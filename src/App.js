@@ -1356,10 +1356,197 @@ function LiqModal({marcaId,ventas,mes,anio,MK,cierres,setCierres,onClose,syncCie
   );
 }
 
+
+// ════════════════════════════════════════════════════════════
+// SISTEMA DE LOGIN — Toscana House
+// Usuarios con contraseña — sesión guardada en localStorage
+// ════════════════════════════════════════════════════════════
+
+// ── Usuarios autorizados ─────────────────────────────────
+// Para agregar usuarios: {usuario, password, nombre, rol}
+// rol: "admin" (acceso total) | "caja" (solo POS y ventas)
+const USUARIOS = [
+  { usuario: "toscana",  password: "casa2024",    nombre: "Toscana House",  rol: "admin" },
+  { usuario: "caja",     password: "caja2024",    nombre: "Vendedor Caja",  rol: "caja"  },
+  { usuario: "tatiana",  password: "toscana2024", nombre: "Tatiana",        rol: "admin" },
+];
+
+function useAuth() {
+  const [user, setUser] = useState(()=>{
+    try { return JSON.parse(localStorage.getItem("th_user")||"null"); } catch { return null; }
+  });
+
+  function login(usuario, password) {
+    const found = USUARIOS.find(u =>
+      u.usuario.toLowerCase() === usuario.toLowerCase() &&
+      u.password === password
+    );
+    if (found) {
+      const session = { ...found, loginAt: Date.now() };
+      localStorage.setItem("th_user", JSON.stringify(session));
+      setUser(session);
+      return { ok: true };
+    }
+    return { ok: false, error: "Usuario o contraseña incorrectos" };
+  }
+
+  function logout() {
+    localStorage.removeItem("th_user");
+    setUser(null);
+  }
+
+  return { user, login, logout };
+}
+
+// Pantalla de Login
+function LoginScreen({ onLogin }) {
+  const [usuario, setUsuario] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError]     = useState("");
+  const [loading, setLoading] = useState(false);
+  const [showPass, setShowPass] = useState(false);
+
+  function handleLogin() {
+    if (!usuario || !password) { setError("Completa todos los campos"); return; }
+    setLoading(true);
+    setError("");
+    setTimeout(() => {
+      const result = onLogin(usuario, password);
+      if (!result.ok) {
+        setError(result.error);
+        setLoading(false);
+      }
+    }, 600);
+  }
+
+  return (
+    <div style={{
+      minHeight:"100vh",
+      background:"linear-gradient(160deg, #F2F7F2 0%, #E8F2E8 50%, #D8EDD8 100%)",
+      display:"flex", flexDirection:"column",
+      alignItems:"center", justifyContent:"center",
+      fontFamily:FONT, padding:24,
+    }}>
+      {/* Logo */}
+      <div style={{marginBottom:40, textAlign:"center"}}>
+        <div style={{fontSize:48, marginBottom:8}}>🏡</div>
+        <div style={{fontSize:28, fontWeight:800, color:"#3D6B3D",
+          fontFamily:"Georgia,serif", letterSpacing:3}}>TOSCANA HOUSE</div>
+        <div style={{fontSize:12, color:"#7A9A7A", letterSpacing:6,
+          fontFamily:"Georgia,serif", marginTop:4}}>CASA DE MODA</div>
+        <div style={{width:80, height:1, background:"#A8C5A0",
+          margin:"12px auto 0"}}/>
+      </div>
+
+      {/* Card login */}
+      <div style={{
+        background:"rgba(255,255,255,0.95)",
+        borderRadius:24, padding:"32px 28px",
+        width:"100%", maxWidth:380,
+        boxShadow:"0 8px 40px rgba(74,107,74,0.15)",
+        border:"1px solid rgba(168,197,160,0.4)",
+      }}>
+        <div style={{fontSize:20, fontWeight:700, color:"#1A2E1A",
+          marginBottom:6, fontFamily:FONT}}>Iniciar sesión</div>
+        <div style={{fontSize:14, color:"#7A9A7A", marginBottom:28, fontFamily:FONT}}>
+          Ingresa tus credenciales para continuar
+        </div>
+
+        {/* Usuario */}
+        <div style={{marginBottom:16}}>
+          <label style={{fontSize:11, fontWeight:700, color:"#4A6B4A",
+            textTransform:"uppercase", letterSpacing:.8, display:"block", marginBottom:6}}>
+            Usuario
+          </label>
+          <input
+            value={usuario}
+            onChange={e=>{setUsuario(e.target.value);setError("");}}
+            onKeyDown={e=>e.key==="Enter"&&handleLogin()}
+            placeholder="tu usuario"
+            autoCapitalize="none"
+            autoCorrect="off"
+            style={{width:"100%", padding:"13px 16px", borderRadius:12,
+              border:`1.5px solid ${error?"#C0504A":"rgba(168,197,160,0.6)"}`,
+              background:"#F7FAF7", fontSize:16, color:"#1A2E1A",
+              outline:"none", fontFamily:FONT, boxSizing:"border-box",
+              WebkitAppearance:"none"}}
+            onFocus={e=>e.target.style.borderColor="#5C8A5C"}
+            onBlur={e=>e.target.style.borderColor=error?"#C0504A":"rgba(168,197,160,0.6)"}
+          />
+        </div>
+
+        {/* Contraseña */}
+        <div style={{marginBottom:24}}>
+          <label style={{fontSize:11, fontWeight:700, color:"#4A6B4A",
+            textTransform:"uppercase", letterSpacing:.8, display:"block", marginBottom:6}}>
+            Contraseña
+          </label>
+          <div style={{position:"relative"}}>
+            <input
+              type={showPass?"text":"password"}
+              value={password}
+              onChange={e=>{setPassword(e.target.value);setError("");}}
+              onKeyDown={e=>e.key==="Enter"&&handleLogin()}
+              placeholder="••••••••"
+              style={{width:"100%", padding:"13px 44px 13px 16px", borderRadius:12,
+                border:`1.5px solid ${error?"#C0504A":"rgba(168,197,160,0.6)"}`,
+                background:"#F7FAF7", fontSize:16, color:"#1A2E1A",
+                outline:"none", fontFamily:FONT, boxSizing:"border-box",
+                WebkitAppearance:"none"}}
+              onFocus={e=>e.target.style.borderColor="#5C8A5C"}
+              onBlur={e=>e.target.style.borderColor=error?"#C0504A":"rgba(168,197,160,0.6)"}
+            />
+            <button onClick={()=>setShowPass(p=>!p)} style={{
+              position:"absolute", right:12, top:"50%",
+              transform:"translateY(-50%)",
+              background:"none", border:"none", cursor:"pointer",
+              fontSize:18, color:"#7A9A7A",
+              WebkitTapHighlightColor:"transparent",
+            }}>{showPass?"🙈":"👁"}</button>
+          </div>
+        </div>
+
+        {/* Error */}
+        {error&&(
+          <div style={{padding:"10px 14px", background:"#FFF0EE",
+            borderRadius:10, border:"1px solid #F4A8A8",
+            color:"#C0504A", fontSize:13, fontFamily:FONT,
+            marginBottom:16, textAlign:"center"}}>
+            {error}
+          </div>
+        )}
+
+        {/* Botón */}
+        <button
+          onClick={handleLogin}
+          disabled={loading}
+          style={{
+            width:"100%", padding:"15px",
+            borderRadius:14, border:"none",
+            background:loading?"#A8C5A0":"linear-gradient(135deg,#5C8A5C,#3D6B3D)",
+            color:"white", fontSize:16, fontWeight:700,
+            cursor:loading?"not-allowed":"pointer",
+            fontFamily:FONT, letterSpacing:.5,
+            transition:"all .2s",
+            WebkitTapHighlightColor:"transparent",
+          }}>
+          {loading?"Verificando…":"Entrar"}
+        </button>
+      </div>
+
+      <div style={{marginTop:24, fontSize:12, color:"#7A9A7A",
+        fontFamily:FONT, textAlign:"center"}}>
+        Toscana House © {new Date().getFullYear()}
+      </div>
+    </div>
+  );
+}
+
 // ══════════════════════════════════════════════════════════
 // APP PRINCIPAL
 // ══════════════════════════════════════════════════════════
 export default function App(){
+  const { user, login, logout } = useAuth();
   const now=new Date();
   const[tab,setTab]         =useState("pos");
   const[inv,setInv]         =useState([]);
@@ -1501,6 +1688,9 @@ export default function App(){
       MozOsxFontSmoothing:"grayscale",
     }}>
 
+      {/* ── LOGIN GATE ── */}
+      {!user ? <LoginScreen onLogin={login}/> : <>
+
       {/* ── LOADING SCREEN ── */}
       {cargando&&(
         <div style={{position:"fixed",inset:0,background:"rgba(242,247,242,0.97)",
@@ -1550,6 +1740,12 @@ export default function App(){
                 color:drive.url?C.green:C.label3,padding:"4px",
                 WebkitTapHighlightColor:"transparent",lineHeight:1,
               }}>☁</button>
+              <button onClick={logout} style={{
+                background:"none",border:"none",fontSize:13,cursor:"pointer",
+                color:C.label3,padding:"4px 8px",fontFamily:FONT,
+                WebkitTapHighlightColor:"transparent",
+                border:`1px solid ${C.sep}`,borderRadius:8,
+              }}>Salir</button>
               <select value={mes} onChange={e=>setMes(Number(e.target.value))}
                 style={{background:"none",border:"none",color:C.gold,fontSize:14,
                   fontFamily:FONT,cursor:"pointer",outline:"none",
@@ -1825,6 +2021,7 @@ export default function App(){
         syncCierre={drive.syncCierre}
       />
     </div>
+    </>}
   );
 }
 
