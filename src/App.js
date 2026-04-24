@@ -2026,6 +2026,80 @@ export default function App(){
 }
 
 // ══════════════════════════════════════════════════════════
+
+// QR Scanner en vivo
+function QRScanner({ onDetect, onClose }) {
+  const videoRef = useRef(null);
+  const canvasRef = useRef(null);
+  const streamRef = useRef(null);
+  const timerRef = useRef(null);
+  const [status, setStatus] = useState("iniciando");
+  const [msg, setMsg] = useState("");
+  useEffect(() => { startCamera(); return () => stopCamera(); }, []);
+  async function startCamera() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+      streamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        videoRef.current.play();
+        setStatus("activo");
+        setMsg("Apunta al codigo QR de la prenda");
+        timerRef.current = setInterval(scanFrame, 400);
+      }
+    } catch(e) { setStatus("error"); setMsg("Permite el acceso a la camara en Ajustes > Safari"); }
+  }
+  function stopCamera() {
+    if (timerRef.current) clearInterval(timerRef.current);
+    if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop());
+  }
+  async function scanFrame() {
+    if (!videoRef.current || !canvasRef.current) return;
+    const v = videoRef.current; const cv = canvasRef.current;
+    if (v.readyState !== v.HAVE_ENOUGH_DATA) return;
+    cv.width = v.videoWidth; cv.height = v.videoHeight;
+    cv.getContext("2d").drawImage(v, 0, 0);
+    if (window.BarcodeDetector) {
+      try {
+        const d = new window.BarcodeDetector({ formats: ["qr_code","code_128","ean_13"] });
+        const codes = await d.detect(cv);
+        if (codes.length > 0) { clearInterval(timerRef.current); stopCamera(); onDetect(codes[0].rawValue); return; }
+      } catch(e) {}
+    }
+    try {
+      const ZX = await loadZXing(); if (!ZX) return;
+      const lum = new ZX.HTMLCanvasElementLuminanceSource(cv);
+      const bmp = new ZX.BinaryBitmap(new ZX.HybridBinarizer(lum));
+      const r = new ZX.MultiFormatReader(); r.setHints(new Map([[ZX.DecodeHintType.TRY_HARDER, true]]));
+      const res = r.decode(bmp);
+      if (res && res.text) { clearInterval(timerRef.current); stopCamera(); onDetect(res.text); }
+    } catch(e) {}
+  }
+  return (
+    <div style={{position:"fixed",inset:0,zIndex:9999,background:"#000",display:"flex",flexDirection:"column"}}>
+      <div style={{padding:"16px 20px",background:"rgba(0,0,0,0.85)",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+        <div>
+          <div style={{fontSize:17,fontWeight:700,color:"#fff",fontFamily:FONT}}>Escanear QR</div>
+          <div style={{fontSize:13,color:"rgba(255,255,255,0.6)",fontFamily:FONT}}>{msg}</div>
+        </div>
+        <button onClick={()=>{stopCamera();onClose();}} style={{background:"rgba(255,255,255,0.2)",border:"none",width:36,height:36,borderRadius:"50%",cursor:"pointer",color:"#fff",fontSize:18}}>X</button>
+      </div>
+      <div style={{flex:1,position:"relative",overflow:"hidden"}}>
+        <video ref={videoRef} playsInline muted autoPlay style={{width:"100%",height:"100%",objectFit:"cover"}}/>
+        <canvas ref={canvasRef} style={{display:"none"}}/>
+        {status==="activo"&&<div style={{position:"absolute",top:"50%",left:"50%",transform:"translate(-50%,-60%)",width:220,height:220,border:"2px solid #4A9B6F",borderRadius:12}}/>}
+        {status==="error"&&<div style={{position:"absolute",inset:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",background:"rgba(0,0,0,0.8)",padding:24,textAlign:"center"}}>
+          <div style={{fontSize:40,marginBottom:12}}>📷</div>
+          <div style={{fontSize:15,color:"#fff",fontFamily:FONT,marginBottom:8}}>Sin acceso a la camara</div>
+          <div style={{fontSize:13,color:"rgba(255,255,255,0.6)",fontFamily:FONT,marginBottom:20}}>{msg}</div>
+          <button onClick={()=>{stopCamera();onClose();}} style={{background:"#4A9B6F",border:"none",borderRadius:12,padding:"12px 24px",color:"#fff",fontSize:15,fontFamily:FONT,cursor:"pointer"}}>Cerrar</button>
+        </div>}
+      </div>
+      <div style={{padding:"14px",background:"rgba(0,0,0,0.85)",textAlign:"center",fontSize:12,color:"rgba(255,255,255,0.4)",fontFamily:FONT}}>El codigo se detecta automaticamente</div>
+    </div>
+  );
+}
+
 // POS — iOS Caja
 // ══════════════════════════════════════════════════════════
 function POS({inv,onVenta}){
@@ -2040,6 +2114,7 @@ function POS({inv,onVenta}){
   const[showPago,setShowPago] =useState(false);
   const[scanStatus,setScanStatus]=useState(null); // null | "leyendo" | "ok" | "notfound"
   const[scanMsg,setScanMsg]   =useState("");
+  const[showScanner,setShowScanner]=useState(false);
   const inputRef=useRef();
   const fileRef=useRef();
 
@@ -2234,7 +2309,12 @@ function POS({inv,onVenta}){
         </div>
       )}
 
-      {/* Escanear Etiqueta */}
+      {showScanner&&(<QRScanner onDetect={(codigo)=>{setShowScanner(false);setScanStatus("ok");const prod=inv.find(i=>i.codigo.toUpperCase()===codigo.toUpperCase());if(prod){add(prod);setScanMsg("Agregado: "+prod.nombre);}else{setBusq(codigo);setScanStatus("notfound");setScanMsg("Codigo: "+codigo+" - buscar manual");}setTimeout(()=>{setScanStatus(null);setScanMsg("");},4000);}} onClose={()=>setShowScanner(false)}/>)}
+      {/* Escanear QR */}
+      <div style={{marginBottom:14}}>
+        <IOSBtn onPress={()=>setShowScanner(true)} variant="fill" full icon="📷">Escanear QR en vivo</IOSBtn>
+        {scanMsg&&<div style={{marginTop:10,padding:"10px 14px",borderRadius:12,fontSize:14,fontFamily:FONT,background:scanStatus==="ok"?"rgba(74,155,111,0.15)":"rgba(200,146,42,0.15)",color:scanStatus==="ok"?C.green:C.amber}}>{scanMsg}</div>}
+      </div>
       <div style={{background:C.bg2,borderRadius:14,padding:"14px 16px",marginBottom:14,
         border:scanStatus==="ok"?`1.5px solid ${C.green}`:scanStatus==="notfound"?`1.5px solid ${C.amber}`:`1px solid ${C.sep}`}}>
         <div style={{fontSize:13,fontWeight:600,color:C.label3,textTransform:"uppercase",
