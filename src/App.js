@@ -1060,6 +1060,8 @@ const TAB_COLORS = {
   marcas:       C.tabMar,
   ventas:       C.tabVen,
   liquidaciones:C.tabLiq,
+  config:       "#7A9A7A",
+  historial:    "#6B8BAE",
 };
 
 function TabBar({tabs, active, onChange}){
@@ -1377,7 +1379,12 @@ function useAuth() {
   });
 
   function login(usuario, password) {
-    const found = USUARIOS.find(u =>
+    // Check localStorage users first, then defaults
+    const listaActual = (() => {
+      try { return JSON.parse(localStorage.getItem("th_usuarios")||"null") || USUARIOS; }
+      catch { return USUARIOS; }
+    })();
+    const found = listaActual.find(u =>
       u.usuario.toLowerCase() === usuario.toLowerCase() &&
       u.password === password
     );
@@ -1671,6 +1678,8 @@ export default function App(){
     {id:"marcas",icon:"◆",label:"Marcas"},
     {id:"ventas",icon:"◈",label:"Ventas"},
     {id:"liquidaciones",icon:"◎",label:"Liquidar"},
+    {id:"historial",icon:"📅",label:"Historial"},
+    {id:"config",icon:"⚙",label:"Config"},
   ];
 
   // Pantallas con vista de detalle (back button)
@@ -1887,6 +1896,16 @@ export default function App(){
               })}
             </div>
           </div>
+        )}
+
+        {/* HISTORIAL */}
+        {tab==="historial" && (
+          <HistorialTab ventas={ventas} inv={inv} cierres={cierres}/>
+        )}
+
+        {/* CONFIG */}
+        {tab==="config" && (
+          <ConfigTab user={user} logout={logout}/>
         )}
       </div>
 
@@ -2900,6 +2919,595 @@ function MarcaDetalle({marcaId,inv,ventas,vMes,mes,anio,MK,cierres,setCierres,ge
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════
+// HISTORIAL TAB — Navegación por mes/año
+// ══════════════════════════════════════════════════════════
+function HistorialTab({ventas, inv, cierres}){
+  const now = new Date();
+  const [mesSel,  setMesSel]  = useState(now.getMonth());
+  const [anioSel, setAnioSel] = useState(now.getFullYear());
+  const [vista,   setVista]   = useState("resumen"); // resumen | marcas | ventas | stock
+
+  const MKSel = mkKey(mesSel, anioSel);
+
+  // Ventas del período seleccionado
+  const ventasPer = useMemo(()=>
+    ventas.filter(v=>v.mk===MKSel),
+  [ventas, MKSel]);
+
+  // Períodos con datos (para el selector)
+  const periodosConDatos = useMemo(()=>{
+    const set = new Set(ventas.map(v=>v.mk));
+    return Array.from(set).sort((a,b)=>b.localeCompare(a)).map(mk=>{
+      const [anio,mes] = mk.split("-");
+      return { mk, mes:Number(mes)-1, anio:Number(anio) };
+    });
+  },[ventas]);
+
+  // Stats del período
+  const totalPer    = ventasPer.reduce((s,v)=>s+v.total,0);
+  const efectivoPer = ventasPer.filter(v=>v.metodoPago==="efectivo").reduce((s,v)=>s+v.total,0);
+  const qrPer       = ventasPer.filter(v=>v.metodoPago==="qr").reduce((s,v)=>s+v.total,0);
+  const tarjetaPer  = ventasPer.filter(v=>v.metodoPago==="tarjeta").reduce((s,v)=>s+v.total,0);
+
+  // Ventas por marca del período
+  const porMarcaPer = useMemo(()=>
+    MARCAS.map(m=>{
+      const total = ventasPer.reduce((s,v)=>s+v.items.filter(i=>i.marcaId===m.id).reduce((ss,i)=>ss+i.subtotal,0),0);
+      const ef    = ventasPer.filter(v=>v.metodoPago==="efectivo").reduce((s,v)=>s+v.items.filter(i=>i.marcaId===m.id).reduce((ss,i)=>ss+i.subtotal,0),0);
+      const qr    = ventasPer.filter(v=>v.metodoPago==="qr").reduce((s,v)=>s+v.items.filter(i=>i.marcaId===m.id).reduce((ss,i)=>ss+i.subtotal,0),0);
+      const tj    = ventasPer.filter(v=>v.metodoPago==="tarjeta").reduce((s,v)=>s+v.items.filter(i=>i.marcaId===m.id).reduce((ss,i)=>ss+i.subtotal,0),0);
+      const txs   = ventasPer.filter(v=>v.items.some(i=>i.marcaId===m.id)).length;
+      return {marca:m, total, ef, qr, tj, txs};
+    }).filter(x=>x.total>0).sort((a,b)=>b.total-a.total)
+  ,[ventasPer]);
+
+  // Años disponibles (entre 2024 y año actual+1)
+  const anios = [];
+  for(let a=2024; a<=now.getFullYear()+1; a++) anios.push(a);
+
+  return (
+    <div>
+      {/* ── SELECTOR MES/AÑO ── */}
+      <div style={{background:C.bg2,borderRadius:16,padding:16,marginBottom:16,
+        border:`1px solid ${C.sep}`}}>
+        <div style={{fontSize:11,fontWeight:700,color:C.label3,textTransform:"uppercase",
+          letterSpacing:.8,marginBottom:12}}>Seleccionar período</div>
+
+        {/* Año */}
+        <div style={{display:"flex",gap:8,marginBottom:12,overflowX:"auto",
+          scrollbarWidth:"none",WebkitOverflowScrolling:"touch",paddingBottom:4}}>
+          {anios.map(a=>(
+            <button key={a} onClick={()=>setAnioSel(a)} style={{
+              flexShrink:0,padding:"8px 18px",borderRadius:20,
+              border:`2px solid ${anioSel===a?C.gold:C.sep}`,
+              background:anioSel===a?`${C.gold}20`:C.bg3,
+              color:anioSel===a?C.gold:C.label2,
+              fontSize:15,fontWeight:anioSel===a?700:400,
+              fontFamily:FONT,cursor:"pointer",
+              WebkitTapHighlightColor:"transparent",
+            }}>{a}</button>
+          ))}
+        </div>
+
+        {/* Mes — grid 3x4 */}
+        <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:6}}>
+          {MESES.map((m,i)=>{
+            const mk = mkKey(i,anioSel);
+            const tieneDatos = ventas.some(v=>v.mk===mk);
+            const esSel = mesSel===i && anioSel===anioSel;
+            return (
+              <button key={i} onClick={()=>setMesSel(i)} style={{
+                padding:"10px 4px",borderRadius:10,
+                border:`2px solid ${mesSel===i?C.gold:tieneDatos?C.sep+"88":C.sep}`,
+                background:mesSel===i?`${C.gold}20`:tieneDatos?C.bg3:"transparent",
+                color:mesSel===i?C.gold:tieneDatos?C.label:C.label3,
+                fontSize:12,fontWeight:mesSel===i?700:400,
+                fontFamily:FONT,cursor:"pointer",textAlign:"center",
+                WebkitTapHighlightColor:"transparent",
+                opacity:tieneDatos||mesSel===i?1:.5,
+                position:"relative",
+              }}>
+                {m.slice(0,3)}
+                {tieneDatos&&mesSel!==i&&(
+                  <div style={{position:"absolute",top:3,right:5,width:5,height:5,
+                    borderRadius:"50%",background:C.green}}/>
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Resumen rápido del período */}
+        <div style={{marginTop:12,padding:"10px 12px",background:C.bg3,borderRadius:10,
+          display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <span style={{fontSize:14,fontWeight:700,color:C.label,fontFamily:FONT}}>
+            {MESES[mesSel]} {anioSel}
+          </span>
+          <span style={{fontSize:14,fontWeight:800,color:totalPer>0?C.gold:C.label3,fontFamily:FONT}}>
+            {totalPer>0?$(totalPer):"Sin ventas"}
+          </span>
+        </div>
+      </div>
+
+      {/* ── SELECTOR VISTA ── */}
+      <div style={{marginBottom:16}}>
+        <SegControl
+          options={[
+            {value:"resumen",label:"Resumen"},
+            {value:"marcas", label:"Marcas"},
+            {value:"ventas", label:"Ventas"},
+            {value:"stock",  label:"Stock"},
+          ]}
+          value={vista} onChange={setVista}
+        />
+      </div>
+
+      {/* ── RESUMEN ── */}
+      {vista==="resumen"&&(
+        <div>
+          {ventasPer.length===0
+            ? <EmptyState icon="📅" title={`Sin datos en ${MESES[mesSel]} ${anioSel}`}
+                sub="Los puntos verdes indican meses con ventas"/>
+            : <>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:16}}>
+                <div style={{gridColumn:"1/-1"}}>
+                  <StatCard icon="💰" label={`Total ${MESES[mesSel]} ${anioSel}`}
+                    value={$(totalPer)} sub={`${ventasPer.length} transacciones · ${porMarcaPer.length} marcas`}/>
+                </div>
+                <StatCard icon="💵" label="Efectivo" value={$(efectivoPer)} color="#4A9B6F" small/>
+                <StatCard icon="📱" label="QR"       value={$(qrPer)}       color="#5B8DB8" small/>
+                <StatCard icon="💳" label="Tarjeta"  value={$(tarjetaPer)}  color="#C8922A" small/>
+                <StatCard icon="🏷" label="Comisión 10%" value={$(totalPer*.1)} color={C.red} small/>
+                <StatCard icon="✅" label="Neto marcas"  value={$(totalPer*.9)} color={C.green} small/>
+              </div>
+
+              {/* Cierre status */}
+              <div style={{background:C.bg2,borderRadius:14,padding:"14px 16px",marginBottom:16}}>
+                <div style={{fontSize:12,fontWeight:700,color:C.label3,textTransform:"uppercase",
+                  letterSpacing:.6,marginBottom:10}}>Estado de cierres</div>
+                <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+                  {MARCAS.filter(m=>ventasPer.some(v=>v.items.some(i=>i.marcaId===m.id))).map(m=>{
+                    const cerrado = cierres[`${MKSel}-${m.id}`]?.cerrado;
+                    return (
+                      <div key={m.id} style={{display:"flex",alignItems:"center",gap:5,
+                        padding:"4px 10px",borderRadius:20,
+                        background:cerrado?`${C.green}15`:`${C.amber}15`,
+                        border:`1px solid ${cerrado?C.green:C.amber}30`}}>
+                        <span style={{fontSize:13}}>{m.emoji}</span>
+                        <span style={{fontSize:12,fontFamily:FONT,
+                          color:cerrado?C.green:C.amber}}>{m.nombre}</span>
+                        <span style={{fontSize:11}}>{cerrado?"✓":"⏳"}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </>
+          }
+        </div>
+      )}
+
+      {/* ── POR MARCA ── */}
+      {vista==="marcas"&&(
+        <div>
+          {porMarcaPer.length===0
+            ? <EmptyState icon="🏷" title="Sin ventas por marca" sub={`${MESES[mesSel]} ${anioSel}`}/>
+            : porMarcaPer.map((x,i)=>{
+                const maxT = Math.max(...porMarcaPer.map(p=>p.total),1);
+                return (
+                  <div key={x.marca.id} style={{
+                    background:C.bg2,
+                    borderRadius:i===0?"16px 16px 4px 4px":i===porMarcaPer.length-1?"4px 4px 16px 16px":"4px",
+                    borderBottom:i<porMarcaPer.length-1?`1px solid ${C.sep}`:"",
+                    padding:"14px 16px",
+                    borderLeft:`4px solid ${x.marca.color}`,
+                  }}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+                      <div style={{display:"flex",alignItems:"center",gap:10}}>
+                        <span style={{fontSize:20}}>{x.marca.emoji}</span>
+                        <div>
+                          <div style={{fontSize:15,fontWeight:700,color:C.label,fontFamily:FONT}}>{x.marca.nombre}</div>
+                          <div style={{fontSize:12,color:C.label3,fontFamily:FONT}}>{x.txs} venta{x.txs!==1?"s":""}</div>
+                        </div>
+                      </div>
+                      <div style={{textAlign:"right"}}>
+                        <div style={{fontSize:18,fontWeight:800,color:x.marca.color,fontFamily:FONT}}>{$(x.total)}</div>
+                        <div style={{fontSize:11,color:C.green,fontFamily:FONT}}>Neto: {$(x.total*.9)}</div>
+                      </div>
+                    </div>
+                    <div style={{background:"rgba(0,0,0,0.06)",borderRadius:4,height:5,marginBottom:10}}>
+                      <div style={{width:`${(x.total/maxT)*100}%`,background:x.marca.color,height:5,borderRadius:4}}/>
+                    </div>
+                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6}}>
+                      {[["💵",x.ef,"#4A9B6F"],["📱",x.qr,"#5B8DB8"],["💳",x.tj,"#C8922A"]].map(([icon,val,color])=>(
+                        <div key={icon} style={{padding:"7px",background:`${color}10`,borderRadius:8,textAlign:"center",
+                          opacity:val>0?1:.4}}>
+                          <div style={{fontSize:13}}>{icon}</div>
+                          <div style={{fontSize:12,fontWeight:700,color,fontFamily:FONT}}>{val>0?$(val):"—"}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })
+          }
+        </div>
+      )}
+
+      {/* ── VENTAS DETALLE ── */}
+      {vista==="ventas"&&(
+        <div>
+          {ventasPer.length===0
+            ? <EmptyState icon="📊" title="Sin ventas" sub={`${MESES[mesSel]} ${anioSel}`}/>
+            : [...ventasPer].reverse().map(v=>{
+                const pg=PAGOS.find(p=>p.id===v.metodoPago);
+                return (
+                  <div key={v.id} style={{background:C.bg2,borderRadius:14,padding:"14px 16px",marginBottom:10}}>
+                    <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
+                      <div>
+                        <span style={{fontFamily:"monospace",fontSize:12,color:C.gold}}>{v.id}</span>
+                        <div style={{fontSize:12,color:C.label3,fontFamily:FONT}}>{v.fecha} {v.hora}</div>
+                      </div>
+                      <div style={{display:"flex",alignItems:"center",gap:8}}>
+                        <Chip color={pg?.color||C.green}>{pg?.icon} {pg?.label}</Chip>
+                        <span style={{fontSize:17,fontWeight:800,color:C.gold,fontFamily:FONT}}>{$(v.total)}</span>
+                      </div>
+                    </div>
+                    {v.items.map((it,ii)=>{
+                      const m=MARCAS.find(x=>x.id===it.marcaId);
+                      return (
+                        <div key={ii} style={{fontSize:13,color:C.label2,fontFamily:FONT,
+                          display:"flex",alignItems:"center",gap:6,marginBottom:3}}>
+                          <div style={{width:6,height:6,borderRadius:"50%",background:m?.color,flexShrink:0}}/>
+                          {it.nombre} ×{it.cantidad} = {$(it.subtotal)}
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })
+          }
+        </div>
+      )}
+
+      {/* ── STOCK ── */}
+      {vista==="stock"&&(
+        <div>
+          <div style={{fontSize:12,color:C.label3,fontFamily:FONT,marginBottom:12}}>
+            Inventario registrado — estado actual
+          </div>
+          {inv.length===0
+            ? <EmptyState icon="📦" title="Sin productos en inventario"/>
+            : MARCAS.map(m=>{
+                const prods=inv.filter(i=>i.marcaId===m.id);
+                if(!prods.length) return null;
+                const stockTotal=prods.reduce((s,p)=>s+p.stock,0);
+                const vendTotal=prods.reduce((s,p)=>s+(p.stockInicial-p.stock),0);
+                return (
+                  <div key={m.id} style={{background:C.bg2,borderRadius:14,
+                    padding:"14px 16px",marginBottom:10,borderLeft:`4px solid ${m.color}`}}>
+                    <div style={{display:"flex",justifyContent:"space-between",
+                      alignItems:"center",marginBottom:10}}>
+                      <div style={{display:"flex",alignItems:"center",gap:8}}>
+                        <span style={{fontSize:18}}>{m.emoji}</span>
+                        <span style={{fontSize:15,fontWeight:700,color:C.label,fontFamily:FONT}}>{m.nombre}</span>
+                      </div>
+                      <div style={{textAlign:"right"}}>
+                        <div style={{fontSize:13,color:C.green,fontFamily:FONT}}>{stockTotal} en stock</div>
+                        <div style={{fontSize:12,color:C.blue,fontFamily:FONT}}>{vendTotal} vendidas</div>
+                      </div>
+                    </div>
+                    {prods.map(p=>(
+                      <div key={p.id} style={{display:"flex",justifyContent:"space-between",
+                        alignItems:"center",padding:"8px 0",
+                        borderTop:`1px solid ${C.sep}`}}>
+                        <div>
+                          <div style={{fontSize:13,color:C.label,fontFamily:FONT}}>{p.nombre}</div>
+                          <span style={{fontFamily:"monospace",fontSize:10,color:C.gold,
+                            background:`${C.gold}18`,padding:"1px 6px",borderRadius:4}}>{p.codigo}</span>
+                        </div>
+                        <div style={{textAlign:"right"}}>
+                          <div style={{fontSize:14,fontWeight:700,
+                            color:p.stock===0?C.red:p.stock<3?C.amber:C.green,fontFamily:FONT}}>
+                            {p.stock} uds
+                          </div>
+                          <div style={{fontSize:11,color:C.label3,fontFamily:FONT}}>{$(p.precio)}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })
+          }
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════
+// CONFIG TAB — Gestión de usuarios y contraseñas
+// ══════════════════════════════════════════════════════════
+function ConfigTab({user, logout}){
+  const [subTab, setSubTab] = useState("cuenta");
+  // Usuarios guardados en localStorage (sobre los defaults)
+  const [usuarios, setUsuarios] = useState(()=>{
+    try { return JSON.parse(localStorage.getItem("th_usuarios")||"null") || USUARIOS; }
+    catch { return USUARIOS; }
+  });
+  function guardarUsuarios(u){
+    setUsuarios(u);
+    localStorage.setItem("th_usuarios", JSON.stringify(u));
+  }
+
+  return (
+    <div>
+      {/* Header */}
+      <div style={{marginBottom:20}}>
+        <h2 style={{margin:0,fontSize:22,fontWeight:800,color:C.label,fontFamily:FONT}}>Configuración</h2>
+        <p style={{margin:"4px 0 0",color:C.label3,fontFamily:FONT,fontSize:13}}>
+          Sesión activa: <strong style={{color:C.gold}}>{user.nombre}</strong> · {user.rol}
+        </p>
+      </div>
+
+      {/* Sub tabs */}
+      <div style={{marginBottom:20}}>
+        <SegControl
+          options={[
+            {value:"cuenta",  label:"Mi cuenta"},
+            {value:"usuarios",label:"Usuarios"},
+            {value:"sistema", label:"Sistema"},
+          ]}
+          value={subTab} onChange={setSubTab}
+        />
+      </div>
+
+      {/* ── MI CUENTA ── */}
+      {subTab==="cuenta" && <CambiarContrasena user={user} usuarios={usuarios} onGuardar={guardarUsuarios}/>}
+
+      {/* ── USUARIOS ── */}
+      {subTab==="usuarios" && <GestionUsuarios user={user} usuarios={usuarios} onGuardar={guardarUsuarios}/>}
+
+      {/* ── SISTEMA ── */}
+      {subTab==="sistema" && (
+        <div>
+          {/* Info sistema */}
+          <div style={{background:C.bg2,borderRadius:16,overflow:"hidden",marginBottom:16}}>
+            {[
+              ["Versión","Toscana House v3.0"],
+              ["Base de datos","Supabase (nube)"],
+              ["Usuario activo",user.nombre],
+              ["Rol",user.rol==="admin"?"Administrador":"Cajero"],
+            ].map(([k,v],i,arr)=>(
+              <div key={k} style={{display:"flex",justifyContent:"space-between",
+                padding:"14px 16px",borderBottom:i<arr.length-1?`1px solid ${C.sep}`:""}}>
+                <span style={{fontSize:15,color:C.label2,fontFamily:FONT}}>{k}</span>
+                <span style={{fontSize:15,color:C.label,fontFamily:FONT,fontWeight:500}}>{v}</span>
+              </div>
+            ))}
+          </div>
+
+          {/* Cerrar sesión */}
+          <IOSBtn onPress={logout} variant="danger" full icon="🚪">
+            Cerrar sesión
+          </IOSBtn>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Cambiar contraseña ────────────────────────────────────
+function CambiarContrasena({user, usuarios, onGuardar}){
+  const [passActual,  setPassActual]  = useState("");
+  const [passNueva,   setPassNueva]   = useState("");
+  const [passConfirm, setPassConfirm] = useState("");
+  const [msg, setMsg] = useState(null);
+  const [show, setShow] = useState(false);
+
+  function cambiar(){
+    setMsg(null);
+    const u = usuarios.find(x=>x.usuario===user.usuario);
+    if (!u) { setMsg({ok:false,txt:"Usuario no encontrado"}); return; }
+    if (u.password !== passActual) { setMsg({ok:false,txt:"Contraseña actual incorrecta"}); return; }
+    if (passNueva.length < 6) { setMsg({ok:false,txt:"La nueva contraseña debe tener al menos 6 caracteres"}); return; }
+    if (passNueva !== passConfirm) { setMsg({ok:false,txt:"Las contraseñas no coinciden"}); return; }
+    const nuevos = usuarios.map(x=>x.usuario===user.usuario?{...x,password:passNueva}:x);
+    onGuardar(nuevos);
+    setMsg({ok:true,txt:"✓ Contraseña actualizada correctamente"});
+    setPassActual(""); setPassNueva(""); setPassConfirm("");
+  }
+
+  return (
+    <div>
+      <div style={{background:C.bg2,borderRadius:16,padding:16,marginBottom:16,
+        border:`1px solid ${C.sep}`}}>
+        <div style={{display:"flex",alignItems:"center",gap:14,marginBottom:16}}>
+          <div style={{width:48,height:48,borderRadius:"50%",
+            background:`${C.gold}20`,display:"flex",alignItems:"center",
+            justifyContent:"center",fontSize:22}}>👤</div>
+          <div>
+            <div style={{fontSize:17,fontWeight:700,color:C.label,fontFamily:FONT}}>{user.nombre}</div>
+            <div style={{fontSize:13,color:C.label3,fontFamily:FONT}}>@{user.usuario}</div>
+          </div>
+        </div>
+      </div>
+
+      <div style={{fontSize:13,fontWeight:700,color:C.label3,textTransform:"uppercase",
+        letterSpacing:.8,marginBottom:12}}>Cambiar contraseña</div>
+
+      <IOSInput label="Contraseña actual" type={show?"text":"password"}
+        value={passActual} onChange={e=>setPassActual(e.target.value)} placeholder="••••••••"/>
+      <IOSInput label="Nueva contraseña" type={show?"text":"password"}
+        value={passNueva} onChange={e=>setPassNueva(e.target.value)} placeholder="Mínimo 6 caracteres"/>
+      <IOSInput label="Confirmar nueva contraseña" type={show?"text":"password"}
+        value={passConfirm} onChange={e=>setPassConfirm(e.target.value)} placeholder="Repetir contraseña"/>
+
+      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:16}}>
+        <input type="checkbox" id="showPass" checked={show} onChange={e=>setShow(e.target.checked)}/>
+        <label htmlFor="showPass" style={{fontSize:13,color:C.label3,fontFamily:FONT,cursor:"pointer"}}>
+          Mostrar contraseñas
+        </label>
+      </div>
+
+      {msg&&(
+        <div style={{padding:"12px 14px",borderRadius:12,marginBottom:12,
+          background:msg.ok?`${C.green}15`:`${C.red}15`,
+          border:`1px solid ${msg.ok?C.green:C.red}40`,
+          color:msg.ok?C.green:C.red,fontSize:14,fontFamily:FONT}}>{msg.txt}</div>
+      )}
+
+      <IOSBtn onPress={cambiar} variant="primary" full icon="🔒">
+        Actualizar contraseña
+      </IOSBtn>
+    </div>
+  );
+}
+
+// ── Gestión de usuarios ───────────────────────────────────
+function GestionUsuarios({user, usuarios, onGuardar}){
+  const [modo,     setModo]    = useState(null); // null | "nuevo" | "editar"
+  const [editUser, setEditUser]= useState(null);
+  const [fUser,    setFUser]   = useState({usuario:"",password:"",nombre:"",rol:"caja"});
+  const [msg,      setMsg]     = useState(null);
+
+  if (user.rol !== "admin") {
+    return (
+      <div style={{textAlign:"center",padding:"48px 20px",color:C.label3}}>
+        <div style={{fontSize:40,marginBottom:12,opacity:.4}}>🔒</div>
+        <div style={{fontSize:16,fontWeight:600,color:C.label2,fontFamily:FONT}}>
+          Solo administradores
+        </div>
+        <div style={{fontSize:13,color:C.label3,fontFamily:FONT,marginTop:6}}>
+          Tu cuenta no tiene permisos para gestionar usuarios
+        </div>
+      </div>
+    );
+  }
+
+  function guardar(){
+    setMsg(null);
+    if(!fUser.usuario||!fUser.password||!fUser.nombre){setMsg({ok:false,txt:"Completa todos los campos"});return;}
+    if(fUser.password.length<6){setMsg({ok:false,txt:"La contraseña debe tener al menos 6 caracteres"});return;}
+    if(modo==="nuevo"){
+      if(usuarios.find(u=>u.usuario===fUser.usuario)){setMsg({ok:false,txt:"Ese usuario ya existe"});return;}
+      onGuardar([...usuarios,{...fUser}]);
+    } else {
+      onGuardar(usuarios.map(u=>u.usuario===editUser?{...u,...fUser}:u));
+    }
+    setMsg({ok:true,txt:`✓ Usuario ${modo==="nuevo"?"creado":"actualizado"}`});
+    setTimeout(()=>{setModo(null);setMsg(null);},1500);
+  }
+
+  function eliminar(usr){
+    if(usr===user.usuario){setMsg({ok:false,txt:"No puedes eliminar tu propio usuario"});return;}
+    if(!window.confirm(`¿Eliminar usuario "${usr}"?`)) return;
+    onGuardar(usuarios.filter(u=>u.usuario!==usr));
+  }
+
+  if(modo){
+    return (
+      <div>
+        <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:20}}>
+          <IOSBtn onPress={()=>{setModo(null);setMsg(null);}} variant="fill" small>← Volver</IOSBtn>
+          <span style={{fontSize:17,fontWeight:700,color:C.label,fontFamily:FONT}}>
+            {modo==="nuevo"?"Nuevo usuario":"Editar usuario"}
+          </span>
+        </div>
+        <IOSInput label="Nombre completo" value={fUser.nombre}
+          onChange={e=>setFUser(p=>({...p,nombre:e.target.value}))} placeholder="Ej: María García"/>
+        <IOSInput label="Usuario (para login)" value={fUser.usuario}
+          onChange={e=>setFUser(p=>({...p,usuario:e.target.value.toLowerCase().replace(/ /g,"")}))}
+          placeholder="Ej: maria" autoCapitalize="none"/>
+        <IOSInput label="Contraseña" type="password" value={fUser.password}
+          onChange={e=>setFUser(p=>({...p,password:e.target.value}))} placeholder="Mínimo 6 caracteres"/>
+        <div style={{marginBottom:12}}>
+          <div style={{fontSize:11,fontWeight:700,color:C.label2,textTransform:"uppercase",
+            letterSpacing:.8,marginBottom:8}}>Rol</div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+            {[["admin","👑 Admin","Acceso total"],["caja","🛒 Cajero","Solo POS y ventas"]].map(([r,label,desc])=>(
+              <button key={r} onClick={()=>setFUser(p=>({...p,rol:r}))} style={{
+                padding:"12px",borderRadius:12,cursor:"pointer",fontFamily:FONT,
+                border:`2px solid ${fUser.rol===r?C.gold:C.sep}`,
+                background:fUser.rol===r?`${C.gold}15`:C.bg2,
+                textAlign:"left",
+              }}>
+                <div style={{fontSize:14,fontWeight:700,color:fUser.rol===r?C.gold:C.label}}>{label}</div>
+                <div style={{fontSize:11,color:C.label3,marginTop:2}}>{desc}</div>
+              </button>
+            ))}
+          </div>
+        </div>
+        {msg&&(
+          <div style={{padding:"12px 14px",borderRadius:12,marginBottom:12,
+            background:msg.ok?`${C.green}15`:`${C.red}15`,
+            border:`1px solid ${msg.ok?C.green:C.red}40`,
+            color:msg.ok?C.green:C.red,fontSize:14,fontFamily:FONT}}>{msg.txt}</div>
+        )}
+        <IOSBtn onPress={guardar} variant="primary" full icon="💾">
+          {modo==="nuevo"?"Crear usuario":"Guardar cambios"}
+        </IOSBtn>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      {msg&&(
+        <div style={{padding:"12px 14px",borderRadius:12,marginBottom:12,
+          background:msg.ok?`${C.green}15`:`${C.red}15`,
+          border:`1px solid ${msg.ok?C.green:C.red}40`,
+          color:msg.ok?C.green:C.red,fontSize:14,fontFamily:FONT}}>{msg.txt}</div>
+      )}
+
+      {/* Lista usuarios */}
+      <div style={{display:"flex",flexDirection:"column",gap:2,marginBottom:16}}>
+        {usuarios.map((u,i)=>(
+          <div key={u.usuario} style={{
+            background:C.bg2,
+            borderRadius:i===0?"14px 14px 2px 2px":i===usuarios.length-1?"2px 2px 14px 14px":"2px",
+            padding:"14px 16px",
+            borderBottom:i<usuarios.length-1?`1px solid ${C.sep}`:"",
+            display:"flex",alignItems:"center",gap:12,
+          }}>
+            <div style={{width:40,height:40,borderRadius:"50%",
+              background:u.rol==="admin"?`${C.gold}20`:`${C.green}20`,
+              display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>
+              {u.rol==="admin"?"👑":"🛒"}
+            </div>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontSize:15,fontWeight:600,color:C.label,fontFamily:FONT}}>{u.nombre}</div>
+              <div style={{fontSize:13,color:C.label3,fontFamily:FONT}}>
+                @{u.usuario} · {u.rol==="admin"?"Administrador":"Cajero"}
+              </div>
+            </div>
+            <div style={{display:"flex",gap:8,flexShrink:0}}>
+              <button onClick={()=>{setEditUser(u.usuario);setFUser({...u});setModo("editar");}} style={{
+                background:`${C.gold}15`,border:`1px solid ${C.gold}30`,
+                borderRadius:8,padding:"6px 12px",color:C.gold,
+                fontSize:12,fontFamily:FONT,fontWeight:600,cursor:"pointer",
+              }}>Editar</button>
+              {u.usuario!==user.usuario&&(
+                <button onClick={()=>eliminar(u.usuario)} style={{
+                  background:`${C.red}10`,border:`1px solid ${C.red}30`,
+                  borderRadius:8,padding:"6px 12px",color:C.red,
+                  fontSize:12,fontFamily:FONT,fontWeight:600,cursor:"pointer",
+                }}>Eliminar</button>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <IOSBtn onPress={()=>{setFUser({usuario:"",password:"",nombre:"",rol:"caja"});setModo("nuevo");}}
+        variant="primary" full icon="+ ">
+        Agregar nuevo usuario
+      </IOSBtn>
     </div>
   );
 }
