@@ -2464,10 +2464,10 @@ function POS({inv,onVenta}){
 // SHEET RECIBIR PRODUCTO — con generación de código de barra
 // ══════════════════════════════════════════════════════════
 function SheetRecibir({open, onClose, inv, onAdd, fInv, setFInv}){
-  const [scanInvMsg, setScanInvMsg] = useState("");
-  const [scanInvStatus, setScanInvStatus] = useState(null);
-  const [barcodeReady, setBarcodeReady] = useState(false);
-  const scanInvRef = useRef(null);
+  const[scanInvMsg,setScanInvMsg]=useState("");
+  const[scanInvStatus,setScanInvStatus]=useState(null);
+  const[barcodeReady,setBarcodeReady]=useState(false);
+  const scanInvRef=useRef(null);
   
   const codigoGenerado = fInv.marcaId && fInv.nombre
     ? genCod(Number(fInv.marcaId), fInv.nombre, inv.length+1)
