@@ -3422,8 +3422,8 @@ function HistorialTab({ventas, inv, cierres}){
 function ConfigTab({user, logout}){
   const[subTab,setSubTab]=useState("cuenta");
   // Usuarios guardados en localStorage (sobre los defaults)
-  const[usuarios,setUsuarios]=useState(()=>{ }
-    catch { return USUARIOS; }
+  const[usuarios,setUsuarios]=useState(()=>{
+    try{return JSON.parse(localStorage.getItem("th_usuarios")||"null")||USUARIOS;}catch{return USUARIOS;}
   });
   function guardarUsuarios(u){
     setUsuarios(u);
