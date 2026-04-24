@@ -1,360 +1,6 @@
 import { useState, useMemo, useRef, useCallback, useEffect } from "react";
 
 // ════════════════════════════════════════════════════════════
-// SUPABASE — Base de datos en la nube
-// Proyecto: toscana house | uqphxiixdulqscbfyxhz
-// ════════════════════════════════════════════════════════════
-const SUPA_URL  = "https://uqphxiixdulqscbfyxhz.supabase.co";
-const SUPA_KEY  = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVxcGh4aWl4ZHVscXNjYmZ5eGh6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcwMzc0NjQsImV4cCI6MjA5MjYxMzQ2NH0.U1EIf4JWqfrvga7CApClLl7nzBuFoPpD8BlicxvfB-w";
-
-// Carga Supabase SDK desde CDN
-let _supabase = null;
-async function getSupabase() {
-  if (_supabase) return _supabase;
-  if (window.supabase) {
-    _supabase = window.supabase.createClient(SUPA_URL, SUPA_KEY);
-    return _supabase;
-  }
-  await new Promise((res, rej) => {
-    const s = document.createElement("script");
-    s.src = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js";
-    s.onload = res; s.onerror = rej;
-    document.head.appendChild(s);
-  });
-  _supabase = window.supabase.createClient(SUPA_URL, SUPA_KEY);
-  return _supabase;
-}
-
-// ── Funciones de sincronización ──────────────────────────
-async function sbGuardarProducto(prod) {
-  try {
-    const db = await getSupabase();
-    await db.from("inventario").upsert({
-      id: prod.id, codigo: prod.codigo, marca_id: prod.marcaId,
-      marca_nombre: prod.marcaNombre, nombre: prod.nombre,
-      categoria: prod.categoria, precio: prod.precio,
-      stock: prod.stock, stock_inicial: prod.stockInicial, fecha: prod.fecha
-    });
-  } catch(e) { console.warn("Supabase save prod:", e.message); }
-}
-
-async function sbActualizarStock(prodId, nuevoStock) {
-  try {
-    const db = await getSupabase();
-    await db.from("inventario").update({ stock: nuevoStock }).eq("id", prodId);
-  } catch(e) { console.warn("Supabase update stock:", e.message); }
-}
-
-async function sbGuardarVenta(venta) {
-  try {
-    const db = await getSupabase();
-    await db.from("ventas").upsert({
-      id: venta.id, fecha: venta.fecha, hora: venta.hora,
-      mk: venta.mk, mes: venta.mes, anio: venta.anio,
-      total: venta.total, subtotal: venta.subtotal,
-      desc_pct: venta.descPct||0, metodo_pago: venta.metodoPago,
-      vendedor: venta.vendedor, etiqueta_img: venta.etiquetaImg||null
-    });
-    const items = venta.items.map(it => ({
-      venta_id: venta.id, prod_id: it.prodId, codigo: it.codigo,
-      nombre: it.nombre, marca_id: it.marcaId, marca_nombre: it.marcaNombre,
-      cantidad: it.cantidad, precio_unit: it.precioUnit, subtotal: it.subtotal
-    }));
-    await db.from("venta_items").insert(items);
-  } catch(e) { console.warn("Supabase save venta:", e.message); }
-}
-
-async function sbGuardarCierre(key, data) {
-  try {
-    const db = await getSupabase();
-    await db.from("cierres").upsert({ id: key, ...data });
-  } catch(e) { console.warn("Supabase save cierre:", e.message); }
-}
-
-async function sbCargarTodo() {
-  try {
-    const db = await getSupabase();
-    const [{ data: inv }, { data: ventas }, { data: items }, { data: cierres }] = await Promise.all([
-      db.from("inventario").select("*").order("created_at"),
-      db.from("ventas").select("*").order("created_at"),
-      db.from("venta_items").select("*"),
-      db.from("cierres").select("*"),
-    ]);
-
-    // Reconstruir ventas con sus items
-    const ventasCompletas = (ventas||[]).map(v => ({
-      id: v.id, fecha: v.fecha, hora: v.hora, mk: v.mk,
-      mes: v.mes, anio: v.anio, total: v.total, subtotal: v.subtotal,
-      descPct: v.desc_pct, metodoPago: v.metodo_pago,
-      vendedor: v.vendedor, etiquetaImg: v.etiqueta_img,
-      items: (items||[]).filter(i=>i.venta_id===v.id).map(i=>({
-        prodId: i.prod_id, codigo: i.codigo, nombre: i.nombre,
-        marcaId: i.marca_id, marcaNombre: i.marca_nombre,
-        cantidad: i.cantidad, precioUnit: i.precio_unit, subtotal: i.subtotal
-      }))
-    }));
-
-    // Reconstruir inventario
-    const invCompleto = (inv||[]).map(p => ({
-      id: p.id, codigo: p.codigo, marcaId: p.marca_id,
-      marcaNombre: p.marca_nombre, nombre: p.nombre,
-      categoria: p.categoria, precio: p.precio,
-      stock: p.stock, stockInicial: p.stock_inicial, fecha: p.fecha
-    }));
-
-    // Reconstruir cierres
-    const cierresObj = {};
-    (cierres||[]).forEach(c => { cierresObj[c.id] = { cerrado: c.cerrado, fecha: c.fecha, mk: c.mk }; });
-
-    return { inv: invCompleto, ventas: ventasCompletas, cierres: cierresObj };
-  } catch(e) {
-    console.warn("Supabase load error:", e.message);
-    return null;
-  }
-}
-
-// Hook de estado de conexión Supabase
-function useSupabaseStatus() {
-  const [status, setStatus] = useState("connecting"); // connecting | ok | error
-  useEffect(() => {
-    getSupabase()
-      .then(db => db.from("inventario").select("id").limit(1))
-      .then(() => setStatus("ok"))
-      .catch(() => setStatus("error"));
-  }, []);
-  return status;
-}
-
-
-// ════════════════════════════════════════════════════════════
-// MOTOR DE CÓDIGOS DE BARRA — JsBarcode + ZXing Scanner
-// ════════════════════════════════════════════════════════════
-
-// Carga JsBarcode desde CDN (genera SVG de código de barras)
-let _JsBarcodeLoaded = false;
-function loadJsBarcode() {
-  return new Promise(res => {
-    if (window.JsBarcode || _JsBarcodeLoaded) { res(true); return; }
-    const s = document.createElement("script");
-    s.src = "https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.5/JsBarcode.all.min.js";
-    s.onload = () => { _JsBarcodeLoaded = true; res(true); };
-    s.onerror = () => res(false);
-    document.head.appendChild(s);
-  });
-}
-
-// Carga ZXing para leer códigos desde imagen
-let _ZXingLoaded = false;
-let _ZXingLib = null;
-function loadZXing() {
-  return new Promise(res => {
-    if (_ZXingLib) { res(_ZXingLib); return; }
-    const s = document.createElement("script");
-    s.src = "https://unpkg.com/@zxing/library@0.19.1/umd/index.min.js";
-    s.onload = () => { _ZXingLib = window.ZXing; res(window.ZXing); };
-    s.onerror = () => res(null);
-    document.head.appendChild(s);
-  });
-}
-
-// Lee código de barras/QR desde un archivo de imagen
-async function leerCodigoDeImagen(file) {
-  try {
-    const ZXing = await loadZXing();
-    if (!ZXing) return null;
-    const img = new Image();
-    const url = URL.createObjectURL(file);
-    await new Promise((res, rej) => { img.onload = res; img.onerror = rej; img.src = url; });
-    const canvas = document.createElement("canvas");
-    canvas.width = img.width; canvas.height = img.height;
-    canvas.getContext("2d").drawImage(img, 0, 0);
-    URL.revokeObjectURL(url);
-    const hints = new Map();
-    const formats = [
-      ZXing.BarcodeFormat.CODE_128, ZXing.BarcodeFormat.CODE_39,
-      ZXing.BarcodeFormat.EAN_13,   ZXing.BarcodeFormat.EAN_8,
-      ZXing.BarcodeFormat.QR_CODE,  ZXing.BarcodeFormat.DATA_MATRIX,
-      ZXing.BarcodeFormat.ITF,      ZXing.BarcodeFormat.UPC_A,
-    ];
-    hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, formats);
-    hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
-    const reader = new ZXing.MultiFormatReader();
-    reader.setHints(hints);
-    const luminance = new ZXing.HTMLCanvasElementLuminanceSource(canvas);
-    const binaryBitmap = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(luminance));
-    const result = reader.decode(binaryBitmap);
-    return result?.text || null;
-  } catch (e) {
-    // Intento con rotaciones si falla el primero
-    return null;
-  }
-}
-
-// Genera SVG de código de barras Code128
-async function generarSVGBarcode(codigo) {
-  await loadJsBarcode();
-  if (!window.JsBarcode) return null;
-  const svg = document.createElementNS("http://www.w3.org/2000/svg","svg");
-  try {
-    window.JsBarcode(svg, codigo, {
-      format: "CODE128",
-      width: 2, height: 60,
-      displayValue: true,
-      fontSize: 13,
-      margin: 8,
-      background: "#ffffff",
-      lineColor: "#1A2E1A",
-      fontOptions: "bold",
-      font: "monospace",
-    });
-    return new XMLSerializer().serializeToString(svg);
-  } catch(e) {
-    return null;
-  }
-}
-
-// Componente: muestra código de barras inline
-function BarcodeDisplay({ codigo, small }) {
-  const ref = useRef(null);
-  const [svgStr, setSvgStr] = useState("");
-
-  useEffect(() => {
-    if (!codigo) return;
-    generarSVGBarcode(codigo).then(s => { if(s) setSvgStr(s); });
-  }, [codigo]);
-
-  if (!svgStr) return (
-    <div style={{padding:"8px 0",fontFamily:"monospace",fontSize:12,color:"#5C8A5C",letterSpacing:2}}>
-      {codigo}
-    </div>
-  );
-  return (
-    <div
-      ref={ref}
-      dangerouslySetInnerHTML={{__html: svgStr}}
-      style={{maxWidth:small?"160px":"240px", overflow:"hidden"}}
-    />
-  );
-}
-
-// Función de impresión de ticket con código de barras
-async function imprimirTicket(producto, marcaNombre) {
-  await loadJsBarcode();
-  const svg = document.createElementNS("http://www.w3.org/2000/svg","svg");
-  let svgStr = "";
-  try {
-    window.JsBarcode(svg, producto.codigo, {
-      format:"CODE128", width:2.5, height:70,
-      displayValue:true, fontSize:14, margin:10,
-      background:"#ffffff", lineColor:"#000000",
-    });
-    svgStr = new XMLSerializer().serializeToString(svg);
-  } catch(e) {}
-
-  const win = window.open("","_blank","width=400,height=300");
-  if (!win) { alert("Activa las ventanas emergentes para imprimir"); return; }
-
-  win.document.write(`
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <title>Ticket — ${producto.nombre}</title>
-      <style>
-        @page { size: 58mm auto; margin: 0; }
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body {
-          font-family: 'Courier New', monospace;
-          width: 58mm;
-          padding: 4mm;
-          background: white;
-          color: black;
-        }
-        .header {
-          text-align: center;
-          border-bottom: 1px dashed #333;
-          padding-bottom: 3mm;
-          margin-bottom: 3mm;
-        }
-        .brand {
-          font-size: 14px;
-          font-weight: 900;
-          letter-spacing: 3px;
-          text-transform: uppercase;
-        }
-        .sub {
-          font-size: 8px;
-          letter-spacing: 4px;
-          color: #555;
-          margin-top: 1mm;
-        }
-        .producto {
-          font-size: 11px;
-          font-weight: bold;
-          text-align: center;
-          margin: 2mm 0;
-          text-transform: uppercase;
-        }
-        .marca {
-          font-size: 9px;
-          text-align: center;
-          color: #444;
-          margin-bottom: 2mm;
-        }
-        .barcode {
-          text-align: center;
-          margin: 2mm 0;
-        }
-        .barcode svg { max-width: 100%; height: auto; }
-        .precio {
-          text-align: center;
-          font-size: 18px;
-          font-weight: 900;
-          margin: 2mm 0;
-        }
-        .codigo {
-          text-align: center;
-          font-size: 9px;
-          color: #555;
-          font-family: monospace;
-          margin-bottom: 2mm;
-        }
-        .footer {
-          border-top: 1px dashed #333;
-          padding-top: 2mm;
-          text-align: center;
-          font-size: 8px;
-          color: #777;
-          letter-spacing: 1px;
-        }
-        @media print {
-          body { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
-        }
-      </style>
-    </head>
-    <body>
-      <div class="header">
-        <div class="brand">TOSCANA HOUSE</div>
-        <div class="sub">CASA DE MODA</div>
-      </div>
-      <div class="producto">${producto.nombre}</div>
-      <div class="marca">${marcaNombre}</div>
-      <div class="barcode">${svgStr}</div>
-      <div class="codigo">${producto.codigo}</div>
-      <div class="precio">Bs ${Number(producto.precio).toLocaleString("es-BO")}</div>
-      <div class="footer">Toscana House · ${new Date().toLocaleDateString("es-BO")}</div>
-      <script>
-        window.onload = function() {
-          setTimeout(function() { window.print(); }, 400);
-        };
-      </script>
-    </body>
-    </html>
-  `);
-  win.document.close();
-}
-
-
-// ════════════════════════════════════════════════════════════
 // GOOGLE DRIVE — Apps Script integration
 // ════════════════════════════════════════════════════════════
 
@@ -1060,8 +706,6 @@ const TAB_COLORS = {
   marcas:       C.tabMar,
   ventas:       C.tabVen,
   liquidaciones:C.tabLiq,
-  config:       "#7A9A7A",
-  historial:    "#6B8BAE",
 };
 
 function TabBar({tabs, active, onChange}){
@@ -1346,7 +990,7 @@ function LiqModal({marcaId,ventas,mes,anio,MK,cierres,setCierres,onClose,syncCie
           Exportar CSV
         </IOSBtn>
         {!cerrado
-          ? <IOSBtn onPress={()=>{setCierres(p=>({...p,[`${MK}-${marcaId}`]:{cerrado:true,fecha:hoy(),mk:MK}}));sbGuardarCierre(`${MK}-${marcaId}`,{cerrado:true,fecha:hoy(),mk:MK,marca_id:marcaId});onClose();}} variant="success" icon="✓">
+          ? <IOSBtn onPress={()=>{setCierres(p=>({...p,[`${MK}-${marcaId}`]:{cerrado:true,fecha:hoy(),mk:MK}}));onClose();}} variant="success" icon="✓">
               Confirmar Cierre Mensual
             </IOSBtn>
           : <IOSBtn onPress={()=>{setCierres(p=>({...p,[`${MK}-${marcaId}`]:{cerrado:false,mk:MK}}));onClose();}} variant="danger">
@@ -1358,210 +1002,16 @@ function LiqModal({marcaId,ventas,mes,anio,MK,cierres,setCierres,onClose,syncCie
   );
 }
 
-
-// ════════════════════════════════════════════════════════════
-// SISTEMA DE LOGIN — Toscana House
-// Usuarios con contraseña — sesión guardada en localStorage
-// ════════════════════════════════════════════════════════════
-
-// ── Usuarios autorizados ─────────────────────────────────
-// Para agregar usuarios: {usuario, password, nombre, rol}
-// rol: "admin" (acceso total) | "caja" (solo POS y ventas)
-const USUARIOS = [
-  { usuario: "toscana",  password: "casa2024",    nombre: "Toscana House",  rol: "admin" },
-  { usuario: "caja",     password: "caja2024",    nombre: "Vendedor Caja",  rol: "caja"  },
-  { usuario: "tatiana",  password: "toscana2024", nombre: "Tatiana",        rol: "admin" },
-];
-
-function useAuth() {
-  const [user, setUser] = useState(()=>{
-    try { return JSON.parse(localStorage.getItem("th_user")||"null"); } catch { return null; }
-  });
-
-  function login(usuario, password) {
-    // Check localStorage users first, then defaults
-    const listaActual = (() => {
-      try { return JSON.parse(localStorage.getItem("th_usuarios")||"null") || USUARIOS; }
-      catch { return USUARIOS; }
-    })();
-    const found = listaActual.find(u =>
-      u.usuario.toLowerCase() === usuario.toLowerCase() &&
-      u.password === password
-    );
-    if (found) {
-      const session = { ...found, loginAt: Date.now() };
-      localStorage.setItem("th_user", JSON.stringify(session));
-      setUser(session);
-      return { ok: true };
-    }
-    return { ok: false, error: "Usuario o contraseña incorrectos" };
-  }
-
-  function logout() {
-    localStorage.removeItem("th_user");
-    setUser(null);
-  }
-
-  return { user, login, logout };
-}
-
-// Pantalla de Login
-function LoginScreen({ onLogin }) {
-  const [usuario, setUsuario] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError]     = useState("");
-  const [loading, setLoading] = useState(false);
-  const [showPass, setShowPass] = useState(false);
-
-  function handleLogin() {
-    if (!usuario || !password) { setError("Completa todos los campos"); return; }
-    setLoading(true);
-    setError("");
-    setTimeout(() => {
-      const result = onLogin(usuario, password);
-      if (!result.ok) {
-        setError(result.error);
-        setLoading(false);
-      }
-    }, 600);
-  }
-
-  return (
-    <div style={{
-      minHeight:"100vh",
-      background:"linear-gradient(160deg, #F2F7F2 0%, #E8F2E8 50%, #D8EDD8 100%)",
-      display:"flex", flexDirection:"column",
-      alignItems:"center", justifyContent:"center",
-      fontFamily:FONT, padding:24,
-    }}>
-      {/* Logo */}
-      <div style={{marginBottom:40, textAlign:"center"}}>
-        <div style={{fontSize:48, marginBottom:8}}>🏡</div>
-        <div style={{fontSize:28, fontWeight:800, color:"#3D6B3D",
-          fontFamily:"Georgia,serif", letterSpacing:3}}>TOSCANA HOUSE</div>
-        <div style={{fontSize:12, color:"#7A9A7A", letterSpacing:6,
-          fontFamily:"Georgia,serif", marginTop:4}}>CASA DE MODA</div>
-        <div style={{width:80, height:1, background:"#A8C5A0",
-          margin:"12px auto 0"}}/>
-      </div>
-
-      {/* Card login */}
-      <div style={{
-        background:"rgba(255,255,255,0.95)",
-        borderRadius:24, padding:"32px 28px",
-        width:"100%", maxWidth:380,
-        boxShadow:"0 8px 40px rgba(74,107,74,0.15)",
-        border:"1px solid rgba(168,197,160,0.4)",
-      }}>
-        <div style={{fontSize:20, fontWeight:700, color:"#1A2E1A",
-          marginBottom:6, fontFamily:FONT}}>Iniciar sesión</div>
-        <div style={{fontSize:14, color:"#7A9A7A", marginBottom:28, fontFamily:FONT}}>
-          Ingresa tus credenciales para continuar
-        </div>
-
-        {/* Usuario */}
-        <div style={{marginBottom:16}}>
-          <label style={{fontSize:11, fontWeight:700, color:"#4A6B4A",
-            textTransform:"uppercase", letterSpacing:.8, display:"block", marginBottom:6}}>
-            Usuario
-          </label>
-          <input
-            value={usuario}
-            onChange={e=>{setUsuario(e.target.value);setError("");}}
-            onKeyDown={e=>e.key==="Enter"&&handleLogin()}
-            placeholder="tu usuario"
-            autoCapitalize="none"
-            autoCorrect="off"
-            style={{width:"100%", padding:"13px 16px", borderRadius:12,
-              border:`1.5px solid ${error?"#C0504A":"rgba(168,197,160,0.6)"}`,
-              background:"#F7FAF7", fontSize:16, color:"#1A2E1A",
-              outline:"none", fontFamily:FONT, boxSizing:"border-box",
-              WebkitAppearance:"none"}}
-            onFocus={e=>e.target.style.borderColor="#5C8A5C"}
-            onBlur={e=>e.target.style.borderColor=error?"#C0504A":"rgba(168,197,160,0.6)"}
-          />
-        </div>
-
-        {/* Contraseña */}
-        <div style={{marginBottom:24}}>
-          <label style={{fontSize:11, fontWeight:700, color:"#4A6B4A",
-            textTransform:"uppercase", letterSpacing:.8, display:"block", marginBottom:6}}>
-            Contraseña
-          </label>
-          <div style={{position:"relative"}}>
-            <input
-              type={showPass?"text":"password"}
-              value={password}
-              onChange={e=>{setPassword(e.target.value);setError("");}}
-              onKeyDown={e=>e.key==="Enter"&&handleLogin()}
-              placeholder="••••••••"
-              style={{width:"100%", padding:"13px 44px 13px 16px", borderRadius:12,
-                border:`1.5px solid ${error?"#C0504A":"rgba(168,197,160,0.6)"}`,
-                background:"#F7FAF7", fontSize:16, color:"#1A2E1A",
-                outline:"none", fontFamily:FONT, boxSizing:"border-box",
-                WebkitAppearance:"none"}}
-              onFocus={e=>e.target.style.borderColor="#5C8A5C"}
-              onBlur={e=>e.target.style.borderColor=error?"#C0504A":"rgba(168,197,160,0.6)"}
-            />
-            <button onClick={()=>setShowPass(p=>!p)} style={{
-              position:"absolute", right:12, top:"50%",
-              transform:"translateY(-50%)",
-              background:"none", border:"none", cursor:"pointer",
-              fontSize:18, color:"#7A9A7A",
-              WebkitTapHighlightColor:"transparent",
-            }}>{showPass?"🙈":"👁"}</button>
-          </div>
-        </div>
-
-        {/* Error */}
-        {error&&(
-          <div style={{padding:"10px 14px", background:"#FFF0EE",
-            borderRadius:10, border:"1px solid #F4A8A8",
-            color:"#C0504A", fontSize:13, fontFamily:FONT,
-            marginBottom:16, textAlign:"center"}}>
-            {error}
-          </div>
-        )}
-
-        {/* Botón */}
-        <button
-          onClick={handleLogin}
-          disabled={loading}
-          style={{
-            width:"100%", padding:"15px",
-            borderRadius:14, border:"none",
-            background:loading?"#A8C5A0":"linear-gradient(135deg,#5C8A5C,#3D6B3D)",
-            color:"white", fontSize:16, fontWeight:700,
-            cursor:loading?"not-allowed":"pointer",
-            fontFamily:FONT, letterSpacing:.5,
-            transition:"all .2s",
-            WebkitTapHighlightColor:"transparent",
-          }}>
-          {loading?"Verificando…":"Entrar"}
-        </button>
-      </div>
-
-      <div style={{marginTop:24, fontSize:12, color:"#7A9A7A",
-        fontFamily:FONT, textAlign:"center"}}>
-        Toscana House © {new Date().getFullYear()}
-      </div>
-    </div>
-  );
-}
-
 // ══════════════════════════════════════════════════════════
 // APP PRINCIPAL
 // ══════════════════════════════════════════════════════════
 export default function App(){
-  const { user, login, logout } = useAuth();
   const now=new Date();
   const[tab,setTab]         =useState("pos");
   const[inv,setInv]         =useState([]);
   const[ventas,setVentas]   =useState([]);
   const[alq,setAlq]         =useState([]);
   const[cierres,setCierres] =useState({});
-  const[cargando,setCargando]=useState(true);
-  const[dbStatus,setDbStatus]=useState("connecting");
   const[mes,setMes]         =useState(now.getMonth());
   const[anio,setAnio]       =useState(now.getFullYear());
   const[marcaDetalle,setMD] =useState(null);
@@ -1577,22 +1027,6 @@ export default function App(){
   const[driveUrl,setDriveUrlLocal]=useState(()=>{ try{return localStorage.getItem("th_drive_url")||"";}catch{return "";} });
   const[generando,setGenerando]=useState(false);
   const drive = useDriveSync();
-
-  // Cargar datos desde Supabase al inicio
-  useEffect(()=>{
-    setDbStatus("connecting");
-    sbCargarTodo().then(data=>{
-      if(data){
-        if(data.inv.length>0)    setInv(data.inv);
-        if(data.ventas.length>0) setVentas(data.ventas);
-        if(Object.keys(data.cierres).length>0) setCierres(data.cierres);
-        setDbStatus("ok");
-      } else {
-        setDbStatus("error");
-      }
-      setCargando(false);
-    });
-  },[]);
 
   const MK      =useMemo(()=>mkKey(mes,anio),[mes,anio]);
   const vMes    =useMemo(()=>ventas.filter(v=>v.mk===MK),[ventas,MK]);
@@ -1615,11 +1049,10 @@ export default function App(){
       precio:Number(fInv.precio),stock:Number(fInv.stock),stockInicial:Number(fInv.stock),fecha:fInv.fecha,
       marcaNombre:marca?.nombre||""};
     setInv(p=>[...p,prod]);
+    // Sync a Google Drive
     drive.syncProducto(prod);
-    sbGuardarProducto(prod); // guardar en nube
     setFInv({marcaId:"",nombre:"",categoria:"",precio:"",stock:"",fecha:hoy()});
     setShInv(false);
-    setTimeout(()=>imprimirTicket(prod, marca?.nombre||"Toscana House"), 300);
   }
 
   function darBaja(){
@@ -1636,12 +1069,9 @@ export default function App(){
     const id=`V${Date.now()}`;
     const vf={...v,id,fecha:hoy(),hora:hora(),mk:MK,mes,anio};
     setVentas(p=>[...p,vf]);
-    v.items.forEach(it=>{
-      setInv(p=>p.map(i=>i.id===it.prodId?{...i,stock:Math.max(0,i.stock-it.cantidad)}:i));
-      sbActualizarStock(it.prodId, Math.max(0,(inv.find(i=>i.id===it.prodId)?.stock||0)-it.cantidad));
-    });
+    v.items.forEach(it=>setInv(p=>p.map(i=>i.id===it.prodId?{...i,stock:Math.max(0,i.stock-it.cantidad)}:i)));
+    // Sync automático a Google Drive (no bloquea la UI)
     drive.syncVenta(vf);
-    sbGuardarVenta(vf); // guardar en nube
     return vf;
   }
 
@@ -1678,16 +1108,10 @@ export default function App(){
     {id:"marcas",icon:"◆",label:"Marcas"},
     {id:"ventas",icon:"◈",label:"Ventas"},
     {id:"liquidaciones",icon:"◎",label:"Liquidar"},
-    {id:"historial",icon:"📅",label:"Historial"},
-    {id:"config",icon:"⚙",label:"Config"},
   ];
 
   // Pantallas con vista de detalle (back button)
   const showingDetail = tab==="marcas" && marcaDetalle;
-  // Pasar dbStatus al NavBar via closure (ya está en scope)
-
-  // Early return si no hay sesión
-  if (!user) return <LoginScreen onLogin={login}/>;
 
   return (
     <div style={{
@@ -1699,21 +1123,6 @@ export default function App(){
       WebkitFontSmoothing:"antialiased",
       MozOsxFontSmoothing:"grayscale",
     }}>
-
-      {/* ── LOADING SCREEN ── */}
-      {cargando&&(
-        <div style={{position:"fixed",inset:0,background:"rgba(242,247,242,0.97)",
-          display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",
-          zIndex:9999,gap:20}}>
-          <LogoMark size={48} color={C.gold}/>
-          <div style={{fontSize:15,color:C.label2,fontFamily:FONT}}>Cargando datos…</div>
-          <div style={{width:48,height:4,borderRadius:2,background:C.sep,overflow:"hidden"}}>
-            <div style={{width:"60%",height:4,background:C.gold,borderRadius:2,
-              animation:"loadbar 1.2s ease-in-out infinite"}}/>
-          </div>
-          <style>{`@keyframes loadbar{0%{transform:translateX(-100%)}100%{transform:translateX(200%)}}`}</style>
-        </div>
-      )}
 
       {/* ── NAV BAR ── */}
       {showingDetail ? (
@@ -1740,7 +1149,7 @@ export default function App(){
       ):(
         <NavBar
           title="Toscana House"
-          subtitle={`${MESES[mes]} ${anio} · ${dbStatus==="ok"?"☁ Nube ✓":dbStatus==="error"?"Sin conexión":"Conectando…"}`}
+          subtitle={`${MESES[mes]} ${anio}`}
           right={
             <div style={{display:"flex",alignItems:"center",gap:10}}>
               <DriveIndicator syncing={drive.syncing} connected={!!drive.url}/>
@@ -1749,12 +1158,6 @@ export default function App(){
                 color:drive.url?C.green:C.label3,padding:"4px",
                 WebkitTapHighlightColor:"transparent",lineHeight:1,
               }}>☁</button>
-              <button onClick={logout} style={{
-                background:"none",border:"none",fontSize:13,cursor:"pointer",
-                color:C.label3,padding:"4px 8px",fontFamily:FONT,
-                WebkitTapHighlightColor:"transparent",
-                border:`1px solid ${C.sep}`,borderRadius:8,
-              }}>Salir</button>
               <select value={mes} onChange={e=>setMes(Number(e.target.value))}
                 style={{background:"none",border:"none",color:C.gold,fontSize:14,
                   fontFamily:FONT,cursor:"pointer",outline:"none",
@@ -1832,7 +1235,58 @@ export default function App(){
 
         {/* VENTAS */}
         {tab==="ventas" && (
-          <VentasTab vMes={vMes} totalVtas={totalVtas} mes={mes} anio={anio}/>
+          <div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:20}}>
+              <StatCard icon="💰" label="Total mes" value={$(totalVtas)} sub={`${vMes.length} ventas`}/>
+              <StatCard icon="💵" label="Efectivo"
+                value={$(vMes.filter(v=>v.metodoPago==="efectivo").reduce((s,v)=>s+v.total,0))} color={C.green}/>
+              <StatCard icon="📱" label="QR"
+                value={$(vMes.filter(v=>v.metodoPago==="qr").reduce((s,v)=>s+v.total,0))} color={C.blue}/>
+              <StatCard icon="💳" label="Tarjeta"
+                value={$(vMes.filter(v=>v.metodoPago==="tarjeta").reduce((s,v)=>s+v.total,0))} color={C.amber}/>
+            </div>
+
+            <div style={{fontSize:13,fontWeight:600,color:C.label3,textTransform:"uppercase",
+              letterSpacing:.8,marginBottom:12,paddingLeft:4}}>Historial</div>
+
+            {vMes.length===0
+              ? <EmptyState icon="📊" title={`Sin ventas en ${MESES[mes]}`} sub="Las ventas aparecen aquí"/>
+              : [...vMes].reverse().map(v=>{
+                  const pg=PAGOS.find(p=>p.id===v.metodoPago);
+                  return (
+                    <div key={v.id} style={{background:C.bg2,borderRadius:16,
+                      padding:"14px 16px",marginBottom:10}}>
+                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
+                        <div>
+                          <span style={{fontFamily:"monospace",fontSize:12,color:C.gold}}>{v.id}</span>
+                          <div style={{fontSize:13,color:C.label3,fontFamily:FONT,marginTop:2}}>
+                            {v.fecha} {v.hora}
+                          </div>
+                        </div>
+                        <div style={{display:"flex",alignItems:"center",gap:8}}>
+                          <Chip color={pg?.color||C.green}>{pg?.label}</Chip>
+                          <span style={{fontSize:20,fontWeight:700,color:C.gold,fontFamily:FONT}}>{$(v.total)}</span>
+                        </div>
+                      </div>
+                      <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:10}}>
+                        {v.items.map((it,ii)=>{
+                          const m=MARCAS.find(x=>x.id===it.marcaId);
+                          return <div key={`v-${v.id}-${ii}`} style={{display:"flex",alignItems:"center",gap:4}}>
+                            <div style={{width:6,height:6,borderRadius:"50%",background:m?.color}}/>
+                            <span style={{fontSize:13,color:C.label2,fontFamily:FONT}}>{it.nombre} ×{it.cantidad}</span>
+                          </div>;
+                        })}
+                      </div>
+                      <IOSBtn onPress={()=>sendWA(v)} variant="fill" small full icon="📲">
+                        Enviar por WhatsApp
+                      </IOSBtn>
+                      {v.etiquetaImg&&<img src={v.etiquetaImg} alt="etiqueta"
+                        style={{width:"100%",maxHeight:80,objectFit:"cover",borderRadius:10,marginTop:10}}/>}
+                    </div>
+                  );
+                })
+            }
+          </div>
         )}
 
         {/* LIQUIDACIONES */}
@@ -1897,16 +1351,6 @@ export default function App(){
             </div>
           </div>
         )}
-
-        {/* HISTORIAL */}
-        {tab==="historial" && (
-          <HistorialTab ventas={ventas} inv={inv} cierres={cierres}/>
-        )}
-
-        {/* CONFIG */}
-        {tab==="config" && (
-          <ConfigTab user={user} logout={logout}/>
-        )}
       </div>
 
       {/* ── BOTTOM TAB BAR ── */}
@@ -1915,14 +1359,34 @@ export default function App(){
       {/* ══ SHEETS ══ */}
 
       {/* Sheet: Recibir Producto */}
-      <SheetRecibir
-        open={sheetInv}
-        onClose={()=>setShInv(false)}
-        inv={inv}
-        onAdd={addProd}
-        fInv={fInv}
-        setFInv={setFInv}
-      />
+      <Sheet open={sheetInv} onClose={()=>setShInv(false)} title="Recibir Producto" tall>
+        <IOSSel label="Marca" value={fInv.marcaId} onChange={e=>setFInv(p=>({...p,marcaId:e.target.value}))}>
+          <option value="">Seleccionar marca…</option>
+          {MARCAS.map(m=><option key={m.id} value={m.id}>{m.emoji} {m.nombre}</option>)}
+        </IOSSel>
+        <IOSInput label="Nombre del producto" value={fInv.nombre}
+          onChange={e=>setFInv(p=>({...p,nombre:e.target.value}))} placeholder="Ej: Crema hidratante 50ml"/>
+        <IOSInput label="Categoría" value={fInv.categoria}
+          onChange={e=>setFInv(p=>({...p,categoria:e.target.value}))} placeholder="Ej: Skincare"/>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+          <IOSInput label="Precio" prefix="$" type="number" value={fInv.precio}
+            onChange={e=>setFInv(p=>({...p,precio:e.target.value}))} placeholder="0"/>
+          <IOSInput label="Unidades" type="number" value={fInv.stock}
+            onChange={e=>setFInv(p=>({...p,stock:e.target.value}))} placeholder="0"/>
+        </div>
+        <IOSInput label="Fecha de ingreso" type="date" value={fInv.fecha}
+          onChange={e=>setFInv(p=>({...p,fecha:e.target.value}))}/>
+        {fInv.marcaId&&fInv.nombre&&(
+          <div style={{padding:"12px 14px",background:`${C.gold}12`,borderRadius:12,
+            border:`1px solid ${C.gold}30`,marginBottom:12}}>
+            <div style={{fontSize:12,color:C.label3,fontFamily:FONT,marginBottom:3}}>Código asignado</div>
+            <div style={{fontFamily:"monospace",fontSize:15,color:C.gold,fontWeight:600}}>
+              {genCod(Number(fInv.marcaId),fInv.nombre,inv.length+1)}
+            </div>
+          </div>
+        )}
+        <IOSBtn onPress={addProd} full variant="primary">Registrar Ingreso</IOSBtn>
+      </Sheet>
 
       {/* Sheet: Dar de Baja */}
       <Sheet open={sheetBaja} onClose={()=>setShBaja(false)} title="Dar de Baja por Código">
@@ -2056,8 +1520,6 @@ function POS({inv,onVenta}){
   const[ultima,setUltima]     =useState(null);
   const[showOk,setShowOk]     =useState(false);
   const[showPago,setShowPago] =useState(false);
-  const[scanStatus,setScanStatus]=useState(null); // null | "leyendo" | "ok" | "notfound"
-  const[scanMsg,setScanMsg]   =useState("");
   const inputRef=useRef();
   const fileRef=useRef();
 
@@ -2098,41 +1560,7 @@ function POS({inv,onVenta}){
   }
   function cambiar(prodId,d){setCarrito(p=>p.map(x=>x.prodId===prodId?{...x,cantidad:Math.max(1,x.cantidad+d)}:x));}
   function quitar(prodId){setCarrito(p=>p.filter(x=>x.prodId!==prodId));}
-  async function handleEtiqueta(e){
-    const f=e.target.files?.[0];
-    if(!f) return;
-    // Guardar imagen para adjuntar a la venta
-    const r=new FileReader();
-    r.onload=ev=>setEtiqueta(ev.target.result);
-    r.readAsDataURL(f);
-    // Intentar leer código de barras/QR de la imagen
-    setScanStatus("leyendo");
-    try {
-      const codigo = await leerCodigoDeImagen(f);
-      if(codigo){
-        setScanStatus("ok");
-        setScanMsg(`Código detectado: ${codigo}`);
-        // Buscar el producto en el inventario por código
-        const prod = inv.find(i=>i.codigo.toUpperCase()===codigo.toUpperCase());
-        if(prod){
-          // Agregar directamente al carrito
-          add(prod);
-          setScanMsg(`✓ "${prod.nombre}" agregado al carrito`);
-        } else {
-          // Poner en el buscador para búsqueda manual
-          setBusq(codigo);
-          setScanMsg(`Código "${codigo}" — busca el producto`);
-        }
-      } else {
-        setScanStatus("notfound");
-        setScanMsg("No se detectó código — foto guardada");
-      }
-    } catch(err){
-      setScanStatus("notfound");
-      setScanMsg("No se pudo leer el código");
-    }
-    setTimeout(()=>setScanStatus(null),4000);
-  }
+  function handleEtiqueta(e){const f=e.target.files?.[0];if(!f)return;const r=new FileReader();r.onload=ev=>setEtiqueta(ev.target.result);r.readAsDataURL(f);}
 
   function cobrar(){
     if(!carrito.length)return;
@@ -2252,37 +1680,26 @@ function POS({inv,onVenta}){
         </div>
       )}
 
-      {/* Escanear Etiqueta */}
-      <div style={{background:C.bg2,borderRadius:14,padding:"14px 16px",marginBottom:14,
-        border:scanStatus==="ok"?`1.5px solid ${C.green}`:scanStatus==="notfound"?`1.5px solid ${C.amber}`:`1px solid ${C.sep}`}}>
+      {/* Etiqueta */}
+      <div style={{background:C.bg2,borderRadius:14,padding:"14px 16px",marginBottom:14}}>
         <div style={{fontSize:13,fontWeight:600,color:C.label3,textTransform:"uppercase",
-          letterSpacing:.6,marginBottom:10}}>📷 Escanear Etiqueta</div>
+          letterSpacing:.6,marginBottom:10}}>Imagen de Etiqueta</div>
         <input ref={fileRef} type="file" accept="image/*" capture="environment"
           onChange={handleEtiqueta} style={{display:"none"}}/>
-        <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:scanMsg?10:0}}>
+        <div style={{display:"flex",alignItems:"center",gap:12}}>
           <IOSBtn onPress={()=>fileRef.current?.click()} variant="fill" small icon="📷">
-            {scanStatus==="leyendo"?"Leyendo…":etiqueta?"Nueva foto":"Fotografiar código"}
+            {etiqueta?"Cambiar":"Cargar / Foto"}
           </IOSBtn>
           {etiqueta&&(
             <>
               <img src={etiqueta} alt="etiqueta"
                 style={{height:44,borderRadius:8,border:`1px solid ${C.sep}`}}/>
-              <button onClick={()=>{setEtiqueta(null);setScanStatus(null);setScanMsg("");}} style={{
+              <button onClick={()=>setEtiqueta(null)} style={{
                 background:"none",border:"none",color:C.red,fontSize:18,cursor:"pointer",
                 WebkitTapHighlightColor:"transparent",
               }}>×</button>
             </>
           )}
-        </div>
-        {scanMsg&&(
-          <div style={{padding:"8px 12px",borderRadius:10,fontSize:13,fontFamily:FONT,
-            background:scanStatus==="ok"?`${C.green}15`:scanStatus==="notfound"?`${C.amber}15`:C.fill2,
-            color:scanStatus==="ok"?C.green:scanStatus==="notfound"?C.amber:C.label2}}>
-            {scanStatus==="leyendo"&&"⏳ "}{scanMsg}
-          </div>
-        )}
-        <div style={{fontSize:11,color:C.label3,fontFamily:FONT,marginTop:8}}>
-          Apunta al código de barras o QR de la prenda → se agrega automáticamente al carrito
         </div>
       </div>
 
@@ -2396,125 +1813,6 @@ function POS({inv,onVenta}){
   );
 }
 
-
-
-// ══════════════════════════════════════════════════════════
-// SHEET RECIBIR PRODUCTO — con generación de código de barra
-// ══════════════════════════════════════════════════════════
-function SheetRecibir({open, onClose, inv, onAdd, fInv, setFInv}){
-  const [scanInvMsg, setScanInvMsg] = useState("");
-  const [scanInvStatus, setScanInvStatus] = useState(null);
-  const [barcodeReady, setBarcodeReady] = useState(false);
-  const scanInvRef = useRef(null);
-  
-  const codigoGenerado = fInv.marcaId && fInv.nombre
-    ? genCod(Number(fInv.marcaId), fInv.nombre, inv.length+1)
-    : "";
-
-  useEffect(()=>{
-    if(codigoGenerado) setBarcodeReady(true);
-  },[codigoGenerado]);
-
-  async function handleScanEtiqueta(e){
-    const f = e.target.files?.[0];
-    if(!f) return;
-    setScanInvStatus("leyendo");
-    setScanInvMsg("Leyendo código de la etiqueta…");
-    try {
-      const codigo = await leerCodigoDeImagen(f);
-      if(codigo){
-        // Rellenar nombre y categoría desde el código
-        const partes = codigo.split("-");
-        const nombre = partes.length >= 2 ? partes.slice(1, partes.length-1).join(" ") : codigo;
-        const categoria = detectarCategoria(codigo);
-        setFInv(p=>({...p,
-          nombre: p.nombre || nombre,
-          categoria: p.categoria || categoria,
-        }));
-        setScanInvStatus("ok");
-        setScanInvMsg(`✓ Código leído: ${codigo}`);
-      } else {
-        setScanInvStatus("notfound");
-        setScanInvMsg("No se detectó código en la imagen");
-      }
-    } catch(e){
-      setScanInvStatus("notfound");
-      setScanInvMsg("Error al leer la imagen");
-    }
-    setTimeout(()=>{setScanInvStatus(null);setScanInvMsg("");},4000);
-  }
-
-  // Detecta categoría según palabras clave en el código o nombre
-  function detectarCategoria(texto){
-    const t = texto.toLowerCase();
-    if(t.includes("cam")||t.includes("pol")||t.includes("rem")) return "Ropa";
-    if(t.includes("pan")||t.includes("jean")||t.includes("fal")) return "Ropa";
-    if(t.includes("bol")||t.includes("car")||t.includes("ach")) return "Accesorios";
-    if(t.includes("zap")||t.includes("san")||t.includes("bot")) return "Calzado";
-    if(t.includes("cre")||t.includes("per")||t.includes("jab")) return "Cuidado personal";
-    if(t.includes("vel")||t.includes("arom")) return "Velas & Aromas";
-    return "General";
-  }
-
-  return (
-    <Sheet open={open} onClose={()=>{onClose();setScanInvMsg("");setScanInvStatus(null);}} title="Recibir Producto" tall>
-      {/* Opción escanear etiqueta existente */}
-      <div style={{background:C.bg3,borderRadius:14,padding:"14px",marginBottom:16,
-        border:`1px solid ${scanInvStatus==="ok"?C.green:scanInvStatus==="notfound"?C.amber:C.sep}`}}>
-        <div style={{fontSize:12,fontWeight:700,color:C.label3,textTransform:"uppercase",
-          letterSpacing:.6,marginBottom:10}}>Escanear etiqueta existente (opcional)</div>
-        <input ref={scanInvRef} type="file" accept="image/*" capture="environment"
-          onChange={handleScanEtiqueta} style={{display:"none"}}/>
-        <IOSBtn onPress={()=>scanInvRef.current?.click()} variant="fill" small icon="📷">
-          {scanInvStatus==="leyendo"?"Leyendo…":"Fotografiar código"}
-        </IOSBtn>
-        {scanInvMsg&&(
-          <div style={{marginTop:8,padding:"8px 12px",borderRadius:8,fontSize:13,fontFamily:FONT,
-            background:scanInvStatus==="ok"?`${C.green}15`:scanInvStatus==="notfound"?`${C.amber}15`:C.fill2,
-            color:scanInvStatus==="ok"?C.green:scanInvStatus==="notfound"?C.amber:C.label2}}>
-            {scanInvMsg}
-          </div>
-        )}
-      </div>
-
-      {/* Formulario */}
-      <IOSSel label="Marca" value={fInv.marcaId} onChange={e=>setFInv(p=>({...p,marcaId:e.target.value}))}>
-        <option value="">Seleccionar marca…</option>
-        {MARCAS.map(m=><option key={m.id} value={m.id}>{m.emoji} {m.nombre}</option>)}
-      </IOSSel>
-      <IOSInput label="Nombre del producto" value={fInv.nombre}
-        onChange={e=>setFInv(p=>({...p,nombre:e.target.value}))} placeholder="Ej: Vestido floral talla M"/>
-      <IOSInput label="Categoría" value={fInv.categoria}
-        onChange={e=>setFInv(p=>({...p,categoria:e.target.value}))} placeholder="Ej: Ropa, Accesorios…"/>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
-        <IOSInput label="Precio (Bs)" prefix="Bs" type="number" value={fInv.precio}
-          onChange={e=>setFInv(p=>({...p,precio:e.target.value}))} placeholder="0"/>
-        <IOSInput label="Unidades" type="number" value={fInv.stock}
-          onChange={e=>setFInv(p=>({...p,stock:e.target.value}))} placeholder="0"/>
-      </div>
-      <IOSInput label="Fecha de ingreso" type="date" value={fInv.fecha}
-        onChange={e=>setFInv(p=>({...p,fecha:e.target.value}))}/>
-
-      {/* Código de barras generado */}
-      {codigoGenerado&&(
-        <div style={{padding:"14px",background:"#FFFFFF",borderRadius:14,
-          border:`1px solid ${C.sep}`,marginBottom:14,textAlign:"center"}}>
-          <div style={{fontSize:11,fontWeight:700,color:C.label3,textTransform:"uppercase",
-            letterSpacing:.8,marginBottom:8}}>Código generado para esta prenda</div>
-          <div style={{fontSize:14,fontFamily:"monospace",fontWeight:700,
-            color:C.gold,marginBottom:10}}>{codigoGenerado}</div>
-          <BarcodeDisplay codigo={codigoGenerado}/>
-          <div style={{fontSize:11,color:C.label3,fontFamily:FONT,marginTop:8}}>
-            {fInv.nombre && <strong style={{color:C.label2}}>{fInv.nombre}</strong>}
-            {fInv.categoria && <span style={{color:C.label3}}> · {fInv.categoria}</span>}
-          </div>
-        </div>
-      )}
-
-      <IOSBtn onPress={onAdd} full variant="primary">Registrar e Imprimir Ticket</IOSBtn>
-    </Sheet>
-  );
-}
 
 // ══════════════════════════════════════════════════════════
 // INVENTARIO POR MARCA — pestaña con scroll horizontal
@@ -2674,26 +1972,14 @@ function InventarioPorMarca({inv, ventas, onRecibir, onBaja}){
                     </div>
                   </div>
 
-                  {/* Footer: vendidas + botón imprimir */}
-                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,flexWrap:"wrap"}}>
-                    {vendidas>0&&(
-                      <div style={{padding:"6px 10px",background:C.stockSold,
-                        borderRadius:8,border:`1px solid #C8D4F4`,
-                        fontSize:12,color:C.blue,fontFamily:FONT,flex:1}}>
-                        🛒 {vendidas} vendida{vendidas!==1?"s":""} · {prod.fecha}
-                      </div>
-                    )}
-                    <button
-                      onClick={()=>imprimirTicket(prod, marca?.nombre||"")}
-                      style={{
-                        padding:"7px 14px",borderRadius:10,border:`1.5px solid ${C.gold}`,
-                        background:"white",color:C.gold,fontSize:12,fontFamily:FONT,
-                        fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",gap:6,
-                        WebkitTapHighlightColor:"transparent",whiteSpace:"nowrap",flexShrink:0,
-                      }}>
-                      🖨 Imprimir ticket
-                    </button>
-                  </div>
+                  {/* Tags vendidos si hay */}
+                  {vendidas>0&&(
+                    <div style={{padding:"6px 10px",background:C.stockSold,
+                      borderRadius:8,border:`1px solid #C8D4F4`,
+                      fontSize:12,color:C.blue,fontFamily:FONT}}>
+                      🛒 {vendidas} unidad{vendidas!==1?"es":""} vendida{vendidas!==1?"s":""} · ingresó {prod.fecha}
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -2917,833 +2203,6 @@ function MarcaDetalle({marcaId,inv,ventas,vMes,mes,anio,MK,cierres,setCierres,ge
               })}
             </div>
           )}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ══════════════════════════════════════════════════════════
-// HISTORIAL TAB — Navegación por mes/año
-// ══════════════════════════════════════════════════════════
-function HistorialTab({ventas, inv, cierres}){
-  const now = new Date();
-  const [mesSel,  setMesSel]  = useState(now.getMonth());
-  const [anioSel, setAnioSel] = useState(now.getFullYear());
-  const [vista,   setVista]   = useState("resumen"); // resumen | marcas | ventas | stock
-
-  const MKSel = mkKey(mesSel, anioSel);
-
-  // Ventas del período seleccionado
-  const ventasPer = useMemo(()=>
-    ventas.filter(v=>v.mk===MKSel),
-  [ventas, MKSel]);
-
-  // Períodos con datos (para el selector)
-  const periodosConDatos = useMemo(()=>{
-    const set = new Set(ventas.map(v=>v.mk));
-    return Array.from(set).sort((a,b)=>b.localeCompare(a)).map(mk=>{
-      const [anio,mes] = mk.split("-");
-      return { mk, mes:Number(mes)-1, anio:Number(anio) };
-    });
-  },[ventas]);
-
-  // Stats del período
-  const totalPer    = ventasPer.reduce((s,v)=>s+v.total,0);
-  const efectivoPer = ventasPer.filter(v=>v.metodoPago==="efectivo").reduce((s,v)=>s+v.total,0);
-  const qrPer       = ventasPer.filter(v=>v.metodoPago==="qr").reduce((s,v)=>s+v.total,0);
-  const tarjetaPer  = ventasPer.filter(v=>v.metodoPago==="tarjeta").reduce((s,v)=>s+v.total,0);
-
-  // Ventas por marca del período
-  const porMarcaPer = useMemo(()=>
-    MARCAS.map(m=>{
-      const total = ventasPer.reduce((s,v)=>s+v.items.filter(i=>i.marcaId===m.id).reduce((ss,i)=>ss+i.subtotal,0),0);
-      const ef    = ventasPer.filter(v=>v.metodoPago==="efectivo").reduce((s,v)=>s+v.items.filter(i=>i.marcaId===m.id).reduce((ss,i)=>ss+i.subtotal,0),0);
-      const qr    = ventasPer.filter(v=>v.metodoPago==="qr").reduce((s,v)=>s+v.items.filter(i=>i.marcaId===m.id).reduce((ss,i)=>ss+i.subtotal,0),0);
-      const tj    = ventasPer.filter(v=>v.metodoPago==="tarjeta").reduce((s,v)=>s+v.items.filter(i=>i.marcaId===m.id).reduce((ss,i)=>ss+i.subtotal,0),0);
-      const txs   = ventasPer.filter(v=>v.items.some(i=>i.marcaId===m.id)).length;
-      return {marca:m, total, ef, qr, tj, txs};
-    }).filter(x=>x.total>0).sort((a,b)=>b.total-a.total)
-  ,[ventasPer]);
-
-  // Años disponibles (entre 2024 y año actual+1)
-  const anios = [];
-  for(let a=2024; a<=now.getFullYear()+1; a++) anios.push(a);
-
-  return (
-    <div>
-      {/* ── SELECTOR MES/AÑO ── */}
-      <div style={{background:C.bg2,borderRadius:16,padding:16,marginBottom:16,
-        border:`1px solid ${C.sep}`}}>
-        <div style={{fontSize:11,fontWeight:700,color:C.label3,textTransform:"uppercase",
-          letterSpacing:.8,marginBottom:12}}>Seleccionar período</div>
-
-        {/* Año */}
-        <div style={{display:"flex",gap:8,marginBottom:12,overflowX:"auto",
-          scrollbarWidth:"none",WebkitOverflowScrolling:"touch",paddingBottom:4}}>
-          {anios.map(a=>(
-            <button key={a} onClick={()=>setAnioSel(a)} style={{
-              flexShrink:0,padding:"8px 18px",borderRadius:20,
-              border:`2px solid ${anioSel===a?C.gold:C.sep}`,
-              background:anioSel===a?`${C.gold}20`:C.bg3,
-              color:anioSel===a?C.gold:C.label2,
-              fontSize:15,fontWeight:anioSel===a?700:400,
-              fontFamily:FONT,cursor:"pointer",
-              WebkitTapHighlightColor:"transparent",
-            }}>{a}</button>
-          ))}
-        </div>
-
-        {/* Mes — grid 3x4 */}
-        <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:6}}>
-          {MESES.map((m,i)=>{
-            const mk = mkKey(i,anioSel);
-            const tieneDatos = ventas.some(v=>v.mk===mk);
-            const esSel = mesSel===i && anioSel===anioSel;
-            return (
-              <button key={i} onClick={()=>setMesSel(i)} style={{
-                padding:"10px 4px",borderRadius:10,
-                border:`2px solid ${mesSel===i?C.gold:tieneDatos?C.sep+"88":C.sep}`,
-                background:mesSel===i?`${C.gold}20`:tieneDatos?C.bg3:"transparent",
-                color:mesSel===i?C.gold:tieneDatos?C.label:C.label3,
-                fontSize:12,fontWeight:mesSel===i?700:400,
-                fontFamily:FONT,cursor:"pointer",textAlign:"center",
-                WebkitTapHighlightColor:"transparent",
-                opacity:tieneDatos||mesSel===i?1:.5,
-                position:"relative",
-              }}>
-                {m.slice(0,3)}
-                {tieneDatos&&mesSel!==i&&(
-                  <div style={{position:"absolute",top:3,right:5,width:5,height:5,
-                    borderRadius:"50%",background:C.green}}/>
-                )}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Resumen rápido del período */}
-        <div style={{marginTop:12,padding:"10px 12px",background:C.bg3,borderRadius:10,
-          display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-          <span style={{fontSize:14,fontWeight:700,color:C.label,fontFamily:FONT}}>
-            {MESES[mesSel]} {anioSel}
-          </span>
-          <span style={{fontSize:14,fontWeight:800,color:totalPer>0?C.gold:C.label3,fontFamily:FONT}}>
-            {totalPer>0?$(totalPer):"Sin ventas"}
-          </span>
-        </div>
-      </div>
-
-      {/* ── SELECTOR VISTA ── */}
-      <div style={{marginBottom:16}}>
-        <SegControl
-          options={[
-            {value:"resumen",label:"Resumen"},
-            {value:"marcas", label:"Marcas"},
-            {value:"ventas", label:"Ventas"},
-            {value:"stock",  label:"Stock"},
-          ]}
-          value={vista} onChange={setVista}
-        />
-      </div>
-
-      {/* ── RESUMEN ── */}
-      {vista==="resumen"&&(
-        <div>
-          {ventasPer.length===0
-            ? <EmptyState icon="📅" title={`Sin datos en ${MESES[mesSel]} ${anioSel}`}
-                sub="Los puntos verdes indican meses con ventas"/>
-            : <>
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:16}}>
-                <div style={{gridColumn:"1/-1"}}>
-                  <StatCard icon="💰" label={`Total ${MESES[mesSel]} ${anioSel}`}
-                    value={$(totalPer)} sub={`${ventasPer.length} transacciones · ${porMarcaPer.length} marcas`}/>
-                </div>
-                <StatCard icon="💵" label="Efectivo" value={$(efectivoPer)} color="#4A9B6F" small/>
-                <StatCard icon="📱" label="QR"       value={$(qrPer)}       color="#5B8DB8" small/>
-                <StatCard icon="💳" label="Tarjeta"  value={$(tarjetaPer)}  color="#C8922A" small/>
-                <StatCard icon="🏷" label="Comisión 10%" value={$(totalPer*.1)} color={C.red} small/>
-                <StatCard icon="✅" label="Neto marcas"  value={$(totalPer*.9)} color={C.green} small/>
-              </div>
-
-              {/* Cierre status */}
-              <div style={{background:C.bg2,borderRadius:14,padding:"14px 16px",marginBottom:16}}>
-                <div style={{fontSize:12,fontWeight:700,color:C.label3,textTransform:"uppercase",
-                  letterSpacing:.6,marginBottom:10}}>Estado de cierres</div>
-                <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
-                  {MARCAS.filter(m=>ventasPer.some(v=>v.items.some(i=>i.marcaId===m.id))).map(m=>{
-                    const cerrado = cierres[`${MKSel}-${m.id}`]?.cerrado;
-                    return (
-                      <div key={m.id} style={{display:"flex",alignItems:"center",gap:5,
-                        padding:"4px 10px",borderRadius:20,
-                        background:cerrado?`${C.green}15`:`${C.amber}15`,
-                        border:`1px solid ${cerrado?C.green:C.amber}30`}}>
-                        <span style={{fontSize:13}}>{m.emoji}</span>
-                        <span style={{fontSize:12,fontFamily:FONT,
-                          color:cerrado?C.green:C.amber}}>{m.nombre}</span>
-                        <span style={{fontSize:11}}>{cerrado?"✓":"⏳"}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </>
-          }
-        </div>
-      )}
-
-      {/* ── POR MARCA ── */}
-      {vista==="marcas"&&(
-        <div>
-          {porMarcaPer.length===0
-            ? <EmptyState icon="🏷" title="Sin ventas por marca" sub={`${MESES[mesSel]} ${anioSel}`}/>
-            : porMarcaPer.map((x,i)=>{
-                const maxT = Math.max(...porMarcaPer.map(p=>p.total),1);
-                return (
-                  <div key={x.marca.id} style={{
-                    background:C.bg2,
-                    borderRadius:i===0?"16px 16px 4px 4px":i===porMarcaPer.length-1?"4px 4px 16px 16px":"4px",
-                    borderBottom:i<porMarcaPer.length-1?`1px solid ${C.sep}`:"",
-                    padding:"14px 16px",
-                    borderLeft:`4px solid ${x.marca.color}`,
-                  }}>
-                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
-                      <div style={{display:"flex",alignItems:"center",gap:10}}>
-                        <span style={{fontSize:20}}>{x.marca.emoji}</span>
-                        <div>
-                          <div style={{fontSize:15,fontWeight:700,color:C.label,fontFamily:FONT}}>{x.marca.nombre}</div>
-                          <div style={{fontSize:12,color:C.label3,fontFamily:FONT}}>{x.txs} venta{x.txs!==1?"s":""}</div>
-                        </div>
-                      </div>
-                      <div style={{textAlign:"right"}}>
-                        <div style={{fontSize:18,fontWeight:800,color:x.marca.color,fontFamily:FONT}}>{$(x.total)}</div>
-                        <div style={{fontSize:11,color:C.green,fontFamily:FONT}}>Neto: {$(x.total*.9)}</div>
-                      </div>
-                    </div>
-                    <div style={{background:"rgba(0,0,0,0.06)",borderRadius:4,height:5,marginBottom:10}}>
-                      <div style={{width:`${(x.total/maxT)*100}%`,background:x.marca.color,height:5,borderRadius:4}}/>
-                    </div>
-                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6}}>
-                      {[["💵",x.ef,"#4A9B6F"],["📱",x.qr,"#5B8DB8"],["💳",x.tj,"#C8922A"]].map(([icon,val,color])=>(
-                        <div key={icon} style={{padding:"7px",background:`${color}10`,borderRadius:8,textAlign:"center",
-                          opacity:val>0?1:.4}}>
-                          <div style={{fontSize:13}}>{icon}</div>
-                          <div style={{fontSize:12,fontWeight:700,color,fontFamily:FONT}}>{val>0?$(val):"—"}</div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })
-          }
-        </div>
-      )}
-
-      {/* ── VENTAS DETALLE ── */}
-      {vista==="ventas"&&(
-        <div>
-          {ventasPer.length===0
-            ? <EmptyState icon="📊" title="Sin ventas" sub={`${MESES[mesSel]} ${anioSel}`}/>
-            : [...ventasPer].reverse().map(v=>{
-                const pg=PAGOS.find(p=>p.id===v.metodoPago);
-                return (
-                  <div key={v.id} style={{background:C.bg2,borderRadius:14,padding:"14px 16px",marginBottom:10}}>
-                    <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
-                      <div>
-                        <span style={{fontFamily:"monospace",fontSize:12,color:C.gold}}>{v.id}</span>
-                        <div style={{fontSize:12,color:C.label3,fontFamily:FONT}}>{v.fecha} {v.hora}</div>
-                      </div>
-                      <div style={{display:"flex",alignItems:"center",gap:8}}>
-                        <Chip color={pg?.color||C.green}>{pg?.icon} {pg?.label}</Chip>
-                        <span style={{fontSize:17,fontWeight:800,color:C.gold,fontFamily:FONT}}>{$(v.total)}</span>
-                      </div>
-                    </div>
-                    {v.items.map((it,ii)=>{
-                      const m=MARCAS.find(x=>x.id===it.marcaId);
-                      return (
-                        <div key={ii} style={{fontSize:13,color:C.label2,fontFamily:FONT,
-                          display:"flex",alignItems:"center",gap:6,marginBottom:3}}>
-                          <div style={{width:6,height:6,borderRadius:"50%",background:m?.color,flexShrink:0}}/>
-                          {it.nombre} ×{it.cantidad} = {$(it.subtotal)}
-                        </div>
-                      );
-                    })}
-                  </div>
-                );
-              })
-          }
-        </div>
-      )}
-
-      {/* ── STOCK ── */}
-      {vista==="stock"&&(
-        <div>
-          <div style={{fontSize:12,color:C.label3,fontFamily:FONT,marginBottom:12}}>
-            Inventario registrado — estado actual
-          </div>
-          {inv.length===0
-            ? <EmptyState icon="📦" title="Sin productos en inventario"/>
-            : MARCAS.map(m=>{
-                const prods=inv.filter(i=>i.marcaId===m.id);
-                if(!prods.length) return null;
-                const stockTotal=prods.reduce((s,p)=>s+p.stock,0);
-                const vendTotal=prods.reduce((s,p)=>s+(p.stockInicial-p.stock),0);
-                return (
-                  <div key={m.id} style={{background:C.bg2,borderRadius:14,
-                    padding:"14px 16px",marginBottom:10,borderLeft:`4px solid ${m.color}`}}>
-                    <div style={{display:"flex",justifyContent:"space-between",
-                      alignItems:"center",marginBottom:10}}>
-                      <div style={{display:"flex",alignItems:"center",gap:8}}>
-                        <span style={{fontSize:18}}>{m.emoji}</span>
-                        <span style={{fontSize:15,fontWeight:700,color:C.label,fontFamily:FONT}}>{m.nombre}</span>
-                      </div>
-                      <div style={{textAlign:"right"}}>
-                        <div style={{fontSize:13,color:C.green,fontFamily:FONT}}>{stockTotal} en stock</div>
-                        <div style={{fontSize:12,color:C.blue,fontFamily:FONT}}>{vendTotal} vendidas</div>
-                      </div>
-                    </div>
-                    {prods.map(p=>(
-                      <div key={p.id} style={{display:"flex",justifyContent:"space-between",
-                        alignItems:"center",padding:"8px 0",
-                        borderTop:`1px solid ${C.sep}`}}>
-                        <div>
-                          <div style={{fontSize:13,color:C.label,fontFamily:FONT}}>{p.nombre}</div>
-                          <span style={{fontFamily:"monospace",fontSize:10,color:C.gold,
-                            background:`${C.gold}18`,padding:"1px 6px",borderRadius:4}}>{p.codigo}</span>
-                        </div>
-                        <div style={{textAlign:"right"}}>
-                          <div style={{fontSize:14,fontWeight:700,
-                            color:p.stock===0?C.red:p.stock<3?C.amber:C.green,fontFamily:FONT}}>
-                            {p.stock} uds
-                          </div>
-                          <div style={{fontSize:11,color:C.label3,fontFamily:FONT}}>{$(p.precio)}</div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                );
-              })
-          }
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ══════════════════════════════════════════════════════════
-// CONFIG TAB — Gestión de usuarios y contraseñas
-// ══════════════════════════════════════════════════════════
-function ConfigTab({user, logout}){
-  const [subTab, setSubTab] = useState("cuenta");
-  // Usuarios guardados en localStorage (sobre los defaults)
-  const [usuarios, setUsuarios] = useState(()=>{
-    try { return JSON.parse(localStorage.getItem("th_usuarios")||"null") || USUARIOS; }
-    catch { return USUARIOS; }
-  });
-  function guardarUsuarios(u){
-    setUsuarios(u);
-    localStorage.setItem("th_usuarios", JSON.stringify(u));
-  }
-
-  return (
-    <div>
-      {/* Header */}
-      <div style={{marginBottom:20}}>
-        <h2 style={{margin:0,fontSize:22,fontWeight:800,color:C.label,fontFamily:FONT}}>Configuración</h2>
-        <p style={{margin:"4px 0 0",color:C.label3,fontFamily:FONT,fontSize:13}}>
-          Sesión activa: <strong style={{color:C.gold}}>{user.nombre}</strong> · {user.rol}
-        </p>
-      </div>
-
-      {/* Sub tabs */}
-      <div style={{marginBottom:20}}>
-        <SegControl
-          options={[
-            {value:"cuenta",  label:"Mi cuenta"},
-            {value:"usuarios",label:"Usuarios"},
-            {value:"sistema", label:"Sistema"},
-          ]}
-          value={subTab} onChange={setSubTab}
-        />
-      </div>
-
-      {/* ── MI CUENTA ── */}
-      {subTab==="cuenta" && <CambiarContrasena user={user} usuarios={usuarios} onGuardar={guardarUsuarios}/>}
-
-      {/* ── USUARIOS ── */}
-      {subTab==="usuarios" && <GestionUsuarios user={user} usuarios={usuarios} onGuardar={guardarUsuarios}/>}
-
-      {/* ── SISTEMA ── */}
-      {subTab==="sistema" && (
-        <div>
-          {/* Info sistema */}
-          <div style={{background:C.bg2,borderRadius:16,overflow:"hidden",marginBottom:16}}>
-            {[
-              ["Versión","Toscana House v3.0"],
-              ["Base de datos","Supabase (nube)"],
-              ["Usuario activo",user.nombre],
-              ["Rol",user.rol==="admin"?"Administrador":"Cajero"],
-            ].map(([k,v],i,arr)=>(
-              <div key={k} style={{display:"flex",justifyContent:"space-between",
-                padding:"14px 16px",borderBottom:i<arr.length-1?`1px solid ${C.sep}`:""}}>
-                <span style={{fontSize:15,color:C.label2,fontFamily:FONT}}>{k}</span>
-                <span style={{fontSize:15,color:C.label,fontFamily:FONT,fontWeight:500}}>{v}</span>
-              </div>
-            ))}
-          </div>
-
-          {/* Cerrar sesión */}
-          <IOSBtn onPress={logout} variant="danger" full icon="🚪">
-            Cerrar sesión
-          </IOSBtn>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ── Cambiar contraseña ────────────────────────────────────
-function CambiarContrasena({user, usuarios, onGuardar}){
-  const [passActual,  setPassActual]  = useState("");
-  const [passNueva,   setPassNueva]   = useState("");
-  const [passConfirm, setPassConfirm] = useState("");
-  const [msg, setMsg] = useState(null);
-  const [show, setShow] = useState(false);
-
-  function cambiar(){
-    setMsg(null);
-    const u = usuarios.find(x=>x.usuario===user.usuario);
-    if (!u) { setMsg({ok:false,txt:"Usuario no encontrado"}); return; }
-    if (u.password !== passActual) { setMsg({ok:false,txt:"Contraseña actual incorrecta"}); return; }
-    if (passNueva.length < 6) { setMsg({ok:false,txt:"La nueva contraseña debe tener al menos 6 caracteres"}); return; }
-    if (passNueva !== passConfirm) { setMsg({ok:false,txt:"Las contraseñas no coinciden"}); return; }
-    const nuevos = usuarios.map(x=>x.usuario===user.usuario?{...x,password:passNueva}:x);
-    onGuardar(nuevos);
-    setMsg({ok:true,txt:"✓ Contraseña actualizada correctamente"});
-    setPassActual(""); setPassNueva(""); setPassConfirm("");
-  }
-
-  return (
-    <div>
-      <div style={{background:C.bg2,borderRadius:16,padding:16,marginBottom:16,
-        border:`1px solid ${C.sep}`}}>
-        <div style={{display:"flex",alignItems:"center",gap:14,marginBottom:16}}>
-          <div style={{width:48,height:48,borderRadius:"50%",
-            background:`${C.gold}20`,display:"flex",alignItems:"center",
-            justifyContent:"center",fontSize:22}}>👤</div>
-          <div>
-            <div style={{fontSize:17,fontWeight:700,color:C.label,fontFamily:FONT}}>{user.nombre}</div>
-            <div style={{fontSize:13,color:C.label3,fontFamily:FONT}}>@{user.usuario}</div>
-          </div>
-        </div>
-      </div>
-
-      <div style={{fontSize:13,fontWeight:700,color:C.label3,textTransform:"uppercase",
-        letterSpacing:.8,marginBottom:12}}>Cambiar contraseña</div>
-
-      <IOSInput label="Contraseña actual" type={show?"text":"password"}
-        value={passActual} onChange={e=>setPassActual(e.target.value)} placeholder="••••••••"/>
-      <IOSInput label="Nueva contraseña" type={show?"text":"password"}
-        value={passNueva} onChange={e=>setPassNueva(e.target.value)} placeholder="Mínimo 6 caracteres"/>
-      <IOSInput label="Confirmar nueva contraseña" type={show?"text":"password"}
-        value={passConfirm} onChange={e=>setPassConfirm(e.target.value)} placeholder="Repetir contraseña"/>
-
-      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:16}}>
-        <input type="checkbox" id="showPass" checked={show} onChange={e=>setShow(e.target.checked)}/>
-        <label htmlFor="showPass" style={{fontSize:13,color:C.label3,fontFamily:FONT,cursor:"pointer"}}>
-          Mostrar contraseñas
-        </label>
-      </div>
-
-      {msg&&(
-        <div style={{padding:"12px 14px",borderRadius:12,marginBottom:12,
-          background:msg.ok?`${C.green}15`:`${C.red}15`,
-          border:`1px solid ${msg.ok?C.green:C.red}40`,
-          color:msg.ok?C.green:C.red,fontSize:14,fontFamily:FONT}}>{msg.txt}</div>
-      )}
-
-      <IOSBtn onPress={cambiar} variant="primary" full icon="🔒">
-        Actualizar contraseña
-      </IOSBtn>
-    </div>
-  );
-}
-
-// ── Gestión de usuarios ───────────────────────────────────
-function GestionUsuarios({user, usuarios, onGuardar}){
-  const [modo,     setModo]    = useState(null); // null | "nuevo" | "editar"
-  const [editUser, setEditUser]= useState(null);
-  const [fUser,    setFUser]   = useState({usuario:"",password:"",nombre:"",rol:"caja"});
-  const [msg,      setMsg]     = useState(null);
-
-  if (user.rol !== "admin") {
-    return (
-      <div style={{textAlign:"center",padding:"48px 20px",color:C.label3}}>
-        <div style={{fontSize:40,marginBottom:12,opacity:.4}}>🔒</div>
-        <div style={{fontSize:16,fontWeight:600,color:C.label2,fontFamily:FONT}}>
-          Solo administradores
-        </div>
-        <div style={{fontSize:13,color:C.label3,fontFamily:FONT,marginTop:6}}>
-          Tu cuenta no tiene permisos para gestionar usuarios
-        </div>
-      </div>
-    );
-  }
-
-  function guardar(){
-    setMsg(null);
-    if(!fUser.usuario||!fUser.password||!fUser.nombre){setMsg({ok:false,txt:"Completa todos los campos"});return;}
-    if(fUser.password.length<6){setMsg({ok:false,txt:"La contraseña debe tener al menos 6 caracteres"});return;}
-    if(modo==="nuevo"){
-      if(usuarios.find(u=>u.usuario===fUser.usuario)){setMsg({ok:false,txt:"Ese usuario ya existe"});return;}
-      onGuardar([...usuarios,{...fUser}]);
-    } else {
-      onGuardar(usuarios.map(u=>u.usuario===editUser?{...u,...fUser}:u));
-    }
-    setMsg({ok:true,txt:`✓ Usuario ${modo==="nuevo"?"creado":"actualizado"}`});
-    setTimeout(()=>{setModo(null);setMsg(null);},1500);
-  }
-
-  function eliminar(usr){
-    if(usr===user.usuario){setMsg({ok:false,txt:"No puedes eliminar tu propio usuario"});return;}
-    if(!window.confirm(`¿Eliminar usuario "${usr}"?`)) return;
-    onGuardar(usuarios.filter(u=>u.usuario!==usr));
-  }
-
-  if(modo){
-    return (
-      <div>
-        <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:20}}>
-          <IOSBtn onPress={()=>{setModo(null);setMsg(null);}} variant="fill" small>← Volver</IOSBtn>
-          <span style={{fontSize:17,fontWeight:700,color:C.label,fontFamily:FONT}}>
-            {modo==="nuevo"?"Nuevo usuario":"Editar usuario"}
-          </span>
-        </div>
-        <IOSInput label="Nombre completo" value={fUser.nombre}
-          onChange={e=>setFUser(p=>({...p,nombre:e.target.value}))} placeholder="Ej: María García"/>
-        <IOSInput label="Usuario (para login)" value={fUser.usuario}
-          onChange={e=>setFUser(p=>({...p,usuario:e.target.value.toLowerCase().replace(/ /g,"")}))}
-          placeholder="Ej: maria" autoCapitalize="none"/>
-        <IOSInput label="Contraseña" type="password" value={fUser.password}
-          onChange={e=>setFUser(p=>({...p,password:e.target.value}))} placeholder="Mínimo 6 caracteres"/>
-        <div style={{marginBottom:12}}>
-          <div style={{fontSize:11,fontWeight:700,color:C.label2,textTransform:"uppercase",
-            letterSpacing:.8,marginBottom:8}}>Rol</div>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-            {[["admin","👑 Admin","Acceso total"],["caja","🛒 Cajero","Solo POS y ventas"]].map(([r,label,desc])=>(
-              <button key={r} onClick={()=>setFUser(p=>({...p,rol:r}))} style={{
-                padding:"12px",borderRadius:12,cursor:"pointer",fontFamily:FONT,
-                border:`2px solid ${fUser.rol===r?C.gold:C.sep}`,
-                background:fUser.rol===r?`${C.gold}15`:C.bg2,
-                textAlign:"left",
-              }}>
-                <div style={{fontSize:14,fontWeight:700,color:fUser.rol===r?C.gold:C.label}}>{label}</div>
-                <div style={{fontSize:11,color:C.label3,marginTop:2}}>{desc}</div>
-              </button>
-            ))}
-          </div>
-        </div>
-        {msg&&(
-          <div style={{padding:"12px 14px",borderRadius:12,marginBottom:12,
-            background:msg.ok?`${C.green}15`:`${C.red}15`,
-            border:`1px solid ${msg.ok?C.green:C.red}40`,
-            color:msg.ok?C.green:C.red,fontSize:14,fontFamily:FONT}}>{msg.txt}</div>
-        )}
-        <IOSBtn onPress={guardar} variant="primary" full icon="💾">
-          {modo==="nuevo"?"Crear usuario":"Guardar cambios"}
-        </IOSBtn>
-      </div>
-    );
-  }
-
-  return (
-    <div>
-      {msg&&(
-        <div style={{padding:"12px 14px",borderRadius:12,marginBottom:12,
-          background:msg.ok?`${C.green}15`:`${C.red}15`,
-          border:`1px solid ${msg.ok?C.green:C.red}40`,
-          color:msg.ok?C.green:C.red,fontSize:14,fontFamily:FONT}}>{msg.txt}</div>
-      )}
-
-      {/* Lista usuarios */}
-      <div style={{display:"flex",flexDirection:"column",gap:2,marginBottom:16}}>
-        {usuarios.map((u,i)=>(
-          <div key={u.usuario} style={{
-            background:C.bg2,
-            borderRadius:i===0?"14px 14px 2px 2px":i===usuarios.length-1?"2px 2px 14px 14px":"2px",
-            padding:"14px 16px",
-            borderBottom:i<usuarios.length-1?`1px solid ${C.sep}`:"",
-            display:"flex",alignItems:"center",gap:12,
-          }}>
-            <div style={{width:40,height:40,borderRadius:"50%",
-              background:u.rol==="admin"?`${C.gold}20`:`${C.green}20`,
-              display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>
-              {u.rol==="admin"?"👑":"🛒"}
-            </div>
-            <div style={{flex:1,minWidth:0}}>
-              <div style={{fontSize:15,fontWeight:600,color:C.label,fontFamily:FONT}}>{u.nombre}</div>
-              <div style={{fontSize:13,color:C.label3,fontFamily:FONT}}>
-                @{u.usuario} · {u.rol==="admin"?"Administrador":"Cajero"}
-              </div>
-            </div>
-            <div style={{display:"flex",gap:8,flexShrink:0}}>
-              <button onClick={()=>{setEditUser(u.usuario);setFUser({...u});setModo("editar");}} style={{
-                background:`${C.gold}15`,border:`1px solid ${C.gold}30`,
-                borderRadius:8,padding:"6px 12px",color:C.gold,
-                fontSize:12,fontFamily:FONT,fontWeight:600,cursor:"pointer",
-              }}>Editar</button>
-              {u.usuario!==user.usuario&&(
-                <button onClick={()=>eliminar(u.usuario)} style={{
-                  background:`${C.red}10`,border:`1px solid ${C.red}30`,
-                  borderRadius:8,padding:"6px 12px",color:C.red,
-                  fontSize:12,fontFamily:FONT,fontWeight:600,cursor:"pointer",
-                }}>Eliminar</button>
-              )}
-            </div>
-          </div>
-        ))}
-      </div>
-
-      <IOSBtn onPress={()=>{setFUser({usuario:"",password:"",nombre:"",rol:"caja"});setModo("nuevo");}}
-        variant="primary" full icon="+ ">
-        Agregar nuevo usuario
-      </IOSBtn>
-    </div>
-  );
-}
-
-// ══════════════════════════════════════════════════════════
-// VENTAS TAB — totales globales + desglose por marca
-// ══════════════════════════════════════════════════════════
-function VentasTab({vMes, totalVtas, mes, anio}){
-  const [vistaActiva, setVistaActiva] = useState("marcas"); // "marcas" | "historial"
-  const [marcaFiltro, setMarcaFiltro] = useState(null); // id marca o null = todas
-
-  // Calcular ventas por marca con desglose de método de pago
-  const porMarca = useMemo(()=>{
-    return MARCAS.map(m=>{
-      const efectivo = vMes.filter(v=>v.metodoPago==="efectivo")
-        .reduce((s,v)=>s+v.items.filter(i=>i.marcaId===m.id).reduce((ss,i)=>ss+i.subtotal,0),0);
-      const qr = vMes.filter(v=>v.metodoPago==="qr")
-        .reduce((s,v)=>s+v.items.filter(i=>i.marcaId===m.id).reduce((ss,i)=>ss+i.subtotal,0),0);
-      const tarjeta = vMes.filter(v=>v.metodoPago==="tarjeta")
-        .reduce((s,v)=>s+v.items.filter(i=>i.marcaId===m.id).reduce((ss,i)=>ss+i.subtotal,0),0);
-      const total = efectivo+qr+tarjeta;
-      const txs = vMes.filter(v=>v.items.some(i=>i.marcaId===m.id)).length;
-      return {marca:m, total, efectivo, qr, tarjeta, txs};
-    }).filter(x=>x.total>0).sort((a,b)=>b.total-a.total);
-  },[vMes]);
-
-  const totalEfectivo = vMes.filter(v=>v.metodoPago==="efectivo").reduce((s,v)=>s+v.total,0);
-  const totalQR       = vMes.filter(v=>v.metodoPago==="qr").reduce((s,v)=>s+v.total,0);
-  const totalTarjeta  = vMes.filter(v=>v.metodoPago==="tarjeta").reduce((s,v)=>s+v.total,0);
-  const maxVenta      = Math.max(...porMarca.map(x=>x.total), 1);
-
-  // Ventas filtradas por marca para el historial
-  const ventasFiltradas = useMemo(()=>{
-    if(!marcaFiltro) return [...vMes].reverse();
-    return [...vMes].filter(v=>v.items.some(i=>i.marcaId===marcaFiltro)).reverse();
-  },[vMes, marcaFiltro]);
-
-  return (
-    <div>
-      {/* Stats globales */}
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:16}}>
-        <div style={{gridColumn:"1/-1",background:C.bg2,borderRadius:16,padding:"16px 20px",
-          border:`1px solid ${C.sep}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-          <div>
-            <div style={{fontSize:11,color:C.label3,fontWeight:700,textTransform:"uppercase",letterSpacing:.7,marginBottom:3}}>Total {MESES[mes]}</div>
-            <div style={{fontSize:28,fontWeight:800,color:C.gold,fontFamily:FONT,lineHeight:1}}>{$(totalVtas)}</div>
-            <div style={{fontSize:12,color:C.label3,fontFamily:FONT,marginTop:3}}>{vMes.length} transacciones · {porMarca.length} marcas activas</div>
-          </div>
-          <div style={{fontSize:36,opacity:.4}}>💰</div>
-        </div>
-        {[
-          {icon:"💵",label:"Efectivo",value:totalEfectivo,color:"#4A9B6F"},
-          {icon:"📱",label:"QR",value:totalQR,color:"#5B8DB8"},
-          {icon:"💳",label:"Tarjeta",value:totalTarjeta,color:"#C8922A"},
-        ].map(s=>(
-          <StatCard key={s.label} icon={s.icon} label={s.label} value={$(s.value)}
-            sub={`${Math.round(totalVtas>0?(s.value/totalVtas)*100:0)}% del total`} color={s.color}/>
-        ))}
-      </div>
-
-      {/* Selector vista */}
-      <div style={{marginBottom:16}}>
-        <SegControl
-          options={[{value:"marcas",label:"Por Marca"},{value:"historial",label:"Historial"}]}
-          value={vistaActiva} onChange={setVistaActiva}
-        />
-      </div>
-
-      {/* ── VISTA POR MARCA ── */}
-      {vistaActiva==="marcas"&&(
-        <div>
-          {porMarca.length===0
-            ? <EmptyState icon="📊" title={`Sin ventas en ${MESES[mes]}`} sub="Las ventas aparecerán aquí"/>
-            : porMarca.map((x,i)=>(
-                <div key={x.marca.id} style={{
-                  background:C.bg2,
-                  borderRadius:i===0?"16px 16px 4px 4px":i===porMarca.length-1?"4px 4px 16px 16px":"4px",
-                  borderBottom:i<porMarca.length-1?`1px solid ${C.sep}`:"",
-                  padding:"14px 16px",
-                  cursor:"pointer",
-                  WebkitTapHighlightColor:"transparent",
-                  borderLeft:`4px solid ${x.marca.color}`,
-                }}
-                onClick={()=>{setMarcaFiltro(marcaFiltro===x.marca.id?null:x.marca.id);setVistaActiva("historial");}}>
-                  {/* Cabecera marca */}
-                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
-                    <div style={{display:"flex",alignItems:"center",gap:10}}>
-                      <div style={{width:36,height:36,borderRadius:10,
-                        background:`${x.marca.color}22`,display:"flex",
-                        alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>
-                        {x.marca.emoji}
-                      </div>
-                      <div>
-                        <div style={{fontSize:15,fontWeight:700,color:C.label,fontFamily:FONT}}>{x.marca.nombre}</div>
-                        <div style={{fontSize:12,color:C.label3,fontFamily:FONT}}>{x.txs} venta{x.txs!==1?"s":""}</div>
-                      </div>
-                    </div>
-                    <div style={{textAlign:"right"}}>
-                      <div style={{fontSize:18,fontWeight:800,color:x.marca.color,fontFamily:FONT}}>{$(x.total)}</div>
-                      <div style={{fontSize:11,color:C.label3,fontFamily:FONT}}>
-                        {Math.round((x.total/totalVtas)*100)}% del total
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Barra total */}
-                  <div style={{background:"rgba(0,0,0,0.06)",borderRadius:6,height:6,marginBottom:10,overflow:"hidden"}}>
-                    <div style={{width:`${(x.total/maxVenta)*100}%`,background:x.marca.color,
-                      height:6,borderRadius:6,transition:"width .5s"}}/>
-                  </div>
-
-                  {/* Desglose métodos de pago */}
-                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
-                    {[
-                      {icon:"💵",label:"Efectivo",value:x.efectivo,color:"#4A9B6F"},
-                      {icon:"📱",label:"QR",value:x.qr,color:"#5B8DB8"},
-                      {icon:"💳",label:"Tarjeta",value:x.tarjeta,color:"#C8922A"},
-                    ].map(p=>(
-                      <div key={p.label} style={{
-                        padding:"8px 10px",borderRadius:10,
-                        background:p.value>0?`${p.color}12`:"rgba(0,0,0,0.03)",
-                        border:`1px solid ${p.value>0?p.color+"25":C.sep}`,
-                        opacity:p.value>0?1:.5,
-                      }}>
-                        <div style={{fontSize:14,marginBottom:3}}>{p.icon}</div>
-                        <div style={{fontSize:11,color:C.label3,fontFamily:FONT,marginBottom:2}}>{p.label}</div>
-                        <div style={{fontSize:13,fontWeight:700,
-                          color:p.value>0?p.color:C.label3,fontFamily:FONT}}>
-                          {p.value>0?$(p.value):"—"}
-                        </div>
-                        {p.value>0&&x.total>0&&(
-                          <div style={{fontSize:10,color:C.label3,fontFamily:FONT}}>
-                            {Math.round((p.value/x.total)*100)}%
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-
-                  <div style={{marginTop:10,fontSize:11,color:x.marca.color,
-                    fontFamily:FONT,textAlign:"right",fontWeight:600}}>
-                    Ver ventas de {x.marca.nombre} →
-                  </div>
-                </div>
-              ))
-          }
-        </div>
-      )}
-
-      {/* ── HISTORIAL ── */}
-      {vistaActiva==="historial"&&(
-        <div>
-          {/* Filtro por marca */}
-          <div style={{display:"flex",gap:8,overflowX:"auto",paddingBottom:8,marginBottom:14,
-            scrollbarWidth:"none",WebkitOverflowScrolling:"touch"}}>
-            <button onClick={()=>setMarcaFiltro(null)} style={{
-              flexShrink:0,padding:"7px 16px",borderRadius:20,
-              border:`1.5px solid ${!marcaFiltro?C.gold:C.sep}`,
-              background:!marcaFiltro?`${C.gold}20`:"transparent",
-              color:!marcaFiltro?C.gold:C.label3,
-              fontSize:12,fontFamily:FONT,fontWeight:!marcaFiltro?700:400,
-              cursor:"pointer",WebkitTapHighlightColor:"transparent",
-            }}>Todas</button>
-            {MARCAS.filter(m=>vMes.some(v=>v.items.some(i=>i.marcaId===m.id))).map(m=>(
-              <button key={m.id} onClick={()=>setMarcaFiltro(marcaFiltro===m.id?null:m.id)} style={{
-                flexShrink:0,padding:"7px 14px",borderRadius:20,
-                border:`1.5px solid ${marcaFiltro===m.id?m.color:C.sep}`,
-                background:marcaFiltro===m.id?`${m.color}20`:"transparent",
-                color:marcaFiltro===m.id?m.color:C.label3,
-                fontSize:12,fontFamily:FONT,fontWeight:marcaFiltro===m.id?700:400,
-                cursor:"pointer",WebkitTapHighlightColor:"transparent",
-                display:"flex",alignItems:"center",gap:5,
-              }}>
-                <span>{m.emoji}</span>{m.nombre}
-              </button>
-            ))}
-          </div>
-
-          {ventasFiltradas.length===0
-            ? <EmptyState icon="📋" title="Sin ventas" sub={marcaFiltro?"Esta marca no tiene ventas":"Sin ventas en el período"}/>
-            : ventasFiltradas.map(v=>{
-                const pg=PAGOS.find(p=>p.id===v.metodoPago);
-                const itemsMostrar=marcaFiltro
-                  ? v.items.filter(i=>i.marcaId===marcaFiltro)
-                  : v.items;
-                const totalMostrar=itemsMostrar.reduce((s,i)=>s+i.subtotal,0);
-                return (
-                  <div key={v.id} style={{background:C.bg2,borderRadius:16,padding:"14px 16px",marginBottom:10}}>
-                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
-                      <div>
-                        <span style={{fontFamily:"monospace",fontSize:12,color:C.gold,fontWeight:700}}>{v.id}</span>
-                        <div style={{fontSize:12,color:C.label3,fontFamily:FONT,marginTop:2}}>
-                          {v.fecha} {v.hora} · {v.vendedor||"Tienda"}
-                        </div>
-                      </div>
-                      <div style={{display:"flex",alignItems:"center",gap:8}}>
-                        <Chip color={pg?.color||C.green}>{pg?.icon} {pg?.label}</Chip>
-                        <span style={{fontSize:18,fontWeight:800,color:C.gold,fontFamily:FONT}}>{$(totalMostrar)}</span>
-                      </div>
-                    </div>
-                    {/* Ítems agrupados por marca */}
-                    {(()=>{
-                      const byMarca={};
-                      itemsMostrar.forEach(it=>{
-                        if(!byMarca[it.marcaId])byMarca[it.marcaId]={marca:MARCAS.find(m=>m.id===it.marcaId),items:[],sub:0};
-                        byMarca[it.marcaId].items.push(it);
-                        byMarca[it.marcaId].sub+=it.subtotal;
-                      });
-                      return Object.values(byMarca).map(g=>(
-                        <div key={g.marca?.id} style={{marginBottom:8,padding:"8px 10px",
-                          background:`${g.marca?.color}10`,borderRadius:10,
-                          borderLeft:`3px solid ${g.marca?.color}`}}>
-                          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
-                            <div style={{display:"flex",alignItems:"center",gap:6}}>
-                              <span style={{fontSize:14}}>{g.marca?.emoji}</span>
-                              <span style={{fontSize:13,fontWeight:700,color:g.marca?.color,fontFamily:FONT}}>{g.marca?.nombre}</span>
-                            </div>
-                            <span style={{fontSize:13,fontWeight:700,color:g.marca?.color,fontFamily:FONT}}>{$(g.sub)}</span>
-                          </div>
-                          {g.items.map((it,ii)=>(
-                            <div key={ii} style={{fontSize:12,color:C.label2,fontFamily:FONT}}>
-                              · {it.nombre} ×{it.cantidad} = {$(it.subtotal)}
-                            </div>
-                          ))}
-                        </div>
-                      ));
-                    })()}
-                    <IOSBtn onPress={()=>sendWA(v)} variant="fill" small full icon="📲">
-                      Enviar por WhatsApp
-                    </IOSBtn>
-                    {v.etiquetaImg&&<img src={v.etiquetaImg} alt="etiqueta"
-                      style={{width:"100%",maxHeight:80,objectFit:"cover",borderRadius:10,marginTop:10}}/>}
-                  </div>
-                );
-              })
-          }
         </div>
       )}
     </div>
