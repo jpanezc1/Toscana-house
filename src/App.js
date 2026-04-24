@@ -2310,44 +2310,6 @@ function POS({inv,onVenta}){
       )}
 
       {showScanner&&(<QRScanner onDetect={(codigo)=>{setShowScanner(false);setScanStatus("ok");const prod=inv.find(i=>i.codigo.toUpperCase()===codigo.toUpperCase());if(prod){add(prod);setScanMsg("Agregado: "+prod.nombre);}else{setBusq(codigo);setScanStatus("notfound");setScanMsg("Codigo: "+codigo+" - buscar manual");}setTimeout(()=>{setScanStatus(null);setScanMsg("");},4000);}} onClose={()=>setShowScanner(false)}/>)}
-      {/* Escanear QR */}
-      <div style={{marginBottom:14}}>
-        <IOSBtn onPress={()=>setShowScanner(true)} variant="fill" full icon="📷">Escanear QR en vivo</IOSBtn>
-        {scanMsg&&<div style={{marginTop:10,padding:"10px 14px",borderRadius:12,fontSize:14,fontFamily:FONT,background:scanStatus==="ok"?"rgba(74,155,111,0.15)":"rgba(200,146,42,0.15)",color:scanStatus==="ok"?C.green:C.amber}}>{scanMsg}</div>}
-      </div>
-      <div style={{background:C.bg2,borderRadius:14,padding:"14px 16px",marginBottom:14,
-        border:scanStatus==="ok"?`1.5px solid ${C.green}`:scanStatus==="notfound"?`1.5px solid ${C.amber}`:`1px solid ${C.sep}`}}>
-        <div style={{fontSize:13,fontWeight:600,color:C.label3,textTransform:"uppercase",
-          letterSpacing:.6,marginBottom:10}}>📷 Escanear Etiqueta</div>
-        <input ref={fileRef} type="file" accept="image/*" capture="environment"
-          onChange={handleEtiqueta} style={{display:"none"}}/>
-        <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:scanMsg?10:0}}>
-          <IOSBtn onPress={()=>fileRef.current?.click()} variant="fill" small icon="📷">
-            {scanStatus==="leyendo"?"Leyendo…":etiqueta?"Nueva foto":"Fotografiar código"}
-          </IOSBtn>
-          {etiqueta&&(
-            <>
-              <img src={etiqueta} alt="etiqueta"
-                style={{height:44,borderRadius:8,border:`1px solid ${C.sep}`}}/>
-              <button onClick={()=>{setEtiqueta(null);setScanStatus(null);setScanMsg("");}} style={{
-                background:"none",border:"none",color:C.red,fontSize:18,cursor:"pointer",
-                WebkitTapHighlightColor:"transparent",
-              }}>×</button>
-            </>
-          )}
-        </div>
-        {scanMsg&&(
-          <div style={{padding:"8px 12px",borderRadius:10,fontSize:13,fontFamily:FONT,
-            background:scanStatus==="ok"?`${C.green}15`:scanStatus==="notfound"?`${C.amber}15`:C.fill2,
-            color:scanStatus==="ok"?C.green:scanStatus==="notfound"?C.amber:C.label2}}>
-            {scanStatus==="leyendo"&&"⏳ "}{scanMsg}
-          </div>
-        )}
-        <div style={{fontSize:11,color:C.label3,fontFamily:FONT,marginTop:8}}>
-          Apunta al código de barras o QR de la prenda → se agrega automáticamente al carrito
-        </div>
-      </div>
-
       {/* Botón cobrar */}
       <IOSBtn
         onPress={()=>carrito.length&&setShowPago(true)}
