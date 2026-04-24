@@ -1677,6 +1677,9 @@ export default function App(){
   const showingDetail = tab==="marcas" && marcaDetalle;
   // Pasar dbStatus al NavBar via closure (ya está en scope)
 
+  // Early return si no hay sesión
+  if (!user) return <LoginScreen onLogin={login}/>;
+
   return (
     <div style={{
       minHeight:"100vh",
@@ -1687,10 +1690,6 @@ export default function App(){
       WebkitFontSmoothing:"antialiased",
       MozOsxFontSmoothing:"grayscale",
     }}>
-
-      {/* ── LOGIN GATE ── */}
-      {!user && <LoginScreen onLogin={login}/>}
-      {user && <>
 
       {/* ── LOADING SCREEN ── */}
       {cargando&&(
@@ -2022,7 +2021,6 @@ export default function App(){
         syncCierre={drive.syncCierre}
       />
     </div>
-      </>}
   );
 }
 
