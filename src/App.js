@@ -1689,7 +1689,8 @@ export default function App(){
     }}>
 
       {/* ── LOGIN GATE ── */}
-      {!user ? <LoginScreen onLogin={login}/> : <>
+      {!user && <LoginScreen onLogin={login}/>}
+      {user && <>
 
       {/* ── LOADING SCREEN ── */}
       {cargando&&(
@@ -2021,7 +2022,7 @@ export default function App(){
         syncCierre={drive.syncCierre}
       />
     </div>
-    </>}
+      </>}
   );
 }
 
