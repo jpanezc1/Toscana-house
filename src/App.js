@@ -361,7 +361,8 @@ async function drivePost(action, payload) {
 function useDriveSync() {
   const[url,setUrl]=useState(() => localStorage.getItem("th_drive_url") || "");
   const[syncing,setSyncing]=useState(false);
-  const[syncLog,setSyncLog]=useState(() => { } catch { return []; }
+  const[syncLog,setSyncLog]=useState(() => {
+    try { return JSON.parse(localStorage.getItem("th_sync_log") || "[]"); } catch { return []; }
   });
 
   function saveUrl(u) {
