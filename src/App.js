@@ -1537,27 +1537,27 @@ function LoginScreen({ onLogin }) {
 export default function App(){
   const { user, login, logout } = useAuth();
   const now=new Date();
-  const[tab,setTab]         =useState("pos");
-  const[inv,setInv]         =useState([]);
-  const[ventas,setVentas]   =useState([]);
-  const[alq,setAlq]         =useState([]);
-  const[cierres,setCierres] =useState({});
-  const[cargando,setCargando]=useState(true);
-  const[dbStatus,setDbStatus]=useState("connecting");
-  const[mes,setMes]         =useState(now.getMonth());
-  const[anio,setAnio]       =useState(now.getFullYear());
-  const[marcaDetalle,setMD] =useState(null);
-  const[sheetInv,setShInv]  =useState(false);
-  const[sheetBaja,setShBaja]=useState(false);
-  const[sheetDrive,setShDrive]=useState(false);
-  const[mLiq,setMLiq]       =useState(null);
-  const[fInv,setFInv]       =useState({marcaId:"",nombre:"",categoria:"",precio:"",stock:"",fecha:hoy()});
-  const[bajaCod,setBajaCod] =useState("");
-  const[bajaMsg,setBajaMsg] =useState(null);
-  const[busqInv,setBusqInv] =useState("");
-  const[filInvM,setFilInvM] =useState("");
-  const[driveUrl,setDriveUrlLocal]=useState(()=>{ try{return localStorage.getItem("th_drive_url")||"";}catch{return "";} });
-  const[generando,setGenerando]=useState(false);
+  const [tab, setTab] = useState("pos");
+  const [inv, setInv] = useState([]);
+  const [ventas, setVentas] = useState([]);
+  const [alq, setAlq] = useState([]);
+  const [cierres, setCierres] = useState({});
+  const [cargando, setCargando] = useState(true);
+  const [dbStatus, setDbStatus] = useState("connecting");
+  const [mes, setMes] = useState(now.getMonth());
+  const [anio, setAnio] = useState(now.getFullYear());
+  const [marcaDetalle, setMD] = useState(null);
+  const [sheetInv, setShInv] = useState(false);
+  const [sheetBaja, setShBaja] = useState(false);
+  const [sheetDrive, setShDrive] = useState(false);
+  const [mLiq, setMLiq] = useState(null);
+  const [fInv, setFInv] = useState({marcaId:"",nombre:"",categoria:"",precio:"",stock:"",fecha:hoy()});
+  const [bajaCod, setBajaCod] = useState("");
+  const [bajaMsg, setBajaMsg] = useState(null);
+  const [busqInv, setBusqInv] = useState("");
+  const [filInvM, setFilInvM] = useState("");
+  const [driveUrl, setDriveUrlLocal] = useState(()=>{ try{return localStorage.getItem("th_drive_url")||"";}catch{return "";} });
+  const [generando, setGenerando] = useState(false);
   const drive = useDriveSync();
 
   // Cargar datos desde Supabase al inicio
@@ -2103,18 +2103,18 @@ function QRScanner({ onDetect, onClose }) {
 // POS — iOS Caja
 // ══════════════════════════════════════════════════════════
 function POS({inv,onVenta}){
-  const[carrito,setCarrito]   =useState([]);
-  const[busq,setBusq]         =useState("");
-  const[pago,setPago]         =useState("efectivo");
-  const[vendedor,setVendedor] =useState("");
-  const[descExtra,setDescExtra]=useState(0);
-  const[etiqueta,setEtiqueta] =useState(null);
-  const[ultima,setUltima]     =useState(null);
-  const[showOk,setShowOk]     =useState(false);
-  const[showPago,setShowPago] =useState(false);
-  const[scanStatus,setScanStatus]=useState(null); // null | "leyendo" | "ok" | "notfound"
-  const[scanMsg,setScanMsg]   =useState("");
-  const[showScanner,setShowScanner]=useState(false);
+  const [carrito, setCarrito] = useState([]);
+  const [busq, setBusq] = useState("");
+  const [pago, setPago] = useState("efectivo");
+  const [vendedor, setVendedor] = useState("");
+  const [descExtra, setDescExtra] = useState(0);
+  const [etiqueta, setEtiqueta] = useState(null);
+  const [ultima, setUltima] = useState(null);
+  const [showOk, setShowOk] = useState(false);
+  const [showPago, setShowPago] = useState(false);
+  const [scanStatus, setScanStatus] = useState(null); // null | "leyendo" | "ok" | "notfound"
+  const [scanMsg, setScanMsg] = useState("");
+  const [showScanner, setShowScanner] = useState(false);
   const inputRef=useRef();
   const fileRef=useRef();
 
@@ -2426,9 +2426,9 @@ function POS({inv,onVenta}){
 // SHEET RECIBIR PRODUCTO — con generación de código de barra
 // ══════════════════════════════════════════════════════════
 function SheetRecibir({open, onClose, inv, onAdd, fInv, setFInv}){
-  const[scanInvMsg,setScanInvMsg]=useState("");
-  const[scanInvStatus,setScanInvStatus]=useState(null);
-  const[barcodeReady,setBarcodeReady]=useState(false);
+  const [scanInvMsg, setScanInvMsg] = useState("");
+  const [scanInvStatus, setScanInvStatus] = useState(null);
+  const [barcodeReady, setBarcodeReady] = useState(false);
   const scanInvRef=useRef(null);
   
   const codigoGenerado = fInv.marcaId && fInv.nombre
@@ -2737,8 +2737,8 @@ function InventarioPorMarca({inv, ventas, onRecibir, onBaja}){
 // MARCA DETALLE — iOS navigation push style
 // ══════════════════════════════════════════════════════════
 function MarcaDetalle({marcaId,inv,ventas,vMes,mes,anio,MK,cierres,setCierres,getHist,getLiq}){
-  const[sub,setSub]       =useState("historial");
-  const[filtroMk,setFMk]  =useState("");
+  const [sub, setSub] = useState("historial");
+  const [filtroMk, setFMk] = useState("");
   const marca   =MARCAS.find(m=>m.id===marcaId);
   const liq     =getLiq(marcaId);
   const cerrado =cierres[`${MK}-${marcaId}`]?.cerrado;
