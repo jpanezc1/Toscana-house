@@ -115,7 +115,7 @@ async function sbCargarTodo() {
 
 // Hook de estado de conexión Supabase
 function useSupabaseStatus() {
-  const [status, setStatus] = useState("connecting"); // connecting | ok | error
+  const[status,setStatus]=useState("connecting"); // connecting | ok | error
   useEffect(() => {
     getSupabase()
       .then(db => db.from("inventario").select("id").limit(1))
@@ -158,21 +158,7 @@ function loadJsBarcode() {
   });
 }
 
-// Carga jsQR — librería principal para leer QR codes generados por QRCode.js
-let _jsQRLib = null;
-function loadJsQR() {
-  return new Promise(res => {
-    if (_jsQRLib) { res(_jsQRLib); return; }
-    if (window.jsQR) { _jsQRLib = window.jsQR; res(_jsQRLib); return; }
-    const s = document.createElement("script");
-    s.src = "https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js";
-    s.onload = () => { _jsQRLib = window.jsQR; res(_jsQRLib); };
-    s.onerror = () => res(null);
-    document.head.appendChild(s);
-  });
-}
-
-// Carga ZXing como fallback para códigos de barras lineales (CODE_128, EAN, etc.)
+// Carga ZXing para leer códigos desde imagen
 let _ZXingLoaded = false;
 let _ZXingLib = null;
 function loadZXing() {
@@ -186,79 +172,35 @@ function loadZXing() {
   });
 }
 
-// Convierte imagen a canvas y devuelve {canvas, ctx, imageData}
-async function imagenACanvas(file) {
-  const img = new Image();
-  const url = URL.createObjectURL(file);
-  await new Promise((res, rej) => { img.onload = res; img.onerror = rej; img.src = url; });
-  URL.revokeObjectURL(url);
-  const canvas = document.createElement("canvas");
-  // Escalar si la imagen es muy grande (mejora detección)
-  const MAX = 1200;
-  const scale = Math.min(1, MAX / Math.max(img.width, img.height));
-  canvas.width = Math.round(img.width * scale);
-  canvas.height = Math.round(img.height * scale);
-  const ctx = canvas.getContext("2d");
-  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  return { canvas, ctx, imageData };
-}
-
-// Lee código QR/barras desde un archivo de imagen
-// Estrategia: jsQR (QR) → BarcodeDetector nativo → ZXing fallback
+// Lee código de barras/QR desde un archivo de imagen
 async function leerCodigoDeImagen(file) {
   try {
-    const { canvas, ctx, imageData } = await imagenACanvas(file);
-
-    // 1️⃣ jsQR — más confiable para QR codes generados por QRCode.js
-    const jsQR = await loadJsQR();
-    if (jsQR) {
-      const result = jsQR(imageData.data, imageData.width, imageData.height, {
-        inversionAttempts: "dontInvert",
-      });
-      if (result?.data) return result.data;
-      // Intentar con inversión (QR oscuro sobre fondo claro)
-      const result2 = jsQR(imageData.data, imageData.width, imageData.height, {
-        inversionAttempts: "onlyInvert",
-      });
-      if (result2?.data) return result2.data;
-    }
-
-    // 2️⃣ BarcodeDetector nativo del navegador (Chrome/Safari moderno)
-    if (window.BarcodeDetector) {
-      try {
-        const detector = new window.BarcodeDetector({
-          formats: ["qr_code", "code_128", "ean_13", "ean_8", "upc_a", "itf", "data_matrix"],
-        });
-        const codes = await detector.detect(canvas);
-        if (codes.length > 0) return codes[0].rawValue;
-      } catch(e) {}
-    }
-
-    // 3️⃣ ZXing como último fallback (códigos lineales CODE_128, EAN, etc.)
-    try {
-      const ZXing = await loadZXing();
-      if (ZXing) {
-        const hints = new Map();
-        const formats = [
-          ZXing.BarcodeFormat.CODE_128, ZXing.BarcodeFormat.CODE_39,
-          ZXing.BarcodeFormat.EAN_13,   ZXing.BarcodeFormat.EAN_8,
-          ZXing.BarcodeFormat.QR_CODE,  ZXing.BarcodeFormat.DATA_MATRIX,
-          ZXing.BarcodeFormat.ITF,      ZXing.BarcodeFormat.UPC_A,
-        ];
-        hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, formats);
-        hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
-        const reader = new ZXing.MultiFormatReader();
-        reader.setHints(hints);
-        const luminance = new ZXing.HTMLCanvasElementLuminanceSource(canvas);
-        const binaryBitmap = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(luminance));
-        const result = reader.decode(binaryBitmap);
-        if (result?.text) return result.text;
-      }
-    } catch(e) {}
-
-    return null;
+    const ZXing = await loadZXing();
+    if (!ZXing) return null;
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    await new Promise((res, rej) => { img.onload = res; img.onerror = rej; img.src = url; });
+    const canvas = document.createElement("canvas");
+    canvas.width = img.width; canvas.height = img.height;
+    canvas.getContext("2d").drawImage(img, 0, 0);
+    URL.revokeObjectURL(url);
+    const hints = new Map();
+    const formats = [
+      ZXing.BarcodeFormat.CODE_128, ZXing.BarcodeFormat.CODE_39,
+      ZXing.BarcodeFormat.EAN_13,   ZXing.BarcodeFormat.EAN_8,
+      ZXing.BarcodeFormat.QR_CODE,  ZXing.BarcodeFormat.DATA_MATRIX,
+      ZXing.BarcodeFormat.ITF,      ZXing.BarcodeFormat.UPC_A,
+    ];
+    hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, formats);
+    hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
+    const reader = new ZXing.MultiFormatReader();
+    reader.setHints(hints);
+    const luminance = new ZXing.HTMLCanvasElementLuminanceSource(canvas);
+    const binaryBitmap = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(luminance));
+    const result = reader.decode(binaryBitmap);
+    return result?.text || null;
   } catch (e) {
+    // Intento con rotaciones si falla el primero
     return null;
   }
 }
@@ -297,7 +239,7 @@ async function generarSVGBarcode(codigo) {
 // Componente: muestra QR code inline
 function BarcodeDisplay({ codigo, small }) {
   const containerRef = useRef(null);
-  const [qrDataUrl, setQrDataUrl] = useState("");
+  const[qrDataUrl,setQrDataUrl]=useState("");
 
   useEffect(() => {
     if (!codigo || !containerRef.current) return;
@@ -417,10 +359,9 @@ async function drivePost(action, payload) {
 
 // Hook que maneja el estado de sincronización
 function useDriveSync() {
-  const [url, setUrl]         = useState(() => localStorage.getItem("th_drive_url") || "");
-  const [syncing, setSyncing] = useState(false);
-  const [syncLog, setSyncLog] = useState(() => {
-    try { return JSON.parse(localStorage.getItem("th_sync_log") || "[]"); } catch { return []; }
+  const[url,setUrl]=useState(() => localStorage.getItem("th_drive_url") || "");
+  const[syncing,setSyncing]=useState(false);
+  const[syncLog,setSyncLog]=useState(() => { } catch { return []; }
   });
 
   function saveUrl(u) {
@@ -1004,7 +945,7 @@ function LogoMark({size=36, color="#3D6B3D"}){
 }
 
 function usePress(onPress) {
-  const [pressed, setPressed] = useState(false);
+  const[pressed,setPressed]=useState(false);
   return {
     onTouchStart: () => setPressed(true),
     onTouchEnd:   () => { setPressed(false); onPress && onPress(); },
@@ -1192,8 +1133,8 @@ function IOSBtn({children,onPress,variant="primary",full,disabled,small,icon}){
 
 // iOS sheet (bottom modal)
 function Sheet({open,onClose,title,children,tall}){
-  const [visible,setVisible]=useState(false);
-  const [anim,setAnim]=useState(false);
+  const[visible,setVisible]=useState(false);
+  const[anim,setAnim]=useState(false);
   useEffect(()=>{
     if(open){setVisible(true);setTimeout(()=>setAnim(true),10);}
     else{setAnim(false);setTimeout(()=>setVisible(false),320);}
@@ -1414,8 +1355,7 @@ const USUARIOS = [
 ];
 
 function useAuth() {
-  const [user, setUser] = useState(()=>{
-    try { return JSON.parse(localStorage.getItem("th_user")||"null"); } catch { return null; }
+  const[user,setUser]=useState(()=>{ } catch { return null; }
   });
 
   function login(usuario, password) {
@@ -1447,11 +1387,11 @@ function useAuth() {
 
 // Pantalla de Login
 function LoginScreen({ onLogin }) {
-  const [usuario, setUsuario] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError]     = useState("");
-  const [loading, setLoading] = useState(false);
-  const [showPass, setShowPass] = useState(false);
+  const[usuario,setUsuario]=useState("");
+  const[password,setPassword]=useState("");
+  const[error,setError]=useState("");
+  const[loading,setLoading]=useState(false);
+  const[showPass,setShowPass]=useState(false);
 
   function handleLogin() {
     if (!usuario || !password) { setError("Completa todos los campos"); return; }
@@ -1595,27 +1535,27 @@ function LoginScreen({ onLogin }) {
 export default function App(){
   const { user, login, logout } = useAuth();
   const now=new Date();
-  const [tab, setTab] = useState("pos");
-  const [inv, setInv] = useState([]);
-  const [ventas, setVentas] = useState([]);
-  const [alq, setAlq] = useState([]);
-  const [cierres, setCierres] = useState({});
-  const [cargando, setCargando] = useState(true);
-  const [dbStatus, setDbStatus] = useState("connecting");
-  const [mes, setMes] = useState(now.getMonth());
-  const [anio, setAnio] = useState(now.getFullYear());
-  const [marcaDetalle, setMD] = useState(null);
-  const [sheetInv, setShInv] = useState(false);
-  const [sheetBaja, setShBaja] = useState(false);
-  const [sheetDrive, setShDrive] = useState(false);
-  const [mLiq, setMLiq] = useState(null);
-  const [fInv, setFInv] = useState({marcaId:"",nombre:"",categoria:"",precio:"",stock:"",fecha:hoy()});
-  const [bajaCod, setBajaCod] = useState("");
-  const [bajaMsg, setBajaMsg] = useState(null);
-  const [busqInv, setBusqInv] = useState("");
-  const [filInvM, setFilInvM] = useState("");
-  const [driveUrl, setDriveUrlLocal] = useState(()=>{ try{return localStorage.getItem("th_drive_url")||"";}catch{return "";} });
-  const [generando, setGenerando] = useState(false);
+  const[tab,setTab]         =useState("pos");
+  const[inv,setInv]         =useState([]);
+  const[ventas,setVentas]   =useState([]);
+  const[alq,setAlq]         =useState([]);
+  const[cierres,setCierres] =useState({});
+  const[cargando,setCargando]=useState(true);
+  const[dbStatus,setDbStatus]=useState("connecting");
+  const[mes,setMes]         =useState(now.getMonth());
+  const[anio,setAnio]       =useState(now.getFullYear());
+  const[marcaDetalle,setMD] =useState(null);
+  const[sheetInv,setShInv]  =useState(false);
+  const[sheetBaja,setShBaja]=useState(false);
+  const[sheetDrive,setShDrive]=useState(false);
+  const[mLiq,setMLiq]       =useState(null);
+  const[fInv,setFInv]       =useState({marcaId:"",nombre:"",categoria:"",precio:"",stock:"",fecha:hoy()});
+  const[bajaCod,setBajaCod] =useState("");
+  const[bajaMsg,setBajaMsg] =useState(null);
+  const[busqInv,setBusqInv] =useState("");
+  const[filInvM,setFilInvM] =useState("");
+  const[driveUrl,setDriveUrlLocal]=useState(()=>{ try{return localStorage.getItem("th_drive_url")||"";}catch{return "";} });
+  const[generando,setGenerando]=useState(false);
   const drive = useDriveSync();
 
   // Cargar datos desde Supabase al inicio
@@ -2083,115 +2023,211 @@ export default function App(){
   );
 }
 
-// ══════════════════════════════════════════════════════════
 
-// QR Scanner en vivo
+// ════════════════════════════════════════════════════════════
+// ESCÁNER QR EN VIVO — usa cámara nativa del iPhone
+// Lee QR en tiempo real sin necesidad de tomar foto
+// ════════════════════════════════════════════════════════════
 function QRScanner({ onDetect, onClose }) {
-  const videoRef = useRef(null);
+  const videoRef  = useRef(null);
   const canvasRef = useRef(null);
   const streamRef = useRef(null);
-  const timerRef = useRef(null);
-  const [status, setStatus] = useState("iniciando");
-  const [msg, setMsg] = useState("");
-  useEffect(() => { startCamera(); return () => stopCamera(); }, []);
+  const timerRef  = useRef(null);
+  const[status,setStatus]=useState("iniciando"); // iniciando | activo | error
+  const[msg,setMsg]=useState("");
+
+  useEffect(() => {
+    startCamera();
+    return () => stopCamera();
+  }, []);
+
   async function startCamera() {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "environment", width: 1280, height: 720 }
+      });
       streamRef.current = stream;
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         videoRef.current.play();
         setStatus("activo");
-        setMsg("Apunta al codigo QR de la prenda");
-        timerRef.current = setInterval(scanFrame, 400);
+        setMsg("Apunta al código QR de la prenda");
+        // Start scanning loop
+        timerRef.current = setInterval(scanFrame, 300);
       }
-    } catch(e) { setStatus("error"); setMsg("Permite el acceso a la camara en Ajustes > Safari"); }
+    } catch (e) {
+      setStatus("error");
+      setMsg("No se pudo acceder a la cámara. Permite el acceso en Ajustes.");
+    }
   }
+
   function stopCamera() {
     if (timerRef.current) clearInterval(timerRef.current);
-    if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop());
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(t => t.stop());
+    }
   }
+
   async function scanFrame() {
     if (!videoRef.current || !canvasRef.current) return;
-    const v = videoRef.current; const cv = canvasRef.current;
-    if (v.readyState !== v.HAVE_ENOUGH_DATA) return;
-    cv.width = v.videoWidth; cv.height = v.videoHeight;
-    const ctx = cv.getContext("2d");
-    ctx.drawImage(v, 0, 0);
-
-    // 1️⃣ jsQR — primario para QR codes generados por QRCode.js
-    try {
-      const jsQR = await loadJsQR();
-      if (jsQR) {
-        const imageData = ctx.getImageData(0, 0, cv.width, cv.height);
-        const result = jsQR(imageData.data, imageData.width, imageData.height, {
-          inversionAttempts: "dontInvert",
-        });
-        if (result?.data) { clearInterval(timerRef.current); stopCamera(); onDetect(result.data); return; }
-      }
-    } catch(e) {}
-
-    // 2️⃣ BarcodeDetector nativo (Chrome/Safari)
+    const video  = videoRef.current;
+    const canvas = canvasRef.current;
+    if (video.readyState !== video.HAVE_ENOUGH_DATA) return;
+    canvas.width  = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext("2d");
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    // Use BarcodeDetector API (native, works on iOS 17+)
     if (window.BarcodeDetector) {
       try {
-        const d = new window.BarcodeDetector({ formats: ["qr_code","code_128","ean_13"] });
-        const codes = await d.detect(cv);
-        if (codes.length > 0) { clearInterval(timerRef.current); stopCamera(); onDetect(codes[0].rawValue); return; }
+        const detector = new window.BarcodeDetector({ formats: ["qr_code","code_128","ean_13","code_39"] });
+        const codes = await detector.detect(canvas);
+        if (codes.length > 0) {
+          const raw = codes[0].rawValue;
+          clearInterval(timerRef.current);
+          stopCamera();
+          onDetect(raw);
+          return;
+        }
       } catch(e) {}
     }
-
-    // 3️⃣ ZXing fallback
+    // Fallback: ZXing
     try {
-      const ZX = await loadZXing(); if (!ZX) return;
-      const lum = new ZX.HTMLCanvasElementLuminanceSource(cv);
-      const bmp = new ZX.BinaryBitmap(new ZX.HybridBinarizer(lum));
-      const r = new ZX.MultiFormatReader(); r.setHints(new Map([[ZX.DecodeHintType.TRY_HARDER, true]]));
-      const res = r.decode(bmp);
-      if (res && res.text) { clearInterval(timerRef.current); stopCamera(); onDetect(res.text); }
+      const ZXing = await loadZXing();
+      if (!ZXing) return;
+      const luminance = new ZXing.HTMLCanvasElementLuminanceSource(canvas);
+      const bitmap = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(luminance));
+      const hints = new Map();
+      hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
+      const reader = new ZXing.MultiFormatReader();
+      reader.setHints(hints);
+      const result = reader.decode(bitmap);
+      if (result?.text) {
+        clearInterval(timerRef.current);
+        stopCamera();
+        onDetect(result.text);
+      }
     } catch(e) {}
   }
+
   return (
-    <div style={{position:"fixed",inset:0,zIndex:9999,background:"#000",display:"flex",flexDirection:"column"}}>
-      <div style={{padding:"16px 20px",background:"rgba(0,0,0,0.85)",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+    <div style={{
+      position:"fixed", inset:0, zIndex:9999,
+      background:"#000",
+      display:"flex", flexDirection:"column",
+    }}>
+      {/* Header */}
+      <div style={{
+        padding:"16px 20px",
+        display:"flex", justifyContent:"space-between", alignItems:"center",
+        background:"rgba(0,0,0,0.8)",
+      }}>
         <div>
           <div style={{fontSize:17,fontWeight:700,color:"#fff",fontFamily:FONT}}>Escanear QR</div>
-          <div style={{fontSize:13,color:"rgba(255,255,255,0.6)",fontFamily:FONT}}>{msg}</div>
+          <div style={{fontSize:13,color:"rgba(255,255,255,0.6)",fontFamily:FONT,marginTop:2}}>{msg}</div>
         </div>
-        <button onClick={()=>{stopCamera();onClose();}} style={{background:"rgba(255,255,255,0.2)",border:"none",width:36,height:36,borderRadius:"50%",cursor:"pointer",color:"#fff",fontSize:18}}>X</button>
+        <button onClick={()=>{stopCamera();onClose();}} style={{
+          background:"rgba(255,255,255,0.15)",border:"none",
+          width:36,height:36,borderRadius:"50%",cursor:"pointer",
+          color:"#fff",fontSize:18,display:"flex",alignItems:"center",justifyContent:"center",
+          WebkitTapHighlightColor:"transparent",
+        }}>✕</button>
       </div>
+
+      {/* Cámara */}
       <div style={{flex:1,position:"relative",overflow:"hidden"}}>
-        <video ref={videoRef} playsInline muted autoPlay style={{width:"100%",height:"100%",objectFit:"cover"}}/>
+        <video
+          ref={videoRef}
+          playsInline muted autoPlay
+          style={{width:"100%",height:"100%",objectFit:"cover"}}
+        />
         <canvas ref={canvasRef} style={{display:"none"}}/>
-        {status==="activo"&&<div style={{position:"absolute",top:"50%",left:"50%",transform:"translate(-50%,-60%)",width:220,height:220,border:"2px solid #4A9B6F",borderRadius:12}}/>}
-        {status==="error"&&<div style={{position:"absolute",inset:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",background:"rgba(0,0,0,0.8)",padding:24,textAlign:"center"}}>
-          <div style={{fontSize:40,marginBottom:12}}>📷</div>
-          <div style={{fontSize:15,color:"#fff",fontFamily:FONT,marginBottom:8}}>Sin acceso a la camara</div>
-          <div style={{fontSize:13,color:"rgba(255,255,255,0.6)",fontFamily:FONT,marginBottom:20}}>{msg}</div>
-          <button onClick={()=>{stopCamera();onClose();}} style={{background:"#4A9B6F",border:"none",borderRadius:12,padding:"12px 24px",color:"#fff",fontSize:15,fontFamily:FONT,cursor:"pointer"}}>Cerrar</button>
-        </div>}
+
+        {/* Marco de escaneo */}
+        {status==="activo"&&(
+          <div style={{
+            position:"absolute",
+            top:"50%",left:"50%",
+            transform:"translate(-50%,-60%)",
+            width:220,height:220,
+          }}>
+            {/* Esquinas del marco */}
+            {[
+              {top:0,left:0,borderTop:"3px solid #4A9B6F",borderLeft:"3px solid #4A9B6F"},
+              {top:0,right:0,borderTop:"3px solid #4A9B6F",borderRight:"3px solid #4A9B6F"},
+              {bottom:0,left:0,borderBottom:"3px solid #4A9B6F",borderLeft:"3px solid #4A9B6F"},
+              {bottom:0,right:0,borderBottom:"3px solid #4A9B6F",borderRight:"3px solid #4A9B6F"},
+            ].map((s,i)=>(
+              <div key={i} style={{position:"absolute",width:30,height:30,...s}}/>
+            ))}
+            {/* Línea de escaneo animada */}
+            <div style={{
+              position:"absolute",left:0,right:0,height:2,
+              background:"rgba(74,155,111,0.8)",
+              animation:"scanline 2s linear infinite",
+              top:"50%",
+            }}/>
+            <style>{`@keyframes scanline{0%{top:10%}50%{top:90%}100%{top:10%}}`}</style>
+          </div>
+        )}
+
+        {status==="error"&&(
+          <div style={{
+            position:"absolute",inset:0,
+            display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",
+            background:"rgba(0,0,0,0.7)",padding:24,textAlign:"center",
+          }}>
+            <div style={{fontSize:48,marginBottom:16}}>📷</div>
+            <div style={{fontSize:16,color:"#fff",fontFamily:FONT,marginBottom:8}}>Sin acceso a la cámara</div>
+            <div style={{fontSize:13,color:"rgba(255,255,255,0.6)",fontFamily:FONT,marginBottom:20}}>{msg}</div>
+            <button onClick={()=>{stopCamera();onClose();}} style={{
+              background:C.green,border:"none",borderRadius:12,
+              padding:"12px 24px",color:"#fff",fontSize:15,
+              fontFamily:FONT,fontWeight:600,cursor:"pointer",
+            }}>Cerrar</button>
+          </div>
+        )}
+
+        {status==="iniciando"&&(
+          <div style={{
+            position:"absolute",inset:0,
+            display:"flex",alignItems:"center",justifyContent:"center",
+            background:"rgba(0,0,0,0.5)",
+          }}>
+            <div style={{fontSize:15,color:"#fff",fontFamily:FONT}}>Iniciando cámara…</div>
+          </div>
+        )}
       </div>
-      <div style={{padding:"14px",background:"rgba(0,0,0,0.85)",textAlign:"center",fontSize:12,color:"rgba(255,255,255,0.4)",fontFamily:FONT}}>El codigo se detecta automaticamente</div>
+
+      {/* Footer hint */}
+      <div style={{
+        padding:"16px 20px",
+        background:"rgba(0,0,0,0.8)",
+        textAlign:"center",
+        fontSize:13,color:"rgba(255,255,255,0.5)",fontFamily:FONT,
+      }}>
+        El código se detecta automáticamente
+      </div>
     </div>
   );
 }
 
+// ══════════════════════════════════════════════════════════
 // POS — iOS Caja
 // ══════════════════════════════════════════════════════════
 function POS({inv,onVenta}){
-  const [carrito, setCarrito] = useState([]);
-  const [busq, setBusq] = useState("");
-  const [pago, setPago] = useState("efectivo");
-  const [vendedor, setVendedor] = useState("");
-  const [descExtra, setDescExtra] = useState(0);
-  const [etiqueta, setEtiqueta] = useState(null);
-  const [ultima, setUltima] = useState(null);
-  const [showOk, setShowOk] = useState(false);
-  const [showPago, setShowPago] = useState(false);
-  const [scanStatus, setScanStatus] = useState(null); // null | "leyendo" | "ok" | "notfound"
-  const [scanMsg, setScanMsg] = useState("");
-  const [showScanner, setShowScanner] = useState(false);
+  const[carrito,setCarrito]   =useState([]);
+  const[busq,setBusq]         =useState("");
+  const[pago,setPago]         =useState("efectivo");
+  const[vendedor,setVendedor] =useState("");
+  const[descExtra,setDescExtra]=useState(0);
+  const[ultima,setUltima]     =useState(null);
+  const[showOk,setShowOk]     =useState(false);
+  const[showPago,setShowPago] =useState(false);
+  const[scanStatus,setScanStatus]=useState(null);
+  const[scanMsg,setScanMsg]   =useState("");
+  const[showScanner,setShowScanner]=useState(false);
   const inputRef=useRef();
-  const fileRef=useRef();
 
   const resultados=useMemo(()=>{
     if(!busq.trim())return[];
@@ -2230,41 +2266,7 @@ function POS({inv,onVenta}){
   }
   function cambiar(prodId,d){setCarrito(p=>p.map(x=>x.prodId===prodId?{...x,cantidad:Math.max(1,x.cantidad+d)}:x));}
   function quitar(prodId){setCarrito(p=>p.filter(x=>x.prodId!==prodId));}
-  async function handleEtiqueta(e){
-    const f=e.target.files?.[0];
-    if(!f) return;
-    // Guardar imagen para adjuntar a la venta
-    const r=new FileReader();
-    r.onload=ev=>setEtiqueta(ev.target.result);
-    r.readAsDataURL(f);
-    // Intentar leer código de barras/QR de la imagen
-    setScanStatus("leyendo");
-    try {
-      const codigo = await leerCodigoDeImagen(f);
-      if(codigo){
-        setScanStatus("ok");
-        setScanMsg(`Código detectado: ${codigo}`);
-        // Buscar el producto en el inventario por código
-        const prod = inv.find(i=>i.codigo.toUpperCase()===codigo.toUpperCase());
-        if(prod){
-          // Agregar directamente al carrito
-          add(prod);
-          setScanMsg(`✓ "${prod.nombre}" agregado al carrito`);
-        } else {
-          // Poner en el buscador para búsqueda manual
-          setBusq(codigo);
-          setScanMsg(`Código "${codigo}" — busca el producto`);
-        }
-      } else {
-        setScanStatus("notfound");
-        setScanMsg("No se detectó código — foto guardada");
-      }
-    } catch(err){
-      setScanStatus("notfound");
-      setScanMsg("No se pudo leer el código");
-    }
-    setTimeout(()=>setScanStatus(null),4000);
-  }
+
 
   function cobrar(){
     if(!carrito.length)return;
@@ -2272,13 +2274,60 @@ function POS({inv,onVenta}){
     const items=carrito.map(it=>({prodId:it.prodId,codigo:it.codigo,nombre:it.nombre,
       marcaId:it.marcaId,marcaNombre:it.marcaNombre,
       cantidad:it.cantidad,precioUnit:it.precio,subtotal:it.precio*it.cantidad*factor}));
-    const vf=onVenta({items,total,subtotal,descPct,metodoPago:pago,vendedor:vendedor||"Tienda",etiquetaImg:etiqueta});
+    const vf=onVenta({items,total,subtotal,descPct,metodoPago:pago,vendedor:vendedor||"Tienda",etiquetaImg:null});
     setUltima(vf);setShowOk(true);setShowPago(false);
-    setCarrito([]);setDescExtra(0);setBusq("");setEtiqueta(null);
+    setCarrito([]);setDescExtra(0);setBusq("");
   }
 
   return (
-    <div>
+    <div style={{position:"relative", minHeight:"100vh"}}>
+
+      {/* Logo fondo decorativo */}
+      <div style={{
+        position:"fixed",
+        top:"50%", left:"50%",
+        transform:"translate(-50%, -50%)",
+        zIndex:0,
+        pointerEvents:"none",
+        display:"flex",flexDirection:"column",
+        alignItems:"center",justifyContent:"center",
+        opacity:0.045,
+        userSelect:"none",
+      }}>
+        <div style={{
+          fontSize:180,
+          fontFamily:"Georgia,serif",
+          fontWeight:900,
+          color:C.gold,
+          letterSpacing:-8,
+          lineHeight:1,
+        }}>TH</div>
+        <div style={{
+          width:280, height:2,
+          background:C.gold,
+          margin:"8px 0",
+        }}/>
+        <div style={{
+          fontSize:26,
+          fontFamily:"Georgia,serif",
+          fontWeight:400,
+          color:C.gold,
+          letterSpacing:14,
+          textTransform:"uppercase",
+        }}>TOSCANA</div>
+        <div style={{
+          fontSize:14,
+          fontFamily:"Georgia,serif",
+          fontWeight:300,
+          color:C.gold,
+          letterSpacing:10,
+          marginTop:4,
+        }}>CASA DE MODA</div>
+      </div>
+
+      {/* Contenido encima del logo */}
+      <div style={{position:"relative",zIndex:1}}>
+
       {/* Search bar */}
       <div style={{position:"relative",marginBottom:14}}>
         <span style={{position:"absolute",left:12,top:"50%",transform:"translateY(-50%)",fontSize:16,color:C.label3}}>🔍</span>
@@ -2384,7 +2433,42 @@ function POS({inv,onVenta}){
         </div>
       )}
 
-      {showScanner&&(<QRScanner onDetect={(codigo)=>{setShowScanner(false);setScanStatus("ok");const prod=inv.find(i=>i.codigo.toUpperCase()===codigo.toUpperCase());if(prod){add(prod);setScanMsg("Agregado: "+prod.nombre);}else{setBusq(codigo);setScanStatus("notfound");setScanMsg("Codigo: "+codigo+" - buscar manual");}setTimeout(()=>{setScanStatus(null);setScanMsg("");},4000);}} onClose={()=>setShowScanner(false)}/>)}
+      {/* Escáner QR en vivo */}
+      {showScanner&&(
+        <QRScanner
+          onDetect={(codigo)=>{
+            setShowScanner(false);
+            setScanStatus("ok");
+            const prod=inv.find(i=>i.codigo.toUpperCase()===codigo.toUpperCase());
+            if(prod){
+              add(prod);
+              setScanMsg(`✓ "${prod.nombre}" agregado al carrito`);
+            } else {
+              setBusq(codigo);
+              setScanMsg(`Código "${codigo}" — no encontrado en inventario`);
+              setScanStatus("notfound");
+            }
+            setTimeout(()=>{setScanStatus(null);setScanMsg("");},4000);
+          }}
+          onClose={()=>setShowScanner(false)}
+        />
+      )}
+
+      {/* Botón escanear */}
+      <div style={{marginBottom:14}}>
+        <IOSBtn onPress={()=>setShowScanner(true)} variant="fill" full icon="📷">
+          Escanear código QR
+        </IOSBtn>
+        {scanMsg&&(
+          <div style={{marginTop:10,padding:"10px 14px",borderRadius:12,fontSize:14,fontFamily:FONT,
+            background:scanStatus==="ok"?`${C.green}15`:`${C.amber}15`,
+            border:`1px solid ${scanStatus==="ok"?C.green:C.amber}30`,
+            color:scanStatus==="ok"?C.green:C.amber}}>
+            {scanMsg}
+          </div>
+        )}
+      </div>
+
       {/* Botón cobrar */}
       <IOSBtn
         onPress={()=>carrito.length&&setShowPago(true)}
@@ -2501,9 +2585,9 @@ function POS({inv,onVenta}){
 // SHEET RECIBIR PRODUCTO — con generación de código de barra
 // ══════════════════════════════════════════════════════════
 function SheetRecibir({open, onClose, inv, onAdd, fInv, setFInv}){
-  const [scanInvMsg, setScanInvMsg] = useState("");
-  const [scanInvStatus, setScanInvStatus] = useState(null);
-  const [barcodeReady, setBarcodeReady] = useState(false);
+  const[scanInvMsg,setScanInvMsg]=useState("");
+  const[scanInvStatus,setScanInvStatus]=useState(null);
+  const[barcodeReady,setBarcodeReady]=useState(false);
   const scanInvRef=useRef(null);
   
   const codigoGenerado = fInv.marcaId && fInv.nombre
@@ -2619,7 +2703,7 @@ function SheetRecibir({open, onClose, inv, onAdd, fInv, setFInv}){
 // INVENTARIO POR MARCA — pestaña con scroll horizontal
 // ══════════════════════════════════════════════════════════
 function InventarioPorMarca({inv, ventas, onRecibir, onBaja}){
-  const [marcaSelec, setMarcaSelec] = useState(MARCAS[0].id);
+  const[marcaSelec,setMarcaSelec]=useState(MARCAS[0].id);
   const marca = MARCAS.find(m=>m.id===marcaSelec);
 
   // Calcular unidades vendidas por producto
@@ -2804,6 +2888,7 @@ function InventarioPorMarca({inv, ventas, onRecibir, onBaja}){
         <IOSBtn onPress={onBaja} variant="fill" full icon="🗑">Dar de Baja</IOSBtn>
         <IOSBtn onPress={onRecibir} full icon="+">Recibir</IOSBtn>
       </div>
+      </div>
     </div>
   );
 }
@@ -2812,8 +2897,8 @@ function InventarioPorMarca({inv, ventas, onRecibir, onBaja}){
 // MARCA DETALLE — iOS navigation push style
 // ══════════════════════════════════════════════════════════
 function MarcaDetalle({marcaId,inv,ventas,vMes,mes,anio,MK,cierres,setCierres,getHist,getLiq}){
-  const [sub, setSub] = useState("historial");
-  const [filtroMk, setFMk] = useState("");
+  const[sub,setSub]       =useState("historial");
+  const[filtroMk,setFMk]  =useState("");
   const marca   =MARCAS.find(m=>m.id===marcaId);
   const liq     =getLiq(marcaId);
   const cerrado =cierres[`${MK}-${marcaId}`]?.cerrado;
@@ -3027,9 +3112,9 @@ function MarcaDetalle({marcaId,inv,ventas,vMes,mes,anio,MK,cierres,setCierres,ge
 // ══════════════════════════════════════════════════════════
 function HistorialTab({ventas, inv, cierres}){
   const now = new Date();
-  const [mesSel,  setMesSel]  = useState(now.getMonth());
-  const [anioSel, setAnioSel] = useState(now.getFullYear());
-  const [vista,   setVista]   = useState("resumen"); // resumen | marcas | ventas | stock
+  const[mesSel,setMesSel]=useState(now.getMonth());
+  const[anioSel,setAnioSel]=useState(now.getFullYear());
+  const[vista,setVista]=useState("resumen"); // resumen | marcas | ventas | stock
 
   const MKSel = mkKey(mesSel, anioSel);
 
@@ -3333,10 +3418,9 @@ function HistorialTab({ventas, inv, cierres}){
 // CONFIG TAB — Gestión de usuarios y contraseñas
 // ══════════════════════════════════════════════════════════
 function ConfigTab({user, logout}){
-  const [subTab, setSubTab] = useState("cuenta");
+  const[subTab,setSubTab]=useState("cuenta");
   // Usuarios guardados en localStorage (sobre los defaults)
-  const [usuarios, setUsuarios] = useState(()=>{
-    try { return JSON.parse(localStorage.getItem("th_usuarios")||"null") || USUARIOS; }
+  const[usuarios,setUsuarios]=useState(()=>{ }
     catch { return USUARIOS; }
   });
   function guardarUsuarios(u){
@@ -3403,11 +3487,11 @@ function ConfigTab({user, logout}){
 
 // ── Cambiar contraseña ────────────────────────────────────
 function CambiarContrasena({user, usuarios, onGuardar}){
-  const [passActual,  setPassActual]  = useState("");
-  const [passNueva,   setPassNueva]   = useState("");
-  const [passConfirm, setPassConfirm] = useState("");
-  const [msg, setMsg] = useState(null);
-  const [show, setShow] = useState(false);
+  const[passActual,setPassActual]=useState("");
+  const[passNueva,setPassNueva]=useState("");
+  const[passConfirm,setPassConfirm]=useState("");
+  const[msg,setMsg]=useState(null);
+  const[show,setShow]=useState(false);
 
   function cambiar(){
     setMsg(null);
@@ -3470,10 +3554,10 @@ function CambiarContrasena({user, usuarios, onGuardar}){
 
 // ── Gestión de usuarios ───────────────────────────────────
 function GestionUsuarios({user, usuarios, onGuardar}){
-  const [modo,     setModo]    = useState(null); // null | "nuevo" | "editar"
-  const [editUser, setEditUser]= useState(null);
-  const [fUser,    setFUser]   = useState({usuario:"",password:"",nombre:"",rol:"caja"});
-  const [msg,      setMsg]     = useState(null);
+  const[modo,setModo]=useState(null); // null | "nuevo" | "editar"
+  const[editUser,setEditUser]=useState(null);
+  const[fUser,setFUser]=useState({usuario:"",password:"",nombre:"",rol:"caja"});
+  const[msg,setMsg]=useState(null);
 
   if (user.rol !== "admin") {
     return (
@@ -3615,8 +3699,8 @@ function GestionUsuarios({user, usuarios, onGuardar}){
 // VENTAS TAB — totales globales + desglose por marca
 // ══════════════════════════════════════════════════════════
 function VentasTab({vMes, totalVtas, mes, anio}){
-  const [vistaActiva, setVistaActiva] = useState("marcas"); // "marcas" | "historial"
-  const [marcaFiltro, setMarcaFiltro] = useState(null); // id marca o null = todas
+  const[vistaActiva,setVistaActiva]=useState("marcas"); // "marcas" | "historial"
+  const[marcaFiltro,setMarcaFiltro]=useState(null); // id marca o null = todas
 
   // Calcular ventas por marca con desglose de método de pago
   const porMarca = useMemo(()=>{
