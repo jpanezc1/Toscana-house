@@ -158,7 +158,21 @@ function loadJsBarcode() {
   });
 }
 
-// Carga ZXing para leer códigos desde imagen
+// Carga jsQR — librería principal para leer QR codes generados por QRCode.js
+let _jsQRLib = null;
+function loadJsQR() {
+  return new Promise(res => {
+    if (_jsQRLib) { res(_jsQRLib); return; }
+    if (window.jsQR) { _jsQRLib = window.jsQR; res(_jsQRLib); return; }
+    const s = document.createElement("script");
+    s.src = "https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js";
+    s.onload = () => { _jsQRLib = window.jsQR; res(_jsQRLib); };
+    s.onerror = () => res(null);
+    document.head.appendChild(s);
+  });
+}
+
+// Carga ZXing como fallback para códigos de barras lineales (CODE_128, EAN, etc.)
 let _ZXingLoaded = false;
 let _ZXingLib = null;
 function loadZXing() {
@@ -172,35 +186,79 @@ function loadZXing() {
   });
 }
 
-// Lee código de barras/QR desde un archivo de imagen
+// Convierte imagen a canvas y devuelve {canvas, ctx, imageData}
+async function imagenACanvas(file) {
+  const img = new Image();
+  const url = URL.createObjectURL(file);
+  await new Promise((res, rej) => { img.onload = res; img.onerror = rej; img.src = url; });
+  URL.revokeObjectURL(url);
+  const canvas = document.createElement("canvas");
+  // Escalar si la imagen es muy grande (mejora detección)
+  const MAX = 1200;
+  const scale = Math.min(1, MAX / Math.max(img.width, img.height));
+  canvas.width = Math.round(img.width * scale);
+  canvas.height = Math.round(img.height * scale);
+  const ctx = canvas.getContext("2d");
+  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  return { canvas, ctx, imageData };
+}
+
+// Lee código QR/barras desde un archivo de imagen
+// Estrategia: jsQR (QR) → BarcodeDetector nativo → ZXing fallback
 async function leerCodigoDeImagen(file) {
   try {
-    const ZXing = await loadZXing();
-    if (!ZXing) return null;
-    const img = new Image();
-    const url = URL.createObjectURL(file);
-    await new Promise((res, rej) => { img.onload = res; img.onerror = rej; img.src = url; });
-    const canvas = document.createElement("canvas");
-    canvas.width = img.width; canvas.height = img.height;
-    canvas.getContext("2d").drawImage(img, 0, 0);
-    URL.revokeObjectURL(url);
-    const hints = new Map();
-    const formats = [
-      ZXing.BarcodeFormat.CODE_128, ZXing.BarcodeFormat.CODE_39,
-      ZXing.BarcodeFormat.EAN_13,   ZXing.BarcodeFormat.EAN_8,
-      ZXing.BarcodeFormat.QR_CODE,  ZXing.BarcodeFormat.DATA_MATRIX,
-      ZXing.BarcodeFormat.ITF,      ZXing.BarcodeFormat.UPC_A,
-    ];
-    hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, formats);
-    hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
-    const reader = new ZXing.MultiFormatReader();
-    reader.setHints(hints);
-    const luminance = new ZXing.HTMLCanvasElementLuminanceSource(canvas);
-    const binaryBitmap = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(luminance));
-    const result = reader.decode(binaryBitmap);
-    return result?.text || null;
+    const { canvas, ctx, imageData } = await imagenACanvas(file);
+
+    // 1️⃣ jsQR — más confiable para QR codes generados por QRCode.js
+    const jsQR = await loadJsQR();
+    if (jsQR) {
+      const result = jsQR(imageData.data, imageData.width, imageData.height, {
+        inversionAttempts: "dontInvert",
+      });
+      if (result?.data) return result.data;
+      // Intentar con inversión (QR oscuro sobre fondo claro)
+      const result2 = jsQR(imageData.data, imageData.width, imageData.height, {
+        inversionAttempts: "onlyInvert",
+      });
+      if (result2?.data) return result2.data;
+    }
+
+    // 2️⃣ BarcodeDetector nativo del navegador (Chrome/Safari moderno)
+    if (window.BarcodeDetector) {
+      try {
+        const detector = new window.BarcodeDetector({
+          formats: ["qr_code", "code_128", "ean_13", "ean_8", "upc_a", "itf", "data_matrix"],
+        });
+        const codes = await detector.detect(canvas);
+        if (codes.length > 0) return codes[0].rawValue;
+      } catch(e) {}
+    }
+
+    // 3️⃣ ZXing como último fallback (códigos lineales CODE_128, EAN, etc.)
+    try {
+      const ZXing = await loadZXing();
+      if (ZXing) {
+        const hints = new Map();
+        const formats = [
+          ZXing.BarcodeFormat.CODE_128, ZXing.BarcodeFormat.CODE_39,
+          ZXing.BarcodeFormat.EAN_13,   ZXing.BarcodeFormat.EAN_8,
+          ZXing.BarcodeFormat.QR_CODE,  ZXing.BarcodeFormat.DATA_MATRIX,
+          ZXing.BarcodeFormat.ITF,      ZXing.BarcodeFormat.UPC_A,
+        ];
+        hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, formats);
+        hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
+        const reader = new ZXing.MultiFormatReader();
+        reader.setHints(hints);
+        const luminance = new ZXing.HTMLCanvasElementLuminanceSource(canvas);
+        const binaryBitmap = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(luminance));
+        const result = reader.decode(binaryBitmap);
+        if (result?.text) return result.text;
+      }
+    } catch(e) {}
+
+    return null;
   } catch (e) {
-    // Intento con rotaciones si falla el primero
     return null;
   }
 }
@@ -2058,7 +2116,22 @@ function QRScanner({ onDetect, onClose }) {
     const v = videoRef.current; const cv = canvasRef.current;
     if (v.readyState !== v.HAVE_ENOUGH_DATA) return;
     cv.width = v.videoWidth; cv.height = v.videoHeight;
-    cv.getContext("2d").drawImage(v, 0, 0);
+    const ctx = cv.getContext("2d");
+    ctx.drawImage(v, 0, 0);
+
+    // 1️⃣ jsQR — primario para QR codes generados por QRCode.js
+    try {
+      const jsQR = await loadJsQR();
+      if (jsQR) {
+        const imageData = ctx.getImageData(0, 0, cv.width, cv.height);
+        const result = jsQR(imageData.data, imageData.width, imageData.height, {
+          inversionAttempts: "dontInvert",
+        });
+        if (result?.data) { clearInterval(timerRef.current); stopCamera(); onDetect(result.data); return; }
+      }
+    } catch(e) {}
+
+    // 2️⃣ BarcodeDetector nativo (Chrome/Safari)
     if (window.BarcodeDetector) {
       try {
         const d = new window.BarcodeDetector({ formats: ["qr_code","code_128","ean_13"] });
@@ -2066,6 +2139,8 @@ function QRScanner({ onDetect, onClose }) {
         if (codes.length > 0) { clearInterval(timerRef.current); stopCamera(); onDetect(codes[0].rawValue); return; }
       } catch(e) {}
     }
+
+    // 3️⃣ ZXing fallback
     try {
       const ZX = await loadZXing(); if (!ZX) return;
       const lum = new ZX.HTMLCanvasElementLuminanceSource(cv);
