@@ -115,7 +115,7 @@ async function sbCargarTodo() {
 
 // Hook de estado de conexión Supabase
 function useSupabaseStatus() {
-  const[status,setStatus]=useState("connecting"); // connecting | ok | error
+  const [status, setStatus] = useState("connecting"); // connecting | ok | error
   useEffect(() => {
     getSupabase()
       .then(db => db.from("inventario").select("id").limit(1))
@@ -239,7 +239,7 @@ async function generarSVGBarcode(codigo) {
 // Componente: muestra QR code inline
 function BarcodeDisplay({ codigo, small }) {
   const containerRef = useRef(null);
-  const[qrDataUrl,setQrDataUrl]=useState("");
+  const [qrDataUrl, setQrDataUrl] = useState("");
 
   useEffect(() => {
     if (!codigo || !containerRef.current) return;
@@ -359,9 +359,9 @@ async function drivePost(action, payload) {
 
 // Hook que maneja el estado de sincronización
 function useDriveSync() {
-  const[url,setUrl]=useState(() => localStorage.getItem("th_drive_url") || "");
-  const[syncing,setSyncing]=useState(false);
-  const[syncLog,setSyncLog]=useState(() => { } catch { return []; }
+  const [url, setUrl] = useState(() => localStorage.getItem("th_drive_url") || "");
+  const [syncing, setSyncing] = useState(false);
+  const [syncLog, setSyncLog] = useState(() => { } catch { return []; }
   });
 
   function saveUrl(u) {
@@ -945,7 +945,7 @@ function LogoMark({size=36, color="#3D6B3D"}){
 }
 
 function usePress(onPress) {
-  const[pressed,setPressed]=useState(false);
+  const [pressed, setPressed] = useState(false);
   return {
     onTouchStart: () => setPressed(true),
     onTouchEnd:   () => { setPressed(false); onPress && onPress(); },
@@ -1133,8 +1133,8 @@ function IOSBtn({children,onPress,variant="primary",full,disabled,small,icon}){
 
 // iOS sheet (bottom modal)
 function Sheet({open,onClose,title,children,tall}){
-  const[visible,setVisible]=useState(false);
-  const[anim,setAnim]=useState(false);
+  const [visible, setVisible] = useState(false);
+  const [anim, setAnim] = useState(false);
   useEffect(()=>{
     if(open){setVisible(true);setTimeout(()=>setAnim(true),10);}
     else{setAnim(false);setTimeout(()=>setVisible(false),320);}
@@ -1355,7 +1355,7 @@ const USUARIOS = [
 ];
 
 function useAuth() {
-  const[user,setUser]=useState(()=>{ } catch { return null; }
+  const [user, setUser] = useState(()=>{ } catch { return null; }
   });
 
   function login(usuario, password) {
@@ -1387,11 +1387,11 @@ function useAuth() {
 
 // Pantalla de Login
 function LoginScreen({ onLogin }) {
-  const[usuario,setUsuario]=useState("");
-  const[password,setPassword]=useState("");
-  const[error,setError]=useState("");
-  const[loading,setLoading]=useState(false);
-  const[showPass,setShowPass]=useState(false);
+  const [usuario, setUsuario] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [showPass, setShowPass] = useState(false);
 
   function handleLogin() {
     if (!usuario || !password) { setError("Completa todos los campos"); return; }
@@ -1535,27 +1535,27 @@ function LoginScreen({ onLogin }) {
 export default function App(){
   const { user, login, logout } = useAuth();
   const now=new Date();
-  const[tab,setTab]         =useState("pos");
-  const[inv,setInv]         =useState([]);
-  const[ventas,setVentas]   =useState([]);
-  const[alq,setAlq]         =useState([]);
-  const[cierres,setCierres] =useState({});
-  const[cargando,setCargando]=useState(true);
-  const[dbStatus,setDbStatus]=useState("connecting");
-  const[mes,setMes]         =useState(now.getMonth());
-  const[anio,setAnio]       =useState(now.getFullYear());
-  const[marcaDetalle,setMD] =useState(null);
-  const[sheetInv,setShInv]  =useState(false);
-  const[sheetBaja,setShBaja]=useState(false);
-  const[sheetDrive,setShDrive]=useState(false);
-  const[mLiq,setMLiq]       =useState(null);
-  const[fInv,setFInv]       =useState({marcaId:"",nombre:"",categoria:"",precio:"",stock:"",fecha:hoy()});
-  const[bajaCod,setBajaCod] =useState("");
-  const[bajaMsg,setBajaMsg] =useState(null);
-  const[busqInv,setBusqInv] =useState("");
-  const[filInvM,setFilInvM] =useState("");
-  const[driveUrl,setDriveUrlLocal]=useState(()=>{ try{return localStorage.getItem("th_drive_url")||"";}catch{return "";} });
-  const[generando,setGenerando]=useState(false);
+  const [tab, setTab] = useState("pos");
+  const [inv, setInv] = useState([]);
+  const [ventas, setVentas] = useState([]);
+  const [alq, setAlq] = useState([]);
+  const [cierres, setCierres] = useState({});
+  const [cargando, setCargando] = useState(true);
+  const [dbStatus, setDbStatus] = useState("connecting");
+  const [mes, setMes] = useState(now.getMonth());
+  const [anio, setAnio] = useState(now.getFullYear());
+  const [marcaDetalle, setMD] = useState(null);
+  const [sheetInv, setShInv] = useState(false);
+  const [sheetBaja, setShBaja] = useState(false);
+  const [sheetDrive, setShDrive] = useState(false);
+  const [mLiq, setMLiq] = useState(null);
+  const [fInv, setFInv] = useState({marcaId:"",nombre:"",categoria:"",precio:"",stock:"",fecha:hoy()});
+  const [bajaCod, setBajaCod] = useState("");
+  const [bajaMsg, setBajaMsg] = useState(null);
+  const [busqInv, setBusqInv] = useState("");
+  const [filInvM, setFilInvM] = useState("");
+  const [driveUrl, setDriveUrlLocal] = useState(()=>{ try{return localStorage.getItem("th_drive_url")||"";}catch{return "";} });
+  const [generando, setGenerando] = useState(false);
   const drive = useDriveSync();
 
   // Cargar datos desde Supabase al inicio
@@ -2033,8 +2033,8 @@ function QRScanner({ onDetect, onClose }) {
   const canvasRef = useRef(null);
   const streamRef = useRef(null);
   const timerRef  = useRef(null);
-  const[status,setStatus]=useState("iniciando"); // iniciando | activo | error
-  const[msg,setMsg]=useState("");
+  const [status, setStatus] = useState("iniciando"); // iniciando | activo | error
+  const [msg, setMsg] = useState("");
 
   useEffect(() => {
     startCamera();
@@ -2216,17 +2216,17 @@ function QRScanner({ onDetect, onClose }) {
 // POS — iOS Caja
 // ══════════════════════════════════════════════════════════
 function POS({inv,onVenta}){
-  const[carrito,setCarrito]   =useState([]);
-  const[busq,setBusq]         =useState("");
-  const[pago,setPago]         =useState("efectivo");
-  const[vendedor,setVendedor] =useState("");
-  const[descExtra,setDescExtra]=useState(0);
-  const[ultima,setUltima]     =useState(null);
-  const[showOk,setShowOk]     =useState(false);
-  const[showPago,setShowPago] =useState(false);
-  const[scanStatus,setScanStatus]=useState(null);
-  const[scanMsg,setScanMsg]   =useState("");
-  const[showScanner,setShowScanner]=useState(false);
+  const [carrito, setCarrito] = useState([]);
+  const [busq, setBusq] = useState("");
+  const [pago, setPago] = useState("efectivo");
+  const [vendedor, setVendedor] = useState("");
+  const [descExtra, setDescExtra] = useState(0);
+  const [ultima, setUltima] = useState(null);
+  const [showOk, setShowOk] = useState(false);
+  const [showPago, setShowPago] = useState(false);
+  const [scanStatus, setScanStatus] = useState(null);
+  const [scanMsg, setScanMsg] = useState("");
+  const [showScanner, setShowScanner] = useState(false);
   const inputRef=useRef();
 
   const resultados=useMemo(()=>{
@@ -2585,9 +2585,9 @@ function POS({inv,onVenta}){
 // SHEET RECIBIR PRODUCTO — con generación de código de barra
 // ══════════════════════════════════════════════════════════
 function SheetRecibir({open, onClose, inv, onAdd, fInv, setFInv}){
-  const[scanInvMsg,setScanInvMsg]=useState("");
-  const[scanInvStatus,setScanInvStatus]=useState(null);
-  const[barcodeReady,setBarcodeReady]=useState(false);
+  const [scanInvMsg, setScanInvMsg] = useState("");
+  const [scanInvStatus, setScanInvStatus] = useState(null);
+  const [barcodeReady, setBarcodeReady] = useState(false);
   const scanInvRef=useRef(null);
   
   const codigoGenerado = fInv.marcaId && fInv.nombre
@@ -2703,7 +2703,7 @@ function SheetRecibir({open, onClose, inv, onAdd, fInv, setFInv}){
 // INVENTARIO POR MARCA — pestaña con scroll horizontal
 // ══════════════════════════════════════════════════════════
 function InventarioPorMarca({inv, ventas, onRecibir, onBaja}){
-  const[marcaSelec,setMarcaSelec]=useState(MARCAS[0].id);
+  const [marcaSelec, setMarcaSelec] = useState(MARCAS[0].id);
   const marca = MARCAS.find(m=>m.id===marcaSelec);
 
   // Calcular unidades vendidas por producto
@@ -2897,8 +2897,8 @@ function InventarioPorMarca({inv, ventas, onRecibir, onBaja}){
 // MARCA DETALLE — iOS navigation push style
 // ══════════════════════════════════════════════════════════
 function MarcaDetalle({marcaId,inv,ventas,vMes,mes,anio,MK,cierres,setCierres,getHist,getLiq}){
-  const[sub,setSub]       =useState("historial");
-  const[filtroMk,setFMk]  =useState("");
+  const [sub, setSub] = useState("historial");
+  const [filtroMk, setFMk] = useState("");
   const marca   =MARCAS.find(m=>m.id===marcaId);
   const liq     =getLiq(marcaId);
   const cerrado =cierres[`${MK}-${marcaId}`]?.cerrado;
@@ -3112,9 +3112,9 @@ function MarcaDetalle({marcaId,inv,ventas,vMes,mes,anio,MK,cierres,setCierres,ge
 // ══════════════════════════════════════════════════════════
 function HistorialTab({ventas, inv, cierres}){
   const now = new Date();
-  const[mesSel,setMesSel]=useState(now.getMonth());
-  const[anioSel,setAnioSel]=useState(now.getFullYear());
-  const[vista,setVista]=useState("resumen"); // resumen | marcas | ventas | stock
+  const [mesSel, setMesSel] = useState(now.getMonth());
+  const [anioSel, setAnioSel] = useState(now.getFullYear());
+  const [vista, setVista] = useState("resumen"); // resumen | marcas | ventas | stock
 
   const MKSel = mkKey(mesSel, anioSel);
 
@@ -3418,9 +3418,9 @@ function HistorialTab({ventas, inv, cierres}){
 // CONFIG TAB — Gestión de usuarios y contraseñas
 // ══════════════════════════════════════════════════════════
 function ConfigTab({user, logout}){
-  const[subTab,setSubTab]=useState("cuenta");
+  const [subTab, setSubTab] = useState("cuenta");
   // Usuarios guardados en localStorage (sobre los defaults)
-  const[usuarios,setUsuarios]=useState(()=>{ }
+  const [usuarios, setUsuarios] = useState(()=>{ }
     catch { return USUARIOS; }
   });
   function guardarUsuarios(u){
@@ -3487,11 +3487,11 @@ function ConfigTab({user, logout}){
 
 // ── Cambiar contraseña ────────────────────────────────────
 function CambiarContrasena({user, usuarios, onGuardar}){
-  const[passActual,setPassActual]=useState("");
-  const[passNueva,setPassNueva]=useState("");
-  const[passConfirm,setPassConfirm]=useState("");
-  const[msg,setMsg]=useState(null);
-  const[show,setShow]=useState(false);
+  const [passActual, setPassActual] = useState("");
+  const [passNueva, setPassNueva] = useState("");
+  const [passConfirm, setPassConfirm] = useState("");
+  const [msg, setMsg] = useState(null);
+  const [show, setShow] = useState(false);
 
   function cambiar(){
     setMsg(null);
@@ -3554,10 +3554,10 @@ function CambiarContrasena({user, usuarios, onGuardar}){
 
 // ── Gestión de usuarios ───────────────────────────────────
 function GestionUsuarios({user, usuarios, onGuardar}){
-  const[modo,setModo]=useState(null); // null | "nuevo" | "editar"
-  const[editUser,setEditUser]=useState(null);
-  const[fUser,setFUser]=useState({usuario:"",password:"",nombre:"",rol:"caja"});
-  const[msg,setMsg]=useState(null);
+  const [modo, setModo] = useState(null); // null | "nuevo" | "editar"
+  const [editUser, setEditUser] = useState(null);
+  const [fUser, setFUser] = useState({usuario:"",password:"",nombre:"",rol:"caja"});
+  const [msg, setMsg] = useState(null);
 
   if (user.rol !== "admin") {
     return (
@@ -3699,8 +3699,8 @@ function GestionUsuarios({user, usuarios, onGuardar}){
 // VENTAS TAB — totales globales + desglose por marca
 // ══════════════════════════════════════════════════════════
 function VentasTab({vMes, totalVtas, mes, anio}){
-  const[vistaActiva,setVistaActiva]=useState("marcas"); // "marcas" | "historial"
-  const[marcaFiltro,setMarcaFiltro]=useState(null); // id marca o null = todas
+  const [vistaActiva, setVistaActiva] = useState("marcas"); // "marcas" | "historial"
+  const [marcaFiltro, setMarcaFiltro] = useState(null); // id marca o null = todas
 
   // Calcular ventas por marca con desglose de método de pago
   const porMarca = useMemo(()=>{
