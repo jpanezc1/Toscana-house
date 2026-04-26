@@ -1354,8 +1354,7 @@ const USUARIOS = [
 ];
 
 function useAuth() {
-  const [user, setUser] = useState(()=>{ } catch { return null; }
-  });
+  const [user, setUser] = useState(() => { try { return JSON.parse(localStorage.getItem("th_user") || "null"); } catch { return null; } });
 
   function login(usuario, password) {
     // Check localStorage users first, then defaults
