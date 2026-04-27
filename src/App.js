@@ -361,8 +361,8 @@ async function imprimirTicket(producto, marcaNombre) {
   <script>
     window.onload = function() {
       try {
-  const [syncLog, setSyncLog] = useState(() => { try { return JSON.parse(localStorage.getItem("th_sync_log") || "[]"); } catch { return []; } });
-
+        new QRCode(document.getElementById("qr"), {
+          text: "${producto.codigo}",
           width: 144, height: 144,
           colorDark: "#000000",
           colorLight: "#ffffff",
