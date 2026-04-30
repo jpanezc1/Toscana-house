@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 node_modules/
 main.jsx
 main_fixed.jsx
@@ -9,28 +8,3 @@ toscana-house.jsx
 toscana-house-new.jsx
 toscana-house.html
 App.js
-=======
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
-
-# dependencies
-/node_modules
-/.pnp
-.pnp.js
-
-# testing
-/coverage
-
-# production
-/build
-
-# misc
-.DS_Store
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
-
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
->>>>>>> 0bbbc1906353b580b0b99459c1a9f085490a5996
