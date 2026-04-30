@@ -25,9 +25,9 @@
     mod
   ));
 
-  // node_modules/react/cjs/react.development.js
+  // home/claude/.npm-global/lib/node_modules/react/cjs/react.development.js
   var require_react_development = __commonJS({
-    "node_modules/react/cjs/react.development.js"(exports, module) {
+    "home/claude/.npm-global/lib/node_modules/react/cjs/react.development.js"(exports, module) {
       "use strict";
       (function() {
         function defineDeprecationWarning(methodName, info) {
@@ -997,9 +997,9 @@
     }
   });
 
-  // node_modules/react/index.js
+  // home/claude/.npm-global/lib/node_modules/react/index.js
   var require_react = __commonJS({
-    "node_modules/react/index.js"(exports, module) {
+    "home/claude/.npm-global/lib/node_modules/react/index.js"(exports, module) {
       "use strict";
       if (false) {
         module.exports = null;
@@ -1009,9 +1009,9 @@
     }
   });
 
-  // node_modules/scheduler/cjs/scheduler.development.js
+  // home/claude/.npm-global/lib/node_modules/react-dom/node_modules/scheduler/cjs/scheduler.development.js
   var require_scheduler_development = __commonJS({
-    "node_modules/scheduler/cjs/scheduler.development.js"(exports) {
+    "home/claude/.npm-global/lib/node_modules/react-dom/node_modules/scheduler/cjs/scheduler.development.js"(exports) {
       "use strict";
       (function() {
         function performWorkUntilDeadline() {
@@ -1268,9 +1268,9 @@
     }
   });
 
-  // node_modules/scheduler/index.js
+  // home/claude/.npm-global/lib/node_modules/react-dom/node_modules/scheduler/index.js
   var require_scheduler = __commonJS({
-    "node_modules/scheduler/index.js"(exports, module) {
+    "home/claude/.npm-global/lib/node_modules/react-dom/node_modules/scheduler/index.js"(exports, module) {
       "use strict";
       if (false) {
         module.exports = null;
@@ -1280,9 +1280,9 @@
     }
   });
 
-  // node_modules/react-dom/cjs/react-dom.development.js
+  // home/claude/.npm-global/lib/node_modules/react-dom/cjs/react-dom.development.js
   var require_react_dom_development = __commonJS({
-    "node_modules/react-dom/cjs/react-dom.development.js"(exports) {
+    "home/claude/.npm-global/lib/node_modules/react-dom/cjs/react-dom.development.js"(exports) {
       "use strict";
       (function() {
         function noop() {
@@ -1524,9 +1524,9 @@
     }
   });
 
-  // node_modules/react-dom/index.js
+  // home/claude/.npm-global/lib/node_modules/react-dom/index.js
   var require_react_dom = __commonJS({
-    "node_modules/react-dom/index.js"(exports, module) {
+    "home/claude/.npm-global/lib/node_modules/react-dom/index.js"(exports, module) {
       "use strict";
       if (false) {
         checkDCE();
@@ -1537,9 +1537,9 @@
     }
   });
 
-  // node_modules/react-dom/cjs/react-dom-client.development.js
+  // home/claude/.npm-global/lib/node_modules/react-dom/cjs/react-dom-client.development.js
   var require_react_dom_client_development = __commonJS({
-    "node_modules/react-dom/cjs/react-dom-client.development.js"(exports) {
+    "home/claude/.npm-global/lib/node_modules/react-dom/cjs/react-dom-client.development.js"(exports) {
       "use strict";
       (function() {
         function findHook(fiber, id) {
@@ -21436,9 +21436,9 @@
     }
   });
 
-  // node_modules/react-dom/client.js
+  // home/claude/.npm-global/lib/node_modules/react-dom/client.js
   var require_client = __commonJS({
-    "node_modules/react-dom/client.js"(exports, module) {
+    "home/claude/.npm-global/lib/node_modules/react-dom/client.js"(exports, module) {
       "use strict";
       if (false) {
         checkDCE();
@@ -21449,7 +21449,7 @@
     }
   });
 
-  // main.jsx
+  // home/claude/main_clean.jsx
   var import_react = __toESM(require_react());
   var import_client = __toESM(require_client());
   var SUPA_URL = "https://uqphxiixdulqscbfyxhz.supabase.co";
@@ -23317,30 +23317,118 @@
         getHist,
         getLiq
       }
-    ), tab === "ventas" && /* @__PURE__ */ import_react.default.createElement(VentasTab, { vMes, totalVtas, mes, anio }), tab === "liquidaciones" && /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 16 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, fontWeight: 600, color: C.label3, textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 12 } }, MESES[mes], " ", anio), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 10 } }, /* @__PURE__ */ import_react.default.createElement(
+    ), tab === "ventas" && /* @__PURE__ */ import_react.default.createElement(VentasTab, { vMes, totalVtas, mes, anio }), tab === "liquidaciones" && /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 16 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      fontSize: 13,
+      fontWeight: 700,
+      color: C.label3,
+      textTransform: "uppercase",
+      letterSpacing: 0.8,
+      marginBottom: 12,
+      fontFamily: FONT_UI
+    } }, MESES[mes], " ", anio), (() => {
+      const ef = vMes.filter((v) => v.metodoPago === "efectivo").reduce((s, v) => s + v.total, 0);
+      const qr = vMes.filter((v) => v.metodoPago === "qr").reduce((s, v) => s + v.total, 0);
+      const tj = vMes.filter((v) => v.metodoPago === "tarjeta").reduce((s, v) => s + v.total, 0);
+      const conFact = vMes.filter((v) => v.conFactura);
+      return /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 8, marginBottom: 12 } }, [
+        { label: "Total mes", value: $(vMes.reduce((s, v) => s + v.total, 0)), color: C.label, bg: C.bg2 },
+        { label: "Efectivo", value: $(ef), color: C.green, bg: `${C.green}10` },
+        { label: "QR", value: $(qr), color: C.blue, bg: `${C.blue}10` },
+        { label: "Tarjeta", value: $(tj), color: C.amber, bg: `${C.amber}10` }
+      ].map((s) => /* @__PURE__ */ import_react.default.createElement("div", { key: s.label, style: {
+        background: s.bg,
+        borderRadius: 14,
+        padding: "12px 10px",
+        border: `1px solid ${s.color}25`,
+        textAlign: "center"
+      } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+        fontSize: 10,
+        fontWeight: 700,
+        color: s.color,
+        fontFamily: FONT_UI,
+        textTransform: "uppercase",
+        letterSpacing: 0.6,
+        marginBottom: 4,
+        opacity: 0.8
+      } }, s.label), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 16, fontWeight: 700, color: s.color, fontFamily: FONT_UI } }, s.value)))), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+        background: C.bg2,
+        borderRadius: 14,
+        border: `1px solid ${C.sep}`,
+        padding: "14px 16px",
+        marginBottom: 12
+      } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+        fontSize: 12,
+        fontWeight: 700,
+        color: C.label3,
+        textTransform: "uppercase",
+        letterSpacing: 0.8,
+        marginBottom: 12,
+        fontFamily: FONT_UI
+      } }, "Conciliaci\xF3n de pagos"), [
+        { label: "Efectivo", val: ef, n: vMes.filter((v) => v.metodoPago === "efectivo").length, color: C.green, icon: "\u{1F4B5}" },
+        { label: "QR", val: qr, n: vMes.filter((v) => v.metodoPago === "qr").length, color: C.blue, icon: "\u{1F4F1}" },
+        { label: "Tarjeta (+2.5%)", val: tj, n: vMes.filter((v) => v.metodoPago === "tarjeta").length, color: C.amber, icon: "\u{1F4B3}" }
+      ].map((p, i, arr) => /* @__PURE__ */ import_react.default.createElement("div", { key: p.label, style: {
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        padding: "10px 0",
+        borderBottom: i < arr.length - 1 ? `1px solid ${C.sep}` : ""
+      } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 18 } }, p.icon), /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 14, fontWeight: 600, color: C.label, fontFamily: FONT_UI } }, p.label), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT_UI } }, p.n, " transacciones"))), /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "right" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 15, fontWeight: 700, color: p.color, fontFamily: FONT_UI } }, $(p.val)), p.val > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: C.green, fontFamily: FONT_UI, fontWeight: 600 } }, "\u2713 Registrado"))))), conFact.length > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: {
+        background: `${C.blue}08`,
+        borderRadius: 14,
+        border: `1px solid ${C.blue}25`,
+        padding: "12px 16px",
+        marginBottom: 12,
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center"
+      } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, fontWeight: 700, color: C.blue, fontFamily: FONT_UI } }, "\u{1F9FE} Ventas con factura"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT_UI, marginTop: 2 } }, conFact.length, " venta", conFact.length > 1 ? "s" : "", " este mes")), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 15, fontWeight: 700, color: C.blue, fontFamily: FONT_UI } }, $(conFact.reduce((s, v) => s + v.total, 0)))), (() => {
+        const cerradas = MARCAS.filter((m) => cierres[`${MK}-${m.id}`]?.cerrado).length;
+        const conVentas = MARCAS.filter((m) => getLiq(m.id).bruto > 0).length;
+        const pct = conVentas > 0 ? Math.round(cerradas / conVentas * 100) : 0;
+        return /* @__PURE__ */ import_react.default.createElement("div", { style: {
+          background: C.bg2,
+          borderRadius: 14,
+          border: `1px solid ${C.sep}`,
+          padding: "12px 16px",
+          marginBottom: 12
+        } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, fontWeight: 700, color: C.label, fontFamily: FONT_UI } }, "Progreso de cierres"), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+          fontSize: 13,
+          fontWeight: 700,
+          color: pct === 100 ? C.green : C.amber,
+          fontFamily: FONT_UI
+        } }, cerradas, "/", conVentas, " marcas")), /* @__PURE__ */ import_react.default.createElement("div", { style: { height: 8, background: C.sep, borderRadius: 4, overflow: "hidden" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+          height: "100%",
+          width: `${pct}%`,
+          background: pct === 100 ? C.green : C.amber,
+          borderRadius: 4,
+          transition: "width .3s"
+        } })), pct === 100 && /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.green, fontFamily: FONT_UI, marginTop: 6, textAlign: "center", fontWeight: 600 } }, "\u2713 Todas las marcas con ventas est\xE1n cerradas"));
+      })());
+    })(), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 8, marginBottom: 16 } }, /* @__PURE__ */ import_react.default.createElement(
       "button",
       {
         onClick: () => generarExcelMensual(ventas, inv, mes, anio, setGenerando),
         disabled: generando,
         style: {
           flex: 1,
-          background: generando ? C.bg2 : `${C.green}20`,
+          background: generando ? C.bg2 : `${C.green}15`,
           border: `1px solid ${generando ? C.sep : C.green}40`,
           borderRadius: 12,
-          padding: "12px 10px",
+          padding: "11px 10px",
           color: generando ? C.label3 : C.green,
-          fontSize: 13,
-          fontFamily: FONT,
-          fontWeight: 600,
+          fontSize: 12,
+          fontFamily: FONT_UI,
+          fontWeight: 700,
           cursor: generando ? "not-allowed" : "pointer",
-          WebkitTapHighlightColor: "transparent",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
           gap: 6
         }
       },
-      generando ? "\u23F3 Generando\u2026" : "\u{1F4CA} Reporte Mensual .xlsx"
+      generando ? "\u23F3 Generando\u2026" : "\u{1F4CA} Reporte Mensual"
     ), /* @__PURE__ */ import_react.default.createElement(
       "button",
       {
@@ -23348,47 +23436,78 @@
         disabled: generando,
         style: {
           flex: 1,
-          background: generando ? C.bg2 : `${C.blue}20`,
+          background: generando ? C.bg2 : `${C.blue}15`,
           border: `1px solid ${generando ? C.sep : C.blue}40`,
           borderRadius: 12,
-          padding: "12px 10px",
+          padding: "11px 10px",
           color: generando ? C.label3 : C.blue,
-          fontSize: 13,
-          fontFamily: FONT,
-          fontWeight: 600,
+          fontSize: 12,
+          fontFamily: FONT_UI,
+          fontWeight: 700,
           cursor: generando ? "not-allowed" : "pointer",
-          WebkitTapHighlightColor: "transparent",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
           gap: 6
         }
       },
-      generando ? "\u23F3" : "\u{1F4E6} Stock .xlsx"
-    ))), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 2 } }, MARCAS.map((m, i) => {
+      generando ? "\u23F3" : "\u{1F4E6} Stock"
+    ))), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      fontSize: 12,
+      fontWeight: 700,
+      color: C.label3,
+      textTransform: "uppercase",
+      letterSpacing: 0.8,
+      marginBottom: 10,
+      fontFamily: FONT_UI
+    } }, "Cierre por marca"), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 2 } }, MARCAS.map((m, i) => {
       const liq = getLiq(m.id);
       const cerrado = cierres[`${MK}-${m.id}`]?.cerrado;
+      const pctBar = liq.bruto > 0 ? 100 : 0;
       return /* @__PURE__ */ import_react.default.createElement("div", { key: m.id, onClick: () => setMLiq(m.id), style: {
-        background: C.bg2,
+        background: cerrado ? `${C.green}08` : C.bg2,
         borderRadius: i === 0 ? "14px 14px 2px 2px" : i === MARCAS.length - 1 ? "2px 2px 14px 14px" : "2px",
-        padding: "14px 16px",
+        padding: "12px 16px",
         borderBottom: i < MARCAS.length - 1 ? `1px solid ${C.sep}` : "",
+        border: cerrado ? `1px solid ${C.green}25` : "",
         display: "flex",
         alignItems: "center",
         gap: 12,
         cursor: "pointer",
-        WebkitTapHighlightColor: "transparent"
+        WebkitTapHighlightColor: "transparent",
+        transition: "background .15s"
       } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
-        width: 38,
-        height: 38,
+        width: 36,
+        height: 36,
         borderRadius: 10,
-        background: `${m.color}22`,
+        background: `${m.color}20`,
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        fontSize: 18,
+        fontSize: 17,
         flexShrink: 0
-      } }, m.emoji), /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 16, fontWeight: 500, color: C.label, fontFamily: FONT } }, m.nombre), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: liq.bruto > 0 ? C.gold : C.label3, fontFamily: FONT } }, liq.bruto > 0 ? `${$(liq.neto)} neto` : "Sin ventas")), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } }, cerrado ? /* @__PURE__ */ import_react.default.createElement(Chip, { color: C.green, small: true }, "\u2713 Cerrado") : liq.bruto > 0 && /* @__PURE__ */ import_react.default.createElement(Chip, { color: C.amber, small: true }, "Pendiente"), /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.label3, fontSize: 22 } }, "\u203A")));
+      } }, m.emoji), /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 3 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 15, fontWeight: 700, color: C.label, fontFamily: FONT_UI } }, m.nombre), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+        fontSize: 14,
+        fontWeight: 700,
+        color: liq.bruto > 0 ? m.color : C.label3,
+        fontFamily: FONT_UI
+      } }, liq.bruto > 0 ? $(liq.neto) : "")), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT_UI } }, liq.bruto > 0 ? `Bruto ${$(liq.bruto)} \xB7 ${liq.vMarca.length} venta${liq.vMarca.length > 1 ? "s" : ""}` : "Sin ventas este mes"), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6 } }, cerrado ? /* @__PURE__ */ import_react.default.createElement("span", { style: {
+        fontSize: 11,
+        fontWeight: 700,
+        color: C.green,
+        background: `${C.green}15`,
+        borderRadius: 20,
+        padding: "2px 8px",
+        fontFamily: FONT_UI
+      } }, "\u2713 Cerrado") : liq.bruto > 0 ? /* @__PURE__ */ import_react.default.createElement("span", { style: {
+        fontSize: 11,
+        fontWeight: 700,
+        color: C.amber,
+        background: `${C.amber}15`,
+        borderRadius: 20,
+        padding: "2px 8px",
+        fontFamily: FONT_UI
+      } }, "Pendiente") : null, /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.label3, fontSize: 20 } }, "\u203A")))));
     }))), tab === "historial" && /* @__PURE__ */ import_react.default.createElement(HistorialTab, { ventas, inv, cierres }), tab === "config" && /* @__PURE__ */ import_react.default.createElement(ConfigTab, { user, logout })), /* @__PURE__ */ import_react.default.createElement(TabBar, { tabs: TABS, active: tab, onChange: (t) => {
       setTab(t);
       setMD(null);

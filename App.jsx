@@ -1940,58 +1940,178 @@ export default function App(){
         {/* LIQUIDACIONES */}
         {tab==="liquidaciones" && (
           <div>
+            {/* ── Panel de cierre mensual ── */}
             <div style={{marginBottom:16}}>
-              <div style={{fontSize:13,fontWeight:600,color:C.label3,textTransform:"uppercase",letterSpacing:.8,marginBottom:12}}>
-                {MESES[mes]} {anio}
-              </div>
-              <div style={{display:"flex",gap:10}}>
+              <div style={{fontSize:13,fontWeight:700,color:C.label3,textTransform:"uppercase",
+                letterSpacing:.8,marginBottom:12,fontFamily:FONT_UI}}>{MESES[mes]} {anio}</div>
+
+              {/* Totales por método de pago */}
+              {(()=>{
+                const ef=vMes.filter(v=>v.metodoPago==="efectivo").reduce((s,v)=>s+v.total,0);
+                const qr=vMes.filter(v=>v.metodoPago==="qr").reduce((s,v)=>s+v.total,0);
+                const tj=vMes.filter(v=>v.metodoPago==="tarjeta").reduce((s,v)=>s+v.total,0);
+                const conFact=vMes.filter(v=>v.conFactura);
+                return (
+                  <div>
+                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:8,marginBottom:12}}>
+                      {[
+                        {label:"Total mes",value:$(vMes.reduce((s,v)=>s+v.total,0)),color:C.label,bg:C.bg2},
+                        {label:"Efectivo",value:$(ef),color:C.green,bg:`${C.green}10`},
+                        {label:"QR",value:$(qr),color:C.blue,bg:`${C.blue}10`},
+                        {label:"Tarjeta",value:$(tj),color:C.amber,bg:`${C.amber}10`},
+                      ].map(s=>(
+                        <div key={s.label} style={{background:s.bg,borderRadius:14,padding:"12px 10px",
+                          border:`1px solid ${s.color}25`,textAlign:"center"}}>
+                          <div style={{fontSize:10,fontWeight:700,color:s.color,fontFamily:FONT_UI,
+                            textTransform:"uppercase",letterSpacing:.6,marginBottom:4,opacity:.8}}>{s.label}</div>
+                          <div style={{fontSize:16,fontWeight:700,color:s.color,fontFamily:FONT_UI}}>{s.value}</div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Conciliación de pagos */}
+                    <div style={{background:C.bg2,borderRadius:14,border:`1px solid ${C.sep}`,
+                      padding:"14px 16px",marginBottom:12}}>
+                      <div style={{fontSize:12,fontWeight:700,color:C.label3,textTransform:"uppercase",
+                        letterSpacing:.8,marginBottom:12,fontFamily:FONT_UI}}>Conciliación de pagos</div>
+                      {[
+                        {label:"Efectivo",val:ef,n:vMes.filter(v=>v.metodoPago==="efectivo").length,color:C.green,icon:"💵"},
+                        {label:"QR",val:qr,n:vMes.filter(v=>v.metodoPago==="qr").length,color:C.blue,icon:"📱"},
+                        {label:"Tarjeta (+2.5%)",val:tj,n:vMes.filter(v=>v.metodoPago==="tarjeta").length,color:C.amber,icon:"💳"},
+                      ].map((p,i,arr)=>(
+                        <div key={p.label} style={{display:"flex",justifyContent:"space-between",
+                          alignItems:"center",padding:"10px 0",
+                          borderBottom:i<arr.length-1?`1px solid ${C.sep}`:""}}>
+                          <div style={{display:"flex",alignItems:"center",gap:10}}>
+                            <span style={{fontSize:18}}>{p.icon}</span>
+                            <div>
+                              <div style={{fontSize:14,fontWeight:600,color:C.label,fontFamily:FONT_UI}}>{p.label}</div>
+                              <div style={{fontSize:12,color:C.label3,fontFamily:FONT_UI}}>{p.n} transacciones</div>
+                            </div>
+                          </div>
+                          <div style={{textAlign:"right"}}>
+                            <div style={{fontSize:15,fontWeight:700,color:p.color,fontFamily:FONT_UI}}>{$(p.val)}</div>
+                            {p.val>0&&<div style={{fontSize:10,color:C.green,fontFamily:FONT_UI,fontWeight:600}}>✓ Registrado</div>}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Ventas con factura */}
+                    {conFact.length>0&&(
+                      <div style={{background:`${C.blue}08`,borderRadius:14,border:`1px solid ${C.blue}25`,
+                        padding:"12px 16px",marginBottom:12,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                        <div>
+                          <div style={{fontSize:13,fontWeight:700,color:C.blue,fontFamily:FONT_UI}}>🧾 Ventas con factura</div>
+                          <div style={{fontSize:12,color:C.label3,fontFamily:FONT_UI,marginTop:2}}>{conFact.length} venta{conFact.length>1?"s":""} este mes</div>
+                        </div>
+                        <div style={{fontSize:15,fontWeight:700,color:C.blue,fontFamily:FONT_UI}}>
+                          {$(conFact.reduce((s,v)=>s+v.total,0))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Estado general del cierre */}
+                    {(()=>{
+                      const cerradas=MARCAS.filter(m=>cierres[`${MK}-${m.id}`]?.cerrado).length;
+                      const conVentas=MARCAS.filter(m=>getLiq(m.id).bruto>0).length;
+                      const pct=conVentas>0?Math.round(cerradas/conVentas*100):0;
+                      return (
+                        <div style={{background:C.bg2,borderRadius:14,border:`1px solid ${C.sep}`,
+                          padding:"12px 16px",marginBottom:12}}>
+                          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+                            <div style={{fontSize:13,fontWeight:700,color:C.label,fontFamily:FONT_UI}}>
+                              Progreso de cierres
+                            </div>
+                            <div style={{fontSize:13,fontWeight:700,
+                              color:pct===100?C.green:C.amber,fontFamily:FONT_UI}}>
+                              {cerradas}/{conVentas} marcas
+                            </div>
+                          </div>
+                          <div style={{height:8,background:C.sep,borderRadius:4,overflow:"hidden"}}>
+                            <div style={{height:"100%",width:`${pct}%`,
+                              background:pct===100?C.green:C.amber,
+                              borderRadius:4,transition:"width .3s"}}/>
+                          </div>
+                          {pct===100&&(
+                            <div style={{fontSize:12,color:C.green,fontFamily:FONT_UI,marginTop:6,textAlign:"center",fontWeight:600}}>
+                              ✓ Todas las marcas con ventas están cerradas
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
+                  </div>
+                );
+              })()}
+
+              {/* Botones Excel */}
+              <div style={{display:"flex",gap:8,marginBottom:16}}>
                 <button onClick={()=>generarExcelMensual(ventas,inv,mes,anio,setGenerando)}
                   disabled={generando}
-                  style={{flex:1,background:generando?C.bg2:`${C.green}20`,border:`1px solid ${generando?C.sep:C.green}40`,
-                    borderRadius:12,padding:"12px 10px",color:generando?C.label3:C.green,
-                    fontSize:13,fontFamily:FONT,fontWeight:600,cursor:generando?"not-allowed":"pointer",
-                    WebkitTapHighlightColor:"transparent",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
-                  {generando?"⏳ Generando…":"📊 Reporte Mensual .xlsx"}
+                  style={{flex:1,background:generando?C.bg2:`${C.green}15`,border:`1px solid ${generando?C.sep:C.green}40`,
+                    borderRadius:12,padding:"11px 10px",color:generando?C.label3:C.green,
+                    fontSize:12,fontFamily:FONT_UI,fontWeight:700,cursor:generando?"not-allowed":"pointer",
+                    display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
+                  {generando?"⏳ Generando…":"📊 Reporte Mensual"}
                 </button>
                 <button onClick={()=>generarExcelStock(inv,setGenerando)}
                   disabled={generando}
-                  style={{flex:1,background:generando?C.bg2:`${C.blue}20`,border:`1px solid ${generando?C.sep:C.blue}40`,
-                    borderRadius:12,padding:"12px 10px",color:generando?C.label3:C.blue,
-                    fontSize:13,fontFamily:FONT,fontWeight:600,cursor:generando?"not-allowed":"pointer",
-                    WebkitTapHighlightColor:"transparent",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
-                  {generando?"⏳":"📦 Stock .xlsx"}
+                  style={{flex:1,background:generando?C.bg2:`${C.blue}15`,border:`1px solid ${generando?C.sep:C.blue}40`,
+                    borderRadius:12,padding:"11px 10px",color:generando?C.label3:C.blue,
+                    fontSize:12,fontFamily:FONT_UI,fontWeight:700,cursor:generando?"not-allowed":"pointer",
+                    display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
+                  {generando?"⏳":"📦 Stock"}
                 </button>
               </div>
             </div>
 
+            {/* Lista de marcas */}
+            <div style={{fontSize:12,fontWeight:700,color:C.label3,textTransform:"uppercase",
+              letterSpacing:.8,marginBottom:10,fontFamily:FONT_UI}}>Cierre por marca</div>
             <div style={{display:"flex",flexDirection:"column",gap:2}}>
               {MARCAS.map((m,i)=>{
                 const liq=getLiq(m.id);
                 const cerrado=cierres[`${MK}-${m.id}`]?.cerrado;
+                const pctBar=liq.bruto>0?100:0;
                 return (
                   <div key={m.id} onClick={()=>setMLiq(m.id)} style={{
-                    background:C.bg2,
+                    background:cerrado?`${C.green}08`:C.bg2,
                     borderRadius:i===0?"14px 14px 2px 2px":i===MARCAS.length-1?"2px 2px 14px 14px":"2px",
-                    padding:"14px 16px",
+                    padding:"12px 16px",
                     borderBottom:i<MARCAS.length-1?`1px solid ${C.sep}`:"",
+                    border:cerrado?`1px solid ${C.green}25`:"",
                     display:"flex",alignItems:"center",gap:12,
                     cursor:"pointer",WebkitTapHighlightColor:"transparent",
+                    transition:"background .15s",
                   }}>
-                    <div style={{width:38,height:38,borderRadius:10,
-                      background:`${m.color}22`,display:"flex",alignItems:"center",
-                      justifyContent:"center",fontSize:18,flexShrink:0}}>{m.emoji}</div>
-                    <div style={{flex:1}}>
-                      <div style={{fontSize:16,fontWeight:500,color:C.label,fontFamily:FONT}}>{m.nombre}</div>
-                      <div style={{fontSize:13,color:liq.bruto>0?C.gold:C.label3,fontFamily:FONT}}>
-                        {liq.bruto>0 ? `${$(liq.neto)} neto` : "Sin ventas"}
+                    <div style={{width:36,height:36,borderRadius:10,
+                      background:`${m.color}20`,display:"flex",alignItems:"center",
+                      justifyContent:"center",fontSize:17,flexShrink:0}}>{m.emoji}</div>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:3}}>
+                        <div style={{fontSize:15,fontWeight:700,color:C.label,fontFamily:FONT_UI}}>{m.nombre}</div>
+                        <div style={{fontSize:14,fontWeight:700,
+                          color:liq.bruto>0?m.color:C.label3,fontFamily:FONT_UI}}>
+                          {liq.bruto>0?$(liq.neto):""}
+                        </div>
                       </div>
-                    </div>
-                    <div style={{display:"flex",alignItems:"center",gap:8}}>
-                      {cerrado
-                        ? <Chip color={C.green} small>✓ Cerrado</Chip>
-                        : liq.bruto>0&&<Chip color={C.amber} small>Pendiente</Chip>
-                      }
-                      <span style={{color:C.label3,fontSize:22}}>›</span>
+                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                        <div style={{fontSize:12,color:C.label3,fontFamily:FONT_UI}}>
+                          {liq.bruto>0?`Bruto ${$(liq.bruto)} · ${liq.vMarca.length} venta${liq.vMarca.length>1?"s":""}`:"Sin ventas este mes"}
+                        </div>
+                        <div style={{display:"flex",alignItems:"center",gap:6}}>
+                          {cerrado
+                            ? <span style={{fontSize:11,fontWeight:700,color:C.green,
+                                background:`${C.green}15`,borderRadius:20,padding:"2px 8px",fontFamily:FONT_UI}}>✓ Cerrado</span>
+                            : liq.bruto>0
+                              ? <span style={{fontSize:11,fontWeight:700,color:C.amber,
+                                  background:`${C.amber}15`,borderRadius:20,padding:"2px 8px",fontFamily:FONT_UI}}>Pendiente</span>
+                              : null
+                          }
+                          <span style={{color:C.label3,fontSize:20}}>›</span>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 );
