@@ -25,9 +25,9 @@
     mod
   ));
 
-  // node_modules/react/cjs/react.development.js
+  // home/claude/.npm-global/lib/node_modules/react/cjs/react.development.js
   var require_react_development = __commonJS({
-    "node_modules/react/cjs/react.development.js"(exports, module) {
+    "home/claude/.npm-global/lib/node_modules/react/cjs/react.development.js"(exports, module) {
       "use strict";
       (function() {
         function defineDeprecationWarning(methodName, info) {
@@ -997,9 +997,9 @@
     }
   });
 
-  // node_modules/react/index.js
+  // home/claude/.npm-global/lib/node_modules/react/index.js
   var require_react = __commonJS({
-    "node_modules/react/index.js"(exports, module) {
+    "home/claude/.npm-global/lib/node_modules/react/index.js"(exports, module) {
       "use strict";
       if (false) {
         module.exports = null;
@@ -1009,9 +1009,9 @@
     }
   });
 
-  // node_modules/scheduler/cjs/scheduler.development.js
+  // home/claude/.npm-global/lib/node_modules/react-dom/node_modules/scheduler/cjs/scheduler.development.js
   var require_scheduler_development = __commonJS({
-    "node_modules/scheduler/cjs/scheduler.development.js"(exports) {
+    "home/claude/.npm-global/lib/node_modules/react-dom/node_modules/scheduler/cjs/scheduler.development.js"(exports) {
       "use strict";
       (function() {
         function performWorkUntilDeadline() {
@@ -1268,9 +1268,9 @@
     }
   });
 
-  // node_modules/scheduler/index.js
+  // home/claude/.npm-global/lib/node_modules/react-dom/node_modules/scheduler/index.js
   var require_scheduler = __commonJS({
-    "node_modules/scheduler/index.js"(exports, module) {
+    "home/claude/.npm-global/lib/node_modules/react-dom/node_modules/scheduler/index.js"(exports, module) {
       "use strict";
       if (false) {
         module.exports = null;
@@ -1280,9 +1280,9 @@
     }
   });
 
-  // node_modules/react-dom/cjs/react-dom.development.js
+  // home/claude/.npm-global/lib/node_modules/react-dom/cjs/react-dom.development.js
   var require_react_dom_development = __commonJS({
-    "node_modules/react-dom/cjs/react-dom.development.js"(exports) {
+    "home/claude/.npm-global/lib/node_modules/react-dom/cjs/react-dom.development.js"(exports) {
       "use strict";
       (function() {
         function noop() {
@@ -1524,9 +1524,9 @@
     }
   });
 
-  // node_modules/react-dom/index.js
+  // home/claude/.npm-global/lib/node_modules/react-dom/index.js
   var require_react_dom = __commonJS({
-    "node_modules/react-dom/index.js"(exports, module) {
+    "home/claude/.npm-global/lib/node_modules/react-dom/index.js"(exports, module) {
       "use strict";
       if (false) {
         checkDCE();
@@ -1537,9 +1537,9 @@
     }
   });
 
-  // node_modules/react-dom/cjs/react-dom-client.development.js
+  // home/claude/.npm-global/lib/node_modules/react-dom/cjs/react-dom-client.development.js
   var require_react_dom_client_development = __commonJS({
-    "node_modules/react-dom/cjs/react-dom-client.development.js"(exports) {
+    "home/claude/.npm-global/lib/node_modules/react-dom/cjs/react-dom-client.development.js"(exports) {
       "use strict";
       (function() {
         function findHook(fiber, id) {
@@ -21436,9 +21436,9 @@
     }
   });
 
-  // node_modules/react-dom/client.js
+  // home/claude/.npm-global/lib/node_modules/react-dom/client.js
   var require_client = __commonJS({
-    "node_modules/react-dom/client.js"(exports, module) {
+    "home/claude/.npm-global/lib/node_modules/react-dom/client.js"(exports, module) {
       "use strict";
       if (false) {
         checkDCE();
@@ -21449,7 +21449,7 @@
     }
   });
 
-  // main.jsx
+  // home/claude/main_clean.jsx
   var import_react = __toESM(require_react());
   var import_client = __toESM(require_client());
   var SUPA_URL = "https://uqphxiixdulqscbfyxhz.supabase.co";
@@ -21481,19 +21481,28 @@
         marca_nombre: prod.marcaNombre,
         nombre: prod.nombre,
         categoria: prod.categoria,
+        descripcion: prod.descripcion || null,
+        subcat: prod.subcat || null,
         precio: prod.precio,
         stock: prod.stock,
         stock_inicial: prod.stockInicial,
-        fecha: prod.fecha
+        fecha: prod.fecha,
+        dado_de_baja: prod.dadoDeBaja || false,
+        fecha_baja: prod.fechaBaja || null
       });
     } catch (e) {
       console.warn("Supabase save prod:", e.message);
     }
   }
-  async function sbActualizarStock(prodId, nuevoStock) {
+  async function sbActualizarStock(prodId, nuevoStock, dadoDeBaja = false, fechaBaja = null) {
     try {
       const db = await getSupabase();
-      await db.from("inventario").update({ stock: nuevoStock }).eq("id", prodId);
+      const upd = { stock: nuevoStock };
+      if (dadoDeBaja) {
+        upd.dado_de_baja = true;
+        upd.fecha_baja = fechaBaja;
+      }
+      await db.from("inventario").update(upd).eq("id", prodId);
     } catch (e) {
       console.warn("Supabase update stock:", e.message);
     }
@@ -21517,8 +21526,8 @@
         con_factura: venta.conFactura || false,
         fact_nombre: venta.factNombre || null,
         fact_nit: venta.factNit || null,
-        iva_desc: venta.ivaDesc || 0,
-        iva_pct: venta.ivaPct || 0
+        cliente_nombre: venta.clienteNombre || null,
+        cliente_tel: venta.clienteTel || null
       });
       const items = venta.items.map((it) => ({
         venta_id: venta.id,
@@ -21569,8 +21578,8 @@
         conFactura: v.con_factura || false,
         factNombre: v.fact_nombre || "",
         factNit: v.fact_nit || "",
-        ivaDesc: v.iva_desc || 0,
-        ivaPct: v.iva_pct || 0,
+        clienteNombre: v.cliente_nombre || "",
+        clienteTel: v.cliente_tel || "",
         items: (items || []).filter((i) => i.venta_id === v.id).map((i) => ({
           prodId: i.prod_id,
           codigo: i.codigo,
@@ -21589,10 +21598,14 @@
         marcaNombre: p.marca_nombre,
         nombre: p.nombre,
         categoria: p.categoria,
-        precio: p.precio,
-        stock: p.stock,
-        stockInicial: p.stock_inicial,
-        fecha: p.fecha
+        descripcion: p.descripcion || "",
+        subcat: p.subcat || "",
+        precio: Number(p.precio) || 0,
+        stock: p.stock || 0,
+        stockInicial: p.stock_inicial || 0,
+        fecha: p.fecha,
+        dadoDeBaja: p.dado_de_baja || false,
+        fechaBaja: p.fecha_baja || null
       }));
       const cierresObj = {};
       (cierres || []).forEach((c) => {
@@ -22049,7 +22062,7 @@
         const rows = [
           [`${m.emoji} ${m.nombre.toUpperCase()} \u2014 ${mesNom} ${anio}`],
           [],
-          ["ID Venta", "Factura", "Nombre Cliente", "NIT", "Fecha", "Hora", "C\xF3digo", "Producto", "Categor\xEDa", "Cantidad", "Precio Unit. (Bs)", "Subtotal (Bs)", "Desc%", "M\xE9todo Pago", "Vendedor"]
+          ["ID Venta", "Factura", "Nombre Cliente", "NIT", "Cliente", "Tel\xE9fono", "Fecha", "Hora", "C\xF3digo", "Producto", "Categor\xEDa", "Cantidad", "Precio Unit. (Bs)", "Subtotal (Bs)", "Desc%", "M\xE9todo Pago", "Vendedor"]
         ];
         let brutoMarca = 0;
         if (vMarca.length === 0) {
@@ -22062,6 +22075,8 @@
                 v.conFactura ? "\u2713 Factura" : "\u2014",
                 v.conFactura ? v.factNombre || "\u2014" : "\u2014",
                 v.conFactura ? v.factNit || "\u2014" : "\u2014",
+                v.clienteNombre || "\u2014",
+                v.clienteTel || "\u2014",
                 v.fecha,
                 v.hora,
                 it.codigo,
@@ -22516,8 +22531,7 @@
       overflowY: "auto",
       transform: anim ? "translateY(0)" : "translateY(100%)",
       transition: "transform .32s cubic-bezier(.32,.72,0,1)",
-      paddingBottom: "env(safe-area-inset-bottom,24px)",
-      paddingBottom: 24
+      paddingBottom: "env(safe-area-inset-bottom,24px)"
     } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "center", padding: "12px 0 4px" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { width: 36, height: 5, borderRadius: 3, background: C.accent } })), /* @__PURE__ */ import_react.default.createElement("div", { style: {
       display: "flex",
       justifyContent: "space-between",
@@ -23221,7 +23235,6 @@
           lineHeight: 1
         } }, "\u2601"), /* @__PURE__ */ import_react.default.createElement("button", { onClick: logout, style: {
           background: "none",
-          border: "none",
           fontSize: 13,
           cursor: "pointer",
           color: C.label3,
@@ -23531,6 +23544,8 @@
     const [conFactura, setConFactura] = (0, import_react.useState)(false);
     const [factNombre, setFactNombre] = (0, import_react.useState)("");
     const [factNit, setFactNit] = (0, import_react.useState)("");
+    const [clienteNombre, setClienteNombre] = (0, import_react.useState)("");
+    const [clienteTel, setClienteTel] = (0, import_react.useState)("");
     const inputRef = (0, import_react.useRef)();
     const fileRef = (0, import_react.useRef)();
     const resultados = (0, import_react.useMemo)(() => {
@@ -23629,7 +23644,18 @@
         factNombre: factNombre.trim(),
         factNit: factNit.trim()
       } : { conFactura: false };
-      const vf = onVenta({ items, total, subtotal, descPct, metodoPago: pago, vendedor: vendedor || "Tienda", etiquetaImg: etiqueta, ...facturaData });
+      const vf = onVenta({
+        items,
+        total,
+        subtotal,
+        descPct,
+        metodoPago: pago,
+        vendedor: vendedor || "Tienda",
+        etiquetaImg: etiqueta,
+        clienteNombre: clienteNombre.trim() || null,
+        clienteTel: clienteTel.trim() || null,
+        ...facturaData
+      });
       setUltima(vf);
       setShowOk(true);
       setShowPago(false);
@@ -23640,6 +23666,8 @@
       setConFactura(false);
       setFactNombre("");
       setFactNit("");
+      setClienteNombre("");
+      setClienteTel("");
     }
     return /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { position: "relative", marginBottom: 14 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", fontSize: 16, color: C.label3 } }, "\u{1F50D}"), /* @__PURE__ */ import_react.default.createElement(
       "input",
@@ -23909,6 +23937,54 @@
         placeholder: "Nombre del vendedor"
       }
     ), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      marginBottom: 16,
+      background: C.bg2,
+      borderRadius: 14,
+      border: `1px solid ${C.sep}`,
+      padding: "14px 16px"
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      fontSize: 13,
+      fontWeight: 700,
+      color: C.label2,
+      fontFamily: FONT_UI,
+      marginBottom: 12,
+      letterSpacing: 0.2
+    } }, "\u{1F464} Datos del cliente (opcional)"), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 10 } }, /* @__PURE__ */ import_react.default.createElement(
+      "input",
+      {
+        value: clienteNombre,
+        onChange: (e) => setClienteNombre(e.target.value),
+        placeholder: "Nombre del cliente",
+        style: {
+          padding: "10px 14px",
+          borderRadius: 10,
+          border: `1px solid ${C.sep}`,
+          fontSize: 14,
+          fontFamily: FONT_UI,
+          background: C.bg1,
+          color: C.label,
+          outline: "none"
+        }
+      }
+    ), /* @__PURE__ */ import_react.default.createElement(
+      "input",
+      {
+        value: clienteTel,
+        onChange: (e) => setClienteTel(e.target.value),
+        placeholder: "Tel\xE9fono / WhatsApp",
+        type: "tel",
+        style: {
+          padding: "10px 14px",
+          borderRadius: 10,
+          border: `1px solid ${C.sep}`,
+          fontSize: 14,
+          fontFamily: FONT_UI,
+          background: C.bg1,
+          color: C.label,
+          outline: "none"
+        }
+      }
+    ))), /* @__PURE__ */ import_react.default.createElement("div", { style: {
       marginBottom: 16,
       background: conFactura ? `${C.blue}10` : C.bg2,
       borderRadius: 14,
@@ -24754,8 +24830,6 @@
       display: "flex",
       alignItems: "center",
       gap: 6,
-      background: "none",
-      border: "none",
       cursor: "pointer",
       padding: "4px 10px",
       borderRadius: 20,

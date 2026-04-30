@@ -61,6 +61,8 @@ async function sbGuardarVenta(venta) {
       con_factura: venta.conFactura||false,
       fact_nombre: venta.factNombre||null,
       fact_nit: venta.factNit||null,
+      cliente_nombre: venta.clienteNombre||null,
+      cliente_tel: venta.clienteTel||null,
     });
     const items = venta.items.map(it => ({
       venta_id: venta.id, prod_id: it.prodId, codigo: it.codigo,
@@ -96,6 +98,7 @@ async function sbCargarTodo() {
       vendedor: v.vendedor, etiquetaImg: v.etiqueta_img,
       conFactura: v.con_factura||false, factNombre: v.fact_nombre||"",
       factNit: v.fact_nit||"",
+      clienteNombre: v.cliente_nombre||"", clienteTel: v.cliente_tel||"",
       items: (items||[]).filter(i=>i.venta_id===v.id).map(i=>({
         prodId: i.prod_id, codigo: i.codigo, nombre: i.nombre,
         marcaId: i.marca_id, marcaNombre: i.marca_nombre,
@@ -662,7 +665,7 @@ async function generarExcelMensual(ventas, inventario, mes, anio, setGenerando) 
       const rows = [
         [`${m.emoji} ${m.nombre.toUpperCase()} — ${mesNom} ${anio}`],
         [],
-        ["ID Venta","Factura","Nombre Cliente","NIT","Fecha","Hora","Código","Producto","Categoría","Cantidad","Precio Unit. (Bs)","Subtotal (Bs)","Desc%","Método Pago","Vendedor"],
+        ["ID Venta","Factura","Nombre Cliente","NIT","Cliente","Teléfono","Fecha","Hora","Código","Producto","Categoría","Cantidad","Precio Unit. (Bs)","Subtotal (Bs)","Desc%","Método Pago","Vendedor"],
       ];
 
       let brutoMarca = 0;
@@ -676,6 +679,7 @@ async function generarExcelMensual(ventas, inventario, mes, anio, setGenerando) 
               v.conFactura ? "✓ Factura" : "—",
               v.conFactura ? (v.factNombre||"—") : "—",
               v.conFactura ? (v.factNit||"—") : "—",
+              v.clienteNombre||"—", v.clienteTel||"—",
               v.fecha, v.hora,
               it.codigo, it.nombre, it.categoria||"",
               it.cantidad, it.precioUnit, it.subtotal,
@@ -2166,6 +2170,8 @@ function POS({inv,onVenta}){
   const[conFactura,setConFactura]=useState(false);
   const[factNombre,setFactNombre]=useState("");
   const[factNit,setFactNit]   =useState("");
+  const[clienteNombre,setClienteNombre]=useState("");
+  const[clienteTel,setClienteTel]=useState("");
   const inputRef=useRef();
   const fileRef=useRef();
 
@@ -2253,10 +2259,12 @@ function POS({inv,onVenta}){
       factNombre:factNombre.trim(),
       factNit:factNit.trim(),
     } : {conFactura:false};
-    const vf=onVenta({items,total,subtotal,descPct,metodoPago:pago,vendedor:vendedor||"Tienda",etiquetaImg:etiqueta,...facturaData});
+    const vf=onVenta({items,total,subtotal,descPct,metodoPago:pago,vendedor:vendedor||"Tienda",etiquetaImg:etiqueta,
+      clienteNombre:clienteNombre.trim()||null, clienteTel:clienteTel.trim()||null,
+      ...facturaData});
     setUltima(vf);setShowOk(true);setShowPago(false);
     setCarrito([]);setDescExtra(0);setBusq("");setEtiqueta(null);
-    setConFactura(false);setFactNombre("");setFactNit("");
+    setConFactura(false);setFactNombre("");setFactNit("");setClienteNombre("");setClienteTel("");
   }
 
   return (
@@ -2507,6 +2515,30 @@ function POS({inv,onVenta}){
           value={descExtra} onChange={e=>setDescExtra(Number(e.target.value))}/>
         <IOSInput label="Vendedor (opcional)" value={vendedor}
           onChange={e=>setVendedor(e.target.value)} placeholder="Nombre del vendedor"/>
+
+        {/* Datos del cliente */}
+        <div style={{marginBottom:16,background:C.bg2,borderRadius:14,
+          border:`1px solid ${C.sep}`,padding:"14px 16px"}}>
+          <div style={{fontSize:13,fontWeight:700,color:C.label2,fontFamily:FONT_UI,
+            marginBottom:12,letterSpacing:0.2}}>👤 Datos del cliente (opcional)</div>
+          <div style={{display:"flex",flexDirection:"column",gap:10}}>
+            <input
+              value={clienteNombre}
+              onChange={e=>setClienteNombre(e.target.value)}
+              placeholder="Nombre del cliente"
+              style={{padding:"10px 14px",borderRadius:10,border:`1px solid ${C.sep}`,
+                fontSize:14,fontFamily:FONT_UI,background:C.bg1,color:C.label,outline:"none"}}
+            />
+            <input
+              value={clienteTel}
+              onChange={e=>setClienteTel(e.target.value)}
+              placeholder="Teléfono / WhatsApp"
+              type="tel"
+              style={{padding:"10px 14px",borderRadius:10,border:`1px solid ${C.sep}`,
+                fontSize:14,fontFamily:FONT_UI,background:C.bg1,color:C.label,outline:"none"}}
+            />
+          </div>
+        </div>
 
         {/* Toggle Factura */}
         <div style={{marginBottom:16,background:conFactura?`${C.blue}10`:C.bg2,
