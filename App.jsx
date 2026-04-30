@@ -32,16 +32,20 @@ async function sbGuardarProducto(prod) {
     await db.from("inventario").upsert({
       id: prod.id, codigo: prod.codigo, marca_id: prod.marcaId,
       marca_nombre: prod.marcaNombre, nombre: prod.nombre,
-      categoria: prod.categoria, precio: prod.precio,
-      stock: prod.stock, stock_inicial: prod.stockInicial, fecha: prod.fecha
+      categoria: prod.categoria, descripcion: prod.descripcion||null,
+      subcat: prod.subcat||null, precio: prod.precio,
+      stock: prod.stock, stock_inicial: prod.stockInicial, fecha: prod.fecha,
+      dado_de_baja: prod.dadoDeBaja||false, fecha_baja: prod.fechaBaja||null,
     });
   } catch(e) { console.warn("Supabase save prod:", e.message); }
 }
 
-async function sbActualizarStock(prodId, nuevoStock) {
+async function sbActualizarStock(prodId, nuevoStock, dadoDeBaja=false, fechaBaja=null) {
   try {
     const db = await getSupabase();
-    await db.from("inventario").update({ stock: nuevoStock }).eq("id", prodId);
+    const upd = { stock: nuevoStock };
+    if (dadoDeBaja) { upd.dado_de_baja = true; upd.fecha_baja = fechaBaja; }
+    await db.from("inventario").update(upd).eq("id", prodId);
   } catch(e) { console.warn("Supabase update stock:", e.message); }
 }
 
@@ -57,8 +61,6 @@ async function sbGuardarVenta(venta) {
       con_factura: venta.conFactura||false,
       fact_nombre: venta.factNombre||null,
       fact_nit: venta.factNit||null,
-      iva_desc: venta.ivaDesc||0,
-      iva_pct: venta.ivaPct||0,
     });
     const items = venta.items.map(it => ({
       venta_id: venta.id, prod_id: it.prodId, codigo: it.codigo,
@@ -93,7 +95,7 @@ async function sbCargarTodo() {
       descPct: v.desc_pct, metodoPago: v.metodo_pago,
       vendedor: v.vendedor, etiquetaImg: v.etiqueta_img,
       conFactura: v.con_factura||false, factNombre: v.fact_nombre||"",
-      factNit: v.fact_nit||"", ivaDesc: v.iva_desc||0, ivaPct: v.iva_pct||0,
+      factNit: v.fact_nit||"",
       items: (items||[]).filter(i=>i.venta_id===v.id).map(i=>({
         prodId: i.prod_id, codigo: i.codigo, nombre: i.nombre,
         marcaId: i.marca_id, marcaNombre: i.marca_nombre,
@@ -105,8 +107,11 @@ async function sbCargarTodo() {
     const invCompleto = (inv||[]).map(p => ({
       id: p.id, codigo: p.codigo, marcaId: p.marca_id,
       marcaNombre: p.marca_nombre, nombre: p.nombre,
-      categoria: p.categoria, precio: p.precio,
-      stock: p.stock, stockInicial: p.stock_inicial, fecha: p.fecha
+      categoria: p.categoria, descripcion: p.descripcion||"",
+      subcat: p.subcat||"",
+      precio: Number(p.precio)||0,
+      stock: p.stock||0, stockInicial: p.stock_inicial||0, fecha: p.fecha,
+      dadoDeBaja: p.dado_de_baja||false, fechaBaja: p.fecha_baja||null,
     }));
 
     // Reconstruir cierres
@@ -1187,7 +1192,6 @@ function Sheet({open,onClose,title,children,tall}){
         transform:anim?"translateY(0)":"translateY(100%)",
         transition:"transform .32s cubic-bezier(.32,.72,0,1)",
         paddingBottom:"env(safe-area-inset-bottom,24px)",
-        paddingBottom:24,
       }}>
         {/* Handle */}
         <div style={{display:"flex",justifyContent:"center",padding:"12px 0 4px"}}>
@@ -1844,7 +1848,7 @@ export default function App(){
                 WebkitTapHighlightColor:"transparent",lineHeight:1,
               }}>☁</button>
               <button onClick={logout} style={{
-                background:"none",border:"none",fontSize:13,cursor:"pointer",
+                background:"none",fontSize:13,cursor:"pointer",
                 color:C.label3,padding:"4px 8px",fontFamily:FONT,
                 WebkitTapHighlightColor:"transparent",
                 border:`1px solid ${C.sep}`,borderRadius:8,
@@ -3410,7 +3414,7 @@ function InventarioPorMarca({inv, ventas, onRecibir, onBaja, onExcel}){
                 ))}
               </div>
               <button onClick={()=>setMostrarAgotados(v=>!v)} style={{
-                display:"flex",alignItems:"center",gap:6,background:"none",border:"none",
+                display:"flex",alignItems:"center",gap:6,
                 cursor:"pointer",padding:"4px 10px",borderRadius:20,
                 background:mostrarAgotados?`${C.red}15`:"none",
                 border:`1px solid ${mostrarAgotados?C.red+"40":C.sep}`,
