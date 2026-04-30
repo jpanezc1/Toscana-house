@@ -1,0 +1,14 @@
+{
+  "name": "toscana-house",
+  "version": "1.0.0",
+  "scripts": {
+    "build": "node build.js"
+  },
+  "dependencies": {
+    "react": "^19.2.5",
+    "react-dom": "^19.2.5"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.0"
+  }
+}
