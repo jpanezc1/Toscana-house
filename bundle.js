@@ -25,9 +25,9 @@
     mod
   ));
 
-  // home/claude/.npm-global/lib/node_modules/react/cjs/react.development.js
+  // node_modules/react/cjs/react.development.js
   var require_react_development = __commonJS({
-    "home/claude/.npm-global/lib/node_modules/react/cjs/react.development.js"(exports, module) {
+    "node_modules/react/cjs/react.development.js"(exports, module) {
       "use strict";
       (function() {
         function defineDeprecationWarning(methodName, info) {
@@ -997,9 +997,9 @@
     }
   });
 
-  // home/claude/.npm-global/lib/node_modules/react/index.js
+  // node_modules/react/index.js
   var require_react = __commonJS({
-    "home/claude/.npm-global/lib/node_modules/react/index.js"(exports, module) {
+    "node_modules/react/index.js"(exports, module) {
       "use strict";
       if (false) {
         module.exports = null;
@@ -1009,9 +1009,9 @@
     }
   });
 
-  // home/claude/.npm-global/lib/node_modules/react-dom/node_modules/scheduler/cjs/scheduler.development.js
+  // node_modules/scheduler/cjs/scheduler.development.js
   var require_scheduler_development = __commonJS({
-    "home/claude/.npm-global/lib/node_modules/react-dom/node_modules/scheduler/cjs/scheduler.development.js"(exports) {
+    "node_modules/scheduler/cjs/scheduler.development.js"(exports) {
       "use strict";
       (function() {
         function performWorkUntilDeadline() {
@@ -1268,9 +1268,9 @@
     }
   });
 
-  // home/claude/.npm-global/lib/node_modules/react-dom/node_modules/scheduler/index.js
+  // node_modules/scheduler/index.js
   var require_scheduler = __commonJS({
-    "home/claude/.npm-global/lib/node_modules/react-dom/node_modules/scheduler/index.js"(exports, module) {
+    "node_modules/scheduler/index.js"(exports, module) {
       "use strict";
       if (false) {
         module.exports = null;
@@ -1280,9 +1280,9 @@
     }
   });
 
-  // home/claude/.npm-global/lib/node_modules/react-dom/cjs/react-dom.development.js
+  // node_modules/react-dom/cjs/react-dom.development.js
   var require_react_dom_development = __commonJS({
-    "home/claude/.npm-global/lib/node_modules/react-dom/cjs/react-dom.development.js"(exports) {
+    "node_modules/react-dom/cjs/react-dom.development.js"(exports) {
       "use strict";
       (function() {
         function noop() {
@@ -1524,9 +1524,9 @@
     }
   });
 
-  // home/claude/.npm-global/lib/node_modules/react-dom/index.js
+  // node_modules/react-dom/index.js
   var require_react_dom = __commonJS({
-    "home/claude/.npm-global/lib/node_modules/react-dom/index.js"(exports, module) {
+    "node_modules/react-dom/index.js"(exports, module) {
       "use strict";
       if (false) {
         checkDCE();
@@ -1537,9 +1537,9 @@
     }
   });
 
-  // home/claude/.npm-global/lib/node_modules/react-dom/cjs/react-dom-client.development.js
+  // node_modules/react-dom/cjs/react-dom-client.development.js
   var require_react_dom_client_development = __commonJS({
-    "home/claude/.npm-global/lib/node_modules/react-dom/cjs/react-dom-client.development.js"(exports) {
+    "node_modules/react-dom/cjs/react-dom-client.development.js"(exports) {
       "use strict";
       (function() {
         function findHook(fiber, id) {
@@ -21436,9 +21436,9 @@
     }
   });
 
-  // home/claude/.npm-global/lib/node_modules/react-dom/client.js
+  // node_modules/react-dom/client.js
   var require_client = __commonJS({
-    "home/claude/.npm-global/lib/node_modules/react-dom/client.js"(exports, module) {
+    "node_modules/react-dom/client.js"(exports, module) {
       "use strict";
       if (false) {
         checkDCE();
@@ -21449,7 +21449,7 @@
     }
   });
 
-  // home/claude/main_clean.jsx
+  // main.jsx
   var import_react = __toESM(require_react());
   var import_client = __toESM(require_client());
   var SUPA_URL = "https://uqphxiixdulqscbfyxhz.supabase.co";
@@ -23016,6 +23016,80 @@
         }
         setCargando(false);
       });
+      let channel = null;
+      getSupabase().then((db) => {
+        channel = db.channel("toscana-realtime").on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "inventario" },
+          (payload) => {
+            const p = payload.new;
+            if (!p) return;
+            if (payload.eventType === "DELETE") {
+              setInv((prev) => prev.filter((i) => i.id !== payload.old.id));
+              return;
+            }
+            const prod = {
+              id: p.id,
+              codigo: p.codigo,
+              marcaId: p.marca_id,
+              marcaNombre: p.marca_nombre,
+              nombre: p.nombre,
+              categoria: p.categoria,
+              descripcion: p.descripcion || "",
+              subcat: p.subcat || "",
+              precio: Number(p.precio) || 0,
+              stock: p.stock || 0,
+              stockInicial: p.stock_inicial || 0,
+              fecha: p.fecha,
+              dadoDeBaja: p.dado_de_baja || false,
+              fechaBaja: p.fecha_baja || null
+            };
+            setInv((prev) => {
+              const idx = prev.findIndex((i) => i.id === prod.id);
+              if (idx >= 0) {
+                const next = [...prev];
+                next[idx] = prod;
+                return next;
+              }
+              return [...prev, prod];
+            });
+          }
+        ).on(
+          "postgres_changes",
+          { event: "INSERT", schema: "public", table: "ventas" },
+          (payload) => {
+            const v = payload.new;
+            if (!v) return;
+            sbCargarTodo().then((data) => {
+              if (data) {
+                setVentas(data.ventas);
+              }
+            });
+          }
+        ).on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "cierres" },
+          (payload) => {
+            const c = payload.new;
+            if (!c) return;
+            setCierres((prev) => ({
+              ...prev,
+              [c.id]: { cerrado: c.cerrado, fecha: c.fecha, mk: c.mk }
+            }));
+          }
+        ).subscribe((status) => {
+          if (status === "SUBSCRIBED") {
+            setDbStatus("ok");
+          } else if (status === "CHANNEL_ERROR") {
+            console.warn("Realtime error");
+          }
+        });
+      });
+      return () => {
+        if (channel) {
+          getSupabase().then((db) => db.removeChannel(channel));
+        }
+      };
     }, []);
     const MK = (0, import_react.useMemo)(() => mkKey(mes, anio), [mes, anio]);
     const vMes = (0, import_react.useMemo)(() => ventas.filter((v) => v.mk === MK), [ventas, MK]);

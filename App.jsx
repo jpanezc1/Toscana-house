@@ -1653,7 +1653,7 @@ export default function App(){
   const[generando,setGenerando]=useState(false);
   const drive = useDriveSync();
 
-  // Cargar datos desde Supabase al inicio
+  // Cargar datos desde Supabase al inicio + Realtime
   useEffect(()=>{
     setDbStatus("connecting");
     sbCargarTodo().then(data=>{
@@ -1667,6 +1667,76 @@ export default function App(){
       }
       setCargando(false);
     });
+
+    // ── Supabase Realtime — sync en tiempo real entre dispositivos ──
+    let channel = null;
+    getSupabase().then(db => {
+      channel = db
+        .channel("toscana-realtime")
+        .on("postgres_changes", { event: "*", schema: "public", table: "inventario" },
+          payload => {
+            const p = payload.new;
+            if (!p) return;
+            if (payload.eventType === "DELETE") {
+              setInv(prev => prev.filter(i => i.id !== payload.old.id));
+              return;
+            }
+            const prod = {
+              id: p.id, codigo: p.codigo, marcaId: p.marca_id,
+              marcaNombre: p.marca_nombre, nombre: p.nombre,
+              categoria: p.categoria, descripcion: p.descripcion||"",
+              subcat: p.subcat||"",
+              precio: Number(p.precio)||0,
+              stock: p.stock||0, stockInicial: p.stock_inicial||0, fecha: p.fecha,
+              dadoDeBaja: p.dado_de_baja||false, fechaBaja: p.fecha_baja||null,
+            };
+            setInv(prev => {
+              const idx = prev.findIndex(i => i.id === prod.id);
+              if (idx >= 0) {
+                const next = [...prev];
+                next[idx] = prod;
+                return next;
+              }
+              return [...prev, prod];
+            });
+          }
+        )
+        .on("postgres_changes", { event: "INSERT", schema: "public", table: "ventas" },
+          payload => {
+            const v = payload.new;
+            if (!v) return;
+            // Recargar todo para obtener los items de la venta
+            sbCargarTodo().then(data => {
+              if (data) {
+                setVentas(data.ventas);
+              }
+            });
+          }
+        )
+        .on("postgres_changes", { event: "*", schema: "public", table: "cierres" },
+          payload => {
+            const c = payload.new;
+            if (!c) return;
+            setCierres(prev => ({
+              ...prev,
+              [c.id]: { cerrado: c.cerrado, fecha: c.fecha, mk: c.mk }
+            }));
+          }
+        )
+        .subscribe(status => {
+          if (status === "SUBSCRIBED") {
+            setDbStatus("ok");
+          } else if (status === "CHANNEL_ERROR") {
+            console.warn("Realtime error");
+          }
+        });
+    });
+
+    return () => {
+      if (channel) {
+        getSupabase().then(db => db.removeChannel(channel));
+      }
+    };
   },[]);
 
   const MK      =useMemo(()=>mkKey(mes,anio),[mes,anio]);
