@@ -23060,11 +23060,17 @@
           (payload) => {
             const v = payload.new;
             if (!v) return;
-            sbCargarTodo().then((data) => {
-              if (data) {
-                setVentas(data.ventas);
-              }
-            });
+            setTimeout(() => {
+              sbCargarTodo().then((data) => {
+                if (data) {
+                  setVentas(data.ventas);
+                  setInv((prev) => {
+                    if (data.inv.length > 0) return data.inv;
+                    return prev;
+                  });
+                }
+              });
+            }, 1500);
           }
         ).on(
           "postgres_changes",

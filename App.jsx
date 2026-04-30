@@ -1705,12 +1705,18 @@ export default function App(){
           payload => {
             const v = payload.new;
             if (!v) return;
-            // Recargar todo para obtener los items de la venta
-            sbCargarTodo().then(data => {
-              if (data) {
-                setVentas(data.ventas);
-              }
-            });
+            // Esperar 1.5s para que los venta_items también estén guardados
+            setTimeout(() => {
+              sbCargarTodo().then(data => {
+                if (data) {
+                  setVentas(data.ventas);
+                  setInv(prev => {
+                    if (data.inv.length > 0) return data.inv;
+                    return prev;
+                  });
+                }
+              });
+            }, 1500);
           }
         )
         .on("postgres_changes", { event: "*", schema: "public", table: "cierres" },
