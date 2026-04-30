@@ -1,5 +1,9 @@
 {
-  "buildCommand": "npm run build",
+  "version": 2,
+  "buildCommand": "npm install && npm run build",
   "outputDirectory": ".",
-  "framework": null
+  "framework": null,
+  "builds": [
+    { "src": "index.html", "use": "@vercel/static" }
+  ]
 }
