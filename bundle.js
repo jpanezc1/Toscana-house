@@ -25,9 +25,9 @@
     mod
   ));
 
-  // node_modules/react/cjs/react.development.js
+  // home/claude/.npm-global/lib/node_modules/react/cjs/react.development.js
   var require_react_development = __commonJS({
-    "node_modules/react/cjs/react.development.js"(exports, module) {
+    "home/claude/.npm-global/lib/node_modules/react/cjs/react.development.js"(exports, module) {
       "use strict";
       (function() {
         function defineDeprecationWarning(methodName, info) {
@@ -997,9 +997,9 @@
     }
   });
 
-  // node_modules/react/index.js
+  // home/claude/.npm-global/lib/node_modules/react/index.js
   var require_react = __commonJS({
-    "node_modules/react/index.js"(exports, module) {
+    "home/claude/.npm-global/lib/node_modules/react/index.js"(exports, module) {
       "use strict";
       if (false) {
         module.exports = null;
@@ -1009,9 +1009,9 @@
     }
   });
 
-  // node_modules/scheduler/cjs/scheduler.development.js
+  // home/claude/.npm-global/lib/node_modules/react-dom/node_modules/scheduler/cjs/scheduler.development.js
   var require_scheduler_development = __commonJS({
-    "node_modules/scheduler/cjs/scheduler.development.js"(exports) {
+    "home/claude/.npm-global/lib/node_modules/react-dom/node_modules/scheduler/cjs/scheduler.development.js"(exports) {
       "use strict";
       (function() {
         function performWorkUntilDeadline() {
@@ -1268,9 +1268,9 @@
     }
   });
 
-  // node_modules/scheduler/index.js
+  // home/claude/.npm-global/lib/node_modules/react-dom/node_modules/scheduler/index.js
   var require_scheduler = __commonJS({
-    "node_modules/scheduler/index.js"(exports, module) {
+    "home/claude/.npm-global/lib/node_modules/react-dom/node_modules/scheduler/index.js"(exports, module) {
       "use strict";
       if (false) {
         module.exports = null;
@@ -1280,9 +1280,9 @@
     }
   });
 
-  // node_modules/react-dom/cjs/react-dom.development.js
+  // home/claude/.npm-global/lib/node_modules/react-dom/cjs/react-dom.development.js
   var require_react_dom_development = __commonJS({
-    "node_modules/react-dom/cjs/react-dom.development.js"(exports) {
+    "home/claude/.npm-global/lib/node_modules/react-dom/cjs/react-dom.development.js"(exports) {
       "use strict";
       (function() {
         function noop() {
@@ -1524,9 +1524,9 @@
     }
   });
 
-  // node_modules/react-dom/index.js
+  // home/claude/.npm-global/lib/node_modules/react-dom/index.js
   var require_react_dom = __commonJS({
-    "node_modules/react-dom/index.js"(exports, module) {
+    "home/claude/.npm-global/lib/node_modules/react-dom/index.js"(exports, module) {
       "use strict";
       if (false) {
         checkDCE();
@@ -1537,9 +1537,9 @@
     }
   });
 
-  // node_modules/react-dom/cjs/react-dom-client.development.js
+  // home/claude/.npm-global/lib/node_modules/react-dom/cjs/react-dom-client.development.js
   var require_react_dom_client_development = __commonJS({
-    "node_modules/react-dom/cjs/react-dom-client.development.js"(exports) {
+    "home/claude/.npm-global/lib/node_modules/react-dom/cjs/react-dom-client.development.js"(exports) {
       "use strict";
       (function() {
         function findHook(fiber, id) {
@@ -21436,9 +21436,9 @@
     }
   });
 
-  // node_modules/react-dom/client.js
+  // home/claude/.npm-global/lib/node_modules/react-dom/client.js
   var require_client = __commonJS({
-    "node_modules/react-dom/client.js"(exports, module) {
+    "home/claude/.npm-global/lib/node_modules/react-dom/client.js"(exports, module) {
       "use strict";
       if (false) {
         checkDCE();
@@ -21449,7 +21449,7 @@
     }
   });
 
-  // main.jsx
+  // home/claude/main_clean.jsx
   var import_react = __toESM(require_react());
   var import_client = __toESM(require_client());
   var SUPA_URL = "https://uqphxiixdulqscbfyxhz.supabase.co";
@@ -23018,6 +23018,7 @@
       });
       let channel = null;
       getSupabase().then((db) => {
+        console.log("[Realtime] Conectando a Supabase Realtime...");
         channel = db.channel("toscana-realtime").on(
           "postgres_changes",
           { event: "*", schema: "public", table: "inventario" },
@@ -23084,17 +23085,31 @@
             }));
           }
         ).subscribe((status) => {
+          console.log("[Realtime] Status:", status);
+          window.__sb_channel = channel;
           if (status === "SUBSCRIBED") {
             setDbStatus("ok");
+            console.log("[Realtime] \u2713 Conectado correctamente");
           } else if (status === "CHANNEL_ERROR") {
-            console.warn("Realtime error");
+            console.warn("[Realtime] \u2717 Error de conexi\xF3n");
           }
         });
       });
+      const poll = setInterval(() => {
+        sbCargarTodo().then((data) => {
+          if (data) {
+            setVentas(data.ventas);
+            if (data.inv.length > 0) setInv(data.inv);
+            if (Object.keys(data.cierres).length > 0) setCierres(data.cierres);
+            setDbStatus("ok");
+          }
+        });
+      }, 3e4);
       return () => {
         if (channel) {
           getSupabase().then((db) => db.removeChannel(channel));
         }
+        clearInterval(poll);
       };
     }, []);
     const MK = (0, import_react.useMemo)(() => mkKey(mes, anio), [mes, anio]);
@@ -26012,4 +26027,3 @@ react-dom/cjs/react-dom-client.development.js:
    * LICENSE file in the root directory of this source tree.
    *)
 */
-/* Thu Apr 30 20:01:45 -04 2026 */

@@ -1671,6 +1671,7 @@ export default function App(){
     // ── Supabase Realtime — sync en tiempo real entre dispositivos ──
     let channel = null;
     getSupabase().then(db => {
+      console.log("[Realtime] Conectando a Supabase Realtime...");
       channel = db
         .channel("toscana-realtime")
         .on("postgres_changes", { event: "*", schema: "public", table: "inventario" },
@@ -1730,18 +1731,34 @@ export default function App(){
           }
         )
         .subscribe(status => {
+          console.log("[Realtime] Status:", status);
+          window.__sb_channel = channel;
           if (status === "SUBSCRIBED") {
             setDbStatus("ok");
+            console.log("[Realtime] ✓ Conectado correctamente");
           } else if (status === "CHANNEL_ERROR") {
-            console.warn("Realtime error");
+            console.warn("[Realtime] ✗ Error de conexión");
           }
         });
     });
+
+    // Polling de respaldo cada 30 segundos
+    const poll = setInterval(() => {
+      sbCargarTodo().then(data => {
+        if (data) {
+          setVentas(data.ventas);
+          if (data.inv.length > 0) setInv(data.inv);
+          if (Object.keys(data.cierres).length > 0) setCierres(data.cierres);
+          setDbStatus("ok");
+        }
+      });
+    }, 30000);
 
     return () => {
       if (channel) {
         getSupabase().then(db => db.removeChannel(channel));
       }
+      clearInterval(poll);
     };
   },[]);
 
