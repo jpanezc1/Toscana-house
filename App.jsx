@@ -1713,15 +1713,23 @@ export default function App(){
           payload => {
             const v = payload.new;
             if (!v) return;
-            // Esperar 2s para que los venta_items también estén guardados
+            // Recargar solo en otros dispositivos (no en el que generó la venta)
+            // Usar timeout para que los items ya estén guardados
             setTimeout(() => {
               sbCargarTodo().then(data => {
-                if (data && data.ventas.length > 0) {
-                  // Solo actualizar si hay datos remotos — nunca borrar estado local
-                  setVentas(data.ventas);
-                }
-                if (data && data.inv.length > 0) {
-                  setInv(data.inv);
+                if (data) {
+                  // Merge: mantener ventas locales + agregar las remotas que no tengamos
+                  if (data.ventas.length > 0) {
+                    setVentas(prev => {
+                      const ids = new Set(prev.map(v => v.id));
+                      const nuevas = data.ventas.filter(v => !ids.has(v.id));
+                      if (nuevas.length > 0) return [...prev, ...nuevas];
+                      return prev;
+                    });
+                  }
+                  if (data.inv.length > 0) {
+                    setInv(data.inv);
+                  }
                 }
               });
             }, 2000);

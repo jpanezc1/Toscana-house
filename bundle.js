@@ -23072,11 +23072,18 @@
             if (!v) return;
             setTimeout(() => {
               sbCargarTodo().then((data) => {
-                if (data && data.ventas.length > 0) {
-                  setVentas(data.ventas);
-                }
-                if (data && data.inv.length > 0) {
-                  setInv(data.inv);
+                if (data) {
+                  if (data.ventas.length > 0) {
+                    setVentas((prev) => {
+                      const ids = new Set(prev.map((v2) => v2.id));
+                      const nuevas = data.ventas.filter((v2) => !ids.has(v2.id));
+                      if (nuevas.length > 0) return [...prev, ...nuevas];
+                      return prev;
+                    });
+                  }
+                  if (data.inv.length > 0) {
+                    setInv(data.inv);
+                  }
                 }
               });
             }, 2e3);
