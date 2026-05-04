@@ -25,9 +25,9 @@
     mod
   ));
 
-  // home/claude/.npm-global/lib/node_modules/react/cjs/react.development.js
+  // node_modules/react/cjs/react.development.js
   var require_react_development = __commonJS({
-    "home/claude/.npm-global/lib/node_modules/react/cjs/react.development.js"(exports, module) {
+    "node_modules/react/cjs/react.development.js"(exports, module) {
       "use strict";
       (function() {
         function defineDeprecationWarning(methodName, info) {
@@ -997,9 +997,9 @@
     }
   });
 
-  // home/claude/.npm-global/lib/node_modules/react/index.js
+  // node_modules/react/index.js
   var require_react = __commonJS({
-    "home/claude/.npm-global/lib/node_modules/react/index.js"(exports, module) {
+    "node_modules/react/index.js"(exports, module) {
       "use strict";
       if (false) {
         module.exports = null;
@@ -1009,9 +1009,9 @@
     }
   });
 
-  // home/claude/.npm-global/lib/node_modules/react-dom/node_modules/scheduler/cjs/scheduler.development.js
+  // node_modules/scheduler/cjs/scheduler.development.js
   var require_scheduler_development = __commonJS({
-    "home/claude/.npm-global/lib/node_modules/react-dom/node_modules/scheduler/cjs/scheduler.development.js"(exports) {
+    "node_modules/scheduler/cjs/scheduler.development.js"(exports) {
       "use strict";
       (function() {
         function performWorkUntilDeadline() {
@@ -1268,9 +1268,9 @@
     }
   });
 
-  // home/claude/.npm-global/lib/node_modules/react-dom/node_modules/scheduler/index.js
+  // node_modules/scheduler/index.js
   var require_scheduler = __commonJS({
-    "home/claude/.npm-global/lib/node_modules/react-dom/node_modules/scheduler/index.js"(exports, module) {
+    "node_modules/scheduler/index.js"(exports, module) {
       "use strict";
       if (false) {
         module.exports = null;
@@ -1280,9 +1280,9 @@
     }
   });
 
-  // home/claude/.npm-global/lib/node_modules/react-dom/cjs/react-dom.development.js
+  // node_modules/react-dom/cjs/react-dom.development.js
   var require_react_dom_development = __commonJS({
-    "home/claude/.npm-global/lib/node_modules/react-dom/cjs/react-dom.development.js"(exports) {
+    "node_modules/react-dom/cjs/react-dom.development.js"(exports) {
       "use strict";
       (function() {
         function noop() {
@@ -1524,9 +1524,9 @@
     }
   });
 
-  // home/claude/.npm-global/lib/node_modules/react-dom/index.js
+  // node_modules/react-dom/index.js
   var require_react_dom = __commonJS({
-    "home/claude/.npm-global/lib/node_modules/react-dom/index.js"(exports, module) {
+    "node_modules/react-dom/index.js"(exports, module) {
       "use strict";
       if (false) {
         checkDCE();
@@ -1537,9 +1537,9 @@
     }
   });
 
-  // home/claude/.npm-global/lib/node_modules/react-dom/cjs/react-dom-client.development.js
+  // node_modules/react-dom/cjs/react-dom-client.development.js
   var require_react_dom_client_development = __commonJS({
-    "home/claude/.npm-global/lib/node_modules/react-dom/cjs/react-dom-client.development.js"(exports) {
+    "node_modules/react-dom/cjs/react-dom-client.development.js"(exports) {
       "use strict";
       (function() {
         function findHook(fiber, id) {
@@ -21436,9 +21436,9 @@
     }
   });
 
-  // home/claude/.npm-global/lib/node_modules/react-dom/client.js
+  // node_modules/react-dom/client.js
   var require_client = __commonJS({
-    "home/claude/.npm-global/lib/node_modules/react-dom/client.js"(exports, module) {
+    "node_modules/react-dom/client.js"(exports, module) {
       "use strict";
       if (false) {
         checkDCE();
@@ -21449,7 +21449,7 @@
     }
   });
 
-  // home/claude/main_clean.jsx
+  // main.jsx
   var import_react = __toESM(require_react());
   var import_client = __toESM(require_client());
   var SUPA_URL = "https://uqphxiixdulqscbfyxhz.supabase.co";
@@ -21510,7 +21510,8 @@
   async function sbGuardarVenta(venta) {
     try {
       const db = await getSupabase();
-      await db.from("ventas").upsert({
+      console.log("[Supabase] Guardando venta:", venta.id, "total:", venta.total);
+      const { error: errVenta } = await db.from("ventas").upsert({
         id: venta.id,
         fecha: venta.fecha,
         hora: venta.hora,
@@ -21529,6 +21530,11 @@
         cliente_nombre: venta.clienteNombre || null,
         cliente_tel: venta.clienteTel || null
       });
+      if (errVenta) {
+        console.error("[Supabase] Error guardando venta:", errVenta.message);
+        return;
+      }
+      console.log("[Supabase] Venta guardada OK, guardando items...");
       const items = venta.items.map((it) => ({
         venta_id: venta.id,
         prod_id: it.prodId,
@@ -21538,11 +21544,14 @@
         marca_nombre: it.marcaNombre,
         cantidad: it.cantidad,
         precio_unit: it.precioUnit,
-        subtotal: it.subtotal
+        subtotal: it.subtotal,
+        categoria: it.categoria || null
       }));
-      await db.from("venta_items").insert(items);
+      const { error: errItems } = await db.from("venta_items").insert(items);
+      if (errItems) console.error("[Supabase] Error guardando items:", errItems.message);
+      else console.log("[Supabase] Items guardados OK");
     } catch (e) {
-      console.warn("Supabase save venta:", e.message);
+      console.error("[Supabase] save venta exception:", e.message);
     }
   }
   async function sbGuardarCierre(key, data) {
@@ -23197,7 +23206,6 @@
         setInv((p) => p.map((i) => i.id === it.prodId ? { ...i, stock: Math.max(0, i.stock - it.cantidad) } : i));
         sbActualizarStock(it.prodId, Math.max(0, (inv.find((i) => i.id === it.prodId)?.stock || 0) - it.cantidad));
       });
-      drive.syncVenta(vf);
       sbGuardarVenta(vf);
       return vf;
     }
@@ -23762,6 +23770,9 @@
     const [clienteTel, setClienteTel] = (0, import_react.useState)("");
     const inputRef = (0, import_react.useRef)();
     const fileRef = (0, import_react.useRef)();
+    const videoRef = (0, import_react.useRef)();
+    const scannerRef = (0, import_react.useRef)(null);
+    const [camActiva, setCamActiva] = (0, import_react.useState)(false);
     const resultados = (0, import_react.useMemo)(() => {
       if (!busq.trim()) return [];
       const q = busq.toLowerCase();
@@ -23782,6 +23793,87 @@
       });
       return Object.entries(m);
     }, [carrito]);
+    function startCamera() {
+      setCamActiva(true);
+      setScanStatus("leyendo");
+      setScanMsg("Apunta la c\xE1mara al c\xF3digo QR...");
+      loadZXing().then((ZXing) => {
+        if (!ZXing) {
+          setScanStatus("notfound");
+          setScanMsg("No se pudo cargar el lector");
+          return;
+        }
+        const hints = /* @__PURE__ */ new Map();
+        const formats = [
+          ZXing.BarcodeFormat.QR_CODE,
+          ZXing.BarcodeFormat.CODE_128,
+          ZXing.BarcodeFormat.CODE_39,
+          ZXing.BarcodeFormat.EAN_13,
+          ZXing.BarcodeFormat.DATA_MATRIX
+        ];
+        hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, formats);
+        hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
+        const reader = new ZXing.MultiFormatReader();
+        reader.setHints(hints);
+        navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } }).then((stream) => {
+          if (!videoRef.current) {
+            stream.getTracks().forEach((t) => t.stop());
+            return;
+          }
+          videoRef.current.srcObject = stream;
+          videoRef.current.play();
+          scannerRef.current = { stream, reader };
+          const scan = () => {
+            if (!videoRef.current || !scannerRef.current) return;
+            const v = videoRef.current;
+            if (v.readyState < 2) {
+              requestAnimationFrame(scan);
+              return;
+            }
+            const canvas = document.createElement("canvas");
+            canvas.width = v.videoWidth;
+            canvas.height = v.videoHeight;
+            canvas.getContext("2d").drawImage(v, 0, 0);
+            try {
+              const lum = new ZXing.HTMLCanvasElementLuminanceSource(canvas);
+              const bb = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(lum));
+              const result = reader.decode(bb);
+              if (result) {
+                const codigo = result.getText().trim().toUpperCase();
+                stopCamera();
+                const prod = inv.find((i) => i.codigo.toUpperCase() === codigo);
+                if (prod && prod.stock > 0) {
+                  add(prod);
+                  setScanStatus("ok");
+                  setScanMsg("\u2713 " + prod.nombre + " agregado al carrito");
+                } else if (prod) {
+                  setScanStatus("notfound");
+                  setScanMsg(prod.nombre + " est\xE1 agotado");
+                } else {
+                  setScanStatus("notfound");
+                  setScanMsg("C\xF3digo " + codigo + " no encontrado");
+                }
+                return;
+              }
+            } catch (e) {
+            }
+            requestAnimationFrame(scan);
+          };
+          requestAnimationFrame(scan);
+        }).catch((err) => {
+          setScanStatus("notfound");
+          setScanMsg("No se pudo acceder a la c\xE1mara: " + err.message);
+          setCamActiva(false);
+        });
+      });
+    }
+    function stopCamera() {
+      if (scannerRef.current?.stream) {
+        scannerRef.current.stream.getTracks().forEach((t) => t.stop());
+      }
+      scannerRef.current = null;
+      setCamActiva(false);
+    }
     function add(prod) {
       const m = MARCAS.find((x) => x.id === prod.marcaId);
       setCarrito((p) => {
@@ -24001,22 +24093,68 @@
       fontSize: 20,
       padding: "4px",
       WebkitTapHighlightColor: "transparent"
-    } }, "\xD7")))), /* @__PURE__ */ import_react.default.createElement(
-      "input",
+    } }, "\xD7")))), camActiva ? /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      marginBottom: 14,
+      borderRadius: 16,
+      overflow: "hidden",
+      border: `1.5px solid ${C.gold}`,
+      position: "relative"
+    } }, /* @__PURE__ */ import_react.default.createElement(
+      "video",
       {
-        ref: fileRef,
-        type: "file",
-        accept: "image/*",
-        capture: "environment",
-        onChange: handleEtiqueta,
-        style: { display: "none" }
+        ref: videoRef,
+        style: {
+          width: "100%",
+          display: "block",
+          maxHeight: 220,
+          objectFit: "cover",
+          background: "#000"
+        },
+        playsInline: true,
+        muted: true
       }
-    ), /* @__PURE__ */ import_react.default.createElement("div", { onClick: () => fileRef.current?.click(), style: {
+    ), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      position: "absolute",
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      pointerEvents: "none"
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      width: 160,
+      height: 160,
+      border: "2px solid rgba(255,255,255,0.6)",
+      borderRadius: 12,
+      boxShadow: "0 0 0 4000px rgba(0,0,0,0.3)"
+    } })), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      position: "absolute",
+      bottom: 0,
+      left: 0,
+      right: 0,
+      background: "rgba(0,0,0,0.6)",
+      padding: "10px 14px",
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center"
+    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { color: "#fff", fontSize: 13, fontFamily: FONT_UI } }, scanMsg || "Apunta al c\xF3digo QR..."), /* @__PURE__ */ import_react.default.createElement("button", { onClick: stopCamera, style: {
+      background: "rgba(255,255,255,0.2)",
+      border: "none",
+      color: "#fff",
+      borderRadius: 8,
+      padding: "6px 12px",
+      fontSize: 12,
+      cursor: "pointer",
+      fontFamily: FONT_UI,
+      fontWeight: 600
+    } }, "Cancelar"))) : /* @__PURE__ */ import_react.default.createElement("div", { onClick: startCamera, style: {
       marginBottom: 14,
       borderRadius: 16,
       cursor: "pointer",
-      border: scanStatus === "ok" ? `1.5px solid ${C.green}` : scanStatus === "notfound" ? `1.5px solid ${C.amber}` : scanStatus === "leyendo" ? `1.5px solid ${C.gold}` : `1.5px dashed ${C.sep}`,
-      background: scanStatus === "ok" ? `${C.green}10` : scanStatus === "notfound" ? `${C.amber}10` : scanStatus === "leyendo" ? `${C.gold}10` : C.bg2,
+      border: scanStatus === "ok" ? `1.5px solid ${C.green}` : scanStatus === "notfound" ? `1.5px solid ${C.amber}` : `1.5px dashed ${C.sep}`,
+      background: scanStatus === "ok" ? `${C.green}10` : scanStatus === "notfound" ? `${C.amber}10` : C.bg2,
       padding: "14px 18px",
       display: "flex",
       alignItems: "center",
@@ -24028,48 +24166,17 @@
       height: 46,
       borderRadius: 12,
       flexShrink: 0,
-      background: scanStatus === "ok" ? `${C.green}20` : scanStatus === "leyendo" ? `${C.gold}20` : `${C.label4}30`,
+      background: scanStatus === "ok" ? `${C.green}20` : `${C.label4}30`,
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
       fontSize: 22
-    } }, scanStatus === "leyendo" ? "\u23F3" : scanStatus === "ok" ? "\u2713" : "\u25A6"), /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+    } }, scanStatus === "ok" ? "\u2713" : scanStatus === "notfound" ? "\u26A0\uFE0F" : "\u25A6"), /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
       fontSize: 15,
       fontWeight: 700,
-      fontFamily: FONT,
-      color: scanStatus === "ok" ? C.green : scanStatus === "notfound" ? C.amber : scanStatus === "leyendo" ? C.gold : C.label
-    } }, scanStatus === "leyendo" ? "Leyendo\u2026" : scanStatus === "ok" ? "\xA1Producto encontrado!" : scanStatus === "notfound" ? "C\xF3digo no encontrado" : "Escanear QR"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT, marginTop: 2 } }, scanMsg || "Toca para escanear el c\xF3digo de la prenda")), etiqueta && /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, flexShrink: 0 } }, /* @__PURE__ */ import_react.default.createElement(
-      "img",
-      {
-        src: etiqueta,
-        alt: "qr",
-        style: {
-          height: 40,
-          width: 40,
-          borderRadius: 8,
-          objectFit: "cover",
-          border: `1px solid ${C.sep}`
-        }
-      }
-    ), /* @__PURE__ */ import_react.default.createElement("button", { onClick: (e) => {
-      e.stopPropagation();
-      setEtiqueta(null);
-      setScanStatus(null);
-      setScanMsg("");
-    }, style: {
-      background: `${C.red}15`,
-      border: "none",
-      color: C.red,
-      width: 28,
-      height: 28,
-      borderRadius: 8,
-      cursor: "pointer",
-      fontSize: 16,
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      WebkitTapHighlightColor: "transparent"
-    } }, "\xD7"))), /* @__PURE__ */ import_react.default.createElement(
+      fontFamily: FONT_UI,
+      color: scanStatus === "ok" ? C.green : scanStatus === "notfound" ? C.amber : C.label
+    } }, scanStatus === "ok" ? "\xA1Producto encontrado!" : scanStatus === "notfound" ? "C\xF3digo no encontrado" : "Escanear QR"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT_UI, marginTop: 2 } }, scanMsg || "Toca para abrir la c\xE1mara")), /* @__PURE__ */ import_react.default.createElement("div", { style: { color: C.label3, fontSize: 20 } }, "\u203A")), /* @__PURE__ */ import_react.default.createElement(
       IOSBtn,
       {
         onPress: () => carrito.length && setShowPago(true),

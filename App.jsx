@@ -52,7 +52,8 @@ async function sbActualizarStock(prodId, nuevoStock, dadoDeBaja=false, fechaBaja
 async function sbGuardarVenta(venta) {
   try {
     const db = await getSupabase();
-    await db.from("ventas").upsert({
+    console.log("[Supabase] Guardando venta:", venta.id, "total:", venta.total);
+    const { error: errVenta } = await db.from("ventas").upsert({
       id: venta.id, fecha: venta.fecha, hora: venta.hora,
       mk: venta.mk, mes: venta.mes, anio: venta.anio,
       total: venta.total, subtotal: venta.subtotal,
@@ -64,13 +65,18 @@ async function sbGuardarVenta(venta) {
       cliente_nombre: venta.clienteNombre||null,
       cliente_tel: venta.clienteTel||null,
     });
+    if (errVenta) { console.error("[Supabase] Error guardando venta:", errVenta.message); return; }
+    console.log("[Supabase] Venta guardada OK, guardando items...");
     const items = venta.items.map(it => ({
       venta_id: venta.id, prod_id: it.prodId, codigo: it.codigo,
       nombre: it.nombre, marca_id: it.marcaId, marca_nombre: it.marcaNombre,
-      cantidad: it.cantidad, precio_unit: it.precioUnit, subtotal: it.subtotal
+      cantidad: it.cantidad, precio_unit: it.precioUnit, subtotal: it.subtotal,
+      categoria: it.categoria||null,
     }));
-    await db.from("venta_items").insert(items);
-  } catch(e) { console.warn("Supabase save venta:", e.message); }
+    const { error: errItems } = await db.from("venta_items").insert(items);
+    if (errItems) console.error("[Supabase] Error guardando items:", errItems.message);
+    else console.log("[Supabase] Items guardados OK");
+  } catch(e) { console.error("[Supabase] save venta exception:", e.message); }
 }
 
 async function sbGuardarCierre(key, data) {
@@ -1832,7 +1838,6 @@ export default function App(){
       setInv(p=>p.map(i=>i.id===it.prodId?{...i,stock:Math.max(0,i.stock-it.cantidad)}:i));
       sbActualizarStock(it.prodId, Math.max(0,(inv.find(i=>i.id===it.prodId)?.stock||0)-it.cantidad));
     });
-    drive.syncVenta(vf);
     sbGuardarVenta(vf); // guardar en nube
     return vf;
   }
@@ -2387,6 +2392,9 @@ function POS({inv,onVenta}){
   const[clienteTel,setClienteTel]=useState("");
   const inputRef=useRef();
   const fileRef=useRef();
+  const videoRef=useRef();
+  const scannerRef=useRef(null);
+  const[camActiva,setCamActiva]=useState(false);
 
   const resultados=useMemo(()=>{
     if(!busq.trim())return[];
@@ -2410,6 +2418,79 @@ function POS({inv,onVenta}){
     });
     return Object.entries(m);
   },[carrito]);
+
+  function startCamera(){
+    setCamActiva(true);
+    setScanStatus("leyendo");
+    setScanMsg("Apunta la cámara al código QR...");
+    loadZXing().then(ZXing=>{
+      if(!ZXing){setScanStatus("notfound");setScanMsg("No se pudo cargar el lector");return;}
+      const hints=new Map();
+      const formats=[
+        ZXing.BarcodeFormat.QR_CODE, ZXing.BarcodeFormat.CODE_128,
+        ZXing.BarcodeFormat.CODE_39, ZXing.BarcodeFormat.EAN_13,
+        ZXing.BarcodeFormat.DATA_MATRIX,
+      ];
+      hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS,formats);
+      hints.set(ZXing.DecodeHintType.TRY_HARDER,true);
+      const reader=new ZXing.MultiFormatReader();
+      reader.setHints(hints);
+
+      navigator.mediaDevices.getUserMedia({video:{facingMode:"environment"}})
+        .then(stream=>{
+          if(!videoRef.current){stream.getTracks().forEach(t=>t.stop());return;}
+          videoRef.current.srcObject=stream;
+          videoRef.current.play();
+          scannerRef.current={stream,reader};
+
+          const scan=()=>{
+            if(!videoRef.current||!scannerRef.current) return;
+            const v=videoRef.current;
+            if(v.readyState<2){requestAnimationFrame(scan);return;}
+            const canvas=document.createElement("canvas");
+            canvas.width=v.videoWidth; canvas.height=v.videoHeight;
+            canvas.getContext("2d").drawImage(v,0,0);
+            try{
+              const lum=new ZXing.HTMLCanvasElementLuminanceSource(canvas);
+              const bb=new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(lum));
+              const result=reader.decode(bb);
+              if(result){
+                const codigo=result.getText().trim().toUpperCase();
+                stopCamera();
+                const prod=inv.find(i=>i.codigo.toUpperCase()===codigo);
+                if(prod&&prod.stock>0){
+                  add(prod);
+                  setScanStatus("ok");
+                  setScanMsg("✓ "+prod.nombre+" agregado al carrito");
+                } else if(prod){
+                  setScanStatus("notfound");
+                  setScanMsg(prod.nombre+" está agotado");
+                } else {
+                  setScanStatus("notfound");
+                  setScanMsg("Código "+codigo+" no encontrado");
+                }
+                return;
+              }
+            }catch(e){}
+            requestAnimationFrame(scan);
+          };
+          requestAnimationFrame(scan);
+        })
+        .catch(err=>{
+          setScanStatus("notfound");
+          setScanMsg("No se pudo acceder a la cámara: "+err.message);
+          setCamActiva(false);
+        });
+    });
+  }
+
+  function stopCamera(){
+    if(scannerRef.current?.stream){
+      scannerRef.current.stream.getTracks().forEach(t=>t.stop());
+    }
+    scannerRef.current=null;
+    setCamActiva(false);
+  }
 
   function add(prod){
     const m=MARCAS.find(x=>x.id===prod.marcaId);
@@ -2587,68 +2668,71 @@ function POS({inv,onVenta}){
         </div>
       )}
 
-      {/* Escanear QR */}
-      <input ref={fileRef} type="file" accept="image/*" capture="environment"
-        onChange={handleEtiqueta} style={{display:"none"}}/>
-      <div onClick={()=>fileRef.current?.click()} style={{
-        marginBottom:14, borderRadius:16, cursor:"pointer",
-        border: scanStatus==="ok" ? `1.5px solid ${C.green}`
-              : scanStatus==="notfound" ? `1.5px solid ${C.amber}`
-              : scanStatus==="leyendo" ? `1.5px solid ${C.gold}`
-              : `1.5px dashed ${C.sep}`,
-        background: scanStatus==="ok" ? `${C.green}10`
-                  : scanStatus==="notfound" ? `${C.amber}10`
-                  : scanStatus==="leyendo" ? `${C.gold}10`
-                  : C.bg2,
-        padding:"14px 18px",
-        display:"flex", alignItems:"center", gap:14,
-        transition:"all .2s",
-        WebkitTapHighlightColor:"transparent",
-      }}>
-        {/* Icono */}
-        <div style={{
-          width:46, height:46, borderRadius:12, flexShrink:0,
-          background: scanStatus==="ok" ? `${C.green}20`
-                    : scanStatus==="leyendo" ? `${C.gold}20`
-                    : `${C.label4}30`,
-          display:"flex", alignItems:"center", justifyContent:"center",
-          fontSize:22,
+      {/* Escanear QR — cámara en tiempo real */}
+      {camActiva ? (
+        <div style={{marginBottom:14,borderRadius:16,overflow:"hidden",
+          border:`1.5px solid ${C.gold}`,position:"relative"}}>
+          <video ref={videoRef} style={{width:"100%",display:"block",
+            maxHeight:220,objectFit:"cover",background:"#000"}}
+            playsInline muted/>
+          <div style={{position:"absolute",top:0,left:0,right:0,bottom:0,
+            display:"flex",alignItems:"center",justifyContent:"center",
+            pointerEvents:"none"}}>
+            <div style={{width:160,height:160,border:"2px solid rgba(255,255,255,0.6)",
+              borderRadius:12,boxShadow:"0 0 0 4000px rgba(0,0,0,0.3)"}}/>
+          </div>
+          <div style={{position:"absolute",bottom:0,left:0,right:0,
+            background:"rgba(0,0,0,0.6)",padding:"10px 14px",
+            display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+            <span style={{color:"#fff",fontSize:13,fontFamily:FONT_UI}}>
+              {scanMsg||"Apunta al código QR..."}
+            </span>
+            <button onClick={stopCamera} style={{
+              background:"rgba(255,255,255,0.2)",border:"none",color:"#fff",
+              borderRadius:8,padding:"6px 12px",fontSize:12,cursor:"pointer",
+              fontFamily:FONT_UI,fontWeight:600}}>Cancelar</button>
+          </div>
+        </div>
+      ) : (
+        <div onClick={startCamera} style={{
+          marginBottom:14, borderRadius:16, cursor:"pointer",
+          border: scanStatus==="ok" ? `1.5px solid ${C.green}`
+                : scanStatus==="notfound" ? `1.5px solid ${C.amber}`
+                : `1.5px dashed ${C.sep}`,
+          background: scanStatus==="ok" ? `${C.green}10`
+                    : scanStatus==="notfound" ? `${C.amber}10`
+                    : C.bg2,
+          padding:"14px 18px",
+          display:"flex", alignItems:"center", gap:14,
+          transition:"all .2s",
+          WebkitTapHighlightColor:"transparent",
         }}>
-          {scanStatus==="leyendo" ? "⏳" : scanStatus==="ok" ? "✓" : "▦"}
-        </div>
-        {/* Texto */}
-        <div style={{flex:1}}>
           <div style={{
-            fontSize:15, fontWeight:700, fontFamily:FONT,
-            color: scanStatus==="ok" ? C.green
-                 : scanStatus==="notfound" ? C.amber
-                 : scanStatus==="leyendo" ? C.gold
-                 : C.label,
+            width:46, height:46, borderRadius:12, flexShrink:0,
+            background: scanStatus==="ok" ? `${C.green}20` : `${C.label4}30`,
+            display:"flex", alignItems:"center", justifyContent:"center",
+            fontSize:22,
           }}>
-            {scanStatus==="leyendo" ? "Leyendo…"
-           : scanStatus==="ok" ? "¡Producto encontrado!"
-           : scanStatus==="notfound" ? "Código no encontrado"
-           : "Escanear QR"}
+            {scanStatus==="ok" ? "✓" : scanStatus==="notfound" ? "⚠️" : "▦"}
           </div>
-          <div style={{fontSize:12, color:C.label3, fontFamily:FONT, marginTop:2}}>
-            {scanMsg || "Toca para escanear el código de la prenda"}
+          <div style={{flex:1}}>
+            <div style={{
+              fontSize:15, fontWeight:700, fontFamily:FONT_UI,
+              color: scanStatus==="ok" ? C.green
+                   : scanStatus==="notfound" ? C.amber
+                   : C.label,
+            }}>
+              {scanStatus==="ok" ? "¡Producto encontrado!"
+             : scanStatus==="notfound" ? "Código no encontrado"
+             : "Escanear QR"}
+            </div>
+            <div style={{fontSize:12, color:C.label3, fontFamily:FONT_UI, marginTop:2}}>
+              {scanMsg || "Toca para abrir la cámara"}
+            </div>
           </div>
+          <div style={{color:C.label3,fontSize:20}}>›</div>
         </div>
-        {/* Miniatura si hay foto */}
-        {etiqueta&&(
-          <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
-            <img src={etiqueta} alt="qr"
-              style={{height:40,width:40,borderRadius:8,objectFit:"cover",
-                border:`1px solid ${C.sep}`}}/>
-            <button onClick={e=>{e.stopPropagation();setEtiqueta(null);setScanStatus(null);setScanMsg("");}} style={{
-              background:`${C.red}15`,border:"none",color:C.red,
-              width:28,height:28,borderRadius:8,cursor:"pointer",fontSize:16,
-              display:"flex",alignItems:"center",justifyContent:"center",
-              WebkitTapHighlightColor:"transparent",
-            }}>×</button>
-          </div>
-        )}
-      </div>
+      )}
 
       {/* Botón cobrar */}
       <IOSBtn
