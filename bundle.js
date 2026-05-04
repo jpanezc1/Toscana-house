@@ -23072,15 +23072,14 @@
             if (!v) return;
             setTimeout(() => {
               sbCargarTodo().then((data) => {
-                if (data) {
+                if (data && data.ventas.length > 0) {
                   setVentas(data.ventas);
-                  setInv((prev) => {
-                    if (data.inv.length > 0) return data.inv;
-                    return prev;
-                  });
+                }
+                if (data && data.inv.length > 0) {
+                  setInv(data.inv);
                 }
               });
-            }, 1500);
+            }, 2e3);
           }
         ).on(
           "postgres_changes",

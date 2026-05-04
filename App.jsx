@@ -1674,6 +1674,7 @@ export default function App(){
       setCargando(false);
     });
 
+
     // ── Supabase Realtime — sync en tiempo real entre dispositivos ──
     let channel = null;
     getSupabase().then(db => {
@@ -1712,18 +1713,18 @@ export default function App(){
           payload => {
             const v = payload.new;
             if (!v) return;
-            // Esperar 1.5s para que los venta_items también estén guardados
+            // Esperar 2s para que los venta_items también estén guardados
             setTimeout(() => {
               sbCargarTodo().then(data => {
-                if (data) {
+                if (data && data.ventas.length > 0) {
+                  // Solo actualizar si hay datos remotos — nunca borrar estado local
                   setVentas(data.ventas);
-                  setInv(prev => {
-                    if (data.inv.length > 0) return data.inv;
-                    return prev;
-                  });
+                }
+                if (data && data.inv.length > 0) {
+                  setInv(data.inv);
                 }
               });
-            }, 1500);
+            }, 2000);
           }
         )
         .on("postgres_changes", { event: "*", schema: "public", table: "cierres" },
