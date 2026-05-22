@@ -1,0 +1,10 @@
+toscana-app/
+│
+├── index.html
+├── style.css
+├── app.js
+│
+├── assets/
+│   ├── images/
+│   └── fonts/
+
