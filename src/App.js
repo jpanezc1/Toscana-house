@@ -2579,7 +2579,15 @@ function POS({inv,onVenta}){
       )}
 
       {/* Sheet: Cobro */}
-      <Sheet open={showPago} onClose={function(){setShowPago(false);}} title="Confirmar Cobro" tall>
+      {showPago && (
+      <div style={{position:"fixed",inset:0,zIndex:500,background:"rgba(0,0,0,0.55)",display:"flex",alignItems:"flex-end"}} onClick={function(e){if(e.target===e.currentTarget)setShowPago(false);}}>
+      <div style={{background:"#FFFFFF",borderRadius:"22px 22px 0 0",width:"100%",maxHeight:"90vh",overflowY:"auto",paddingBottom:24}}>
+        <div style={{display:"flex",justifyContent:"center",padding:"12px 0 4px"}}><div style={{width:36,height:5,borderRadius:3,background:C.accent}}/></div>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 20px 16px"}}>
+          <h3 style={{margin:0,fontSize:17,fontWeight:600,color:C.label,fontFamily:FONT}}>Confirmar Cobro</h3>
+          <button onClick={function(){setShowPago(false);}} style={{background:C.fill2,border:"none",borderRadius:"50%",width:30,height:30,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",color:C.label2,fontSize:16}}>x</button>
+        </div>
+        <div style={{padding:"0 16px"}}>
         {/* Total */}
         <div style={{background:`${C.gold}12`,border:`1px solid ${C.gold}30`,
           borderRadius:16,padding:"20px",marginBottom:20,textAlign:"center"}}>
@@ -2742,7 +2750,9 @@ function POS({inv,onVenta}){
         <IOSBtn onPress={cobrar} full variant="primary" style={{fontSize:18,padding:"17px"}} icon="💳">
           Cobrar {$(total)}
         </IOSBtn>
-      </Sheet>
+        </div>
+      </div>
+      </div>)}
     </div>
   );
 }
