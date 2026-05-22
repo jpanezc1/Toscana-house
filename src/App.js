@@ -1934,7 +1934,7 @@ export default function App(){
       />
 
       {/* Sheet: Dar de Baja */}
-      <Sheet open={sheetBaja} onClose{function(){setShBaja(false);}} title="Dar de Baja por Código">
+      <Sheet open={sheetBaja} onClose={function(){setShBaja(false);}} title="Dar de Baja por Código">
         <p style={{color:C.label2,fontFamily:FONT,fontSize:15,margin:"0 0 16px"}}>
           Ingresa el código del producto para marcarlo como agotado.
         </p>
@@ -1952,7 +1952,7 @@ export default function App(){
       </Sheet>
 
       {/* -- DRIVE CONFIG SHEET -- */}
-      <Sheet open={sheetDrive} onClose{function(){setShDrive(false);}} title="☁ Google Drive" tall>
+      <Sheet open={sheetDrive} onClose={function(){setShDrive(false);}} title="☁ Google Drive" tall>
         {/* Status */}
         <div style={{background:drive.url?`${C.green}15`:`${C.label3}10`,borderRadius:16,
           padding:"16px",marginBottom:20,border:`1px solid ${drive.url?C.green+"30":C.sep}`}}>
@@ -2579,7 +2579,7 @@ function POS({inv,onVenta}){
       )}
 
       {/* Sheet: Cobro */}
-      <Sheet open={showPago} onClose{function(){setShowPago(false);}} title="Confirmar Cobro" tall>
+      <Sheet open={showPago} onClose={function(){setShowPago(false);}} title="Confirmar Cobro" tall>
         {/* Total */}
         <div style={{background:`${C.gold}12`,border:`1px solid ${C.gold}30`,
           borderRadius:16,padding:"20px",marginBottom:20,textAlign:"center"}}>
@@ -2808,7 +2808,7 @@ function SheetRecibir({open, onClose, inv, onAdd, fInv, setFInv}){
   }
 
   return (
-    <Sheet open={open} onClose{function(){{onClose();setScanInvMsg("");setScanInvStatus(null);;}}} title="Recibir Producto" tall>
+    <Sheet open={open} onClose={function(){onClose();setScanInvMsg("");setScanInvStatus(null);}}} title="Recibir Producto" tall>
       {/* Opción escanear etiqueta existente */}
       <div style={{background:C.bg3,borderRadius:14,padding:"14px",marginBottom:16,
         border:`1px solid ${scanInvStatus==="ok"?C.green:scanInvStatus==="notfound"?C.amber:C.sep}`}}>
