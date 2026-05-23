@@ -1,9 +1,9 @@
 import { useState, useMemo, useRef, useCallback, useEffect } from "react";
 
-// ------------------------------------------------------------
+// ════════════════════════════════════════════════════════════
 // SUPABASE — Base de datos en la nube
 // Proyecto: toscana house | uqphxiixdulqscbfyxhz
-// ------------------------------------------------------------
+// ════════════════════════════════════════════════════════════
 const SUPA_URL  = "https://uqphxiixdulqscbfyxhz.supabase.co";
 const SUPA_KEY  = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVxcGh4aWl4ZHVscXNjYmZ5eGh6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcwMzc0NjQsImV4cCI6MjA5MjYxMzQ2NH0.U1EIf4JWqfrvga7CApClLl7nzBuFoPpD8BlicxvfB-w";
 
@@ -25,7 +25,7 @@ async function getSupabase() {
   return _supabase;
 }
 
-// -- Funciones de sincronización --------------------------
+// ── Funciones de sincronización ──────────────────────────
 async function sbGuardarProducto(prod) {
   try {
     const db = await getSupabase();
@@ -74,16 +74,12 @@ async function sbGuardarCierre(key, data) {
 async function sbCargarTodo() {
   try {
     const db = await getSupabase();
-    const _all = await Promise.all([
+    const [{ data: inv }, { data: ventas }, { data: items }, { data: cierres }] = await Promise.all([
       db.from("inventario").select("*").order("created_at"),
       db.from("ventas").select("*").order("created_at"),
       db.from("venta_items").select("*"),
       db.from("cierres").select("*"),
     ]);
-    const inv = _all[0].data;
-    const ventas = _all[1].data;
-    const items = _all[2].data;
-    const cierres = _all[3].data;
 
     // Reconstruir ventas con sus items
     const ventasCompletas = (ventas||[]).map(v => ({
@@ -119,7 +115,7 @@ async function sbCargarTodo() {
 
 // Hook de estado de conexión Supabase
 function useSupabaseStatus() {
-  var _h1 = useState("connecting"); var status = _h1[0]; var setStatus = _h1[1]; // connecting | ok | error
+  var _hN100 = useState("connecting"); var status = _hN100[0]; var setStatus = _hN100[1];; // connecting | ok | error
   useEffect(() => {
     getSupabase()
       .then(db => db.from("inventario").select("id").limit(1))
@@ -130,12 +126,11 @@ function useSupabaseStatus() {
 }
 
 
-// ------------------------------------------------------------
+// ════════════════════════════════════════════════════════════
 // MOTOR DE CÓDIGOS QR — QRCode.js + ZXing Scanner
-// ------------------------------------------------------------
+// ════════════════════════════════════════════════════════════
 
 // Carga QRCode.js desde CDN (genera QR codes)
-
 let _QRLoaded = false;
 let _QRLib = null;
 function loadQRCode() {
@@ -244,7 +239,7 @@ async function generarSVGBarcode(codigo) {
 // Componente: muestra QR code inline
 function BarcodeDisplay({ codigo, small }) {
   const containerRef = useRef(null);
-  var _h2 = useState(""); var qrDataUrl = _h2[0]; var setQrDataUrl = _h2[1];
+  var _hN101 = useState(""); var qrDataUrl = _hN101[0]; var setQrDataUrl = _hN101[1];;
 
   useEffect(() => {
     if (!codigo || !containerRef.current) return;
@@ -341,9 +336,9 @@ async function imprimirTicket(producto, marcaNombre) {
 }
 
 
-// ------------------------------------------------------------
+// ════════════════════════════════════════════════════════════
 // GOOGLE DRIVE — Apps Script integration
-// ------------------------------------------------------------
+// ════════════════════════════════════════════════════════════
 
 // 🔧 CONFIGURACIÓN — Pega aquí la URL de tu Google Apps Script
 // Instrucciones en el panel de Configuración → Drive
@@ -364,11 +359,11 @@ async function drivePost(action, payload) {
 
 // Hook que maneja el estado de sincronización
 function useDriveSync() {
-  var _h3 = useState(function(){ try{return localStorage.getItem("th_drive_url")||"";}catch{return "";} }); var url = _h3[0]; var setUrl = _h3[1];
-  var _h4 = useState(false); var syncing = _h4[0]; var setSyncing = _h4[1];
-  var _h5 = useState(function(){
+  var _hN102 = useState(function(){ try{return localStorage.getItem("th_drive_url")||"";}catch{return "";} }); var url = _hN102[0]; var setUrl = _hN102[1];
+  var _hN103 = useState(false); var syncing = _hN103[0]; var setSyncing = _hN103[1];;
+  var _hN104 = useState(function(){
     try { return JSON.parse(localStorage.getItem("th_sync_log") || "[]"); } catch { return []; }
-  }); var syncLog = _h5[0]; var setSyncLog = _h5[1];
+  }); var syncLog = _hN104[0]; var setSyncLog = _hN104[1];
 
   function saveUrl(u) {
     setUrl(u);
@@ -469,15 +464,15 @@ function DriveIndicator({ syncing, connected }) {
 }
 
 
-/* -----------------------------------------------------------
+/* ═══════════════════════════════════════════════════════════
    TOSCANA HOUSE — iOS Native Design v3.0
    · Bottom Tab Bar (iPhone style)
    · Safe area insets  · 44pt tap targets
    · Sheets deslizantes · SF Pro-style typography
    · Dark mode premium  · Haptic-feel micro-animations
------------------------------------------------------------ */
+═══════════════════════════════════════════════════════════ */
 
-// -- Paleta Pastel — Toscana House Casa de Moda ----------
+// ── Paleta Pastel — Toscana House Casa de Moda ──────────
 const C = {
   bg0:   "#F2F7F2",
   bg1:   "#FFFFFF",
@@ -544,24 +539,7 @@ const PAGOS = [
   {id:"tarjeta",  label:"Tarjeta",  icon:"💳", desc:2.5, color:"#C8922A"},
 ];
 
-// -- Helpers de método de pago (incluye pago mixto) --------
-function labelPago(mp) {
-  if (!mp) return "—";
-  if (mp.startsWith("mixto|")) return "Mixto";
-  return PAGOS.find(p => p.id === mp)?.label || mp;
-}
-function colorPago(mp) {
-  if (!mp) return C.green;
-  if (mp.startsWith("mixto|")) return C.indigo;
-  return PAGOS.find(p => p.id === mp)?.color || C.green;
-}
-function iconPago(mp) {
-  if (!mp) return "";
-  if (mp.startsWith("mixto|")) return "🔀";
-  return PAGOS.find(p => p.id === mp)?.icon || "";
-}
-
-// -- Helpers -----------------------------------------------
+// ── Helpers ───────────────────────────────────────────────
 const $    = n => "Bs " + new Intl.NumberFormat("es-BO",{minimumFractionDigits:0,maximumFractionDigits:2}).format(n||0);
 const hoy  = () => new Date().toISOString().slice(0,10);
 const hora = () => new Date().toLocaleTimeString("es-BO",{hour:"2-digit",minute:"2-digit"});
@@ -574,10 +552,10 @@ const genCod=(mid,nombre,idx)=>{
 };
 
 
-// ------------------------------------------------------------
+// ════════════════════════════════════════════════════════════
 // EXCEL ENGINE — SheetJS (xlsx) generador de reportes
 // Genera .xlsx real con múltiples pestañas, estilos y fórmulas
-// ------------------------------------------------------------
+// ════════════════════════════════════════════════════════════
 
 // Carga SheetJS dinámicamente desde CDN (una sola vez)
 let _XLSXPromise = null;
@@ -602,7 +580,7 @@ function descargarArchivo(blob, nombre) {
   URL.revokeObjectURL(url);
 }
 
-// -- REPORTE MENSUAL COMPLETO (todas las marcas, una pestaña c/u) --
+// ── REPORTE MENSUAL COMPLETO (todas las marcas, una pestaña c/u) ──
 async function generarExcelMensual(ventas, inventario, mes, anio, setGenerando) {
   setGenerando(true);
   try {
@@ -611,7 +589,7 @@ async function generarExcelMensual(ventas, inventario, mes, anio, setGenerando) 
     const mesNom = MESES[mes];
     const wb    = XLSX.utils.book_new();
 
-    // -- Pestaña RESUMEN GENERAL ------------------------------
+    // ── Pestaña RESUMEN GENERAL ──────────────────────────────
     const resumenRows = [
       [`TOSCANA HOUSE — REPORTE MENSUAL ${mesNom.toUpperCase()} ${anio}`],
       [`Generado: ${new Date().toLocaleString("es-BO")}`],
@@ -647,7 +625,7 @@ async function generarExcelMensual(ventas, inventario, mes, anio, setGenerando) 
     wsResumen["!cols"] = [{wch:22},{wch:20},{wch:16},{wch:20},{wch:12},{wch:18},{wch:14}];
     XLSX.utils.book_append_sheet(wb, wsResumen, "📊 Resumen");
 
-    // -- Una pestaña por cada marca ---------------------------
+    // ── Una pestaña por cada marca ───────────────────────────
     MARCAS.forEach(m => {
       const vMarca = ventasMes.filter(v => v.items.some(i => i.marcaId === m.id));
       
@@ -690,7 +668,7 @@ async function generarExcelMensual(ventas, inventario, mes, anio, setGenerando) 
       XLSX.utils.book_append_sheet(wb, ws, tabName);
     });
 
-    // -- Pestaña STOCK ACTUAL ---------------------------------
+    // ── Pestaña STOCK ACTUAL ─────────────────────────────────
     const stockRows = [
       [`TOSCANA HOUSE — REPORTE DE STOCK — ${mesNom} ${anio}`],
       [],
@@ -715,7 +693,7 @@ async function generarExcelMensual(ventas, inventario, mes, anio, setGenerando) 
     wsStock["!cols"] = [{wch:18},{wch:26},{wch:18},{wch:14},{wch:14},{wch:14},{wch:13},{wch:10},{wch:10},{wch:12}];
     XLSX.utils.book_append_sheet(wb, wsStock, "📦 Stock");
 
-    // -- Generar y descargar ----------------------------------
+    // ── Generar y descargar ──────────────────────────────────
     // Aplicar bordes a todas las hojas
     wb.SheetNames.forEach(name => {
       aplicarBordesSheet(wb.Sheets[name], XLSX);
@@ -731,7 +709,7 @@ async function generarExcelMensual(ventas, inventario, mes, anio, setGenerando) 
   setGenerando(false);
 }
 
-// -- Aplicar bordes solo a celdas con datos ----------------
+// ── Aplicar bordes solo a celdas con datos ────────────────
 function aplicarBordesSheet(ws, XLSX) {
   if (!ws || !ws["!ref"]) return;
   const range = XLSX.utils.decode_range(ws["!ref"]);
@@ -775,7 +753,7 @@ function aplicarBordesSheet(ws, XLSX) {
   }
 }
 
-// -- REPORTE INDIVIDUAL DE UNA MARCA -------------------------
+// ── REPORTE INDIVIDUAL DE UNA MARCA ─────────────────────────
 async function generarExcelMarca(marca, ventas, inventario, setGenerando) {
   setGenerando(true);
   try {
@@ -847,7 +825,7 @@ async function generarExcelMarca(marca, ventas, inventario, setGenerando) {
   setGenerando(false);
 }
 
-// -- REPORTE STOCK COMPLETO --------------------------------
+// ── REPORTE STOCK COMPLETO ────────────────────────────────
 async function generarExcelStock(inventario, setGenerando) {
   setGenerando(true);
   try {
@@ -936,13 +914,14 @@ function exportTodasCSV(ventas,mes,anio){
 
 function sendWA(venta){
   const lines=venta.items.map(it=>{const m=MARCAS.find(x=>x.id===it.marcaId);return `• ${it.nombre} (${m?.nombre}) x${it.cantidad} = ${$(it.subtotal)}`;});
-  const msg=[`🏡 *TOSCANA HOUSE — ${venta.id}*`,`📅 ${venta.fecha} ${venta.hora}`,`💳 ${labelPago(venta.metodoPago)}${venta.descPct?` (-${venta.descPct}%)`:""}`,"",  ...lines,"",`💰 *TOTAL: ${$(venta.total)}*`].join("\n");
+  const pg=PAGOS.find(p=>p.id===venta.metodoPago);
+  const msg=[`🏡 *TOSCANA HOUSE — ${venta.id}*`,`📅 ${venta.fecha} ${venta.hora}`,`💳 ${pg?.label}${venta.descPct?` (-${venta.descPct}%)`:""}`,"",  ...lines,"",`💰 *TOTAL: ${$(venta.total)}*`].join("\n");
   window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`,"_blank");
 }
 
-// ----------------------------------------------------------
+// ══════════════════════════════════════════════════════════
 // iOS DESIGN ATOMS
-// ----------------------------------------------------------
+// ══════════════════════════════════════════════════════════
 
 // Font stack
 const FONT = "'Cormorant Garamond', 'Palatino', 'Georgia', serif";
@@ -967,7 +946,7 @@ function LogoMark({size=36, color="#3D6B3D"}){
 }
 
 function usePress(onPress) {
-  var _h6 = useState(false); var pressed = _h6[0]; var setPressed = _h6[1];
+  var _hN105 = useState(false); var pressed = _hN105[0]; var setPressed = _hN105[1];;
   return {
     onTouchStart: () => setPressed(true),
     onTouchEnd:   () => { setPressed(false); onPress && onPress(); },
@@ -1083,7 +1062,7 @@ function TabBar({tabs, active, onChange}){
         const isActive=active===t.id;
         const tabColor=TAB_COLORS[t.id]||C.gold;
         return (
-          <button key={t.id} onClick={function(){onChange(t.id);}} style={{
+          <button key={t.id} onClick={()=>onChange(t.id)} style={{
             flex:1,border:"none",
             background:isActive?`${tabColor}18`:"transparent",
             display:"flex",flexDirection:"column",alignItems:"center",
@@ -1155,8 +1134,8 @@ function IOSBtn({children,onPress,variant="primary",full,disabled,small,icon}){
 
 // iOS sheet (bottom modal)
 function Sheet({open,onClose,title,children,tall}){
-  var _h7 = useState(false); var visible = _h7[0]; var setVisible = _h7[1];
-  var _h8 = useState(false); var anim = _h8[0]; var setAnim = _h8[1];
+  var _hN106 = useState(false); var visible = _hN106[0]; var setVisible = _hN106[1];;
+  var _hN107 = useState(false); var anim = _hN107[0]; var setAnim = _hN107[1];;
   useEffect(()=>{
     if(open){setVisible(true);setTimeout(()=>setAnim(true),10);}
     else{setAnim(false);setTimeout(()=>setVisible(false),320);}
@@ -1235,7 +1214,7 @@ function SegControl({options,value,onChange}){
       display:"flex",gap:3,
     }}>
       {options.map(o=>(
-        <button key={o.value} onClick={function(){onChange(o.value);}} style={{
+        <button key={o.value} onClick={()=>onChange(o.value)} style={{
           flex:1,padding:"7px 0",borderRadius:8,border:"none",
           background:value===o.value?C.bg3:"transparent",
           color:value===o.value?C.label:C.label2,
@@ -1284,9 +1263,9 @@ function StatCard({icon,label,value,sub,color=C.gold}){
   );
 }
 
-// ----------------------------------------------------------
+// ══════════════════════════════════════════════════════════
 // LiqModal — liquidación como componente iOS sheet
-// ----------------------------------------------------------
+// ══════════════════════════════════════════════════════════
 function LiqModal({marcaId,ventas,mes,anio,MK,cierres,setCierres,onClose,syncCierre}){
   if(!marcaId) return null;
   const marca=MARCAS.find(x=>x.id===marcaId);
@@ -1332,7 +1311,7 @@ function LiqModal({marcaId,ventas,mes,anio,MK,cierres,setCierres,onClose,syncCie
                   <span style={{fontSize:16,fontWeight:700,color:C.gold,fontFamily:FONT}}>{$(sub)}</span>
                 </div>
                 <div style={{fontSize:13,color:C.label3,fontFamily:FONT,marginBottom:6}}>
-                  {v.fecha} {v.hora} · {labelPago(v.metodoPago)}
+                  {v.fecha} {v.hora} · {PAGOS.find(p=>p.id===v.metodoPago)?.label}
                 </div>
                 {its.map((it,ii)=>(
                   <div key={`${v.id}-${it.prodId}-${ii}`} style={{fontSize:13,color:C.label2,fontFamily:FONT}}>
@@ -1345,14 +1324,14 @@ function LiqModal({marcaId,ventas,mes,anio,MK,cierres,setCierres,onClose,syncCie
       }
 
       <div style={{display:"flex",flexDirection:"column",gap:10,marginTop:16}}>
-        <IOSBtn onPress={function(){exportCSV(marca,ventas,mes,anio);}} variant="fill" icon="⬇">
+        <IOSBtn onPress={()=>exportCSV(marca,ventas,mes,anio)} variant="fill" icon="⬇">
           Exportar CSV
         </IOSBtn>
         {!cerrado
-          ? <IOSBtn onPress={function(){setCierres(p=>({...p,[`${MK}-${marcaId}`]:{cerrado:true,fecha:hoy(),mk:MK}}));sbGuardarCierre(`${MK}-${marcaId}`,{cerrado:true,fecha:hoy(),mk:MK,marca_id:marcaId});onClose();}} variant="success" icon="✓">
+          ? <IOSBtn onPress={()=>{setCierres(p=>({...p,[`${MK}-${marcaId}`]:{cerrado:true,fecha:hoy(),mk:MK}}));sbGuardarCierre(`${MK}-${marcaId}`,{cerrado:true,fecha:hoy(),mk:MK,marca_id:marcaId});onClose();}} variant="success" icon="✓">
               Confirmar Cierre Mensual
             </IOSBtn>
-          : <IOSBtn onPress={function(){setCierres(p=>({...p,[`${MK}-${marcaId}`]:{cerrado:false,mk:MK}}));onClose();}} variant="danger">
+          : <IOSBtn onPress={()=>{setCierres(p=>({...p,[`${MK}-${marcaId}`]:{cerrado:false,mk:MK}}));onClose();}} variant="danger">
               Reabrir Liquidación
             </IOSBtn>
         }
@@ -1362,12 +1341,12 @@ function LiqModal({marcaId,ventas,mes,anio,MK,cierres,setCierres,onClose,syncCie
 }
 
 
-// ------------------------------------------------------------
+// ════════════════════════════════════════════════════════════
 // SISTEMA DE LOGIN — Toscana House
 // Usuarios con contraseña — sesión guardada en localStorage
-// ------------------------------------------------------------
+// ════════════════════════════════════════════════════════════
 
-// -- Usuarios autorizados ---------------------------------
+// ── Usuarios autorizados ─────────────────────────────────
 // Para agregar usuarios: {usuario, password, nombre, rol}
 // rol: "admin" (acceso total) | "caja" (solo POS y ventas)
 const USUARIOS = [
@@ -1377,7 +1356,7 @@ const USUARIOS = [
 ];
 
 function useAuth() {
-  var _h9 = useState(function(){ try{return JSON.parse(localStorage.getItem("th_user")||"null");}catch{return null;} }); var user = _h9[0]; var setUser = _h9[1];
+  var _hN108 = useState(function(){ try{return JSON.parse(localStorage.getItem("th_user")||"null");}catch{return null;} }); var user = _hN108[0]; var setUser = _hN108[1];
 
   function login(usuario, password) {
     // Check localStorage users first, then defaults
@@ -1408,11 +1387,11 @@ function useAuth() {
 
 // Pantalla de Login
 function LoginScreen({ onLogin }) {
-  var _h10 = useState(""); var usuario = _h10[0]; var setUsuario = _h10[1];
-  var _h11 = useState(""); var password = _h11[0]; var setPassword = _h11[1];
-  var _h12 = useState(""); var error = _h12[0]; var setError = _h12[1];
-  var _h13 = useState(false); var loading = _h13[0]; var setLoading = _h13[1];
-  var _h14 = useState(false); var showPass = _h14[0]; var setShowPass = _h14[1];
+  var _hN109 = useState(""); var usuario = _hN109[0]; var setUsuario = _hN109[1];;
+  var _hN110 = useState(""); var password = _hN110[0]; var setPassword = _hN110[1];;
+  var _hN111 = useState(""); var error = _hN111[0]; var setError = _hN111[1];;
+  var _hN112 = useState(false); var loading = _hN112[0]; var setLoading = _hN112[1];;
+  var _hN113 = useState(false); var showPass = _hN113[0]; var setShowPass = _hN113[1];;
 
   function handleLogin() {
     if (!usuario || !password) { setError("Completa todos los campos"); return; }
@@ -1504,7 +1483,7 @@ function LoginScreen({ onLogin }) {
               onFocus={e=>e.target.style.borderColor="#5C8A5C"}
               onBlur={e=>e.target.style.borderColor=error?"#C0504A":"rgba(168,197,160,0.6)"}
             />
-            <button onClick={function(){setShowPass(p=>!p);}} style={{
+            <button onClick={()=>setShowPass(p=>!p)} style={{
               position:"absolute", right:12, top:"50%",
               transform:"translateY(-50%)",
               background:"none", border:"none", cursor:"pointer",
@@ -1550,34 +1529,33 @@ function LoginScreen({ onLogin }) {
   );
 }
 
-// ----------------------------------------------------------
+// ══════════════════════════════════════════════════════════
 // APP PRINCIPAL
-// ----------------------------------------------------------
+// ══════════════════════════════════════════════════════════
 export default function App(){
   const { user, login, logout } = useAuth();
   const now=new Date();
-  var _h15 = useState("pos"); var tab = _h15[0]; var setTab = _h15[1];
-  var _h16 = useState([]); var inv = _h16[0]; var setInv = _h16[1];
-  var _h17 = useState([]); var ventas = _h17[0]; var setVentas = _h17[1];
-  var _h18 = useState([]); var alq = _h18[0]; var setAlq = _h18[1];
-  var _h19 = useState({}); var cierres = _h19[0]; var setCierres = _h19[1];
-  var _h20 = useState(true); var cargando = _h20[0]; var setCargando = _h20[1];
-  var _h21 = useState("connecting"); var dbStatus = _h21[0]; var setDbStatus = _h21[1];
-  var _h22 = useState(now.getMonth()); var mes = _h22[0]; var setMes = _h22[1];
-  var _h23 = useState(now.getFullYear()); var anio = _h23[0]; var setAnio = _h23[1];
-  var _h24 = useState(null); var marcaDetalle = _h24[0]; var setMD = _h24[1];
-  var _h25 = useState(false); var sheetInv = _h25[0]; var setShInv = _h25[1];
-  var _h25b = useState(false); var shExcel = _h25b[0]; var setShExcel = _h25b[1];
-  var _h26 = useState(false); var sheetBaja = _h26[0]; var setShBaja = _h26[1];
-  var _h27 = useState(false); var sheetDrive = _h27[0]; var setShDrive = _h27[1];
-  var _h28 = useState(null); var mLiq = _h28[0]; var setMLiq = _h28[1];
-  var _h29 = useState({marcaId:"",nombre:"",categoria:"",precio:"",stock:"",fecha:hoy()}); var fInv = _h29[0]; var setFInv = _h29[1];
-  var _h30 = useState(""); var bajaCod = _h30[0]; var setBajaCod = _h30[1];
-  var _h31 = useState(null); var bajaMsg = _h31[0]; var setBajaMsg = _h31[1];
-  var _h32 = useState(""); var busqInv = _h32[0]; var setBusqInv = _h32[1];
-  var _h33 = useState(""); var filInvM = _h33[0]; var setFilInvM = _h33[1];
-  var _h34 = useState(function(){ try{return localStorage.getItem("th_drive_url")||"";}catch{return "";} }); var driveUrl = _h34[0]; var setDriveUrlLocal = _h34[1];
-  var _h35 = useState(false); var generando = _h35[0]; var setGenerando = _h35[1];
+  var _hN114 = useState("pos"); var tab = _hN114[0]; var setTab = _hN114[1];;
+  var _hN115 = useState([]); var inv = _hN115[0]; var setInv = _hN115[1];;
+  var _hN116 = useState([]); var ventas = _hN116[0]; var setVentas = _hN116[1];;
+  var _hN117 = useState([]); var alq = _hN117[0]; var setAlq = _hN117[1];;
+  var _hN118 = useState({}); var cierres = _hN118[0]; var setCierres = _hN118[1];;
+  var _hN119 = useState(true); var cargando = _hN119[0]; var setCargando = _hN119[1];;
+  var _hN120 = useState("connecting"); var dbStatus = _hN120[0]; var setDbStatus = _hN120[1];;
+  var _hN121 = useState(now.getMonth()); var mes = _hN121[0]; var setMes = _hN121[1];
+  var _hN122 = useState(now.getFullYear()); var anio = _hN122[0]; var setAnio = _hN122[1];
+  var _hN123 = useState(null); var marcaDetalle = _hN123[0]; var setMD = _hN123[1];;
+  var _hN124 = useState(false); var sheetInv = _hN124[0]; var setShInv = _hN124[1];;
+  var _hN125 = useState(false); var sheetBaja = _hN125[0]; var setShBaja = _hN125[1];;
+  var _hN126 = useState(false); var sheetDrive = _hN126[0]; var setShDrive = _hN126[1];;
+  var _hN127 = useState(null); var mLiq = _hN127[0]; var setMLiq = _hN127[1];;
+  var _hN128 = useState({marcaId:"",nombre:"",categoria:"",precio:"",stock:"",fecha:hoy()}); var fInv = _hN128[0]; var setFInv = _hN128[1];
+  var _hN129 = useState(""); var bajaCod = _hN129[0]; var setBajaCod = _hN129[1];;
+  var _hN130 = useState(null); var bajaMsg = _hN130[0]; var setBajaMsg = _hN130[1];;
+  var _hN131 = useState(""); var busqInv = _hN131[0]; var setBusqInv = _hN131[1];;
+  var _hN132 = useState(""); var filInvM = _hN132[0]; var setFilInvM = _hN132[1];;
+  var _hN133 = useState(function(){ try{return localStorage.getItem("th_drive_url")||"";}catch{return "";} }); var driveUrl = _hN133[0]; var setDriveUrlLocal = _hN133[1];
+  var _hN134 = useState(false); var generando = _hN134[0]; var setGenerando = _hN134[1];;
   const drive = useDriveSync();
 
   // Cargar datos desde Supabase al inicio
@@ -1702,7 +1680,7 @@ export default function App(){
       MozOsxFontSmoothing:"grayscale",
     }}>
 
-      {/* -- LOADING SCREEN -- */}
+      {/* ── LOADING SCREEN ── */}
       {cargando&&(
         <div style={{position:"fixed",inset:0,background:"rgba(242,247,242,0.97)",
           display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",
@@ -1717,20 +1695,20 @@ export default function App(){
         </div>
       )}
 
-      {/* -- NAV BAR -- */}
+      {/* ── NAV BAR ── */}
       {showingDetail ? (
         <NavBar
           title={MARCAS.find(m=>m.id===marcaDetalle)?.nombre}
           back="Marcas"
-          onBack={function(){setMD(null);}}
+          onBack={()=>setMD(null)}
           right={
             <div style={{display:"flex",gap:12,alignItems:"center"}}>
-              <button onClick={function(){exportCSV(MARCAS.find(m=>m.id===marcaDetalle),ventas,mes,anio);}}
+              <button onClick={()=>exportCSV(MARCAS.find(m=>m.id===marcaDetalle),ventas,mes,anio)}
                 style={{background:"none",border:"none",color:C.label3,fontSize:13,fontFamily:FONT,
                   cursor:"pointer",padding:"4px 0",WebkitTapHighlightColor:"transparent"}}>CSV</button>
               <button
                 disabled={generando}
-                onClick={function(){generarExcelMarca(MARCAS.find(m=>m.id===marcaDetalle),ventas,inv,setGenerando);}}
+                onClick={()=>generarExcelMarca(MARCAS.find(m=>m.id===marcaDetalle),ventas,inv,setGenerando)}
                 style={{background:`${C.gold}20`,border:`1px solid ${C.gold}40`,color:C.gold,
                   borderRadius:8,padding:"5px 12px",fontSize:13,fontFamily:FONT,fontWeight:600,
                   cursor:generando?"not-allowed":"pointer",WebkitTapHighlightColor:"transparent"}}>
@@ -1746,7 +1724,7 @@ export default function App(){
           right={
             <div style={{display:"flex",alignItems:"center",gap:10}}>
               <DriveIndicator syncing={drive.syncing} connected={!!drive.url}/>
-              <button onClick={function(){setShDrive(true);}} style={{
+              <button onClick={()=>setShDrive(true)} style={{
                 background:"none",border:"none",fontSize:20,cursor:"pointer",
                 color:drive.url?C.green:C.label3,padding:"4px",
                 WebkitTapHighlightColor:"transparent",lineHeight:1,
@@ -1768,7 +1746,7 @@ export default function App(){
         />
       )}
 
-      {/* -- CONTENT -- */}
+      {/* ── CONTENT ── */}
       <div style={{padding:"16px 16px 0"}}>
 
         {/* POS */}
@@ -1776,7 +1754,7 @@ export default function App(){
 
         {/* INVENTARIO — por marca */}
         {tab==="inventario" && (
-          <InventarioPorMarca inv={inv} ventas={ventas} onRecibir={function(){setShInv(true);}} onBaja={function(){setShBaja(true);setBajaMsg(null);setBajaCod("");}} onExcel={function(){setShExcel(true);}}/>
+          <InventarioPorMarca inv={inv} ventas={ventas} onRecibir={()=>setShInv(true)} onBaja={()=>{setShBaja(true);setBajaMsg(null);setBajaCod("");}}/>
         )}
 
         {/* MARCAS — lista */}
@@ -1790,7 +1768,7 @@ export default function App(){
                 const prods=inv.filter(i=>i.marcaId===m.id).filter(p=>p.stock>0).length;
                 const cerrado=cierres[`${MK}-${m.id}`]?.cerrado;
                 return (
-                  <div key={m.id} onClick={function(){setMD(m.id);}} style={{
+                  <div key={m.id} onClick={()=>setMD(m.id)} style={{
                     background:C.bg2,
                     borderRadius:i===0?"14px 14px 2px 2px":i===MARCAS.length-1?"2px 2px 14px 14px":"2px",
                     padding:"14px 16px",
@@ -1845,7 +1823,7 @@ export default function App(){
                 {MESES[mes]} {anio}
               </div>
               <div style={{display:"flex",gap:10}}>
-                <button onClick={function(){generarExcelMensual(ventas,inv,mes,anio,setGenerando);}}
+                <button onClick={()=>generarExcelMensual(ventas,inv,mes,anio,setGenerando)}
                   disabled={generando}
                   style={{flex:1,background:generando?C.bg2:`${C.green}20`,border:`1px solid ${generando?C.sep:C.green}40`,
                     borderRadius:12,padding:"12px 10px",color:generando?C.label3:C.green,
@@ -1853,7 +1831,7 @@ export default function App(){
                     WebkitTapHighlightColor:"transparent",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
                   {generando?"⏳ Generando…":"📊 Reporte Mensual .xlsx"}
                 </button>
-                <button onClick={function(){generarExcelStock(inv,setGenerando);}}
+                <button onClick={()=>generarExcelStock(inv,setGenerando)}
                   disabled={generando}
                   style={{flex:1,background:generando?C.bg2:`${C.blue}20`,border:`1px solid ${generando?C.sep:C.blue}40`,
                     borderRadius:12,padding:"12px 10px",color:generando?C.label3:C.blue,
@@ -1869,7 +1847,7 @@ export default function App(){
                 const liq=getLiq(m.id);
                 const cerrado=cierres[`${MK}-${m.id}`]?.cerrado;
                 return (
-                  <div key={m.id} onClick={function(){setMLiq(m.id);}} style={{
+                  <div key={m.id} onClick={()=>setMLiq(m.id)} style={{
                     background:C.bg2,
                     borderRadius:i===0?"14px 14px 2px 2px":i===MARCAS.length-1?"2px 2px 14px 14px":"2px",
                     padding:"14px 16px",
@@ -1911,24 +1889,15 @@ export default function App(){
         )}
       </div>
 
-      {/* -- BOTTOM TAB BAR -- */}
+      {/* ── BOTTOM TAB BAR ── */}
       <TabBar tabs={TABS} active={tab} onChange={t=>{setTab(t);setMD(null);}}/>
 
-      {/* -- SHEETS -- */}
-
-      {/* Sheet: Carga Masiva Excel */}
-      <SheetExcelMasivo
-        open={shExcel}
-        onClose={function(){setShExcel(false);}}
-        inv={inv}
-        setInv={setInv}
-        drive={drive}
-      />
+      {/* ══ SHEETS ══ */}
 
       {/* Sheet: Recibir Producto */}
       <SheetRecibir
         open={sheetInv}
-        onClose={function(){setShInv(false);}}
+        onClose={()=>setShInv(false)}
         inv={inv}
         onAdd={addProd}
         fInv={fInv}
@@ -1936,7 +1905,7 @@ export default function App(){
       />
 
       {/* Sheet: Dar de Baja */}
-      <Sheet open={sheetBaja} onClose={function(){setShBaja(false);}} title="Dar de Baja por Código">
+      <Sheet open={sheetBaja} onClose={()=>setShBaja(false)} title="Dar de Baja por Código">
         <p style={{color:C.label2,fontFamily:FONT,fontSize:15,margin:"0 0 16px"}}>
           Ingresa el código del producto para marcarlo como agotado.
         </p>
@@ -1953,8 +1922,8 @@ export default function App(){
         <IOSBtn onPress={darBaja} variant="danger" full disabled={!bajaCod.trim()}>Dar de Baja</IOSBtn>
       </Sheet>
 
-      {/* -- DRIVE CONFIG SHEET -- */}
-      <Sheet open={sheetDrive} onClose={function(){setShDrive(false);}} title="☁ Google Drive" tall>
+      {/* ══ DRIVE CONFIG SHEET ══ */}
+      <Sheet open={sheetDrive} onClose={()=>setShDrive(false)} title="☁ Google Drive" tall>
         {/* Status */}
         <div style={{background:drive.url?`${C.green}15`:`${C.label3}10`,borderRadius:16,
           padding:"16px",marginBottom:20,border:`1px solid ${drive.url?C.green+"30":C.sep}`}}>
@@ -2036,7 +2005,7 @@ export default function App(){
             ))}
           </div>
           <div style={{marginTop:10}}>
-            <IOSBtn onPress={function(){()=>{localStorage.removeItem('th_sync_log');window.location.reload();}}}
+            <IOSBtn onPress={()=>()=>{localStorage.removeItem('th_sync_log');window.location.reload()}}
               variant="danger" small>Limpiar historial</IOSBtn>
           </div>
         </div>}
@@ -2047,255 +2016,32 @@ export default function App(){
       <LiqModal
         marcaId={mLiq} ventas={ventas} mes={mes} anio={anio}
         MK={MK} cierres={cierres} setCierres={setCierres}
-        onClose={function(){setMLiq(null);}}
+        onClose={()=>setMLiq(null)}
         syncCierre={drive.syncCierre}
       />
     </div>
   );
 }
 
-
-// ------------------------------------------------------------
-// ESCÁNER QR EN VIVO — usa cámara nativa del iPhone
-// Lee QR en tiempo real sin necesidad de tomar foto
-// ------------------------------------------------------------
-
-// QR Display usando canvas nativo
-function QRDisplay({codigo}) {
-  const ref = useRef(null);
-  useEffect(function() {
-    if (!codigo || !ref.current) return;
-    ref.current.innerHTML = "";
-    loadQRCode().then(function(QRCode) {
-      if (!QRCode || !ref.current) return;
-      try {
-        new QRCode(ref.current, {
-          text: codigo,
-          width: 140, height: 140,
-          colorDark: "#1A2E1A",
-          colorLight: "#ffffff",
-          correctLevel: QRCode.CorrectLevel.M,
-        });
-      } catch(e) {}
-    });
-  }, [codigo]);
-  return (
-    <div style={{display:"flex", flexDirection:"column", alignItems:"center", gap:6}}>
-      <div ref={ref} style={{
-        width:140, height:140, background:"#fff",
-        borderRadius:8, overflow:"hidden",
-        display:"flex", alignItems:"center", justifyContent:"center"
-      }}/>
-      <div style={{
-        fontFamily:"monospace", fontSize:10, color:"#5C8A5C",
-        letterSpacing:1, textAlign:"center", maxWidth:150, wordBreak:"break-all"
-      }}>{codigo}</div>
-    </div>
-  );
-}
-
-function QRScanner({ onDetect, onClose }) {
-  const videoRef  = useRef(null);
-  const canvasRef = useRef(null);
-  const streamRef = useRef(null);
-  const timerRef  = useRef(null);
-  var _h36 = useState("iniciando"); var status = _h36[0]; var setStatus = _h36[1]; // iniciando | activo | error
-  var _h37 = useState(""); var msg = _h37[0]; var setMsg = _h37[1];
-
-  useEffect(() => {
-    startCamera();
-    return () => stopCamera();
-  }, []);
-
-  async function startCamera() {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "environment", width: 1280, height: 720 }
-      });
-      streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        videoRef.current.play();
-        setStatus("activo");
-        setMsg("Apunta al código QR de la prenda");
-        // Start scanning loop
-        timerRef.current = setInterval(scanFrame, 300);
-      }
-    } catch (e) {
-      setStatus("error");
-      setMsg("No se pudo acceder a la cámara. Permite el acceso en Ajustes.");
-    }
-  }
-
-  function stopCamera() {
-    if (timerRef.current) clearInterval(timerRef.current);
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(t => t.stop());
-    }
-  }
-
-  async function scanFrame() {
-    if (!videoRef.current || !canvasRef.current) return;
-    const video  = videoRef.current;
-    const canvas = canvasRef.current;
-    if (video.readyState !== video.HAVE_ENOUGH_DATA) return;
-    canvas.width  = video.videoWidth;
-    canvas.height = video.videoHeight;
-    const ctx = canvas.getContext("2d");
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    // Use BarcodeDetector API (native, works on iOS 17+)
-    if (window.BarcodeDetector) {
-      try {
-        const detector = new window.BarcodeDetector({ formats: ["qr_code","code_128","ean_13","code_39"] });
-        const codes = await detector.detect(canvas);
-        if (codes.length > 0) {
-          const raw = codes[0].rawValue;
-          clearInterval(timerRef.current);
-          stopCamera();
-          onDetect(raw);
-          return;
-        }
-      } catch(e) {}
-    }
-    // Fallback: ZXing
-    try {
-      const ZXing = await loadZXing();
-      if (!ZXing) return;
-      const luminance = new ZXing.HTMLCanvasElementLuminanceSource(canvas);
-      const bitmap = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(luminance));
-      const hints = new Map();
-      hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
-      const reader = new ZXing.MultiFormatReader();
-      reader.setHints(hints);
-      const result = reader.decode(bitmap);
-      if (result?.text) {
-        clearInterval(timerRef.current);
-        stopCamera();
-        onDetect(result.text);
-      }
-    } catch(e) {}
-  }
-
-  return (
-    <div style={{
-      position:"fixed", inset:0, zIndex:9999,
-      background:"#000",
-      display:"flex", flexDirection:"column",
-    }}>
-      {/* Header */}
-      <div style={{
-        padding:"16px 20px",
-        display:"flex", justifyContent:"space-between", alignItems:"center",
-        background:"rgba(0,0,0,0.8)",
-      }}>
-        <div>
-          <div style={{fontSize:17,fontWeight:700,color:"#fff",fontFamily:FONT}}>Escanear QR</div>
-          <div style={{fontSize:13,color:"rgba(255,255,255,0.6)",fontFamily:FONT,marginTop:2}}>{msg}</div>
-        </div>
-        <button onClick={function(){stopCamera();onClose();}} style={{
-          background:"rgba(255,255,255,0.15)",border:"none",
-          width:36,height:36,borderRadius:"50%",cursor:"pointer",
-          color:"#fff",fontSize:18,display:"flex",alignItems:"center",justifyContent:"center",
-          WebkitTapHighlightColor:"transparent",
-        }}>✕</button>
-      </div>
-
-      {/* Cámara */}
-      <div style={{flex:1,position:"relative",overflow:"hidden"}}>
-        <video
-          ref={videoRef}
-          playsInline muted autoPlay
-          style={{width:"100%",height:"100%",objectFit:"cover"}}
-        />
-        <canvas ref={canvasRef} style={{display:"none"}}/>
-
-        {/* Marco de escaneo */}
-        {status==="activo"&&(
-          <div style={{
-            position:"absolute",
-            top:"50%",left:"50%",
-            transform:"translate(-50%,-60%)",
-            width:220,height:220,
-          }}>
-            {/* Esquinas del marco */}
-            {[
-              {top:0,left:0,borderTop:"3px solid #4A9B6F",borderLeft:"3px solid #4A9B6F"},
-              {top:0,right:0,borderTop:"3px solid #4A9B6F",borderRight:"3px solid #4A9B6F"},
-              {bottom:0,left:0,borderBottom:"3px solid #4A9B6F",borderLeft:"3px solid #4A9B6F"},
-              {bottom:0,right:0,borderBottom:"3px solid #4A9B6F",borderRight:"3px solid #4A9B6F"},
-            ].map((s,i)=>(
-              <div key={i} style={{position:"absolute",width:30,height:30,...s}}/>
-            ))}
-            {/* Línea de escaneo animada */}
-            <div style={{
-              position:"absolute",left:0,right:0,height:2,
-              background:"rgba(74,155,111,0.8)",
-              animation:"scanline 2s linear infinite",
-              top:"50%",
-            }}/>
-            <style>{`@keyframes scanline{0%{top:10%}50%{top:90%}100%{top:10%}}`}</style>
-          </div>
-        )}
-
-        {status==="error"&&(
-          <div style={{
-            position:"absolute",inset:0,
-            display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",
-            background:"rgba(0,0,0,0.7)",padding:24,textAlign:"center",
-          }}>
-            <div style={{fontSize:48,marginBottom:16}}>📷</div>
-            <div style={{fontSize:16,color:"#fff",fontFamily:FONT,marginBottom:8}}>Sin acceso a la cámara</div>
-            <div style={{fontSize:13,color:"rgba(255,255,255,0.6)",fontFamily:FONT,marginBottom:20}}>{msg}</div>
-            <button onClick={function(){stopCamera();onClose();}} style={{
-              background:C.green,border:"none",borderRadius:12,
-              padding:"12px 24px",color:"#fff",fontSize:15,
-              fontFamily:FONT,fontWeight:600,cursor:"pointer",
-            }}>Cerrar</button>
-          </div>
-        )}
-
-        {status==="iniciando"&&(
-          <div style={{
-            position:"absolute",inset:0,
-            display:"flex",alignItems:"center",justifyContent:"center",
-            background:"rgba(0,0,0,0.5)",
-          }}>
-            <div style={{fontSize:15,color:"#fff",fontFamily:FONT}}>Iniciando cámara…</div>
-          </div>
-        )}
-      </div>
-
-      {/* Footer hint */}
-      <div style={{
-        padding:"16px 20px",
-        background:"rgba(0,0,0,0.8)",
-        textAlign:"center",
-        fontSize:13,color:"rgba(255,255,255,0.5)",fontFamily:FONT,
-      }}>
-        El código se detecta automáticamente
-      </div>
-    </div>
-  );
-}
-
-// ----------------------------------------------------------
+// ══════════════════════════════════════════════════════════
 // POS — iOS Caja
-// ----------------------------------------------------------
+// ══════════════════════════════════════════════════════════
 function POS({inv,onVenta}){
-  var _h38 = useState([]); var carrito = _h38[0]; var setCarrito = _h38[1];
-  var _h39 = useState(""); var busq = _h39[0]; var setBusq = _h39[1];
-  var _h40 = useState("efectivo"); var pago = _h40[0]; var setPago = _h40[1];
-  var _hm1 = useState(false); var pagoMixto = _hm1[0]; var setPagoMixto = _hm1[1];
-  var _hm2 = useState({efectivo:"", qr:"", tarjeta:""}); var montosMixtos = _hm2[0]; var setMontosMixtos = _hm2[1];
-  var _h41 = useState(""); var vendedor = _h41[0]; var setVendedor = _h41[1];
-  var _h42 = useState(0); var descExtra = _h42[0]; var setDescExtra = _h42[1];
-  var _h43 = useState(null); var ultima = _h43[0]; var setUltima = _h43[1];
-  var _h44 = useState(false); var showOk = _h44[0]; var setShowOk = _h44[1];
-  var _h45 = useState(false); var showPago = _h45[0]; var setShowPago = _h45[1];
-  var _h46 = useState(null); var scanStatus = _h46[0]; var setScanStatus = _h46[1];
-  var _h47 = useState(""); var scanMsg = _h47[0]; var setScanMsg = _h47[1];
-  var _h48 = useState(false); var showScanner = _h48[0]; var setShowScanner = _h48[1];
+  var _hN135 = useState([]); var carrito = _hN135[0]; var setCarrito = _hN135[1];;
+  var _hN136 = useState(""); var busq = _hN136[0]; var setBusq = _hN136[1];;
+  var _hN137 = useState("efectivo"); var pago = _hN137[0]; var setPago = _hN137[1];;
+  var _hN138 = useState(""); var vendedor = _hN138[0]; var setVendedor = _hN138[1];;
+  var _hN139 = useState(0); var descExtra = _hN139[0]; var setDescExtra = _hN139[1];;
+  var _hN140 = useState(null); var etiqueta = _hN140[0]; var setEtiqueta = _hN140[1];;
+  var _hN141 = useState(null); var ultima = _hN141[0]; var setUltima = _hN141[1];;
+  var _hN142 = useState(false); var showOk = _hN142[0]; var setShowOk = _hN142[1];;
+  var _hN143 = useState(false); var showPago = _hN143[0]; var setShowPago = _hN143[1];
+  var _hNm1 = useState(false); var pagoMixto = _hNm1[0]; var setPagoMixto = _hNm1[1];
+  var _hNm2 = useState({efectivo:"", qr:"", tarjeta:""}); var montosMixtos = _hNm2[0]; var setMontosMixtos = _hNm2[1];
+  var _hN144 = useState(null); var scanStatus = _hN144[0]; var setScanStatus = _hN144[1];; // null | "leyendo" | "ok" | "notfound"
+  var _hN145 = useState(""); var scanMsg = _hN145[0]; var setScanMsg = _hN145[1];;
   const inputRef=useRef();
+  const fileRef=useRef();
 
   const resultados=useMemo(()=>{
     if(!busq.trim())return[];
@@ -2334,82 +2080,64 @@ function POS({inv,onVenta}){
   }
   function cambiar(prodId,d){setCarrito(p=>p.map(x=>x.prodId===prodId?{...x,cantidad:Math.max(1,x.cantidad+d)}:x));}
   function quitar(prodId){setCarrito(p=>p.filter(x=>x.prodId!==prodId));}
-
+  async function handleEtiqueta(e){
+    const f=e.target.files?.[0];
+    if(!f) return;
+    // Guardar imagen para adjuntar a la venta
+    const r=new FileReader();
+    r.onload=ev=>setEtiqueta(ev.target.result);
+    r.readAsDataURL(f);
+    // Intentar leer código de barras/QR de la imagen
+    setScanStatus("leyendo");
+    try {
+      const codigo = await leerCodigoDeImagen(f);
+      if(codigo){
+        setScanStatus("ok");
+        setScanMsg(`Código detectado: ${codigo}`);
+        // Buscar el producto en el inventario por código
+        const prod = inv.find(i=>i.codigo.toUpperCase()===codigo.toUpperCase());
+        if(prod){
+          // Agregar directamente al carrito
+          add(prod);
+          setScanMsg(`✓ "${prod.nombre}" agregado al carrito`);
+        } else {
+          // Poner en el buscador para búsqueda manual
+          setBusq(codigo);
+          setScanMsg(`Código "${codigo}" — busca el producto`);
+        }
+      } else {
+        setScanStatus("notfound");
+        setScanMsg("No se detectó código — foto guardada");
+      }
+    } catch(err){
+      setScanStatus("notfound");
+      setScanMsg("No se pudo leer el código");
+    }
+    setTimeout(()=>setScanStatus(null),4000);
+  }
 
   function cobrar(){
     if(!carrito.length)return;
-    // Validación pago mixto: la suma debe cuadrar con el total
-    if (pagoMixto) {
-      const suma=(parseFloat(montosMixtos.efectivo)||0)+(parseFloat(montosMixtos.qr)||0)+(parseFloat(montosMixtos.tarjeta)||0);
-      if (Math.abs(suma-total)>0.01) { alert(`Los montos ingresados (${$(suma)}) no cuadran con el total (${$(total)})`); return; }
-    }
     const factor=1-descPct/100;
     const items=carrito.map(it=>({prodId:it.prodId,codigo:it.codigo,nombre:it.nombre,
       marcaId:it.marcaId,marcaNombre:it.marcaNombre,
       cantidad:it.cantidad,precioUnit:it.precio,subtotal:it.precio*it.cantidad*factor}));
     var metodoPagoFinal = pago;
-    if (pagoMixto) {
+    if(pagoMixto){
       var partes = [];
-      if (parseFloat(montosMixtos.efectivo) > 0) partes.push("efectivo:" + montosMixtos.efectivo);
-      if (parseFloat(montosMixtos.qr) > 0) partes.push("qr:" + montosMixtos.qr);
-      if (parseFloat(montosMixtos.tarjeta) > 0) partes.push("tarjeta:" + montosMixtos.tarjeta);
+      if(parseFloat(montosMixtos.efectivo)>0) partes.push("efectivo:"+montosMixtos.efectivo);
+      if(parseFloat(montosMixtos.qr)>0) partes.push("qr:"+montosMixtos.qr);
+      if(parseFloat(montosMixtos.tarjeta)>0) partes.push("tarjeta:"+montosMixtos.tarjeta);
       metodoPagoFinal = partes.length > 0 ? "mixto|" + partes.join("|") : pago;
     }
-    var vf=onVenta({items,total,subtotal,descPct,metodoPago:metodoPagoFinal,vendedor:vendedor||"Tienda",etiquetaImg:null});
+    const vf=onVenta({items,total,subtotal,descPct,metodoPago:metodoPagoFinal,vendedor:vendedor||"Tienda",etiquetaImg:etiqueta});
     setUltima(vf);setShowOk(true);setShowPago(false);
-    setCarrito([]);setDescExtra(0);setBusq("");
+    setCarrito([]);setDescExtra(0);setBusq("");setEtiqueta(null);
     setPagoMixto(false);setMontosMixtos({efectivo:"",qr:"",tarjeta:""});
   }
 
   return (
-    <div style={{position:"relative", minHeight:"100vh"}}>
-
-      {/* Logo fondo decorativo */}
-      <div style={{
-        position:"fixed",
-        top:"50%", left:"50%",
-        transform:"translate(-50%, -50%)",
-        zIndex:0,
-        pointerEvents:"none",
-        display:"flex",flexDirection:"column",
-        alignItems:"center",justifyContent:"center",
-        opacity:0.045,
-        userSelect:"none",
-      }}>
-        <div style={{
-          fontSize:180,
-          fontFamily:"Georgia,serif",
-          fontWeight:900,
-          color:C.gold,
-          letterSpacing:-8,
-          lineHeight:1,
-        }}>TH</div>
-        <div style={{
-          width:280, height:2,
-          background:C.gold,
-          margin:"8px 0",
-        }}/>
-        <div style={{
-          fontSize:26,
-          fontFamily:"Georgia,serif",
-          fontWeight:400,
-          color:C.gold,
-          letterSpacing:14,
-          textTransform:"uppercase",
-        }}>TOSCANA</div>
-        <div style={{
-          fontSize:14,
-          fontFamily:"Georgia,serif",
-          fontWeight:300,
-          color:C.gold,
-          letterSpacing:10,
-          marginTop:4,
-        }}>CASA DE MODA</div>
-      </div>
-
-      {/* Contenido encima del logo */}
-      <div style={{position:"relative",zIndex:1}}>
-
+    <div>
       {/* Search bar */}
       <div style={{position:"relative",marginBottom:14}}>
         <span style={{position:"absolute",left:12,top:"50%",transform:"translateY(-50%)",fontSize:16,color:C.label3}}>🔍</span>
@@ -2433,7 +2161,7 @@ function POS({inv,onVenta}){
           {resultados.map((p,idx)=>{
             const m=MARCAS.find(x=>x.id===p.marcaId);
             return (
-              <div key={p.id} onClick={function(){add(p);}} style={{
+              <div key={p.id} onClick={()=>add(p)} style={{
                 display:"flex",alignItems:"center",justifyContent:"space-between",
                 padding:"13px 16px",
                 borderBottom:idx<resultados.length-1?`1px solid ${C.sep}`:"",
@@ -2486,7 +2214,7 @@ function POS({inv,onVenta}){
                 </div>
               </div>
               <div style={{display:"flex",alignItems:"center",gap:10,flexShrink:0}}>
-                <button onClick={function(){cambiar(it.prodId,-1);}} style={{
+                <button onClick={()=>cambiar(it.prodId,-1)} style={{
                   width:32,height:32,borderRadius:"50%",
                   background:C.fill2,border:"none",cursor:"pointer",
                   display:"flex",alignItems:"center",justifyContent:"center",
@@ -2494,7 +2222,7 @@ function POS({inv,onVenta}){
                   WebkitTapHighlightColor:"transparent",
                 }}>−</button>
                 <span style={{fontSize:16,fontWeight:700,color:C.label,fontFamily:FONT,minWidth:20,textAlign:"center"}}>{it.cantidad}</span>
-                <button onClick={function(){cambiar(it.prodId,1);}} style={{
+                <button onClick={()=>cambiar(it.prodId,1)} style={{
                   width:32,height:32,borderRadius:"50%",
                   background:C.fill2,border:"none",cursor:"pointer",
                   display:"flex",alignItems:"center",justifyContent:"center",
@@ -2505,7 +2233,7 @@ function POS({inv,onVenta}){
               <div style={{minWidth:70,textAlign:"right"}}>
                 <div style={{fontSize:15,fontWeight:600,color:C.gold,fontFamily:FONT}}>{$(it.precio*it.cantidad)}</div>
               </div>
-              <button onClick={function(){quitar(it.prodId);}} style={{
+              <button onClick={()=>quitar(it.prodId)} style={{
                 background:"none",border:"none",cursor:"pointer",
                 color:C.red,fontSize:20,padding:"4px",
                 WebkitTapHighlightColor:"transparent",
@@ -2515,45 +2243,43 @@ function POS({inv,onVenta}){
         </div>
       )}
 
-      {/* Escáner QR en vivo */}
-      {showScanner&&(
-        <QRScanner
-          onDetect={(codigo)=>{
-            setShowScanner(false);
-            setScanStatus("ok");
-            const prod=inv.find(i=>i.codigo.toUpperCase()===codigo.toUpperCase());
-            if(prod){
-              add(prod);
-              setScanMsg(`✓ "${prod.nombre}" agregado al carrito`);
-            } else {
-              setBusq(codigo);
-              setScanMsg(`Código "${codigo}" — no encontrado en inventario`);
-              setScanStatus("notfound");
-            }
-            setTimeout(()=>{setScanStatus(null);setScanMsg("");},4000);
-          }}
-          onClose={function(){setShowScanner(false);}}
-        />
-      )}
-
-      {/* Botón escanear */}
-      <div style={{marginBottom:14}}>
-        <IOSBtn onPress={function(){setShowScanner(true);}} variant="fill" full icon="📷">
-          Escanear código QR
-        </IOSBtn>
+      {/* Escanear Etiqueta */}
+      <div style={{background:C.bg2,borderRadius:14,padding:"14px 16px",marginBottom:14,
+        border:scanStatus==="ok"?`1.5px solid ${C.green}`:scanStatus==="notfound"?`1.5px solid ${C.amber}`:`1px solid ${C.sep}`}}>
+        <div style={{fontSize:13,fontWeight:600,color:C.label3,textTransform:"uppercase",
+          letterSpacing:.6,marginBottom:10}}>📷 Escanear Etiqueta</div>
+        <input ref={fileRef} type="file" accept="image/*" capture="environment"
+          onChange={handleEtiqueta} style={{display:"none"}}/>
+        <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:scanMsg?10:0}}>
+          <IOSBtn onPress={()=>fileRef.current?.click()} variant="fill" small icon="📷">
+            {scanStatus==="leyendo"?"Leyendo…":etiqueta?"Nueva foto":"Fotografiar código"}
+          </IOSBtn>
+          {etiqueta&&(
+            <>
+              <img src={etiqueta} alt="etiqueta"
+                style={{height:44,borderRadius:8,border:`1px solid ${C.sep}`}}/>
+              <button onClick={()=>{setEtiqueta(null);setScanStatus(null);setScanMsg("");}} style={{
+                background:"none",border:"none",color:C.red,fontSize:18,cursor:"pointer",
+                WebkitTapHighlightColor:"transparent",
+              }}>×</button>
+            </>
+          )}
+        </div>
         {scanMsg&&(
-          <div style={{marginTop:10,padding:"10px 14px",borderRadius:12,fontSize:14,fontFamily:FONT,
-            background:scanStatus==="ok"?`${C.green}15`:`${C.amber}15`,
-            border:`1px solid ${scanStatus==="ok"?C.green:C.amber}30`,
-            color:scanStatus==="ok"?C.green:C.amber}}>
-            {scanMsg}
+          <div style={{padding:"8px 12px",borderRadius:10,fontSize:13,fontFamily:FONT,
+            background:scanStatus==="ok"?`${C.green}15`:scanStatus==="notfound"?`${C.amber}15`:C.fill2,
+            color:scanStatus==="ok"?C.green:scanStatus==="notfound"?C.amber:C.label2}}>
+            {scanStatus==="leyendo"&&"⏳ "}{scanMsg}
           </div>
         )}
+        <div style={{fontSize:11,color:C.label3,fontFamily:FONT,marginTop:8}}>
+          Apunta al código de barras o QR de la prenda → se agrega automáticamente al carrito
+        </div>
       </div>
 
       {/* Botón cobrar */}
       <IOSBtn
-        onPress={function(){carrito.length&&setShowPago(true);}}
+        onPress={()=>carrito.length&&setShowPago(true)}
         variant="primary" full
         disabled={!carrito.length}
         style={{fontSize:18,padding:"17px"}}
@@ -2567,7 +2293,7 @@ function POS({inv,onVenta}){
           borderRadius:16,padding:"16px",marginTop:14}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10}}>
             <div style={{fontSize:13,fontWeight:700,color:C.green,textTransform:"uppercase",letterSpacing:.5}}>✓ Venta Registrada</div>
-            <button onClick={function(){setShowOk(false);}} style={{background:"none",border:"none",
+            <button onClick={()=>setShowOk(false)} style={{background:"none",border:"none",
               color:C.label3,cursor:"pointer",fontSize:18,WebkitTapHighlightColor:"transparent"}}>×</button>
           </div>
           <div style={{fontFamily:"monospace",fontSize:13,color:C.gold}}>{ultima.id}</div>
@@ -2578,7 +2304,7 @@ function POS({inv,onVenta}){
             </div>
           ))}
           <div style={{marginTop:12}}>
-            <IOSBtn onPress={function(){sendWA(ultima);}} variant="fill" full small icon="📲">
+            <IOSBtn onPress={()=>sendWA(ultima)} variant="fill" full small icon="📲">
               Enviar por WhatsApp
             </IOSBtn>
           </div>
@@ -2586,15 +2312,7 @@ function POS({inv,onVenta}){
       )}
 
       {/* Sheet: Cobro */}
-      {showPago && (
-      <div style={{position:"fixed",inset:0,zIndex:500,background:"rgba(0,0,0,0.55)",display:"flex",alignItems:"flex-end"}} onClick={function(e){if(e.target===e.currentTarget)setShowPago(false);}}>
-      <div style={{background:"#FFFFFF",borderRadius:"22px 22px 0 0",width:"100%",maxHeight:"90vh",overflowY:"auto",paddingBottom:24}}>
-        <div style={{display:"flex",justifyContent:"center",padding:"12px 0 4px"}}><div style={{width:36,height:5,borderRadius:3,background:C.accent}}/></div>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 20px 16px"}}>
-          <h3 style={{margin:0,fontSize:17,fontWeight:600,color:C.label,fontFamily:FONT}}>Confirmar Cobro</h3>
-          <button onClick={function(){setShowPago(false);}} style={{background:C.fill2,border:"none",borderRadius:"50%",width:30,height:30,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",color:C.label2,fontSize:16}}>x</button>
-        </div>
-        <div style={{padding:"0 16px"}}>
+      <Sheet open={showPago} onClose={()=>setShowPago(false)} title="Confirmar Cobro" tall>
         {/* Total */}
         <div style={{background:`${C.gold}12`,border:`1px solid ${C.gold}30`,
           borderRadius:16,padding:"20px",marginBottom:20,textAlign:"center"}}>
@@ -2628,13 +2346,13 @@ function POS({inv,onVenta}){
         {/* Pago simple */}
         {!pagoMixto&&(
           <div>
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:16}}>
-              {PAGOS.map(function(p){return(
-                <button key={p.id} onClick={function(){setPago(p.id);}} style={{
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:20}}>
+              {PAGOS.map(p=>(
+                <button key={p.id} onClick={()=>setPago(p.id)} style={{
                   padding:"14px 8px",borderRadius:14,
-                  border:"2px solid "+(pago===p.id?p.color:C.sep),
-                  background:pago===p.id?p.color+"18":C.bg2,
-                  cursor:"pointer",fontFamily:FONT,
+                  border:`2px solid ${pago===p.id?p.color:C.sep}`,
+                  background:pago===p.id?`${p.color}18`:C.bg2,
+                  cursor:"pointer",fontFamily:FONT,transition:"all .15s",
                   display:"flex",flexDirection:"column",alignItems:"center",gap:6,
                   WebkitTapHighlightColor:"transparent",
                 }}>
@@ -2643,12 +2361,12 @@ function POS({inv,onVenta}){
                     color:pago===p.id?p.color:C.label2}}>{p.label}</span>
                   {p.desc>0&&<Chip color={C.amber} small>-{p.desc}%</Chip>}
                 </button>
-              );})}
+              ))}
             </div>
             {pago==="tarjeta"&&(
-              <div style={{padding:"12px 14px",background:C.amber+"15",borderRadius:12,
-                border:"1px solid "+C.amber+"30",marginBottom:16,fontSize:13,color:C.amber,fontFamily:FONT}}>
-                Descuento 2.5% por tarjeta aplicado automáticamente
+              <div style={{padding:"12px 14px",background:`${C.amber}15`,borderRadius:12,
+                border:`1px solid ${C.amber}30`,marginBottom:16,fontSize:13,color:C.amber,fontFamily:FONT}}>
+                💳 Descuento 2.5% por tarjeta aplicado automáticamente
               </div>
             )}
           </div>
@@ -2693,7 +2411,6 @@ function POS({inv,onVenta}){
                   </div>
                 );
               })}
-              {/* Suma y diferencia */}
               {(function(){
                 var suma = (parseFloat(montosMixtos.efectivo)||0) +
                            (parseFloat(montosMixtos.qr)||0) +
@@ -2715,7 +2432,7 @@ function POS({inv,onVenta}){
                     )}
                     {Math.abs(diff)<0.01&&(
                       <div style={{fontSize:13,color:C.green,textAlign:"center",marginTop:4,fontFamily:FONT}}>
-                        Montos cuadrados correctamente
+                        ✓ Montos cuadrados
                       </div>
                     )}
                   </div>
@@ -2757,24 +2474,21 @@ function POS({inv,onVenta}){
         <IOSBtn onPress={cobrar} full variant="primary" style={{fontSize:18,padding:"17px"}} icon="💳">
           Cobrar {$(total)}
         </IOSBtn>
-        </div>
-      </div>
-      </div>)}
-      </div>
+      </Sheet>
     </div>
   );
 }
 
 
 
-// ----------------------------------------------------------
+// ══════════════════════════════════════════════════════════
 // SHEET RECIBIR PRODUCTO — con generación de código de barra
-// ----------------------------------------------------------
+// ══════════════════════════════════════════════════════════
 function SheetRecibir({open, onClose, inv, onAdd, fInv, setFInv}){
-  var _h49 = useState(""); var scanInvMsg = _h49[0]; var setScanInvMsg = _h49[1];
-  var _h50 = useState(null); var scanInvStatus = _h50[0]; var setScanInvStatus = _h50[1];
-  var _h51 = useState(false); var barcodeReady = _h51[0]; var setBarcodeReady = _h51[1];
-  const scanInvRef=useRef(null);
+  var _hN146 = useState(""); var scanInvMsg = _hN146[0]; var setScanInvMsg = _hN146[1];;
+  var _hN147 = useState(null); var scanInvStatus = _hN147[0]; var setScanInvStatus = _hN147[1];;
+  var _hN148 = useState(false); var barcodeReady = _hN148[0]; var setBarcodeReady = _hN148[1];;
+  const scanInvRef = useRef(null);
   
   const codigoGenerado = fInv.marcaId && fInv.nombre
     ? genCod(Number(fInv.marcaId), fInv.nombre, inv.length+1)
@@ -2826,7 +2540,7 @@ function SheetRecibir({open, onClose, inv, onAdd, fInv, setFInv}){
   }
 
   return (
-    <Sheet open={open} onClose={function(){onClose();setScanInvMsg("");setScanInvStatus(null);}} title="Recibir Producto" tall>
+    <Sheet open={open} onClose={()=>{onClose();setScanInvMsg("");setScanInvStatus(null);}} title="Recibir Producto" tall>
       {/* Opción escanear etiqueta existente */}
       <div style={{background:C.bg3,borderRadius:14,padding:"14px",marginBottom:16,
         border:`1px solid ${scanInvStatus==="ok"?C.green:scanInvStatus==="notfound"?C.amber:C.sep}`}}>
@@ -2834,7 +2548,7 @@ function SheetRecibir({open, onClose, inv, onAdd, fInv, setFInv}){
           letterSpacing:.6,marginBottom:10}}>Escanear etiqueta existente (opcional)</div>
         <input ref={scanInvRef} type="file" accept="image/*" capture="environment"
           onChange={handleScanEtiqueta} style={{display:"none"}}/>
-        <IOSBtn onPress={function(){scanInvRef.current?.click();}} variant="fill" small icon="📷">
+        <IOSBtn onPress={()=>scanInvRef.current?.click()} variant="fill" small icon="📷">
           {scanInvStatus==="leyendo"?"Leyendo…":"Fotografiar código"}
         </IOSBtn>
         {scanInvMsg&&(
@@ -2872,7 +2586,7 @@ function SheetRecibir({open, onClose, inv, onAdd, fInv, setFInv}){
             letterSpacing:.8,marginBottom:8}}>Código generado para esta prenda</div>
           <div style={{fontSize:14,fontFamily:"monospace",fontWeight:700,
             color:C.gold,marginBottom:10}}>{codigoGenerado}</div>
-          <QRDisplay codigo={codigoGenerado}/>
+          <BarcodeDisplay codigo={codigoGenerado}/>
           <div style={{fontSize:11,color:C.label3,fontFamily:FONT,marginTop:8}}>
             {fInv.nombre && <strong style={{color:C.label2}}>{fInv.nombre}</strong>}
             {fInv.categoria && <span style={{color:C.label3}}> · {fInv.categoria}</span>}
@@ -2885,183 +2599,11 @@ function SheetRecibir({open, onClose, inv, onAdd, fInv, setFInv}){
   );
 }
 
-// ----------------------------------------------------------
-
-// ----------------------------------------------------------
-// CARGA MASIVA EXCEL
-// ----------------------------------------------------------
-function SheetExcelMasivo({open, onClose, inv, setInv, drive}) {
-  var _e1 = useState(null); var marcaSel = _e1[0]; var setMarcaSel = _e1[1];
-  var _e2 = useState([]); var filas = _e2[0]; var setFilas = _e2[1];
-  var _e3 = useState("idle"); var estado = _e3[0]; var setEstado = _e3[1];
-  var _e4 = useState(""); var msg = _e4[0]; var setMsg = _e4[1];
-  var _e5 = useState([]); var productosGenerados = _e5[0]; var setProductosGenerados = _e5[1];
-  var fileRef = useRef(null);
-
-  useEffect(function() { loadXLSX(); }, []);
-
-  function reset() {
-    setMarcaSel(null); setFilas([]); setEstado("idle");
-    setMsg(""); setProductosGenerados([]);
-    if (fileRef.current) fileRef.current.value = "";
-  }
-
-  function handleFile(e) {
-    var file = e.target.files && e.target.files[0];
-    if (!file) return;
-    setEstado("leyendo"); setMsg("Leyendo archivo..."); setFilas([]); setProductosGenerados([]);
-    var reader = new FileReader();
-    reader.onload = function(ev) {
-      try {
-        var wb = XLSX.read(new Uint8Array(ev.target.result), {type:"array"});
-        var ws = wb.Sheets[wb.SheetNames[0]];
-        var rows = XLSX.utils.sheet_to_json(ws, {header:1});
-        var valid = rows.filter(function(r){return r && r[0] && String(r[0]).trim();});
-        if (valid.length > 0) {
-          var first = String(valid[0][0]).toLowerCase();
-          if (first.includes("nombre")||first.includes("producto")||first.includes("name")) {
-            valid = valid.slice(1);
-          }
-        }
-        setFilas(valid); setEstado("preview");
-        setMsg(valid.length + " productos encontrados. Revisa y confirma.");
-      } catch(err) { setEstado("error"); setMsg("Error leyendo el archivo. Usa .xlsx"); }
-    };
-    reader.onerror = function(){ setEstado("error"); setMsg("No se pudo leer el archivo"); };
-    reader.readAsArrayBuffer(file);
-  }
-
-  function confirmar() {
-    if (!marcaSel) { setMsg("Selecciona una marca primero"); return; }
-    if (!filas.length) { setMsg("No hay productos para cargar"); return; }
-    setEstado("procesando"); setMsg("Generando productos y QR...");
-    var marca = MARCAS.find(function(m){return m.id===Number(marcaSel);});
-    var nuevos = []; var base = inv.length;
-    filas.forEach(function(row, i) {
-      var nombre = String(row[0]||"").trim();
-      if (!nombre) return;
-      var prod = {
-        id: Date.now()+i,
-        codigo: genCod(Number(marcaSel), nombre, base+i+1),
-        marcaId: Number(marcaSel),
-        nombre: nombre,
-        categoria: String(row[1]||"General").trim(),
-        precio: parseFloat(row[2])||0,
-        stock: parseInt(row[3])||1,
-        stockInicial: parseInt(row[3])||1,
-        fecha: hoy(),
-        marcaNombre: marca?marca.nombre:"",
-      };
-      nuevos.push(prod);
-    });
-    setInv(function(prev){return prev.concat(nuevos);});
-    nuevos.forEach(function(p){
-      sbGuardarProducto(p);
-      if(drive) drive.syncProducto(p);
-    });
-    setProductosGenerados(nuevos);
-    setEstado("listo");
-    setMsg(nuevos.length+" productos cargados con QR generados.");
-  }
-
-  function imprimirTodos() {
-    productosGenerados.forEach(function(prod, i) {
-      var marca = MARCAS.find(function(m){return m.id===prod.marcaId;});
-      setTimeout(function(){ imprimirTicket(prod, marca?marca.nombre:"Toscana House"); }, i*600);
-    });
-  }
-
-  if (!open) return null;
-  return (
-    <div style={{position:"fixed",inset:0,zIndex:900,background:"rgba(0,0,0,0.5)",display:"flex",alignItems:"flex-end"}}>
-      <div style={{width:"100%",maxHeight:"92vh",background:C.bg,borderRadius:"20px 20px 0 0",overflow:"hidden",display:"flex",flexDirection:"column"}}>
-        <div style={{padding:"16px 20px",borderBottom:"1px solid "+C.sep,display:"flex",justifyContent:"space-between",alignItems:"center",flexShrink:0}}>
-          <div>
-            <div style={{fontSize:18,fontWeight:800,color:C.label,fontFamily:FONT}}>Carga Masiva Excel</div>
-            <div style={{fontSize:13,color:C.label3,fontFamily:FONT,marginTop:2}}>Importa productos desde Excel con QR</div>
-          </div>
-          <button onClick={function(){reset();onClose();}} style={{background:C.fill2,border:"none",width:32,height:32,borderRadius:"50%",cursor:"pointer",color:C.label2,fontSize:16}}>x</button>
-        </div>
-        <div style={{flex:1,overflowY:"auto",padding:"16px 20px",WebkitOverflowScrolling:"touch"}}>
-
-          <div style={{marginBottom:20}}>
-            <div style={{fontSize:12,fontWeight:700,color:C.label3,textTransform:"uppercase",letterSpacing:.8,marginBottom:10}}>1. Selecciona la marca</div>
-            <div style={{display:"flex",gap:8,overflowX:"auto",scrollbarWidth:"none",paddingBottom:4}}>
-              {MARCAS.map(function(m){
-                var activa = marcaSel===m.id;
-                return (
-                  <button key={m.id} onClick={function(){setMarcaSel(m.id);}} style={{flexShrink:0,padding:"8px 14px",borderRadius:20,border:"2px solid "+(activa?m.color:C.sep),background:activa?m.color+"25":C.bg2,color:activa?m.color:C.label2,fontSize:13,fontWeight:activa?700:400,fontFamily:FONT,cursor:"pointer",display:"flex",alignItems:"center",gap:6,WebkitTapHighlightColor:"transparent"}}>
-                    <span>{m.emoji}</span><span>{m.nombre}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          <div style={{marginBottom:20}}>
-            <div style={{fontSize:12,fontWeight:700,color:C.label3,textTransform:"uppercase",letterSpacing:.8,marginBottom:10}}>2. Sube el archivo Excel</div>
-            <div style={{background:C.bg2,borderRadius:14,padding:16,border:"2px dashed "+C.sep,textAlign:"center",marginBottom:10}}>
-              <div style={{fontSize:32,marginBottom:8}}>📊</div>
-              <div style={{fontSize:13,color:C.label2,fontFamily:FONT,marginBottom:4}}>Formato: Nombre | Categoría | Precio | Stock</div>
-              <div style={{fontSize:11,color:C.label3,fontFamily:FONT,marginBottom:12,lineHeight:1.6}}>
-                Col A: Nombre · Col B: Categoría · Col C: Precio (Bs) · Col D: Cantidad
-              </div>
-              <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" onChange={handleFile} style={{display:"none"}}/>
-              <IOSBtn onPress={function(){if(fileRef.current)fileRef.current.click();}} variant="fill" icon="📂">Seleccionar archivo .xlsx</IOSBtn>
-            </div>
-          </div>
-
-          {filas.length>0&&(
-            <div style={{marginBottom:20}}>
-              <div style={{fontSize:12,fontWeight:700,color:C.label3,textTransform:"uppercase",letterSpacing:.8,marginBottom:10}}>3. Revisa los productos ({filas.length})</div>
-              <div style={{background:C.bg2,borderRadius:14,overflow:"hidden",border:"1px solid "+C.sep,maxHeight:200,overflowY:"auto"}}>
-                {filas.slice(0,30).map(function(row,i){
-                  return (
-                    <div key={i} style={{padding:"10px 14px",borderBottom:i<filas.length-1?"1px solid "+C.sep:"none",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                      <div>
-                        <div style={{fontSize:14,fontWeight:600,color:C.label,fontFamily:FONT}}>{String(row[0]||"")}</div>
-                        <div style={{fontSize:12,color:C.label3,fontFamily:FONT}}>{String(row[1]||"General")}</div>
-                      </div>
-                      <div style={{textAlign:"right"}}>
-                        <div style={{fontSize:14,fontWeight:700,color:C.gold,fontFamily:FONT}}>Bs {parseFloat(row[2]||0).toFixed(2)}</div>
-                        <div style={{fontSize:12,color:C.green,fontFamily:FONT}}>{parseInt(row[3]||1)} uds</div>
-                      </div>
-                    </div>
-                  );
-                })}
-                {filas.length>30&&<div style={{padding:"10px 14px",textAlign:"center",fontSize:12,color:C.label3,fontFamily:FONT}}>... y {filas.length-30} mas</div>}
-              </div>
-            </div>
-          )}
-
-          {msg&&(
-            <div style={{padding:"12px 14px",borderRadius:12,marginBottom:16,background:estado==="listo"?C.green+"20":estado==="error"?C.red+"20":C.amber+"20",color:estado==="listo"?C.green:estado==="error"?C.red:C.amber,fontSize:14,fontFamily:FONT}}>{msg}</div>
-          )}
-
-          <div style={{display:"flex",flexDirection:"column",gap:10}}>
-            {estado==="preview"&&marcaSel&&(
-              <IOSBtn onPress={confirmar} variant="primary" full icon="✓">Confirmar e importar {filas.length} productos</IOSBtn>
-            )}
-            {estado==="listo"&&productosGenerados.length>0&&(
-              <>
-                <IOSBtn onPress={imprimirTodos} variant="primary" full icon="🖨">Imprimir todos los QR ({productosGenerados.length})</IOSBtn>
-                <IOSBtn onPress={function(){reset();onClose();}} variant="fill" full>Cerrar</IOSBtn>
-              </>
-            )}
-            {(estado==="idle"||estado==="error")&&(
-              <IOSBtn onPress={function(){reset();onClose();}} variant="fill" full>Cancelar</IOSBtn>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
+// ══════════════════════════════════════════════════════════
 // INVENTARIO POR MARCA — pestaña con scroll horizontal
-// ----------------------------------------------------------
-function InventarioPorMarca({inv, ventas, onRecibir, onBaja, onExcel}){
-  var _h52 = useState(MARCAS[0].id); var marcaSelec = _h52[0]; var setMarcaSelec = _h52[1];
+// ══════════════════════════════════════════════════════════
+function InventarioPorMarca({inv, ventas, onRecibir, onBaja}){
+  var _hN149 = useState(MARCAS[0].id); var marcaSelec = _hN149[0]; var setMarcaSelec = _hN149[1];;
   const marca = MARCAS.find(m=>m.id===marcaSelec);
 
   // Calcular unidades vendidas por producto
@@ -3091,7 +2633,7 @@ function InventarioPorMarca({inv, ventas, onRecibir, onBaja, onExcel}){
             const stock=prods.reduce((s,p)=>s+p.stock,0);
             const activa=m.id===marcaSelec;
             return (
-              <button key={m.id} onClick={function(){setMarcaSelec(m.id);}} style={{
+              <button key={m.id} onClick={()=>setMarcaSelec(m.id)} style={{
                 flexShrink:0,padding:"10px 16px",borderRadius:14,
                 border:`2px solid ${activa?m.color:C.sep}`,
                 background:activa?m.color+"30":C.bg2,
@@ -3225,7 +2767,7 @@ function InventarioPorMarca({inv, ventas, onRecibir, onBaja, onExcel}){
                       </div>
                     )}
                     <button
-                      onClick={function(){imprimirTicket(prod, marca?.nombre||"");}}
+                      onClick={()=>imprimirTicket(prod, marca?.nombre||"")}
                       style={{
                         padding:"7px 14px",borderRadius:10,border:`1.5px solid ${C.gold}`,
                         background:"white",color:C.gold,fontSize:12,fontFamily:FONT,
@@ -3245,19 +2787,17 @@ function InventarioPorMarca({inv, ventas, onRecibir, onBaja, onExcel}){
       <div style={{display:"flex",gap:10,marginBottom:20}}>
         <IOSBtn onPress={onBaja} variant="fill" full icon="🗑">Dar de Baja</IOSBtn>
         <IOSBtn onPress={onRecibir} full icon="+">Recibir</IOSBtn>
-        <IOSBtn onPress={onExcel} variant="fill" full icon="📊">Carga Excel</IOSBtn>
-      </div>
       </div>
     </div>
   );
 }
 
-// ----------------------------------------------------------
+// ══════════════════════════════════════════════════════════
 // MARCA DETALLE — iOS navigation push style
-// ----------------------------------------------------------
+// ══════════════════════════════════════════════════════════
 function MarcaDetalle({marcaId,inv,ventas,vMes,mes,anio,MK,cierres,setCierres,getHist,getLiq}){
-  var _h53 = useState("historial"); var sub = _h53[0]; var setSub = _h53[1];
-  var _h54 = useState(""); var filtroMk = _h54[0]; var setFMk = _h54[1];
+  var _hN150 = useState("historial"); var sub = _hN150[0]; var setSub = _hN150[1];;
+  var _hN151 = useState(""); var filtroMk = _hN151[0]; var setFMk = _hN151[1];;
   const marca   =MARCAS.find(m=>m.id===marcaId);
   const liq     =getLiq(marcaId);
   const cerrado =cierres[`${MK}-${marcaId}`]?.cerrado;
@@ -3330,8 +2870,8 @@ function MarcaDetalle({marcaId,inv,ventas,vMes,mes,anio,MK,cierres,setCierres,ge
                       <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
                         <div style={{display:"flex",alignItems:"center",gap:8}}>
                           <span style={{fontFamily:"monospace",fontSize:12,color:C.gold}}>{v.id}</span>
-                          <Chip color={colorPago(v.metodoPago)} small>
-                            {iconPago(v.metodoPago)} {labelPago(v.metodoPago)}
+                          <Chip color={v.metodoPago==="tarjeta"?C.amber:v.metodoPago==="qr"?C.blue:C.green} small>
+                            {PAGOS.find(p=>p.id===v.metodoPago)?.label}
                           </Chip>
                         </div>
                         <span style={{fontSize:16,fontWeight:700,color:C.gold,fontFamily:FONT}}>{$(v.subMarca)}</span>
@@ -3418,16 +2958,16 @@ function MarcaDetalle({marcaId,inv,ventas,vMes,mes,anio,MK,cierres,setCierres,ge
           </div>
 
           <div style={{display:"flex",flexDirection:"column",gap:10}}>
-            <IOSBtn onPress={function(){exportCSV(MARCAS.find(m=>m.id===marcaId),ventas,mes,anio);}} variant="fill" full icon="⬇">
+            <IOSBtn onPress={()=>exportCSV(MARCAS.find(m=>m.id===marcaId),ventas,mes,anio)} variant="fill" full icon="⬇">
               Exportar CSV
             </IOSBtn>
             {!cerrado
               ? <IOSBtn variant="success" full icon="✓"
-                  onPress={function(){setCierres(p=>({...p,[`${MK}-${marcaId}`]:{cerrado:true,fecha:hoy(),mk:MK}}))}}>
+                  onPress={()=>setCierres(p=>({...p,[`${MK}-${marcaId}`]:{cerrado:true,fecha:hoy(),mk:MK}}))}>
                   Confirmar Cierre Mensual
                 </IOSBtn>
               : <IOSBtn variant="danger" full
-                  onPress={function(){setCierres(p=>({...p,[`${MK}-${marcaId}`]:{cerrado:false,mk:MK}}))}}>
+                  onPress={()=>setCierres(p=>({...p,[`${MK}-${marcaId}`]:{cerrado:false,mk:MK}}))}>
                   Reabrir Liquidación
                 </IOSBtn>
             }
@@ -3448,7 +2988,7 @@ function MarcaDetalle({marcaId,inv,ventas,vMes,mes,anio,MK,cierres,setCierres,ge
                       <span style={{fontSize:16,fontWeight:700,color:C.gold,fontFamily:FONT}}>{$(sub2)}</span>
                     </div>
                     <div style={{fontSize:13,color:C.label3,fontFamily:FONT,marginBottom:4}}>
-                      {v.fecha} {v.hora} · {labelPago(v.metodoPago)}
+                      {v.fecha} {v.hora} · {PAGOS.find(p=>p.id===v.metodoPago)?.label}
                     </div>
                     {its.map((it,ii)=>(
                       <div key={`liq-${v.id}-${it.prodId}-${ii}`} style={{fontSize:13,color:C.label2,fontFamily:FONT}}>
@@ -3466,14 +3006,14 @@ function MarcaDetalle({marcaId,inv,ventas,vMes,mes,anio,MK,cierres,setCierres,ge
   );
 }
 
-// ----------------------------------------------------------
+// ══════════════════════════════════════════════════════════
 // HISTORIAL TAB — Navegación por mes/año
-// ----------------------------------------------------------
+// ══════════════════════════════════════════════════════════
 function HistorialTab({ventas, inv, cierres}){
   const now = new Date();
-  var _h55 = useState(now.getMonth()); var mesSel = _h55[0]; var setMesSel = _h55[1];
-  var _h56 = useState(now.getFullYear()); var anioSel = _h56[0]; var setAnioSel = _h56[1];
-  var _h57 = useState("resumen"); var vista = _h57[0]; var setVista = _h57[1]; // resumen | marcas | ventas | stock
+  var _hN152 = useState(now.getMonth()); var mesSel = _hN152[0]; var setMesSel = _hN152[1];
+  var _hN153 = useState(now.getFullYear()); var anioSel = _hN153[0]; var setAnioSel = _hN153[1];
+  var _hN154 = useState("resumen"); var vista = _hN154[0]; var setVista = _hN154[1];; // resumen | marcas | ventas | stock
 
   const MKSel = mkKey(mesSel, anioSel);
 
@@ -3486,7 +3026,7 @@ function HistorialTab({ventas, inv, cierres}){
   const periodosConDatos = useMemo(()=>{
     const set = new Set(ventas.map(v=>v.mk));
     return Array.from(set).sort((a,b)=>b.localeCompare(a)).map(mk=>{
-      var _mk = mk.split("-"); var anio = _mk[0]; var mes = _mk[1];
+      const [anio,mes] = mk.split("-");
       return { mk, mes:Number(mes)-1, anio:Number(anio) };
     });
   },[ventas]);
@@ -3496,7 +3036,6 @@ function HistorialTab({ventas, inv, cierres}){
   const efectivoPer = ventasPer.filter(v=>v.metodoPago==="efectivo").reduce((s,v)=>s+v.total,0);
   const qrPer       = ventasPer.filter(v=>v.metodoPago==="qr").reduce((s,v)=>s+v.total,0);
   const tarjetaPer  = ventasPer.filter(v=>v.metodoPago==="tarjeta").reduce((s,v)=>s+v.total,0);
-  const mixtoPer    = ventasPer.filter(v=>v.metodoPago?.startsWith("mixto|")).reduce((s,v)=>s+v.total,0);
 
   // Ventas por marca del período
   const porMarcaPer = useMemo(()=>
@@ -3505,9 +3044,8 @@ function HistorialTab({ventas, inv, cierres}){
       const ef    = ventasPer.filter(v=>v.metodoPago==="efectivo").reduce((s,v)=>s+v.items.filter(i=>i.marcaId===m.id).reduce((ss,i)=>ss+i.subtotal,0),0);
       const qr    = ventasPer.filter(v=>v.metodoPago==="qr").reduce((s,v)=>s+v.items.filter(i=>i.marcaId===m.id).reduce((ss,i)=>ss+i.subtotal,0),0);
       const tj    = ventasPer.filter(v=>v.metodoPago==="tarjeta").reduce((s,v)=>s+v.items.filter(i=>i.marcaId===m.id).reduce((ss,i)=>ss+i.subtotal,0),0);
-      const mx    = ventasPer.filter(v=>v.metodoPago?.startsWith("mixto|")).reduce((s,v)=>s+v.items.filter(i=>i.marcaId===m.id).reduce((ss,i)=>ss+i.subtotal,0),0);
       const txs   = ventasPer.filter(v=>v.items.some(i=>i.marcaId===m.id)).length;
-      return {marca:m, total, ef, qr, tj, mx, txs};
+      return {marca:m, total, ef, qr, tj, txs};
     }).filter(x=>x.total>0).sort((a,b)=>b.total-a.total)
   ,[ventasPer]);
 
@@ -3517,7 +3055,7 @@ function HistorialTab({ventas, inv, cierres}){
 
   return (
     <div>
-      {/* -- SELECTOR MES/AÑO -- */}
+      {/* ── SELECTOR MES/AÑO ── */}
       <div style={{background:C.bg2,borderRadius:16,padding:16,marginBottom:16,
         border:`1px solid ${C.sep}`}}>
         <div style={{fontSize:11,fontWeight:700,color:C.label3,textTransform:"uppercase",
@@ -3527,7 +3065,7 @@ function HistorialTab({ventas, inv, cierres}){
         <div style={{display:"flex",gap:8,marginBottom:12,overflowX:"auto",
           scrollbarWidth:"none",WebkitOverflowScrolling:"touch",paddingBottom:4}}>
           {anios.map(a=>(
-            <button key={a} onClick={function(){setAnioSel(a);}} style={{
+            <button key={a} onClick={()=>setAnioSel(a)} style={{
               flexShrink:0,padding:"8px 18px",borderRadius:20,
               border:`2px solid ${anioSel===a?C.gold:C.sep}`,
               background:anioSel===a?`${C.gold}20`:C.bg3,
@@ -3546,7 +3084,7 @@ function HistorialTab({ventas, inv, cierres}){
             const tieneDatos = ventas.some(v=>v.mk===mk);
             const esSel = mesSel===i && anioSel===anioSel;
             return (
-              <button key={i} onClick={function(){setMesSel(i);}} style={{
+              <button key={i} onClick={()=>setMesSel(i)} style={{
                 padding:"10px 4px",borderRadius:10,
                 border:`2px solid ${mesSel===i?C.gold:tieneDatos?C.sep+"88":C.sep}`,
                 background:mesSel===i?`${C.gold}20`:tieneDatos?C.bg3:"transparent",
@@ -3579,7 +3117,7 @@ function HistorialTab({ventas, inv, cierres}){
         </div>
       </div>
 
-      {/* -- SELECTOR VISTA -- */}
+      {/* ── SELECTOR VISTA ── */}
       <div style={{marginBottom:16}}>
         <SegControl
           options={[
@@ -3592,7 +3130,7 @@ function HistorialTab({ventas, inv, cierres}){
         />
       </div>
 
-      {/* -- RESUMEN -- */}
+      {/* ── RESUMEN ── */}
       {vista==="resumen"&&(
         <div>
           {ventasPer.length===0
@@ -3637,7 +3175,7 @@ function HistorialTab({ventas, inv, cierres}){
         </div>
       )}
 
-      {/* -- POR MARCA -- */}
+      {/* ── POR MARCA ── */}
       {vista==="marcas"&&(
         <div>
           {porMarcaPer.length===0
@@ -3684,12 +3222,13 @@ function HistorialTab({ventas, inv, cierres}){
         </div>
       )}
 
-      {/* -- VENTAS DETALLE -- */}
+      {/* ── VENTAS DETALLE ── */}
       {vista==="ventas"&&(
         <div>
           {ventasPer.length===0
             ? <EmptyState icon="📊" title="Sin ventas" sub={`${MESES[mesSel]} ${anioSel}`}/>
             : [...ventasPer].reverse().map(v=>{
+                const pg=PAGOS.find(p=>p.id===v.metodoPago);
                 return (
                   <div key={v.id} style={{background:C.bg2,borderRadius:14,padding:"14px 16px",marginBottom:10}}>
                     <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
@@ -3698,7 +3237,7 @@ function HistorialTab({ventas, inv, cierres}){
                         <div style={{fontSize:12,color:C.label3,fontFamily:FONT}}>{v.fecha} {v.hora}</div>
                       </div>
                       <div style={{display:"flex",alignItems:"center",gap:8}}>
-                        <Chip color={colorPago(v.metodoPago)}>{iconPago(v.metodoPago)} {labelPago(v.metodoPago)}</Chip>
+                        <Chip color={pg?.color||C.green}>{pg?.icon} {pg?.label}</Chip>
                         <span style={{fontSize:17,fontWeight:800,color:C.gold,fontFamily:FONT}}>{$(v.total)}</span>
                       </div>
                     </div>
@@ -3719,7 +3258,7 @@ function HistorialTab({ventas, inv, cierres}){
         </div>
       )}
 
-      {/* -- STOCK -- */}
+      {/* ── STOCK ── */}
       {vista==="stock"&&(
         <div>
           <div style={{fontSize:12,color:C.label3,fontFamily:FONT,marginBottom:12}}>
@@ -3774,13 +3313,13 @@ function HistorialTab({ventas, inv, cierres}){
   );
 }
 
-// ----------------------------------------------------------
+// ══════════════════════════════════════════════════════════
 // CONFIG TAB — Gestión de usuarios y contraseñas
-// ----------------------------------------------------------
+// ══════════════════════════════════════════════════════════
 function ConfigTab({user, logout}){
-  var _h58 = useState("cuenta"); var subTab = _h58[0]; var setSubTab = _h58[1];
+  var _hN155 = useState("cuenta"); var subTab = _hN155[0]; var setSubTab = _hN155[1];;
   // Usuarios guardados en localStorage (sobre los defaults)
-  var _h59 = useState(function(){ try{return JSON.parse(localStorage.getItem("th_usuarios")||"null")||USUARIOS;}catch{return USUARIOS;} }); var usuarios = _h59[0]; var setUsuarios = _h59[1];
+  var _hN156 = useState(function(){ try{return JSON.parse(localStorage.getItem("th_usuarios")||"null")||USUARIOS;}catch{return USUARIOS;} }); var usuarios = _hN156[0]; var setUsuarios = _hN156[1];
   function guardarUsuarios(u){
     setUsuarios(u);
     localStorage.setItem("th_usuarios", JSON.stringify(u));
@@ -3808,13 +3347,13 @@ function ConfigTab({user, logout}){
         />
       </div>
 
-      {/* -- MI CUENTA -- */}
+      {/* ── MI CUENTA ── */}
       {subTab==="cuenta" && <CambiarContrasena user={user} usuarios={usuarios} onGuardar={guardarUsuarios}/>}
 
-      {/* -- USUARIOS -- */}
+      {/* ── USUARIOS ── */}
       {subTab==="usuarios" && <GestionUsuarios user={user} usuarios={usuarios} onGuardar={guardarUsuarios}/>}
 
-      {/* -- SISTEMA -- */}
+      {/* ── SISTEMA ── */}
       {subTab==="sistema" && (
         <div>
           {/* Info sistema */}
@@ -3843,13 +3382,13 @@ function ConfigTab({user, logout}){
   );
 }
 
-// -- Cambiar contraseña ------------------------------------
+// ── Cambiar contraseña ────────────────────────────────────
 function CambiarContrasena({user, usuarios, onGuardar}){
-  var _h60 = useState(""); var passActual = _h60[0]; var setPassActual = _h60[1];
-  var _h61 = useState(""); var passNueva = _h61[0]; var setPassNueva = _h61[1];
-  var _h62 = useState(""); var passConfirm = _h62[0]; var setPassConfirm = _h62[1];
-  var _h63 = useState(null); var msg = _h63[0]; var setMsg = _h63[1];
-  var _h64 = useState(false); var show = _h64[0]; var setShow = _h64[1];
+  var _hN157 = useState(""); var passActual = _hN157[0]; var setPassActual = _hN157[1];;
+  var _hN158 = useState(""); var passNueva = _hN158[0]; var setPassNueva = _hN158[1];;
+  var _hN159 = useState(""); var passConfirm = _hN159[0]; var setPassConfirm = _hN159[1];;
+  var _hN160 = useState(null); var msg = _hN160[0]; var setMsg = _hN160[1];;
+  var _hN161 = useState(false); var show = _hN161[0]; var setShow = _hN161[1];;
 
   function cambiar(){
     setMsg(null);
@@ -3910,12 +3449,12 @@ function CambiarContrasena({user, usuarios, onGuardar}){
   );
 }
 
-// -- Gestión de usuarios -----------------------------------
+// ── Gestión de usuarios ───────────────────────────────────
 function GestionUsuarios({user, usuarios, onGuardar}){
-  var _h65 = useState(null); var modo = _h65[0]; var setModo = _h65[1]; // null | "nuevo" | "editar"
-  var _h66 = useState(null); var editUser = _h66[0]; var setEditUser = _h66[1];
-  var _h67 = useState({usuario:"",password:"",nombre:"",rol:"caja"}); var fUser = _h67[0]; var setFUser = _h67[1];
-  var _h68 = useState(null); var msg = _h68[0]; var setMsg = _h68[1];
+  var _hN162 = useState(null); var modo = _hN162[0]; var setModo = _hN162[1];; // null | "nuevo" | "editar"
+  var _hN163 = useState(null); var editUser = _hN163[0]; var setEditUser = _hN163[1];;
+  var _hN164 = useState({usuario:"",password:"",nombre:"",rol:"caja"}); var fUser = _hN164[0]; var setFUser = _hN164[1];;
+  var _hN165 = useState(null); var msg = _hN165[0]; var setMsg = _hN165[1];;
 
   if (user.rol !== "admin") {
     return (
@@ -3955,7 +3494,7 @@ function GestionUsuarios({user, usuarios, onGuardar}){
     return (
       <div>
         <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:20}}>
-          <IOSBtn onPress={function(){setModo(null);setMsg(null);}} variant="fill" small>← Volver</IOSBtn>
+          <IOSBtn onPress={()=>{setModo(null);setMsg(null);}} variant="fill" small>← Volver</IOSBtn>
           <span style={{fontSize:17,fontWeight:700,color:C.label,fontFamily:FONT}}>
             {modo==="nuevo"?"Nuevo usuario":"Editar usuario"}
           </span>
@@ -3972,7 +3511,7 @@ function GestionUsuarios({user, usuarios, onGuardar}){
             letterSpacing:.8,marginBottom:8}}>Rol</div>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
             {[["admin","👑 Admin","Acceso total"],["caja","🛒 Cajero","Solo POS y ventas"]].map(([r,label,desc])=>(
-              <button key={r} onClick={function(){setFUser(p=>({...p,rol:r;}}))} style={{
+              <button key={r} onClick={()=>setFUser(p=>({...p,rol:r}))} style={{
                 padding:"12px",borderRadius:12,cursor:"pointer",fontFamily:FONT,
                 border:`2px solid ${fUser.rol===r?C.gold:C.sep}`,
                 background:fUser.rol===r?`${C.gold}15`:C.bg2,
@@ -4028,13 +3567,13 @@ function GestionUsuarios({user, usuarios, onGuardar}){
               </div>
             </div>
             <div style={{display:"flex",gap:8,flexShrink:0}}>
-              <button onClick={function(){setEditUser(u.usuario);setFUser({...u});setModo("editar");}} style={{
+              <button onClick={()=>{setEditUser(u.usuario);setFUser({...u});setModo("editar");}} style={{
                 background:`${C.gold}15`,border:`1px solid ${C.gold}30`,
                 borderRadius:8,padding:"6px 12px",color:C.gold,
                 fontSize:12,fontFamily:FONT,fontWeight:600,cursor:"pointer",
               }}>Editar</button>
               {u.usuario!==user.usuario&&(
-                <button onClick={function(){eliminar(u.usuario);}} style={{
+                <button onClick={()=>eliminar(u.usuario)} style={{
                   background:`${C.red}10`,border:`1px solid ${C.red}30`,
                   borderRadius:8,padding:"6px 12px",color:C.red,
                   fontSize:12,fontFamily:FONT,fontWeight:600,cursor:"pointer",
@@ -4045,7 +3584,7 @@ function GestionUsuarios({user, usuarios, onGuardar}){
         ))}
       </div>
 
-      <IOSBtn onPress={function(){setFUser({usuario:"",password:"",nombre:"",rol:"caja"}});setModo("nuevo");}}
+      <IOSBtn onPress={()=>{setFUser({usuario:"",password:"",nombre:"",rol:"caja"});setModo("nuevo");}}
         variant="primary" full icon="+ ">
         Agregar nuevo usuario
       </IOSBtn>
@@ -4053,12 +3592,12 @@ function GestionUsuarios({user, usuarios, onGuardar}){
   );
 }
 
-// ----------------------------------------------------------
+// ══════════════════════════════════════════════════════════
 // VENTAS TAB — totales globales + desglose por marca
-// ----------------------------------------------------------
+// ══════════════════════════════════════════════════════════
 function VentasTab({vMes, totalVtas, mes, anio}){
-  var _h69 = useState("marcas"); var vistaActiva = _h69[0]; var setVistaActiva = _h69[1]; // "marcas" | "historial"
-  var _h70 = useState(null); var marcaFiltro = _h70[0]; var setMarcaFiltro = _h70[1]; // id marca o null = todas
+  var _hN166 = useState("marcas"); var vistaActiva = _hN166[0]; var setVistaActiva = _hN166[1];; // "marcas" | "historial"
+  var _hN167 = useState(null); var marcaFiltro = _hN167[0]; var setMarcaFiltro = _hN167[1];; // id marca o null = todas
 
   // Calcular ventas por marca con desglose de método de pago
   const porMarca = useMemo(()=>{
@@ -4069,18 +3608,15 @@ function VentasTab({vMes, totalVtas, mes, anio}){
         .reduce((s,v)=>s+v.items.filter(i=>i.marcaId===m.id).reduce((ss,i)=>ss+i.subtotal,0),0);
       const tarjeta = vMes.filter(v=>v.metodoPago==="tarjeta")
         .reduce((s,v)=>s+v.items.filter(i=>i.marcaId===m.id).reduce((ss,i)=>ss+i.subtotal,0),0);
-      const mixto = vMes.filter(v=>v.metodoPago?.startsWith("mixto|"))
-        .reduce((s,v)=>s+v.items.filter(i=>i.marcaId===m.id).reduce((ss,i)=>ss+i.subtotal,0),0);
-      const total = efectivo+qr+tarjeta+mixto;
+      const total = efectivo+qr+tarjeta;
       const txs = vMes.filter(v=>v.items.some(i=>i.marcaId===m.id)).length;
-      return {marca:m, total, efectivo, qr, tarjeta, mixto, txs};
+      return {marca:m, total, efectivo, qr, tarjeta, txs};
     }).filter(x=>x.total>0).sort((a,b)=>b.total-a.total);
   },[vMes]);
 
   const totalEfectivo = vMes.filter(v=>v.metodoPago==="efectivo").reduce((s,v)=>s+v.total,0);
   const totalQR       = vMes.filter(v=>v.metodoPago==="qr").reduce((s,v)=>s+v.total,0);
   const totalTarjeta  = vMes.filter(v=>v.metodoPago==="tarjeta").reduce((s,v)=>s+v.total,0);
-  const totalMixto    = vMes.filter(v=>v.metodoPago?.startsWith("mixto|")).reduce((s,v)=>s+v.total,0);
   const maxVenta      = Math.max(...porMarca.map(x=>x.total), 1);
 
   // Ventas filtradas por marca para el historial
@@ -4106,7 +3642,6 @@ function VentasTab({vMes, totalVtas, mes, anio}){
           {icon:"💵",label:"Efectivo",value:totalEfectivo,color:"#4A9B6F"},
           {icon:"📱",label:"QR",value:totalQR,color:"#5B8DB8"},
           {icon:"💳",label:"Tarjeta",value:totalTarjeta,color:"#C8922A"},
-          ...(totalMixto>0?[{icon:"🔀",label:"Mixto",value:totalMixto,color:C.indigo}]:[]),
         ].map(s=>(
           <StatCard key={s.label} icon={s.icon} label={s.label} value={$(s.value)}
             sub={`${Math.round(totalVtas>0?(s.value/totalVtas)*100:0)}% del total`} color={s.color}/>
@@ -4121,7 +3656,7 @@ function VentasTab({vMes, totalVtas, mes, anio}){
         />
       </div>
 
-      {/* -- VISTA POR MARCA -- */}
+      {/* ── VISTA POR MARCA ── */}
       {vistaActiva==="marcas"&&(
         <div>
           {porMarca.length===0
@@ -4136,7 +3671,7 @@ function VentasTab({vMes, totalVtas, mes, anio}){
                   WebkitTapHighlightColor:"transparent",
                   borderLeft:`4px solid ${x.marca.color}`,
                 }}
-                onClick={function(){setMarcaFiltro(marcaFiltro===x.marca.id?null:x.marca.id);setVistaActiva("historial");}}>
+                onClick={()=>{setMarcaFiltro(marcaFiltro===x.marca.id?null:x.marca.id);setVistaActiva("historial");}}>
                   {/* Cabecera marca */}
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
                     <div style={{display:"flex",alignItems:"center",gap:10}}>
@@ -4170,7 +3705,6 @@ function VentasTab({vMes, totalVtas, mes, anio}){
                       {icon:"💵",label:"Efectivo",value:x.efectivo,color:"#4A9B6F"},
                       {icon:"📱",label:"QR",value:x.qr,color:"#5B8DB8"},
                       {icon:"💳",label:"Tarjeta",value:x.tarjeta,color:"#C8922A"},
-                      ...(x.mixto>0?[{icon:"🔀",label:"Mixto",value:x.mixto,color:C.indigo}]:[]),
                     ].map(p=>(
                       <div key={p.label} style={{
                         padding:"8px 10px",borderRadius:10,
@@ -4203,13 +3737,13 @@ function VentasTab({vMes, totalVtas, mes, anio}){
         </div>
       )}
 
-      {/* -- HISTORIAL -- */}
+      {/* ── HISTORIAL ── */}
       {vistaActiva==="historial"&&(
         <div>
           {/* Filtro por marca */}
           <div style={{display:"flex",gap:8,overflowX:"auto",paddingBottom:8,marginBottom:14,
             scrollbarWidth:"none",WebkitOverflowScrolling:"touch"}}>
-            <button onClick={function(){setMarcaFiltro(null);}} style={{
+            <button onClick={()=>setMarcaFiltro(null)} style={{
               flexShrink:0,padding:"7px 16px",borderRadius:20,
               border:`1.5px solid ${!marcaFiltro?C.gold:C.sep}`,
               background:!marcaFiltro?`${C.gold}20`:"transparent",
@@ -4218,7 +3752,7 @@ function VentasTab({vMes, totalVtas, mes, anio}){
               cursor:"pointer",WebkitTapHighlightColor:"transparent",
             }}>Todas</button>
             {MARCAS.filter(m=>vMes.some(v=>v.items.some(i=>i.marcaId===m.id))).map(m=>(
-              <button key={m.id} onClick={function(){setMarcaFiltro(marcaFiltro===m.id?null:m.id);}} style={{
+              <button key={m.id} onClick={()=>setMarcaFiltro(marcaFiltro===m.id?null:m.id)} style={{
                 flexShrink:0,padding:"7px 14px",borderRadius:20,
                 border:`1.5px solid ${marcaFiltro===m.id?m.color:C.sep}`,
                 background:marcaFiltro===m.id?`${m.color}20`:"transparent",
@@ -4235,6 +3769,7 @@ function VentasTab({vMes, totalVtas, mes, anio}){
           {ventasFiltradas.length===0
             ? <EmptyState icon="📋" title="Sin ventas" sub={marcaFiltro?"Esta marca no tiene ventas":"Sin ventas en el período"}/>
             : ventasFiltradas.map(v=>{
+                const pg=PAGOS.find(p=>p.id===v.metodoPago);
                 const itemsMostrar=marcaFiltro
                   ? v.items.filter(i=>i.marcaId===marcaFiltro)
                   : v.items;
@@ -4249,7 +3784,7 @@ function VentasTab({vMes, totalVtas, mes, anio}){
                         </div>
                       </div>
                       <div style={{display:"flex",alignItems:"center",gap:8}}>
-                        <Chip color={colorPago(v.metodoPago)}>{iconPago(v.metodoPago)} {labelPago(v.metodoPago)}</Chip>
+                        <Chip color={pg?.color||C.green}>{pg?.icon} {pg?.label}</Chip>
                         <span style={{fontSize:18,fontWeight:800,color:C.gold,fontFamily:FONT}}>{$(totalMostrar)}</span>
                       </div>
                     </div>
@@ -4280,7 +3815,7 @@ function VentasTab({vMes, totalVtas, mes, anio}){
                         </div>
                       ));
                     })()}
-                    <IOSBtn onPress={function(){sendWA(v);}} variant="fill" small full icon="📲">
+                    <IOSBtn onPress={()=>sendWA(v)} variant="fill" small full icon="📲">
                       Enviar por WhatsApp
                     </IOSBtn>
                     {v.etiquetaImg&&<img src={v.etiquetaImg} alt="etiqueta"
@@ -4295,7 +3830,7 @@ function VentasTab({vMes, totalVtas, mes, anio}){
   );
 }
 
-// -- Atoms aux --
+// ── Atoms aux ──
 function FilterPill({label,color,active,onPress}){
   return (
     <button onClick={onPress} style={{
