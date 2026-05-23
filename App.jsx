@@ -1079,7 +1079,7 @@ function TabBar({tabs, active, onChange}){
         const isActive=active===t.id;
         const tabColor=TAB_COLORS[t.id]||C.gold;
         return (
-          <button key={t.id} onClick={function(){onChange(t.id);}} style={{
+          <button key={t.id} onClick={function(){onChange(t.id);} style={{
             flex:1,border:"none",
             background:isActive?`${tabColor}18`:"transparent",
             display:"flex",flexDirection:"column",alignItems:"center",
@@ -1231,7 +1231,7 @@ function SegControl({options,value,onChange}){
       display:"flex",gap:3,
     }}>
       {options.map(o=>(
-        <button key={o.value} onClick={function(){onChange(o.value);}} style={{
+        <button key={o.value} onClick={function(){onChange(o.value);} style={{
           flex:1,padding:"7px 0",borderRadius:8,border:"none",
           background:value===o.value?C.bg3:"transparent",
           color:value===o.value?C.label:C.label2,
@@ -1341,14 +1341,14 @@ function LiqModal({marcaId,ventas,mes,anio,MK,cierres,setCierres,onClose,syncCie
       }
 
       <div style={{display:"flex",flexDirection:"column",gap:10,marginTop:16}}>
-        <IOSBtn onPress={function(){exportCSV(marca,ventas,mes,anio);}} variant="fill" icon="⬇">
+        <IOSBtn onPress={function(){exportCSV(marca,ventas,mes,anio);} variant="fill" icon="⬇">
           Exportar CSV
         </IOSBtn>
         {!cerrado
-          ? <IOSBtn onPress={function(){{setCierres(p=>({...p,[`${MK}-${marcaId}`]:{cerrado:true,fecha:hoy(),mk:MK}}));sbGuardarCierre(`${MK}-${marcaId}`,{cerrado:true,fecha:hoy(),mk:MK,marca_id:marcaId});onClose();}} variant="success" icon="✓">
+          ? <IOSBtn onPress={function(){setCierres(p=>({...p,[`${MK}-${marcaId}`]:{cerrado:true,fecha:hoy(),mk:MK}}));sbGuardarCierre(`${MK}-${marcaId}`,{cerrado:true,fecha:hoy(),mk:MK,marca_id:marcaId});onClose();} variant="success" icon="✓">
               Confirmar Cierre Mensual
             </IOSBtn>
-          : <IOSBtn onPress={function(){{setCierres(p=>({...p,[`${MK}-${marcaId}`]:{cerrado:false,mk:MK}}));onClose();}} variant="danger">
+          : <IOSBtn onPress={function(){setCierres(p=>({...p,[`${MK}-${marcaId}`]:{cerrado:false,mk:MK}}));onClose();} variant="danger">
               Reabrir Liquidación
             </IOSBtn>
         }
@@ -1500,7 +1500,7 @@ function LoginScreen({ onLogin }) {
               onFocus={e=>e.target.style.borderColor="#5C8A5C"}
               onBlur={e=>e.target.style.borderColor=error?"#C0504A":"rgba(168,197,160,0.6)"}
             />
-            <button onClick={function(){setShowPass(p=>!p);}} style={{
+            <button onClick={function(){setShowPass(p=>!p);} style={{
               position:"absolute", right:12, top:"50%",
               transform:"translateY(-50%)",
               background:"none", border:"none", cursor:"pointer",
@@ -1742,7 +1742,7 @@ export default function App(){
           right={
             <div style={{display:"flex",alignItems:"center",gap:10}}>
               <DriveIndicator syncing={drive.syncing} connected={!!drive.url}/>
-              <button onClick={function(){setShDrive(true);}} style={{
+              <button onClick={function(){setShDrive(true);} style={{
                 background:"none",border:"none",fontSize:20,cursor:"pointer",
                 color:drive.url?C.green:C.label3,padding:"4px",
                 WebkitTapHighlightColor:"transparent",lineHeight:1,
@@ -1786,7 +1786,7 @@ export default function App(){
                 const prods=inv.filter(i=>i.marcaId===m.id).filter(p=>p.stock>0).length;
                 const cerrado=cierres[`${MK}-${m.id}`]?.cerrado;
                 return (
-                  <div key={m.id} onClick={function(){setMD(m.id);}} style={{
+                  <div key={m.id} onClick={function(){setMD(m.id);} style={{
                     background:C.bg2,
                     borderRadius:i===0?"14px 14px 2px 2px":i===MARCAS.length-1?"2px 2px 14px 14px":"2px",
                     padding:"14px 16px",
@@ -1865,7 +1865,7 @@ export default function App(){
                 const liq=getLiq(m.id);
                 const cerrado=cierres[`${MK}-${m.id}`]?.cerrado;
                 return (
-                  <div key={m.id} onClick={function(){setMLiq(m.id);}} style={{
+                  <div key={m.id} onClick={function(){setMLiq(m.id);} style={{
                     background:C.bg2,
                     borderRadius:i===0?"14px 14px 2px 2px":i===MARCAS.length-1?"2px 2px 14px 14px":"2px",
                     padding:"14px 16px",
@@ -2188,7 +2188,7 @@ function QRScanner({ onDetect, onClose }) {
           <div style={{fontSize:17,fontWeight:700,color:"#fff",fontFamily:FONT}}>Escanear QR</div>
           <div style={{fontSize:13,color:"rgba(255,255,255,0.6)",fontFamily:FONT,marginTop:2}}>{msg}</div>
         </div>
-        <button onClick={function(){{stopCamera();onClose();;}}} style={{
+        <button onClick={function(){stopCamera();onClose();}} style={{
           background:"rgba(255,255,255,0.15)",border:"none",
           width:36,height:36,borderRadius:"50%",cursor:"pointer",
           color:"#fff",fontSize:18,display:"flex",alignItems:"center",justifyContent:"center",
@@ -2242,7 +2242,7 @@ function QRScanner({ onDetect, onClose }) {
             <div style={{fontSize:48,marginBottom:16}}>📷</div>
             <div style={{fontSize:16,color:"#fff",fontFamily:FONT,marginBottom:8}}>Sin acceso a la cámara</div>
             <div style={{fontSize:13,color:"rgba(255,255,255,0.6)",fontFamily:FONT,marginBottom:20}}>{msg}</div>
-            <button onClick={function(){{stopCamera();onClose();;}}} style={{
+            <button onClick={function(){stopCamera();onClose();}} style={{
               background:C.green,border:"none",borderRadius:12,
               padding:"12px 24px",color:"#fff",fontSize:15,
               fontFamily:FONT,fontWeight:600,cursor:"pointer",
@@ -2424,7 +2424,7 @@ function POS({inv,onVenta}){
           {resultados.map((p,idx)=>{
             const m=MARCAS.find(x=>x.id===p.marcaId);
             return (
-              <div key={p.id} onClick={function(){add(p);}} style={{
+              <div key={p.id} onClick={function(){add(p);} style={{
                 display:"flex",alignItems:"center",justifyContent:"space-between",
                 padding:"13px 16px",
                 borderBottom:idx<resultados.length-1?`1px solid ${C.sep}`:"",
@@ -2477,7 +2477,7 @@ function POS({inv,onVenta}){
                 </div>
               </div>
               <div style={{display:"flex",alignItems:"center",gap:10,flexShrink:0}}>
-                <button onClick={function(){cambiar(it.prodId,-1);}} style={{
+                <button onClick={function(){cambiar(it.prodId,-1);} style={{
                   width:32,height:32,borderRadius:"50%",
                   background:C.fill2,border:"none",cursor:"pointer",
                   display:"flex",alignItems:"center",justifyContent:"center",
@@ -2485,7 +2485,7 @@ function POS({inv,onVenta}){
                   WebkitTapHighlightColor:"transparent",
                 }}>−</button>
                 <span style={{fontSize:16,fontWeight:700,color:C.label,fontFamily:FONT,minWidth:20,textAlign:"center"}}>{it.cantidad}</span>
-                <button onClick={function(){cambiar(it.prodId,1);}} style={{
+                <button onClick={function(){cambiar(it.prodId,1);} style={{
                   width:32,height:32,borderRadius:"50%",
                   background:C.fill2,border:"none",cursor:"pointer",
                   display:"flex",alignItems:"center",justifyContent:"center",
@@ -2496,7 +2496,7 @@ function POS({inv,onVenta}){
               <div style={{minWidth:70,textAlign:"right"}}>
                 <div style={{fontSize:15,fontWeight:600,color:C.gold,fontFamily:FONT}}>{$(it.precio*it.cantidad)}</div>
               </div>
-              <button onClick={function(){quitar(it.prodId);}} style={{
+              <button onClick={function(){quitar(it.prodId);} style={{
                 background:"none",border:"none",cursor:"pointer",
                 color:C.red,fontSize:20,padding:"4px",
                 WebkitTapHighlightColor:"transparent",
@@ -2529,7 +2529,7 @@ function POS({inv,onVenta}){
 
       {/* Botón escanear */}
       <div style={{marginBottom:14}}>
-        <IOSBtn onPress={function(){setShowScanner(true);}} variant="fill" full icon="📷">
+        <IOSBtn onPress={function(){setShowScanner(true);} variant="fill" full icon="📷">
           Escanear código QR
         </IOSBtn>
         {scanMsg&&(
@@ -2558,7 +2558,7 @@ function POS({inv,onVenta}){
           borderRadius:16,padding:"16px",marginTop:14}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10}}>
             <div style={{fontSize:13,fontWeight:700,color:C.green,textTransform:"uppercase",letterSpacing:.5}}>✓ Venta Registrada</div>
-            <button onClick={function(){setShowOk(false);}} style={{background:"none",border:"none",
+            <button onClick={function(){setShowOk(false);} style={{background:"none",border:"none",
               color:C.label3,cursor:"pointer",fontSize:18,WebkitTapHighlightColor:"transparent"}}>×</button>
           </div>
           <div style={{fontFamily:"monospace",fontSize:13,color:C.gold}}>{ultima.id}</div>
@@ -2569,7 +2569,7 @@ function POS({inv,onVenta}){
             </div>
           ))}
           <div style={{marginTop:12}}>
-            <IOSBtn onPress={function(){sendWA(ultima);}} variant="fill" full small icon="📲">
+            <IOSBtn onPress={function(){sendWA(ultima);} variant="fill" full small icon="📲">
               Enviar por WhatsApp
             </IOSBtn>
           </div>
@@ -2583,7 +2583,7 @@ function POS({inv,onVenta}){
         <div style={{display:"flex",justifyContent:"center",padding:"12px 0 4px"}}><div style={{width:36,height:5,borderRadius:3,background:C.accent}}/></div>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 20px 16px"}}>
           <h3 style={{margin:0,fontSize:17,fontWeight:600,color:C.label,fontFamily:FONT}}>Confirmar Cobro</h3>
-          <button onClick={function(){setShowPago(false);}} style={{background:C.fill2,border:"none",borderRadius:"50%",width:30,height:30,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",color:C.label2,fontSize:16}}>x</button>
+          <button onClick={function(){setShowPago(false);} style={{background:C.fill2,border:"none",borderRadius:"50%",width:30,height:30,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",color:C.label2,fontSize:16}}>x</button>
         </div>
         <div style={{padding:"0 16px"}}>
         {/* Total */}
@@ -2602,13 +2602,13 @@ function POS({inv,onVenta}){
 
         {/* Toggle pago simple / mixto */}
         <div style={{display:"flex",gap:8,marginBottom:16}}>
-          <button onClick={function(){setPagoMixto(false);}} style={{
+          <button onClick={function(){setPagoMixto(false);} style={{
             flex:1,padding:"10px",borderRadius:12,cursor:"pointer",fontFamily:FONT,
             border:"2px solid "+(!pagoMixto?C.green:C.sep),
             background:!pagoMixto?C.green+"18":C.bg2,
             color:!pagoMixto?C.green:C.label2,fontWeight:!pagoMixto?700:400,fontSize:13,
           }}>Pago simple</button>
-          <button onClick={function(){setPagoMixto(true);}} style={{
+          <button onClick={function(){setPagoMixto(true);} style={{
             flex:1,padding:"10px",borderRadius:12,cursor:"pointer",fontFamily:FONT,
             border:"2px solid "+(pagoMixto?C.blue:C.sep),
             background:pagoMixto?C.blue+"18":C.bg2,
@@ -2621,7 +2621,7 @@ function POS({inv,onVenta}){
           <div>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:16}}>
               {PAGOS.map(function(p){return(
-                <button key={p.id} onClick={function(){setPago(p.id);}} style={{
+                <button key={p.id} onClick={function(){setPago(p.id);} style={{
                   padding:"14px 8px",borderRadius:14,
                   border:"2px solid "+(pago===p.id?p.color:C.sep),
                   background:pago===p.id?p.color+"18":C.bg2,
@@ -2816,7 +2816,7 @@ function SheetRecibir({open, onClose, inv, onAdd, fInv, setFInv}){
   }
 
   return (
-    <Sheet open={open} onClose={function(){{onClose();setScanInvMsg("");setScanInvStatus(null);;}}} title="Recibir Producto" tall>
+    <Sheet open={open} onClose={function(){onClose();setScanInvMsg("");setScanInvStatus(null);}} title="Recibir Producto" tall>
       {/* Opción escanear etiqueta existente */}
       <div style={{background:C.bg3,borderRadius:14,padding:"14px",marginBottom:16,
         border:`1px solid ${scanInvStatus==="ok"?C.green:scanInvStatus==="notfound"?C.amber:C.sep}`}}>
@@ -2824,7 +2824,7 @@ function SheetRecibir({open, onClose, inv, onAdd, fInv, setFInv}){
           letterSpacing:.6,marginBottom:10}}>Escanear etiqueta existente (opcional)</div>
         <input ref={scanInvRef} type="file" accept="image/*" capture="environment"
           onChange={handleScanEtiqueta} style={{display:"none"}}/>
-        <IOSBtn onPress={function(){scanInvRef.current?.click();}} variant="fill" small icon="📷">
+        <IOSBtn onPress={function(){scanInvRef.current?.click();} variant="fill" small icon="📷">
           {scanInvStatus==="leyendo"?"Leyendo…":"Fotografiar código"}
         </IOSBtn>
         {scanInvMsg&&(
@@ -2970,7 +2970,7 @@ function SheetExcelMasivo({open, onClose, inv, setInv, drive}) {
             <div style={{fontSize:18,fontWeight:800,color:C.label,fontFamily:FONT}}>Carga Masiva Excel</div>
             <div style={{fontSize:13,color:C.label3,fontFamily:FONT,marginTop:2}}>Importa productos desde Excel con QR</div>
           </div>
-          <button onClick={function(){reset();onClose();}} style={{background:C.fill2,border:"none",width:32,height:32,borderRadius:"50%",cursor:"pointer",color:C.label2,fontSize:16}}>x</button>
+          <button onClick={function(){reset();onClose();} style={{background:C.fill2,border:"none",width:32,height:32,borderRadius:"50%",cursor:"pointer",color:C.label2,fontSize:16}}>x</button>
         </div>
         <div style={{flex:1,overflowY:"auto",padding:"16px 20px",WebkitOverflowScrolling:"touch"}}>
 
@@ -2980,7 +2980,7 @@ function SheetExcelMasivo({open, onClose, inv, setInv, drive}) {
               {MARCAS.map(function(m){
                 var activa = marcaSel===m.id;
                 return (
-                  <button key={m.id} onClick={function(){setMarcaSel(m.id);}} style={{flexShrink:0,padding:"8px 14px",borderRadius:20,border:"2px solid "+(activa?m.color:C.sep),background:activa?m.color+"25":C.bg2,color:activa?m.color:C.label2,fontSize:13,fontWeight:activa?700:400,fontFamily:FONT,cursor:"pointer",display:"flex",alignItems:"center",gap:6,WebkitTapHighlightColor:"transparent"}}>
+                  <button key={m.id} onClick={function(){setMarcaSel(m.id);} style={{flexShrink:0,padding:"8px 14px",borderRadius:20,border:"2px solid "+(activa?m.color:C.sep),background:activa?m.color+"25":C.bg2,color:activa?m.color:C.label2,fontSize:13,fontWeight:activa?700:400,fontFamily:FONT,cursor:"pointer",display:"flex",alignItems:"center",gap:6,WebkitTapHighlightColor:"transparent"}}>
                     <span>{m.emoji}</span><span>{m.nombre}</span>
                   </button>
                 );
@@ -2997,7 +2997,7 @@ function SheetExcelMasivo({open, onClose, inv, setInv, drive}) {
                 Col A: Nombre · Col B: Categoría · Col C: Precio (Bs) · Col D: Cantidad
               </div>
               <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" onChange={handleFile} style={{display:"none"}}/>
-              <IOSBtn onPress={function(){if(fileRef.current)fileRef.current.click();}} variant="fill" icon="📂">Seleccionar archivo .xlsx</IOSBtn>
+              <IOSBtn onPress={function(){if(fileRef.current)fileRef.current.click();} variant="fill" icon="📂">Seleccionar archivo .xlsx</IOSBtn>
             </div>
           </div>
 
@@ -3035,11 +3035,11 @@ function SheetExcelMasivo({open, onClose, inv, setInv, drive}) {
             {estado==="listo"&&productosGenerados.length>0&&(
               <>
                 <IOSBtn onPress={imprimirTodos} variant="primary" full icon="🖨">Imprimir todos los QR ({productosGenerados.length})</IOSBtn>
-                <IOSBtn onPress={function(){reset();onClose();}} variant="fill" full>Cerrar</IOSBtn>
+                <IOSBtn onPress={function(){reset();onClose();} variant="fill" full>Cerrar</IOSBtn>
               </>
             )}
             {(estado==="idle"||estado==="error")&&(
-              <IOSBtn onPress={function(){reset();onClose();}} variant="fill" full>Cancelar</IOSBtn>
+              <IOSBtn onPress={function(){reset();onClose();} variant="fill" full>Cancelar</IOSBtn>
             )}
           </div>
         </div>
@@ -3081,7 +3081,7 @@ function InventarioPorMarca({inv, ventas, onRecibir, onBaja, onExcel}){
             const stock=prods.reduce((s,p)=>s+p.stock,0);
             const activa=m.id===marcaSelec;
             return (
-              <button key={m.id} onClick={function(){setMarcaSelec(m.id);}} style={{
+              <button key={m.id} onClick={function(){setMarcaSelec(m.id);} style={{
                 flexShrink:0,padding:"10px 16px",borderRadius:14,
                 border:`2px solid ${activa?m.color:C.sep}`,
                 background:activa?m.color+"30":C.bg2,
@@ -3408,7 +3408,7 @@ function MarcaDetalle({marcaId,inv,ventas,vMes,mes,anio,MK,cierres,setCierres,ge
           </div>
 
           <div style={{display:"flex",flexDirection:"column",gap:10}}>
-            <IOSBtn onPress={function(){exportCSV(MARCAS.find(m=>m.id===marcaId),ventas,mes,anio);}} variant="fill" full icon="⬇">
+            <IOSBtn onPress={function(){exportCSV(MARCAS.find(m=>m.id===marcaId),ventas,mes,anio);} variant="fill" full icon="⬇">
               Exportar CSV
             </IOSBtn>
             {!cerrado
@@ -3515,7 +3515,7 @@ function HistorialTab({ventas, inv, cierres}){
         <div style={{display:"flex",gap:8,marginBottom:12,overflowX:"auto",
           scrollbarWidth:"none",WebkitOverflowScrolling:"touch",paddingBottom:4}}>
           {anios.map(a=>(
-            <button key={a} onClick={function(){setAnioSel(a);}} style={{
+            <button key={a} onClick={function(){setAnioSel(a);} style={{
               flexShrink:0,padding:"8px 18px",borderRadius:20,
               border:`2px solid ${anioSel===a?C.gold:C.sep}`,
               background:anioSel===a?`${C.gold}20`:C.bg3,
@@ -3534,7 +3534,7 @@ function HistorialTab({ventas, inv, cierres}){
             const tieneDatos = ventas.some(v=>v.mk===mk);
             const esSel = mesSel===i && anioSel===anioSel;
             return (
-              <button key={i} onClick={function(){setMesSel(i);}} style={{
+              <button key={i} onClick={function(){setMesSel(i);} style={{
                 padding:"10px 4px",borderRadius:10,
                 border:`2px solid ${mesSel===i?C.gold:tieneDatos?C.sep+"88":C.sep}`,
                 background:mesSel===i?`${C.gold}20`:tieneDatos?C.bg3:"transparent",
@@ -3944,7 +3944,7 @@ function GestionUsuarios({user, usuarios, onGuardar}){
     return (
       <div>
         <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:20}}>
-          <IOSBtn onPress={function(){{setModo(null);setMsg(null);;}}} variant="fill" small>← Volver</IOSBtn>
+          <IOSBtn onPress={function(){setModo(null);setMsg(null);}} variant="fill" small>← Volver</IOSBtn>
           <span style={{fontSize:17,fontWeight:700,color:C.label,fontFamily:FONT}}>
             {modo==="nuevo"?"Nuevo usuario":"Editar usuario"}
           </span>
@@ -4017,13 +4017,13 @@ function GestionUsuarios({user, usuarios, onGuardar}){
               </div>
             </div>
             <div style={{display:"flex",gap:8,flexShrink:0}}>
-              <button onClick={function(){{setEditUser(u.usuario);setFUser({...u;}});setModo("editar");}} style={{
+              <button onClick={function(){setEditUser(u.usuario);setFUser({...u});setModo("editar");}} style={{
                 background:`${C.gold}15`,border:`1px solid ${C.gold}30`,
                 borderRadius:8,padding:"6px 12px",color:C.gold,
                 fontSize:12,fontFamily:FONT,fontWeight:600,cursor:"pointer",
               }}>Editar</button>
               {u.usuario!==user.usuario&&(
-                <button onClick={function(){eliminar(u.usuario);}} style={{
+                <button onClick={function(){eliminar(u.usuario);} style={{
                   background:`${C.red}10`,border:`1px solid ${C.red}30`,
                   borderRadius:8,padding:"6px 12px",color:C.red,
                   fontSize:12,fontFamily:FONT,fontWeight:600,cursor:"pointer",
@@ -4034,7 +4034,7 @@ function GestionUsuarios({user, usuarios, onGuardar}){
         ))}
       </div>
 
-      <IOSBtn onPress={function(){{setFUser({usuario:"",password:"",nombre:"",rol:"caja";}});setModo("nuevo");}}
+      <IOSBtn onPress={function(){setFUser({usuario:"",password:"",nombre:"",rol:"caja"}});setModo("nuevo");}}
         variant="primary" full icon="+ ">
         Agregar nuevo usuario
       </IOSBtn>
@@ -4121,7 +4121,7 @@ function VentasTab({vMes, totalVtas, mes, anio}){
                   WebkitTapHighlightColor:"transparent",
                   borderLeft:`4px solid ${x.marca.color}`,
                 }}
-                onClick={function(){{setMarcaFiltro(marcaFiltro===x.marca.id?null:x.marca.id);setVistaActiva("historial");;}}}>
+                onClick={function(){setMarcaFiltro(marcaFiltro===x.marca.id?null:x.marca.id);setVistaActiva("historial");}}>
                   {/* Cabecera marca */}
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
                     <div style={{display:"flex",alignItems:"center",gap:10}}>
@@ -4193,7 +4193,7 @@ function VentasTab({vMes, totalVtas, mes, anio}){
           {/* Filtro por marca */}
           <div style={{display:"flex",gap:8,overflowX:"auto",paddingBottom:8,marginBottom:14,
             scrollbarWidth:"none",WebkitOverflowScrolling:"touch"}}>
-            <button onClick={function(){setMarcaFiltro(null);}} style={{
+            <button onClick={function(){setMarcaFiltro(null);} style={{
               flexShrink:0,padding:"7px 16px",borderRadius:20,
               border:`1.5px solid ${!marcaFiltro?C.gold:C.sep}`,
               background:!marcaFiltro?`${C.gold}20`:"transparent",
@@ -4202,7 +4202,7 @@ function VentasTab({vMes, totalVtas, mes, anio}){
               cursor:"pointer",WebkitTapHighlightColor:"transparent",
             }}>Todas</button>
             {MARCAS.filter(m=>vMes.some(v=>v.items.some(i=>i.marcaId===m.id))).map(m=>(
-              <button key={m.id} onClick={function(){setMarcaFiltro(marcaFiltro===m.id?null:m.id);}} style={{
+              <button key={m.id} onClick={function(){setMarcaFiltro(marcaFiltro===m.id?null:m.id);} style={{
                 flexShrink:0,padding:"7px 14px",borderRadius:20,
                 border:`1.5px solid ${marcaFiltro===m.id?m.color:C.sep}`,
                 background:marcaFiltro===m.id?`${m.color}20`:"transparent",
@@ -4265,7 +4265,7 @@ function VentasTab({vMes, totalVtas, mes, anio}){
                         </div>
                       ));
                     })()}
-                    <IOSBtn onPress={function(){sendWA(v);}} variant="fill" small full icon="📲">
+                    <IOSBtn onPress={function(){sendWA(v);} variant="fill" small full icon="📲">
                       Enviar por WhatsApp
                     </IOSBtn>
                     {v.etiquetaImg&&<img src={v.etiquetaImg} alt="etiqueta"
