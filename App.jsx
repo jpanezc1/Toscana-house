@@ -1,9 +1,9 @@
 import { useState, useMemo, useRef, useCallback, useEffect } from "react";
 
-// ════════════════════════════════════════════════════════════
+// ------------------------------------------------------------
 // SUPABASE — Base de datos en la nube
 // Proyecto: toscana house | uqphxiixdulqscbfyxhz
-// ════════════════════════════════════════════════════════════
+// ------------------------------------------------------------
 const SUPA_URL  = "https://uqphxiixdulqscbfyxhz.supabase.co";
 const SUPA_KEY  = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVxcGh4aWl4ZHVscXNjYmZ5eGh6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcwMzc0NjQsImV4cCI6MjA5MjYxMzQ2NH0.U1EIf4JWqfrvga7CApClLl7nzBuFoPpD8BlicxvfB-w";
 
@@ -25,58 +25,43 @@ async function getSupabase() {
   return _supabase;
 }
 
-// ── Funciones de sincronización ──────────────────────────
+// -- Funciones de sincronización --------------------------
 async function sbGuardarProducto(prod) {
   try {
     const db = await getSupabase();
     await db.from("inventario").upsert({
       id: prod.id, codigo: prod.codigo, marca_id: prod.marcaId,
       marca_nombre: prod.marcaNombre, nombre: prod.nombre,
-      categoria: prod.categoria, descripcion: prod.descripcion||null,
-      subcat: prod.subcat||null, precio: prod.precio,
-      stock: prod.stock, stock_inicial: prod.stockInicial, fecha: prod.fecha,
-      dado_de_baja: prod.dadoDeBaja||false, fecha_baja: prod.fechaBaja||null,
+      categoria: prod.categoria, precio: prod.precio,
+      stock: prod.stock, stock_inicial: prod.stockInicial, fecha: prod.fecha
     });
   } catch(e) { console.warn("Supabase save prod:", e.message); }
 }
 
-async function sbActualizarStock(prodId, nuevoStock, dadoDeBaja=false, fechaBaja=null) {
+async function sbActualizarStock(prodId, nuevoStock) {
   try {
     const db = await getSupabase();
-    const upd = { stock: nuevoStock };
-    if (dadoDeBaja) { upd.dado_de_baja = true; upd.fecha_baja = fechaBaja; }
-    await db.from("inventario").update(upd).eq("id", prodId);
+    await db.from("inventario").update({ stock: nuevoStock }).eq("id", prodId);
   } catch(e) { console.warn("Supabase update stock:", e.message); }
 }
 
 async function sbGuardarVenta(venta) {
   try {
     const db = await getSupabase();
-    console.log("[Supabase] Guardando venta:", venta.id, "total:", venta.total);
-    const { error: errVenta } = await db.from("ventas").upsert({
+    await db.from("ventas").upsert({
       id: venta.id, fecha: venta.fecha, hora: venta.hora,
       mk: venta.mk, mes: venta.mes, anio: venta.anio,
       total: venta.total, subtotal: venta.subtotal,
       desc_pct: venta.descPct||0, metodo_pago: venta.metodoPago,
-      vendedor: venta.vendedor, etiqueta_img: venta.etiquetaImg||null,
-      con_factura: venta.conFactura||false,
-      fact_nombre: venta.factNombre||null,
-      fact_nit: venta.factNit||null,
-      cliente_nombre: venta.clienteNombre||null,
-      cliente_tel: venta.clienteTel||null,
+      vendedor: venta.vendedor, etiqueta_img: venta.etiquetaImg||null
     });
-    if (errVenta) { console.error("[Supabase] Error guardando venta:", errVenta.message); return; }
-    console.log("[Supabase] Venta guardada OK, guardando items...");
     const items = venta.items.map(it => ({
       venta_id: venta.id, prod_id: it.prodId, codigo: it.codigo,
       nombre: it.nombre, marca_id: it.marcaId, marca_nombre: it.marcaNombre,
-      cantidad: it.cantidad, precio_unit: it.precioUnit, subtotal: it.subtotal,
-      categoria: it.categoria||null,
+      cantidad: it.cantidad, precio_unit: it.precioUnit, subtotal: it.subtotal
     }));
-    const { error: errItems } = await db.from("venta_items").insert(items);
-    if (errItems) console.error("[Supabase] Error guardando items:", errItems.message);
-    else console.log("[Supabase] Items guardados OK");
-  } catch(e) { console.error("[Supabase] save venta exception:", e.message); }
+    await db.from("venta_items").insert(items);
+  } catch(e) { console.warn("Supabase save venta:", e.message); }
 }
 
 async function sbGuardarCierre(key, data) {
@@ -89,12 +74,16 @@ async function sbGuardarCierre(key, data) {
 async function sbCargarTodo() {
   try {
     const db = await getSupabase();
-    const [{ data: inv }, { data: ventas }, { data: items }, { data: cierres }] = await Promise.all([
+    const _all = await Promise.all([
       db.from("inventario").select("*").order("created_at"),
       db.from("ventas").select("*").order("created_at"),
       db.from("venta_items").select("*"),
       db.from("cierres").select("*"),
     ]);
+    const inv = _all[0].data;
+    const ventas = _all[1].data;
+    const items = _all[2].data;
+    const cierres = _all[3].data;
 
     // Reconstruir ventas con sus items
     const ventasCompletas = (ventas||[]).map(v => ({
@@ -102,9 +91,6 @@ async function sbCargarTodo() {
       mes: v.mes, anio: v.anio, total: v.total, subtotal: v.subtotal,
       descPct: v.desc_pct, metodoPago: v.metodo_pago,
       vendedor: v.vendedor, etiquetaImg: v.etiqueta_img,
-      conFactura: v.con_factura||false, factNombre: v.fact_nombre||"",
-      factNit: v.fact_nit||"",
-      clienteNombre: v.cliente_nombre||"", clienteTel: v.cliente_tel||"",
       items: (items||[]).filter(i=>i.venta_id===v.id).map(i=>({
         prodId: i.prod_id, codigo: i.codigo, nombre: i.nombre,
         marcaId: i.marca_id, marcaNombre: i.marca_nombre,
@@ -116,11 +102,8 @@ async function sbCargarTodo() {
     const invCompleto = (inv||[]).map(p => ({
       id: p.id, codigo: p.codigo, marcaId: p.marca_id,
       marcaNombre: p.marca_nombre, nombre: p.nombre,
-      categoria: p.categoria, descripcion: p.descripcion||"",
-      subcat: p.subcat||"",
-      precio: Number(p.precio)||0,
-      stock: p.stock||0, stockInicial: p.stock_inicial||0, fecha: p.fecha,
-      dadoDeBaja: p.dado_de_baja||false, fechaBaja: p.fecha_baja||null,
+      categoria: p.categoria, precio: p.precio,
+      stock: p.stock, stockInicial: p.stock_inicial, fecha: p.fecha
     }));
 
     // Reconstruir cierres
@@ -136,7 +119,7 @@ async function sbCargarTodo() {
 
 // Hook de estado de conexión Supabase
 function useSupabaseStatus() {
-  const [status, setStatus] = useState("connecting"); // connecting | ok | error
+  var _h1 = useState("connecting"); var status = _h1[0]; var setStatus = _h1[1]; // connecting | ok | error
   useEffect(() => {
     getSupabase()
       .then(db => db.from("inventario").select("id").limit(1))
@@ -147,11 +130,24 @@ function useSupabaseStatus() {
 }
 
 
-// ════════════════════════════════════════════════════════════
+// ------------------------------------------------------------
 // MOTOR DE CÓDIGOS QR — QRCode.js + ZXing Scanner
-// ════════════════════════════════════════════════════════════
+// ------------------------------------------------------------
 
 // Carga QRCode.js desde CDN (genera QR codes)
+// Load XLSX library for Excel import
+let _XLSXLoaded = false;
+function loadXLSX() {
+  return new Promise(function(res) {
+    if (window.XLSX) { res(window.XLSX); return; }
+    var s = document.createElement("script");
+    s.src = "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js";
+    s.onload = function() { _XLSXLoaded = true; res(window.XLSX); };
+    s.onerror = function() { res(null); };
+    document.head.appendChild(s);
+  });
+}
+
 let _QRLoaded = false;
 let _QRLib = null;
 function loadQRCode() {
@@ -260,7 +256,7 @@ async function generarSVGBarcode(codigo) {
 // Componente: muestra QR code inline
 function BarcodeDisplay({ codigo, small }) {
   const containerRef = useRef(null);
-  const [qrDataUrl, setQrDataUrl] = useState("");
+  var _h2 = useState(""); var qrDataUrl = _h2[0]; var setQrDataUrl = _h2[1];
 
   useEffect(() => {
     if (!codigo || !containerRef.current) return;
@@ -299,14 +295,8 @@ function BarcodeDisplay({ codigo, small }) {
 
 // Función de impresión de ticket con código QR
 async function imprimirTicket(producto, marcaNombre) {
-  const win = window.open("","_blank","width=400,height=560");
+  const win = window.open("","_blank","width=400,height=500");
   if (!win) { alert("Activa las ventanas emergentes para imprimir"); return; }
-
-  const descripcion = producto.descripcion || producto.categoria || "";
-  const subcategoria = producto.subcat || "";
-  const detalleLineas = descripcion
-    ? descripcion.split(",").map(s=>s.trim()).filter(Boolean)
-    : [];
 
   win.document.write(`<!DOCTYPE html>
 <html>
@@ -316,22 +306,17 @@ async function imprimirTicket(producto, marcaNombre) {
   <style>
     @page { size: 58mm auto; margin: 0; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family:'Courier New',monospace; width:58mm; padding:4mm 5mm; background:white; color:black; }
-    .header { text-align:center; border-bottom:1px dashed #aaa; padding-bottom:3mm; margin-bottom:3mm; }
-    .brand { font-size:13px; font-weight:900; letter-spacing:3px; text-transform:uppercase; }
-    .sub { font-size:7px; letter-spacing:5px; color:#777; margin-top:1mm; }
-    .marca { font-size:10px; font-weight:700; text-align:center; color:#333; margin-bottom:1.5mm; letter-spacing:1px; text-transform:uppercase; }
-    .producto { font-size:10px; font-weight:bold; text-align:center; margin:0 0 1.5mm; text-transform:uppercase; line-height:1.35; }
-    .detalle-wrap { border:1px dashed #ccc; border-radius:2mm; padding:2mm 3mm; margin:2mm 0; background:#fafafa; }
-    .detalle-titulo { font-size:6.5px; letter-spacing:1.5px; text-transform:uppercase; color:#888; margin-bottom:1mm; }
-    .detalle-item { font-size:8px; color:#333; line-height:1.5; padding-left:2mm; }
-    .detalle-item::before { content:"· "; color:#888; }
-    .subcat { font-size:7.5px; text-align:center; color:#666; margin-bottom:2mm; font-style:italic; }
-    .qr-wrap { display:flex; flex-direction:column; align-items:center; margin:2.5mm 0; }
-    .qr-wrap canvas, .qr-wrap img { width:36mm!important; height:36mm!important; }
-    .codigo { text-align:center; font-size:7.5px; color:#666; font-family:monospace; margin:1mm 0 1.5mm; letter-spacing:0.5px; }
-    .precio { text-align:center; font-size:20px; font-weight:900; margin:1.5mm 0; letter-spacing:1px; }
-    .footer { border-top:1px dashed #aaa; padding-top:2mm; text-align:center; font-size:7px; color:#999; letter-spacing:1px; margin-top:1mm; }
+    body { font-family:'Courier New',monospace; width:58mm; padding:4mm; background:white; color:black; }
+    .header { text-align:center; border-bottom:1px dashed #333; padding-bottom:3mm; margin-bottom:3mm; }
+    .brand { font-size:14px; font-weight:900; letter-spacing:3px; text-transform:uppercase; }
+    .sub { font-size:8px; letter-spacing:4px; color:#555; margin-top:1mm; }
+    .producto { font-size:11px; font-weight:bold; text-align:center; margin:2mm 0; text-transform:uppercase; }
+    .marca { font-size:9px; text-align:center; color:#444; margin-bottom:2mm; }
+    .qr-wrap { display:flex; flex-direction:column; align-items:center; margin:3mm 0; }
+    .qr-wrap canvas, .qr-wrap img { width:38mm!important; height:38mm!important; }
+    .codigo { text-align:center; font-size:8px; color:#555; font-family:monospace; margin:1mm 0 2mm; word-break:break-all; }
+    .precio { text-align:center; font-size:18px; font-weight:900; margin:2mm 0; }
+    .footer { border-top:1px dashed #333; padding-top:2mm; text-align:center; font-size:8px; color:#777; letter-spacing:1px; }
     @media print { body { print-color-adjust:exact; -webkit-print-color-adjust:exact; } }
   </style>
 </head>
@@ -340,14 +325,8 @@ async function imprimirTicket(producto, marcaNombre) {
     <div class="brand">TOSCANA HOUSE</div>
     <div class="sub">CASA DE MODA</div>
   </div>
-  <div class="marca">${marcaNombre}</div>
   <div class="producto">${producto.nombre}</div>
-  ${subcategoria ? `<div class="subcat">${subcategoria}</div>` : ""}
-  ${detalleLineas.length > 0 ? `
-  <div class="detalle-wrap">
-    <div class="detalle-titulo">Detalle</div>
-    ${detalleLineas.map(l => `<div class="detalle-item">${l}</div>`).join("")}
-  </div>` : ""}
+  <div class="marca">${marcaNombre}</div>
   <div class="qr-wrap">
     <div id="qr"></div>
   </div>
@@ -359,7 +338,7 @@ async function imprimirTicket(producto, marcaNombre) {
       try {
         new QRCode(document.getElementById("qr"), {
           text: "${producto.codigo}",
-          width: 140, height: 140,
+          width: 144, height: 144,
           colorDark: "#000000",
           colorLight: "#ffffff",
           correctLevel: QRCode.CorrectLevel.M
@@ -374,9 +353,9 @@ async function imprimirTicket(producto, marcaNombre) {
 }
 
 
-// ════════════════════════════════════════════════════════════
+// ------------------------------------------------------------
 // GOOGLE DRIVE — Apps Script integration
-// ════════════════════════════════════════════════════════════
+// ------------------------------------------------------------
 
 // 🔧 CONFIGURACIÓN — Pega aquí la URL de tu Google Apps Script
 // Instrucciones en el panel de Configuración → Drive
@@ -397,11 +376,11 @@ async function drivePost(action, payload) {
 
 // Hook que maneja el estado de sincronización
 function useDriveSync() {
-  const [url, setUrl]         = useState(() => localStorage.getItem("th_drive_url") || "");
-  const [syncing, setSyncing] = useState(false);
-  const [syncLog, setSyncLog] = useState(() => {
+  var _h3 = useState(function(){ try{return localStorage.getItem("th_drive_url")||"";}catch{return "";} }); var url = _h3[0]; var setUrl = _h3[1];
+  var _h4 = useState(false); var syncing = _h4[0]; var setSyncing = _h4[1];
+  var _h5 = useState(function(){
     try { return JSON.parse(localStorage.getItem("th_sync_log") || "[]"); } catch { return []; }
-  });
+  }); var syncLog = _h5[0]; var setSyncLog = _h5[1];
 
   function saveUrl(u) {
     setUrl(u);
@@ -502,83 +481,82 @@ function DriveIndicator({ syncing, connected }) {
 }
 
 
-/* ═══════════════════════════════════════════════════════════
+/* -----------------------------------------------------------
    TOSCANA HOUSE — iOS Native Design v3.0
    · Bottom Tab Bar (iPhone style)
    · Safe area insets  · 44pt tap targets
    · Sheets deslizantes · SF Pro-style typography
    · Dark mode premium  · Haptic-feel micro-animations
-═══════════════════════════════════════════════════════════ */
+----------------------------------------------------------- */
 
-// ── Paleta Pastel — Toscana House Casa de Moda ──────────
+// -- Paleta Pastel — Toscana House Casa de Moda ----------
 const C = {
-  bg0:   "#F0F4F1",
+  bg0:   "#F2F7F2",
   bg1:   "#FFFFFF",
-  bg2:   "#F8FAFA",
-  bg3:   "#EEF4EF",
-  label:    "#0F1F0F",
-  label2:   "#2D4A2D",
-  label3:   "#5A7A5A",
-  label4:   "rgba(15,31,15,0.18)",
-  sep:   "rgba(45,74,45,0.13)",
-  sepH:  "rgba(45,74,45,0.25)",
-  gold:  "#2E6B3E",
-  goldL: "#5A9B6A",
-  goldD: "#1A4A28",
-  accent:"#A8CCB0",
+  bg2:   "#F7FAF7",
+  bg3:   "#EAF3EA",
+  label:    "#1A2E1A",
+  label2:   "#4A6B4A",
+  label3:   "#7A9A7A",
+  label4:   "rgba(26,46,26,0.18)",
+  sep:   "rgba(74,107,74,0.15)",
+  sepH:  "rgba(74,107,74,0.28)",
+  gold:  "#5C8A5C",
+  goldL: "#8BB88B",
+  goldD: "#3D6B3D",
+  accent:"#B8D4B8",
   cream: "#F5F0E8",
-  green: "#2E8B57",
-  red:   "#B03030",
-  blue:  "#2E6BA8",
-  amber: "#B87820",
-  indigo:"#6A6AAA",
-  tabPos:"#2E8B57",
-  tabInv:"#4A7A2E",
-  tabMar:"#A06030",
-  tabVen:"#2E6BA8",
-  tabLiq:"#8B2E70",
-  fill1: "rgba(45,107,62,0.04)",
-  fill2: "rgba(45,107,62,0.09)",
-  fill3: "rgba(45,107,62,0.16)",
-  stockOk:  "#E8F5EC",
-  stockLow: "#FFF8E0",
-  stockOut: "#FDECEA",
+  green: "#4A9B6F",
+  red:   "#C0504A",
+  blue:  "#5B8DB8",
+  amber: "#C8922A",
+  indigo:"#7B7BB8",
+  tabPos:"#6BAE8B",
+  tabInv:"#7AAE5C",
+  tabMar:"#C8925A",
+  tabVen:"#5A8BB8",
+  tabLiq:"#AE5A8B",
+  fill1: "rgba(74,107,74,0.04)",
+  fill2: "rgba(74,107,74,0.08)",
+  fill3: "rgba(74,107,74,0.14)",
+  stockOk:  "#E8F5E8",
+  stockLow: "#FFF8E8",
+  stockOut: "#FFF0EE",
   stockSold:"#EEF2FF",
-  greenBg:  "#E8F5EC",
-  redBg:    "#FDECEA",
-  amberBg:  "#FFF8E0",
+  greenBg:  "#E8F5E8",
+  redBg:    "#FFF0EE",
+  amberBg:  "#FFF8E8",
 };
 
 const MARCAS = [
-  {id:1,  nombre:"Donaire",       color:"#2E7D52", emoji:"✨"},
-  {id:2,  nombre:"Ramona",        color:"#C0404A", emoji:"🌸"},
-  {id:3,  nombre:"Materia",       color:"#3A7A50", emoji:"🌿"},
-  {id:4,  nombre:"Dual",          color:"#2E5F9A", emoji:"◈"},
-  {id:5,  nombre:"Sensually",     color:"#A03070", emoji:"💫"},
-  {id:6,  nombre:"Glowphoria",    color:"#B07020", emoji:"✦"},
-  {id:7,  nombre:"Monas",         color:"#6A3A9A", emoji:"🔮"},
-  {id:8,  nombre:"Bonita",        color:"#C05030", emoji:"🌺"},
-  {id:9,  nombre:"She",           color:"#2A7A6A", emoji:"◎"},
-  {id:10, nombre:"Ellá",          color:"#7A5A30", emoji:"🍂"},
-  {id:11, nombre:"Magenta",       color:"#9A2A6A", emoji:"◆"},
-  {id:12, nombre:"Ikawi",         color:"#2A6A8A", emoji:"🌊"},
-  {id:13, nombre:"Romero Brand",  color:"#5A4A2A", emoji:"⚡"},
-  {id:14, nombre:"Minimal",       color:"#4A4A4A", emoji:"◻"},
-  {id:15, nombre:"Comfy",         color:"#7A5040", emoji:"☁"},
-  {id:16, nombre:"Essenza",       color:"#6A6A20", emoji:"🕊"},
-  {id:17, nombre:"Doña Mamushka", color:"#B03050", emoji:"🎀"},
+  {id:1,  nombre:"Donaire",       color:"#A8C5A0", emoji:"✨"},
+  {id:2,  nombre:"Ramona",        color:"#F4A8A8", emoji:"🌸"},
+  {id:3,  nombre:"Materia",       color:"#A8D4B0", emoji:"🌿"},
+  {id:4,  nombre:"Dual",          color:"#A8BCD4", emoji:"◈"},
+  {id:5,  nombre:"Sensually",     color:"#F4A8C8", emoji:"💫"},
+  {id:6,  nombre:"Glowphoria",    color:"#F4D4A8", emoji:"✦"},
+  {id:7,  nombre:"Monas",         color:"#C8A8D4", emoji:"🔮"},
+  {id:8,  nombre:"Bonita",        color:"#F4BCA8", emoji:"🌺"},
+  {id:9,  nombre:"She",           color:"#A8D4C4", emoji:"◎"},
+  {id:10, nombre:"Ellá",          color:"#D4C4A8", emoji:"🍂"},
+  {id:11, nombre:"Magenta",       color:"#D4A8BC", emoji:"◆"},
+  {id:12, nombre:"Ikawi",         color:"#A8CCD4", emoji:"🌊"},
+  {id:13, nombre:"Romero Brand",  color:"#C4B89A", emoji:"⚡"},
+  {id:14, nombre:"Minimal",       color:"#C4C4C4", emoji:"◻"},
+  {id:15, nombre:"Comfy",         color:"#C8B8A8", emoji:"☁"},
+  {id:16, nombre:"Essenza",       color:"#D4C8A0", emoji:"🕊"},
+  {id:17, nombre:"Doña Mamushka", color:"#F4ACA8", emoji:"🎀"},
 ];
 
 const MESES = ["Enero","Febrero","Marzo","Abril","Mayo","Junio",
                "Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
-const IVA_PCT = 16; // % IVA Bolivia — se descuenta de la liquidación de cada marca
 const PAGOS = [
   {id:"efectivo", label:"Efectivo", icon:"💵", desc:0,   color:"#4A9B6F"},
   {id:"qr",       label:"QR",       icon:"📱", desc:0,   color:"#5B8DB8"},
   {id:"tarjeta",  label:"Tarjeta",  icon:"💳", desc:2.5, color:"#C8922A"},
 ];
 
-// ── Helpers ───────────────────────────────────────────────
+// -- Helpers -----------------------------------------------
 const $    = n => "Bs " + new Intl.NumberFormat("es-BO",{minimumFractionDigits:0,maximumFractionDigits:2}).format(n||0);
 const hoy  = () => new Date().toISOString().slice(0,10);
 const hora = () => new Date().toLocaleTimeString("es-BO",{hour:"2-digit",minute:"2-digit"});
@@ -591,10 +569,10 @@ const genCod=(mid,nombre,idx)=>{
 };
 
 
-// ════════════════════════════════════════════════════════════
+// ------------------------------------------------------------
 // EXCEL ENGINE — SheetJS (xlsx) generador de reportes
 // Genera .xlsx real con múltiples pestañas, estilos y fórmulas
-// ════════════════════════════════════════════════════════════
+// ------------------------------------------------------------
 
 // Carga SheetJS dinámicamente desde CDN (una sola vez)
 let _XLSXPromise = null;
@@ -619,7 +597,7 @@ function descargarArchivo(blob, nombre) {
   URL.revokeObjectURL(url);
 }
 
-// ── REPORTE MENSUAL COMPLETO (todas las marcas, una pestaña c/u) ──
+// -- REPORTE MENSUAL COMPLETO (todas las marcas, una pestaña c/u) --
 async function generarExcelMensual(ventas, inventario, mes, anio, setGenerando) {
   setGenerando(true);
   try {
@@ -628,7 +606,7 @@ async function generarExcelMensual(ventas, inventario, mes, anio, setGenerando) 
     const mesNom = MESES[mes];
     const wb    = XLSX.utils.book_new();
 
-    // ── Pestaña RESUMEN GENERAL ──────────────────────────────
+    // -- Pestaña RESUMEN GENERAL ------------------------------
     const resumenRows = [
       [`TOSCANA HOUSE — REPORTE MENSUAL ${mesNom.toUpperCase()} ${anio}`],
       [`Generado: ${new Date().toLocaleString("es-BO")}`],
@@ -664,14 +642,14 @@ async function generarExcelMensual(ventas, inventario, mes, anio, setGenerando) 
     wsResumen["!cols"] = [{wch:22},{wch:20},{wch:16},{wch:20},{wch:12},{wch:18},{wch:14}];
     XLSX.utils.book_append_sheet(wb, wsResumen, "📊 Resumen");
 
-    // ── Una pestaña por cada marca ───────────────────────────
+    // -- Una pestaña por cada marca ---------------------------
     MARCAS.forEach(m => {
       const vMarca = ventasMes.filter(v => v.items.some(i => i.marcaId === m.id));
       
       const rows = [
         [`${m.emoji} ${m.nombre.toUpperCase()} — ${mesNom} ${anio}`],
         [],
-        ["ID Venta","Factura","Nombre Cliente","NIT","Cliente","Teléfono","Fecha","Hora","Código","Producto","Categoría","Cantidad","Precio Unit. (Bs)","Subtotal (Bs)","Desc%","Método Pago","Vendedor"],
+        ["ID Venta","Fecha","Hora","Código","Producto","Categoría","Cantidad","Precio Unit. (Bs)","Subtotal (Bs)","Desc%","Método Pago","Vendedor"],
       ];
 
       let brutoMarca = 0;
@@ -681,12 +659,7 @@ async function generarExcelMensual(ventas, inventario, mes, anio, setGenerando) 
         vMarca.forEach(v => {
           v.items.filter(i => i.marcaId === m.id).forEach(it => {
             rows.push([
-              v.id,
-              v.conFactura ? "✓ Factura" : "—",
-              v.conFactura ? (v.factNombre||"—") : "—",
-              v.conFactura ? (v.factNit||"—") : "—",
-              v.clienteNombre||"—", v.clienteTel||"—",
-              v.fecha, v.hora,
+              v.id, v.fecha, v.hora,
               it.codigo, it.nombre, it.categoria||"",
               it.cantidad, it.precioUnit, it.subtotal,
               v.descPct||0, v.metodoPago, v.vendedor||"Tienda"
@@ -705,14 +678,14 @@ async function generarExcelMensual(ventas, inventario, mes, anio, setGenerando) 
       );
 
       const ws = XLSX.utils.aoa_to_sheet(rows);
-      ws["!cols"] = [{wch:16},{wch:12},{wch:22},{wch:14},{wch:12},{wch:8},{wch:16},{wch:24},{wch:14},{wch:8},{wch:18},{wch:16},{wch:6},{wch:14},{wch:14}];
+      ws["!cols"] = [{wch:16},{wch:12},{wch:8},{wch:16},{wch:24},{wch:14},{wch:8},{wch:18},{wch:16},{wch:6},{wch:14},{wch:14}];
       
       // Nombre de pestaña max 31 chars (límite Excel)
       const tabName = m.nombre.slice(0, 28);
       XLSX.utils.book_append_sheet(wb, ws, tabName);
     });
 
-    // ── Pestaña STOCK ACTUAL ─────────────────────────────────
+    // -- Pestaña STOCK ACTUAL ---------------------------------
     const stockRows = [
       [`TOSCANA HOUSE — REPORTE DE STOCK — ${mesNom} ${anio}`],
       [],
@@ -737,7 +710,7 @@ async function generarExcelMensual(ventas, inventario, mes, anio, setGenerando) 
     wsStock["!cols"] = [{wch:18},{wch:26},{wch:18},{wch:14},{wch:14},{wch:14},{wch:13},{wch:10},{wch:10},{wch:12}];
     XLSX.utils.book_append_sheet(wb, wsStock, "📦 Stock");
 
-    // ── Generar y descargar ──────────────────────────────────
+    // -- Generar y descargar ----------------------------------
     // Aplicar bordes a todas las hojas
     wb.SheetNames.forEach(name => {
       aplicarBordesSheet(wb.Sheets[name], XLSX);
@@ -753,7 +726,7 @@ async function generarExcelMensual(ventas, inventario, mes, anio, setGenerando) 
   setGenerando(false);
 }
 
-// ── Aplicar bordes solo a celdas con datos ────────────────
+// -- Aplicar bordes solo a celdas con datos ----------------
 function aplicarBordesSheet(ws, XLSX) {
   if (!ws || !ws["!ref"]) return;
   const range = XLSX.utils.decode_range(ws["!ref"]);
@@ -797,7 +770,7 @@ function aplicarBordesSheet(ws, XLSX) {
   }
 }
 
-// ── REPORTE INDIVIDUAL DE UNA MARCA ─────────────────────────
+// -- REPORTE INDIVIDUAL DE UNA MARCA -------------------------
 async function generarExcelMarca(marca, ventas, inventario, setGenerando) {
   setGenerando(true);
   try {
@@ -825,18 +798,18 @@ async function generarExcelMarca(marca, ventas, inventario, setGenerando) {
         const rows = [
           [`${marca.emoji} ${marca.nombre} — ${mesNom} ${p.anio}`],
           [],
-          ["ID Venta","Factura","Nombre Cliente","NIT","Fecha","Hora","Código","Producto","Categoría","Cantidad","Precio Unit.","Subtotal","Desc%","Pago","Vendedor"],
+          ["ID Venta","Fecha","Hora","Código","Producto","Categoría","Cantidad","Precio Unit.","Subtotal","Desc%","Pago","Vendedor"],
         ];
         let bruto = 0;
         p.ventas.forEach(v => {
           v.items.filter(i => i.marcaId === marca.id).forEach(it => {
-            rows.push([v.id, v.conFactura?"✓ Factura":"—", v.conFactura?(v.factNombre||"—"):"—", v.conFactura?(v.factNit||"—"):"—", v.fecha, v.hora, it.codigo, it.nombre, it.categoria||"", it.cantidad, it.precioUnit, it.subtotal, v.descPct||0, v.metodoPago, v.vendedor||"Tienda"]);
+            rows.push([v.id, v.fecha, v.hora, it.codigo, it.nombre, it.categoria||"", it.cantidad, it.precioUnit, it.subtotal, v.descPct||0, v.metodoPago, v.vendedor||"Tienda"]);
             bruto += it.subtotal;
           });
         });
         rows.push([], ["","","","","","","","Bruto",bruto,"","",""], ["","","","","","","","Comisión 10%",+(bruto*.1).toFixed(2),"","",""], ["","","","","","","","Neto",+(bruto*.9).toFixed(2),"","",""]);
         const ws = XLSX.utils.aoa_to_sheet(rows);
-        ws["!cols"] = [{wch:16},{wch:12},{wch:22},{wch:14},{wch:12},{wch:8},{wch:16},{wch:24},{wch:14},{wch:8},{wch:16},{wch:14},{wch:6},{wch:12},{wch:14}];
+        ws["!cols"] = [{wch:16},{wch:12},{wch:8},{wch:16},{wch:24},{wch:14},{wch:8},{wch:16},{wch:14},{wch:6},{wch:12},{wch:14}];
         XLSX.utils.book_append_sheet(wb, ws, `${mesNom} ${p.anio}`.slice(0,31));
       });
     }
@@ -869,7 +842,7 @@ async function generarExcelMarca(marca, ventas, inventario, setGenerando) {
   setGenerando(false);
 }
 
-// ── REPORTE STOCK COMPLETO ────────────────────────────────
+// -- REPORTE STOCK COMPLETO --------------------------------
 async function generarExcelStock(inventario, setGenerando) {
   setGenerando(true);
   try {
@@ -963,13 +936,12 @@ function sendWA(venta){
   window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`,"_blank");
 }
 
-// ══════════════════════════════════════════════════════════
+// ----------------------------------------------------------
 // iOS DESIGN ATOMS
-// ══════════════════════════════════════════════════════════
+// ----------------------------------------------------------
 
 // Font stack
 const FONT = "'Cormorant Garamond', 'Palatino', 'Georgia', serif";
-const FONT_UI = "'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
 
 // Logo SVG inline de Toscana House
 const LOGO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 120" fill="none">
@@ -991,7 +963,7 @@ function LogoMark({size=36, color="#3D6B3D"}){
 }
 
 function usePress(onPress) {
-  const [pressed, setPressed] = useState(false);
+  var _h6 = useState(false); var pressed = _h6[0]; var setPressed = _h6[1];
   return {
     onTouchStart: () => setPressed(true),
     onTouchEnd:   () => { setPressed(false); onPress && onPress(); },
@@ -1107,7 +1079,7 @@ function TabBar({tabs, active, onChange}){
         const isActive=active===t.id;
         const tabColor=TAB_COLORS[t.id]||C.gold;
         return (
-          <button key={t.id} onClick={()=>onChange(t.id)} style={{
+          <button key={t.id} onClick={function(){onChange(t.id);}} style={{
             flex:1,border:"none",
             background:isActive?`${tabColor}18`:"transparent",
             display:"flex",flexDirection:"column",alignItems:"center",
@@ -1179,8 +1151,8 @@ function IOSBtn({children,onPress,variant="primary",full,disabled,small,icon}){
 
 // iOS sheet (bottom modal)
 function Sheet({open,onClose,title,children,tall}){
-  const [visible,setVisible]=useState(false);
-  const [anim,setAnim]=useState(false);
+  var _h7 = useState(false); var visible = _h7[0]; var setVisible = _h7[1];
+  var _h8 = useState(false); var anim = _h8[0]; var setAnim = _h8[1];
   useEffect(()=>{
     if(open){setVisible(true);setTimeout(()=>setAnim(true),10);}
     else{setAnim(false);setTimeout(()=>setVisible(false),320);}
@@ -1202,6 +1174,7 @@ function Sheet({open,onClose,title,children,tall}){
         transform:anim?"translateY(0)":"translateY(100%)",
         transition:"transform .32s cubic-bezier(.32,.72,0,1)",
         paddingBottom:"env(safe-area-inset-bottom,24px)",
+        paddingBottom:24,
       }}>
         {/* Handle */}
         <div style={{display:"flex",justifyContent:"center",padding:"12px 0 4px"}}>
@@ -1258,7 +1231,7 @@ function SegControl({options,value,onChange}){
       display:"flex",gap:3,
     }}>
       {options.map(o=>(
-        <button key={o.value} onClick={()=>onChange(o.value)} style={{
+        <button key={o.value} onClick={function(){onChange(o.value);}} style={{
           flex:1,padding:"7px 0",borderRadius:8,border:"none",
           background:value===o.value?C.bg3:"transparent",
           color:value===o.value?C.label:C.label2,
@@ -1307,128 +1280,75 @@ function StatCard({icon,label,value,sub,color=C.gold}){
   );
 }
 
-// ══════════════════════════════════════════════════════════
+// ----------------------------------------------------------
 // LiqModal — liquidación como componente iOS sheet
-// ══════════════════════════════════════════════════════════
+// ----------------------------------------------------------
 function LiqModal({marcaId,ventas,mes,anio,MK,cierres,setCierres,onClose,syncCierre}){
   if(!marcaId) return null;
-  const [tabLiq, setTabLiq] = useState("resumen"); // resumen | sinfact | confact
   const marca=MARCAS.find(x=>x.id===marcaId);
   const vMes=ventas.filter(v=>v.mk===MK);
   const vMarca=vMes.filter(v=>v.items.some(i=>i.marcaId===marcaId));
-  const vSinFact=vMarca.filter(v=>!v.conFactura);
-  const vConFact=vMarca.filter(v=>v.conFactura);
-
   const bruto=vMarca.reduce((s,v)=>s+v.items.filter(i=>i.marcaId===marcaId).reduce((ss,i)=>ss+i.subtotal,0),0);
   const comision=bruto*0.10;
   const neto=bruto*0.90;
   const cerrado=cierres[`${MK}-${marcaId}`]?.cerrado;
 
-  function VentaCard({v}){
-    const its=v.items.filter(i=>i.marcaId===marcaId);
-    const sub=its.reduce((s,i)=>s+i.subtotal,0);
-    return (
-      <div style={{background:C.bg2,borderRadius:14,padding:14,marginBottom:10,
-        border:`1px solid ${v.conFactura?C.blue+"30":C.sep}`}}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
-          <div style={{display:"flex",alignItems:"center",gap:8}}>
-            <span style={{fontFamily:"monospace",fontSize:11,color:C.label3}}>{v.id}</span>
-            {v.conFactura&&<span style={{fontSize:11,fontWeight:700,color:C.blue,
-              background:`${C.blue}15`,borderRadius:6,padding:"2px 7px"}}>🧾 Factura</span>}
-          </div>
-          <span style={{fontSize:15,fontWeight:700,color:C.gold,fontFamily:FONT}}>{$(sub)}</span>
-        </div>
-        <div style={{fontSize:12,color:C.label3,fontFamily:FONT,marginBottom:4}}>
-          {v.fecha} {v.hora} · {PAGOS.find(p=>p.id===v.metodoPago)?.label}
-          {v.conFactura&&v.factNombre&&<span style={{color:C.blue}}> · {v.factNombre} · NIT: {v.factNit}</span>}
-        </div>
-        {its.map((it,ii)=>(
-          <div key={`${v.id}-${it.prodId}-${ii}`} style={{fontSize:13,color:C.label2,fontFamily:FONT}}>
-            · {it.nombre} ×{it.cantidad} = {$(it.subtotal)}
-          </div>
-        ))}
-      </div>
-    );
-  }
-
-  const ventasActivas = tabLiq==="confact"?vConFact:tabLiq==="sinfact"?vSinFact:vMarca;
-
   return (
     <Sheet open={!!marcaId} onClose={onClose} title={`${marca?.emoji} ${marca?.nombre} — ${MESES[mes]}`} tall>
-
-      {/* Resumen financiero */}
+      {/* Financiero */}
       <div style={{background:C.bg2,borderRadius:16,overflow:"hidden",marginBottom:16}}>
-        {vConFact.length>0&&(
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",
-            padding:"11px 16px",borderBottom:`1px solid ${C.sep}`}}>
-            <span style={{fontSize:13,color:C.label3,fontFamily:FONT}}>Con factura ({vConFact.length})</span>
-            <span style={{fontSize:13,fontWeight:600,color:C.blue,fontFamily:FONT}}>
-              {$(vConFact.reduce((s,v)=>s+v.items.filter(i=>i.marcaId===marcaId).reduce((ss,i)=>ss+i.subtotal,0),0))}
-            </span>
-          </div>
-        )}
-        {vSinFact.length>0&&(
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",
-            padding:"11px 16px",borderBottom:`1px solid ${C.sep}`}}>
-            <span style={{fontSize:13,color:C.label3,fontFamily:FONT}}>Sin factura ({vSinFact.length})</span>
-            <span style={{fontSize:13,fontWeight:600,color:C.label2,fontFamily:FONT}}>
-              {$(vSinFact.reduce((s,v)=>s+v.items.filter(i=>i.marcaId===marcaId).reduce((ss,i)=>ss+i.subtotal,0),0))}
-            </span>
-          </div>
-        )}
-        {[
-          ["Ventas brutas",$(bruto),C.label],
-          ["Comisión Toscana (10%)",`-${$(comision)}`,C.red],
-          ["Neto a liquidar",$(neto),C.green],
-        ].map(([k,v,c],i,arr)=>(
+        {[["Ventas brutas",$(bruto),C.label],["Comisión (10%)",`-${$(comision)}`,C.red],["Neto a liquidar",$(neto),C.green]].map(([k,v,c],i,arr)=>(
           <div key={k} style={{display:"flex",justifyContent:"space-between",alignItems:"center",
-            padding:"13px 16px",borderBottom:i<arr.length-1?`1px solid ${C.sep}`:""}}>
-            <span style={{fontSize:14,color:C.label2,fontFamily:FONT}}>{k}</span>
-            <span style={{fontSize:14,fontWeight:600,color:c,fontFamily:FONT}}>{v}</span>
+            padding:"15px 16px",borderBottom:i<arr.length-1?`1px solid ${C.sep}`:""}}>
+            <span style={{fontSize:16,color:C.label2,fontFamily:FONT}}>{k}</span>
+            <span style={{fontSize:16,fontWeight:600,color:c,fontFamily:FONT}}>{v}</span>
           </div>
         ))}
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",
-          padding:"16px 16px",background:`${C.gold}12`}}>
+          padding:"18px 16px",background:`${C.gold}12`}}>
           <span style={{fontSize:17,fontWeight:700,color:C.label,fontFamily:FONT}}>TOTAL A PAGAR</span>
           <span style={{fontSize:22,fontWeight:800,color:C.gold,fontFamily:FONT}}>{$(neto)}</span>
         </div>
       </div>
 
-      {/* Tabs ventas */}
-      <div style={{display:"flex",gap:4,marginBottom:14,background:C.bg2,borderRadius:12,padding:4}}>
-        {[
-          ["resumen",`Todas (${vMarca.length})`],
-          ["sinfact",`Sin factura (${vSinFact.length})`],
-          ["confact",`Con factura (${vConFact.length})`],
-        ].map(([t,label])=>(
-          <button key={t} onClick={()=>setTabLiq(t)} style={{
-            flex:1,padding:"8px 4px",borderRadius:9,border:"none",
-            background:tabLiq===t?C.bg1:"none",
-            color:tabLiq===t?(t==="confact"?C.blue:C.gold):C.label3,
-            fontSize:11,fontWeight:tabLiq===t?700:400,fontFamily:FONT,
-            cursor:"pointer",boxShadow:tabLiq===t?"0 1px 4px rgba(0,0,0,0.08)":"none",
-            transition:"all .15s"
-          }}>{label}</button>
-        ))}
+      {/* Ventas */}
+      <div style={{fontSize:13,fontWeight:600,color:C.label3,fontFamily:FONT,
+        textTransform:"uppercase",letterSpacing:.8,marginBottom:8,paddingLeft:4}}>
+        Transacciones del período
       </div>
-
-      {/* Lista ventas */}
-      {ventasActivas.length===0
-        ? <div style={{textAlign:"center",padding:"28px 0",color:C.label3,fontFamily:FONT,fontSize:15}}>
-            Sin ventas en esta categoría
-          </div>
-        : ventasActivas.map(v=><VentaCard key={v.id} v={v}/>)
+      {vMarca.length===0
+        ? <div style={{textAlign:"center",padding:"32px 0",color:C.label3,fontFamily:FONT,fontSize:16}}>Sin ventas en {MESES[mes]}</div>
+        : vMarca.map(v=>{
+            const its=v.items.filter(i=>i.marcaId===marcaId);
+            const sub=its.reduce((s,i)=>s+i.subtotal,0);
+            return (
+              <div key={v.id} style={{background:C.bg2,borderRadius:14,padding:14,marginBottom:10}}>
+                <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
+                  <span style={{fontFamily:"monospace",fontSize:12,color:C.gold}}>{v.id}</span>
+                  <span style={{fontSize:16,fontWeight:700,color:C.gold,fontFamily:FONT}}>{$(sub)}</span>
+                </div>
+                <div style={{fontSize:13,color:C.label3,fontFamily:FONT,marginBottom:6}}>
+                  {v.fecha} {v.hora} · {PAGOS.find(p=>p.id===v.metodoPago)?.label}
+                </div>
+                {its.map((it,ii)=>(
+                  <div key={`${v.id}-${it.prodId}-${ii}`} style={{fontSize:13,color:C.label2,fontFamily:FONT}}>
+                    · {it.nombre} ×{it.cantidad} = {$(it.subtotal)}
+                  </div>
+                ))}
+              </div>
+            );
+          })
       }
 
       <div style={{display:"flex",flexDirection:"column",gap:10,marginTop:16}}>
-        <IOSBtn onPress={()=>exportCSV(marca,ventas,mes,anio)} variant="fill" icon="⬇">
+        <IOSBtn onPress={function(){exportCSV(marca,ventas,mes,anio);}} variant="fill" icon="⬇">
           Exportar CSV
         </IOSBtn>
         {!cerrado
-          ? <IOSBtn onPress={()=>{setCierres(p=>({...p,[`${MK}-${marcaId}`]:{cerrado:true,fecha:hoy(),mk:MK}}));sbGuardarCierre(`${MK}-${marcaId}`,{cerrado:true,fecha:hoy(),mk:MK,marca_id:marcaId});onClose();}} variant="success" icon="✓">
+          ? <IOSBtn onPress={function(){{setCierres(p=>({...p,[`${MK}-${marcaId}`]:{cerrado:true,fecha:hoy(),mk:MK}}));sbGuardarCierre(`${MK}-${marcaId}`,{cerrado:true,fecha:hoy(),mk:MK,marca_id:marcaId});onClose();}} variant="success" icon="✓">
               Confirmar Cierre Mensual
             </IOSBtn>
-          : <IOSBtn onPress={()=>{setCierres(p=>({...p,[`${MK}-${marcaId}`]:{cerrado:false,mk:MK}}));onClose();}} variant="danger">
+          : <IOSBtn onPress={function(){{setCierres(p=>({...p,[`${MK}-${marcaId}`]:{cerrado:false,mk:MK}}));onClose();}} variant="danger">
               Reabrir Liquidación
             </IOSBtn>
         }
@@ -1438,24 +1358,22 @@ function LiqModal({marcaId,ventas,mes,anio,MK,cierres,setCierres,onClose,syncCie
 }
 
 
-// ════════════════════════════════════════════════════════════
+// ------------------------------------------------------------
 // SISTEMA DE LOGIN — Toscana House
 // Usuarios con contraseña — sesión guardada en localStorage
-// ════════════════════════════════════════════════════════════
+// ------------------------------------------------------------
 
-// ── Usuarios autorizados ─────────────────────────────────
+// -- Usuarios autorizados ---------------------------------
 // Para agregar usuarios: {usuario, password, nombre, rol}
 // rol: "admin" (acceso total) | "caja" (solo POS y ventas)
 const USUARIOS = [
-  { usuario: "jpanezc", password: "jpac",        nombre: "JP Anez",    rol: "admin" },
-  { usuario: "carog",   password: "jpac",        nombre: "Caro G",     rol: "admin" },
-  { usuario: "ventas",  password: "toscana2026", nombre: "Ventas",     rol: "caja"  },
+  { usuario: "toscana",  password: "casa2024",    nombre: "Toscana House",  rol: "admin" },
+  { usuario: "caja",     password: "caja2024",    nombre: "Vendedor Caja",  rol: "caja"  },
+  { usuario: "tatiana",  password: "toscana2024", nombre: "Tatiana",        rol: "admin" },
 ];
 
 function useAuth() {
-  const [user, setUser] = useState(()=>{
-    try { return JSON.parse(localStorage.getItem("th_user")||"null"); } catch { return null; }
-  });
+  var _h9 = useState(function(){ try{return JSON.parse(localStorage.getItem("th_user")||"null");}catch{return null;} }); var user = _h9[0]; var setUser = _h9[1];
 
   function login(usuario, password) {
     // Check localStorage users first, then defaults
@@ -1486,11 +1404,11 @@ function useAuth() {
 
 // Pantalla de Login
 function LoginScreen({ onLogin }) {
-  const [usuario, setUsuario] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError]     = useState("");
-  const [loading, setLoading] = useState(false);
-  const [showPass, setShowPass] = useState(false);
+  var _h10 = useState(""); var usuario = _h10[0]; var setUsuario = _h10[1];
+  var _h11 = useState(""); var password = _h11[0]; var setPassword = _h11[1];
+  var _h12 = useState(""); var error = _h12[0]; var setError = _h12[1];
+  var _h13 = useState(false); var loading = _h13[0]; var setLoading = _h13[1];
+  var _h14 = useState(false); var showPass = _h14[0]; var setShowPass = _h14[1];
 
   function handleLogin() {
     if (!usuario || !password) { setError("Completa todos los campos"); return; }
@@ -1582,7 +1500,7 @@ function LoginScreen({ onLogin }) {
               onFocus={e=>e.target.style.borderColor="#5C8A5C"}
               onBlur={e=>e.target.style.borderColor=error?"#C0504A":"rgba(168,197,160,0.6)"}
             />
-            <button onClick={()=>setShowPass(p=>!p)} style={{
+            <button onClick={function(){setShowPass(p=>!p);}} style={{
               position:"absolute", right:12, top:"50%",
               transform:"translateY(-50%)",
               background:"none", border:"none", cursor:"pointer",
@@ -1628,38 +1546,37 @@ function LoginScreen({ onLogin }) {
   );
 }
 
-// ══════════════════════════════════════════════════════════
+// ----------------------------------------------------------
 // APP PRINCIPAL
-// ══════════════════════════════════════════════════════════
+// ----------------------------------------------------------
 export default function App(){
   const { user, login, logout } = useAuth();
   const now=new Date();
-  const[tab,setTab]         =useState("pos");
-  const[inv,setInv]         =useState([]);
-  const[ventas,setVentas]   =useState([]);
-  const[alq,setAlq]         =useState([]);
-  const[cierres,setCierres] =useState({});
-  const[cargando,setCargando]=useState(true);
-  const[dbStatus,setDbStatus]=useState("connecting");
-  const[mes,setMes]         =useState(now.getMonth());
-  const[anio,setAnio]       =useState(now.getFullYear());
-  const[marcaDetalle,setMD] =useState(null);
-  const[sheetInv,setShInv]  =useState(false);
-  const[sheetBaja,setShBaja]=useState(false);
-  const[shExcel,setShExcel]=useState(false);
-  const[sheetDrive,setShDrive]=useState(false);
-  const[mLiq,setMLiq]       =useState(null);
-  const[fInv,setFInv]       =useState({marcaId:"",nombre:"",categoria:"",descripcion:"",subcat:"",precio:"",stock:"",fecha:hoy()});
-  const[bajaCod,setBajaCod] =useState("");
-  const[bajaMsg,setBajaMsg] =useState(null);
-  const[bajasLista,setBajasLista]=useState([]);
-  const[busqInv,setBusqInv] =useState("");
-  const[filInvM,setFilInvM] =useState("");
-  const[driveUrl,setDriveUrlLocal]=useState(()=>{ try{return localStorage.getItem("th_drive_url")||"";}catch{return "";} });
-  const[generando,setGenerando]=useState(false);
+  var _h15 = useState("pos"); var tab = _h15[0]; var setTab = _h15[1];
+  var _h16 = useState([]); var inv = _h16[0]; var setInv = _h16[1];
+  var _h17 = useState([]); var ventas = _h17[0]; var setVentas = _h17[1];
+  var _h18 = useState([]); var alq = _h18[0]; var setAlq = _h18[1];
+  var _h19 = useState({}); var cierres = _h19[0]; var setCierres = _h19[1];
+  var _h20 = useState(true); var cargando = _h20[0]; var setCargando = _h20[1];
+  var _h21 = useState("connecting"); var dbStatus = _h21[0]; var setDbStatus = _h21[1];
+  var _h22 = useState(now.getMonth(); var mes = _h22[0]; var setMes = _h22[1]);
+  var _h23 = useState(now.getFullYear(); var anio = _h23[0]; var setAnio = _h23[1]);
+  var _h24 = useState(null); var marcaDetalle = _h24[0]; var setMD = _h24[1];
+  var _h25 = useState(false); var sheetInv = _h25[0]; var setShInv = _h25[1];
+  var _h25b = useState(false); var shExcel = _h25b[0]; var setShExcel = _h25b[1];
+  var _h26 = useState(false); var sheetBaja = _h26[0]; var setShBaja = _h26[1];
+  var _h27 = useState(false); var sheetDrive = _h27[0]; var setShDrive = _h27[1];
+  var _h28 = useState(null); var mLiq = _h28[0]; var setMLiq = _h28[1];
+  var _h29 = useState({marcaId:"",nombre:"",categoria:"",precio:"",stock:"",fecha:hoy(); var fInv = _h29[0]; var setFInv = _h29[1]});
+  var _h30 = useState(""); var bajaCod = _h30[0]; var setBajaCod = _h30[1];
+  var _h31 = useState(null); var bajaMsg = _h31[0]; var setBajaMsg = _h31[1];
+  var _h32 = useState(""); var busqInv = _h32[0]; var setBusqInv = _h32[1];
+  var _h33 = useState(""); var filInvM = _h33[0]; var setFilInvM = _h33[1];
+  var _h34 = useState(function(){ try{return localStorage.getItem("th_drive_url")||"";}catch{return "";} }); var driveUrl = _h34[0]; var setDriveUrlLocal = _h34[1];
+  var _h35 = useState(false); var generando = _h35[0]; var setGenerando = _h35[1];
   const drive = useDriveSync();
 
-  // Cargar datos desde Supabase al inicio + Realtime
+  // Cargar datos desde Supabase al inicio
   useEffect(()=>{
     setDbStatus("connecting");
     sbCargarTodo().then(data=>{
@@ -1673,108 +1590,6 @@ export default function App(){
       }
       setCargando(false);
     });
-
-
-    // ── Supabase Realtime — sync en tiempo real entre dispositivos ──
-    let channel = null;
-    getSupabase().then(db => {
-      console.log("[Realtime] Conectando a Supabase Realtime...");
-      channel = db
-        .channel("toscana-realtime")
-        .on("postgres_changes", { event: "*", schema: "public", table: "inventario" },
-          payload => {
-            const p = payload.new;
-            if (!p) return;
-            if (payload.eventType === "DELETE") {
-              setInv(prev => prev.filter(i => i.id !== payload.old.id));
-              return;
-            }
-            const prod = {
-              id: p.id, codigo: p.codigo, marcaId: p.marca_id,
-              marcaNombre: p.marca_nombre, nombre: p.nombre,
-              categoria: p.categoria, descripcion: p.descripcion||"",
-              subcat: p.subcat||"",
-              precio: Number(p.precio)||0,
-              stock: p.stock||0, stockInicial: p.stock_inicial||0, fecha: p.fecha,
-              dadoDeBaja: p.dado_de_baja||false, fechaBaja: p.fecha_baja||null,
-            };
-            setInv(prev => {
-              const idx = prev.findIndex(i => i.id === prod.id);
-              if (idx >= 0) {
-                const next = [...prev];
-                next[idx] = prod;
-                return next;
-              }
-              return [...prev, prod];
-            });
-          }
-        )
-        .on("postgres_changes", { event: "INSERT", schema: "public", table: "ventas" },
-          payload => {
-            const v = payload.new;
-            if (!v) return;
-            // Recargar solo en otros dispositivos (no en el que generó la venta)
-            // Usar timeout para que los items ya estén guardados
-            setTimeout(() => {
-              sbCargarTodo().then(data => {
-                if (data) {
-                  // Merge: mantener ventas locales + agregar las remotas que no tengamos
-                  if (data.ventas.length > 0) {
-                    setVentas(prev => {
-                      const ids = new Set(prev.map(v => v.id));
-                      const nuevas = data.ventas.filter(v => !ids.has(v.id));
-                      if (nuevas.length > 0) return [...prev, ...nuevas];
-                      return prev;
-                    });
-                  }
-                  if (data.inv.length > 0) {
-                    setInv(data.inv);
-                  }
-                }
-              });
-            }, 2000);
-          }
-        )
-        .on("postgres_changes", { event: "*", schema: "public", table: "cierres" },
-          payload => {
-            const c = payload.new;
-            if (!c) return;
-            setCierres(prev => ({
-              ...prev,
-              [c.id]: { cerrado: c.cerrado, fecha: c.fecha, mk: c.mk }
-            }));
-          }
-        )
-        .subscribe(status => {
-          console.log("[Realtime] Status:", status);
-          window.__sb_channel = channel;
-          if (status === "SUBSCRIBED") {
-            setDbStatus("ok");
-            console.log("[Realtime] ✓ Conectado correctamente");
-          } else if (status === "CHANNEL_ERROR") {
-            console.warn("[Realtime] ✗ Error de conexión");
-          }
-        });
-    });
-
-    // Polling de respaldo cada 30 segundos
-    const poll = setInterval(() => {
-      sbCargarTodo().then(data => {
-        if (data) {
-          setVentas(data.ventas);
-          if (data.inv.length > 0) setInv(data.inv);
-          if (Object.keys(data.cierres).length > 0) setCierres(data.cierres);
-          setDbStatus("ok");
-        }
-      });
-    }, 30000);
-
-    return () => {
-      if (channel) {
-        getSupabase().then(db => db.removeChannel(channel));
-      }
-      clearInterval(poll);
-    };
   },[]);
 
   const MK      =useMemo(()=>mkKey(mes,anio),[mes,anio]);
@@ -1795,48 +1610,24 @@ export default function App(){
     const marca=MARCAS.find(m=>m.id===Number(fInv.marcaId));
     const prod={id:Date.now(),codigo:genCod(Number(fInv.marcaId),fInv.nombre,idx),
       marcaId:Number(fInv.marcaId),nombre:fInv.nombre,categoria:fInv.categoria||"General",
-      descripcion:fInv.descripcion||"",subcat:fInv.subcat||"",
       precio:Number(fInv.precio),stock:Number(fInv.stock),stockInicial:Number(fInv.stock),fecha:fInv.fecha,
       marcaNombre:marca?.nombre||""};
     setInv(p=>[...p,prod]);
     drive.syncProducto(prod);
     sbGuardarProducto(prod); // guardar en nube
-    setFInv({marcaId:"",nombre:"",categoria:"",descripcion:"",subcat:"",precio:"",stock:"",fecha:hoy()});
+    setFInv({marcaId:"",nombre:"",categoria:"",precio:"",stock:"",fecha:hoy()});
     setShInv(false);
     setTimeout(()=>imprimirTicket(prod, marca?.nombre||"Toscana House"), 300);
   }
 
   function darBaja(){
     const cod=bajaCod.trim().toUpperCase();
-    if(!cod) return;
     const prod=inv.find(i=>i.codigo.toUpperCase()===cod);
     if(!prod){setBajaMsg({ok:false,msg:`"${cod}" no encontrado`});return;}
     if(prod.stock<=0){setBajaMsg({ok:false,msg:`"${prod.nombre}" ya está agotado`});return;}
-    setBajasLista(prev=>{
-      if(prev.find(p=>p.id===prod.id)) return prev;
-      return [...prev,prod];
-    });
-    setBajaMsg({ok:true,msg:`✓ "${prod.nombre}" agregado`});
+    setInv(p=>p.map(i=>i.id===prod.id?{...i,stock:0}:i));
+    setBajaMsg({ok:true,msg:`✓ "${prod.nombre}" dado de baja`});
     setBajaCod("");
-  }
-
-  function confirmarBajas(){
-    if(!bajasLista.length) return;
-    setInv(p=>p.map(i=>{
-      const enLista=bajasLista.find(b=>b.id===i.id);
-      if(enLista){
-        sbActualizarStock(i.id, 0);
-        return {...i, stock:0, dadoDeBaja:true, fechaBaja:hoy()};
-      }
-      return i;
-    }));
-    setBajaMsg({ok:true,msg:`✓ ${bajasLista.length} producto(s) dado(s) de baja`});
-    setBajasLista([]);
-    setBajaCod("");
-  }
-
-  function quitarDeBaja(id){
-    setBajasLista(prev=>prev.filter(p=>p.id!==id));
   }
 
   function handleVenta(v){
@@ -1847,6 +1638,7 @@ export default function App(){
       setInv(p=>p.map(i=>i.id===it.prodId?{...i,stock:Math.max(0,i.stock-it.cantidad)}:i));
       sbActualizarStock(it.prodId, Math.max(0,(inv.find(i=>i.id===it.prodId)?.stock||0)-it.cantidad));
     });
+    drive.syncVenta(vf);
     sbGuardarVenta(vf); // guardar en nube
     return vf;
   }
@@ -1860,11 +1652,8 @@ export default function App(){
   const getLiq=useCallback((marcaId)=>{
     const marca=MARCAS.find(m=>m.id===marcaId);
     const vM=vMes.filter(v=>v.items.some(i=>i.marcaId===marcaId));
-    const vSinFact=vM.filter(v=>!v.conFactura);
-    const vConFact=vM.filter(v=>v.conFactura);
     const bruto=vM.reduce((s,v)=>s+v.items.filter(i=>i.marcaId===marcaId).reduce((ss,i)=>ss+i.subtotal,0),0);
-    return{marca,vMarca:vM,vSinFact,vConFact,
-           bruto,comision:bruto*.1,neto:bruto*.9,
+    return{marca,vMarca:vM,bruto,comision:bruto*.1,neto:bruto*.9,
            alqPagado:alqMes.find(a=>a.marcaId===marcaId)?.pagado||false};
   },[vMes,alqMes]);
 
@@ -1909,7 +1698,7 @@ export default function App(){
       MozOsxFontSmoothing:"grayscale",
     }}>
 
-      {/* ── LOADING SCREEN ── */}
+      {/* -- LOADING SCREEN -- */}
       {cargando&&(
         <div style={{position:"fixed",inset:0,background:"rgba(242,247,242,0.97)",
           display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",
@@ -1924,20 +1713,20 @@ export default function App(){
         </div>
       )}
 
-      {/* ── NAV BAR ── */}
+      {/* -- NAV BAR -- */}
       {showingDetail ? (
         <NavBar
           title={MARCAS.find(m=>m.id===marcaDetalle)?.nombre}
           back="Marcas"
-          onBack={()=>setMD(null)}
+          onBack={function(){setMD(null);}}
           right={
             <div style={{display:"flex",gap:12,alignItems:"center"}}>
-              <button onClick={()=>exportCSV(MARCAS.find(m=>m.id===marcaDetalle),ventas,mes,anio)}
+              <button onClick={function(){exportCSV(MARCAS.find(m=>m.id===marcaDetalle),ventas,mes,anio);}}
                 style={{background:"none",border:"none",color:C.label3,fontSize:13,fontFamily:FONT,
                   cursor:"pointer",padding:"4px 0",WebkitTapHighlightColor:"transparent"}}>CSV</button>
               <button
                 disabled={generando}
-                onClick={()=>generarExcelMarca(MARCAS.find(m=>m.id===marcaDetalle),ventas,inv,setGenerando)}
+                onClick={function(){generarExcelMarca(MARCAS.find(m=>m.id===marcaDetalle),ventas,inv,setGenerando);}}
                 style={{background:`${C.gold}20`,border:`1px solid ${C.gold}40`,color:C.gold,
                   borderRadius:8,padding:"5px 12px",fontSize:13,fontFamily:FONT,fontWeight:600,
                   cursor:generando?"not-allowed":"pointer",WebkitTapHighlightColor:"transparent"}}>
@@ -1953,13 +1742,13 @@ export default function App(){
           right={
             <div style={{display:"flex",alignItems:"center",gap:10}}>
               <DriveIndicator syncing={drive.syncing} connected={!!drive.url}/>
-              <button onClick={()=>setShDrive(true)} style={{
+              <button onClick={function(){setShDrive(true);}} style={{
                 background:"none",border:"none",fontSize:20,cursor:"pointer",
                 color:drive.url?C.green:C.label3,padding:"4px",
                 WebkitTapHighlightColor:"transparent",lineHeight:1,
               }}>☁</button>
               <button onClick={logout} style={{
-                background:"none",fontSize:13,cursor:"pointer",
+                background:"none",border:"none",fontSize:13,cursor:"pointer",
                 color:C.label3,padding:"4px 8px",fontFamily:FONT,
                 WebkitTapHighlightColor:"transparent",
                 border:`1px solid ${C.sep}`,borderRadius:8,
@@ -1975,7 +1764,7 @@ export default function App(){
         />
       )}
 
-      {/* ── CONTENT ── */}
+      {/* -- CONTENT -- */}
       <div style={{padding:"16px 16px 0"}}>
 
         {/* POS */}
@@ -1983,7 +1772,7 @@ export default function App(){
 
         {/* INVENTARIO — por marca */}
         {tab==="inventario" && (
-          <InventarioPorMarca inv={inv} ventas={ventas} onRecibir={()=>setShInv(true)} onBaja={()=>{setShBaja(true);setBajaMsg(null);setBajaCod("");setBajasLista([]);}} onExcel={()=>setShExcel(true)}/>
+          <InventarioPorMarca inv={inv} ventas={ventas} onRecibir={function(){setShInv(true);}} onBaja={function(){setShBaja(true);setBajaMsg(null);setBajaCod("");}} onExcel={function(){setShExcel(true);}}/>
         )}
 
         {/* MARCAS — lista */}
@@ -1997,7 +1786,7 @@ export default function App(){
                 const prods=inv.filter(i=>i.marcaId===m.id).filter(p=>p.stock>0).length;
                 const cerrado=cierres[`${MK}-${m.id}`]?.cerrado;
                 return (
-                  <div key={m.id} onClick={()=>setMD(m.id)} style={{
+                  <div key={m.id} onClick={function(){setMD(m.id);}} style={{
                     background:C.bg2,
                     borderRadius:i===0?"14px 14px 2px 2px":i===MARCAS.length-1?"2px 2px 14px 14px":"2px",
                     padding:"14px 16px",
@@ -2047,178 +1836,58 @@ export default function App(){
         {/* LIQUIDACIONES */}
         {tab==="liquidaciones" && (
           <div>
-            {/* ── Panel de cierre mensual ── */}
             <div style={{marginBottom:16}}>
-              <div style={{fontSize:13,fontWeight:700,color:C.label3,textTransform:"uppercase",
-                letterSpacing:.8,marginBottom:12,fontFamily:FONT_UI}}>{MESES[mes]} {anio}</div>
-
-              {/* Totales por método de pago */}
-              {(()=>{
-                const ef=vMes.filter(v=>v.metodoPago==="efectivo").reduce((s,v)=>s+v.total,0);
-                const qr=vMes.filter(v=>v.metodoPago==="qr").reduce((s,v)=>s+v.total,0);
-                const tj=vMes.filter(v=>v.metodoPago==="tarjeta").reduce((s,v)=>s+v.total,0);
-                const conFact=vMes.filter(v=>v.conFactura);
-                return (
-                  <div>
-                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:8,marginBottom:12}}>
-                      {[
-                        {label:"Total mes",value:$(vMes.reduce((s,v)=>s+v.total,0)),color:C.label,bg:C.bg2},
-                        {label:"Efectivo",value:$(ef),color:C.green,bg:`${C.green}10`},
-                        {label:"QR",value:$(qr),color:C.blue,bg:`${C.blue}10`},
-                        {label:"Tarjeta",value:$(tj),color:C.amber,bg:`${C.amber}10`},
-                      ].map(s=>(
-                        <div key={s.label} style={{background:s.bg,borderRadius:14,padding:"12px 10px",
-                          border:`1px solid ${s.color}25`,textAlign:"center"}}>
-                          <div style={{fontSize:10,fontWeight:700,color:s.color,fontFamily:FONT_UI,
-                            textTransform:"uppercase",letterSpacing:.6,marginBottom:4,opacity:.8}}>{s.label}</div>
-                          <div style={{fontSize:16,fontWeight:700,color:s.color,fontFamily:FONT_UI}}>{s.value}</div>
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* Conciliación de pagos */}
-                    <div style={{background:C.bg2,borderRadius:14,border:`1px solid ${C.sep}`,
-                      padding:"14px 16px",marginBottom:12}}>
-                      <div style={{fontSize:12,fontWeight:700,color:C.label3,textTransform:"uppercase",
-                        letterSpacing:.8,marginBottom:12,fontFamily:FONT_UI}}>Conciliación de pagos</div>
-                      {[
-                        {label:"Efectivo",val:ef,n:vMes.filter(v=>v.metodoPago==="efectivo").length,color:C.green,icon:"💵"},
-                        {label:"QR",val:qr,n:vMes.filter(v=>v.metodoPago==="qr").length,color:C.blue,icon:"📱"},
-                        {label:"Tarjeta (+2.5%)",val:tj,n:vMes.filter(v=>v.metodoPago==="tarjeta").length,color:C.amber,icon:"💳"},
-                      ].map((p,i,arr)=>(
-                        <div key={p.label} style={{display:"flex",justifyContent:"space-between",
-                          alignItems:"center",padding:"10px 0",
-                          borderBottom:i<arr.length-1?`1px solid ${C.sep}`:""}}>
-                          <div style={{display:"flex",alignItems:"center",gap:10}}>
-                            <span style={{fontSize:18}}>{p.icon}</span>
-                            <div>
-                              <div style={{fontSize:14,fontWeight:600,color:C.label,fontFamily:FONT_UI}}>{p.label}</div>
-                              <div style={{fontSize:12,color:C.label3,fontFamily:FONT_UI}}>{p.n} transacciones</div>
-                            </div>
-                          </div>
-                          <div style={{textAlign:"right"}}>
-                            <div style={{fontSize:15,fontWeight:700,color:p.color,fontFamily:FONT_UI}}>{$(p.val)}</div>
-                            {p.val>0&&<div style={{fontSize:10,color:C.green,fontFamily:FONT_UI,fontWeight:600}}>✓ Registrado</div>}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* Ventas con factura */}
-                    {conFact.length>0&&(
-                      <div style={{background:`${C.blue}08`,borderRadius:14,border:`1px solid ${C.blue}25`,
-                        padding:"12px 16px",marginBottom:12,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                        <div>
-                          <div style={{fontSize:13,fontWeight:700,color:C.blue,fontFamily:FONT_UI}}>🧾 Ventas con factura</div>
-                          <div style={{fontSize:12,color:C.label3,fontFamily:FONT_UI,marginTop:2}}>{conFact.length} venta{conFact.length>1?"s":""} este mes</div>
-                        </div>
-                        <div style={{fontSize:15,fontWeight:700,color:C.blue,fontFamily:FONT_UI}}>
-                          {$(conFact.reduce((s,v)=>s+v.total,0))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Estado general del cierre */}
-                    {(()=>{
-                      const cerradas=MARCAS.filter(m=>cierres[`${MK}-${m.id}`]?.cerrado).length;
-                      const conVentas=MARCAS.filter(m=>getLiq(m.id).bruto>0).length;
-                      const pct=conVentas>0?Math.round(cerradas/conVentas*100):0;
-                      return (
-                        <div style={{background:C.bg2,borderRadius:14,border:`1px solid ${C.sep}`,
-                          padding:"12px 16px",marginBottom:12}}>
-                          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
-                            <div style={{fontSize:13,fontWeight:700,color:C.label,fontFamily:FONT_UI}}>
-                              Progreso de cierres
-                            </div>
-                            <div style={{fontSize:13,fontWeight:700,
-                              color:pct===100?C.green:C.amber,fontFamily:FONT_UI}}>
-                              {cerradas}/{conVentas} marcas
-                            </div>
-                          </div>
-                          <div style={{height:8,background:C.sep,borderRadius:4,overflow:"hidden"}}>
-                            <div style={{height:"100%",width:`${pct}%`,
-                              background:pct===100?C.green:C.amber,
-                              borderRadius:4,transition:"width .3s"}}/>
-                          </div>
-                          {pct===100&&(
-                            <div style={{fontSize:12,color:C.green,fontFamily:FONT_UI,marginTop:6,textAlign:"center",fontWeight:600}}>
-                              ✓ Todas las marcas con ventas están cerradas
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })()}
-                  </div>
-                );
-              })()}
-
-              {/* Botones Excel */}
-              <div style={{display:"flex",gap:8,marginBottom:16}}>
-                <button onClick={()=>generarExcelMensual(ventas,inv,mes,anio,setGenerando)}
+              <div style={{fontSize:13,fontWeight:600,color:C.label3,textTransform:"uppercase",letterSpacing:.8,marginBottom:12}}>
+                {MESES[mes]} {anio}
+              </div>
+              <div style={{display:"flex",gap:10}}>
+                <button onClick={function(){generarExcelMensual(ventas,inv,mes,anio,setGenerando);}}
                   disabled={generando}
-                  style={{flex:1,background:generando?C.bg2:`${C.green}15`,border:`1px solid ${generando?C.sep:C.green}40`,
-                    borderRadius:12,padding:"11px 10px",color:generando?C.label3:C.green,
-                    fontSize:12,fontFamily:FONT_UI,fontWeight:700,cursor:generando?"not-allowed":"pointer",
-                    display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
-                  {generando?"⏳ Generando…":"📊 Reporte Mensual"}
+                  style={{flex:1,background:generando?C.bg2:`${C.green}20`,border:`1px solid ${generando?C.sep:C.green}40`,
+                    borderRadius:12,padding:"12px 10px",color:generando?C.label3:C.green,
+                    fontSize:13,fontFamily:FONT,fontWeight:600,cursor:generando?"not-allowed":"pointer",
+                    WebkitTapHighlightColor:"transparent",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
+                  {generando?"⏳ Generando…":"📊 Reporte Mensual .xlsx"}
                 </button>
-                <button onClick={()=>generarExcelStock(inv,setGenerando)}
+                <button onClick={function(){generarExcelStock(inv,setGenerando);}}
                   disabled={generando}
-                  style={{flex:1,background:generando?C.bg2:`${C.blue}15`,border:`1px solid ${generando?C.sep:C.blue}40`,
-                    borderRadius:12,padding:"11px 10px",color:generando?C.label3:C.blue,
-                    fontSize:12,fontFamily:FONT_UI,fontWeight:700,cursor:generando?"not-allowed":"pointer",
-                    display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
-                  {generando?"⏳":"📦 Stock"}
+                  style={{flex:1,background:generando?C.bg2:`${C.blue}20`,border:`1px solid ${generando?C.sep:C.blue}40`,
+                    borderRadius:12,padding:"12px 10px",color:generando?C.label3:C.blue,
+                    fontSize:13,fontFamily:FONT,fontWeight:600,cursor:generando?"not-allowed":"pointer",
+                    WebkitTapHighlightColor:"transparent",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
+                  {generando?"⏳":"📦 Stock .xlsx"}
                 </button>
               </div>
             </div>
 
-            {/* Lista de marcas */}
-            <div style={{fontSize:12,fontWeight:700,color:C.label3,textTransform:"uppercase",
-              letterSpacing:.8,marginBottom:10,fontFamily:FONT_UI}}>Cierre por marca</div>
             <div style={{display:"flex",flexDirection:"column",gap:2}}>
               {MARCAS.map((m,i)=>{
                 const liq=getLiq(m.id);
                 const cerrado=cierres[`${MK}-${m.id}`]?.cerrado;
-                const pctBar=liq.bruto>0?100:0;
                 return (
-                  <div key={m.id} onClick={()=>setMLiq(m.id)} style={{
-                    background:cerrado?`${C.green}08`:C.bg2,
+                  <div key={m.id} onClick={function(){setMLiq(m.id);}} style={{
+                    background:C.bg2,
                     borderRadius:i===0?"14px 14px 2px 2px":i===MARCAS.length-1?"2px 2px 14px 14px":"2px",
-                    padding:"12px 16px",
+                    padding:"14px 16px",
                     borderBottom:i<MARCAS.length-1?`1px solid ${C.sep}`:"",
-                    border:cerrado?`1px solid ${C.green}25`:"",
                     display:"flex",alignItems:"center",gap:12,
                     cursor:"pointer",WebkitTapHighlightColor:"transparent",
-                    transition:"background .15s",
                   }}>
-                    <div style={{width:36,height:36,borderRadius:10,
-                      background:`${m.color}20`,display:"flex",alignItems:"center",
-                      justifyContent:"center",fontSize:17,flexShrink:0}}>{m.emoji}</div>
-                    <div style={{flex:1,minWidth:0}}>
-                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:3}}>
-                        <div style={{fontSize:15,fontWeight:700,color:C.label,fontFamily:FONT_UI}}>{m.nombre}</div>
-                        <div style={{fontSize:14,fontWeight:700,
-                          color:liq.bruto>0?m.color:C.label3,fontFamily:FONT_UI}}>
-                          {liq.bruto>0?$(liq.neto):""}
-                        </div>
+                    <div style={{width:38,height:38,borderRadius:10,
+                      background:`${m.color}22`,display:"flex",alignItems:"center",
+                      justifyContent:"center",fontSize:18,flexShrink:0}}>{m.emoji}</div>
+                    <div style={{flex:1}}>
+                      <div style={{fontSize:16,fontWeight:500,color:C.label,fontFamily:FONT}}>{m.nombre}</div>
+                      <div style={{fontSize:13,color:liq.bruto>0?C.gold:C.label3,fontFamily:FONT}}>
+                        {liq.bruto>0 ? `${$(liq.neto)} neto` : "Sin ventas"}
                       </div>
-                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                        <div style={{fontSize:12,color:C.label3,fontFamily:FONT_UI}}>
-                          {liq.bruto>0?`Bruto ${$(liq.bruto)} · ${liq.vMarca.length} venta${liq.vMarca.length>1?"s":""}`:"Sin ventas este mes"}
-                        </div>
-                        <div style={{display:"flex",alignItems:"center",gap:6}}>
-                          {cerrado
-                            ? <span style={{fontSize:11,fontWeight:700,color:C.green,
-                                background:`${C.green}15`,borderRadius:20,padding:"2px 8px",fontFamily:FONT_UI}}>✓ Cerrado</span>
-                            : liq.bruto>0
-                              ? <span style={{fontSize:11,fontWeight:700,color:C.amber,
-                                  background:`${C.amber}15`,borderRadius:20,padding:"2px 8px",fontFamily:FONT_UI}}>Pendiente</span>
-                              : null
-                          }
-                          <span style={{color:C.label3,fontSize:20}}>›</span>
-                        </div>
-                      </div>
+                    </div>
+                    <div style={{display:"flex",alignItems:"center",gap:8}}>
+                      {cerrado
+                        ? <Chip color={C.green} small>✓ Cerrado</Chip>
+                        : liq.bruto>0&&<Chip color={C.amber} small>Pendiente</Chip>
+                      }
+                      <span style={{color:C.label3,fontSize:22}}>›</span>
                     </div>
                   </div>
                 );
@@ -2238,48 +1907,50 @@ export default function App(){
         )}
       </div>
 
-      {/* ── BOTTOM TAB BAR ── */}
+      {/* -- BOTTOM TAB BAR -- */}
       <TabBar tabs={TABS} active={tab} onChange={t=>{setTab(t);setMD(null);}}/>
 
-      {/* ══ SHEETS ══ */}
+      {/* -- SHEETS -- */}
 
       {/* Sheet: Carga Masiva Excel */}
       <SheetExcelMasivo
         open={shExcel}
-        onClose={()=>setShExcel(false)}
+        onClose={function(){setShExcel(false);}}
         inv={inv}
         setInv={setInv}
         drive={drive}
       />
 
-            {/* Sheet: Recibir Producto */}
+      {/* Sheet: Recibir Producto */}
       <SheetRecibir
         open={sheetInv}
-        onClose={()=>setShInv(false)}
+        onClose={function(){setShInv(false);}}
         inv={inv}
         onAdd={addProd}
         fInv={fInv}
         setFInv={setFInv}
       />
 
-      {/* Sheet: Dar de Baja — múltiple por código + selección visual */}
-      <SheetBajaMultiple
-        open={sheetBaja}
-        onClose={()=>setShBaja(false)}
-        inv={inv}
-        bajasLista={bajasLista}
-        setBajasLista={setBajasLista}
-        bajaCod={bajaCod}
-        setBajaCod={setBajaCod}
-        bajaMsg={bajaMsg}
-        setBajaMsg={setBajaMsg}
-        onConfirmar={confirmarBajas}
-        onQuitar={quitarDeBaja}
-        darBaja={darBaja}
-      />
+      {/* Sheet: Dar de Baja */}
+      <Sheet open={sheetBaja} onClose={function(){setShBaja(false);}} title="Dar de Baja por Código">
+        <p style={{color:C.label2,fontFamily:FONT,fontSize:15,margin:"0 0 16px"}}>
+          Ingresa el código del producto para marcarlo como agotado.
+        </p>
+        <IOSInput label="Código del producto" value={bajaCod}
+          onChange={e=>{setBajaCod(e.target.value.toUpperCase());setBajaMsg(null);}}
+          placeholder="Ej: DON-CREM-0001"
+          style={{fontFamily:"monospace",textTransform:"uppercase"}}/>
+        {bajaMsg&&(
+          <div style={{padding:"12px 14px",borderRadius:12,marginBottom:12,
+            background:bajaMsg.ok?`${C.green}15`:`${C.red}15`,
+            border:`1px solid ${(bajaMsg.ok?C.green:C.red)}40`,
+            color:bajaMsg.ok?C.green:C.red,fontSize:14,fontFamily:FONT}}>{bajaMsg.msg}</div>
+        )}
+        <IOSBtn onPress={darBaja} variant="danger" full disabled={!bajaCod.trim()}>Dar de Baja</IOSBtn>
+      </Sheet>
 
-      {/* ══ DRIVE CONFIG SHEET ══ */}
-      <Sheet open={sheetDrive} onClose={()=>setShDrive(false)} title="☁ Google Drive" tall>
+      {/* -- DRIVE CONFIG SHEET -- */}
+      <Sheet open={sheetDrive} onClose={function(){setShDrive(false);}} title="☁ Google Drive" tall>
         {/* Status */}
         <div style={{background:drive.url?`${C.green}15`:`${C.label3}10`,borderRadius:16,
           padding:"16px",marginBottom:20,border:`1px solid ${drive.url?C.green+"30":C.sep}`}}>
@@ -2361,7 +2032,7 @@ export default function App(){
             ))}
           </div>
           <div style={{marginTop:10}}>
-            <IOSBtn onPress={()=>()=>{localStorage.removeItem('th_sync_log');window.location.reload()}}
+            <IOSBtn onPress={function(){()=>{localStorage.removeItem('th_sync_log');window.location.reload();}}}
               variant="danger" small>Limpiar historial</IOSBtn>
           </div>
         </div>}
@@ -2372,38 +2043,255 @@ export default function App(){
       <LiqModal
         marcaId={mLiq} ventas={ventas} mes={mes} anio={anio}
         MK={MK} cierres={cierres} setCierres={setCierres}
-        onClose={()=>setMLiq(null)}
+        onClose={function(){setMLiq(null);}}
         syncCierre={drive.syncCierre}
       />
     </div>
   );
 }
 
-// ══════════════════════════════════════════════════════════
+
+// ------------------------------------------------------------
+// ESCÁNER QR EN VIVO — usa cámara nativa del iPhone
+// Lee QR en tiempo real sin necesidad de tomar foto
+// ------------------------------------------------------------
+
+// QR Display usando canvas nativo
+function QRDisplay({codigo}) {
+  const ref = useRef(null);
+  useEffect(function() {
+    if (!codigo || !ref.current) return;
+    ref.current.innerHTML = "";
+    loadQRCode().then(function(QRCode) {
+      if (!QRCode || !ref.current) return;
+      try {
+        new QRCode(ref.current, {
+          text: codigo,
+          width: 140, height: 140,
+          colorDark: "#1A2E1A",
+          colorLight: "#ffffff",
+          correctLevel: QRCode.CorrectLevel.M,
+        });
+      } catch(e) {}
+    });
+  }, [codigo]);
+  return (
+    <div style={{display:"flex", flexDirection:"column", alignItems:"center", gap:6}}>
+      <div ref={ref} style={{
+        width:140, height:140, background:"#fff",
+        borderRadius:8, overflow:"hidden",
+        display:"flex", alignItems:"center", justifyContent:"center"
+      }}/>
+      <div style={{
+        fontFamily:"monospace", fontSize:10, color:"#5C8A5C",
+        letterSpacing:1, textAlign:"center", maxWidth:150, wordBreak:"break-all"
+      }}>{codigo}</div>
+    </div>
+  );
+}
+
+function QRScanner({ onDetect, onClose }) {
+  const videoRef  = useRef(null);
+  const canvasRef = useRef(null);
+  const streamRef = useRef(null);
+  const timerRef  = useRef(null);
+  var _h36 = useState("iniciando"); var status = _h36[0]; var setStatus = _h36[1]; // iniciando | activo | error
+  var _h37 = useState(""); var msg = _h37[0]; var setMsg = _h37[1];
+
+  useEffect(() => {
+    startCamera();
+    return () => stopCamera();
+  }, []);
+
+  async function startCamera() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "environment", width: 1280, height: 720 }
+      });
+      streamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        videoRef.current.play();
+        setStatus("activo");
+        setMsg("Apunta al código QR de la prenda");
+        // Start scanning loop
+        timerRef.current = setInterval(scanFrame, 300);
+      }
+    } catch (e) {
+      setStatus("error");
+      setMsg("No se pudo acceder a la cámara. Permite el acceso en Ajustes.");
+    }
+  }
+
+  function stopCamera() {
+    if (timerRef.current) clearInterval(timerRef.current);
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(t => t.stop());
+    }
+  }
+
+  async function scanFrame() {
+    if (!videoRef.current || !canvasRef.current) return;
+    const video  = videoRef.current;
+    const canvas = canvasRef.current;
+    if (video.readyState !== video.HAVE_ENOUGH_DATA) return;
+    canvas.width  = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext("2d");
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    // Use BarcodeDetector API (native, works on iOS 17+)
+    if (window.BarcodeDetector) {
+      try {
+        const detector = new window.BarcodeDetector({ formats: ["qr_code","code_128","ean_13","code_39"] });
+        const codes = await detector.detect(canvas);
+        if (codes.length > 0) {
+          const raw = codes[0].rawValue;
+          clearInterval(timerRef.current);
+          stopCamera();
+          onDetect(raw);
+          return;
+        }
+      } catch(e) {}
+    }
+    // Fallback: ZXing
+    try {
+      const ZXing = await loadZXing();
+      if (!ZXing) return;
+      const luminance = new ZXing.HTMLCanvasElementLuminanceSource(canvas);
+      const bitmap = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(luminance));
+      const hints = new Map();
+      hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
+      const reader = new ZXing.MultiFormatReader();
+      reader.setHints(hints);
+      const result = reader.decode(bitmap);
+      if (result?.text) {
+        clearInterval(timerRef.current);
+        stopCamera();
+        onDetect(result.text);
+      }
+    } catch(e) {}
+  }
+
+  return (
+    <div style={{
+      position:"fixed", inset:0, zIndex:9999,
+      background:"#000",
+      display:"flex", flexDirection:"column",
+    }}>
+      {/* Header */}
+      <div style={{
+        padding:"16px 20px",
+        display:"flex", justifyContent:"space-between", alignItems:"center",
+        background:"rgba(0,0,0,0.8)",
+      }}>
+        <div>
+          <div style={{fontSize:17,fontWeight:700,color:"#fff",fontFamily:FONT}}>Escanear QR</div>
+          <div style={{fontSize:13,color:"rgba(255,255,255,0.6)",fontFamily:FONT,marginTop:2}}>{msg}</div>
+        </div>
+        <button onClick={function(){{stopCamera();onClose();;}}} style={{
+          background:"rgba(255,255,255,0.15)",border:"none",
+          width:36,height:36,borderRadius:"50%",cursor:"pointer",
+          color:"#fff",fontSize:18,display:"flex",alignItems:"center",justifyContent:"center",
+          WebkitTapHighlightColor:"transparent",
+        }}>✕</button>
+      </div>
+
+      {/* Cámara */}
+      <div style={{flex:1,position:"relative",overflow:"hidden"}}>
+        <video
+          ref={videoRef}
+          playsInline muted autoPlay
+          style={{width:"100%",height:"100%",objectFit:"cover"}}
+        />
+        <canvas ref={canvasRef} style={{display:"none"}}/>
+
+        {/* Marco de escaneo */}
+        {status==="activo"&&(
+          <div style={{
+            position:"absolute",
+            top:"50%",left:"50%",
+            transform:"translate(-50%,-60%)",
+            width:220,height:220,
+          }}>
+            {/* Esquinas del marco */}
+            {[
+              {top:0,left:0,borderTop:"3px solid #4A9B6F",borderLeft:"3px solid #4A9B6F"},
+              {top:0,right:0,borderTop:"3px solid #4A9B6F",borderRight:"3px solid #4A9B6F"},
+              {bottom:0,left:0,borderBottom:"3px solid #4A9B6F",borderLeft:"3px solid #4A9B6F"},
+              {bottom:0,right:0,borderBottom:"3px solid #4A9B6F",borderRight:"3px solid #4A9B6F"},
+            ].map((s,i)=>(
+              <div key={i} style={{position:"absolute",width:30,height:30,...s}}/>
+            ))}
+            {/* Línea de escaneo animada */}
+            <div style={{
+              position:"absolute",left:0,right:0,height:2,
+              background:"rgba(74,155,111,0.8)",
+              animation:"scanline 2s linear infinite",
+              top:"50%",
+            }}/>
+            <style>{`@keyframes scanline{0%{top:10%}50%{top:90%}100%{top:10%}}`}</style>
+          </div>
+        )}
+
+        {status==="error"&&(
+          <div style={{
+            position:"absolute",inset:0,
+            display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",
+            background:"rgba(0,0,0,0.7)",padding:24,textAlign:"center",
+          }}>
+            <div style={{fontSize:48,marginBottom:16}}>📷</div>
+            <div style={{fontSize:16,color:"#fff",fontFamily:FONT,marginBottom:8}}>Sin acceso a la cámara</div>
+            <div style={{fontSize:13,color:"rgba(255,255,255,0.6)",fontFamily:FONT,marginBottom:20}}>{msg}</div>
+            <button onClick={function(){{stopCamera();onClose();;}}} style={{
+              background:C.green,border:"none",borderRadius:12,
+              padding:"12px 24px",color:"#fff",fontSize:15,
+              fontFamily:FONT,fontWeight:600,cursor:"pointer",
+            }}>Cerrar</button>
+          </div>
+        )}
+
+        {status==="iniciando"&&(
+          <div style={{
+            position:"absolute",inset:0,
+            display:"flex",alignItems:"center",justifyContent:"center",
+            background:"rgba(0,0,0,0.5)",
+          }}>
+            <div style={{fontSize:15,color:"#fff",fontFamily:FONT}}>Iniciando cámara…</div>
+          </div>
+        )}
+      </div>
+
+      {/* Footer hint */}
+      <div style={{
+        padding:"16px 20px",
+        background:"rgba(0,0,0,0.8)",
+        textAlign:"center",
+        fontSize:13,color:"rgba(255,255,255,0.5)",fontFamily:FONT,
+      }}>
+        El código se detecta automáticamente
+      </div>
+    </div>
+  );
+}
+
+// ----------------------------------------------------------
 // POS — iOS Caja
-// ══════════════════════════════════════════════════════════
+// ----------------------------------------------------------
 function POS({inv,onVenta}){
-  const[carrito,setCarrito]   =useState([]);
-  const[busq,setBusq]         =useState("");
-  const[pago,setPago]         =useState("efectivo");
-  const[vendedor,setVendedor] =useState("");
-  const[descExtra,setDescExtra]=useState(0);
-  const[etiqueta,setEtiqueta] =useState(null);
-  const[ultima,setUltima]     =useState(null);
-  const[showOk,setShowOk]     =useState(false);
-  const[showPago,setShowPago] =useState(false);
-  const[scanStatus,setScanStatus]=useState(null); // null | "leyendo" | "ok" | "notfound"
-  const[scanMsg,setScanMsg]   =useState("");
-  const[conFactura,setConFactura]=useState(false);
-  const[factNombre,setFactNombre]=useState("");
-  const[factNit,setFactNit]   =useState("");
-  const[clienteNombre,setClienteNombre]=useState("");
-  const[clienteTel,setClienteTel]=useState("");
+  var _h38 = useState([]); var carrito = _h38[0]; var setCarrito = _h38[1];
+  var _h39 = useState(""); var busq = _h39[0]; var setBusq = _h39[1];
+  var _h40 = useState("efectivo"); var pago = _h40[0]; var setPago = _h40[1];
+  var _hm1 = useState(false); var pagoMixto = _hm1[0]; var setPagoMixto = _hm1[1];
+  var _hm2 = useState({efectivo:"", qr:"", tarjeta:""}); var montosMixtos = _hm2[0]; var setMontosMixtos = _hm2[1];
+  var _h41 = useState(""); var vendedor = _h41[0]; var setVendedor = _h41[1];
+  var _h42 = useState(0); var descExtra = _h42[0]; var setDescExtra = _h42[1];
+  var _h43 = useState(null); var ultima = _h43[0]; var setUltima = _h43[1];
+  var _h44 = useState(false); var showOk = _h44[0]; var setShowOk = _h44[1];
+  var _h45 = useState(false); var showPago = _h45[0]; var setShowPago = _h45[1];
+  var _h46 = useState(null); var scanStatus = _h46[0]; var setScanStatus = _h46[1];
+  var _h47 = useState(""); var scanMsg = _h47[0]; var setScanMsg = _h47[1];
+  var _h48 = useState(false); var showScanner = _h48[0]; var setShowScanner = _h48[1];
   const inputRef=useRef();
-  const fileRef=useRef();
-  const videoRef=useRef();
-  const scannerRef=useRef(null);
-  const[camActiva,setCamActiva]=useState(false);
 
   const resultados=useMemo(()=>{
     if(!busq.trim())return[];
@@ -2428,79 +2316,6 @@ function POS({inv,onVenta}){
     return Object.entries(m);
   },[carrito]);
 
-  function startCamera(){
-    setCamActiva(true);
-    setScanStatus("leyendo");
-    setScanMsg("Apunta la cámara al código QR...");
-    loadZXing().then(ZXing=>{
-      if(!ZXing){setScanStatus("notfound");setScanMsg("No se pudo cargar el lector");return;}
-      const hints=new Map();
-      const formats=[
-        ZXing.BarcodeFormat.QR_CODE, ZXing.BarcodeFormat.CODE_128,
-        ZXing.BarcodeFormat.CODE_39, ZXing.BarcodeFormat.EAN_13,
-        ZXing.BarcodeFormat.DATA_MATRIX,
-      ];
-      hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS,formats);
-      hints.set(ZXing.DecodeHintType.TRY_HARDER,true);
-      const reader=new ZXing.MultiFormatReader();
-      reader.setHints(hints);
-
-      navigator.mediaDevices.getUserMedia({video:{facingMode:"environment"}})
-        .then(stream=>{
-          if(!videoRef.current){stream.getTracks().forEach(t=>t.stop());return;}
-          videoRef.current.srcObject=stream;
-          videoRef.current.play();
-          scannerRef.current={stream,reader};
-
-          const scan=()=>{
-            if(!videoRef.current||!scannerRef.current) return;
-            const v=videoRef.current;
-            if(v.readyState<2){requestAnimationFrame(scan);return;}
-            const canvas=document.createElement("canvas");
-            canvas.width=v.videoWidth; canvas.height=v.videoHeight;
-            canvas.getContext("2d").drawImage(v,0,0);
-            try{
-              const lum=new ZXing.HTMLCanvasElementLuminanceSource(canvas);
-              const bb=new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(lum));
-              const result=reader.decode(bb);
-              if(result){
-                const codigo=result.getText().trim().toUpperCase();
-                stopCamera();
-                const prod=inv.find(i=>i.codigo.toUpperCase()===codigo);
-                if(prod&&prod.stock>0){
-                  add(prod);
-                  setScanStatus("ok");
-                  setScanMsg("✓ "+prod.nombre+" agregado al carrito");
-                } else if(prod){
-                  setScanStatus("notfound");
-                  setScanMsg(prod.nombre+" está agotado");
-                } else {
-                  setScanStatus("notfound");
-                  setScanMsg("Código "+codigo+" no encontrado");
-                }
-                return;
-              }
-            }catch(e){}
-            requestAnimationFrame(scan);
-          };
-          requestAnimationFrame(scan);
-        })
-        .catch(err=>{
-          setScanStatus("notfound");
-          setScanMsg("No se pudo acceder a la cámara: "+err.message);
-          setCamActiva(false);
-        });
-    });
-  }
-
-  function stopCamera(){
-    if(scannerRef.current?.stream){
-      scannerRef.current.stream.getTracks().forEach(t=>t.stop());
-    }
-    scannerRef.current=null;
-    setCamActiva(false);
-  }
-
   function add(prod){
     const m=MARCAS.find(x=>x.id===prod.marcaId);
     setCarrito(p=>{
@@ -2515,41 +2330,7 @@ function POS({inv,onVenta}){
   }
   function cambiar(prodId,d){setCarrito(p=>p.map(x=>x.prodId===prodId?{...x,cantidad:Math.max(1,x.cantidad+d)}:x));}
   function quitar(prodId){setCarrito(p=>p.filter(x=>x.prodId!==prodId));}
-  async function handleEtiqueta(e){
-    const f=e.target.files?.[0];
-    if(!f) return;
-    // Guardar imagen para adjuntar a la venta
-    const r=new FileReader();
-    r.onload=ev=>setEtiqueta(ev.target.result);
-    r.readAsDataURL(f);
-    // Intentar leer código de barras/QR de la imagen
-    setScanStatus("leyendo");
-    try {
-      const codigo = await leerCodigoDeImagen(f);
-      if(codigo){
-        setScanStatus("ok");
-        setScanMsg(`Código detectado: ${codigo}`);
-        // Buscar el producto en el inventario por código
-        const prod = inv.find(i=>i.codigo.toUpperCase()===codigo.toUpperCase());
-        if(prod){
-          // Agregar directamente al carrito
-          add(prod);
-          setScanMsg(`✓ "${prod.nombre}" agregado al carrito`);
-        } else {
-          // Poner en el buscador para búsqueda manual
-          setBusq(codigo);
-          setScanMsg(`Código "${codigo}" — busca el producto`);
-        }
-      } else {
-        setScanStatus("notfound");
-        setScanMsg("No se detectó código — foto guardada");
-      }
-    } catch(err){
-      setScanStatus("notfound");
-      setScanMsg("No se pudo leer el código");
-    }
-    setTimeout(()=>setScanStatus(null),4000);
-  }
+
 
   function cobrar(){
     if(!carrito.length)return;
@@ -2557,21 +2338,69 @@ function POS({inv,onVenta}){
     const items=carrito.map(it=>({prodId:it.prodId,codigo:it.codigo,nombre:it.nombre,
       marcaId:it.marcaId,marcaNombre:it.marcaNombre,
       cantidad:it.cantidad,precioUnit:it.precio,subtotal:it.precio*it.cantidad*factor}));
-    const facturaData = conFactura ? {
-      conFactura:true,
-      factNombre:factNombre.trim(),
-      factNit:factNit.trim(),
-    } : {conFactura:false};
-    const vf=onVenta({items,total,subtotal,descPct,metodoPago:pago,vendedor:vendedor||"Tienda",etiquetaImg:etiqueta,
-      clienteNombre:clienteNombre.trim()||null, clienteTel:clienteTel.trim()||null,
-      ...facturaData});
+    // Build payment method string
+    var metodoPagoFinal = pago;
+    if (pagoMixto) {
+      var partes = [];
+      if (parseFloat(montosMixtos.efectivo) > 0) partes.push("efectivo:" + montosMixtos.efectivo);
+      if (parseFloat(montosMixtos.qr) > 0) partes.push("qr:" + montosMixtos.qr);
+      if (parseFloat(montosMixtos.tarjeta) > 0) partes.push("tarjeta:" + montosMixtos.tarjeta);
+      metodoPagoFinal = partes.length > 0 ? "mixto|" + partes.join("|") : pago;
+    }
+    var vf=onVenta({items,total,subtotal,descPct,metodoPago:metodoPagoFinal,vendedor:vendedor||"Tienda",etiquetaImg:null});
     setUltima(vf);setShowOk(true);setShowPago(false);
-    setCarrito([]);setDescExtra(0);setBusq("");setEtiqueta(null);
-    setConFactura(false);setFactNombre("");setFactNit("");setClienteNombre("");setClienteTel("");
+    setCarrito([]);setDescExtra(0);setBusq("");
   }
 
   return (
-    <div>
+    <div style={{position:"relative", minHeight:"100vh"}}>
+
+      {/* Logo fondo decorativo */}
+      <div style={{
+        position:"fixed",
+        top:"50%", left:"50%",
+        transform:"translate(-50%, -50%)",
+        zIndex:0,
+        pointerEvents:"none",
+        display:"flex",flexDirection:"column",
+        alignItems:"center",justifyContent:"center",
+        opacity:0.045,
+        userSelect:"none",
+      }}>
+        <div style={{
+          fontSize:180,
+          fontFamily:"Georgia,serif",
+          fontWeight:900,
+          color:C.gold,
+          letterSpacing:-8,
+          lineHeight:1,
+        }}>TH</div>
+        <div style={{
+          width:280, height:2,
+          background:C.gold,
+          margin:"8px 0",
+        }}/>
+        <div style={{
+          fontSize:26,
+          fontFamily:"Georgia,serif",
+          fontWeight:400,
+          color:C.gold,
+          letterSpacing:14,
+          textTransform:"uppercase",
+        }}>TOSCANA</div>
+        <div style={{
+          fontSize:14,
+          fontFamily:"Georgia,serif",
+          fontWeight:300,
+          color:C.gold,
+          letterSpacing:10,
+          marginTop:4,
+        }}>CASA DE MODA</div>
+      </div>
+
+      {/* Contenido encima del logo */}
+      <div style={{position:"relative",zIndex:1}}>
+
       {/* Search bar */}
       <div style={{position:"relative",marginBottom:14}}>
         <span style={{position:"absolute",left:12,top:"50%",transform:"translateY(-50%)",fontSize:16,color:C.label3}}>🔍</span>
@@ -2595,7 +2424,7 @@ function POS({inv,onVenta}){
           {resultados.map((p,idx)=>{
             const m=MARCAS.find(x=>x.id===p.marcaId);
             return (
-              <div key={p.id} onClick={()=>add(p)} style={{
+              <div key={p.id} onClick={function(){add(p);}} style={{
                 display:"flex",alignItems:"center",justifyContent:"space-between",
                 padding:"13px 16px",
                 borderBottom:idx<resultados.length-1?`1px solid ${C.sep}`:"",
@@ -2648,7 +2477,7 @@ function POS({inv,onVenta}){
                 </div>
               </div>
               <div style={{display:"flex",alignItems:"center",gap:10,flexShrink:0}}>
-                <button onClick={()=>cambiar(it.prodId,-1)} style={{
+                <button onClick={function(){cambiar(it.prodId,-1);}} style={{
                   width:32,height:32,borderRadius:"50%",
                   background:C.fill2,border:"none",cursor:"pointer",
                   display:"flex",alignItems:"center",justifyContent:"center",
@@ -2656,7 +2485,7 @@ function POS({inv,onVenta}){
                   WebkitTapHighlightColor:"transparent",
                 }}>−</button>
                 <span style={{fontSize:16,fontWeight:700,color:C.label,fontFamily:FONT,minWidth:20,textAlign:"center"}}>{it.cantidad}</span>
-                <button onClick={()=>cambiar(it.prodId,1)} style={{
+                <button onClick={function(){cambiar(it.prodId,1);}} style={{
                   width:32,height:32,borderRadius:"50%",
                   background:C.fill2,border:"none",cursor:"pointer",
                   display:"flex",alignItems:"center",justifyContent:"center",
@@ -2667,7 +2496,7 @@ function POS({inv,onVenta}){
               <div style={{minWidth:70,textAlign:"right"}}>
                 <div style={{fontSize:15,fontWeight:600,color:C.gold,fontFamily:FONT}}>{$(it.precio*it.cantidad)}</div>
               </div>
-              <button onClick={()=>quitar(it.prodId)} style={{
+              <button onClick={function(){quitar(it.prodId);}} style={{
                 background:"none",border:"none",cursor:"pointer",
                 color:C.red,fontSize:20,padding:"4px",
                 WebkitTapHighlightColor:"transparent",
@@ -2677,75 +2506,45 @@ function POS({inv,onVenta}){
         </div>
       )}
 
-      {/* Escanear QR — cámara en tiempo real */}
-      {camActiva ? (
-        <div style={{marginBottom:14,borderRadius:16,overflow:"hidden",
-          border:`1.5px solid ${C.gold}`,position:"relative"}}>
-          <video ref={videoRef} style={{width:"100%",display:"block",
-            maxHeight:220,objectFit:"cover",background:"#000"}}
-            playsInline muted/>
-          <div style={{position:"absolute",top:0,left:0,right:0,bottom:0,
-            display:"flex",alignItems:"center",justifyContent:"center",
-            pointerEvents:"none"}}>
-            <div style={{width:160,height:160,border:"2px solid rgba(255,255,255,0.6)",
-              borderRadius:12,boxShadow:"0 0 0 4000px rgba(0,0,0,0.3)"}}/>
-          </div>
-          <div style={{position:"absolute",bottom:0,left:0,right:0,
-            background:"rgba(0,0,0,0.6)",padding:"10px 14px",
-            display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-            <span style={{color:"#fff",fontSize:13,fontFamily:FONT_UI}}>
-              {scanMsg||"Apunta al código QR..."}
-            </span>
-            <button onClick={stopCamera} style={{
-              background:"rgba(255,255,255,0.2)",border:"none",color:"#fff",
-              borderRadius:8,padding:"6px 12px",fontSize:12,cursor:"pointer",
-              fontFamily:FONT_UI,fontWeight:600}}>Cancelar</button>
-          </div>
-        </div>
-      ) : (
-        <div onClick={startCamera} style={{
-          marginBottom:14, borderRadius:16, cursor:"pointer",
-          border: scanStatus==="ok" ? `1.5px solid ${C.green}`
-                : scanStatus==="notfound" ? `1.5px solid ${C.amber}`
-                : `1.5px dashed ${C.sep}`,
-          background: scanStatus==="ok" ? `${C.green}10`
-                    : scanStatus==="notfound" ? `${C.amber}10`
-                    : C.bg2,
-          padding:"14px 18px",
-          display:"flex", alignItems:"center", gap:14,
-          transition:"all .2s",
-          WebkitTapHighlightColor:"transparent",
-        }}>
-          <div style={{
-            width:46, height:46, borderRadius:12, flexShrink:0,
-            background: scanStatus==="ok" ? `${C.green}20` : `${C.label4}30`,
-            display:"flex", alignItems:"center", justifyContent:"center",
-            fontSize:22,
-          }}>
-            {scanStatus==="ok" ? "✓" : scanStatus==="notfound" ? "⚠️" : "▦"}
-          </div>
-          <div style={{flex:1}}>
-            <div style={{
-              fontSize:15, fontWeight:700, fontFamily:FONT_UI,
-              color: scanStatus==="ok" ? C.green
-                   : scanStatus==="notfound" ? C.amber
-                   : C.label,
-            }}>
-              {scanStatus==="ok" ? "¡Producto encontrado!"
-             : scanStatus==="notfound" ? "Código no encontrado"
-             : "Escanear QR"}
-            </div>
-            <div style={{fontSize:12, color:C.label3, fontFamily:FONT_UI, marginTop:2}}>
-              {scanMsg || "Toca para abrir la cámara"}
-            </div>
-          </div>
-          <div style={{color:C.label3,fontSize:20}}>›</div>
-        </div>
+      {/* Escáner QR en vivo */}
+      {showScanner&&(
+        <QRScanner
+          onDetect={(codigo)=>{
+            setShowScanner(false);
+            setScanStatus("ok");
+            const prod=inv.find(i=>i.codigo.toUpperCase()===codigo.toUpperCase());
+            if(prod){
+              add(prod);
+              setScanMsg(`✓ "${prod.nombre}" agregado al carrito`);
+            } else {
+              setBusq(codigo);
+              setScanMsg(`Código "${codigo}" — no encontrado en inventario`);
+              setScanStatus("notfound");
+            }
+            setTimeout(()=>{setScanStatus(null);setScanMsg("");},4000);
+          }}
+          onClose={function(){setShowScanner(false);}}
+        />
       )}
+
+      {/* Botón escanear */}
+      <div style={{marginBottom:14}}>
+        <IOSBtn onPress={function(){setShowScanner(true);}} variant="fill" full icon="📷">
+          Escanear código QR
+        </IOSBtn>
+        {scanMsg&&(
+          <div style={{marginTop:10,padding:"10px 14px",borderRadius:12,fontSize:14,fontFamily:FONT,
+            background:scanStatus==="ok"?`${C.green}15`:`${C.amber}15`,
+            border:`1px solid ${scanStatus==="ok"?C.green:C.amber}30`,
+            color:scanStatus==="ok"?C.green:C.amber}}>
+            {scanMsg}
+          </div>
+        )}
+      </div>
 
       {/* Botón cobrar */}
       <IOSBtn
-        onPress={()=>carrito.length&&setShowPago(true)}
+        onPress={function(){carrito.length&&setShowPago(true);}}
         variant="primary" full
         disabled={!carrito.length}
         style={{fontSize:18,padding:"17px"}}
@@ -2759,7 +2558,7 @@ function POS({inv,onVenta}){
           borderRadius:16,padding:"16px",marginTop:14}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10}}>
             <div style={{fontSize:13,fontWeight:700,color:C.green,textTransform:"uppercase",letterSpacing:.5}}>✓ Venta Registrada</div>
-            <button onClick={()=>setShowOk(false)} style={{background:"none",border:"none",
+            <button onClick={function(){setShowOk(false);}} style={{background:"none",border:"none",
               color:C.label3,cursor:"pointer",fontSize:18,WebkitTapHighlightColor:"transparent"}}>×</button>
           </div>
           <div style={{fontFamily:"monospace",fontSize:13,color:C.gold}}>{ultima.id}</div>
@@ -2770,7 +2569,7 @@ function POS({inv,onVenta}){
             </div>
           ))}
           <div style={{marginTop:12}}>
-            <IOSBtn onPress={()=>sendWA(ultima)} variant="fill" full small icon="📲">
+            <IOSBtn onPress={function(){sendWA(ultima);}} variant="fill" full small icon="📲">
               Enviar por WhatsApp
             </IOSBtn>
           </div>
@@ -2778,7 +2577,15 @@ function POS({inv,onVenta}){
       )}
 
       {/* Sheet: Cobro */}
-      <Sheet open={showPago} onClose={()=>setShowPago(false)} title="Confirmar Cobro" tall>
+      {showPago && (
+      <div style={{position:"fixed",inset:0,zIndex:500,background:"rgba(0,0,0,0.55)",display:"flex",alignItems:"flex-end"}} onClick={function(e){if(e.target===e.currentTarget)setShowPago(false);}}>
+      <div style={{background:"#FFFFFF",borderRadius:"22px 22px 0 0",width:"100%",maxHeight:"90vh",overflowY:"auto",paddingBottom:24}}>
+        <div style={{display:"flex",justifyContent:"center",padding:"12px 0 4px"}}><div style={{width:36,height:5,borderRadius:3,background:C.accent}}/></div>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 20px 16px"}}>
+          <h3 style={{margin:0,fontSize:17,fontWeight:600,color:C.label,fontFamily:FONT}}>Confirmar Cobro</h3>
+          <button onClick={function(){setShowPago(false);}} style={{background:C.fill2,border:"none",borderRadius:"50%",width:30,height:30,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",color:C.label2,fontSize:16}}>x</button>
+        </div>
+        <div style={{padding:"0 16px"}}>
         {/* Total */}
         <div style={{background:`${C.gold}12`,border:`1px solid ${C.gold}30`,
           borderRadius:16,padding:"20px",marginBottom:20,textAlign:"center"}}>
@@ -2792,27 +2599,120 @@ function POS({inv,onVenta}){
         {/* Método de pago */}
         <div style={{fontSize:13,fontWeight:600,color:C.label3,textTransform:"uppercase",
           letterSpacing:.6,marginBottom:10}}>Método de Pago</div>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:20}}>
-          {PAGOS.map(p=>(
-            <button key={p.id} onClick={()=>setPago(p.id)} style={{
-              padding:"14px 8px",borderRadius:14,
-              border:`2px solid ${pago===p.id?p.color:C.sep}`,
-              background:pago===p.id?`${p.color}18`:C.bg2,
-              cursor:"pointer",fontFamily:FONT,transition:"all .15s",
-              display:"flex",flexDirection:"column",alignItems:"center",gap:6,
-              WebkitTapHighlightColor:"transparent",
-            }}>
-              <span style={{fontSize:26}}>{p.icon}</span>
-              <span style={{fontSize:13,fontWeight:pago===p.id?700:400,
-                color:pago===p.id?p.color:C.label2}}>{p.label}</span>
-              {p.desc>0&&<Chip color={C.amber} small>-{p.desc}%</Chip>}
-            </button>
-          ))}
+
+        {/* Toggle pago simple / mixto */}
+        <div style={{display:"flex",gap:8,marginBottom:16}}>
+          <button onClick={function(){setPagoMixto(false);}} style={{
+            flex:1,padding:"10px",borderRadius:12,cursor:"pointer",fontFamily:FONT,
+            border:"2px solid "+(!pagoMixto?C.green:C.sep),
+            background:!pagoMixto?C.green+"18":C.bg2,
+            color:!pagoMixto?C.green:C.label2,fontWeight:!pagoMixto?700:400,fontSize:13,
+          }}>Pago simple</button>
+          <button onClick={function(){setPagoMixto(true);}} style={{
+            flex:1,padding:"10px",borderRadius:12,cursor:"pointer",fontFamily:FONT,
+            border:"2px solid "+(pagoMixto?C.blue:C.sep),
+            background:pagoMixto?C.blue+"18":C.bg2,
+            color:pagoMixto?C.blue:C.label2,fontWeight:pagoMixto?700:400,fontSize:13,
+          }}>Pago mixto</button>
         </div>
-        {pago==="tarjeta"&&(
-          <div style={{padding:"12px 14px",background:`${C.amber}15`,borderRadius:12,
-            border:`1px solid ${C.amber}30`,marginBottom:16,fontSize:13,color:C.amber,fontFamily:FONT}}>
-            💳 Descuento 2.5% por tarjeta aplicado automáticamente
+
+        {/* Pago simple */}
+        {!pagoMixto&&(
+          <div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:16}}>
+              {PAGOS.map(function(p){return(
+                <button key={p.id} onClick={function(){setPago(p.id);}} style={{
+                  padding:"14px 8px",borderRadius:14,
+                  border:"2px solid "+(pago===p.id?p.color:C.sep),
+                  background:pago===p.id?p.color+"18":C.bg2,
+                  cursor:"pointer",fontFamily:FONT,
+                  display:"flex",flexDirection:"column",alignItems:"center",gap:6,
+                  WebkitTapHighlightColor:"transparent",
+                }}>
+                  <span style={{fontSize:26}}>{p.icon}</span>
+                  <span style={{fontSize:13,fontWeight:pago===p.id?700:400,
+                    color:pago===p.id?p.color:C.label2}}>{p.label}</span>
+                  {p.desc>0&&<Chip color={C.amber} small>-{p.desc}%</Chip>}
+                </button>
+              );})}
+            </div>
+            {pago==="tarjeta"&&(
+              <div style={{padding:"12px 14px",background:C.amber+"15",borderRadius:12,
+                border:"1px solid "+C.amber+"30",marginBottom:16,fontSize:13,color:C.amber,fontFamily:FONT}}>
+                Descuento 2.5% por tarjeta aplicado automáticamente
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Pago mixto */}
+        {pagoMixto&&(
+          <div style={{marginBottom:16}}>
+            <div style={{background:C.bg2,borderRadius:14,padding:16,border:"1px solid "+C.sep,marginBottom:10}}>
+              <div style={{fontSize:12,color:C.label3,fontFamily:FONT,marginBottom:12,textAlign:"center"}}>
+                Total a cobrar: <strong style={{color:C.gold}}>{$(total)}</strong> — distribuye entre los métodos
+              </div>
+              {PAGOS.map(function(p){
+                var val = montosMixtos[p.id] || "";
+                return (
+                  <div key={p.id} style={{marginBottom:12}}>
+                    <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:6}}>
+                      <span style={{fontSize:20}}>{p.icon}</span>
+                      <span style={{fontSize:14,fontWeight:600,color:C.label,fontFamily:FONT}}>{p.label}</span>
+                    </div>
+                    <div style={{position:"relative"}}>
+                      <span style={{position:"absolute",left:12,top:"50%",transform:"translateY(-50%)",
+                        fontSize:14,color:C.label3,fontFamily:FONT}}>Bs</span>
+                      <input
+                        type="number" min="0" step="0.01"
+                        value={val}
+                        placeholder="0.00"
+                        onChange={function(e){
+                          var v = e.target.value;
+                          setMontosMixtos(function(prev){
+                            var next = Object.assign({}, prev);
+                            next[p.id] = v;
+                            return next;
+                          });
+                        }}
+                        style={{width:"100%",padding:"11px 14px 11px 36px",borderRadius:12,
+                          border:"1.5px solid "+C.sep,background:C.bg3,
+                          fontSize:16,color:C.label,outline:"none",
+                          fontFamily:FONT,boxSizing:"border-box"}}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+              {/* Suma y diferencia */}
+              {(function(){
+                var suma = (parseFloat(montosMixtos.efectivo)||0) +
+                           (parseFloat(montosMixtos.qr)||0) +
+                           (parseFloat(montosMixtos.tarjeta)||0);
+                var diff = total - suma;
+                return (
+                  <div style={{padding:"10px 12px",borderRadius:10,
+                    background:Math.abs(diff)<0.01?C.green+"15":C.red+"15",
+                    border:"1px solid "+(Math.abs(diff)<0.01?C.green:C.red)+"30"}}>
+                    <div style={{display:"flex",justifyContent:"space-between",fontFamily:FONT}}>
+                      <span style={{fontSize:13,color:C.label3}}>Total ingresado:</span>
+                      <span style={{fontSize:13,fontWeight:700,color:C.label}}>{$(suma)}</span>
+                    </div>
+                    {Math.abs(diff)>0.01&&(
+                      <div style={{display:"flex",justifyContent:"space-between",marginTop:4,fontFamily:FONT}}>
+                        <span style={{fontSize:13,color:C.red}}>Diferencia:</span>
+                        <span style={{fontSize:13,fontWeight:700,color:C.red}}>{$(Math.abs(diff))}</span>
+                      </div>
+                    )}
+                    {Math.abs(diff)<0.01&&(
+                      <div style={{fontSize:13,color:C.green,textAlign:"center",marginTop:4,fontFamily:FONT}}>
+                        Montos cuadrados correctamente
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+            </div>
           </div>
         )}
 
@@ -2821,72 +2721,6 @@ function POS({inv,onVenta}){
           value={descExtra} onChange={e=>setDescExtra(Number(e.target.value))}/>
         <IOSInput label="Vendedor (opcional)" value={vendedor}
           onChange={e=>setVendedor(e.target.value)} placeholder="Nombre del vendedor"/>
-
-        {/* Datos del cliente */}
-        <div style={{marginBottom:16,background:C.bg2,borderRadius:14,
-          border:`1px solid ${C.sep}`,padding:"14px 16px"}}>
-          <div style={{fontSize:13,fontWeight:700,color:C.label2,fontFamily:FONT_UI,
-            marginBottom:12,letterSpacing:0.2}}>👤 Datos del cliente (opcional)</div>
-          <div style={{display:"flex",flexDirection:"column",gap:10}}>
-            <input
-              value={clienteNombre}
-              onChange={e=>setClienteNombre(e.target.value)}
-              placeholder="Nombre del cliente"
-              style={{padding:"10px 14px",borderRadius:10,border:`1px solid ${C.sep}`,
-                fontSize:14,fontFamily:FONT_UI,background:C.bg1,color:C.label,outline:"none"}}
-            />
-            <input
-              value={clienteTel}
-              onChange={e=>setClienteTel(e.target.value)}
-              placeholder="Teléfono / WhatsApp"
-              type="tel"
-              style={{padding:"10px 14px",borderRadius:10,border:`1px solid ${C.sep}`,
-                fontSize:14,fontFamily:FONT_UI,background:C.bg1,color:C.label,outline:"none"}}
-            />
-          </div>
-        </div>
-
-        {/* Toggle Factura */}
-        <div style={{marginBottom:16,background:conFactura?`${C.blue}10`:C.bg2,
-          borderRadius:14,border:`1px solid ${conFactura?C.blue+"40":C.sep}`,
-          padding:"14px 16px",transition:"all .2s"}}>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:conFactura?14:0}}>
-            <div style={{fontSize:15,fontWeight:700,color:conFactura?C.blue:C.label,fontFamily:FONT}}>
-              🧾 Venta con Factura
-            </div>
-            <div onClick={()=>setConFactura(v=>!v)} style={{
-              width:48,height:28,borderRadius:14,cursor:"pointer",
-              background:conFactura?C.blue:"#ccc",
-              position:"relative",transition:"background .2s",flexShrink:0
-            }}>
-              <div style={{
-                position:"absolute",top:3,
-                left:conFactura?22:3,
-                width:22,height:22,borderRadius:"50%",
-                background:"#fff",transition:"left .2s",
-                boxShadow:"0 1px 3px rgba(0,0,0,0.3)"
-              }}/>
-            </div>
-          </div>
-          {conFactura&&(
-            <div style={{display:"flex",flexDirection:"column",gap:10}}>
-              <input
-                value={factNombre}
-                onChange={e=>setFactNombre(e.target.value)}
-                placeholder="Nombre / Razón Social"
-                style={{padding:"10px 14px",borderRadius:10,border:`1px solid ${C.sep}`,
-                  fontSize:14,fontFamily:FONT,background:C.bg1,color:C.label,outline:"none"}}
-              />
-              <input
-                value={factNit}
-                onChange={e=>setFactNit(e.target.value)}
-                placeholder="NIT"
-                style={{padding:"10px 14px",borderRadius:10,border:`1px solid ${C.sep}`,
-                  fontSize:14,fontFamily:"monospace",background:C.bg1,color:C.label,outline:"none"}}
-              />
-            </div>
-          )}
-        </div>
 
         {/* Apropiación */}
         {porMarca.length>0&&(
@@ -2914,527 +2748,23 @@ function POS({inv,onVenta}){
         <IOSBtn onPress={cobrar} full variant="primary" style={{fontSize:18,padding:"17px"}} icon="💳">
           Cobrar {$(total)}
         </IOSBtn>
-      </Sheet>
+        </div>
+      </div>
+      </div>)}
     </div>
   );
 }
 
 
 
-// ══════════════════════════════════════════════════════════
+// ----------------------------------------------------------
 // SHEET RECIBIR PRODUCTO — con generación de código de barra
-// ══════════════════════════════════════════════════════════
-
-// ══════════════════════════════════════════════════════════
-// SHEET DAR DE BAJA MÚLTIPLE — por código y por selección
-// ══════════════════════════════════════════════════════════
-function SheetBajaMultiple({open, onClose, inv, bajasLista, setBajasLista, bajaCod, setBajaCod, bajaMsg, setBajaMsg, onConfirmar, onQuitar, darBaja}) {
-  const [modo, setModo] = useState("codigo"); // "codigo" | "lista"
-  const [busq, setBusq] = useState("");
-  const [marcaFil, setMarcaFil] = useState("");
-
-  function toggleSeleccion(prod) {
-    const ya = bajasLista.find(p => p.id === prod.id);
-    if (ya) {
-      setBajasLista(prev => prev.filter(p => p.id !== prod.id));
-    } else {
-      setBajasLista(prev => [...prev, prod]);
-    }
-  }
-
-  function toggleTodos() {
-    if (todosFiltradosSeleccionados) {
-      // Deseleccionar todos los filtrados
-      const idsF = new Set(invFiltrado.map(p => p.id));
-      setBajasLista(prev => prev.filter(p => !idsF.has(p.id)));
-    } else {
-      // Seleccionar todos los filtrados que no estén ya
-      setBajasLista(prev => {
-        const nuevos = invFiltrado.filter(p => !prev.find(b => b.id === p.id));
-        return [...prev, ...nuevos];
-      });
-    }
-  }
-
-  const invConStock = inv.filter(p => p.stock > 0 && !p.dadoDeBaja);
-  const invFiltrado = invConStock.filter(p => {
-    const q = busq.toLowerCase();
-    const matchBusq = !busq || p.nombre.toLowerCase().includes(q) || p.codigo.toLowerCase().includes(q);
-    const matchMarca = !marcaFil || p.marcaId === Number(marcaFil);
-    return matchBusq && matchMarca;
-  });
-  const todosFiltradosSeleccionados = invFiltrado.length > 0 && invFiltrado.every(p => bajasLista.find(b => b.id === p.id));
-
-  if (!open) return null;
-
-  return (
-    <div style={{position:"fixed",inset:0,zIndex:900,background:"rgba(0,0,0,0.5)",display:"flex",alignItems:"flex-end"}}>
-      <div style={{width:"100%",maxHeight:"94vh",background:C.bg1,borderRadius:"20px 20px 0 0",overflow:"hidden",display:"flex",flexDirection:"column"}}>
-
-        {/* Header */}
-        <div style={{padding:"16px 20px 0",borderBottom:`1px solid ${C.sep}`,flexShrink:0}}>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
-            <div>
-              <div style={{fontSize:18,fontWeight:800,color:C.label,fontFamily:FONT}}>Dar de Baja</div>
-              <div style={{fontSize:13,color:C.label3,fontFamily:FONT}}>
-                {bajasLista.length > 0 ? `${bajasLista.length} seleccionado${bajasLista.length>1?"s":""}` : "Ninguno seleccionado"}
-              </div>
-            </div>
-            <button onClick={onClose} style={{background:C.fill2,border:"none",width:32,height:32,borderRadius:"50%",cursor:"pointer",color:C.label2,fontSize:16}}>×</button>
-          </div>
-          {/* Tabs modo */}
-          <div style={{display:"flex",gap:4,marginBottom:0}}>
-            {[["codigo","📝 Por código"],["lista","📋 Seleccionar"]].map(([m,label])=>(
-              <button key={m} onClick={()=>setModo(m)} style={{
-                flex:1,padding:"9px 0",fontSize:13,fontWeight:modo===m?700:400,
-                fontFamily:FONT,border:"none",cursor:"pointer",
-                borderBottom:modo===m?`2px solid ${C.red}`:"2px solid transparent",
-                background:"none",color:modo===m?C.red:C.label3,
-                transition:"all .15s"
-              }}>{label}</button>
-            ))}
-          </div>
-        </div>
-
-        {/* Content */}
-        <div style={{flex:1,overflowY:"auto",padding:"16px 20px",WebkitOverflowScrolling:"touch"}}>
-
-          {/* MODO: Por código */}
-          {modo==="codigo" && (
-            <div>
-              <div style={{display:"flex",gap:8,marginBottom:12}}>
-                <div style={{flex:1}}>
-                  <IOSInput label="Código del producto" value={bajaCod}
-                    onChange={e=>{setBajaCod(e.target.value.toUpperCase());setBajaMsg(null);}}
-                    placeholder="Ej: DON-CREM-0001"
-                    style={{fontFamily:"monospace",textTransform:"uppercase"}}/>
-                </div>
-                <button onClick={darBaja} disabled={!bajaCod.trim()} style={{
-                  marginTop:22,padding:"0 16px",background:bajaCod.trim()?C.red:"#ccc",
-                  color:"#fff",border:"none",borderRadius:12,fontSize:14,fontWeight:700,
-                  cursor:bajaCod.trim()?"pointer":"not-allowed",fontFamily:FONT,flexShrink:0
-                }}>+ Agregar</button>
-              </div>
-              {bajaMsg&&(
-                <div style={{padding:"10px 14px",borderRadius:10,marginBottom:12,
-                  background:bajaMsg.ok?`${C.green}15`:`${C.red}15`,
-                  border:`1px solid ${bajaMsg.ok?C.green+"40":C.red+"40"}`,
-                  color:bajaMsg.ok?C.green:C.red,fontSize:13,fontFamily:FONT}}>{bajaMsg.msg}</div>
-              )}
-              <div style={{fontSize:13,color:C.label3,fontFamily:FONT,marginTop:8,lineHeight:1.6}}>
-                Ingresá el código que aparece en el ticket de cada producto (ej: DON-CREM-0001) y presioná + Agregar. Podés agregar varios antes de confirmar.
-              </div>
-            </div>
-          )}
-
-          {/* MODO: Selección visual */}
-          {modo==="lista" && (
-            <div>
-              {/* Filtros */}
-              <div style={{display:"flex",gap:8,marginBottom:12}}>
-                <input
-                  value={busq}
-                  onChange={e=>setBusq(e.target.value)}
-                  placeholder="Buscar producto..."
-                  style={{flex:1,padding:"10px 14px",borderRadius:12,border:`1px solid ${C.sep}`,
-                    fontSize:14,fontFamily:FONT,background:C.bg2,color:C.label,outline:"none"}}
-                />
-                <select value={marcaFil} onChange={e=>setMarcaFil(e.target.value)} style={{
-                  padding:"10px 12px",borderRadius:12,border:`1px solid ${C.sep}`,
-                  fontSize:13,fontFamily:FONT,background:C.bg2,color:C.label,outline:"none"
-                }}>
-                  <option value="">Todas</option>
-                  {MARCAS.map(m=><option key={m.id} value={m.id}>{m.nombre}</option>)}
-                </select>
-              </div>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
-                <div style={{fontSize:12,color:C.label3,fontFamily:FONT}}>
-                  {invFiltrado.length} productos con stock
-                </div>
-                <button onClick={toggleTodos} style={{
-                  background:todosFiltradosSeleccionados?`${C.red}15`:C.fill2,
-                  border:`1px solid ${todosFiltradosSeleccionados?C.red+"40":C.sep}`,
-                  color:todosFiltradosSeleccionados?C.red:C.label2,
-                  borderRadius:20,padding:"5px 14px",fontSize:12,fontWeight:700,
-                  fontFamily:FONT,cursor:"pointer",transition:"all .15s"
-                }}>
-                  {todosFiltradosSeleccionados?"✓ Todo seleccionado":"Seleccionar todo"}
-                </button>
-              </div>
-              {/* Lista */}
-              <div style={{display:"flex",flexDirection:"column",gap:4}}>
-                {invFiltrado.map(prod=>{
-                  const sel = !!bajasLista.find(p=>p.id===prod.id);
-                  const marca = MARCAS.find(m=>m.id===prod.marcaId);
-                  return (
-                    <div key={prod.id} onClick={()=>toggleSeleccion(prod)} style={{
-                      display:"flex",alignItems:"center",gap:12,
-                      padding:"12px 14px",borderRadius:12,cursor:"pointer",
-                      background:sel?`${C.red}12`:C.bg2,
-                      border:`1px solid ${sel?C.red+"60":C.sep}`,
-                      transition:"all .15s",WebkitTapHighlightColor:"transparent"
-                    }}>
-                      {/* Checkbox */}
-                      <div style={{width:22,height:22,borderRadius:6,flexShrink:0,
-                        background:sel?C.red:"none",
-                        border:`2px solid ${sel?C.red:C.label4}`,
-                        display:"flex",alignItems:"center",justifyContent:"center"}}>
-                        {sel&&<span style={{color:"#fff",fontSize:13,fontWeight:800}}>✓</span>}
-                      </div>
-                      {/* Info */}
-                      <div style={{flex:1,minWidth:0}}>
-                        <div style={{fontSize:14,fontWeight:600,color:C.label,fontFamily:FONT,
-                          whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{prod.nombre}</div>
-                        <div style={{fontSize:11,color:C.label3,fontFamily:"monospace"}}>{prod.codigo}</div>
-                      </div>
-                      {/* Marca + stock */}
-                      <div style={{textAlign:"right",flexShrink:0}}>
-                        <div style={{fontSize:11,color:marca?.color||C.label3,fontWeight:600,fontFamily:FONT}}>{marca?.nombre}</div>
-                        <div style={{fontSize:12,color:C.label3,fontFamily:FONT}}>{prod.stock} uds</div>
-                      </div>
-                    </div>
-                  );
-                })}
-                {invFiltrado.length===0&&(
-                  <div style={{textAlign:"center",padding:"32px 0",color:C.label3,fontFamily:FONT,fontSize:14}}>
-                    No hay productos con stock
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Lista seleccionados (siempre visible abajo) */}
-          {bajasLista.length>0&&(
-            <div style={{marginTop:20}}>
-              <div style={{fontSize:12,fontWeight:700,color:C.red,textTransform:"uppercase",
-                letterSpacing:.8,marginBottom:8}}>A dar de baja ({bajasLista.length})</div>
-              <div style={{background:`${C.red}08`,borderRadius:14,overflow:"hidden",border:`1px solid ${C.red}30`}}>
-                {bajasLista.map((prod,i)=>(
-                  <div key={prod.id} style={{display:"flex",alignItems:"center",
-                    padding:"10px 14px",borderBottom:i<bajasLista.length-1?`1px solid ${C.red}20`:"none",gap:10}}>
-                    <div style={{flex:1}}>
-                      <div style={{fontSize:13,fontWeight:600,color:C.label,fontFamily:FONT}}>{prod.nombre}</div>
-                      <div style={{fontSize:11,color:C.label3,fontFamily:"monospace"}}>{prod.codigo}</div>
-                    </div>
-                    <div style={{fontSize:12,color:C.label3,marginRight:6}}>stock: {prod.stock}</div>
-                    <button onClick={()=>onQuitar(prod.id)} style={{background:"none",border:"none",
-                      color:C.red,fontSize:20,cursor:"pointer",padding:"0 2px",lineHeight:1}}>×</button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Footer fijo */}
-        <div style={{padding:"12px 20px",borderTop:`1px solid ${C.sep}`,flexShrink:0,display:"flex",gap:8}}>
-          <button onClick={onClose} style={{flex:1,padding:"14px 0",borderRadius:14,
-            background:C.fill2,border:"none",fontSize:15,fontFamily:FONT,
-            color:C.label2,cursor:"pointer",fontWeight:600}}>Cancelar</button>
-          {bajasLista.length>0&&(
-            <button onClick={onConfirmar} style={{flex:2,padding:"14px 0",borderRadius:14,
-              background:C.red,border:"none",fontSize:15,fontFamily:FONT,
-              color:"#fff",cursor:"pointer",fontWeight:700}}>
-              🗑 Dar de baja ({bajasLista.length})
-            </button>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function SheetExcelMasivo({open, onClose, inv, setInv, drive}) {
-  // Formato iZi Stock:
-  // Col 0: Código | Col 1: Nombre | Col 2: Unidad | Col 3: Categoría (Marca) | Col 4: Subcategoría
-  // Col 5: Min | Col 6: Max | Col 7: Precio venta | Col 8: Precio compra | Col 9: Stock | Col 10: Descripción
-  const [filas, setFilas] = useState([]);
-  const [estado, setEstado] = useState("idle");
-  const [msg, setMsg] = useState("");
-  const [productosGenerados, setProductosGenerados] = useState([]);
-  const [errores, setErrores] = useState([]);
-  const fileRef = useRef(null);
-
-  useEffect(function() { loadXLSX(); }, []);
-
-  function reset() {
-    setFilas([]); setEstado("idle");
-    setMsg(""); setProductosGenerados([]); setErrores([]);
-    if (fileRef.current) fileRef.current.value = "";
-  }
-
-  function parsearFila(row) {
-    // Detectar columnas del formato iZi
-    var codigoPropio = String(row[0]||"").trim();
-    var nombre       = String(row[1]||"").trim();
-    var categoria    = String(row[3]||"").trim();
-    var subcat       = String(row[4]||"").trim();
-    var precioStr    = String(row[7]||"0").replace(/,/g,".");
-    var precio       = parseFloat(precioStr)||0;
-    var stockStr     = String(row[9]||"1").replace(/,/g,".");
-    var stock        = parseInt(stockStr)||1;
-    var descripcion  = String(row[10]||"").trim();
-
-    // Buscar marca por nombre en col 3
-    var marcaEncontrada = MARCAS.find(function(m){
-      return m.nombre.toLowerCase() === categoria.toLowerCase();
-    });
-
-    return {
-      codigoPropio, nombre, categoria, subcat,
-      precio, stock, descripcion,
-      marcaEncontrada,
-    };
-  }
-
-  function handleFile(e) {
-    var file = e.target.files && e.target.files[0];
-    if (!file) return;
-    setEstado("leyendo"); setMsg("Leyendo archivo..."); setFilas([]); setProductosGenerados([]);
-    var reader = new FileReader();
-    reader.onload = function(ev) {
-      try {
-        var wb = XLSX.read(new Uint8Array(ev.target.result), {type:"array"});
-        var ws = wb.Sheets[wb.SheetNames[0]];
-        var rows = XLSX.utils.sheet_to_json(ws, {header:1, raw:false});
-
-        // Saltar filas de encabezado/instrucciones — buscar primera fila con código real
-        // Un código real: no empieza con número de columna, no contiene "Ejemplo", no está vacío
-        var dataRows = rows.filter(function(r){
-          if (!r || !r[0]) return false;
-          var cell = String(r[0]).trim();
-          if (!cell) return false;
-          if (cell.match(/^\d+\./)) return false; // "1. Código..."
-          if (cell.toLowerCase().includes("ejemplo")) return false;
-          if (cell.toLowerCase().includes("formato")) return false;
-          if (cell.toLowerCase().includes("atenci")) return false;
-          if (cell.toLowerCase().includes("código del")) return false;
-          if (cell.toLowerCase().includes("datalla")) return false;
-          return true;
-        });
-
-        if (dataRows.length === 0) {
-          setEstado("error"); setMsg("No se encontraron productos válidos en el archivo.");
-          return;
-        }
-
-        var parsed = dataRows.map(parsearFila).filter(function(p){ return p.nombre; });
-        setFilas(parsed);
-        setEstado("preview");
-        var sinMarca = parsed.filter(function(p){ return !p.marcaEncontrada; });
-        if (sinMarca.length > 0) {
-          setMsg(parsed.length + " productos encontrados. ⚠️ " + sinMarca.length + " sin marca reconocida.");
-        } else {
-          setMsg(parsed.length + " productos encontrados. Revisa y confirma.");
-        }
-      } catch(err) {
-        setEstado("error"); setMsg("Error leyendo el archivo: " + err.message);
-      }
-    };
-    reader.onerror = function(){ setEstado("error"); setMsg("No se pudo leer el archivo"); };
-    reader.readAsArrayBuffer(file);
-  }
-
-  function confirmar() {
-    if (!filas.length) { setMsg("No hay productos para cargar"); return; }
-    var sinMarca = filas.filter(function(p){ return !p.marcaEncontrada; });
-    if (sinMarca.length === filas.length) {
-      setMsg("Ningún producto tiene marca reconocida. Verifica que la columna Categoría tenga el nombre exacto de la marca.");
-      return;
-    }
-    setEstado("procesando"); setMsg("Importando productos...");
-    var nuevos = [];
-    var errs = [];
-    var base = inv.length;
-    filas.forEach(function(p, i) {
-      if (!p.marcaEncontrada) {
-        errs.push(p.nombre + " - marca [" + p.categoria + "] no encontrada");
-        return;
-      }
-      var marca = p.marcaEncontrada;
-      // Usar código propio si existe, si no generar
-      var codigo = p.codigoPropio || genCod(marca.id, p.nombre, base+i+1);
-      var prod = {
-        id: Date.now()+i,
-        codigo: codigo,
-        marcaId: marca.id,
-        marcaNombre: marca.nombre,
-        nombre: p.nombre,
-        categoria: p.subcat || p.categoria || "General",
-        descripcion: p.descripcion,
-        precio: p.precio,
-        stock: p.stock,
-        stockInicial: p.stock,
-        fecha: hoy(),
-      };
-      nuevos.push(prod);
-    });
-    setInv(function(prev){ return prev.concat(nuevos); });
-    nuevos.forEach(function(p){
-      sbGuardarProducto(p);
-      if(drive) drive.syncProducto(p);
-    });
-    setProductosGenerados(nuevos);
-    setErrores(errs);
-    setEstado("listo");
-    setMsg(nuevos.length + " productos importados" + (errs.length > 0 ? " · " + errs.length + " omitidos" : "") + ".");
-  }
-
-  function imprimirTodos() {
-    productosGenerados.forEach(function(prod, i) {
-      var marca = MARCAS.find(function(m){ return m.id===prod.marcaId; });
-      setTimeout(function(){ imprimirTicket(prod, marca?marca.nombre:"Toscana House"); }, i*600);
-    });
-  }
-
-  if (!open) return null;
-  return (
-    <div style={{position:"fixed",inset:0,zIndex:900,background:"rgba(0,0,0,0.5)",display:"flex",alignItems:"flex-end"}}>
-      <div style={{width:"100%",maxHeight:"94vh",background:C.bg1,borderRadius:"20px 20px 0 0",overflow:"hidden",display:"flex",flexDirection:"column"}}>
-
-        {/* Header */}
-        <div style={{padding:"16px 20px",borderBottom:"1px solid "+C.sep,display:"flex",justifyContent:"space-between",alignItems:"center",flexShrink:0}}>
-          <div>
-            <div style={{fontSize:18,fontWeight:800,color:C.label,fontFamily:FONT}}>Carga Masiva Excel</div>
-            <div style={{fontSize:13,color:C.label3,fontFamily:FONT,marginTop:2}}>Formato iZi Stock — detecta marca automáticamente</div>
-          </div>
-          <button onClick={function(){reset();onClose();}} style={{background:C.fill2,border:"none",width:32,height:32,borderRadius:"50%",cursor:"pointer",color:C.label2,fontSize:18,lineHeight:1}}>×</button>
-        </div>
-
-        <div style={{flex:1,overflowY:"auto",padding:"16px 20px",WebkitOverflowScrolling:"touch"}}>
-
-          {/* Formato esperado */}
-          <div style={{background:C.bg3,borderRadius:14,padding:"12px 14px",marginBottom:20,
-            border:"1px solid "+C.sep}}>
-            <div style={{fontSize:12,fontWeight:700,color:C.label3,textTransform:"uppercase",letterSpacing:.8,marginBottom:8}}>
-              Columnas que se leen
-            </div>
-            <div style={{display:"grid",gridTemplateColumns:"auto 1fr",gap:"4px 12px",fontSize:12,fontFamily:"monospace"}}>
-              {[["Col A","Código (se usa tal cual)"],["Col B","Nombre del producto"],
-                ["Col D","Categoría = Nombre de la Marca"],["Col E","Subcategoría"],
-                ["Col H","Precio de venta (Bs)"],["Col J","Stock actual"],
-                ["Col K","Descripción"]].map(function(r){return (
-                <React.Fragment key={r[0]}>
-                  <span style={{color:C.gold,fontWeight:700}}>{r[0]}</span>
-                  <span style={{color:C.label2}}>{r[1]}</span>
-                </React.Fragment>
-              );})}
-            </div>
-            <div style={{marginTop:10,fontSize:12,color:C.label3,fontFamily:FONT,lineHeight:1.5}}>
-              ⚠️ La columna D debe tener el nombre <strong>exacto</strong> de la marca (ej: <em>Sensually</em>, <em>Donaire</em>)
-            </div>
-          </div>
-
-          {/* Upload */}
-          <div style={{marginBottom:20}}>
-            <div style={{background:C.bg2,borderRadius:14,padding:20,border:"2px dashed "+C.sep,textAlign:"center"}}>
-              <div style={{fontSize:36,marginBottom:8}}>📊</div>
-              <div style={{fontSize:14,fontWeight:600,color:C.label,fontFamily:FONT,marginBottom:4}}>
-                {filas.length > 0 ? filas.length + " productos detectados" : "Subir archivo Excel"}
-              </div>
-              <div style={{fontSize:12,color:C.label3,fontFamily:FONT,marginBottom:14}}>
-                .xlsx — Formato iZi Stock
-              </div>
-              <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" onChange={handleFile} style={{display:"none"}}/>
-              <IOSBtn onPress={function(){if(fileRef.current)fileRef.current.click();}} variant="fill" icon="📂">
-                {filas.length > 0 ? "Cambiar archivo" : "Seleccionar archivo .xlsx"}
-              </IOSBtn>
-            </div>
-          </div>
-
-          {/* Preview */}
-          {filas.length>0&&(
-            <div style={{marginBottom:16}}>
-              <div style={{fontSize:12,fontWeight:700,color:C.label3,textTransform:"uppercase",letterSpacing:.8,marginBottom:10}}>
-                Vista previa ({filas.length} productos)
-              </div>
-              <div style={{background:C.bg2,borderRadius:14,overflow:"hidden",border:"1px solid "+C.sep,maxHeight:280,overflowY:"auto"}}>
-                {filas.slice(0,50).map(function(p,i){
-                  var marcaOk = !!p.marcaEncontrada;
-                  return (
-                    <div key={i} style={{padding:"10px 14px",borderBottom:i<Math.min(filas.length,50)-1?"1px solid "+C.sep:"none",
-                      display:"flex",justifyContent:"space-between",alignItems:"center",
-                      background:marcaOk?"":C.redBg}}>
-                      <div style={{flex:1,minWidth:0}}>
-                        <div style={{fontSize:13,fontWeight:600,color:C.label,fontFamily:FONT,
-                          whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{p.nombre}</div>
-                        <div style={{fontSize:11,color:marcaOk?C.label3:C.red,fontFamily:FONT}}>
-                          {p.codigoPropio&&<span style={{fontFamily:"monospace",marginRight:6}}>{p.codigoPropio}</span>}
-                          {marcaOk
-                            ? <span>{p.marcaEncontrada.emoji} {p.marcaEncontrada.nombre}{p.subcat?" · "+p.subcat:""}</span>
-                            : <span>{"⚠️ Marca [" + p.categoria + "] no encontrada"}</span>
-                          }
-                        </div>
-                      </div>
-                      <div style={{textAlign:"right",flexShrink:0,marginLeft:10}}>
-                        <div style={{fontSize:13,fontWeight:700,color:C.gold,fontFamily:FONT}}>Bs {p.precio.toFixed(0)}</div>
-                        <div style={{fontSize:11,color:C.green,fontFamily:FONT}}>{p.stock} uds</div>
-                      </div>
-                    </div>
-                  );
-                })}
-                {filas.length>50&&(
-                  <div style={{padding:"10px 14px",textAlign:"center",fontSize:12,color:C.label3,fontFamily:FONT}}>
-                    ... y {filas.length-50} más
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Mensaje */}
-          {msg&&(
-            <div style={{padding:"12px 14px",borderRadius:12,marginBottom:16,
-              background:estado==="listo"?C.green+"20":estado==="error"?C.red+"20":C.amber+"20",
-              color:estado==="listo"?C.green:estado==="error"?C.red:C.amber,
-              fontSize:14,fontFamily:FONT}}>{msg}</div>
-          )}
-
-          {/* Errores */}
-          {errores.length>0&&(
-            <div style={{marginBottom:16}}>
-              <div style={{fontSize:12,fontWeight:700,color:C.red,textTransform:"uppercase",letterSpacing:.8,marginBottom:8}}>
-                Omitidos ({errores.length})
-              </div>
-              <div style={{background:C.redBg,borderRadius:12,padding:"10px 14px",border:"1px solid "+C.red+"30"}}>
-                {errores.map(function(e,i){ return (
-                  <div key={i} style={{fontSize:12,color:C.red,fontFamily:FONT,marginBottom:i<errores.length-1?4:0}}>· {e}</div>
-                );})}
-              </div>
-            </div>
-          )}
-
-          {/* Botones */}
-          <div style={{display:"flex",flexDirection:"column",gap:10}}>
-            {estado==="preview"&&filas.length>0&&(
-              <IOSBtn onPress={confirmar} variant="primary" full icon="✓">
-                Importar {filas.filter(function(p){return !!p.marcaEncontrada;}).length} productos
-              </IOSBtn>
-            )}
-            {estado==="listo"&&productosGenerados.length>0&&(
-              <>
-                <IOSBtn onPress={imprimirTodos} variant="primary" full icon="🖨">
-                  Imprimir QR ({productosGenerados.length})
-                </IOSBtn>
-                <IOSBtn onPress={function(){reset();onClose();}} variant="fill" full>Cerrar</IOSBtn>
-              </>
-            )}
-            {(estado==="idle"||estado==="error")&&(
-              <IOSBtn onPress={function(){reset();onClose();}} variant="fill" full>Cancelar</IOSBtn>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
+// ----------------------------------------------------------
 function SheetRecibir({open, onClose, inv, onAdd, fInv, setFInv}){
-  const [scanInvMsg, setScanInvMsg] = useState("");
-  const [scanInvStatus, setScanInvStatus] = useState(null);
-  const [barcodeReady, setBarcodeReady] = useState(false);
-  const scanInvRef = useRef(null);
+  var _h49 = useState(""); var scanInvMsg = _h49[0]; var setScanInvMsg = _h49[1];
+  var _h50 = useState(null); var scanInvStatus = _h50[0]; var setScanInvStatus = _h50[1];
+  var _h51 = useState(false); var barcodeReady = _h51[0]; var setBarcodeReady = _h51[1];
+  const scanInvRef=useRef(null);
   
   const codigoGenerado = fInv.marcaId && fInv.nombre
     ? genCod(Number(fInv.marcaId), fInv.nombre, inv.length+1)
@@ -3486,7 +2816,7 @@ function SheetRecibir({open, onClose, inv, onAdd, fInv, setFInv}){
   }
 
   return (
-    <Sheet open={open} onClose={()=>{onClose();setScanInvMsg("");setScanInvStatus(null);}} title="Recibir Producto" tall>
+    <Sheet open={open} onClose={function(){{onClose();setScanInvMsg("");setScanInvStatus(null);;}}} title="Recibir Producto" tall>
       {/* Opción escanear etiqueta existente */}
       <div style={{background:C.bg3,borderRadius:14,padding:"14px",marginBottom:16,
         border:`1px solid ${scanInvStatus==="ok"?C.green:scanInvStatus==="notfound"?C.amber:C.sep}`}}>
@@ -3494,7 +2824,7 @@ function SheetRecibir({open, onClose, inv, onAdd, fInv, setFInv}){
           letterSpacing:.6,marginBottom:10}}>Escanear etiqueta existente (opcional)</div>
         <input ref={scanInvRef} type="file" accept="image/*" capture="environment"
           onChange={handleScanEtiqueta} style={{display:"none"}}/>
-        <IOSBtn onPress={()=>scanInvRef.current?.click()} variant="fill" small icon="📷">
+        <IOSBtn onPress={function(){scanInvRef.current?.click();}} variant="fill" small icon="📷">
           {scanInvStatus==="leyendo"?"Leyendo…":"Fotografiar código"}
         </IOSBtn>
         {scanInvMsg&&(
@@ -3514,10 +2844,7 @@ function SheetRecibir({open, onClose, inv, onAdd, fInv, setFInv}){
       <IOSInput label="Nombre del producto" value={fInv.nombre}
         onChange={e=>setFInv(p=>({...p,nombre:e.target.value}))} placeholder="Ej: Vestido floral talla M"/>
       <IOSInput label="Categoría" value={fInv.categoria}
-        onChange={e=>setFInv(p=>({...p,categoria:e.target.value}))} placeholder="Ej: Blusas, Vestidos, Accesorios…"/>
-      <IOSInput label="Descripción / Detalle" value={fInv.descripcion}
-        onChange={e=>setFInv(p=>({...p,descripcion:e.target.value}))}
-        placeholder="Ej: Material microfibra, color pastel, talla M"/>
+        onChange={e=>setFInv(p=>({...p,categoria:e.target.value}))} placeholder="Ej: Ropa, Accesorios…"/>
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
         <IOSInput label="Precio (Bs)" prefix="Bs" type="number" value={fInv.precio}
           onChange={e=>setFInv(p=>({...p,precio:e.target.value}))} placeholder="0"/>
@@ -3535,7 +2862,7 @@ function SheetRecibir({open, onClose, inv, onAdd, fInv, setFInv}){
             letterSpacing:.8,marginBottom:8}}>Código generado para esta prenda</div>
           <div style={{fontSize:14,fontFamily:"monospace",fontWeight:700,
             color:C.gold,marginBottom:10}}>{codigoGenerado}</div>
-          <BarcodeDisplay codigo={codigoGenerado}/>
+          <QRDisplay codigo={codigoGenerado}/>
           <div style={{fontSize:11,color:C.label3,fontFamily:FONT,marginTop:8}}>
             {fInv.nombre && <strong style={{color:C.label2}}>{fInv.nombre}</strong>}
             {fInv.categoria && <span style={{color:C.label3}}> · {fInv.categoria}</span>}
@@ -3548,60 +2875,183 @@ function SheetRecibir({open, onClose, inv, onAdd, fInv, setFInv}){
   );
 }
 
-// ══════════════════════════════════════════════════════════
-// INVENTARIO POR MARCA — pestaña con scroll horizontal
-// ══════════════════════════════════════════════════════════
+// ----------------------------------------------------------
 
-// ══ BAJAS COLAPSADAS — ocultas por defecto, expandibles ══
-function BajasColapsadas({productosBaja, vendidosPorProd}){
-  const [abierto, setAbierto] = useState(false);
+// ----------------------------------------------------------
+// CARGA MASIVA EXCEL
+// ----------------------------------------------------------
+function SheetExcelMasivo({open, onClose, inv, setInv, drive}) {
+  var _e1 = useState(null); var marcaSel = _e1[0]; var setMarcaSel = _e1[1];
+  var _e2 = useState([]); var filas = _e2[0]; var setFilas = _e2[1];
+  var _e3 = useState("idle"); var estado = _e3[0]; var setEstado = _e3[1];
+  var _e4 = useState(""); var msg = _e4[0]; var setMsg = _e4[1];
+  var _e5 = useState([]); var productosGenerados = _e5[0]; var setProductosGenerados = _e5[1];
+  var fileRef = useRef(null);
+
+  useEffect(function() { loadXLSX(); }, []);
+
+  function reset() {
+    setMarcaSel(null); setFilas([]); setEstado("idle");
+    setMsg(""); setProductosGenerados([]);
+    if (fileRef.current) fileRef.current.value = "";
+  }
+
+  function handleFile(e) {
+    var file = e.target.files && e.target.files[0];
+    if (!file) return;
+    setEstado("leyendo"); setMsg("Leyendo archivo..."); setFilas([]); setProductosGenerados([]);
+    var reader = new FileReader();
+    reader.onload = function(ev) {
+      try {
+        var wb = XLSX.read(new Uint8Array(ev.target.result), {type:"array"});
+        var ws = wb.Sheets[wb.SheetNames[0]];
+        var rows = XLSX.utils.sheet_to_json(ws, {header:1});
+        var valid = rows.filter(function(r){return r && r[0] && String(r[0]).trim();});
+        if (valid.length > 0) {
+          var first = String(valid[0][0]).toLowerCase();
+          if (first.includes("nombre")||first.includes("producto")||first.includes("name")) {
+            valid = valid.slice(1);
+          }
+        }
+        setFilas(valid); setEstado("preview");
+        setMsg(valid.length + " productos encontrados. Revisa y confirma.");
+      } catch(err) { setEstado("error"); setMsg("Error leyendo el archivo. Usa .xlsx"); }
+    };
+    reader.onerror = function(){ setEstado("error"); setMsg("No se pudo leer el archivo"); };
+    reader.readAsArrayBuffer(file);
+  }
+
+  function confirmar() {
+    if (!marcaSel) { setMsg("Selecciona una marca primero"); return; }
+    if (!filas.length) { setMsg("No hay productos para cargar"); return; }
+    setEstado("procesando"); setMsg("Generando productos y QR...");
+    var marca = MARCAS.find(function(m){return m.id===Number(marcaSel);});
+    var nuevos = []; var base = inv.length;
+    filas.forEach(function(row, i) {
+      var nombre = String(row[0]||"").trim();
+      if (!nombre) return;
+      var prod = {
+        id: Date.now()+i,
+        codigo: genCod(Number(marcaSel), nombre, base+i+1),
+        marcaId: Number(marcaSel),
+        nombre: nombre,
+        categoria: String(row[1]||"General").trim(),
+        precio: parseFloat(row[2])||0,
+        stock: parseInt(row[3])||1,
+        stockInicial: parseInt(row[3])||1,
+        fecha: hoy(),
+        marcaNombre: marca?marca.nombre:"",
+      };
+      nuevos.push(prod);
+    });
+    setInv(function(prev){return prev.concat(nuevos);});
+    nuevos.forEach(function(p){
+      sbGuardarProducto(p);
+      if(drive) drive.syncProducto(p);
+    });
+    setProductosGenerados(nuevos);
+    setEstado("listo");
+    setMsg(nuevos.length+" productos cargados con QR generados.");
+  }
+
+  function imprimirTodos() {
+    productosGenerados.forEach(function(prod, i) {
+      var marca = MARCAS.find(function(m){return m.id===prod.marcaId;});
+      setTimeout(function(){ imprimirTicket(prod, marca?marca.nombre:"Toscana House"); }, i*600);
+    });
+  }
+
+  if (!open) return null;
   return (
-    <div style={{marginTop:20,marginBottom:8}}>
-      <button onClick={()=>setAbierto(v=>!v)} style={{
-        display:"flex",alignItems:"center",gap:8,width:"100%",
-        background:"none",border:"none",cursor:"pointer",padding:"8px 0",
-        WebkitTapHighlightColor:"transparent",
-      }}>
-        <div style={{height:1,flex:1,background:C.sep}}/>
-        <span style={{fontSize:11,fontWeight:600,color:C.label3,fontFamily:FONT_UI,
-          textTransform:"uppercase",letterSpacing:.8}}>
-          {abierto?"▼":"▶"} {productosBaja.length} dado{productosBaja.length>1?"s":""} de baja
-        </span>
-        <div style={{height:1,flex:1,background:C.sep}}/>
-      </button>
-      {abierto&&(
-        <div style={{display:"flex",flexDirection:"column",gap:5,marginTop:8}}>
-          {productosBaja.map(prod=>{
-            const vendidas=vendidosPorProd[prod.id]||0;
-            return (
-              <div key={prod.id} style={{
-                background:"#FEF2F2",border:`1px solid ${C.red}20`,
-                borderRadius:12,padding:"11px 14px",
-                display:"flex",justifyContent:"space-between",alignItems:"center",
-                opacity:0.7
-              }}>
-                <div style={{flex:1,minWidth:0}}>
-                  <div style={{fontSize:13,fontWeight:600,color:C.label3,fontFamily:FONT_UI,
-                    textDecoration:"line-through",whiteSpace:"nowrap",overflow:"hidden",
-                    textOverflow:"ellipsis"}}>{prod.nombre}</div>
-                  <div style={{fontSize:10,color:C.label3,fontFamily:"monospace"}}>{prod.codigo}</div>
-                  {prod.fechaBaja&&<div style={{fontSize:10,color:C.red,opacity:.7,marginTop:1}}>Baja: {prod.fechaBaja}</div>}
-                </div>
-                <div style={{textAlign:"right",flexShrink:0,marginLeft:10}}>
-                  {vendidas>0&&<div style={{fontSize:11,color:C.label3,fontFamily:FONT_UI}}>{vendidas} vendidas</div>}
-                  <div style={{fontSize:10,color:C.red,fontWeight:700,fontFamily:FONT_UI,letterSpacing:.5}}>BAJA</div>
-                </div>
-              </div>
-            );
-          })}
+    <div style={{position:"fixed",inset:0,zIndex:900,background:"rgba(0,0,0,0.5)",display:"flex",alignItems:"flex-end"}}>
+      <div style={{width:"100%",maxHeight:"92vh",background:C.bg,borderRadius:"20px 20px 0 0",overflow:"hidden",display:"flex",flexDirection:"column"}}>
+        <div style={{padding:"16px 20px",borderBottom:"1px solid "+C.sep,display:"flex",justifyContent:"space-between",alignItems:"center",flexShrink:0}}>
+          <div>
+            <div style={{fontSize:18,fontWeight:800,color:C.label,fontFamily:FONT}}>Carga Masiva Excel</div>
+            <div style={{fontSize:13,color:C.label3,fontFamily:FONT,marginTop:2}}>Importa productos desde Excel con QR</div>
+          </div>
+          <button onClick={function(){reset();onClose();}} style={{background:C.fill2,border:"none",width:32,height:32,borderRadius:"50%",cursor:"pointer",color:C.label2,fontSize:16}}>x</button>
         </div>
-      )}
+        <div style={{flex:1,overflowY:"auto",padding:"16px 20px",WebkitOverflowScrolling:"touch"}}>
+
+          <div style={{marginBottom:20}}>
+            <div style={{fontSize:12,fontWeight:700,color:C.label3,textTransform:"uppercase",letterSpacing:.8,marginBottom:10}}>1. Selecciona la marca</div>
+            <div style={{display:"flex",gap:8,overflowX:"auto",scrollbarWidth:"none",paddingBottom:4}}>
+              {MARCAS.map(function(m){
+                var activa = marcaSel===m.id;
+                return (
+                  <button key={m.id} onClick={function(){setMarcaSel(m.id);}} style={{flexShrink:0,padding:"8px 14px",borderRadius:20,border:"2px solid "+(activa?m.color:C.sep),background:activa?m.color+"25":C.bg2,color:activa?m.color:C.label2,fontSize:13,fontWeight:activa?700:400,fontFamily:FONT,cursor:"pointer",display:"flex",alignItems:"center",gap:6,WebkitTapHighlightColor:"transparent"}}>
+                    <span>{m.emoji}</span><span>{m.nombre}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div style={{marginBottom:20}}>
+            <div style={{fontSize:12,fontWeight:700,color:C.label3,textTransform:"uppercase",letterSpacing:.8,marginBottom:10}}>2. Sube el archivo Excel</div>
+            <div style={{background:C.bg2,borderRadius:14,padding:16,border:"2px dashed "+C.sep,textAlign:"center",marginBottom:10}}>
+              <div style={{fontSize:32,marginBottom:8}}>📊</div>
+              <div style={{fontSize:13,color:C.label2,fontFamily:FONT,marginBottom:4}}>Formato: Nombre | Categoría | Precio | Stock</div>
+              <div style={{fontSize:11,color:C.label3,fontFamily:FONT,marginBottom:12,lineHeight:1.6}}>
+                Col A: Nombre · Col B: Categoría · Col C: Precio (Bs) · Col D: Cantidad
+              </div>
+              <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" onChange={handleFile} style={{display:"none"}}/>
+              <IOSBtn onPress={function(){if(fileRef.current)fileRef.current.click();}} variant="fill" icon="📂">Seleccionar archivo .xlsx</IOSBtn>
+            </div>
+          </div>
+
+          {filas.length>0&&(
+            <div style={{marginBottom:20}}>
+              <div style={{fontSize:12,fontWeight:700,color:C.label3,textTransform:"uppercase",letterSpacing:.8,marginBottom:10}}>3. Revisa los productos ({filas.length})</div>
+              <div style={{background:C.bg2,borderRadius:14,overflow:"hidden",border:"1px solid "+C.sep,maxHeight:200,overflowY:"auto"}}>
+                {filas.slice(0,30).map(function(row,i){
+                  return (
+                    <div key={i} style={{padding:"10px 14px",borderBottom:i<filas.length-1?"1px solid "+C.sep:"none",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                      <div>
+                        <div style={{fontSize:14,fontWeight:600,color:C.label,fontFamily:FONT}}>{String(row[0]||"")}</div>
+                        <div style={{fontSize:12,color:C.label3,fontFamily:FONT}}>{String(row[1]||"General")}</div>
+                      </div>
+                      <div style={{textAlign:"right"}}>
+                        <div style={{fontSize:14,fontWeight:700,color:C.gold,fontFamily:FONT}}>Bs {parseFloat(row[2]||0).toFixed(2)}</div>
+                        <div style={{fontSize:12,color:C.green,fontFamily:FONT}}>{parseInt(row[3]||1)} uds</div>
+                      </div>
+                    </div>
+                  );
+                })}
+                {filas.length>30&&<div style={{padding:"10px 14px",textAlign:"center",fontSize:12,color:C.label3,fontFamily:FONT}}>... y {filas.length-30} mas</div>}
+              </div>
+            </div>
+          )}
+
+          {msg&&(
+            <div style={{padding:"12px 14px",borderRadius:12,marginBottom:16,background:estado==="listo"?C.green+"20":estado==="error"?C.red+"20":C.amber+"20",color:estado==="listo"?C.green:estado==="error"?C.red:C.amber,fontSize:14,fontFamily:FONT}}>{msg}</div>
+          )}
+
+          <div style={{display:"flex",flexDirection:"column",gap:10}}>
+            {estado==="preview"&&marcaSel&&(
+              <IOSBtn onPress={confirmar} variant="primary" full icon="✓">Confirmar e importar {filas.length} productos</IOSBtn>
+            )}
+            {estado==="listo"&&productosGenerados.length>0&&(
+              <>
+                <IOSBtn onPress={imprimirTodos} variant="primary" full icon="🖨">Imprimir todos los QR ({productosGenerados.length})</IOSBtn>
+                <IOSBtn onPress={function(){reset();onClose();}} variant="fill" full>Cerrar</IOSBtn>
+              </>
+            )}
+            {(estado==="idle"||estado==="error")&&(
+              <IOSBtn onPress={function(){reset();onClose();}} variant="fill" full>Cancelar</IOSBtn>
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
 
+// INVENTARIO POR MARCA — pestaña con scroll horizontal
+// ----------------------------------------------------------
 function InventarioPorMarca({inv, ventas, onRecibir, onBaja, onExcel}){
-  const [marcaSelec, setMarcaSelec] = useState(MARCAS[0].id);
+  var _h52 = useState(MARCAS[0].id); var marcaSelec = _h52[0]; var setMarcaSelec = _h52[1];
   const marca = MARCAS.find(m=>m.id===marcaSelec);
 
   // Calcular unidades vendidas por producto
@@ -3613,65 +3063,13 @@ function InventarioPorMarca({inv, ventas, onRecibir, onBaja, onExcel}){
     return map;
   },[ventas]);
 
-  const todosProductos = inv.filter(i=>i.marcaId===marcaSelec);
-  const [mostrarAgotados, setMostrarAgotados] = useState(false);
-  const todosActivos = todosProductos.filter(p=>!p.dadoDeBaja);
-  const productos = mostrarAgotados ? todosActivos : todosActivos.filter(p=>p.stock>0);
-  const agotadosOcultos = todosActivos.filter(p=>p.stock===0);
-  const productosBaja = todosProductos.filter(p=>p.dadoDeBaja);
+  const productos = inv.filter(i=>i.marcaId===marcaSelec);
   const totalStock = productos.reduce((s,p)=>s+p.stock,0);
-  const totalVendidas = todosProductos.reduce((s,p)=>s+(vendidosPorProd[p.id]||0),0);
-  const agotados = todosActivos.filter(p=>p.stock===0).length;
+  const totalVendidas = productos.reduce((s,p)=>s+(vendidosPorProd[p.id]||0),0);
+  const agotados = productos.filter(p=>p.stock===0).length;
 
   return (
-    <div style={{display:"flex",flexDirection:"column"}}>
-
-      {/* ── Barra de acciones fija arriba ── */}
-      <div style={{
-        position:"sticky", top:0, zIndex:50,
-        background:"rgba(248,252,250,0.97)",
-        backdropFilter:"blur(10px)",
-        WebkitBackdropFilter:"blur(10px)",
-        borderBottom:`1px solid ${C.sep}`,
-        padding:"10px 0 10px",
-        marginBottom:14,
-        marginLeft:-16, marginRight:-16,
-        paddingLeft:16, paddingRight:16,
-      }}>
-        <div style={{display:"flex",gap:8}}>
-          <button onClick={onBaja} style={{
-            flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:4,
-            padding:"12px 4px",borderRadius:16,border:`1.5px solid ${C.red}40`,
-            background:`${C.red}10`,cursor:"pointer",fontFamily:FONT_UI,
-            WebkitTapHighlightColor:"transparent",
-            boxShadow:"0 2px 8px rgba(176,48,48,0.1)",transition:"all .15s"
-          }}>
-            <span style={{fontSize:20}}>🗑</span>
-            <span style={{fontSize:11,fontWeight:700,color:C.red,letterSpacing:0.2}}>Dar de Baja</span>
-          </button>
-          <button onClick={onRecibir} style={{
-            flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:4,
-            padding:"12px 4px",borderRadius:16,border:`1.5px solid ${C.gold}50`,
-            background:`${C.gold}12`,cursor:"pointer",fontFamily:FONT_UI,
-            WebkitTapHighlightColor:"transparent",
-            boxShadow:"0 2px 8px rgba(46,107,62,0.1)",transition:"all .15s"
-          }}>
-            <span style={{fontSize:20}}>📥</span>
-            <span style={{fontSize:11,fontWeight:700,color:C.gold,letterSpacing:0.2}}>Recibir</span>
-          </button>
-          <button onClick={onExcel} style={{
-            flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:4,
-            padding:"12px 4px",borderRadius:16,border:`1.5px solid ${C.green}50`,
-            background:`${C.green}12`,cursor:"pointer",fontFamily:FONT_UI,
-            WebkitTapHighlightColor:"transparent",
-            boxShadow:"0 2px 8px rgba(46,139,87,0.1)",transition:"all .15s"
-          }}>
-            <span style={{fontSize:18}}>📊</span>
-            <span style={{fontSize:11,fontWeight:600,color:C.green}}>Carga Excel</span>
-          </button>
-        </div>
-      </div>
-
+    <div>
       {/* Selector de marcas — scroll horizontal */}
       <div style={{marginBottom:16}}>
         <div style={{fontSize:11,fontWeight:700,color:C.label3,textTransform:"uppercase",
@@ -3683,21 +3081,19 @@ function InventarioPorMarca({inv, ventas, onRecibir, onBaja, onExcel}){
             const stock=prods.reduce((s,p)=>s+p.stock,0);
             const activa=m.id===marcaSelec;
             return (
-              <button key={m.id} onClick={()=>setMarcaSelec(m.id)} style={{
-                flexShrink:0,padding:"10px 14px",borderRadius:16,
-                border:`2px solid ${activa?m.color:"rgba(0,0,0,0.07)"}`,
-                background:activa?m.color+"22":"#fff",
-                cursor:"pointer",fontFamily:FONT_UI,
+              <button key={m.id} onClick={function(){setMarcaSelec(m.id);}} style={{
+                flexShrink:0,padding:"10px 16px",borderRadius:14,
+                border:`2px solid ${activa?m.color:C.sep}`,
+                background:activa?m.color+"30":C.bg2,
+                cursor:"pointer",fontFamily:FONT,
                 WebkitTapHighlightColor:"transparent",
-                display:"flex",flexDirection:"column",alignItems:"center",gap:4,
-                minWidth:82,transition:"all .2s",
-                boxShadow:activa?`0 4px 14px ${m.color}35`:"0 1px 4px rgba(0,0,0,0.07)",
+                display:"flex",flexDirection:"column",alignItems:"center",gap:3,
+                minWidth:80,transition:"all .2s",
               }}>
-                <span style={{fontSize:22}}>{m.emoji}</span>
-                <span style={{fontSize:11.5,fontWeight:700,
-                  color:activa?m.color:C.label,whiteSpace:"nowrap",letterSpacing:0.1}}>{m.nombre}</span>
-                <span style={{fontSize:10,fontWeight:activa?600:400,
-                  color:activa?m.color:C.label3,fontFamily:FONT_UI}}>
+                <span style={{fontSize:20}}>{m.emoji}</span>
+                <span style={{fontSize:11,fontWeight:activa?700:500,
+                  color:activa?m.color:C.label2,whiteSpace:"nowrap"}}>{m.nombre}</span>
+                <span style={{fontSize:10,color:activa?m.color:C.label3}}>
                   {stock} uds
                 </span>
               </button>
@@ -3709,17 +3105,15 @@ function InventarioPorMarca({inv, ventas, onRecibir, onBaja, onExcel}){
       {/* Stats de la marca */}
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:16}}>
         {[
-          {icon:"📦",label:"En stock",value:totalStock,color:C.green,bg:C.greenBg},
-          {icon:"✅",label:"Vendidas",value:totalVendidas,color:C.blue,bg:`${C.blue}10`},
-          {icon:"❌",label:"Agotados",value:agotados,color:C.red,bg:C.redBg},
+          {icon:"📦",label:"En stock",value:totalStock,color:C.green},
+          {icon:"✅",label:"Vendidas",value:totalVendidas,color:C.blue},
+          {icon:"❌",label:"Agotados",value:agotados,color:C.red},
         ].map(s=>(
-          <div key={s.label} style={{background:s.bg,borderRadius:16,padding:"14px 10px",
-            border:`1.5px solid ${s.color}25`,textAlign:"center",
-            boxShadow:`0 2px 8px ${s.color}15`}}>
-            <div style={{fontSize:22,marginBottom:5}}>{s.icon}</div>
-            <div style={{fontSize:20,fontWeight:800,color:s.color,fontFamily:FONT_UI}}>{s.value}</div>
-            <div style={{fontSize:10,fontWeight:600,color:s.color,fontFamily:FONT_UI,
-              textTransform:"uppercase",letterSpacing:.8,opacity:.75,marginTop:2}}>{s.label}</div>
+          <div key={s.label} style={{background:C.bg2,borderRadius:14,padding:"12px 10px",
+            border:`1px solid ${C.sep}`,textAlign:"center"}}>
+            <div style={{fontSize:20,marginBottom:4}}>{s.icon}</div>
+            <div style={{fontSize:18,fontWeight:800,color:s.color,fontFamily:FONT}}>{s.value}</div>
+            <div style={{fontSize:10,color:C.label3,fontFamily:FONT,textTransform:"uppercase",letterSpacing:.5}}>{s.label}</div>
           </div>
         ))}
       </div>
@@ -3736,41 +3130,29 @@ function InventarioPorMarca({inv, ventas, onRecibir, onBaja, onExcel}){
             </div>
           </div>
         : <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:16}}>
-            {/* Filtro agotados */}
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",
-              padding:"8px 12px",background:C.bg2,borderRadius:12,marginBottom:4,
-              border:`1px solid ${C.sep}`}}>
-              <div style={{display:"flex",gap:10}}>
-                {[
-                  {color:C.green,label:"En stock"},
-                  {color:C.amber,label:"Stock bajo"},
-                ].map(l=>(
-                  <div key={l.label} style={{display:"flex",alignItems:"center",gap:5}}>
-                    <div style={{width:8,height:8,borderRadius:2,background:l.color}}/>
-                    <span style={{fontSize:10,color:C.label3,fontFamily:FONT_UI}}>{l.label}</span>
-                  </div>
-                ))}
-              </div>
-              <button onClick={()=>setMostrarAgotados(v=>!v)} style={{
-                display:"flex",alignItems:"center",gap:6,
-                cursor:"pointer",padding:"4px 10px",borderRadius:20,
-                background:mostrarAgotados?`${C.red}15`:"none",
-                border:`1px solid ${mostrarAgotados?C.red+"40":C.sep}`,
-                transition:"all .2s",WebkitTapHighlightColor:"transparent",
-              }}>
-                <span style={{fontSize:11,fontWeight:600,
-                  color:mostrarAgotados?C.red:C.label3,fontFamily:FONT_UI}}>
-                  {mostrarAgotados?"Ocultar agotados":`Ver agotados (${agotadosOcultos.length})`}
-                </span>
-              </button>
+            {/* Leyenda */}
+            <div style={{display:"flex",gap:12,padding:"8px 12px",background:C.bg2,
+              borderRadius:10,marginBottom:4}}>
+              {[
+                {color:C.stockOk,label:"En stock"},
+                {color:C.stockLow,label:"Stock bajo"},
+                {color:C.stockOut,label:"Agotado"},
+                {color:C.stockSold,label:"Vendido"},
+              ].map(l=>(
+                <div key={l.label} style={{display:"flex",alignItems:"center",gap:5}}>
+                  <div style={{width:10,height:10,borderRadius:3,background:l.color,
+                    border:`1px solid ${C.sep}`}}/>
+                  <span style={{fontSize:10,color:C.label3,fontFamily:FONT}}>{l.label}</span>
+                </div>
+              ))}
             </div>
 
             {productos.map(prod=>{
               const vendidas=vendidosPorProd[prod.id]||0;
               const pctVendido=prod.stockInicial>0?Math.round((vendidas/prod.stockInicial)*100):0;
               const estado=prod.stock===0?"agotado":prod.stock<3?"bajo":"ok";
-              const bgColor=prod.stock===0?"#FEF2F2":prod.stock<3?"#FFFBEB":C.stockOk;
-              const borderColor=prod.stock===0?`${C.red}30`:prod.stock<3?`${C.amber}40`:`${C.green}30`;
+              const bgColor=prod.stock===0?C.stockOut:prod.stock<3?C.stockLow:C.stockOk;
+              const borderColor=prod.stock===0?"#F4A8A8":prod.stock<3?"#F4D4A8":"#A8D4A8";
 
               return (
                 <div key={prod.id} style={{
@@ -3833,7 +3215,7 @@ function InventarioPorMarca({inv, ventas, onRecibir, onBaja, onExcel}){
                       </div>
                     )}
                     <button
-                      onClick={()=>imprimirTicket(prod, marca?.nombre||"")}
+                      onClick={function(){imprimirTicket(prod, marca?.nombre||"");}}
                       style={{
                         padding:"7px 14px",borderRadius:10,border:`1.5px solid ${C.gold}`,
                         background:"white",color:C.gold,fontSize:12,fontFamily:FONT,
@@ -3849,21 +3231,23 @@ function InventarioPorMarca({inv, ventas, onRecibir, onBaja, onExcel}){
           </div>
       }
 
-      {/* ── Sección: Dados de Baja ── */}
-      {productosBaja.length>0&&(
-        <BajasColapsadas productosBaja={productosBaja} vendidosPorProd={vendidosPorProd}/>
-      )}
-
+      {/* Botones acción */}
+      <div style={{display:"flex",gap:10,marginBottom:20}}>
+        <IOSBtn onPress={onBaja} variant="fill" full icon="🗑">Dar de Baja</IOSBtn>
+        <IOSBtn onPress={onRecibir} full icon="+">Recibir</IOSBtn>
+        <IOSBtn onPress={onExcel} variant="fill" full icon="📊">Carga Excel</IOSBtn>
+      </div>
+      </div>
     </div>
   );
 }
 
-// ══════════════════════════════════════════════════════════
+// ----------------------------------------------------------
 // MARCA DETALLE — iOS navigation push style
-// ══════════════════════════════════════════════════════════
+// ----------------------------------------------------------
 function MarcaDetalle({marcaId,inv,ventas,vMes,mes,anio,MK,cierres,setCierres,getHist,getLiq}){
-  const[sub,setSub]       =useState("historial");
-  const[filtroMk,setFMk]  =useState("");
+  var _h53 = useState("historial"); var sub = _h53[0]; var setSub = _h53[1];
+  var _h54 = useState(""); var filtroMk = _h54[0]; var setFMk = _h54[1];
   const marca   =MARCAS.find(m=>m.id===marcaId);
   const liq     =getLiq(marcaId);
   const cerrado =cierres[`${MK}-${marcaId}`]?.cerrado;
@@ -3935,11 +3319,7 @@ function MarcaDetalle({marcaId,inv,ventas,vMes,mes,anio,MK,cierres,setCierres,ge
                       borderBottom:i<periodo.ventas.length-1?`1px solid ${C.sep}`:""}}>
                       <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
                         <div style={{display:"flex",alignItems:"center",gap:8}}>
-                          <div style={{display:"flex",alignItems:"center",gap:8}}>
-                    <span style={{fontFamily:"monospace",fontSize:12,color:C.gold}}>{v.id}</span>
-                    {v.conFactura&&<span style={{fontSize:10,fontWeight:700,color:C.blue,
-                      background:`${C.blue}15`,borderRadius:5,padding:"2px 6px"}}>🧾 FACTURA</span>}
-                  </div>
+                          <span style={{fontFamily:"monospace",fontSize:12,color:C.gold}}>{v.id}</span>
                           <Chip color={v.metodoPago==="tarjeta"?C.amber:v.metodoPago==="qr"?C.blue:C.green} small>
                             {PAGOS.find(p=>p.id===v.metodoPago)?.label}
                           </Chip>
@@ -4028,16 +3408,16 @@ function MarcaDetalle({marcaId,inv,ventas,vMes,mes,anio,MK,cierres,setCierres,ge
           </div>
 
           <div style={{display:"flex",flexDirection:"column",gap:10}}>
-            <IOSBtn onPress={()=>exportCSV(MARCAS.find(m=>m.id===marcaId),ventas,mes,anio)} variant="fill" full icon="⬇">
+            <IOSBtn onPress={function(){exportCSV(MARCAS.find(m=>m.id===marcaId),ventas,mes,anio);}} variant="fill" full icon="⬇">
               Exportar CSV
             </IOSBtn>
             {!cerrado
               ? <IOSBtn variant="success" full icon="✓"
-                  onPress={()=>setCierres(p=>({...p,[`${MK}-${marcaId}`]:{cerrado:true,fecha:hoy(),mk:MK}}))}>
+                  onPress={function(){setCierres(p=>({...p,[`${MK}-${marcaId}`]:{cerrado:true,fecha:hoy(),mk:MK}}))}>
                   Confirmar Cierre Mensual
                 </IOSBtn>
               : <IOSBtn variant="danger" full
-                  onPress={()=>setCierres(p=>({...p,[`${MK}-${marcaId}`]:{cerrado:false,mk:MK}}))}>
+                  onPress={function(){setCierres(p=>({...p,[`${MK}-${marcaId}`]:{cerrado:false,mk:MK}}))}>
                   Reabrir Liquidación
                 </IOSBtn>
             }
@@ -4076,14 +3456,14 @@ function MarcaDetalle({marcaId,inv,ventas,vMes,mes,anio,MK,cierres,setCierres,ge
   );
 }
 
-// ══════════════════════════════════════════════════════════
+// ----------------------------------------------------------
 // HISTORIAL TAB — Navegación por mes/año
-// ══════════════════════════════════════════════════════════
+// ----------------------------------------------------------
 function HistorialTab({ventas, inv, cierres}){
   const now = new Date();
-  const [mesSel,  setMesSel]  = useState(now.getMonth());
-  const [anioSel, setAnioSel] = useState(now.getFullYear());
-  const [vista,   setVista]   = useState("resumen"); // resumen | marcas | ventas | stock
+  var _h55 = useState(now.getMonth(); var mesSel = _h55[0]; var setMesSel = _h55[1]);
+  var _h56 = useState(now.getFullYear(); var anioSel = _h56[0]; var setAnioSel = _h56[1]);
+  var _h57 = useState("resumen"); var vista = _h57[0]; var setVista = _h57[1]; // resumen | marcas | ventas | stock
 
   const MKSel = mkKey(mesSel, anioSel);
 
@@ -4096,7 +3476,7 @@ function HistorialTab({ventas, inv, cierres}){
   const periodosConDatos = useMemo(()=>{
     const set = new Set(ventas.map(v=>v.mk));
     return Array.from(set).sort((a,b)=>b.localeCompare(a)).map(mk=>{
-      const [anio,mes] = mk.split("-");
+      var _mk = mk.split("-"); var anio = _mk[0]; var mes = _mk[1];
       return { mk, mes:Number(mes)-1, anio:Number(anio) };
     });
   },[ventas]);
@@ -4125,7 +3505,7 @@ function HistorialTab({ventas, inv, cierres}){
 
   return (
     <div>
-      {/* ── SELECTOR MES/AÑO ── */}
+      {/* -- SELECTOR MES/AÑO -- */}
       <div style={{background:C.bg2,borderRadius:16,padding:16,marginBottom:16,
         border:`1px solid ${C.sep}`}}>
         <div style={{fontSize:11,fontWeight:700,color:C.label3,textTransform:"uppercase",
@@ -4135,7 +3515,7 @@ function HistorialTab({ventas, inv, cierres}){
         <div style={{display:"flex",gap:8,marginBottom:12,overflowX:"auto",
           scrollbarWidth:"none",WebkitOverflowScrolling:"touch",paddingBottom:4}}>
           {anios.map(a=>(
-            <button key={a} onClick={()=>setAnioSel(a)} style={{
+            <button key={a} onClick={function(){setAnioSel(a);}} style={{
               flexShrink:0,padding:"8px 18px",borderRadius:20,
               border:`2px solid ${anioSel===a?C.gold:C.sep}`,
               background:anioSel===a?`${C.gold}20`:C.bg3,
@@ -4154,7 +3534,7 @@ function HistorialTab({ventas, inv, cierres}){
             const tieneDatos = ventas.some(v=>v.mk===mk);
             const esSel = mesSel===i && anioSel===anioSel;
             return (
-              <button key={i} onClick={()=>setMesSel(i)} style={{
+              <button key={i} onClick={function(){setMesSel(i);}} style={{
                 padding:"10px 4px",borderRadius:10,
                 border:`2px solid ${mesSel===i?C.gold:tieneDatos?C.sep+"88":C.sep}`,
                 background:mesSel===i?`${C.gold}20`:tieneDatos?C.bg3:"transparent",
@@ -4187,7 +3567,7 @@ function HistorialTab({ventas, inv, cierres}){
         </div>
       </div>
 
-      {/* ── SELECTOR VISTA ── */}
+      {/* -- SELECTOR VISTA -- */}
       <div style={{marginBottom:16}}>
         <SegControl
           options={[
@@ -4200,7 +3580,7 @@ function HistorialTab({ventas, inv, cierres}){
         />
       </div>
 
-      {/* ── RESUMEN ── */}
+      {/* -- RESUMEN -- */}
       {vista==="resumen"&&(
         <div>
           {ventasPer.length===0
@@ -4245,7 +3625,7 @@ function HistorialTab({ventas, inv, cierres}){
         </div>
       )}
 
-      {/* ── POR MARCA ── */}
+      {/* -- POR MARCA -- */}
       {vista==="marcas"&&(
         <div>
           {porMarcaPer.length===0
@@ -4292,7 +3672,7 @@ function HistorialTab({ventas, inv, cierres}){
         </div>
       )}
 
-      {/* ── VENTAS DETALLE ── */}
+      {/* -- VENTAS DETALLE -- */}
       {vista==="ventas"&&(
         <div>
           {ventasPer.length===0
@@ -4328,7 +3708,7 @@ function HistorialTab({ventas, inv, cierres}){
         </div>
       )}
 
-      {/* ── STOCK ── */}
+      {/* -- STOCK -- */}
       {vista==="stock"&&(
         <div>
           <div style={{fontSize:12,color:C.label3,fontFamily:FONT,marginBottom:12}}>
@@ -4383,16 +3763,13 @@ function HistorialTab({ventas, inv, cierres}){
   );
 }
 
-// ══════════════════════════════════════════════════════════
+// ----------------------------------------------------------
 // CONFIG TAB — Gestión de usuarios y contraseñas
-// ══════════════════════════════════════════════════════════
+// ----------------------------------------------------------
 function ConfigTab({user, logout}){
-  const [subTab, setSubTab] = useState("cuenta");
+  var _h58 = useState("cuenta"); var subTab = _h58[0]; var setSubTab = _h58[1];
   // Usuarios guardados en localStorage (sobre los defaults)
-  const [usuarios, setUsuarios] = useState(()=>{
-    try { return JSON.parse(localStorage.getItem("th_usuarios")||"null") || USUARIOS; }
-    catch { return USUARIOS; }
-  });
+  var _h59 = useState(function(){ try{return JSON.parse(localStorage.getItem("th_usuarios")||"null")||USUARIOS;}catch{return USUARIOS;} }); var usuarios = _h59[0]; var setUsuarios = _h59[1];
   function guardarUsuarios(u){
     setUsuarios(u);
     localStorage.setItem("th_usuarios", JSON.stringify(u));
@@ -4420,13 +3797,13 @@ function ConfigTab({user, logout}){
         />
       </div>
 
-      {/* ── MI CUENTA ── */}
+      {/* -- MI CUENTA -- */}
       {subTab==="cuenta" && <CambiarContrasena user={user} usuarios={usuarios} onGuardar={guardarUsuarios}/>}
 
-      {/* ── USUARIOS ── */}
+      {/* -- USUARIOS -- */}
       {subTab==="usuarios" && <GestionUsuarios user={user} usuarios={usuarios} onGuardar={guardarUsuarios}/>}
 
-      {/* ── SISTEMA ── */}
+      {/* -- SISTEMA -- */}
       {subTab==="sistema" && (
         <div>
           {/* Info sistema */}
@@ -4455,13 +3832,13 @@ function ConfigTab({user, logout}){
   );
 }
 
-// ── Cambiar contraseña ────────────────────────────────────
+// -- Cambiar contraseña ------------------------------------
 function CambiarContrasena({user, usuarios, onGuardar}){
-  const [passActual,  setPassActual]  = useState("");
-  const [passNueva,   setPassNueva]   = useState("");
-  const [passConfirm, setPassConfirm] = useState("");
-  const [msg, setMsg] = useState(null);
-  const [show, setShow] = useState(false);
+  var _h60 = useState(""); var passActual = _h60[0]; var setPassActual = _h60[1];
+  var _h61 = useState(""); var passNueva = _h61[0]; var setPassNueva = _h61[1];
+  var _h62 = useState(""); var passConfirm = _h62[0]; var setPassConfirm = _h62[1];
+  var _h63 = useState(null); var msg = _h63[0]; var setMsg = _h63[1];
+  var _h64 = useState(false); var show = _h64[0]; var setShow = _h64[1];
 
   function cambiar(){
     setMsg(null);
@@ -4522,12 +3899,12 @@ function CambiarContrasena({user, usuarios, onGuardar}){
   );
 }
 
-// ── Gestión de usuarios ───────────────────────────────────
+// -- Gestión de usuarios -----------------------------------
 function GestionUsuarios({user, usuarios, onGuardar}){
-  const [modo,     setModo]    = useState(null); // null | "nuevo" | "editar"
-  const [editUser, setEditUser]= useState(null);
-  const [fUser,    setFUser]   = useState({usuario:"",password:"",nombre:"",rol:"caja"});
-  const [msg,      setMsg]     = useState(null);
+  var _h65 = useState(null); var modo = _h65[0]; var setModo = _h65[1]; // null | "nuevo" | "editar"
+  var _h66 = useState(null); var editUser = _h66[0]; var setEditUser = _h66[1];
+  var _h67 = useState({usuario:"",password:"",nombre:"",rol:"caja"}); var fUser = _h67[0]; var setFUser = _h67[1];
+  var _h68 = useState(null); var msg = _h68[0]; var setMsg = _h68[1];
 
   if (user.rol !== "admin") {
     return (
@@ -4567,7 +3944,7 @@ function GestionUsuarios({user, usuarios, onGuardar}){
     return (
       <div>
         <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:20}}>
-          <IOSBtn onPress={()=>{setModo(null);setMsg(null);}} variant="fill" small>← Volver</IOSBtn>
+          <IOSBtn onPress={function(){{setModo(null);setMsg(null);;}}} variant="fill" small>← Volver</IOSBtn>
           <span style={{fontSize:17,fontWeight:700,color:C.label,fontFamily:FONT}}>
             {modo==="nuevo"?"Nuevo usuario":"Editar usuario"}
           </span>
@@ -4584,7 +3961,7 @@ function GestionUsuarios({user, usuarios, onGuardar}){
             letterSpacing:.8,marginBottom:8}}>Rol</div>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
             {[["admin","👑 Admin","Acceso total"],["caja","🛒 Cajero","Solo POS y ventas"]].map(([r,label,desc])=>(
-              <button key={r} onClick={()=>setFUser(p=>({...p,rol:r}))} style={{
+              <button key={r} onClick={function(){setFUser(p=>({...p,rol:r;}}))} style={{
                 padding:"12px",borderRadius:12,cursor:"pointer",fontFamily:FONT,
                 border:`2px solid ${fUser.rol===r?C.gold:C.sep}`,
                 background:fUser.rol===r?`${C.gold}15`:C.bg2,
@@ -4640,13 +4017,13 @@ function GestionUsuarios({user, usuarios, onGuardar}){
               </div>
             </div>
             <div style={{display:"flex",gap:8,flexShrink:0}}>
-              <button onClick={()=>{setEditUser(u.usuario);setFUser({...u});setModo("editar");}} style={{
+              <button onClick={function(){{setEditUser(u.usuario);setFUser({...u;}});setModo("editar");}} style={{
                 background:`${C.gold}15`,border:`1px solid ${C.gold}30`,
                 borderRadius:8,padding:"6px 12px",color:C.gold,
                 fontSize:12,fontFamily:FONT,fontWeight:600,cursor:"pointer",
               }}>Editar</button>
               {u.usuario!==user.usuario&&(
-                <button onClick={()=>eliminar(u.usuario)} style={{
+                <button onClick={function(){eliminar(u.usuario);}} style={{
                   background:`${C.red}10`,border:`1px solid ${C.red}30`,
                   borderRadius:8,padding:"6px 12px",color:C.red,
                   fontSize:12,fontFamily:FONT,fontWeight:600,cursor:"pointer",
@@ -4657,7 +4034,7 @@ function GestionUsuarios({user, usuarios, onGuardar}){
         ))}
       </div>
 
-      <IOSBtn onPress={()=>{setFUser({usuario:"",password:"",nombre:"",rol:"caja"});setModo("nuevo");}}
+      <IOSBtn onPress={function(){{setFUser({usuario:"",password:"",nombre:"",rol:"caja";}});setModo("nuevo");}}
         variant="primary" full icon="+ ">
         Agregar nuevo usuario
       </IOSBtn>
@@ -4665,12 +4042,12 @@ function GestionUsuarios({user, usuarios, onGuardar}){
   );
 }
 
-// ══════════════════════════════════════════════════════════
+// ----------------------------------------------------------
 // VENTAS TAB — totales globales + desglose por marca
-// ══════════════════════════════════════════════════════════
+// ----------------------------------------------------------
 function VentasTab({vMes, totalVtas, mes, anio}){
-  const [vistaActiva, setVistaActiva] = useState("marcas"); // "marcas" | "historial"
-  const [marcaFiltro, setMarcaFiltro] = useState(null); // id marca o null = todas
+  var _h69 = useState("marcas"); var vistaActiva = _h69[0]; var setVistaActiva = _h69[1]; // "marcas" | "historial"
+  var _h70 = useState(null); var marcaFiltro = _h70[0]; var setMarcaFiltro = _h70[1]; // id marca o null = todas
 
   // Calcular ventas por marca con desglose de método de pago
   const porMarca = useMemo(()=>{
@@ -4729,7 +4106,7 @@ function VentasTab({vMes, totalVtas, mes, anio}){
         />
       </div>
 
-      {/* ── VISTA POR MARCA ── */}
+      {/* -- VISTA POR MARCA -- */}
       {vistaActiva==="marcas"&&(
         <div>
           {porMarca.length===0
@@ -4744,7 +4121,7 @@ function VentasTab({vMes, totalVtas, mes, anio}){
                   WebkitTapHighlightColor:"transparent",
                   borderLeft:`4px solid ${x.marca.color}`,
                 }}
-                onClick={()=>{setMarcaFiltro(marcaFiltro===x.marca.id?null:x.marca.id);setVistaActiva("historial");}}>
+                onClick={function(){{setMarcaFiltro(marcaFiltro===x.marca.id?null:x.marca.id);setVistaActiva("historial");;}}}>
                   {/* Cabecera marca */}
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
                     <div style={{display:"flex",alignItems:"center",gap:10}}>
@@ -4810,13 +4187,13 @@ function VentasTab({vMes, totalVtas, mes, anio}){
         </div>
       )}
 
-      {/* ── HISTORIAL ── */}
+      {/* -- HISTORIAL -- */}
       {vistaActiva==="historial"&&(
         <div>
           {/* Filtro por marca */}
           <div style={{display:"flex",gap:8,overflowX:"auto",paddingBottom:8,marginBottom:14,
             scrollbarWidth:"none",WebkitOverflowScrolling:"touch"}}>
-            <button onClick={()=>setMarcaFiltro(null)} style={{
+            <button onClick={function(){setMarcaFiltro(null);}} style={{
               flexShrink:0,padding:"7px 16px",borderRadius:20,
               border:`1.5px solid ${!marcaFiltro?C.gold:C.sep}`,
               background:!marcaFiltro?`${C.gold}20`:"transparent",
@@ -4825,7 +4202,7 @@ function VentasTab({vMes, totalVtas, mes, anio}){
               cursor:"pointer",WebkitTapHighlightColor:"transparent",
             }}>Todas</button>
             {MARCAS.filter(m=>vMes.some(v=>v.items.some(i=>i.marcaId===m.id))).map(m=>(
-              <button key={m.id} onClick={()=>setMarcaFiltro(marcaFiltro===m.id?null:m.id)} style={{
+              <button key={m.id} onClick={function(){setMarcaFiltro(marcaFiltro===m.id?null:m.id);}} style={{
                 flexShrink:0,padding:"7px 14px",borderRadius:20,
                 border:`1.5px solid ${marcaFiltro===m.id?m.color:C.sep}`,
                 background:marcaFiltro===m.id?`${m.color}20`:"transparent",
@@ -4888,7 +4265,7 @@ function VentasTab({vMes, totalVtas, mes, anio}){
                         </div>
                       ));
                     })()}
-                    <IOSBtn onPress={()=>sendWA(v)} variant="fill" small full icon="📲">
+                    <IOSBtn onPress={function(){sendWA(v);}} variant="fill" small full icon="📲">
                       Enviar por WhatsApp
                     </IOSBtn>
                     {v.etiquetaImg&&<img src={v.etiquetaImg} alt="etiqueta"
@@ -4903,7 +4280,7 @@ function VentasTab({vMes, totalVtas, mes, anio}){
   );
 }
 
-// ── Atoms aux ──
+// -- Atoms aux --
 function FilterPill({label,color,active,onPress}){
   return (
     <button onClick={onPress} style={{
