@@ -624,28 +624,6 @@ const genCod=(mid,nombre,idx)=>{
   return `${p}-${s}-${String(idx).padStart(4,"0")}`;
 };
 
-// ── Empresa ───────────────────────────────────────────────
-const NIT_EMPRESA  = "690053037";
-const PROPIETARIA  = "SYLVIA CAROLINA GRANIER ZALLES";
-const SUCURSAL_EMP = "Casa Matriz – Equipetrol, Santa Cruz";
-
-// ── Pago helpers (soporta pago mixto "mixto|ef:N|qr:N|...") ─
-function labelPago(mp){
-  if(!mp) return "—";
-  if(mp.startsWith("mixto|")) return "Mixto";
-  return PAGOS.find(p=>p.id===mp)?.label||mp;
-}
-function colorPago(mp){
-  if(!mp) return "#4A9B6F";
-  if(mp.startsWith("mixto|")) return "#6C5CE7";
-  return PAGOS.find(p=>p.id===mp)?.color||"#4A9B6F";
-}
-function iconPago(mp){
-  if(!mp) return "";
-  if(mp.startsWith("mixto|")) return "🔀";
-  return PAGOS.find(p=>p.id===mp)?.icon||"";
-}
-
 // ════════════════════════════════════════════════════════════
 // EXCEL ENGINE — SheetJS (xlsx) generador de reportes
 // Genera .xlsx real con múltiples pestañas, estilos y fórmulas
@@ -1376,7 +1354,6 @@ function Sheet({open,onClose,title,children,tall}){
         transform:anim?"translateY(0)":"translateY(100%)",
         transition:"transform .32s cubic-bezier(.32,.72,0,1)",
         paddingBottom:"env(safe-area-inset-bottom,24px)",
-        paddingBottom:24,
       }}>
         {/* Handle */}
         <div style={{display:"flex",justifyContent:"center",padding:"12px 0 4px"}}>
@@ -2274,7 +2251,7 @@ function CajasTab(){
 // ══════════════════════════════════════════════════════════
 // APP PRINCIPAL
 // ══════════════════════════════════════════════════════════
-export default // ── Comprobante de venta (58mm) ──────────────────────────
+// ── Comprobante de venta (58mm) ──────────────────────────
 function imprimirComprobante(venta) {
   const marca = MARCAS.find(m => m.id === venta.items?.[0]?.marcaId);
   const win = window.open('', '_blank', 'width=300,height=600');
@@ -2977,7 +2954,7 @@ function App(){
                 WebkitTapHighlightColor:"transparent",lineHeight:1,
               }}>☁</button>
               <button onClick={logout} style={{
-                background:"none",border:"none",fontSize:13,cursor:"pointer",
+                background:"none",fontSize:13,cursor:"pointer",
                 color:C.label3,padding:"4px 8px",fontFamily:FONT,
                 WebkitTapHighlightColor:"transparent",
                 border:`1px solid ${C.sep}`,borderRadius:8,
