@@ -21919,41 +21919,62 @@
     } }), /* @__PURE__ */ import_react.default.createElement("style", null, `@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}`), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 11, color: syncing ? C.amber : connected ? C.green : C.label3, fontFamily: FONT } }, syncing ? "Sync\u2026" : connected ? "Drive \u2713" : "Drive"));
   }
   var C = {
-    bg0: "#F0F4F1",
+    bg0: "#F4F7FB",
+    // blue-gray page background
     bg1: "#FFFFFF",
-    bg2: "#F8FAFA",
-    bg3: "#EEF4EF",
-    label: "#0F1F0F",
-    label2: "#2D4A2D",
-    label3: "#5A7A5A",
-    label4: "rgba(15,31,15,0.18)",
-    sep: "rgba(45,74,45,0.13)",
-    sepH: "rgba(45,74,45,0.25)",
-    gold: "#2E6B3E",
-    goldL: "#5A9B6A",
-    goldD: "#1A4A28",
-    accent: "#A8CCB0",
-    cream: "#F5F0E8",
-    green: "#2E8B57",
-    red: "#B03030",
-    blue: "#2E6BA8",
-    amber: "#B87820",
-    indigo: "#6A6AAA",
-    tabPos: "#2E8B57",
-    tabInv: "#4A7A2E",
-    tabMar: "#A06030",
-    tabVen: "#2E6BA8",
-    tabLiq: "#8B2E70",
-    fill1: "rgba(45,107,62,0.04)",
-    fill2: "rgba(45,107,62,0.09)",
-    fill3: "rgba(45,107,62,0.16)",
-    stockOk: "#E8F5EC",
-    stockLow: "#FFF8E0",
-    stockOut: "#FDECEA",
-    stockSold: "#EEF2FF",
-    greenBg: "#E8F5EC",
-    redBg: "#FDECEA",
-    amberBg: "#FFF8E0"
+    // white cards
+    bg2: "#F8FAFD",
+    // subtle card fill
+    bg3: "#EBF1F9",
+    // blue-tinted section bg
+    label: "#0F172A",
+    // slate-900
+    label2: "#334155",
+    // slate-700
+    label3: "#64748B",
+    // slate-500
+    label4: "rgba(15,23,42,0.15)",
+    sep: "rgba(100,116,139,0.14)",
+    sepH: "rgba(100,116,139,0.28)",
+    gold: "#1565C0",
+    // primary blue (kept key name for compat)
+    goldL: "#1976D2",
+    // blue lighter
+    goldD: "#0D47A1",
+    // blue darker
+    accent: "#90CAF9",
+    // blue accent
+    cream: "#F4F7FB",
+    green: "#2E7D32",
+    // success green
+    red: "#C62828",
+    // error red
+    blue: "#1565C0",
+    // alias for gold
+    amber: "#E65100",
+    // warning orange
+    indigo: "#3949AB",
+    // indigo/violet
+    tabPos: "#1565C0",
+    // Caja — blue
+    tabInv: "#0277BD",
+    // Inventario — dark blue
+    tabMar: "#6A1B9A",
+    // Marcas — purple
+    tabVen: "#00695C",
+    // Ventas — teal
+    tabLiq: "#AD1457",
+    // Liquidar — pink
+    fill1: "rgba(21,101,192,0.04)",
+    fill2: "rgba(21,101,192,0.09)",
+    fill3: "rgba(21,101,192,0.16)",
+    stockOk: "#E8F5E9",
+    stockLow: "#FFF8E1",
+    stockOut: "#FFEBEE",
+    stockSold: "#EDE7F6",
+    greenBg: "#E8F5E9",
+    redBg: "#FFEBEE",
+    amberBg: "#FFF8E1"
   };
   var ALQUILERES = {
     1: { alquiler: 2e3, comision: 0 },
@@ -22040,6 +22061,16 @@
     const s = (nombre || "ITEM").replace(/[^a-zA-Z0-9]/g, "").toUpperCase().slice(0, 4);
     return `${p}-${s}-${String(idx).padStart(4, "0")}`;
   };
+  function labelPago(mp) {
+    if (!mp) return "\u2014";
+    if (mp.startsWith("mixto|")) return "Mixto";
+    return PAGOS.find((p) => p.id === mp)?.label || mp;
+  }
+  function iconPago(mp) {
+    if (!mp) return "";
+    if (mp.startsWith("mixto|")) return "\u{1F500}";
+    return PAGOS.find((p) => p.id === mp)?.icon || "";
+  }
   var _XLSXPromise = null;
   function loadXLSX() {
     if (_XLSXPromise) return _XLSXPromise;
@@ -22372,9 +22403,9 @@
     const msg = [`\u{1F3E1} *TOSCANA HOUSE \u2014 ${venta.id}*`, `\u{1F4C5} ${venta.fecha} ${venta.hora}`, `\u{1F4B3} ${pg?.label}${venta.descPct ? ` (-${venta.descPct}%)` : ""}`, "", ...lines, "", `\u{1F4B0} *TOTAL: ${$(venta.total)}*`].join("\n");
     window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, "_blank");
   }
-  var FONT = "'Cormorant Garamond', 'Palatino', 'Georgia', serif";
+  var FONT = "'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
   var FONT_UI = "'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
-  function LogoMark({ size = 36, color = "#3D6B3D" }) {
+  function LogoMark({ size = 36, color = "#1565C0" }) {
     return /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", flexDirection: "column", alignItems: "center", lineHeight: 1 } }, /* @__PURE__ */ import_react.default.createElement(
       "div",
       {
@@ -22419,8 +22450,8 @@
       background: "rgba(255,255,255,0.96)",
       backdropFilter: "blur(20px) saturate(180%)",
       WebkitBackdropFilter: "blur(20px) saturate(180%)",
-      borderBottom: `2px solid ${C.sep}`,
-      boxShadow: "0 2px 16px rgba(74,107,74,0.10)",
+      borderBottom: `1px solid ${C.sep}`,
+      boxShadow: "0 2px 16px rgba(21,101,192,0.07)",
       padding: "0 16px",
       position: "sticky",
       top: 0,
@@ -22446,13 +22477,14 @@
     } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 22, lineHeight: 1 } }, "\u2039"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 16 } }, typeof back === "string" ? back : "")), /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1, textAlign: "center" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 17, fontWeight: 600, color: C.label, fontFamily: FONT, lineHeight: 1.2 } }, title), subtitle && /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label2, fontFamily: FONT, marginTop: 1 } }, subtitle)), /* @__PURE__ */ import_react.default.createElement("div", { style: { minWidth: back ? 44 : 0, display: "flex", justifyContent: "flex-end" } }, right));
   }
   var TAB_COLORS = {
+    inicio: "#1565C0",
     pos: C.tabPos,
     inventario: C.tabInv,
     marcas: C.tabMar,
     ventas: C.tabVen,
     liquidaciones: C.tabLiq,
-    config: "#7A9A7A",
-    historial: "#6B8BAE"
+    config: "#455A64",
+    historial: "#546E7A"
   };
   function TabBar({ tabs, active, onChange }) {
     return /* @__PURE__ */ import_react.default.createElement("div", { style: {
@@ -22464,10 +22496,10 @@
       background: "rgba(255,255,255,0.96)",
       backdropFilter: "blur(20px) saturate(180%)",
       WebkitBackdropFilter: "blur(20px) saturate(180%)",
-      borderTop: `2px solid ${C.sep}`,
+      borderTop: `1px solid ${C.sep}`,
       display: "flex",
       paddingBottom: 16,
-      boxShadow: "0 -4px 24px rgba(74,107,74,0.10)"
+      boxShadow: "0 -4px 24px rgba(21,101,192,0.07)"
     } }, tabs.map((t) => {
       const isActive = active === t.id;
       const tabColor = TAB_COLORS[t.id] || C.gold;
@@ -23205,10 +23237,209 @@
 </html>`);
     win.document.close();
   }
+  function KPICard({ icon, label, val, sub, color }) {
+    return /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      background: "#fff",
+      borderRadius: 14,
+      padding: "14px 16px",
+      border: "1px solid #E2E8F0",
+      boxShadow: "0 1px 4px rgba(21,101,192,0.06)"
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 8 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      width: 32,
+      height: 32,
+      borderRadius: 10,
+      background: `${color}18`,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      fontSize: 16
+    } }, icon), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 12, color: "#64748B", fontFamily: FONT_UI, fontWeight: 500 } }, label)), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 22, fontWeight: 800, color, fontFamily: FONT_UI, lineHeight: 1 } }, val), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: "#94A3B8", fontFamily: FONT_UI, marginTop: 4 } }, sub));
+  }
+  function HomeDashboard({ ventas, inv, vMes, mes, anio, onGoTab }) {
+    const [clock, setClock] = (0, import_react.useState)(
+      () => (/* @__PURE__ */ new Date()).toLocaleTimeString("es-BO", { hour: "2-digit", minute: "2-digit", second: "2-digit" })
+    );
+    (0, import_react.useEffect)(() => {
+      const t = setInterval(() => setClock(
+        (/* @__PURE__ */ new Date()).toLocaleTimeString("es-BO", { hour: "2-digit", minute: "2-digit", second: "2-digit" })
+      ), 1e3);
+      return () => clearInterval(t);
+    }, []);
+    const hoyStr = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+    const vHoy = ventas.filter((v) => v.fecha === hoyStr);
+    const totalHoy = vHoy.reduce((s, v) => s + v.total, 0);
+    const totalMes = vMes.reduce((s, v) => s + v.total, 0);
+    const stockTotal = inv.reduce((s, i) => s + (i.stock || 0), 0);
+    const last7 = (0, import_react.useMemo)(() => {
+      const days = [];
+      for (let i = 6; i >= 0; i--) {
+        const d = /* @__PURE__ */ new Date();
+        d.setDate(d.getDate() - i);
+        const str = d.toISOString().slice(0, 10);
+        const total = ventas.filter((v) => v.fecha === str).reduce((s, v) => s + v.total, 0);
+        const label = d.toLocaleDateString("es-BO", { weekday: "short" }).slice(0, 3);
+        days.push({ str, total, label });
+      }
+      return days;
+    }, [ventas]);
+    const maxDay = Math.max(...last7.map((d) => d.total), 1);
+    const pagoHoy = {
+      efectivo: vHoy.filter((v) => v.metodoPago === "efectivo").reduce((s, v) => s + v.total, 0),
+      qr: vHoy.filter((v) => v.metodoPago === "qr").reduce((s, v) => s + v.total, 0),
+      tarjeta: vHoy.filter((v) => v.metodoPago === "tarjeta").reduce((s, v) => s + v.total, 0),
+      mixto: vHoy.filter((v) => v.metodoPago?.startsWith("mixto|")).reduce((s, v) => s + v.total, 0)
+    };
+    const topMarcas = (0, import_react.useMemo)(() => {
+      const map = {};
+      vMes.forEach((v) => v.items.forEach((it) => {
+        map[it.marcaId] = (map[it.marcaId] || 0) + it.subtotal;
+      }));
+      return Object.entries(map).map(([id, total]) => ({ marca: MARCAS.find((m) => m.id === Number(id)), total })).filter((x) => x.marca).sort((a, b) => b.total - a.total).slice(0, 5);
+    }, [vMes]);
+    const maxMarca = Math.max(...topMarcas.map((m) => m.total), 1);
+    const ultVentas = (0, import_react.useMemo)(
+      () => [...ventas].sort((a, b) => (b.createdAt || b.fecha || "").localeCompare(a.createdAt || a.fecha || "")).slice(0, 6),
+      [ventas]
+    );
+    const today = /* @__PURE__ */ new Date();
+    const dayNames = ["Dom", "Lun", "Mar", "Mi\xE9", "Jue", "Vie", "S\xE1b"];
+    const dateStr = `${dayNames[today.getDay()]}, ${today.getDate()} de ${MESES[today.getMonth()]} ${today.getFullYear()}`;
+    const cardStyle = {
+      background: "#fff",
+      borderRadius: 14,
+      padding: "14px 16px",
+      border: "1px solid #E2E8F0",
+      boxShadow: "0 1px 4px rgba(21,101,192,0.06)",
+      marginBottom: 14
+    };
+    return /* @__PURE__ */ import_react.default.createElement("div", { style: { paddingBottom: 8 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center", marginBottom: 20 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      fontSize: 38,
+      fontWeight: 800,
+      color: C.gold,
+      fontFamily: FONT_UI,
+      letterSpacing: -1,
+      lineHeight: 1
+    } }, clock), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.label3, fontFamily: FONT_UI, marginTop: 4 } }, dateStr)), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 14 } }, /* @__PURE__ */ import_react.default.createElement(
+      KPICard,
+      {
+        icon: "\u{1F4B0}",
+        label: "Ventas hoy",
+        val: `Bs ${new Intl.NumberFormat("es-BO", { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(totalHoy)}`,
+        sub: `${vHoy.length} transacci\xF3n${vHoy.length !== 1 ? "es" : ""}`,
+        color: "#2E7D32"
+      }
+    ), /* @__PURE__ */ import_react.default.createElement(
+      KPICard,
+      {
+        icon: "\u{1F4C5}",
+        label: `Ventas ${MESES[mes].slice(0, 3)}`,
+        val: `Bs ${new Intl.NumberFormat("es-BO", { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(totalMes)}`,
+        sub: `${vMes.length} transacciones`,
+        color: C.gold
+      }
+    ), /* @__PURE__ */ import_react.default.createElement(
+      KPICard,
+      {
+        icon: "\u{1F4E6}",
+        label: "Stock total",
+        val: stockTotal.toLocaleString(),
+        sub: "unidades en tienda",
+        color: C.indigo
+      }
+    ), /* @__PURE__ */ import_react.default.createElement(
+      KPICard,
+      {
+        icon: "\u{1F3F7}\uFE0F",
+        label: "Marcas activas",
+        val: MARCAS.length,
+        sub: "marcas en tienda",
+        color: C.amber
+      }
+    )), /* @__PURE__ */ import_react.default.createElement("div", { style: cardStyle }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, fontWeight: 700, color: C.label2, fontFamily: FONT_UI, marginBottom: 14 } }, "\xDAltimos 7 d\xEDas"), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "flex-end", gap: 6, height: 80 } }, last7.map((d, i) => {
+      const pct = d.total / maxDay;
+      const isToday = d.str === hoyStr;
+      return /* @__PURE__ */ import_react.default.createElement("div", { key: i, style: { flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { width: "100%", display: "flex", flexDirection: "column", justifyContent: "flex-end", height: 64 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+        width: "100%",
+        height: d.total > 0 ? Math.max(pct * 64, 4) : 0,
+        background: isToday ? C.gold : `${C.gold}50`,
+        borderRadius: "4px 4px 0 0",
+        transition: "height .35s ease"
+      } })), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+        fontSize: 9,
+        fontFamily: FONT_UI,
+        color: isToday ? C.gold : C.label3,
+        fontWeight: isToday ? 700 : 400
+      } }, d.label));
+    })), totalHoy > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT_UI, textAlign: "center", marginTop: 8 } }, "Hoy: Bs ", new Intl.NumberFormat("es-BO", { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(totalHoy))), totalHoy > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: cardStyle }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, fontWeight: 700, color: C.label2, fontFamily: FONT_UI, marginBottom: 10 } }, "M\xE9todos de pago \u2014 hoy"), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 } }, [
+      { label: "Efectivo", val: pagoHoy.efectivo, icon: "\u{1F4B5}", color: "#2E7D32" },
+      { label: "QR", val: pagoHoy.qr, icon: "\u{1F4F1}", color: "#1565C0" },
+      { label: "Tarjeta", val: pagoHoy.tarjeta, icon: "\u{1F4B3}", color: "#E65100" },
+      { label: "Mixto", val: pagoHoy.mixto, icon: "\u{1F500}", color: "#6C5CE7" }
+    ].filter((p) => p.val > 0).map((p) => /* @__PURE__ */ import_react.default.createElement("div", { key: p.label, style: {
+      background: `${p.color}08`,
+      borderRadius: 10,
+      padding: "10px 12px",
+      border: `1px solid ${p.color}20`
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: p.color, fontFamily: FONT_UI, fontWeight: 600, marginBottom: 4 } }, p.icon, " ", p.label), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 16, fontWeight: 800, color: p.color, fontFamily: FONT_UI } }, "Bs ", new Intl.NumberFormat("es-BO", { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(p.val)))))), topMarcas.length > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: cardStyle }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, fontWeight: 700, color: C.label2, fontFamily: FONT_UI } }, "Top marcas \u2014 ", MESES[mes]), /* @__PURE__ */ import_react.default.createElement("button", { onClick: () => onGoTab("marcas"), style: {
+      fontSize: 12,
+      color: C.gold,
+      fontFamily: FONT_UI,
+      fontWeight: 600,
+      background: "none",
+      border: "none",
+      cursor: "pointer",
+      padding: 0
+    } }, "Ver todas \u2192")), topMarcas.map((m, i) => /* @__PURE__ */ import_react.default.createElement("div", { key: m.marca.id, style: { marginBottom: i < topMarcas.length - 1 ? 12 : 0 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 14 } }, m.marca.emoji), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, fontWeight: 600, color: C.label, fontFamily: FONT_UI } }, m.marca.nombre)), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 12, fontWeight: 700, color: m.marca.color, fontFamily: FONT_UI } }, "Bs ", new Intl.NumberFormat("es-BO", { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(m.total))), /* @__PURE__ */ import_react.default.createElement("div", { style: { height: 6, background: "#F1F5F9", borderRadius: 3, overflow: "hidden" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      height: 6,
+      width: `${m.total / maxMarca * 100}%`,
+      background: m.marca.color,
+      borderRadius: 3,
+      transition: "width .4s ease"
+    } }))))), ultVentas.length > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: cardStyle }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, fontWeight: 700, color: C.label2, fontFamily: FONT_UI } }, "\xDAltimas ventas"), /* @__PURE__ */ import_react.default.createElement("button", { onClick: () => onGoTab("ventas"), style: {
+      fontSize: 12,
+      color: C.gold,
+      fontFamily: FONT_UI,
+      fontWeight: 600,
+      background: "none",
+      border: "none",
+      cursor: "pointer",
+      padding: 0
+    } }, "Ver todas \u2192")), ultVentas.map((v, i) => /* @__PURE__ */ import_react.default.createElement("div", { key: v.id || i, style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      padding: "9px 0",
+      borderBottom: i < ultVentas.length - 1 ? "1px solid #F1F5F9" : ""
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      fontSize: 13,
+      fontWeight: 600,
+      color: C.label,
+      fontFamily: FONT_UI,
+      overflow: "hidden",
+      textOverflow: "ellipsis",
+      whiteSpace: "nowrap"
+    } }, iconPago(v.metodoPago), " ", v.items?.map((it) => it.nombre).join(", ") || "Venta"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT_UI } }, v.fecha, " \xB7 ", labelPago(v.metodoPago))), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 14, fontWeight: 800, color: "#2E7D32", fontFamily: FONT_UI, marginLeft: 12 } }, "Bs ", new Intl.NumberFormat("es-BO", { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(v.total))))), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 8 } }, [
+      { icon: "\u2295", label: "Nueva venta", tab: "pos", color: C.gold },
+      { icon: "\u25EB", label: "Inventario", tab: "inventario", color: C.indigo },
+      { icon: "\u25C8", label: "Ver ventas", tab: "ventas", color: "#00695C" },
+      { icon: "\u25CE", label: "Liquidaciones", tab: "liquidaciones", color: "#AD1457" }
+    ].map((a) => /* @__PURE__ */ import_react.default.createElement("button", { key: a.tab, onClick: () => onGoTab(a.tab), style: {
+      background: `${a.color}10`,
+      borderRadius: 12,
+      padding: "14px 12px",
+      border: `1px solid ${a.color}25`,
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+      cursor: "pointer",
+      WebkitTapHighlightColor: "transparent",
+      transition: "background .15s"
+    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 22 } }, a.icon), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, fontWeight: 700, color: a.color, fontFamily: FONT_UI } }, a.label)))));
+  }
   function App() {
     const { user, login, logout } = useAuth();
     const now = /* @__PURE__ */ new Date();
-    const [tab, setTab] = (0, import_react.useState)("pos");
+    const [tab, setTab] = (0, import_react.useState)("inicio");
     const [inv, setInv] = (0, import_react.useState)([]);
     const [ventas, setVentas] = (0, import_react.useState)([]);
     const [alq, setAlq] = (0, import_react.useState)([]);
@@ -23476,21 +23707,21 @@
       return Object.values(map).sort((a, b) => b.mk.localeCompare(a.mk));
     }, [ventas]);
     const TABS = [
+      { id: "inicio", icon: "\u229E", label: "Inicio" },
       { id: "pos", icon: "\u2295", label: "Caja" },
+      { id: "ventas", icon: "\u25C8", label: "Ventas" },
       { id: "inventario", icon: "\u25EB", label: "Inventario" },
       { id: "marcas", icon: "\u25C6", label: "Marcas" },
-      { id: "ventas", icon: "\u25C8", label: "Ventas" },
       { id: "liquidaciones", icon: "\u25CE", label: "Liquidar" },
-      { id: "historial", icon: "\u{1F4C5}", label: "Historial" },
       { id: "config", icon: "\u2699", label: "Config" }
     ];
     const showingDetail = tab === "marcas" && marcaDetalle;
     if (!user) return /* @__PURE__ */ import_react.default.createElement(LoginScreen, { onLogin: login });
     return /* @__PURE__ */ import_react.default.createElement("div", { style: {
       minHeight: "100vh",
-      background: `linear-gradient(160deg, ${C.bg0} 0%, #E8F2E8 50%, #F0F5F0 100%)`,
+      background: C.bg0,
       color: C.label,
-      fontFamily: FONT,
+      fontFamily: FONT_UI,
       paddingBottom: 84,
       // espacio para tab bar + safe area
       WebkitFontSmoothing: "antialiased",
@@ -23498,7 +23729,7 @@
     } }, cargando && /* @__PURE__ */ import_react.default.createElement("div", { style: {
       position: "fixed",
       inset: 0,
-      background: "rgba(242,247,242,0.97)",
+      background: "rgba(244,247,251,0.97)",
       display: "flex",
       flexDirection: "column",
       alignItems: "center",
@@ -23598,7 +23829,17 @@
           MESES.map((m, i) => /* @__PURE__ */ import_react.default.createElement("option", { key: i, value: i, style: { background: C.bg1 } }, m.slice(0, 3)))
         ))
       }
-    ), /* @__PURE__ */ import_react.default.createElement("div", { style: { padding: "16px 16px 0" } }, tab === "pos" && /* @__PURE__ */ import_react.default.createElement(POS, { inv, onVenta: handleVenta }), tab === "inventario" && /* @__PURE__ */ import_react.default.createElement(InventarioPorMarca, { inv, ventas, onRecibir: () => setShInv(true), onBaja: () => {
+    ), /* @__PURE__ */ import_react.default.createElement("div", { style: { padding: "16px 16px 0" } }, tab === "inicio" && /* @__PURE__ */ import_react.default.createElement(
+      HomeDashboard,
+      {
+        ventas,
+        inv,
+        vMes,
+        mes,
+        anio,
+        onGoTab: setTab
+      }
+    ), tab === "pos" && /* @__PURE__ */ import_react.default.createElement(POS, { inv, onVenta: handleVenta }), tab === "inventario" && /* @__PURE__ */ import_react.default.createElement(InventarioPorMarca, { inv, ventas, onRecibir: () => setShInv(true), onBaja: () => {
       setShBaja(true);
       setBajaMsg(null);
       setBajaCod("");

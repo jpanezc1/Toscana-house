@@ -510,43 +510,43 @@ function DriveIndicator({ syncing, connected }) {
    · Dark mode premium  · Haptic-feel micro-animations
 ═══════════════════════════════════════════════════════════ */
 
-// ── Paleta Pastel — Toscana House Casa de Moda ──────────
+// ── Paleta Profesional — Toscana House (iZi-style blue/white) ──
 const C = {
-  bg0:   "#F0F4F1",
-  bg1:   "#FFFFFF",
-  bg2:   "#F8FAFA",
-  bg3:   "#EEF4EF",
-  label:    "#0F1F0F",
-  label2:   "#2D4A2D",
-  label3:   "#5A7A5A",
-  label4:   "rgba(15,31,15,0.18)",
-  sep:   "rgba(45,74,45,0.13)",
-  sepH:  "rgba(45,74,45,0.25)",
-  gold:  "#2E6B3E",
-  goldL: "#5A9B6A",
-  goldD: "#1A4A28",
-  accent:"#A8CCB0",
-  cream: "#F5F0E8",
-  green: "#2E8B57",
-  red:   "#B03030",
-  blue:  "#2E6BA8",
-  amber: "#B87820",
-  indigo:"#6A6AAA",
-  tabPos:"#2E8B57",
-  tabInv:"#4A7A2E",
-  tabMar:"#A06030",
-  tabVen:"#2E6BA8",
-  tabLiq:"#8B2E70",
-  fill1: "rgba(45,107,62,0.04)",
-  fill2: "rgba(45,107,62,0.09)",
-  fill3: "rgba(45,107,62,0.16)",
-  stockOk:  "#E8F5EC",
-  stockLow: "#FFF8E0",
-  stockOut: "#FDECEA",
-  stockSold:"#EEF2FF",
-  greenBg:  "#E8F5EC",
-  redBg:    "#FDECEA",
-  amberBg:  "#FFF8E0",
+  bg0:   "#F4F7FB",       // blue-gray page background
+  bg1:   "#FFFFFF",       // white cards
+  bg2:   "#F8FAFD",       // subtle card fill
+  bg3:   "#EBF1F9",       // blue-tinted section bg
+  label:    "#0F172A",    // slate-900
+  label2:   "#334155",    // slate-700
+  label3:   "#64748B",    // slate-500
+  label4:   "rgba(15,23,42,0.15)",
+  sep:   "rgba(100,116,139,0.14)",
+  sepH:  "rgba(100,116,139,0.28)",
+  gold:  "#1565C0",       // primary blue (kept key name for compat)
+  goldL: "#1976D2",       // blue lighter
+  goldD: "#0D47A1",       // blue darker
+  accent:"#90CAF9",       // blue accent
+  cream: "#F4F7FB",
+  green: "#2E7D32",       // success green
+  red:   "#C62828",       // error red
+  blue:  "#1565C0",       // alias for gold
+  amber: "#E65100",       // warning orange
+  indigo:"#3949AB",       // indigo/violet
+  tabPos:"#1565C0",       // Caja — blue
+  tabInv:"#0277BD",       // Inventario — dark blue
+  tabMar:"#6A1B9A",       // Marcas — purple
+  tabVen:"#00695C",       // Ventas — teal
+  tabLiq:"#AD1457",       // Liquidar — pink
+  fill1: "rgba(21,101,192,0.04)",
+  fill2: "rgba(21,101,192,0.09)",
+  fill3: "rgba(21,101,192,0.16)",
+  stockOk:  "#E8F5E9",
+  stockLow: "#FFF8E1",
+  stockOut: "#FFEBEE",
+  stockSold:"#EDE7F6",
+  greenBg:  "#E8F5E9",
+  redBg:    "#FFEBEE",
+  amberBg:  "#FFF8E1",
 };
 
 const ALQUILERES = {
@@ -612,6 +612,27 @@ const genCod=(mid,nombre,idx)=>{
   return `${p}-${s}-${String(idx).padStart(4,"0")}`;
 };
 
+// ── Empresa ───────────────────────────────────────────────
+const NIT_EMPRESA  = "690053037";
+const PROPIETARIA  = "SYLVIA CAROLINA GRANIER ZALLES";
+const SUCURSAL_EMP = "Casa Matriz – Equipetrol, Santa Cruz";
+
+// ── Pago helpers (soporta pago mixto "mixto|ef:N|qr:N|...") ─
+function labelPago(mp){
+  if(!mp) return "—";
+  if(mp.startsWith("mixto|")) return "Mixto";
+  return PAGOS.find(p=>p.id===mp)?.label||mp;
+}
+function colorPago(mp){
+  if(!mp) return "#4A9B6F";
+  if(mp.startsWith("mixto|")) return "#6C5CE7";
+  return PAGOS.find(p=>p.id===mp)?.color||"#4A9B6F";
+}
+function iconPago(mp){
+  if(!mp) return "";
+  if(mp.startsWith("mixto|")) return "🔀";
+  return PAGOS.find(p=>p.id===mp)?.icon||"";
+}
 
 // ════════════════════════════════════════════════════════════
 // EXCEL ENGINE — SheetJS (xlsx) generador de reportes
@@ -989,8 +1010,8 @@ function sendWA(venta){
 // iOS DESIGN ATOMS
 // ══════════════════════════════════════════════════════════
 
-// Font stack
-const FONT = "'Cormorant Garamond', 'Palatino', 'Georgia', serif";
+// Font stack — unified DM Sans for professional/clean look
+const FONT = "'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
 const FONT_UI = "'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
 
 // Logo SVG inline de Toscana House
@@ -1001,7 +1022,7 @@ const LOGO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 120" 
   <line x1="30" y1="60" x2="170" y2="60" stroke="currentColor" strokeWidth="0.5" opacity="0.4"/>
 </svg>`;
 
-function LogoMark({size=36, color="#3D6B3D"}){
+function LogoMark({size=36, color="#1565C0"}){
   return <div style={{display:"flex",flexDirection:"column",alignItems:"center",lineHeight:1}}>
     <div style={{fontSize:size*.55,fontWeight:800,color,fontFamily:"Georgia,serif",letterSpacing:2,lineHeight:1}}
       dangerouslySetInnerHTML={{__html:"&#119947;&#119947;".replace(/&#119947;/g,"")}}
@@ -1073,8 +1094,8 @@ function NavBar({title, subtitle, back, onBack, right}){
       background:"rgba(255,255,255,0.96)",
       backdropFilter:"blur(20px) saturate(180%)",
       WebkitBackdropFilter:"blur(20px) saturate(180%)",
-      borderBottom:`2px solid ${C.sep}`,
-      boxShadow:"0 2px 16px rgba(74,107,74,0.10)",
+      borderBottom:`1px solid ${C.sep}`,
+      boxShadow:"0 2px 16px rgba(21,101,192,0.07)",
       padding:"0 16px",
       position:"sticky",top:0,zIndex:100,
       display:"flex",alignItems:"center",height:56,
@@ -1104,13 +1125,14 @@ function NavBar({title, subtitle, back, onBack, right}){
 
 // iOS Bottom Tab Bar
 const TAB_COLORS = {
-  pos:          C.tabPos,
-  inventario:   C.tabInv,
-  marcas:       C.tabMar,
-  ventas:       C.tabVen,
-  liquidaciones:C.tabLiq,
-  config:       "#7A9A7A",
-  historial:    "#6B8BAE",
+  inicio:        "#1565C0",
+  pos:           C.tabPos,
+  inventario:    C.tabInv,
+  marcas:        C.tabMar,
+  ventas:        C.tabVen,
+  liquidaciones: C.tabLiq,
+  config:        "#455A64",
+  historial:     "#546E7A",
 };
 
 function TabBar({tabs, active, onChange}){
@@ -1120,10 +1142,10 @@ function TabBar({tabs, active, onChange}){
       background:"rgba(255,255,255,0.96)",
       backdropFilter:"blur(20px) saturate(180%)",
       WebkitBackdropFilter:"blur(20px) saturate(180%)",
-      borderTop:`2px solid ${C.sep}`,
+      borderTop:`1px solid ${C.sep}`,
       display:"flex",
       paddingBottom:16,
-      boxShadow:"0 -4px 24px rgba(74,107,74,0.10)",
+      boxShadow:"0 -4px 24px rgba(21,101,192,0.07)",
     }}>
       {tabs.map(t=>{
         const isActive=active===t.id;
@@ -1853,10 +1875,298 @@ function generarPlanillaAlquileres(ventas, mes, anio) {
   win.document.close();
 }
 
+// ══════════════════════════════════════════════════════════
+// KPI CARD — small metric tile
+// ══════════════════════════════════════════════════════════
+function KPICard({icon, label, val, sub, color}){
+  return (
+    <div style={{
+      background:"#fff", borderRadius:14, padding:"14px 16px",
+      border:"1px solid #E2E8F0",
+      boxShadow:"0 1px 4px rgba(21,101,192,0.06)",
+    }}>
+      <div style={{display:"flex", alignItems:"center", gap:8, marginBottom:8}}>
+        <div style={{
+          width:32, height:32, borderRadius:10,
+          background:`${color}18`,
+          display:"flex", alignItems:"center", justifyContent:"center",
+          fontSize:16,
+        }}>{icon}</div>
+        <span style={{fontSize:12, color:"#64748B", fontFamily:FONT_UI, fontWeight:500}}>{label}</span>
+      </div>
+      <div style={{fontSize:22, fontWeight:800, color:color, fontFamily:FONT_UI, lineHeight:1}}>{val}</div>
+      <div style={{fontSize:11, color:"#94A3B8", fontFamily:FONT_UI, marginTop:4}}>{sub}</div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════
+// HOME DASHBOARD — vista en tiempo real (KPIs, chart, feed)
+// ══════════════════════════════════════════════════════════
+function HomeDashboard({ventas, inv, vMes, mes, anio, onGoTab}){
+  const [clock, setClock] = useState(
+    () => new Date().toLocaleTimeString("es-BO", {hour:"2-digit", minute:"2-digit", second:"2-digit"})
+  );
+  useEffect(() => {
+    const t = setInterval(() => setClock(
+      new Date().toLocaleTimeString("es-BO", {hour:"2-digit", minute:"2-digit", second:"2-digit"})
+    ), 1000);
+    return () => clearInterval(t);
+  }, []);
+
+  const hoyStr = new Date().toISOString().slice(0,10);
+  const vHoy   = ventas.filter(v => v.fecha === hoyStr);
+  const totalHoy = vHoy.reduce((s, v) => s + v.total, 0);
+  const totalMes  = vMes.reduce((s, v) => s + v.total, 0);
+  const stockTotal = inv.reduce((s, i) => s + (i.stock || 0), 0);
+
+  // ── Últimos 7 días (bar chart) ──────────────────────────
+  const last7 = useMemo(() => {
+    const days = [];
+    for(let i = 6; i >= 0; i--){
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const str   = d.toISOString().slice(0,10);
+      const total = ventas.filter(v => v.fecha === str).reduce((s,v) => s + v.total, 0);
+      const label = d.toLocaleDateString("es-BO", {weekday:"short"}).slice(0,3);
+      days.push({str, total, label});
+    }
+    return days;
+  }, [ventas]);
+  const maxDay = Math.max(...last7.map(d => d.total), 1);
+
+  // ── Métodos de pago hoy ─────────────────────────────────
+  const pagoHoy = {
+    efectivo: vHoy.filter(v => v.metodoPago === "efectivo").reduce((s,v) => s+v.total, 0),
+    qr:       vHoy.filter(v => v.metodoPago === "qr").reduce((s,v) => s+v.total, 0),
+    tarjeta:  vHoy.filter(v => v.metodoPago === "tarjeta").reduce((s,v) => s+v.total, 0),
+    mixto:    vHoy.filter(v => v.metodoPago?.startsWith("mixto|")).reduce((s,v) => s+v.total, 0),
+  };
+
+  // ── Top 5 marcas del mes ────────────────────────────────
+  const topMarcas = useMemo(() => {
+    const map = {};
+    vMes.forEach(v => v.items.forEach(it => {
+      map[it.marcaId] = (map[it.marcaId] || 0) + it.subtotal;
+    }));
+    return Object.entries(map)
+      .map(([id, total]) => ({marca: MARCAS.find(m => m.id === Number(id)), total}))
+      .filter(x => x.marca)
+      .sort((a,b) => b.total - a.total)
+      .slice(0, 5);
+  }, [vMes]);
+  const maxMarca = Math.max(...topMarcas.map(m => m.total), 1);
+
+  // ── Últimas 6 ventas ────────────────────────────────────
+  const ultVentas = useMemo(() =>
+    [...ventas]
+      .sort((a,b) => (b.createdAt||b.fecha||"").localeCompare(a.createdAt||a.fecha||""))
+      .slice(0, 6),
+    [ventas]
+  );
+
+  const today   = new Date();
+  const dayNames = ["Dom","Lun","Mar","Mié","Jue","Vie","Sáb"];
+  const dateStr  = `${dayNames[today.getDay()]}, ${today.getDate()} de ${MESES[today.getMonth()]} ${today.getFullYear()}`;
+
+  const cardStyle = {
+    background:"#fff", borderRadius:14, padding:"14px 16px",
+    border:"1px solid #E2E8F0", boxShadow:"0 1px 4px rgba(21,101,192,0.06)",
+    marginBottom:14,
+  };
+
+  return (
+    <div style={{paddingBottom:8}}>
+
+      {/* ── Reloj / fecha ── */}
+      <div style={{textAlign:"center", marginBottom:20}}>
+        <div style={{fontSize:38, fontWeight:800, color:C.gold, fontFamily:FONT_UI,
+          letterSpacing:-1, lineHeight:1}}>{clock}</div>
+        <div style={{fontSize:13, color:C.label3, fontFamily:FONT_UI, marginTop:4}}>{dateStr}</div>
+      </div>
+
+      {/* ── KPI 2×2 grid ── */}
+      <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:14}}>
+        <KPICard icon="💰" label="Ventas hoy"
+          val={`Bs ${new Intl.NumberFormat("es-BO",{minimumFractionDigits:0,maximumFractionDigits:0}).format(totalHoy)}`}
+          sub={`${vHoy.length} transacción${vHoy.length!==1?"es":""}`}
+          color="#2E7D32"/>
+        <KPICard icon="📅" label={`Ventas ${MESES[mes].slice(0,3)}`}
+          val={`Bs ${new Intl.NumberFormat("es-BO",{minimumFractionDigits:0,maximumFractionDigits:0}).format(totalMes)}`}
+          sub={`${vMes.length} transacciones`}
+          color={C.gold}/>
+        <KPICard icon="📦" label="Stock total"
+          val={stockTotal.toLocaleString()}
+          sub="unidades en tienda"
+          color={C.indigo}/>
+        <KPICard icon="🏷️" label="Marcas activas"
+          val={MARCAS.length}
+          sub="marcas en tienda"
+          color={C.amber}/>
+      </div>
+
+      {/* ── Bar chart últimos 7 días ── */}
+      <div style={cardStyle}>
+        <div style={{fontSize:13, fontWeight:700, color:C.label2, fontFamily:FONT_UI, marginBottom:14}}>
+          Últimos 7 días
+        </div>
+        <div style={{display:"flex", alignItems:"flex-end", gap:6, height:80}}>
+          {last7.map((d, i) => {
+            const pct    = d.total / maxDay;
+            const isToday = d.str === hoyStr;
+            return (
+              <div key={i} style={{flex:1, display:"flex", flexDirection:"column", alignItems:"center", gap:4}}>
+                <div style={{width:"100%", display:"flex", flexDirection:"column", justifyContent:"flex-end", height:64}}>
+                  <div style={{
+                    width:"100%",
+                    height: d.total > 0 ? Math.max(pct * 64, 4) : 0,
+                    background: isToday ? C.gold : `${C.gold}50`,
+                    borderRadius:"4px 4px 0 0",
+                    transition:"height .35s ease",
+                  }}/>
+                </div>
+                <div style={{fontSize:9, fontFamily:FONT_UI,
+                  color: isToday ? C.gold : C.label3,
+                  fontWeight: isToday ? 700 : 400,
+                }}>{d.label}</div>
+              </div>
+            );
+          })}
+        </div>
+        {totalHoy > 0 && (
+          <div style={{fontSize:11, color:C.label3, fontFamily:FONT_UI, textAlign:"center", marginTop:8}}>
+            Hoy: Bs {new Intl.NumberFormat("es-BO",{minimumFractionDigits:0,maximumFractionDigits:0}).format(totalHoy)}
+          </div>
+        )}
+      </div>
+
+      {/* ── Métodos de pago hoy ── */}
+      {totalHoy > 0 && (
+        <div style={cardStyle}>
+          <div style={{fontSize:13, fontWeight:700, color:C.label2, fontFamily:FONT_UI, marginBottom:10}}>
+            Métodos de pago — hoy
+          </div>
+          <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:8}}>
+            {[
+              {label:"Efectivo", val:pagoHoy.efectivo, icon:"💵", color:"#2E7D32"},
+              {label:"QR",       val:pagoHoy.qr,       icon:"📱", color:"#1565C0"},
+              {label:"Tarjeta",  val:pagoHoy.tarjeta,  icon:"💳", color:"#E65100"},
+              {label:"Mixto",    val:pagoHoy.mixto,    icon:"🔀", color:"#6C5CE7"},
+            ].filter(p => p.val > 0).map(p => (
+              <div key={p.label} style={{
+                background:`${p.color}08`, borderRadius:10, padding:"10px 12px",
+                border:`1px solid ${p.color}20`,
+              }}>
+                <div style={{fontSize:11, color:p.color, fontFamily:FONT_UI, fontWeight:600, marginBottom:4}}>
+                  {p.icon} {p.label}
+                </div>
+                <div style={{fontSize:16, fontWeight:800, color:p.color, fontFamily:FONT_UI}}>
+                  Bs {new Intl.NumberFormat("es-BO",{minimumFractionDigits:0,maximumFractionDigits:0}).format(p.val)}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Top marcas del mes ── */}
+      {topMarcas.length > 0 && (
+        <div style={cardStyle}>
+          <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:12}}>
+            <div style={{fontSize:13, fontWeight:700, color:C.label2, fontFamily:FONT_UI}}>
+              Top marcas — {MESES[mes]}
+            </div>
+            <button onClick={() => onGoTab("marcas")} style={{
+              fontSize:12, color:C.gold, fontFamily:FONT_UI, fontWeight:600,
+              background:"none", border:"none", cursor:"pointer", padding:0,
+            }}>Ver todas →</button>
+          </div>
+          {topMarcas.map((m, i) => (
+            <div key={m.marca.id} style={{marginBottom: i < topMarcas.length - 1 ? 12 : 0}}>
+              <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:4}}>
+                <div style={{display:"flex", alignItems:"center", gap:6}}>
+                  <span style={{fontSize:14}}>{m.marca.emoji}</span>
+                  <span style={{fontSize:13, fontWeight:600, color:C.label, fontFamily:FONT_UI}}>{m.marca.nombre}</span>
+                </div>
+                <span style={{fontSize:12, fontWeight:700, color:m.marca.color, fontFamily:FONT_UI}}>
+                  Bs {new Intl.NumberFormat("es-BO",{minimumFractionDigits:0,maximumFractionDigits:0}).format(m.total)}
+                </span>
+              </div>
+              <div style={{height:6, background:"#F1F5F9", borderRadius:3, overflow:"hidden"}}>
+                <div style={{
+                  height:6,
+                  width:`${(m.total / maxMarca) * 100}%`,
+                  background:m.marca.color,
+                  borderRadius:3,
+                  transition:"width .4s ease",
+                }}/>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* ── Últimas ventas ── */}
+      {ultVentas.length > 0 && (
+        <div style={cardStyle}>
+          <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:12}}>
+            <div style={{fontSize:13, fontWeight:700, color:C.label2, fontFamily:FONT_UI}}>Últimas ventas</div>
+            <button onClick={() => onGoTab("ventas")} style={{
+              fontSize:12, color:C.gold, fontFamily:FONT_UI, fontWeight:600,
+              background:"none", border:"none", cursor:"pointer", padding:0,
+            }}>Ver todas →</button>
+          </div>
+          {ultVentas.map((v, i) => (
+            <div key={v.id || i} style={{
+              display:"flex", justifyContent:"space-between", alignItems:"center",
+              padding:"9px 0",
+              borderBottom: i < ultVentas.length - 1 ? "1px solid #F1F5F9" : "",
+            }}>
+              <div style={{flex:1, minWidth:0}}>
+                <div style={{fontSize:13, fontWeight:600, color:C.label, fontFamily:FONT_UI,
+                  overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>
+                  {iconPago(v.metodoPago)} {v.items?.map(it => it.nombre).join(", ") || "Venta"}
+                </div>
+                <div style={{fontSize:11, color:C.label3, fontFamily:FONT_UI}}>
+                  {v.fecha} · {labelPago(v.metodoPago)}
+                </div>
+              </div>
+              <div style={{fontSize:14, fontWeight:800, color:"#2E7D32", fontFamily:FONT_UI, marginLeft:12}}>
+                Bs {new Intl.NumberFormat("es-BO",{minimumFractionDigits:0,maximumFractionDigits:0}).format(v.total)}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* ── Accesos rápidos ── */}
+      <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:8}}>
+        {[
+          {icon:"⊕", label:"Nueva venta",    tab:"pos",           color:C.gold},
+          {icon:"◫", label:"Inventario",      tab:"inventario",    color:C.indigo},
+          {icon:"◈", label:"Ver ventas",      tab:"ventas",        color:"#00695C"},
+          {icon:"◎", label:"Liquidaciones",   tab:"liquidaciones", color:"#AD1457"},
+        ].map(a => (
+          <button key={a.tab} onClick={() => onGoTab(a.tab)} style={{
+            background:`${a.color}10`, borderRadius:12, padding:"14px 12px",
+            border:`1px solid ${a.color}25`,
+            display:"flex", alignItems:"center", gap:10,
+            cursor:"pointer", WebkitTapHighlightColor:"transparent",
+            transition:"background .15s",
+          }}>
+            <span style={{fontSize:22}}>{a.icon}</span>
+            <span style={{fontSize:13, fontWeight:700, color:a.color, fontFamily:FONT_UI}}>{a.label}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function App(){
   const { user, login, logout } = useAuth();
   const now=new Date();
-  const[tab,setTab]         =useState("pos");
+  const[tab,setTab]         =useState("inicio");
   const[inv,setInv]         =useState([]);
   const[ventas,setVentas]   =useState([]);
   const[alq,setAlq]         =useState([]);
@@ -2104,13 +2414,13 @@ function App(){
   },[ventas]);
 
   const TABS=[
-    {id:"pos",icon:"⊕",label:"Caja"},
-    {id:"inventario",icon:"◫",label:"Inventario"},
-    {id:"marcas",icon:"◆",label:"Marcas"},
-    {id:"ventas",icon:"◈",label:"Ventas"},
-    {id:"liquidaciones",icon:"◎",label:"Liquidar"},
-    {id:"historial",icon:"📅",label:"Historial"},
-    {id:"config",icon:"⚙",label:"Config"},
+    {id:"inicio",        icon:"⊞", label:"Inicio"},
+    {id:"pos",           icon:"⊕", label:"Caja"},
+    {id:"ventas",        icon:"◈", label:"Ventas"},
+    {id:"inventario",    icon:"◫", label:"Inventario"},
+    {id:"marcas",        icon:"◆", label:"Marcas"},
+    {id:"liquidaciones", icon:"◎", label:"Liquidar"},
+    {id:"config",        icon:"⚙", label:"Config"},
   ];
 
   // Pantallas con vista de detalle (back button)
@@ -2123,9 +2433,9 @@ function App(){
   return (
     <div style={{
       minHeight:"100vh",
-      background:`linear-gradient(160deg, ${C.bg0} 0%, #E8F2E8 50%, #F0F5F0 100%)`,
+      background:C.bg0,
       color:C.label,
-      fontFamily:FONT,
+      fontFamily:FONT_UI,
       paddingBottom:84, // espacio para tab bar + safe area
       WebkitFontSmoothing:"antialiased",
       MozOsxFontSmoothing:"grayscale",
@@ -2133,7 +2443,7 @@ function App(){
 
       {/* ── LOADING SCREEN ── */}
       {cargando&&(
-        <div style={{position:"fixed",inset:0,background:"rgba(242,247,242,0.97)",
+        <div style={{position:"fixed",inset:0,background:"rgba(244,247,251,0.97)",
           display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",
           zIndex:9999,gap:20}}>
           <LogoMark size={48} color={C.gold}/>
@@ -2199,6 +2509,15 @@ function App(){
 
       {/* ── CONTENT ── */}
       <div style={{padding:"16px 16px 0"}}>
+
+        {/* INICIO — dashboard */}
+        {tab==="inicio" && (
+          <HomeDashboard
+            ventas={ventas} inv={inv} vMes={vMes}
+            mes={mes} anio={anio}
+            onGoTab={setTab}
+          />
+        )}
 
         {/* POS */}
         {tab==="pos" && <POS inv={inv} onVenta={handleVenta}/>}
