@@ -991,7 +991,7 @@
         exports.useTransition = function() {
           return resolveDispatcher().useTransition();
         };
-        exports.version = "19.2.5";
+        exports.version = "19.2.6";
         "undefined" !== typeof __REACT_DEVTOOLS_GLOBAL_HOOK__ && "function" === typeof __REACT_DEVTOOLS_GLOBAL_HOOK__.registerInternalModuleStop && __REACT_DEVTOOLS_GLOBAL_HOOK__.registerInternalModuleStop(Error());
       })();
     }
@@ -1518,7 +1518,7 @@
         exports.useFormStatus = function() {
           return resolveDispatcher().useHostTransitionStatus();
         };
-        exports.version = "19.2.5";
+        exports.version = "19.2.6";
         "undefined" !== typeof __REACT_DEVTOOLS_GLOBAL_HOOK__ && "function" === typeof __REACT_DEVTOOLS_GLOBAL_HOOK__.registerInternalModuleStop && __REACT_DEVTOOLS_GLOBAL_HOOK__.registerInternalModuleStop(Error());
       })();
     }
@@ -21310,9 +21310,9 @@
         };
         (function() {
           var isomorphicReactPackageVersion = React2.version;
-          if ("19.2.5" !== isomorphicReactPackageVersion)
+          if ("19.2.6" !== isomorphicReactPackageVersion)
             throw Error(
-              'Incompatible React versions: The "react" and "react-dom" packages must have the exact same version. Instead got:\n  - react:      ' + (isomorphicReactPackageVersion + "\n  - react-dom:  19.2.5\nLearn more: https://react.dev/warnings/version-mismatch")
+              'Incompatible React versions: The "react" and "react-dom" packages must have the exact same version. Instead got:\n  - react:      ' + (isomorphicReactPackageVersion + "\n  - react-dom:  19.2.6\nLearn more: https://react.dev/warnings/version-mismatch")
             );
         })();
         "function" === typeof Map && null != Map.prototype && "function" === typeof Map.prototype.forEach && "function" === typeof Set && null != Set.prototype && "function" === typeof Set.prototype.clear && "function" === typeof Set.prototype.forEach || console.error(
@@ -21336,10 +21336,10 @@
         if (!(function() {
           var internals = {
             bundleType: 1,
-            version: "19.2.5",
+            version: "19.2.6",
             rendererPackageName: "react-dom",
             currentDispatcherRef: ReactSharedInternals,
-            reconcilerVersion: "19.2.5"
+            reconcilerVersion: "19.2.6"
           };
           internals.overrideHookState = overrideHookState;
           internals.overrideHookStateDeletePath = overrideHookStateDeletePath;
@@ -21430,7 +21430,7 @@
           listenToAllSupportedEvents(container);
           return new ReactDOMHydrationRoot(initialChildren);
         };
-        exports.version = "19.2.5";
+        exports.version = "19.2.6";
         "undefined" !== typeof __REACT_DEVTOOLS_GLOBAL_HOOK__ && "function" === typeof __REACT_DEVTOOLS_GLOBAL_HOOK__.registerInternalModuleStop && __REACT_DEVTOOLS_GLOBAL_HOOK__.registerInternalModuleStop(Error());
       })();
     }
@@ -21454,6 +21454,12 @@
   var import_client = __toESM(require_client());
   var SUPA_URL = "https://uqphxiixdulqscbfyxhz.supabase.co";
   var SUPA_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVxcGh4aWl4ZHVscXNjYmZ5eGh6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcwMzc0NjQsImV4cCI6MjA5MjYxMzQ2NH0.U1EIf4JWqfrvga7CApClLl7nzBuFoPpD8BlicxvfB-w";
+  var NIT_EMPRESA = "690053037";
+  var PROPIETARIA = "SYLVIA CAROLINA GRANIER ZALLES";
+  var DIRECCION_EMP = "Calle La Plata 8 Oeste, Equipetrol";
+  var TELEFONO_EMP = "69895217";
+  var CIUDAD_EMP = "Santa Cruz, Bolivia";
+  var SUCURSAL_EMP = "Casa Matriz";
   var _supabase = null;
   async function getSupabase() {
     if (_supabase) return _supabase;
@@ -21481,28 +21487,19 @@
         marca_nombre: prod.marcaNombre,
         nombre: prod.nombre,
         categoria: prod.categoria,
-        descripcion: prod.descripcion || null,
-        subcat: prod.subcat || null,
         precio: prod.precio,
         stock: prod.stock,
         stock_inicial: prod.stockInicial,
-        fecha: prod.fecha,
-        dado_de_baja: prod.dadoDeBaja || false,
-        fecha_baja: prod.fechaBaja || null
+        fecha: prod.fecha
       });
     } catch (e) {
       console.warn("Supabase save prod:", e.message);
     }
   }
-  async function sbActualizarStock(prodId, nuevoStock, dadoDeBaja = false, fechaBaja = null) {
+  async function sbActualizarStock(prodId, nuevoStock) {
     try {
       const db = await getSupabase();
-      const upd = { stock: nuevoStock };
-      if (dadoDeBaja) {
-        upd.dado_de_baja = true;
-        upd.fecha_baja = fechaBaja;
-      }
-      await db.from("inventario").update(upd).eq("id", prodId);
+      await db.from("inventario").update({ stock: nuevoStock }).eq("id", prodId);
     } catch (e) {
       console.warn("Supabase update stock:", e.message);
     }
@@ -21510,8 +21507,7 @@
   async function sbGuardarVenta(venta) {
     try {
       const db = await getSupabase();
-      console.log("[Supabase] Guardando venta:", venta.id, "total:", venta.total);
-      const { error: errVenta } = await db.from("ventas").upsert({
+      await db.from("ventas").upsert({
         id: venta.id,
         fecha: venta.fecha,
         hora: venta.hora,
@@ -21523,18 +21519,8 @@
         desc_pct: venta.descPct || 0,
         metodo_pago: venta.metodoPago,
         vendedor: venta.vendedor,
-        etiqueta_img: venta.etiquetaImg || null,
-        con_factura: venta.conFactura || false,
-        fact_nombre: venta.factNombre || null,
-        fact_nit: venta.factNit || null,
-        cliente_nombre: venta.clienteNombre || null,
-        cliente_tel: venta.clienteTel || null
+        etiqueta_img: venta.etiquetaImg || null
       });
-      if (errVenta) {
-        console.error("[Supabase] Error guardando venta:", errVenta.message);
-        return;
-      }
-      console.log("[Supabase] Venta guardada OK, guardando items...");
       const items = venta.items.map((it) => ({
         venta_id: venta.id,
         prod_id: it.prodId,
@@ -21544,14 +21530,11 @@
         marca_nombre: it.marcaNombre,
         cantidad: it.cantidad,
         precio_unit: it.precioUnit,
-        subtotal: it.subtotal,
-        categoria: it.categoria || null
+        subtotal: it.subtotal
       }));
-      const { error: errItems } = await db.from("venta_items").insert(items);
-      if (errItems) console.error("[Supabase] Error guardando items:", errItems.message);
-      else console.log("[Supabase] Items guardados OK");
+      await db.from("venta_items").insert(items);
     } catch (e) {
-      console.error("[Supabase] save venta exception:", e.message);
+      console.warn("Supabase save venta:", e.message);
     }
   }
   async function sbGuardarCierre(key, data) {
@@ -21560,6 +21543,48 @@
       await db.from("cierres").upsert({ id: key, ...data });
     } catch (e) {
       console.warn("Supabase save cierre:", e.message);
+    }
+  }
+  async function sbGuardarRetiro(retiro) {
+    try {
+      const db = await getSupabase();
+      await db.from("retiros").upsert({
+        id: retiro.id,
+        fecha: retiro.fecha,
+        hora: retiro.hora,
+        prod_id: retiro.prodId,
+        codigo: retiro.codigo,
+        nombre: retiro.nombre,
+        marca_id: retiro.marcaId,
+        marca_nombre: retiro.marcaNombre,
+        cantidad: retiro.cantidad,
+        destinatario: retiro.destinatario,
+        motivo: retiro.motivo || ""
+      });
+    } catch (e) {
+      console.warn("Supabase retiro (tabla puede no existir):", e.message);
+    }
+  }
+  async function sbCargarRetiros() {
+    try {
+      const db = await getSupabase();
+      const { data } = await db.from("retiros").select("*").order("created_at");
+      return (data || []).map((r) => ({
+        id: r.id,
+        fecha: r.fecha,
+        hora: r.hora,
+        prodId: r.prod_id,
+        codigo: r.codigo,
+        nombre: r.nombre,
+        marcaId: r.marca_id,
+        marcaNombre: r.marca_nombre,
+        cantidad: r.cantidad,
+        destinatario: r.destinatario,
+        motivo: r.motivo
+      }));
+    } catch (e) {
+      console.warn("Supabase load retiros:", e.message);
+      return [];
     }
   }
   async function sbCargarTodo() {
@@ -21584,11 +21609,6 @@
         metodoPago: v.metodo_pago,
         vendedor: v.vendedor,
         etiquetaImg: v.etiqueta_img,
-        conFactura: v.con_factura || false,
-        factNombre: v.fact_nombre || "",
-        factNit: v.fact_nit || "",
-        clienteNombre: v.cliente_nombre || "",
-        clienteTel: v.cliente_tel || "",
         items: (items || []).filter((i) => i.venta_id === v.id).map((i) => ({
           prodId: i.prod_id,
           codigo: i.codigo,
@@ -21607,14 +21627,10 @@
         marcaNombre: p.marca_nombre,
         nombre: p.nombre,
         categoria: p.categoria,
-        descripcion: p.descripcion || "",
-        subcat: p.subcat || "",
-        precio: Number(p.precio) || 0,
-        stock: p.stock || 0,
-        stockInicial: p.stock_inicial || 0,
-        fecha: p.fecha,
-        dadoDeBaja: p.dado_de_baja || false,
-        fechaBaja: p.fecha_baja || null
+        precio: p.precio,
+        stock: p.stock,
+        stockInicial: p.stock_inicial,
+        fecha: p.fecha
       }));
       const cierresObj = {};
       (cierres || []).forEach((c) => {
@@ -21708,7 +21724,10 @@
   }
   function BarcodeDisplay({ codigo, small }) {
     const containerRef = (0, import_react.useRef)(null);
-    const [qrDataUrl, setQrDataUrl] = (0, import_react.useState)("");
+    var _hN101 = (0, import_react.useState)("");
+    var qrDataUrl = _hN101[0];
+    var setQrDataUrl = _hN101[1];
+    ;
     (0, import_react.useEffect)(() => {
       if (!codigo || !containerRef.current) return;
       setQrDataUrl("");
@@ -21748,14 +21767,11 @@
     } }, codigo));
   }
   async function imprimirTicket(producto, marcaNombre) {
-    const win = window.open("", "_blank", "width=400,height=560");
+    const win = window.open("", "_blank", "width=400,height=500");
     if (!win) {
       alert("Activa las ventanas emergentes para imprimir");
       return;
     }
-    const descripcion = producto.descripcion || producto.categoria || "";
-    const subcategoria = producto.subcat || "";
-    const detalleLineas = descripcion ? descripcion.split(",").map((s) => s.trim()).filter(Boolean) : [];
     win.document.write(`<!DOCTYPE html>
 <html>
 <head>
@@ -21764,22 +21780,17 @@
   <style>
     @page { size: 58mm auto; margin: 0; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family:'Courier New',monospace; width:58mm; padding:4mm 5mm; background:white; color:black; }
-    .header { text-align:center; border-bottom:1px dashed #aaa; padding-bottom:3mm; margin-bottom:3mm; }
-    .brand { font-size:13px; font-weight:900; letter-spacing:3px; text-transform:uppercase; }
-    .sub { font-size:7px; letter-spacing:5px; color:#777; margin-top:1mm; }
-    .marca { font-size:10px; font-weight:700; text-align:center; color:#333; margin-bottom:1.5mm; letter-spacing:1px; text-transform:uppercase; }
-    .producto { font-size:10px; font-weight:bold; text-align:center; margin:0 0 1.5mm; text-transform:uppercase; line-height:1.35; }
-    .detalle-wrap { border:1px dashed #ccc; border-radius:2mm; padding:2mm 3mm; margin:2mm 0; background:#fafafa; }
-    .detalle-titulo { font-size:6.5px; letter-spacing:1.5px; text-transform:uppercase; color:#888; margin-bottom:1mm; }
-    .detalle-item { font-size:8px; color:#333; line-height:1.5; padding-left:2mm; }
-    .detalle-item::before { content:"\xB7 "; color:#888; }
-    .subcat { font-size:7.5px; text-align:center; color:#666; margin-bottom:2mm; font-style:italic; }
-    .qr-wrap { display:flex; flex-direction:column; align-items:center; margin:2.5mm 0; }
-    .qr-wrap canvas, .qr-wrap img { width:36mm!important; height:36mm!important; }
-    .codigo { text-align:center; font-size:7.5px; color:#666; font-family:monospace; margin:1mm 0 1.5mm; letter-spacing:0.5px; }
-    .precio { text-align:center; font-size:20px; font-weight:900; margin:1.5mm 0; letter-spacing:1px; }
-    .footer { border-top:1px dashed #aaa; padding-top:2mm; text-align:center; font-size:7px; color:#999; letter-spacing:1px; margin-top:1mm; }
+    body { font-family:'Courier New',monospace; width:58mm; padding:4mm; background:white; color:black; }
+    .header { text-align:center; border-bottom:1px dashed #333; padding-bottom:3mm; margin-bottom:3mm; }
+    .brand { font-size:14px; font-weight:900; letter-spacing:3px; text-transform:uppercase; }
+    .sub { font-size:8px; letter-spacing:4px; color:#555; margin-top:1mm; }
+    .producto { font-size:11px; font-weight:bold; text-align:center; margin:2mm 0; text-transform:uppercase; }
+    .marca { font-size:9px; text-align:center; color:#444; margin-bottom:2mm; }
+    .qr-wrap { display:flex; flex-direction:column; align-items:center; margin:3mm 0; }
+    .qr-wrap canvas, .qr-wrap img { width:38mm!important; height:38mm!important; }
+    .codigo { text-align:center; font-size:8px; color:#555; font-family:monospace; margin:1mm 0 2mm; word-break:break-all; }
+    .precio { text-align:center; font-size:18px; font-weight:900; margin:2mm 0; }
+    .footer { border-top:1px dashed #333; padding-top:2mm; text-align:center; font-size:8px; color:#777; letter-spacing:1px; }
     @media print { body { print-color-adjust:exact; -webkit-print-color-adjust:exact; } }
   </style>
 </head>
@@ -21788,14 +21799,8 @@
     <div class="brand">TOSCANA HOUSE</div>
     <div class="sub">CASA DE MODA</div>
   </div>
-  <div class="marca">${marcaNombre}</div>
   <div class="producto">${producto.nombre}</div>
-  ${subcategoria ? `<div class="subcat">${subcategoria}</div>` : ""}
-  ${detalleLineas.length > 0 ? `
-  <div class="detalle-wrap">
-    <div class="detalle-titulo">Detalle</div>
-    ${detalleLineas.map((l) => `<div class="detalle-item">${l}</div>`).join("")}
-  </div>` : ""}
+  <div class="marca">${marcaNombre}</div>
   <div class="qr-wrap">
     <div id="qr"></div>
   </div>
@@ -21807,7 +21812,7 @@
       try {
         new QRCode(document.getElementById("qr"), {
           text: "${producto.codigo}",
-          width: 140, height: 140,
+          width: 144, height: 144,
           colorDark: "#000000",
           colorLight: "#ffffff",
           correctLevel: QRCode.CorrectLevel.M
@@ -21821,15 +21826,28 @@
     win.document.close();
   }
   function useDriveSync() {
-    const [url, setUrl] = (0, import_react.useState)(() => localStorage.getItem("th_drive_url") || "");
-    const [syncing, setSyncing] = (0, import_react.useState)(false);
-    const [syncLog, setSyncLog] = (0, import_react.useState)(() => {
+    var _hN102 = (0, import_react.useState)(function() {
+      try {
+        return localStorage.getItem("th_drive_url") || "";
+      } catch {
+        return "";
+      }
+    });
+    var url = _hN102[0];
+    var setUrl = _hN102[1];
+    var _hN103 = (0, import_react.useState)(false);
+    var syncing = _hN103[0];
+    var setSyncing = _hN103[1];
+    ;
+    var _hN104 = (0, import_react.useState)(function() {
       try {
         return JSON.parse(localStorage.getItem("th_sync_log") || "[]");
       } catch {
         return [];
       }
     });
+    var syncLog = _hN104[0];
+    var setSyncLog = _hN104[1];
     function saveUrl(u) {
       setUrl(u);
       localStorage.setItem("th_drive_url", u);
@@ -22014,23 +22032,23 @@
   };
   var LOGO_B64 = "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0ZJTEUAAQEAAAHIAAAAAAQwAABtbnRyUkdCIFhZWiAH4AABAAEAAAAAAABhY3NwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAA9tYAAQAAAADTLQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAlkZXNjAAAA8AAAACRyWFlaAAABFAAAABRnWFlaAAABKAAAABRiWFlaAAABPAAAABR3dHB0AAABUAAAABRyVFJDAAABZAAAAChnVFJDAAABZAAAAChiVFJDAAABZAAAAChjcHJ0AAABjAAAADxtbHVjAAAAAAAAAAEAAAAMZW5VUwAAAAgAAAAcAHMAUgBHAEJYWVogAAAAAAAAb6IAADj1AAADkFhZWiAAAAAAAABimQAAt4UAABjaWFlaIAAAAAAAACSgAAAPhAAAts9YWVogAAAAAAAA9tYAAQAAAADTLXBhcmEAAAAAAAQAAAACZmYAAPKnAAANWQAAE9AAAApbAAAAAAAAAABtbHVjAAAAAAAAAAEAAAAMZW5VUwAAACAAAAAcAEcAbwBvAGcAbABlACAASQBuAGMALgAgADIAMAAxADb/2wBDAAMCAgICAgMCAgIDAwMDBAYEBAQEBAgGBgUGCQgKCgkICQkKDA8MCgsOCwkJDRENDg8QEBEQCgwSExIQEw8QEBD/2wBDAQMDAwQDBAgEBAgQCwkLEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBD/wAARCAQ4BDgDASIAAhEBAxEB/8QAHgABAAMBAAMBAQEAAAAAAAAAAAcICQYEBQoDAgH/xABfEAEAAQMDAgMDBgcIDQYNBAMAAQIDBAUGBwgRCRIhEzE4FCJBdrS1FTJRYXF1syM2N1h0gZGWFhcYGUJSU5ShxdHT1CQzVYax1SU0NTlWV2Jyc4KSssFDRFRjw+Hk/8QAFAEBAAAAAAAAAAAAAAAAAAAAAP/EABQRAQAAAAAAAAAAAAAAAAAAAAD/2gAMAwEAAhEDEQA/ANPQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA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AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD/9k=";
   var MARCAS = [
-    { id: 1, nombre: "Donaire", color: "#2E7D52", emoji: "\u2728" },
-    { id: 2, nombre: "Ramona", color: "#C0404A", emoji: "\u{1F338}" },
-    { id: 3, nombre: "Materia", color: "#3A7A50", emoji: "\u{1F33F}" },
-    { id: 4, nombre: "Dual", color: "#2E5F9A", emoji: "\u25C8" },
-    { id: 5, nombre: "Sensually", color: "#A03070", emoji: "\u{1F4AB}" },
-    { id: 6, nombre: "Glowphoria", color: "#B07020", emoji: "\u2726" },
-    { id: 7, nombre: "Monas", color: "#6A3A9A", emoji: "\u{1F52E}" },
-    { id: 8, nombre: "Bonita", color: "#C05030", emoji: "\u{1F33A}" },
-    { id: 9, nombre: "She", color: "#2A7A6A", emoji: "\u25CE" },
-    { id: 10, nombre: "Ell\xE1", color: "#7A5A30", emoji: "\u{1F342}" },
-    { id: 11, nombre: "Magenta", color: "#9A2A6A", emoji: "\u25C6" },
-    { id: 12, nombre: "Ikawi", color: "#2A6A8A", emoji: "\u{1F30A}" },
-    { id: 13, nombre: "Romero Brand", color: "#5A4A2A", emoji: "\u26A1" },
-    { id: 14, nombre: "Minimal", color: "#4A4A4A", emoji: "\u25FB" },
-    { id: 15, nombre: "Comfy", color: "#7A5040", emoji: "\u2601" },
-    { id: 16, nombre: "Essenza", color: "#6A6A20", emoji: "\u{1F54A}" },
-    { id: 17, nombre: "Do\xF1a Mamushka", color: "#B03050", emoji: "\u{1F380}" }
+    { id: 1, nombre: "Donaire", color: "#A8C5A0", emoji: "\u2728" },
+    { id: 2, nombre: "Ramona", color: "#F4A8A8", emoji: "\u{1F338}" },
+    { id: 3, nombre: "Materia", color: "#A8D4B0", emoji: "\u{1F33F}" },
+    { id: 4, nombre: "Dual", color: "#A8BCD4", emoji: "\u25C8" },
+    { id: 5, nombre: "Sensually", color: "#F4A8C8", emoji: "\u{1F4AB}" },
+    { id: 6, nombre: "Glowphoria", color: "#F4D4A8", emoji: "\u2726" },
+    { id: 7, nombre: "Monas", color: "#C8A8D4", emoji: "\u{1F52E}" },
+    { id: 8, nombre: "Bonita", color: "#F4BCA8", emoji: "\u{1F33A}" },
+    { id: 9, nombre: "She", color: "#A8D4C4", emoji: "\u25CE" },
+    { id: 10, nombre: "Ell\xE1", color: "#D4C4A8", emoji: "\u{1F342}" },
+    { id: 11, nombre: "Magenta", color: "#D4A8BC", emoji: "\u25C6" },
+    { id: 12, nombre: "Ikawi", color: "#A8CCD4", emoji: "\u{1F30A}" },
+    { id: 13, nombre: "Romero Brand", color: "#C4B89A", emoji: "\u26A1" },
+    { id: 14, nombre: "Minimal", color: "#C4C4C4", emoji: "\u25FB" },
+    { id: 15, nombre: "Comfy", color: "#C8B8A8", emoji: "\u2601" },
+    { id: 16, nombre: "Essenza", color: "#D4C8A0", emoji: "\u{1F54A}" },
+    { id: 17, nombre: "Do\xF1a Mamushka", color: "#F4ACA8", emoji: "\u{1F380}" }
   ];
   var MESES = [
     "Enero",
@@ -22051,6 +22069,21 @@
     { id: "qr", label: "QR", icon: "\u{1F4F1}", desc: 0, color: "#5B8DB8" },
     { id: "tarjeta", label: "Tarjeta", icon: "\u{1F4B3}", desc: 2.5, color: "#C8922A" }
   ];
+  function labelPago(mp) {
+    if (!mp) return "\u2014";
+    if (mp.startsWith("mixto|")) return "Mixto";
+    return PAGOS.find((p) => p.id === mp)?.label || mp;
+  }
+  function colorPago(mp) {
+    if (!mp) return "#4A9B6F";
+    if (mp.startsWith("mixto|")) return "#6C5CE7";
+    return PAGOS.find((p) => p.id === mp)?.color || "#4A9B6F";
+  }
+  function iconPago(mp) {
+    if (!mp) return "";
+    if (mp.startsWith("mixto|")) return "\u{1F500}";
+    return PAGOS.find((p) => p.id === mp)?.icon || "";
+  }
   var $ = (n) => "Bs " + new Intl.NumberFormat("es-BO", { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(n || 0);
   var hoy = () => (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
   var hora = () => (/* @__PURE__ */ new Date()).toLocaleTimeString("es-BO", { hour: "2-digit", minute: "2-digit" });
@@ -22098,10 +22131,10 @@
   async function generarExcelMensual(ventas, inventario, mes, anio, setGenerando) {
     setGenerando(true);
     try {
-      const XLSX2 = await loadXLSX();
+      const XLSX = await loadXLSX();
       const MK = mkKey(mes, anio);
       const mesNom = MESES[mes];
-      const wb = XLSX2.utils.book_new();
+      const wb = XLSX.utils.book_new();
       const resumenRows = [
         [`TOSCANA HOUSE \u2014 REPORTE MENSUAL ${mesNom.toUpperCase()} ${anio}`],
         [`Generado: ${(/* @__PURE__ */ new Date()).toLocaleString("es-BO")}`],
@@ -22131,15 +22164,15 @@
         [],
         ["TOTAL GENERAL", totalBruto, +(totalBruto * 0.1).toFixed(2), +totalNeto.toFixed(2), totalVentas, "", ""]
       );
-      const wsResumen = XLSX2.utils.aoa_to_sheet(resumenRows);
+      const wsResumen = XLSX.utils.aoa_to_sheet(resumenRows);
       wsResumen["!cols"] = [{ wch: 22 }, { wch: 20 }, { wch: 16 }, { wch: 20 }, { wch: 12 }, { wch: 18 }, { wch: 14 }];
-      XLSX2.utils.book_append_sheet(wb, wsResumen, "\u{1F4CA} Resumen");
+      XLSX.utils.book_append_sheet(wb, wsResumen, "\u{1F4CA} Resumen");
       MARCAS.forEach((m) => {
         const vMarca = ventasMes.filter((v) => v.items.some((i) => i.marcaId === m.id));
         const rows = [
           [`${m.emoji} ${m.nombre.toUpperCase()} \u2014 ${mesNom} ${anio}`],
           [],
-          ["ID Venta", "Factura", "Nombre Cliente", "NIT", "Cliente", "Tel\xE9fono", "Fecha", "Hora", "C\xF3digo", "Producto", "Categor\xEDa", "Cantidad", "Precio Unit. (Bs)", "Subtotal (Bs)", "Desc%", "M\xE9todo Pago", "Vendedor"]
+          ["ID Venta", "Fecha", "Hora", "C\xF3digo", "Producto", "Categor\xEDa", "Cantidad", "Precio Unit. (Bs)", "Subtotal (Bs)", "Desc%", "M\xE9todo Pago", "Vendedor"]
         ];
         let brutoMarca = 0;
         if (vMarca.length === 0) {
@@ -22149,11 +22182,6 @@
             v.items.filter((i) => i.marcaId === m.id).forEach((it) => {
               rows.push([
                 v.id,
-                v.conFactura ? "\u2713 Factura" : "\u2014",
-                v.conFactura ? v.factNombre || "\u2014" : "\u2014",
-                v.conFactura ? v.factNit || "\u2014" : "\u2014",
-                v.clienteNombre || "\u2014",
-                v.clienteTel || "\u2014",
                 v.fecha,
                 v.hora,
                 it.codigo,
@@ -22176,10 +22204,10 @@
           ["", "", "", "", "", "", "", "COMISI\xD3N 10%", +(brutoMarca * 0.1).toFixed(2), "", "", ""],
           ["", "", "", "", "", "", "", "NETO A PAGAR", +(brutoMarca * 0.9).toFixed(2), "", "", ""]
         );
-        const ws = XLSX2.utils.aoa_to_sheet(rows);
-        ws["!cols"] = [{ wch: 16 }, { wch: 12 }, { wch: 22 }, { wch: 14 }, { wch: 12 }, { wch: 8 }, { wch: 16 }, { wch: 24 }, { wch: 14 }, { wch: 8 }, { wch: 18 }, { wch: 16 }, { wch: 6 }, { wch: 14 }, { wch: 14 }];
+        const ws = XLSX.utils.aoa_to_sheet(rows);
+        ws["!cols"] = [{ wch: 16 }, { wch: 12 }, { wch: 8 }, { wch: 16 }, { wch: 24 }, { wch: 14 }, { wch: 8 }, { wch: 18 }, { wch: 16 }, { wch: 6 }, { wch: 14 }, { wch: 14 }];
         const tabName = m.nombre.slice(0, 28);
-        XLSX2.utils.book_append_sheet(wb, ws, tabName);
+        XLSX.utils.book_append_sheet(wb, ws, tabName);
       });
       const stockRows = [
         [`TOSCANA HOUSE \u2014 REPORTE DE STOCK \u2014 ${mesNom} ${anio}`],
@@ -22205,13 +22233,13 @@
           ]);
         });
       });
-      const wsStock = XLSX2.utils.aoa_to_sheet(stockRows);
+      const wsStock = XLSX.utils.aoa_to_sheet(stockRows);
       wsStock["!cols"] = [{ wch: 18 }, { wch: 26 }, { wch: 18 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 13 }, { wch: 10 }, { wch: 10 }, { wch: 12 }];
-      XLSX2.utils.book_append_sheet(wb, wsStock, "\u{1F4E6} Stock");
+      XLSX.utils.book_append_sheet(wb, wsStock, "\u{1F4E6} Stock");
       wb.SheetNames.forEach((name) => {
-        aplicarBordesSheet(wb.Sheets[name], XLSX2);
+        aplicarBordesSheet(wb.Sheets[name], XLSX);
       });
-      const wbOut = XLSX2.write(wb, { bookType: "xlsx", type: "array" });
+      const wbOut = XLSX.write(wb, { bookType: "xlsx", type: "array" });
       const blob = new Blob([wbOut], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
       descargarArchivo(blob, `ToscanaHouse_${mesNom}_${anio}.xlsx`);
     } catch (e) {
@@ -22219,9 +22247,9 @@
     }
     setGenerando(false);
   }
-  function aplicarBordesSheet(ws, XLSX2) {
+  function aplicarBordesSheet(ws, XLSX) {
     if (!ws || !ws["!ref"]) return;
-    const range = XLSX2.utils.decode_range(ws["!ref"]);
+    const range = XLSX.utils.decode_range(ws["!ref"]);
     const borderStyle = {
       top: { style: "thin", color: { rgb: "B8D4B8" } },
       bottom: { style: "thin", color: { rgb: "B8D4B8" } },
@@ -22237,7 +22265,7 @@
     for (let R = range.s.r; R <= range.e.r; R++) {
       let rowHasData = false;
       for (let CC = range.s.c; CC <= range.e.c; CC++) {
-        const addr = XLSX2.utils.encode_cell({ r: R, c: CC });
+        const addr = XLSX.utils.encode_cell({ r: R, c: CC });
         if (ws[addr] && ws[addr].v !== void 0 && ws[addr].v !== "") {
           rowHasData = true;
           break;
@@ -22245,7 +22273,7 @@
       }
       if (!rowHasData) continue;
       for (let CC = range.s.c; CC <= range.e.c; CC++) {
-        const addr = XLSX2.utils.encode_cell({ r: R, c: CC });
+        const addr = XLSX.utils.encode_cell({ r: R, c: CC });
         if (!ws[addr]) ws[addr] = { t: "z", v: "" };
         ws[addr].s = ws[addr].s || {};
         ws[addr].s.border = R === range.s.r ? headerBorder : borderStyle;
@@ -22263,8 +22291,8 @@
   async function generarExcelMarca(marca, ventas, inventario, setGenerando) {
     setGenerando(true);
     try {
-      const XLSX2 = await loadXLSX();
-      const wb = XLSX2.utils.book_new();
+      const XLSX = await loadXLSX();
+      const wb = XLSX.utils.book_new();
       const porMes = {};
       ventas.forEach((v) => {
         if (!v.items.some((i) => i.marcaId === marca.id)) return;
@@ -22273,27 +22301,27 @@
       });
       const periodos = Object.values(porMes).sort((a, b) => b.mk.localeCompare(a.mk));
       if (periodos.length === 0) {
-        const ws = XLSX2.utils.aoa_to_sheet([[`${marca.emoji} ${marca.nombre}`], [], ["Sin ventas registradas"]]);
-        XLSX2.utils.book_append_sheet(wb, ws, marca.nombre.slice(0, 28));
+        const ws = XLSX.utils.aoa_to_sheet([[`${marca.emoji} ${marca.nombre}`], [], ["Sin ventas registradas"]]);
+        XLSX.utils.book_append_sheet(wb, ws, marca.nombre.slice(0, 28));
       } else {
         periodos.forEach((p) => {
           const mesNom = MESES[p.mes];
           const rows = [
             [`${marca.emoji} ${marca.nombre} \u2014 ${mesNom} ${p.anio}`],
             [],
-            ["ID Venta", "Factura", "Nombre Cliente", "NIT", "Fecha", "Hora", "C\xF3digo", "Producto", "Categor\xEDa", "Cantidad", "Precio Unit.", "Subtotal", "Desc%", "Pago", "Vendedor"]
+            ["ID Venta", "Fecha", "Hora", "C\xF3digo", "Producto", "Categor\xEDa", "Cantidad", "Precio Unit.", "Subtotal", "Desc%", "Pago", "Vendedor"]
           ];
           let bruto = 0;
           p.ventas.forEach((v) => {
             v.items.filter((i) => i.marcaId === marca.id).forEach((it) => {
-              rows.push([v.id, v.conFactura ? "\u2713 Factura" : "\u2014", v.conFactura ? v.factNombre || "\u2014" : "\u2014", v.conFactura ? v.factNit || "\u2014" : "\u2014", v.fecha, v.hora, it.codigo, it.nombre, it.categoria || "", it.cantidad, it.precioUnit, it.subtotal, v.descPct || 0, v.metodoPago, v.vendedor || "Tienda"]);
+              rows.push([v.id, v.fecha, v.hora, it.codigo, it.nombre, it.categoria || "", it.cantidad, it.precioUnit, it.subtotal, v.descPct || 0, v.metodoPago, v.vendedor || "Tienda"]);
               bruto += it.subtotal;
             });
           });
           rows.push([], ["", "", "", "", "", "", "", "Bruto", bruto, "", "", ""], ["", "", "", "", "", "", "", "Comisi\xF3n 10%", +(bruto * 0.1).toFixed(2), "", "", ""], ["", "", "", "", "", "", "", "Neto", +(bruto * 0.9).toFixed(2), "", "", ""]);
-          const ws = XLSX2.utils.aoa_to_sheet(rows);
-          ws["!cols"] = [{ wch: 16 }, { wch: 12 }, { wch: 22 }, { wch: 14 }, { wch: 12 }, { wch: 8 }, { wch: 16 }, { wch: 24 }, { wch: 14 }, { wch: 8 }, { wch: 16 }, { wch: 14 }, { wch: 6 }, { wch: 12 }, { wch: 14 }];
-          XLSX2.utils.book_append_sheet(wb, ws, `${mesNom} ${p.anio}`.slice(0, 31));
+          const ws = XLSX.utils.aoa_to_sheet(rows);
+          ws["!cols"] = [{ wch: 16 }, { wch: 12 }, { wch: 8 }, { wch: 16 }, { wch: 24 }, { wch: 14 }, { wch: 8 }, { wch: 16 }, { wch: 14 }, { wch: 6 }, { wch: 12 }, { wch: 14 }];
+          XLSX.utils.book_append_sheet(wb, ws, `${mesNom} ${p.anio}`.slice(0, 31));
         });
       }
       const prods = inventario.filter((i) => i.marcaId === marca.id);
@@ -22308,13 +22336,13 @@
         stockRows.push([p.codigo, p.nombre, p.categoria || "", p.precio, p.stockInicial, p.stock, vendidas, pct + "%", p.stock === 0 ? "AGOTADO" : p.stock < 3 ? "BAJO STOCK" : "OK", p.fecha]);
       });
       if (prods.length === 0) stockRows.push(["Sin productos registrados"]);
-      const wsStock = XLSX2.utils.aoa_to_sheet(stockRows);
+      const wsStock = XLSX.utils.aoa_to_sheet(stockRows);
       wsStock["!cols"] = [{ wch: 18 }, { wch: 26 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 13 }, { wch: 10 }, { wch: 10 }, { wch: 12 }, { wch: 14 }];
-      XLSX2.utils.book_append_sheet(wb, wsStock, "Stock");
+      XLSX.utils.book_append_sheet(wb, wsStock, "Stock");
       wb.SheetNames.forEach((name) => {
-        aplicarBordesSheet(wb.Sheets[name], XLSX2);
+        aplicarBordesSheet(wb.Sheets[name], XLSX);
       });
-      const wbOut = XLSX2.write(wb, { bookType: "xlsx", type: "array" });
+      const wbOut = XLSX.write(wb, { bookType: "xlsx", type: "array" });
       const blob = new Blob([wbOut], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
       descargarArchivo(blob, `TH_${marca.nombre.replace(/ /g, "_")}_Historial.xlsx`);
     } catch (e) {
@@ -22325,8 +22353,8 @@
   async function generarExcelStock(inventario, setGenerando) {
     setGenerando(true);
     try {
-      const XLSX2 = await loadXLSX();
-      const wb = XLSX2.utils.book_new();
+      const XLSX = await loadXLSX();
+      const wb = XLSX.utils.book_new();
       const rows = [
         ["TOSCANA HOUSE \u2014 REPORTE DE STOCK COMPLETO"],
         [`Generado: ${(/* @__PURE__ */ new Date()).toLocaleString("es-BO")}`],
@@ -22340,9 +22368,9 @@
           rows.push([p.codigo, p.nombre, m.nombre, p.categoria || "", p.precio, p.stockInicial, p.stock, vendidas, pct + "%", p.stock === 0 ? "AGOTADO" : p.stock < 3 ? "BAJO STOCK" : "OK", p.fecha]);
         });
       });
-      const wsAll = XLSX2.utils.aoa_to_sheet(rows);
+      const wsAll = XLSX.utils.aoa_to_sheet(rows);
       wsAll["!cols"] = [{ wch: 18 }, { wch: 26 }, { wch: 18 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 13 }, { wch: 10 }, { wch: 10 }, { wch: 12 }, { wch: 14 }];
-      XLSX2.utils.book_append_sheet(wb, wsAll, "Todo el Stock");
+      XLSX.utils.book_append_sheet(wb, wsAll, "Todo el Stock");
       MARCAS.forEach((m) => {
         const prods = inventario.filter((i) => i.marcaId === m.id);
         if (prods.length === 0) return;
@@ -22355,14 +22383,14 @@
           const vendidas = p.stockInicial - p.stock;
           mRows.push([p.codigo, p.nombre, p.categoria || "", p.precio, p.stockInicial, p.stock, vendidas, p.stock === 0 ? "AGOTADO" : p.stock < 3 ? "BAJO" : ""]);
         });
-        const ws = XLSX2.utils.aoa_to_sheet(mRows);
+        const ws = XLSX.utils.aoa_to_sheet(mRows);
         ws["!cols"] = [{ wch: 18 }, { wch: 26 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 13 }, { wch: 10 }, { wch: 12 }];
-        XLSX2.utils.book_append_sheet(wb, ws, m.nombre.slice(0, 28));
+        XLSX.utils.book_append_sheet(wb, ws, m.nombre.slice(0, 28));
       });
       wb.SheetNames.forEach((name) => {
-        aplicarBordesSheet(wb.Sheets[name], XLSX2);
+        aplicarBordesSheet(wb.Sheets[name], XLSX);
       });
-      const wbOut = XLSX2.write(wb, { bookType: "xlsx", type: "array" });
+      const wbOut = XLSX.write(wb, { bookType: "xlsx", type: "array" });
       const blob = new Blob([wbOut], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
       descargarArchivo(blob, `TH_Stock_${(/* @__PURE__ */ new Date()).toISOString().slice(0, 10)}.xlsx`);
     } catch (e) {
@@ -22399,8 +22427,7 @@
       const m = MARCAS.find((x) => x.id === it.marcaId);
       return `\u2022 ${it.nombre} (${m?.nombre}) x${it.cantidad} = ${$(it.subtotal)}`;
     });
-    const pg = PAGOS.find((p) => p.id === venta.metodoPago);
-    const msg = [`\u{1F3E1} *TOSCANA HOUSE \u2014 ${venta.id}*`, `\u{1F4C5} ${venta.fecha} ${venta.hora}`, `\u{1F4B3} ${pg?.label}${venta.descPct ? ` (-${venta.descPct}%)` : ""}`, "", ...lines, "", `\u{1F4B0} *TOTAL: ${$(venta.total)}*`].join("\n");
+    const msg = [`\u{1F3E1} *TOSCANA HOUSE \u2014 ${venta.id}*`, `\u{1F4C5} ${venta.fecha} ${venta.hora}`, `\u{1F4B3} ${labelPago(venta.metodoPago)}${venta.descPct ? ` (-${venta.descPct}%)` : ""}`, "", ...lines, "", `\u{1F4B0} *TOTAL: ${$(venta.total)}*`].join("\n");
     window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, "_blank");
   }
   var FONT = "'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
@@ -22415,7 +22442,10 @@
     ), /* @__PURE__ */ import_react.default.createElement("div", { style: { width: size * 1.2, height: 1, background: color, opacity: 0.4, margin: "2px 0" } }), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: size * 0.22, fontWeight: 700, color, fontFamily: "Georgia,serif", letterSpacing: 4, lineHeight: 1 } }, "TOSCANA"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: size * 0.14, fontWeight: 300, color: color + "AA", fontFamily: "Georgia,serif", letterSpacing: 3, lineHeight: 1.4 } }, "CASA DE MODA"));
   }
   function usePress(onPress) {
-    const [pressed, setPressed] = (0, import_react.useState)(false);
+    var _hN105 = (0, import_react.useState)(false);
+    var pressed = _hN105[0];
+    var setPressed = _hN105[1];
+    ;
     return {
       onTouchStart: () => setPressed(true),
       onTouchEnd: () => {
@@ -22498,13 +22528,17 @@
       WebkitBackdropFilter: "blur(20px) saturate(180%)",
       borderTop: `1px solid ${C.sep}`,
       display: "flex",
+      overflowX: "auto",
+      WebkitOverflowScrolling: "touch",
+      scrollbarWidth: "none",
       paddingBottom: 16,
       boxShadow: "0 -4px 24px rgba(21,101,192,0.07)"
     } }, tabs.map((t) => {
       const isActive = active === t.id;
       const tabColor = TAB_COLORS[t.id] || C.gold;
       return /* @__PURE__ */ import_react.default.createElement("button", { key: t.id, onClick: () => onChange(t.id), style: {
-        flex: 1,
+        flex: "0 0 auto",
+        minWidth: 64,
         border: "none",
         background: isActive ? `${tabColor}18` : "transparent",
         display: "flex",
@@ -22581,8 +22615,14 @@
     );
   }
   function Sheet({ open, onClose, title, children, tall }) {
-    const [visible, setVisible] = (0, import_react.useState)(false);
-    const [anim, setAnim] = (0, import_react.useState)(false);
+    var _hN106 = (0, import_react.useState)(false);
+    var visible = _hN106[0];
+    var setVisible = _hN106[1];
+    ;
+    var _hN107 = (0, import_react.useState)(false);
+    var anim = _hN107[0];
+    var setAnim = _hN107[1];
+    ;
     (0, import_react.useEffect)(() => {
       if (open) {
         setVisible(true);
@@ -22609,7 +22649,8 @@
       overflowY: "auto",
       transform: anim ? "translateY(0)" : "translateY(100%)",
       transition: "transform .32s cubic-bezier(.32,.72,0,1)",
-      paddingBottom: "env(safe-area-inset-bottom,24px)"
+      paddingBottom: "env(safe-area-inset-bottom,24px)",
+      paddingBottom: 24
     } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "center", padding: "12px 0 4px" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { width: 36, height: 5, borderRadius: 3, background: C.accent } })), /* @__PURE__ */ import_react.default.createElement("div", { style: {
       display: "flex",
       justifyContent: "space-between",
@@ -22744,81 +22785,39 @@
   }
   function LiqModal({ marcaId, ventas, mes, anio, MK, cierres, setCierres, onClose, syncCierre }) {
     if (!marcaId) return null;
-    const [tabLiq, setTabLiq] = (0, import_react.useState)("resumen");
     const marca = MARCAS.find((x) => x.id === marcaId);
     const vMes = ventas.filter((v) => v.mk === MK);
     const vMarca = vMes.filter((v) => v.items.some((i) => i.marcaId === marcaId));
-    const vSinFact = vMarca.filter((v) => !v.conFactura);
-    const vConFact = vMarca.filter((v) => v.conFactura);
     const bruto = vMarca.reduce((s, v) => s + v.items.filter((i) => i.marcaId === marcaId).reduce((ss, i) => ss + i.subtotal, 0), 0);
     const comision = bruto * 0.1;
     const neto = bruto * 0.9;
     const cerrado = cierres[`${MK}-${marcaId}`]?.cerrado;
-    function VentaCard({ v }) {
+    return /* @__PURE__ */ import_react.default.createElement(Sheet, { open: !!marcaId, onClose, title: `${marca?.emoji} ${marca?.nombre} \u2014 ${MESES[mes]}`, tall: true }, /* @__PURE__ */ import_react.default.createElement("div", { style: { background: C.bg2, borderRadius: 16, overflow: "hidden", marginBottom: 16 } }, [["Ventas brutas", $(bruto), C.label], ["Comisi\xF3n (10%)", `-${$(comision)}`, C.red], ["Neto a liquidar", $(neto), C.green]].map(([k, v, c], i, arr) => /* @__PURE__ */ import_react.default.createElement("div", { key: k, style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      padding: "15px 16px",
+      borderBottom: i < arr.length - 1 ? `1px solid ${C.sep}` : ""
+    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 16, color: C.label2, fontFamily: FONT } }, k), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 16, fontWeight: 600, color: c, fontFamily: FONT } }, v))), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      padding: "18px 16px",
+      background: `${C.gold}12`
+    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 17, fontWeight: 700, color: C.label, fontFamily: FONT } }, "TOTAL A PAGAR"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 22, fontWeight: 800, color: C.gold, fontFamily: FONT } }, $(neto)))), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      fontSize: 13,
+      fontWeight: 600,
+      color: C.label3,
+      fontFamily: FONT,
+      textTransform: "uppercase",
+      letterSpacing: 0.8,
+      marginBottom: 8,
+      paddingLeft: 4
+    } }, "Transacciones del per\xEDodo"), vMarca.length === 0 ? /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center", padding: "32px 0", color: C.label3, fontFamily: FONT, fontSize: 16 } }, "Sin ventas en ", MESES[mes]) : vMarca.map((v) => {
       const its = v.items.filter((i) => i.marcaId === marcaId);
       const sub = its.reduce((s, i) => s + i.subtotal, 0);
-      return /* @__PURE__ */ import_react.default.createElement("div", { style: {
-        background: C.bg2,
-        borderRadius: 14,
-        padding: 14,
-        marginBottom: 10,
-        border: `1px solid ${v.conFactura ? C.blue + "30" : C.sep}`
-      } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontFamily: "monospace", fontSize: 11, color: C.label3 } }, v.id), v.conFactura && /* @__PURE__ */ import_react.default.createElement("span", { style: {
-        fontSize: 11,
-        fontWeight: 700,
-        color: C.blue,
-        background: `${C.blue}15`,
-        borderRadius: 6,
-        padding: "2px 7px"
-      } }, "\u{1F9FE} Factura")), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 15, fontWeight: 700, color: C.gold, fontFamily: FONT } }, $(sub))), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT, marginBottom: 4 } }, v.fecha, " ", v.hora, " \xB7 ", PAGOS.find((p) => p.id === v.metodoPago)?.label, v.conFactura && v.factNombre && /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.blue } }, " \xB7 ", v.factNombre, " \xB7 NIT: ", v.factNit)), its.map((it, ii) => /* @__PURE__ */ import_react.default.createElement("div", { key: `${v.id}-${it.prodId}-${ii}`, style: { fontSize: 13, color: C.label2, fontFamily: FONT } }, "\xB7 ", it.nombre, " \xD7", it.cantidad, " = ", $(it.subtotal))));
-    }
-    const ventasActivas = tabLiq === "confact" ? vConFact : tabLiq === "sinfact" ? vSinFact : vMarca;
-    return /* @__PURE__ */ import_react.default.createElement(Sheet, { open: !!marcaId, onClose, title: `${marca?.emoji} ${marca?.nombre} \u2014 ${MESES[mes]}`, tall: true }, /* @__PURE__ */ import_react.default.createElement("div", { style: { background: C.bg2, borderRadius: 16, overflow: "hidden", marginBottom: 16 } }, vConFact.length > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      display: "flex",
-      justifyContent: "space-between",
-      alignItems: "center",
-      padding: "11px 16px",
-      borderBottom: `1px solid ${C.sep}`
-    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, color: C.label3, fontFamily: FONT } }, "Con factura (", vConFact.length, ")"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, fontWeight: 600, color: C.blue, fontFamily: FONT } }, $(vConFact.reduce((s, v) => s + v.items.filter((i) => i.marcaId === marcaId).reduce((ss, i) => ss + i.subtotal, 0), 0)))), vSinFact.length > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      display: "flex",
-      justifyContent: "space-between",
-      alignItems: "center",
-      padding: "11px 16px",
-      borderBottom: `1px solid ${C.sep}`
-    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, color: C.label3, fontFamily: FONT } }, "Sin factura (", vSinFact.length, ")"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, fontWeight: 600, color: C.label2, fontFamily: FONT } }, $(vSinFact.reduce((s, v) => s + v.items.filter((i) => i.marcaId === marcaId).reduce((ss, i) => ss + i.subtotal, 0), 0)))), [
-      ["Ventas brutas", $(bruto), C.label],
-      ["Comisi\xF3n Toscana (10%)", `-${$(comision)}`, C.red],
-      ["Neto a liquidar", $(neto), C.green]
-    ].map(([k, v, c], i, arr) => /* @__PURE__ */ import_react.default.createElement("div", { key: k, style: {
-      display: "flex",
-      justifyContent: "space-between",
-      alignItems: "center",
-      padding: "13px 16px",
-      borderBottom: i < arr.length - 1 ? `1px solid ${C.sep}` : ""
-    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 14, color: C.label2, fontFamily: FONT } }, k), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 14, fontWeight: 600, color: c, fontFamily: FONT } }, v))), /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      display: "flex",
-      justifyContent: "space-between",
-      alignItems: "center",
-      padding: "16px 16px",
-      background: `${C.gold}12`
-    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 17, fontWeight: 700, color: C.label, fontFamily: FONT } }, "TOTAL A PAGAR"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 22, fontWeight: 800, color: C.gold, fontFamily: FONT } }, $(neto)))), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 4, marginBottom: 14, background: C.bg2, borderRadius: 12, padding: 4 } }, [
-      ["resumen", `Todas (${vMarca.length})`],
-      ["sinfact", `Sin factura (${vSinFact.length})`],
-      ["confact", `Con factura (${vConFact.length})`]
-    ].map(([t, label]) => /* @__PURE__ */ import_react.default.createElement("button", { key: t, onClick: () => setTabLiq(t), style: {
-      flex: 1,
-      padding: "8px 4px",
-      borderRadius: 9,
-      border: "none",
-      background: tabLiq === t ? C.bg1 : "none",
-      color: tabLiq === t ? t === "confact" ? C.blue : C.gold : C.label3,
-      fontSize: 11,
-      fontWeight: tabLiq === t ? 700 : 400,
-      fontFamily: FONT,
-      cursor: "pointer",
-      boxShadow: tabLiq === t ? "0 1px 4px rgba(0,0,0,0.08)" : "none",
-      transition: "all .15s"
-    } }, label))), ventasActivas.length === 0 ? /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center", padding: "28px 0", color: C.label3, fontFamily: FONT, fontSize: 15 } }, "Sin ventas en esta categor\xEDa") : ventasActivas.map((v) => /* @__PURE__ */ import_react.default.createElement(VentaCard, { key: v.id, v })), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 10, marginTop: 16 } }, /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => exportCSV(marca, ventas, mes, anio), variant: "fill", icon: "\u2B07" }, "Exportar CSV"), !cerrado ? /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => {
+      return /* @__PURE__ */ import_react.default.createElement("div", { key: v.id, style: { background: C.bg2, borderRadius: 14, padding: 14, marginBottom: 10 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", marginBottom: 6 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontFamily: "monospace", fontSize: 12, color: C.gold } }, v.id), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 16, fontWeight: 700, color: C.gold, fontFamily: FONT } }, $(sub))), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.label3, fontFamily: FONT, marginBottom: 6 } }, v.fecha, " ", v.hora, " \xB7 ", labelPago(v.metodoPago)), its.map((it, ii) => /* @__PURE__ */ import_react.default.createElement("div", { key: `${v.id}-${it.prodId}-${ii}`, style: { fontSize: 13, color: C.label2, fontFamily: FONT } }, "\xB7 ", it.nombre, " \xD7", it.cantidad, " = ", $(it.subtotal))));
+    }), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 10, marginTop: 16 } }, /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => exportCSV(marca, ventas, mes, anio), variant: "fill", icon: "\u2B07" }, "Exportar CSV"), !cerrado ? /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => {
       setCierres((p) => ({ ...p, [`${MK}-${marcaId}`]: { cerrado: true, fecha: hoy(), mk: MK } }));
       sbGuardarCierre(`${MK}-${marcaId}`, { cerrado: true, fecha: hoy(), mk: MK, marca_id: marcaId });
       onClose();
@@ -22828,18 +22827,20 @@
     }, variant: "danger" }, "Reabrir Liquidaci\xF3n")));
   }
   var USUARIOS = [
-    { usuario: "jpanezc", password: "jpac", nombre: "JP Anez", rol: "admin" },
-    { usuario: "carog", password: "jpac", nombre: "Caro G", rol: "admin" },
-    { usuario: "ventas", password: "toscana2026", nombre: "Ventas", rol: "caja" }
+    { usuario: "toscana", password: "casa2024", nombre: "Toscana House", rol: "admin" },
+    { usuario: "caja", password: "caja2024", nombre: "Vendedor Caja", rol: "caja" },
+    { usuario: "tatiana", password: "toscana2024", nombre: "Tatiana", rol: "admin" }
   ];
   function useAuth() {
-    const [user, setUser] = (0, import_react.useState)(() => {
+    var _hN108 = (0, import_react.useState)(function() {
       try {
         return JSON.parse(localStorage.getItem("th_user") || "null");
       } catch {
         return null;
       }
     });
+    var user = _hN108[0];
+    var setUser = _hN108[1];
     function login(usuario, password) {
       const listaActual = (() => {
         try {
@@ -22866,11 +22867,26 @@
     return { user, login, logout };
   }
   function LoginScreen({ onLogin }) {
-    const [usuario, setUsuario] = (0, import_react.useState)("");
-    const [password, setPassword] = (0, import_react.useState)("");
-    const [error, setError] = (0, import_react.useState)("");
-    const [loading, setLoading] = (0, import_react.useState)(false);
-    const [showPass, setShowPass] = (0, import_react.useState)(false);
+    var _hN109 = (0, import_react.useState)("");
+    var usuario = _hN109[0];
+    var setUsuario = _hN109[1];
+    ;
+    var _hN110 = (0, import_react.useState)("");
+    var password = _hN110[0];
+    var setPassword = _hN110[1];
+    ;
+    var _hN111 = (0, import_react.useState)("");
+    var error = _hN111[0];
+    var setError = _hN111[1];
+    ;
+    var _hN112 = (0, import_react.useState)(false);
+    var loading = _hN112[0];
+    var setLoading = _hN112[1];
+    ;
+    var _hN113 = (0, import_react.useState)(false);
+    var showPass = _hN113[0];
+    var setShowPass = _hN113[1];
+    ;
     function handleLogin() {
       if (!usuario || !password) {
         setError("Completa todos los campos");
@@ -23467,8 +23483,37 @@
         return "";
       }
     });
-    const [generando, setGenerando] = (0, import_react.useState)(false);
+    var driveUrl = _hN133[0];
+    var setDriveUrlLocal = _hN133[1];
+    var _hN134 = (0, import_react.useState)(false);
+    var generando = _hN134[0];
+    var setGenerando = _hN134[1];
+    ;
+    const [ventaDetalle, setVentaDetalle] = (0, import_react.useState)(null);
+    const [retiros, setRetiros] = (0, import_react.useState)(() => {
+      try {
+        return JSON.parse(localStorage.getItem("th_retiros_v1")) || [];
+      } catch {
+        return [];
+      }
+    });
     const drive = useDriveSync();
+    (0, import_react.useEffect)(() => {
+      sbCargarRetiros().then((data) => {
+        if (data.length > 0) setRetiros(data);
+      });
+    }, []);
+    function registrarRetiro(r) {
+      const updated = [...retiros, r];
+      setRetiros(updated);
+      try {
+        localStorage.setItem("th_retiros_v1", JSON.stringify(updated));
+      } catch {
+      }
+      setInv((p) => p.map((i) => i.id === r.prodId ? { ...i, stock: Math.max(0, i.stock - r.cantidad) } : i));
+      sbActualizarStock(r.prodId, Math.max(0, (inv.find((i) => i.id === r.prodId)?.stock || 0) - r.cantidad));
+      sbGuardarRetiro(r);
+    }
     (0, import_react.useEffect)(() => {
       setDbStatus("connecting");
       sbCargarTodo().then((data) => {
@@ -23482,107 +23527,6 @@
         }
         setCargando(false);
       });
-      let channel = null;
-      getSupabase().then((db) => {
-        console.log("[Realtime] Conectando a Supabase Realtime...");
-        channel = db.channel("toscana-realtime").on(
-          "postgres_changes",
-          { event: "*", schema: "public", table: "inventario" },
-          (payload) => {
-            const p = payload.new;
-            if (!p) return;
-            if (payload.eventType === "DELETE") {
-              setInv((prev) => prev.filter((i) => i.id !== payload.old.id));
-              return;
-            }
-            const prod = {
-              id: p.id,
-              codigo: p.codigo,
-              marcaId: p.marca_id,
-              marcaNombre: p.marca_nombre,
-              nombre: p.nombre,
-              categoria: p.categoria,
-              descripcion: p.descripcion || "",
-              subcat: p.subcat || "",
-              precio: Number(p.precio) || 0,
-              stock: p.stock || 0,
-              stockInicial: p.stock_inicial || 0,
-              fecha: p.fecha,
-              dadoDeBaja: p.dado_de_baja || false,
-              fechaBaja: p.fecha_baja || null
-            };
-            setInv((prev) => {
-              const idx = prev.findIndex((i) => i.id === prod.id);
-              if (idx >= 0) {
-                const next = [...prev];
-                next[idx] = prod;
-                return next;
-              }
-              return [...prev, prod];
-            });
-          }
-        ).on(
-          "postgres_changes",
-          { event: "INSERT", schema: "public", table: "ventas" },
-          (payload) => {
-            const v = payload.new;
-            if (!v) return;
-            setTimeout(() => {
-              sbCargarTodo().then((data) => {
-                if (data) {
-                  if (data.ventas.length > 0) {
-                    setVentas((prev) => {
-                      const ids = new Set(prev.map((v2) => v2.id));
-                      const nuevas = data.ventas.filter((v2) => !ids.has(v2.id));
-                      if (nuevas.length > 0) return [...prev, ...nuevas];
-                      return prev;
-                    });
-                  }
-                  if (data.inv.length > 0) {
-                    setInv(data.inv);
-                  }
-                }
-              });
-            }, 2e3);
-          }
-        ).on(
-          "postgres_changes",
-          { event: "*", schema: "public", table: "cierres" },
-          (payload) => {
-            const c = payload.new;
-            if (!c) return;
-            setCierres((prev) => ({
-              ...prev,
-              [c.id]: { cerrado: c.cerrado, fecha: c.fecha, mk: c.mk }
-            }));
-          }
-        ).subscribe((status) => {
-          console.log("[Realtime] Status:", status);
-          window.__sb_channel = channel;
-          if (status === "SUBSCRIBED") {
-            setDbStatus("ok");
-            console.log("[Realtime] \u2713 Conectado correctamente");
-          } else if (status === "CHANNEL_ERROR") {
-            console.warn("[Realtime] \u2717 Error de conexi\xF3n");
-          }
-        });
-      });
-      const poll = setInterval(() => {
-        sbCargarTodo().then((data) => {
-          if (data) {
-            setVentas(data.ventas);
-            if (data.inv.length > 0) setInv(data.inv);
-            if (Object.keys(data.cierres).length > 0) setCierres(data.cierres);
-            setDbStatus("ok");
-          }
-        });
-      }, 3e4);
-      return () => {
-        if (channel) {
-          getSupabase().then((db) => db.removeChannel(channel));
-        }
-        clearInterval(poll);
-      };
     }, []);
     const MK = (0, import_react.useMemo)(() => mkKey(mes, anio), [mes, anio]);
     const vMes = (0, import_react.useMemo)(() => ventas.filter((v) => v.mk === MK), [ventas, MK]);
@@ -23610,8 +23554,6 @@
         marcaId: Number(fInv.marcaId),
         nombre: fInv.nombre,
         categoria: fInv.categoria || "General",
-        descripcion: fInv.descripcion || "",
-        subcat: fInv.subcat || "",
         precio: Number(fInv.precio),
         stock: Number(fInv.stock),
         stockInicial: Number(fInv.stock),
@@ -23621,13 +23563,12 @@
       setInv((p) => [...p, prod]);
       drive.syncProducto(prod);
       sbGuardarProducto(prod);
-      setFInv({ marcaId: "", nombre: "", categoria: "", descripcion: "", subcat: "", precio: "", stock: "", fecha: hoy() });
+      setFInv({ marcaId: "", nombre: "", categoria: "", precio: "", stock: "", fecha: hoy() });
       setShInv(false);
       setTimeout(() => imprimirTicket(prod, marca?.nombre || "Toscana House"), 300);
     }
     function darBaja() {
       const cod = bajaCod.trim().toUpperCase();
-      if (!cod) return;
       const prod = inv.find((i) => i.codigo.toUpperCase() === cod);
       if (!prod) {
         setBajaMsg({ ok: false, msg: `"${cod}" no encontrado` });
@@ -23637,29 +23578,9 @@
         setBajaMsg({ ok: false, msg: `"${prod.nombre}" ya est\xE1 agotado` });
         return;
       }
-      setBajasLista((prev) => {
-        if (prev.find((p) => p.id === prod.id)) return prev;
-        return [...prev, prod];
-      });
-      setBajaMsg({ ok: true, msg: `\u2713 "${prod.nombre}" agregado` });
+      setInv((p) => p.map((i) => i.id === prod.id ? { ...i, stock: 0 } : i));
+      setBajaMsg({ ok: true, msg: `\u2713 "${prod.nombre}" dado de baja` });
       setBajaCod("");
-    }
-    function confirmarBajas() {
-      if (!bajasLista.length) return;
-      setInv((p) => p.map((i) => {
-        const enLista = bajasLista.find((b) => b.id === i.id);
-        if (enLista) {
-          sbActualizarStock(i.id, 0);
-          return { ...i, stock: 0, dadoDeBaja: true, fechaBaja: hoy() };
-        }
-        return i;
-      }));
-      setBajaMsg({ ok: true, msg: `\u2713 ${bajasLista.length} producto(s) dado(s) de baja` });
-      setBajasLista([]);
-      setBajaCod("");
-    }
-    function quitarDeBaja(id) {
-      setBajasLista((prev) => prev.filter((p) => p.id !== id));
     }
     function handleVenta(v) {
       const id = `V${Date.now()}`;
@@ -23669,6 +23590,7 @@
         setInv((p) => p.map((i) => i.id === it.prodId ? { ...i, stock: Math.max(0, i.stock - it.cantidad) } : i));
         sbActualizarStock(it.prodId, Math.max(0, (inv.find((i) => i.id === it.prodId)?.stock || 0) - it.cantidad));
       });
+      drive.syncVenta(vf);
       sbGuardarVenta(vf);
       return vf;
     }
@@ -23680,14 +23602,10 @@
     const getLiq = (0, import_react.useCallback)((marcaId) => {
       const marca = MARCAS.find((m) => m.id === marcaId);
       const vM = vMes.filter((v) => v.items.some((i) => i.marcaId === marcaId));
-      const vSinFact = vM.filter((v) => !v.conFactura);
-      const vConFact = vM.filter((v) => v.conFactura);
       const bruto = vM.reduce((s, v) => s + v.items.filter((i) => i.marcaId === marcaId).reduce((ss, i) => ss + i.subtotal, 0), 0);
       return {
         marca,
         vMarca: vM,
-        vSinFact,
-        vConFact,
         bruto,
         comision: bruto * 0.1,
         neto: bruto * 0.9,
@@ -23801,6 +23719,7 @@
           lineHeight: 1
         } }, "\u2601"), /* @__PURE__ */ import_react.default.createElement("button", { onClick: logout, style: {
           background: "none",
+          border: "none",
           fontSize: 13,
           cursor: "pointer",
           color: C.label3,
@@ -23843,8 +23762,7 @@
       setShBaja(true);
       setBajaMsg(null);
       setBajaCod("");
-      setBajasLista([]);
-    }, onExcel: () => setShExcel(true) }), tab === "marcas" && !marcaDetalle && /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+    } }), tab === "marcas" && !marcaDetalle && /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: {
       fontSize: 13,
       fontWeight: 600,
       color: C.label3,
@@ -24011,22 +23929,23 @@
         disabled: generando,
         style: {
           flex: 1,
-          background: generando ? C.bg2 : `${C.green}15`,
+          background: generando ? C.bg2 : `${C.green}20`,
           border: `1px solid ${generando ? C.sep : C.green}40`,
           borderRadius: 12,
-          padding: "11px 10px",
+          padding: "12px 10px",
           color: generando ? C.label3 : C.green,
-          fontSize: 12,
-          fontFamily: FONT_UI,
-          fontWeight: 700,
+          fontSize: 13,
+          fontFamily: FONT,
+          fontWeight: 600,
           cursor: generando ? "not-allowed" : "pointer",
+          WebkitTapHighlightColor: "transparent",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
           gap: 6
         }
       },
-      generando ? "\u23F3 Generando\u2026" : "\u{1F4CA} Reporte Mensual"
+      generando ? "\u23F3 Generando\u2026" : "\u{1F4CA} Reporte Mensual .xlsx"
     ), /* @__PURE__ */ import_react.default.createElement(
       "button",
       {
@@ -24034,89 +23953,64 @@
         disabled: generando,
         style: {
           flex: 1,
-          background: generando ? C.bg2 : `${C.blue}15`,
+          background: generando ? C.bg2 : `${C.blue}20`,
           border: `1px solid ${generando ? C.sep : C.blue}40`,
           borderRadius: 12,
-          padding: "11px 10px",
+          padding: "12px 10px",
           color: generando ? C.label3 : C.blue,
-          fontSize: 12,
-          fontFamily: FONT_UI,
-          fontWeight: 700,
+          fontSize: 13,
+          fontFamily: FONT,
+          fontWeight: 600,
           cursor: generando ? "not-allowed" : "pointer",
+          WebkitTapHighlightColor: "transparent",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
           gap: 6
         }
       },
-      generando ? "\u23F3" : "\u{1F4E6} Stock"
-    ))), /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      fontSize: 12,
-      fontWeight: 700,
-      color: C.label3,
-      textTransform: "uppercase",
-      letterSpacing: 0.8,
-      marginBottom: 10,
-      fontFamily: FONT_UI
-    } }, "Cierre por marca"), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 2 } }, MARCAS.map((m, i) => {
+      generando ? "\u23F3" : "\u{1F4E6} Stock .xlsx"
+    ))), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 2 } }, MARCAS.map((m, i) => {
       const liq = getLiq(m.id);
       const cerrado = cierres[`${MK}-${m.id}`]?.cerrado;
-      const pctBar = liq.bruto > 0 ? 100 : 0;
       return /* @__PURE__ */ import_react.default.createElement("div", { key: m.id, onClick: () => setMLiq(m.id), style: {
-        background: cerrado ? `${C.green}08` : C.bg2,
+        background: C.bg2,
         borderRadius: i === 0 ? "14px 14px 2px 2px" : i === MARCAS.length - 1 ? "2px 2px 14px 14px" : "2px",
-        padding: "12px 16px",
+        padding: "14px 16px",
         borderBottom: i < MARCAS.length - 1 ? `1px solid ${C.sep}` : "",
-        border: cerrado ? `1px solid ${C.green}25` : "",
         display: "flex",
         alignItems: "center",
         gap: 12,
         cursor: "pointer",
-        WebkitTapHighlightColor: "transparent",
-        transition: "background .15s"
+        WebkitTapHighlightColor: "transparent"
       } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
-        width: 36,
-        height: 36,
+        width: 38,
+        height: 38,
         borderRadius: 10,
-        background: `${m.color}20`,
+        background: `${m.color}22`,
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        fontSize: 17,
+        fontSize: 18,
         flexShrink: 0
-      } }, m.emoji), /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 3 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 15, fontWeight: 700, color: C.label, fontFamily: FONT_UI } }, m.nombre), /* @__PURE__ */ import_react.default.createElement("div", { style: {
-        fontSize: 14,
-        fontWeight: 700,
-        color: liq.bruto > 0 ? m.color : C.label3,
-        fontFamily: FONT_UI
-      } }, liq.bruto > 0 ? $(liq.neto) : "")), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT_UI } }, liq.bruto > 0 ? `Bruto ${$(liq.bruto)} \xB7 ${liq.vMarca.length} venta${liq.vMarca.length > 1 ? "s" : ""}` : "Sin ventas este mes"), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6 } }, cerrado ? /* @__PURE__ */ import_react.default.createElement("span", { style: {
-        fontSize: 11,
-        fontWeight: 700,
-        color: C.green,
-        background: `${C.green}15`,
-        borderRadius: 20,
-        padding: "2px 8px",
-        fontFamily: FONT_UI
-      } }, "\u2713 Cerrado") : liq.bruto > 0 ? /* @__PURE__ */ import_react.default.createElement("span", { style: {
-        fontSize: 11,
-        fontWeight: 700,
-        color: C.amber,
-        background: `${C.amber}15`,
-        borderRadius: 20,
-        padding: "2px 8px",
-        fontFamily: FONT_UI
-      } }, "Pendiente") : null, /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.label3, fontSize: 20 } }, "\u203A")))));
-    }))), tab === "historial" && /* @__PURE__ */ import_react.default.createElement(HistorialTab, { ventas, inv, cierres }), tab === "config" && /* @__PURE__ */ import_react.default.createElement(ConfigTab, { user, logout })), /* @__PURE__ */ import_react.default.createElement(TabBar, { tabs: TABS, active: tab, onChange: (t) => {
+      } }, m.emoji), /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 16, fontWeight: 500, color: C.label, fontFamily: FONT } }, m.nombre), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: liq.bruto > 0 ? C.gold : C.label3, fontFamily: FONT } }, liq.bruto > 0 ? `${$(liq.neto)} neto` : "Sin ventas")), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } }, cerrado ? /* @__PURE__ */ import_react.default.createElement(Chip, { color: C.green, small: true }, "\u2713 Cerrado") : liq.bruto > 0 && /* @__PURE__ */ import_react.default.createElement(Chip, { color: C.amber, small: true }, "Pendiente"), /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.label3, fontSize: 22 } }, "\u203A")));
+    }))), tab === "cajas" && /* @__PURE__ */ import_react.default.createElement(CajasTab, null), tab === "historial" && /* @__PURE__ */ import_react.default.createElement(
+      HistorialTab,
+      {
+        ventas,
+        inv,
+        cierres,
+        onVentaClick: (v) => setVentaDetalle(v)
+      }
+    ), tab === "config" && /* @__PURE__ */ import_react.default.createElement(ConfigTab, { user, logout })), /* @__PURE__ */ import_react.default.createElement(TabBar, { tabs: TABS, active: tab, onChange: (t) => {
       setTab(t);
       setMD(null);
     } }), /* @__PURE__ */ import_react.default.createElement(
-      SheetExcelMasivo,
+      NotaVentaModal,
       {
-        open: shExcel,
-        onClose: () => setShExcel(false),
-        inv,
-        setInv,
-        drive
+        venta: ventaDetalle,
+        numVenta: ventaDetalle ? ventaDetalle.id.replace(/\D/g, "").slice(-4).padStart(4, "0") : null,
+        onClose: () => setVentaDetalle(null)
       }
     ), /* @__PURE__ */ import_react.default.createElement(
       SheetRecibir,
@@ -24128,23 +24022,28 @@
         fInv,
         setFInv
       }
-    ), /* @__PURE__ */ import_react.default.createElement(
-      SheetBajaMultiple,
+    ), /* @__PURE__ */ import_react.default.createElement(Sheet, { open: sheetBaja, onClose: () => setShBaja(false), title: "Dar de Baja por C\xF3digo" }, /* @__PURE__ */ import_react.default.createElement("p", { style: { color: C.label2, fontFamily: FONT, fontSize: 15, margin: "0 0 16px" } }, "Ingresa el c\xF3digo del producto para marcarlo como agotado."), /* @__PURE__ */ import_react.default.createElement(
+      IOSInput,
       {
-        open: sheetBaja,
-        onClose: () => setShBaja(false),
-        inv,
-        bajasLista,
-        setBajasLista,
-        bajaCod,
-        setBajaCod,
-        bajaMsg,
-        setBajaMsg,
-        onConfirmar: confirmarBajas,
-        onQuitar: quitarDeBaja,
-        darBaja
+        label: "C\xF3digo del producto",
+        value: bajaCod,
+        onChange: (e) => {
+          setBajaCod(e.target.value.toUpperCase());
+          setBajaMsg(null);
+        },
+        placeholder: "Ej: DON-CREM-0001",
+        style: { fontFamily: "monospace", textTransform: "uppercase" }
       }
-    ), /* @__PURE__ */ import_react.default.createElement(Sheet, { open: sheetDrive, onClose: () => setShDrive(false), title: "\u2601 Google Drive", tall: true }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+    ), bajaMsg && /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      padding: "12px 14px",
+      borderRadius: 12,
+      marginBottom: 12,
+      background: bajaMsg.ok ? `${C.green}15` : `${C.red}15`,
+      border: `1px solid ${bajaMsg.ok ? C.green : C.red}40`,
+      color: bajaMsg.ok ? C.green : C.red,
+      fontSize: 14,
+      fontFamily: FONT
+    } }, bajaMsg.msg), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: darBaja, variant: "danger", full: true, disabled: !bajaCod.trim() }, "Dar de Baja")), /* @__PURE__ */ import_react.default.createElement(Sheet, { open: sheetDrive, onClose: () => setShDrive(false), title: "\u2601 Google Drive", tall: true }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
       background: drive.url ? `${C.green}15` : `${C.label3}10`,
       borderRadius: 16,
       padding: "16px",
@@ -24246,28 +24145,85 @@
       }
     ));
   }
+  function POSContainer({ inv, onVenta, retiros, onRetiro }) {
+    const [subTab, setSubTab] = (0, import_react.useState)("venta");
+    const tabs = [{ id: "venta", label: "\u{1F4B3} Venta" }, { id: "retiros", label: "\u{1F4E4} Retiros" }];
+    return /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      display: "flex",
+      gap: 4,
+      marginBottom: 16,
+      background: C.bg2,
+      borderRadius: 12,
+      padding: 4,
+      border: `1px solid ${C.sep}`
+    } }, tabs.map((t) => /* @__PURE__ */ import_react.default.createElement("button", { key: t.id, onClick: () => setSubTab(t.id), style: {
+      flex: 1,
+      border: "none",
+      borderRadius: 9,
+      padding: "9px 12px",
+      fontSize: 13,
+      fontWeight: subTab === t.id ? 700 : 500,
+      cursor: "pointer",
+      fontFamily: FONT,
+      background: subTab === t.id ? C.bg1 : "transparent",
+      color: subTab === t.id ? C.blue : C.label3,
+      boxShadow: subTab === t.id ? "0 1px 4px rgba(0,0,0,0.10)" : "none",
+      transition: "all .15s",
+      WebkitTapHighlightColor: "transparent"
+    } }, t.label))), subTab === "venta" ? /* @__PURE__ */ import_react.default.createElement(POS, { inv, onVenta }) : /* @__PURE__ */ import_react.default.createElement(RetirosTab, { inv, retiros, onRetiro }));
+  }
   function POS({ inv, onVenta }) {
-    const [carrito, setCarrito] = (0, import_react.useState)([]);
-    const [busq, setBusq] = (0, import_react.useState)("");
-    const [pago, setPago] = (0, import_react.useState)("efectivo");
-    const [vendedor, setVendedor] = (0, import_react.useState)("");
-    const [descExtra, setDescExtra] = (0, import_react.useState)(0);
-    const [etiqueta, setEtiqueta] = (0, import_react.useState)(null);
-    const [ultima, setUltima] = (0, import_react.useState)(null);
-    const [showOk, setShowOk] = (0, import_react.useState)(false);
-    const [showPago, setShowPago] = (0, import_react.useState)(false);
-    const [scanStatus, setScanStatus] = (0, import_react.useState)(null);
-    const [scanMsg, setScanMsg] = (0, import_react.useState)("");
-    const [conFactura, setConFactura] = (0, import_react.useState)(false);
-    const [factNombre, setFactNombre] = (0, import_react.useState)("");
-    const [factNit, setFactNit] = (0, import_react.useState)("");
-    const [clienteNombre, setClienteNombre] = (0, import_react.useState)("");
-    const [clienteTel, setClienteTel] = (0, import_react.useState)("");
+    var _hN135 = (0, import_react.useState)([]);
+    var carrito = _hN135[0];
+    var setCarrito = _hN135[1];
+    ;
+    var _hN136 = (0, import_react.useState)("");
+    var busq = _hN136[0];
+    var setBusq = _hN136[1];
+    ;
+    var _hN137 = (0, import_react.useState)("efectivo");
+    var pago = _hN137[0];
+    var setPago = _hN137[1];
+    ;
+    var _hN138 = (0, import_react.useState)("");
+    var vendedor = _hN138[0];
+    var setVendedor = _hN138[1];
+    ;
+    var _hN139 = (0, import_react.useState)(0);
+    var descExtra = _hN139[0];
+    var setDescExtra = _hN139[1];
+    ;
+    var _hN140 = (0, import_react.useState)(null);
+    var etiqueta = _hN140[0];
+    var setEtiqueta = _hN140[1];
+    ;
+    var _hN141 = (0, import_react.useState)(null);
+    var ultima = _hN141[0];
+    var setUltima = _hN141[1];
+    ;
+    var _hN142 = (0, import_react.useState)(false);
+    var showOk = _hN142[0];
+    var setShowOk = _hN142[1];
+    ;
+    var _hN143 = (0, import_react.useState)(false);
+    var showPago = _hN143[0];
+    var setShowPago = _hN143[1];
+    var _hNm1 = (0, import_react.useState)(false);
+    var pagoMixto = _hNm1[0];
+    var setPagoMixto = _hNm1[1];
+    var _hNm2 = (0, import_react.useState)({ efectivo: "", qr: "", tarjeta: "" });
+    var montosMixtos = _hNm2[0];
+    var setMontosMixtos = _hNm2[1];
+    var _hN144 = (0, import_react.useState)(null);
+    var scanStatus = _hN144[0];
+    var setScanStatus = _hN144[1];
+    ;
+    var _hN145 = (0, import_react.useState)("");
+    var scanMsg = _hN145[0];
+    var setScanMsg = _hN145[1];
+    ;
     const inputRef = (0, import_react.useRef)();
     const fileRef = (0, import_react.useRef)();
-    const videoRef = (0, import_react.useRef)();
-    const scannerRef = (0, import_react.useRef)(null);
-    const [camActiva, setCamActiva] = (0, import_react.useState)(false);
     const resultados = (0, import_react.useMemo)(() => {
       if (!busq.trim()) return [];
       const q = busq.toLowerCase();
@@ -24288,87 +24244,6 @@
       });
       return Object.entries(m);
     }, [carrito]);
-    function startCamera() {
-      setCamActiva(true);
-      setScanStatus("leyendo");
-      setScanMsg("Apunta la c\xE1mara al c\xF3digo QR...");
-      loadZXing().then((ZXing) => {
-        if (!ZXing) {
-          setScanStatus("notfound");
-          setScanMsg("No se pudo cargar el lector");
-          return;
-        }
-        const hints = /* @__PURE__ */ new Map();
-        const formats = [
-          ZXing.BarcodeFormat.QR_CODE,
-          ZXing.BarcodeFormat.CODE_128,
-          ZXing.BarcodeFormat.CODE_39,
-          ZXing.BarcodeFormat.EAN_13,
-          ZXing.BarcodeFormat.DATA_MATRIX
-        ];
-        hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, formats);
-        hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
-        const reader = new ZXing.MultiFormatReader();
-        reader.setHints(hints);
-        navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } }).then((stream) => {
-          if (!videoRef.current) {
-            stream.getTracks().forEach((t) => t.stop());
-            return;
-          }
-          videoRef.current.srcObject = stream;
-          videoRef.current.play();
-          scannerRef.current = { stream, reader };
-          const scan = () => {
-            if (!videoRef.current || !scannerRef.current) return;
-            const v = videoRef.current;
-            if (v.readyState < 2) {
-              requestAnimationFrame(scan);
-              return;
-            }
-            const canvas = document.createElement("canvas");
-            canvas.width = v.videoWidth;
-            canvas.height = v.videoHeight;
-            canvas.getContext("2d").drawImage(v, 0, 0);
-            try {
-              const lum = new ZXing.HTMLCanvasElementLuminanceSource(canvas);
-              const bb = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(lum));
-              const result = reader.decode(bb);
-              if (result) {
-                const codigo = result.getText().trim().toUpperCase();
-                stopCamera();
-                const prod = inv.find((i) => i.codigo.toUpperCase() === codigo);
-                if (prod && prod.stock > 0) {
-                  add(prod);
-                  setScanStatus("ok");
-                  setScanMsg("\u2713 " + prod.nombre + " agregado al carrito");
-                } else if (prod) {
-                  setScanStatus("notfound");
-                  setScanMsg(prod.nombre + " est\xE1 agotado");
-                } else {
-                  setScanStatus("notfound");
-                  setScanMsg("C\xF3digo " + codigo + " no encontrado");
-                }
-                return;
-              }
-            } catch (e) {
-            }
-            requestAnimationFrame(scan);
-          };
-          requestAnimationFrame(scan);
-        }).catch((err) => {
-          setScanStatus("notfound");
-          setScanMsg("No se pudo acceder a la c\xE1mara: " + err.message);
-          setCamActiva(false);
-        });
-      });
-    }
-    function stopCamera() {
-      if (scannerRef.current?.stream) {
-        scannerRef.current.stream.getTracks().forEach((t) => t.stop());
-      }
-      scannerRef.current = null;
-      setCamActiva(false);
-    }
     function add(prod) {
       const m = MARCAS.find((x) => x.id === prod.marcaId);
       setCarrito((p) => {
@@ -24429,6 +24304,13 @@
     }
     function cobrar() {
       if (!carrito.length) return;
+      if (pagoMixto) {
+        const suma = (parseFloat(montosMixtos.efectivo) || 0) + (parseFloat(montosMixtos.qr) || 0) + (parseFloat(montosMixtos.tarjeta) || 0);
+        if (Math.abs(suma - total) > 0.01) {
+          alert(`Los montos (${$(suma)}) no cuadran con el total (${$(total)})`);
+          return;
+        }
+      }
       const factor = 1 - descPct / 100;
       const items = carrito.map((it) => ({
         prodId: it.prodId,
@@ -24440,23 +24322,15 @@
         precioUnit: it.precio,
         subtotal: it.precio * it.cantidad * factor
       }));
-      const facturaData = conFactura ? {
-        conFactura: true,
-        factNombre: factNombre.trim(),
-        factNit: factNit.trim()
-      } : { conFactura: false };
-      const vf = onVenta({
-        items,
-        total,
-        subtotal,
-        descPct,
-        metodoPago: pago,
-        vendedor: vendedor || "Tienda",
-        etiquetaImg: etiqueta,
-        clienteNombre: clienteNombre.trim() || null,
-        clienteTel: clienteTel.trim() || null,
-        ...facturaData
-      });
+      var metodoPagoFinal = pago;
+      if (pagoMixto) {
+        var partes = [];
+        if (parseFloat(montosMixtos.efectivo) > 0) partes.push("efectivo:" + montosMixtos.efectivo);
+        if (parseFloat(montosMixtos.qr) > 0) partes.push("qr:" + montosMixtos.qr);
+        if (parseFloat(montosMixtos.tarjeta) > 0) partes.push("tarjeta:" + montosMixtos.tarjeta);
+        metodoPagoFinal = partes.length > 0 ? "mixto|" + partes.join("|") : pago;
+      }
+      const vf = onVenta({ items, total, subtotal, descPct, metodoPago: metodoPagoFinal, vendedor: vendedor || "Tienda", etiquetaImg: etiqueta });
       setUltima(vf);
       setShowOk(true);
       setShowPago(false);
@@ -24464,11 +24338,8 @@
       setDescExtra(0);
       setBusq("");
       setEtiqueta(null);
-      setConFactura(false);
-      setFactNombre("");
-      setFactNit("");
-      setClienteNombre("");
-      setClienteTel("");
+      setPagoMixto(false);
+      setMontosMixtos({ efectivo: "", qr: "", tarjeta: "" });
     }
     return /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { position: "relative", marginBottom: 14 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", fontSize: 16, color: C.label3 } }, "\u{1F50D}"), /* @__PURE__ */ import_react.default.createElement(
       "input",
@@ -24588,90 +24459,55 @@
       fontSize: 20,
       padding: "4px",
       WebkitTapHighlightColor: "transparent"
-    } }, "\xD7")))), camActiva ? /* @__PURE__ */ import_react.default.createElement("div", { style: {
+    } }, "\xD7")))), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      background: C.bg2,
+      borderRadius: 14,
+      padding: "14px 16px",
       marginBottom: 14,
-      borderRadius: 16,
-      overflow: "hidden",
-      border: `1.5px solid ${C.gold}`,
-      position: "relative"
-    } }, /* @__PURE__ */ import_react.default.createElement(
-      "video",
+      border: scanStatus === "ok" ? `1.5px solid ${C.green}` : scanStatus === "notfound" ? `1.5px solid ${C.amber}` : `1px solid ${C.sep}`
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      fontSize: 13,
+      fontWeight: 600,
+      color: C.label3,
+      textTransform: "uppercase",
+      letterSpacing: 0.6,
+      marginBottom: 10
+    } }, "\u{1F4F7} Escanear Etiqueta"), /* @__PURE__ */ import_react.default.createElement(
+      "input",
       {
-        ref: videoRef,
-        style: {
-          width: "100%",
-          display: "block",
-          maxHeight: 220,
-          objectFit: "cover",
-          background: "#000"
-        },
-        playsInline: true,
-        muted: true
+        ref: fileRef,
+        type: "file",
+        accept: "image/*",
+        capture: "environment",
+        onChange: handleEtiqueta,
+        style: { display: "none" }
       }
-    ), /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      position: "absolute",
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      pointerEvents: "none"
-    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      width: 160,
-      height: 160,
-      border: "2px solid rgba(255,255,255,0.6)",
-      borderRadius: 12,
-      boxShadow: "0 0 0 4000px rgba(0,0,0,0.3)"
-    } })), /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      position: "absolute",
-      bottom: 0,
-      left: 0,
-      right: 0,
-      background: "rgba(0,0,0,0.6)",
-      padding: "10px 14px",
-      display: "flex",
-      justifyContent: "space-between",
-      alignItems: "center"
-    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { color: "#fff", fontSize: 13, fontFamily: FONT_UI } }, scanMsg || "Apunta al c\xF3digo QR..."), /* @__PURE__ */ import_react.default.createElement("button", { onClick: stopCamera, style: {
-      background: "rgba(255,255,255,0.2)",
+    ), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 12, marginBottom: scanMsg ? 10 : 0 } }, /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => fileRef.current?.click(), variant: "fill", small: true, icon: "\u{1F4F7}" }, scanStatus === "leyendo" ? "Leyendo\u2026" : etiqueta ? "Nueva foto" : "Fotografiar c\xF3digo"), etiqueta && /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, null, /* @__PURE__ */ import_react.default.createElement(
+      "img",
+      {
+        src: etiqueta,
+        alt: "etiqueta",
+        style: { height: 44, borderRadius: 8, border: `1px solid ${C.sep}` }
+      }
+    ), /* @__PURE__ */ import_react.default.createElement("button", { onClick: () => {
+      setEtiqueta(null);
+      setScanStatus(null);
+      setScanMsg("");
+    }, style: {
+      background: "none",
       border: "none",
-      color: "#fff",
-      borderRadius: 8,
-      padding: "6px 12px",
-      fontSize: 12,
+      color: C.red,
+      fontSize: 18,
       cursor: "pointer",
-      fontFamily: FONT_UI,
-      fontWeight: 600
-    } }, "Cancelar"))) : /* @__PURE__ */ import_react.default.createElement("div", { onClick: startCamera, style: {
-      marginBottom: 14,
-      borderRadius: 16,
-      cursor: "pointer",
-      border: scanStatus === "ok" ? `1.5px solid ${C.green}` : scanStatus === "notfound" ? `1.5px solid ${C.amber}` : `1.5px dashed ${C.sep}`,
-      background: scanStatus === "ok" ? `${C.green}10` : scanStatus === "notfound" ? `${C.amber}10` : C.bg2,
-      padding: "14px 18px",
-      display: "flex",
-      alignItems: "center",
-      gap: 14,
-      transition: "all .2s",
       WebkitTapHighlightColor: "transparent"
-    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      width: 46,
-      height: 46,
-      borderRadius: 12,
-      flexShrink: 0,
-      background: scanStatus === "ok" ? `${C.green}20` : `${C.label4}30`,
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      fontSize: 22
-    } }, scanStatus === "ok" ? "\u2713" : scanStatus === "notfound" ? "\u26A0\uFE0F" : "\u25A6"), /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      fontSize: 15,
-      fontWeight: 700,
-      fontFamily: FONT_UI,
-      color: scanStatus === "ok" ? C.green : scanStatus === "notfound" ? C.amber : C.label
-    } }, scanStatus === "ok" ? "\xA1Producto encontrado!" : scanStatus === "notfound" ? "C\xF3digo no encontrado" : "Escanear QR"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT_UI, marginTop: 2 } }, scanMsg || "Toca para abrir la c\xE1mara")), /* @__PURE__ */ import_react.default.createElement("div", { style: { color: C.label3, fontSize: 20 } }, "\u203A")), /* @__PURE__ */ import_react.default.createElement(
+    } }, "\xD7"))), scanMsg && /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      padding: "8px 12px",
+      borderRadius: 10,
+      fontSize: 13,
+      fontFamily: FONT,
+      background: scanStatus === "ok" ? `${C.green}15` : scanStatus === "notfound" ? `${C.amber}15` : C.fill2,
+      color: scanStatus === "ok" ? C.green : scanStatus === "notfound" ? C.amber : C.label2
+    } }, scanStatus === "leyendo" && "\u23F3 ", scanMsg), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT, marginTop: 8 } }, "Apunta al c\xF3digo de barras o QR de la prenda \u2192 se agrega autom\xE1ticamente al carrito")), /* @__PURE__ */ import_react.default.createElement(
       IOSBtn,
       {
         onPress: () => carrito.length && setShowPago(true),
@@ -24708,7 +24544,33 @@
       textTransform: "uppercase",
       letterSpacing: 0.6,
       marginBottom: 10
-    } }, "M\xE9todo de Pago"), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 20 } }, PAGOS.map((p) => /* @__PURE__ */ import_react.default.createElement("button", { key: p.id, onClick: () => setPago(p.id), style: {
+    } }, "M\xE9todo de Pago"), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 8, marginBottom: 16 } }, /* @__PURE__ */ import_react.default.createElement("button", { onClick: function() {
+      setPagoMixto(false);
+    }, style: {
+      flex: 1,
+      padding: "10px",
+      borderRadius: 12,
+      cursor: "pointer",
+      fontFamily: FONT,
+      border: "2px solid " + (!pagoMixto ? C.green : C.sep),
+      background: !pagoMixto ? C.green + "18" : C.bg2,
+      color: !pagoMixto ? C.green : C.label2,
+      fontWeight: !pagoMixto ? 700 : 400,
+      fontSize: 13
+    } }, "Pago simple"), /* @__PURE__ */ import_react.default.createElement("button", { onClick: function() {
+      setPagoMixto(true);
+    }, style: {
+      flex: 1,
+      padding: "10px",
+      borderRadius: 12,
+      cursor: "pointer",
+      fontFamily: FONT,
+      border: "2px solid " + (pagoMixto ? C.blue : C.sep),
+      background: pagoMixto ? C.blue + "18" : C.bg2,
+      color: pagoMixto ? C.blue : C.label2,
+      fontWeight: pagoMixto ? 700 : 400,
+      fontSize: 13
+    } }, "Pago mixto")), !pagoMixto && /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 20 } }, PAGOS.map((p) => /* @__PURE__ */ import_react.default.createElement("button", { key: p.id, onClick: () => setPago(p.id), style: {
       padding: "14px 8px",
       borderRadius: 14,
       border: `2px solid ${pago === p.id ? p.color : C.sep}`,
@@ -24734,7 +24596,56 @@
       fontSize: 13,
       color: C.amber,
       fontFamily: FONT
-    } }, "\u{1F4B3} Descuento 2.5% por tarjeta aplicado autom\xE1ticamente"), /* @__PURE__ */ import_react.default.createElement(
+    } }, "\u{1F4B3} Descuento 2.5% por tarjeta aplicado autom\xE1ticamente")), pagoMixto && /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 16 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { background: C.bg2, borderRadius: 14, padding: 16, border: "1px solid " + C.sep, marginBottom: 10 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT, marginBottom: 12, textAlign: "center" } }, "Total a cobrar: ", /* @__PURE__ */ import_react.default.createElement("strong", { style: { color: C.gold } }, $(total)), " \u2014 distribuye entre los m\xE9todos"), PAGOS.map(function(p) {
+      var val = montosMixtos[p.id] || "";
+      return /* @__PURE__ */ import_react.default.createElement("div", { key: p.id, style: { marginBottom: 12 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10, marginBottom: 6 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 20 } }, p.icon), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 14, fontWeight: 600, color: C.label, fontFamily: FONT } }, p.label)), /* @__PURE__ */ import_react.default.createElement("div", { style: { position: "relative" } }, /* @__PURE__ */ import_react.default.createElement("span", { style: {
+        position: "absolute",
+        left: 12,
+        top: "50%",
+        transform: "translateY(-50%)",
+        fontSize: 14,
+        color: C.label3,
+        fontFamily: FONT
+      } }, "Bs"), /* @__PURE__ */ import_react.default.createElement(
+        "input",
+        {
+          type: "number",
+          min: "0",
+          step: "0.01",
+          value: val,
+          placeholder: "0.00",
+          onChange: function(e) {
+            var v = e.target.value;
+            setMontosMixtos(function(prev) {
+              var next = Object.assign({}, prev);
+              next[p.id] = v;
+              return next;
+            });
+          },
+          style: {
+            width: "100%",
+            padding: "11px 14px 11px 36px",
+            borderRadius: 12,
+            border: "1.5px solid " + C.sep,
+            background: C.bg3,
+            fontSize: 16,
+            color: C.label,
+            outline: "none",
+            fontFamily: FONT,
+            boxSizing: "border-box"
+          }
+        }
+      )));
+    }), (function() {
+      var suma = (parseFloat(montosMixtos.efectivo) || 0) + (parseFloat(montosMixtos.qr) || 0) + (parseFloat(montosMixtos.tarjeta) || 0);
+      var diff = total - suma;
+      return /* @__PURE__ */ import_react.default.createElement("div", { style: {
+        padding: "10px 12px",
+        borderRadius: 10,
+        background: Math.abs(diff) < 0.01 ? C.green + "15" : C.red + "15",
+        border: "1px solid " + (Math.abs(diff) < 0.01 ? C.green : C.red) + "30"
+      } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", fontFamily: FONT } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, color: C.label3 } }, "Total ingresado:"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, fontWeight: 700, color: C.label } }, $(suma))), Math.abs(diff) > 0.01 && /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", marginTop: 4, fontFamily: FONT } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, color: C.red } }, "Diferencia:"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, fontWeight: 700, color: C.red } }, $(Math.abs(diff)))), Math.abs(diff) < 0.01 && /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.green, textAlign: "center", marginTop: 4, fontFamily: FONT } }, "\u2713 Montos cuadrados"));
+    })())), /* @__PURE__ */ import_react.default.createElement(
       IOSInput,
       {
         label: "Descuento adicional (%)",
@@ -24752,115 +24663,7 @@
         onChange: (e) => setVendedor(e.target.value),
         placeholder: "Nombre del vendedor"
       }
-    ), /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      marginBottom: 16,
-      background: C.bg2,
-      borderRadius: 14,
-      border: `1px solid ${C.sep}`,
-      padding: "14px 16px"
-    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      fontSize: 13,
-      fontWeight: 700,
-      color: C.label2,
-      fontFamily: FONT_UI,
-      marginBottom: 12,
-      letterSpacing: 0.2
-    } }, "\u{1F464} Datos del cliente (opcional)"), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 10 } }, /* @__PURE__ */ import_react.default.createElement(
-      "input",
-      {
-        value: clienteNombre,
-        onChange: (e) => setClienteNombre(e.target.value),
-        placeholder: "Nombre del cliente",
-        style: {
-          padding: "10px 14px",
-          borderRadius: 10,
-          border: `1px solid ${C.sep}`,
-          fontSize: 14,
-          fontFamily: FONT_UI,
-          background: C.bg1,
-          color: C.label,
-          outline: "none"
-        }
-      }
-    ), /* @__PURE__ */ import_react.default.createElement(
-      "input",
-      {
-        value: clienteTel,
-        onChange: (e) => setClienteTel(e.target.value),
-        placeholder: "Tel\xE9fono / WhatsApp",
-        type: "tel",
-        style: {
-          padding: "10px 14px",
-          borderRadius: 10,
-          border: `1px solid ${C.sep}`,
-          fontSize: 14,
-          fontFamily: FONT_UI,
-          background: C.bg1,
-          color: C.label,
-          outline: "none"
-        }
-      }
-    ))), /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      marginBottom: 16,
-      background: conFactura ? `${C.blue}10` : C.bg2,
-      borderRadius: 14,
-      border: `1px solid ${conFactura ? C.blue + "40" : C.sep}`,
-      padding: "14px 16px",
-      transition: "all .2s"
-    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: conFactura ? 14 : 0 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 15, fontWeight: 700, color: conFactura ? C.blue : C.label, fontFamily: FONT } }, "\u{1F9FE} Venta con Factura"), /* @__PURE__ */ import_react.default.createElement("div", { onClick: () => setConFactura((v) => !v), style: {
-      width: 48,
-      height: 28,
-      borderRadius: 14,
-      cursor: "pointer",
-      background: conFactura ? C.blue : "#ccc",
-      position: "relative",
-      transition: "background .2s",
-      flexShrink: 0
-    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      position: "absolute",
-      top: 3,
-      left: conFactura ? 22 : 3,
-      width: 22,
-      height: 22,
-      borderRadius: "50%",
-      background: "#fff",
-      transition: "left .2s",
-      boxShadow: "0 1px 3px rgba(0,0,0,0.3)"
-    } }))), conFactura && /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 10 } }, /* @__PURE__ */ import_react.default.createElement(
-      "input",
-      {
-        value: factNombre,
-        onChange: (e) => setFactNombre(e.target.value),
-        placeholder: "Nombre / Raz\xF3n Social",
-        style: {
-          padding: "10px 14px",
-          borderRadius: 10,
-          border: `1px solid ${C.sep}`,
-          fontSize: 14,
-          fontFamily: FONT,
-          background: C.bg1,
-          color: C.label,
-          outline: "none"
-        }
-      }
-    ), /* @__PURE__ */ import_react.default.createElement(
-      "input",
-      {
-        value: factNit,
-        onChange: (e) => setFactNit(e.target.value),
-        placeholder: "NIT",
-        style: {
-          padding: "10px 14px",
-          borderRadius: 10,
-          border: `1px solid ${C.sep}`,
-          fontSize: 14,
-          fontFamily: "monospace",
-          background: C.bg1,
-          color: C.label,
-          outline: "none"
-        }
-      }
-    ))), porMarca.length > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 16 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+    ), porMarca.length > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 16 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
       fontSize: 13,
       fontWeight: 600,
       color: C.label3,
@@ -24875,420 +24678,19 @@
       borderBottom: i < porMarca.length - 1 ? `1px solid ${C.sep}` : ""
     } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 16 } }, d.emoji), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 15, color: C.label, fontFamily: FONT } }, d.nombre), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 12, color: C.label3 } }, d.uds, " uds")), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 15, fontWeight: 600, color: d.color, fontFamily: FONT } }, $(d.total * (1 - descPct / 100))))))), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: cobrar, full: true, variant: "primary", style: { fontSize: 18, padding: "17px" }, icon: "\u{1F4B3}" }, "Cobrar ", $(total))));
   }
-  function SheetBajaMultiple({ open, onClose, inv, bajasLista, setBajasLista, bajaCod, setBajaCod, bajaMsg, setBajaMsg, onConfirmar, onQuitar, darBaja }) {
-    const [modo, setModo] = (0, import_react.useState)("codigo");
-    const [busq, setBusq] = (0, import_react.useState)("");
-    const [marcaFil, setMarcaFil] = (0, import_react.useState)("");
-    function toggleSeleccion(prod) {
-      const ya = bajasLista.find((p) => p.id === prod.id);
-      if (ya) {
-        setBajasLista((prev) => prev.filter((p) => p.id !== prod.id));
-      } else {
-        setBajasLista((prev) => [...prev, prod]);
-      }
-    }
-    function toggleTodos() {
-      if (todosFiltradosSeleccionados) {
-        const idsF = new Set(invFiltrado.map((p) => p.id));
-        setBajasLista((prev) => prev.filter((p) => !idsF.has(p.id)));
-      } else {
-        setBajasLista((prev) => {
-          const nuevos = invFiltrado.filter((p) => !prev.find((b) => b.id === p.id));
-          return [...prev, ...nuevos];
-        });
-      }
-    }
-    const invConStock = inv.filter((p) => p.stock > 0 && !p.dadoDeBaja);
-    const invFiltrado = invConStock.filter((p) => {
-      const q = busq.toLowerCase();
-      const matchBusq = !busq || p.nombre.toLowerCase().includes(q) || p.codigo.toLowerCase().includes(q);
-      const matchMarca = !marcaFil || p.marcaId === Number(marcaFil);
-      return matchBusq && matchMarca;
-    });
-    const todosFiltradosSeleccionados = invFiltrado.length > 0 && invFiltrado.every((p) => bajasLista.find((b) => b.id === p.id));
-    if (!open) return null;
-    return /* @__PURE__ */ import_react.default.createElement("div", { style: { position: "fixed", inset: 0, zIndex: 900, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "flex-end" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { width: "100%", maxHeight: "94vh", background: C.bg1, borderRadius: "20px 20px 0 0", overflow: "hidden", display: "flex", flexDirection: "column" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { padding: "16px 20px 0", borderBottom: `1px solid ${C.sep}`, flexShrink: 0 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 18, fontWeight: 800, color: C.label, fontFamily: FONT } }, "Dar de Baja"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.label3, fontFamily: FONT } }, bajasLista.length > 0 ? `${bajasLista.length} seleccionado${bajasLista.length > 1 ? "s" : ""}` : "Ninguno seleccionado")), /* @__PURE__ */ import_react.default.createElement("button", { onClick: onClose, style: { background: C.fill2, border: "none", width: 32, height: 32, borderRadius: "50%", cursor: "pointer", color: C.label2, fontSize: 16 } }, "\xD7")), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 4, marginBottom: 0 } }, [["codigo", "\u{1F4DD} Por c\xF3digo"], ["lista", "\u{1F4CB} Seleccionar"]].map(([m, label]) => /* @__PURE__ */ import_react.default.createElement("button", { key: m, onClick: () => setModo(m), style: {
-      flex: 1,
-      padding: "9px 0",
-      fontSize: 13,
-      fontWeight: modo === m ? 700 : 400,
-      fontFamily: FONT,
-      border: "none",
-      cursor: "pointer",
-      borderBottom: modo === m ? `2px solid ${C.red}` : "2px solid transparent",
-      background: "none",
-      color: modo === m ? C.red : C.label3,
-      transition: "all .15s"
-    } }, label)))), /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1, overflowY: "auto", padding: "16px 20px", WebkitOverflowScrolling: "touch" } }, modo === "codigo" && /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 8, marginBottom: 12 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ import_react.default.createElement(
-      IOSInput,
-      {
-        label: "C\xF3digo del producto",
-        value: bajaCod,
-        onChange: (e) => {
-          setBajaCod(e.target.value.toUpperCase());
-          setBajaMsg(null);
-        },
-        placeholder: "Ej: DON-CREM-0001",
-        style: { fontFamily: "monospace", textTransform: "uppercase" }
-      }
-    )), /* @__PURE__ */ import_react.default.createElement("button", { onClick: darBaja, disabled: !bajaCod.trim(), style: {
-      marginTop: 22,
-      padding: "0 16px",
-      background: bajaCod.trim() ? C.red : "#ccc",
-      color: "#fff",
-      border: "none",
-      borderRadius: 12,
-      fontSize: 14,
-      fontWeight: 700,
-      cursor: bajaCod.trim() ? "pointer" : "not-allowed",
-      fontFamily: FONT,
-      flexShrink: 0
-    } }, "+ Agregar")), bajaMsg && /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      padding: "10px 14px",
-      borderRadius: 10,
-      marginBottom: 12,
-      background: bajaMsg.ok ? `${C.green}15` : `${C.red}15`,
-      border: `1px solid ${bajaMsg.ok ? C.green + "40" : C.red + "40"}`,
-      color: bajaMsg.ok ? C.green : C.red,
-      fontSize: 13,
-      fontFamily: FONT
-    } }, bajaMsg.msg), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.label3, fontFamily: FONT, marginTop: 8, lineHeight: 1.6 } }, "Ingres\xE1 el c\xF3digo que aparece en el ticket de cada producto (ej: DON-CREM-0001) y presion\xE1 + Agregar. Pod\xE9s agregar varios antes de confirmar.")), modo === "lista" && /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 8, marginBottom: 12 } }, /* @__PURE__ */ import_react.default.createElement(
-      "input",
-      {
-        value: busq,
-        onChange: (e) => setBusq(e.target.value),
-        placeholder: "Buscar producto...",
-        style: {
-          flex: 1,
-          padding: "10px 14px",
-          borderRadius: 12,
-          border: `1px solid ${C.sep}`,
-          fontSize: 14,
-          fontFamily: FONT,
-          background: C.bg2,
-          color: C.label,
-          outline: "none"
-        }
-      }
-    ), /* @__PURE__ */ import_react.default.createElement("select", { value: marcaFil, onChange: (e) => setMarcaFil(e.target.value), style: {
-      padding: "10px 12px",
-      borderRadius: 12,
-      border: `1px solid ${C.sep}`,
-      fontSize: 13,
-      fontFamily: FONT,
-      background: C.bg2,
-      color: C.label,
-      outline: "none"
-    } }, /* @__PURE__ */ import_react.default.createElement("option", { value: "" }, "Todas"), MARCAS.map((m) => /* @__PURE__ */ import_react.default.createElement("option", { key: m.id, value: m.id }, m.nombre)))), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT } }, invFiltrado.length, " productos con stock"), /* @__PURE__ */ import_react.default.createElement("button", { onClick: toggleTodos, style: {
-      background: todosFiltradosSeleccionados ? `${C.red}15` : C.fill2,
-      border: `1px solid ${todosFiltradosSeleccionados ? C.red + "40" : C.sep}`,
-      color: todosFiltradosSeleccionados ? C.red : C.label2,
-      borderRadius: 20,
-      padding: "5px 14px",
-      fontSize: 12,
-      fontWeight: 700,
-      fontFamily: FONT,
-      cursor: "pointer",
-      transition: "all .15s"
-    } }, todosFiltradosSeleccionados ? "\u2713 Todo seleccionado" : "Seleccionar todo")), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 4 } }, invFiltrado.map((prod) => {
-      const sel = !!bajasLista.find((p) => p.id === prod.id);
-      const marca = MARCAS.find((m) => m.id === prod.marcaId);
-      return /* @__PURE__ */ import_react.default.createElement("div", { key: prod.id, onClick: () => toggleSeleccion(prod), style: {
-        display: "flex",
-        alignItems: "center",
-        gap: 12,
-        padding: "12px 14px",
-        borderRadius: 12,
-        cursor: "pointer",
-        background: sel ? `${C.red}12` : C.bg2,
-        border: `1px solid ${sel ? C.red + "60" : C.sep}`,
-        transition: "all .15s",
-        WebkitTapHighlightColor: "transparent"
-      } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
-        width: 22,
-        height: 22,
-        borderRadius: 6,
-        flexShrink: 0,
-        background: sel ? C.red : "none",
-        border: `2px solid ${sel ? C.red : C.label4}`,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center"
-      } }, sel && /* @__PURE__ */ import_react.default.createElement("span", { style: { color: "#fff", fontSize: 13, fontWeight: 800 } }, "\u2713")), /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
-        fontSize: 14,
-        fontWeight: 600,
-        color: C.label,
-        fontFamily: FONT,
-        whiteSpace: "nowrap",
-        overflow: "hidden",
-        textOverflow: "ellipsis"
-      } }, prod.nombre), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: "monospace" } }, prod.codigo)), /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "right", flexShrink: 0 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: marca?.color || C.label3, fontWeight: 600, fontFamily: FONT } }, marca?.nombre), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT } }, prod.stock, " uds")));
-    }), invFiltrado.length === 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center", padding: "32px 0", color: C.label3, fontFamily: FONT, fontSize: 14 } }, "No hay productos con stock"))), bajasLista.length > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: { marginTop: 20 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      fontSize: 12,
-      fontWeight: 700,
-      color: C.red,
-      textTransform: "uppercase",
-      letterSpacing: 0.8,
-      marginBottom: 8
-    } }, "A dar de baja (", bajasLista.length, ")"), /* @__PURE__ */ import_react.default.createElement("div", { style: { background: `${C.red}08`, borderRadius: 14, overflow: "hidden", border: `1px solid ${C.red}30` } }, bajasLista.map((prod, i) => /* @__PURE__ */ import_react.default.createElement("div", { key: prod.id, style: {
-      display: "flex",
-      alignItems: "center",
-      padding: "10px 14px",
-      borderBottom: i < bajasLista.length - 1 ? `1px solid ${C.red}20` : "none",
-      gap: 10
-    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, fontWeight: 600, color: C.label, fontFamily: FONT } }, prod.nombre), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: "monospace" } }, prod.codigo)), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, marginRight: 6 } }, "stock: ", prod.stock), /* @__PURE__ */ import_react.default.createElement("button", { onClick: () => onQuitar(prod.id), style: {
-      background: "none",
-      border: "none",
-      color: C.red,
-      fontSize: 20,
-      cursor: "pointer",
-      padding: "0 2px",
-      lineHeight: 1
-    } }, "\xD7")))))), /* @__PURE__ */ import_react.default.createElement("div", { style: { padding: "12px 20px", borderTop: `1px solid ${C.sep}`, flexShrink: 0, display: "flex", gap: 8 } }, /* @__PURE__ */ import_react.default.createElement("button", { onClick: onClose, style: {
-      flex: 1,
-      padding: "14px 0",
-      borderRadius: 14,
-      background: C.fill2,
-      border: "none",
-      fontSize: 15,
-      fontFamily: FONT,
-      color: C.label2,
-      cursor: "pointer",
-      fontWeight: 600
-    } }, "Cancelar"), bajasLista.length > 0 && /* @__PURE__ */ import_react.default.createElement("button", { onClick: onConfirmar, style: {
-      flex: 2,
-      padding: "14px 0",
-      borderRadius: 14,
-      background: C.red,
-      border: "none",
-      fontSize: 15,
-      fontFamily: FONT,
-      color: "#fff",
-      cursor: "pointer",
-      fontWeight: 700
-    } }, "\u{1F5D1} Dar de baja (", bajasLista.length, ")"))));
-  }
-  function SheetExcelMasivo({ open, onClose, inv, setInv, drive }) {
-    const [filas, setFilas] = (0, import_react.useState)([]);
-    const [estado, setEstado] = (0, import_react.useState)("idle");
-    const [msg, setMsg] = (0, import_react.useState)("");
-    const [productosGenerados, setProductosGenerados] = (0, import_react.useState)([]);
-    const [errores, setErrores] = (0, import_react.useState)([]);
-    const fileRef = (0, import_react.useRef)(null);
-    (0, import_react.useEffect)(function() {
-      loadXLSX();
-    }, []);
-    function reset() {
-      setFilas([]);
-      setEstado("idle");
-      setMsg("");
-      setProductosGenerados([]);
-      setErrores([]);
-      if (fileRef.current) fileRef.current.value = "";
-    }
-    function parsearFila(row) {
-      var codigoPropio = String(row[0] || "").trim();
-      var nombre = String(row[1] || "").trim();
-      var categoria = String(row[3] || "").trim();
-      var subcat = String(row[4] || "").trim();
-      var precioStr = String(row[7] || "0").replace(/,/g, ".");
-      var precio = parseFloat(precioStr) || 0;
-      var stockStr = String(row[9] || "1").replace(/,/g, ".");
-      var stock = parseInt(stockStr) || 1;
-      var descripcion = String(row[10] || "").trim();
-      var marcaEncontrada = MARCAS.find(function(m) {
-        return m.nombre.toLowerCase() === categoria.toLowerCase();
-      });
-      return {
-        codigoPropio,
-        nombre,
-        categoria,
-        subcat,
-        precio,
-        stock,
-        descripcion,
-        marcaEncontrada
-      };
-    }
-    function handleFile(e) {
-      var file = e.target.files && e.target.files[0];
-      if (!file) return;
-      setEstado("leyendo");
-      setMsg("Leyendo archivo...");
-      setFilas([]);
-      setProductosGenerados([]);
-      var reader = new FileReader();
-      reader.onload = function(ev) {
-        try {
-          var wb = XLSX.read(new Uint8Array(ev.target.result), { type: "array" });
-          var ws = wb.Sheets[wb.SheetNames[0]];
-          var rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false });
-          var dataRows = rows.filter(function(r) {
-            if (!r || !r[0]) return false;
-            var cell = String(r[0]).trim();
-            if (!cell) return false;
-            if (cell.match(/^\d+\./)) return false;
-            if (cell.toLowerCase().includes("ejemplo")) return false;
-            if (cell.toLowerCase().includes("formato")) return false;
-            if (cell.toLowerCase().includes("atenci")) return false;
-            if (cell.toLowerCase().includes("c\xF3digo del")) return false;
-            if (cell.toLowerCase().includes("datalla")) return false;
-            return true;
-          });
-          if (dataRows.length === 0) {
-            setEstado("error");
-            setMsg("No se encontraron productos v\xE1lidos en el archivo.");
-            return;
-          }
-          var parsed = dataRows.map(parsearFila).filter(function(p) {
-            return p.nombre;
-          });
-          setFilas(parsed);
-          setEstado("preview");
-          var sinMarca = parsed.filter(function(p) {
-            return !p.marcaEncontrada;
-          });
-          if (sinMarca.length > 0) {
-            setMsg(parsed.length + " productos encontrados. \u26A0\uFE0F " + sinMarca.length + " sin marca reconocida.");
-          } else {
-            setMsg(parsed.length + " productos encontrados. Revisa y confirma.");
-          }
-        } catch (err) {
-          setEstado("error");
-          setMsg("Error leyendo el archivo: " + err.message);
-        }
-      };
-      reader.onerror = function() {
-        setEstado("error");
-        setMsg("No se pudo leer el archivo");
-      };
-      reader.readAsArrayBuffer(file);
-    }
-    function confirmar() {
-      if (!filas.length) {
-        setMsg("No hay productos para cargar");
-        return;
-      }
-      var sinMarca = filas.filter(function(p) {
-        return !p.marcaEncontrada;
-      });
-      if (sinMarca.length === filas.length) {
-        setMsg("Ning\xFAn producto tiene marca reconocida. Verifica que la columna Categor\xEDa tenga el nombre exacto de la marca.");
-        return;
-      }
-      setEstado("procesando");
-      setMsg("Importando productos...");
-      var nuevos = [];
-      var errs = [];
-      var base = inv.length;
-      filas.forEach(function(p, i) {
-        if (!p.marcaEncontrada) {
-          errs.push(p.nombre + " - marca [" + p.categoria + "] no encontrada");
-          return;
-        }
-        var marca = p.marcaEncontrada;
-        var codigo = p.codigoPropio || genCod(marca.id, p.nombre, base + i + 1);
-        var prod = {
-          id: Date.now() + i,
-          codigo,
-          marcaId: marca.id,
-          marcaNombre: marca.nombre,
-          nombre: p.nombre,
-          categoria: p.subcat || p.categoria || "General",
-          descripcion: p.descripcion,
-          precio: p.precio,
-          stock: p.stock,
-          stockInicial: p.stock,
-          fecha: hoy()
-        };
-        nuevos.push(prod);
-      });
-      setInv(function(prev) {
-        return prev.concat(nuevos);
-      });
-      nuevos.forEach(function(p) {
-        sbGuardarProducto(p);
-        if (drive) drive.syncProducto(p);
-      });
-      setProductosGenerados(nuevos);
-      setErrores(errs);
-      setEstado("listo");
-      setMsg(nuevos.length + " productos importados" + (errs.length > 0 ? " \xB7 " + errs.length + " omitidos" : "") + ".");
-    }
-    function imprimirTodos() {
-      productosGenerados.forEach(function(prod, i) {
-        var marca = MARCAS.find(function(m) {
-          return m.id === prod.marcaId;
-        });
-        setTimeout(function() {
-          imprimirTicket(prod, marca ? marca.nombre : "Toscana House");
-        }, i * 600);
-      });
-    }
-    if (!open) return null;
-    return /* @__PURE__ */ import_react.default.createElement("div", { style: { position: "fixed", inset: 0, zIndex: 900, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "flex-end" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { width: "100%", maxHeight: "94vh", background: C.bg1, borderRadius: "20px 20px 0 0", overflow: "hidden", display: "flex", flexDirection: "column" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { padding: "16px 20px", borderBottom: "1px solid " + C.sep, display: "flex", justifyContent: "space-between", alignItems: "center", flexShrink: 0 } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 18, fontWeight: 800, color: C.label, fontFamily: FONT } }, "Carga Masiva Excel"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.label3, fontFamily: FONT, marginTop: 2 } }, "Formato iZi Stock \u2014 detecta marca autom\xE1ticamente")), /* @__PURE__ */ import_react.default.createElement("button", { onClick: function() {
-      reset();
-      onClose();
-    }, style: { background: C.fill2, border: "none", width: 32, height: 32, borderRadius: "50%", cursor: "pointer", color: C.label2, fontSize: 18, lineHeight: 1 } }, "\xD7")), /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1, overflowY: "auto", padding: "16px 20px", WebkitOverflowScrolling: "touch" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      background: C.bg3,
-      borderRadius: 14,
-      padding: "12px 14px",
-      marginBottom: 20,
-      border: "1px solid " + C.sep
-    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, fontWeight: 700, color: C.label3, textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 8 } }, "Columnas que se leen"), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "grid", gridTemplateColumns: "auto 1fr", gap: "4px 12px", fontSize: 12, fontFamily: "monospace" } }, [
-      ["Col A", "C\xF3digo (se usa tal cual)"],
-      ["Col B", "Nombre del producto"],
-      ["Col D", "Categor\xEDa = Nombre de la Marca"],
-      ["Col E", "Subcategor\xEDa"],
-      ["Col H", "Precio de venta (Bs)"],
-      ["Col J", "Stock actual"],
-      ["Col K", "Descripci\xF3n"]
-    ].map(function(r) {
-      return /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, { key: r[0] }, /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.gold, fontWeight: 700 } }, r[0]), /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.label2 } }, r[1]));
-    })), /* @__PURE__ */ import_react.default.createElement("div", { style: { marginTop: 10, fontSize: 12, color: C.label3, fontFamily: FONT, lineHeight: 1.5 } }, "\u26A0\uFE0F La columna D debe tener el nombre ", /* @__PURE__ */ import_react.default.createElement("strong", null, "exacto"), " de la marca (ej: ", /* @__PURE__ */ import_react.default.createElement("em", null, "Sensually"), ", ", /* @__PURE__ */ import_react.default.createElement("em", null, "Donaire"), ")")), /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 20 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { background: C.bg2, borderRadius: 14, padding: 20, border: "2px dashed " + C.sep, textAlign: "center" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 36, marginBottom: 8 } }, "\u{1F4CA}"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 14, fontWeight: 600, color: C.label, fontFamily: FONT, marginBottom: 4 } }, filas.length > 0 ? filas.length + " productos detectados" : "Subir archivo Excel"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT, marginBottom: 14 } }, ".xlsx \u2014 Formato iZi Stock"), /* @__PURE__ */ import_react.default.createElement("input", { ref: fileRef, type: "file", accept: ".xlsx,.xls,.csv", onChange: handleFile, style: { display: "none" } }), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: function() {
-      if (fileRef.current) fileRef.current.click();
-    }, variant: "fill", icon: "\u{1F4C2}" }, filas.length > 0 ? "Cambiar archivo" : "Seleccionar archivo .xlsx"))), filas.length > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 16 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, fontWeight: 700, color: C.label3, textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 10 } }, "Vista previa (", filas.length, " productos)"), /* @__PURE__ */ import_react.default.createElement("div", { style: { background: C.bg2, borderRadius: 14, overflow: "hidden", border: "1px solid " + C.sep, maxHeight: 280, overflowY: "auto" } }, filas.slice(0, 50).map(function(p, i) {
-      var marcaOk = !!p.marcaEncontrada;
-      return /* @__PURE__ */ import_react.default.createElement("div", { key: i, style: {
-        padding: "10px 14px",
-        borderBottom: i < Math.min(filas.length, 50) - 1 ? "1px solid " + C.sep : "none",
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
-        background: marcaOk ? "" : C.redBg
-      } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
-        fontSize: 13,
-        fontWeight: 600,
-        color: C.label,
-        fontFamily: FONT,
-        whiteSpace: "nowrap",
-        overflow: "hidden",
-        textOverflow: "ellipsis"
-      } }, p.nombre), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: marcaOk ? C.label3 : C.red, fontFamily: FONT } }, p.codigoPropio && /* @__PURE__ */ import_react.default.createElement("span", { style: { fontFamily: "monospace", marginRight: 6 } }, p.codigoPropio), marcaOk ? /* @__PURE__ */ import_react.default.createElement("span", null, p.marcaEncontrada.emoji, " ", p.marcaEncontrada.nombre, p.subcat ? " \xB7 " + p.subcat : "") : /* @__PURE__ */ import_react.default.createElement("span", null, "\u26A0\uFE0F Marca [" + p.categoria + "] no encontrada"))), /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "right", flexShrink: 0, marginLeft: 10 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, fontWeight: 700, color: C.gold, fontFamily: FONT } }, "Bs ", p.precio.toFixed(0)), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.green, fontFamily: FONT } }, p.stock, " uds")));
-    }), filas.length > 50 && /* @__PURE__ */ import_react.default.createElement("div", { style: { padding: "10px 14px", textAlign: "center", fontSize: 12, color: C.label3, fontFamily: FONT } }, "... y ", filas.length - 50, " m\xE1s"))), msg && /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      padding: "12px 14px",
-      borderRadius: 12,
-      marginBottom: 16,
-      background: estado === "listo" ? C.green + "20" : estado === "error" ? C.red + "20" : C.amber + "20",
-      color: estado === "listo" ? C.green : estado === "error" ? C.red : C.amber,
-      fontSize: 14,
-      fontFamily: FONT
-    } }, msg), errores.length > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 16 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, fontWeight: 700, color: C.red, textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 8 } }, "Omitidos (", errores.length, ")"), /* @__PURE__ */ import_react.default.createElement("div", { style: { background: C.redBg, borderRadius: 12, padding: "10px 14px", border: "1px solid " + C.red + "30" } }, errores.map(function(e, i) {
-      return /* @__PURE__ */ import_react.default.createElement("div", { key: i, style: { fontSize: 12, color: C.red, fontFamily: FONT, marginBottom: i < errores.length - 1 ? 4 : 0 } }, "\xB7 ", e);
-    }))), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 10 } }, estado === "preview" && filas.length > 0 && /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: confirmar, variant: "primary", full: true, icon: "\u2713" }, "Importar ", filas.filter(function(p) {
-      return !!p.marcaEncontrada;
-    }).length, " productos"), estado === "listo" && productosGenerados.length > 0 && /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, null, /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: imprimirTodos, variant: "primary", full: true, icon: "\u{1F5A8}" }, "Imprimir QR (", productosGenerados.length, ")"), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: function() {
-      reset();
-      onClose();
-    }, variant: "fill", full: true }, "Cerrar")), (estado === "idle" || estado === "error") && /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: function() {
-      reset();
-      onClose();
-    }, variant: "fill", full: true }, "Cancelar")))));
-  }
   function SheetRecibir({ open, onClose, inv, onAdd, fInv, setFInv }) {
-    const [scanInvMsg, setScanInvMsg] = (0, import_react.useState)("");
-    const [scanInvStatus, setScanInvStatus] = (0, import_react.useState)(null);
-    const [barcodeReady, setBarcodeReady] = (0, import_react.useState)(false);
+    var _hN146 = (0, import_react.useState)("");
+    var scanInvMsg = _hN146[0];
+    var setScanInvMsg = _hN146[1];
+    ;
+    var _hN147 = (0, import_react.useState)(null);
+    var scanInvStatus = _hN147[0];
+    var setScanInvStatus = _hN147[1];
+    ;
+    var _hN148 = (0, import_react.useState)(false);
+    var barcodeReady = _hN148[0];
+    var setBarcodeReady = _hN148[1];
+    ;
     const scanInvRef = (0, import_react.useRef)(null);
     const codigoGenerado = fInv.marcaId && fInv.nombre ? genCod(Number(fInv.marcaId), fInv.nombre, inv.length + 1) : "";
     (0, import_react.useEffect)(() => {
@@ -25384,15 +24786,7 @@
         label: "Categor\xEDa",
         value: fInv.categoria,
         onChange: (e) => setFInv((p) => ({ ...p, categoria: e.target.value })),
-        placeholder: "Ej: Blusas, Vestidos, Accesorios\u2026"
-      }
-    ), /* @__PURE__ */ import_react.default.createElement(
-      IOSInput,
-      {
-        label: "Descripci\xF3n / Detalle",
-        value: fInv.descripcion,
-        onChange: (e) => setFInv((p) => ({ ...p, descripcion: e.target.value })),
-        placeholder: "Ej: Material microfibra, color pastel, talla M"
+        placeholder: "Ej: Ropa, Accesorios\u2026"
       }
     ), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 } }, /* @__PURE__ */ import_react.default.createElement(
       IOSInput,
@@ -25443,50 +24837,11 @@
       marginBottom: 10
     } }, codigoGenerado), /* @__PURE__ */ import_react.default.createElement(BarcodeDisplay, { codigo: codigoGenerado }), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT, marginTop: 8 } }, fInv.nombre && /* @__PURE__ */ import_react.default.createElement("strong", { style: { color: C.label2 } }, fInv.nombre), fInv.categoria && /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.label3 } }, " \xB7 ", fInv.categoria))), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: onAdd, full: true, variant: "primary" }, "Registrar e Imprimir Ticket"));
   }
-  function BajasColapsadas({ productosBaja, vendidosPorProd }) {
-    const [abierto, setAbierto] = (0, import_react.useState)(false);
-    return /* @__PURE__ */ import_react.default.createElement("div", { style: { marginTop: 20, marginBottom: 8 } }, /* @__PURE__ */ import_react.default.createElement("button", { onClick: () => setAbierto((v) => !v), style: {
-      display: "flex",
-      alignItems: "center",
-      gap: 8,
-      width: "100%",
-      background: "none",
-      border: "none",
-      cursor: "pointer",
-      padding: "8px 0",
-      WebkitTapHighlightColor: "transparent"
-    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { height: 1, flex: 1, background: C.sep } }), /* @__PURE__ */ import_react.default.createElement("span", { style: {
-      fontSize: 11,
-      fontWeight: 600,
-      color: C.label3,
-      fontFamily: FONT_UI,
-      textTransform: "uppercase",
-      letterSpacing: 0.8
-    } }, abierto ? "\u25BC" : "\u25B6", " ", productosBaja.length, " dado", productosBaja.length > 1 ? "s" : "", " de baja"), /* @__PURE__ */ import_react.default.createElement("div", { style: { height: 1, flex: 1, background: C.sep } })), abierto && /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 5, marginTop: 8 } }, productosBaja.map((prod) => {
-      const vendidas = vendidosPorProd[prod.id] || 0;
-      return /* @__PURE__ */ import_react.default.createElement("div", { key: prod.id, style: {
-        background: "#FEF2F2",
-        border: `1px solid ${C.red}20`,
-        borderRadius: 12,
-        padding: "11px 14px",
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
-        opacity: 0.7
-      } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
-        fontSize: 13,
-        fontWeight: 600,
-        color: C.label3,
-        fontFamily: FONT_UI,
-        textDecoration: "line-through",
-        whiteSpace: "nowrap",
-        overflow: "hidden",
-        textOverflow: "ellipsis"
-      } }, prod.nombre), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: C.label3, fontFamily: "monospace" } }, prod.codigo), prod.fechaBaja && /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: C.red, opacity: 0.7, marginTop: 1 } }, "Baja: ", prod.fechaBaja)), /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "right", flexShrink: 0, marginLeft: 10 } }, vendidas > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT_UI } }, vendidas, " vendidas"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: C.red, fontWeight: 700, fontFamily: FONT_UI, letterSpacing: 0.5 } }, "BAJA")));
-    })));
-  }
-  function InventarioPorMarca({ inv, ventas, onRecibir, onBaja, onExcel }) {
-    const [marcaSelec, setMarcaSelec] = (0, import_react.useState)(MARCAS[0].id);
+  function InventarioPorMarca({ inv, ventas, onRecibir, onBaja }) {
+    var _hN149 = (0, import_react.useState)(MARCAS[0].id);
+    var marcaSelec = _hN149[0];
+    var setMarcaSelec = _hN149[1];
+    ;
     const marca = MARCAS.find((m) => m.id === marcaSelec);
     const vendidosPorProd = (0, import_react.useMemo)(() => {
       const map = {};
@@ -25495,75 +24850,11 @@
       }));
       return map;
     }, [ventas]);
-    const todosProductos = inv.filter((i) => i.marcaId === marcaSelec);
-    const [mostrarAgotados, setMostrarAgotados] = (0, import_react.useState)(false);
-    const todosActivos = todosProductos.filter((p) => !p.dadoDeBaja);
-    const productos = mostrarAgotados ? todosActivos : todosActivos.filter((p) => p.stock > 0);
-    const agotadosOcultos = todosActivos.filter((p) => p.stock === 0);
-    const productosBaja = todosProductos.filter((p) => p.dadoDeBaja);
+    const productos = inv.filter((i) => i.marcaId === marcaSelec);
     const totalStock = productos.reduce((s, p) => s + p.stock, 0);
-    const totalVendidas = todosProductos.reduce((s, p) => s + (vendidosPorProd[p.id] || 0), 0);
-    const agotados = todosActivos.filter((p) => p.stock === 0).length;
-    return /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", flexDirection: "column" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      position: "sticky",
-      top: 0,
-      zIndex: 50,
-      background: "rgba(248,252,250,0.97)",
-      backdropFilter: "blur(10px)",
-      WebkitBackdropFilter: "blur(10px)",
-      borderBottom: `1px solid ${C.sep}`,
-      padding: "10px 0 10px",
-      marginBottom: 14,
-      marginLeft: -16,
-      marginRight: -16,
-      paddingLeft: 16,
-      paddingRight: 16
-    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 8 } }, /* @__PURE__ */ import_react.default.createElement("button", { onClick: onBaja, style: {
-      flex: 1,
-      display: "flex",
-      flexDirection: "column",
-      alignItems: "center",
-      gap: 4,
-      padding: "12px 4px",
-      borderRadius: 16,
-      border: `1.5px solid ${C.red}40`,
-      background: `${C.red}10`,
-      cursor: "pointer",
-      fontFamily: FONT_UI,
-      WebkitTapHighlightColor: "transparent",
-      boxShadow: "0 2px 8px rgba(176,48,48,0.1)",
-      transition: "all .15s"
-    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 20 } }, "\u{1F5D1}"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 11, fontWeight: 700, color: C.red, letterSpacing: 0.2 } }, "Dar de Baja")), /* @__PURE__ */ import_react.default.createElement("button", { onClick: onRecibir, style: {
-      flex: 1,
-      display: "flex",
-      flexDirection: "column",
-      alignItems: "center",
-      gap: 4,
-      padding: "12px 4px",
-      borderRadius: 16,
-      border: `1.5px solid ${C.gold}50`,
-      background: `${C.gold}12`,
-      cursor: "pointer",
-      fontFamily: FONT_UI,
-      WebkitTapHighlightColor: "transparent",
-      boxShadow: "0 2px 8px rgba(46,107,62,0.1)",
-      transition: "all .15s"
-    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 20 } }, "\u{1F4E5}"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 11, fontWeight: 700, color: C.gold, letterSpacing: 0.2 } }, "Recibir")), /* @__PURE__ */ import_react.default.createElement("button", { onClick: onExcel, style: {
-      flex: 1,
-      display: "flex",
-      flexDirection: "column",
-      alignItems: "center",
-      gap: 4,
-      padding: "12px 4px",
-      borderRadius: 16,
-      border: `1.5px solid ${C.green}50`,
-      background: `${C.green}12`,
-      cursor: "pointer",
-      fontFamily: FONT_UI,
-      WebkitTapHighlightColor: "transparent",
-      boxShadow: "0 2px 8px rgba(46,139,87,0.1)",
-      transition: "all .15s"
-    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 18 } }, "\u{1F4CA}"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 11, fontWeight: 600, color: C.green } }, "Carga Excel")))), /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 16 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+    const totalVendidas = productos.reduce((s, p) => s + (vendidosPorProd[p.id] || 0), 0);
+    const agotados = productos.filter((p) => p.stock === 0).length;
+    return /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 16 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
       fontSize: 11,
       fontWeight: 700,
       color: C.label3,
@@ -25584,86 +24875,59 @@
       const activa = m.id === marcaSelec;
       return /* @__PURE__ */ import_react.default.createElement("button", { key: m.id, onClick: () => setMarcaSelec(m.id), style: {
         flexShrink: 0,
-        padding: "10px 14px",
-        borderRadius: 16,
-        border: `2px solid ${activa ? m.color : "rgba(0,0,0,0.07)"}`,
-        background: activa ? m.color + "22" : "#fff",
+        padding: "10px 16px",
+        borderRadius: 14,
+        border: `2px solid ${activa ? m.color : C.sep}`,
+        background: activa ? m.color + "30" : C.bg2,
         cursor: "pointer",
-        fontFamily: FONT_UI,
+        fontFamily: FONT,
         WebkitTapHighlightColor: "transparent",
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
-        gap: 4,
-        minWidth: 82,
-        transition: "all .2s",
-        boxShadow: activa ? `0 4px 14px ${m.color}35` : "0 1px 4px rgba(0,0,0,0.07)"
-      } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 22 } }, m.emoji), /* @__PURE__ */ import_react.default.createElement("span", { style: {
-        fontSize: 11.5,
-        fontWeight: 700,
-        color: activa ? m.color : C.label,
-        whiteSpace: "nowrap",
-        letterSpacing: 0.1
-      } }, m.nombre), /* @__PURE__ */ import_react.default.createElement("span", { style: {
-        fontSize: 10,
-        fontWeight: activa ? 600 : 400,
-        color: activa ? m.color : C.label3,
-        fontFamily: FONT_UI
-      } }, stock, " uds"));
+        gap: 3,
+        minWidth: 80,
+        transition: "all .2s"
+      } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 20 } }, m.emoji), /* @__PURE__ */ import_react.default.createElement("span", { style: {
+        fontSize: 11,
+        fontWeight: activa ? 700 : 500,
+        color: activa ? m.color : C.label2,
+        whiteSpace: "nowrap"
+      } }, m.nombre), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 10, color: activa ? m.color : C.label3 } }, stock, " uds"));
     }))), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 16 } }, [
-      { icon: "\u{1F4E6}", label: "En stock", value: totalStock, color: C.green, bg: C.greenBg },
-      { icon: "\u2705", label: "Vendidas", value: totalVendidas, color: C.blue, bg: `${C.blue}10` },
-      { icon: "\u274C", label: "Agotados", value: agotados, color: C.red, bg: C.redBg }
+      { icon: "\u{1F4E6}", label: "En stock", value: totalStock, color: C.green },
+      { icon: "\u2705", label: "Vendidas", value: totalVendidas, color: C.blue },
+      { icon: "\u274C", label: "Agotados", value: agotados, color: C.red }
     ].map((s) => /* @__PURE__ */ import_react.default.createElement("div", { key: s.label, style: {
-      background: s.bg,
-      borderRadius: 16,
-      padding: "14px 10px",
-      border: `1.5px solid ${s.color}25`,
-      textAlign: "center",
-      boxShadow: `0 2px 8px ${s.color}15`
-    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 22, marginBottom: 5 } }, s.icon), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 20, fontWeight: 800, color: s.color, fontFamily: FONT_UI } }, s.value), /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      fontSize: 10,
-      fontWeight: 600,
-      color: s.color,
-      fontFamily: FONT_UI,
-      textTransform: "uppercase",
-      letterSpacing: 0.8,
-      opacity: 0.75,
-      marginTop: 2
-    } }, s.label)))), productos.length === 0 ? /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center", padding: "48px 20px", color: C.label3 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 40, marginBottom: 10, opacity: 0.5 } }, "\u{1F4E6}"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 16, fontWeight: 600, color: C.label2, fontFamily: FONT } }, "Sin productos para ", marca?.nombre), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.label3, fontFamily: FONT, marginTop: 6 } }, 'Usa "Recibir" para agregar \xEDtems')) : /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      background: C.bg2,
+      borderRadius: 14,
+      padding: "12px 10px",
+      border: `1px solid ${C.sep}`,
+      textAlign: "center"
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 20, marginBottom: 4 } }, s.icon), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 18, fontWeight: 800, color: s.color, fontFamily: FONT } }, s.value), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: C.label3, fontFamily: FONT, textTransform: "uppercase", letterSpacing: 0.5 } }, s.label)))), productos.length === 0 ? /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center", padding: "48px 20px", color: C.label3 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 40, marginBottom: 10, opacity: 0.5 } }, "\u{1F4E6}"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 16, fontWeight: 600, color: C.label2, fontFamily: FONT } }, "Sin productos para ", marca?.nombre), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.label3, fontFamily: FONT, marginTop: 6 } }, 'Usa "Recibir" para agregar \xEDtems')) : /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
       display: "flex",
-      justifyContent: "space-between",
-      alignItems: "center",
+      gap: 12,
       padding: "8px 12px",
       background: C.bg2,
-      borderRadius: 12,
-      marginBottom: 4,
+      borderRadius: 10,
+      marginBottom: 4
+    } }, [
+      { color: C.stockOk, label: "En stock" },
+      { color: C.stockLow, label: "Stock bajo" },
+      { color: C.stockOut, label: "Agotado" },
+      { color: C.stockSold, label: "Vendido" }
+    ].map((l) => /* @__PURE__ */ import_react.default.createElement("div", { key: l.label, style: { display: "flex", alignItems: "center", gap: 5 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      width: 10,
+      height: 10,
+      borderRadius: 3,
+      background: l.color,
       border: `1px solid ${C.sep}`
-    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 10 } }, [
-      { color: C.green, label: "En stock" },
-      { color: C.amber, label: "Stock bajo" }
-    ].map((l) => /* @__PURE__ */ import_react.default.createElement("div", { key: l.label, style: { display: "flex", alignItems: "center", gap: 5 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { width: 8, height: 8, borderRadius: 2, background: l.color } }), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 10, color: C.label3, fontFamily: FONT_UI } }, l.label)))), /* @__PURE__ */ import_react.default.createElement("button", { onClick: () => setMostrarAgotados((v) => !v), style: {
-      display: "flex",
-      alignItems: "center",
-      gap: 6,
-      cursor: "pointer",
-      padding: "4px 10px",
-      borderRadius: 20,
-      background: mostrarAgotados ? `${C.red}15` : "none",
-      border: `1px solid ${mostrarAgotados ? C.red + "40" : C.sep}`,
-      transition: "all .2s",
-      WebkitTapHighlightColor: "transparent"
-    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: {
-      fontSize: 11,
-      fontWeight: 600,
-      color: mostrarAgotados ? C.red : C.label3,
-      fontFamily: FONT_UI
-    } }, mostrarAgotados ? "Ocultar agotados" : `Ver agotados (${agotadosOcultos.length})`))), productos.map((prod) => {
+    } }), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 10, color: C.label3, fontFamily: FONT } }, l.label)))), productos.map((prod) => {
       const vendidas = vendidosPorProd[prod.id] || 0;
       const pctVendido = prod.stockInicial > 0 ? Math.round(vendidas / prod.stockInicial * 100) : 0;
       const estado = prod.stock === 0 ? "agotado" : prod.stock < 3 ? "bajo" : "ok";
-      const bgColor = prod.stock === 0 ? "#FEF2F2" : prod.stock < 3 ? "#FFFBEB" : C.stockOk;
-      const borderColor = prod.stock === 0 ? `${C.red}30` : prod.stock < 3 ? `${C.amber}40` : `${C.green}30`;
+      const bgColor = prod.stock === 0 ? C.stockOut : prod.stock < 3 ? C.stockLow : C.stockOk;
+      const borderColor = prod.stock === 0 ? "#F4A8A8" : prod.stock < 3 ? "#F4D4A8" : "#A8D4A8";
       return /* @__PURE__ */ import_react.default.createElement("div", { key: prod.id, style: {
         background: bgColor,
         border: `1.5px solid ${borderColor}`,
@@ -25740,11 +25004,17 @@
         },
         "\u{1F5A8} Imprimir ticket"
       )));
-    })), productosBaja.length > 0 && /* @__PURE__ */ import_react.default.createElement(BajasColapsadas, { productosBaja, vendidosPorProd }));
+    })), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 10, marginBottom: 20 } }, /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: onBaja, variant: "fill", full: true, icon: "\u{1F5D1}" }, "Dar de Baja"), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: onRecibir, full: true, icon: "+" }, "Recibir")));
   }
   function MarcaDetalle({ marcaId, inv, ventas, vMes, mes, anio, MK, cierres, setCierres, getHist, getLiq }) {
-    const [sub, setSub] = (0, import_react.useState)("historial");
-    const [filtroMk, setFMk] = (0, import_react.useState)("");
+    var _hN150 = (0, import_react.useState)("historial");
+    var sub = _hN150[0];
+    var setSub = _hN150[1];
+    ;
+    var _hN151 = (0, import_react.useState)("");
+    var filtroMk = _hN151[0];
+    var setFMk = _hN151[1];
+    ;
     const marca = MARCAS.find((m) => m.id === marcaId);
     const liq = getLiq(marcaId);
     const cerrado = cierres[`${MK}-${marcaId}`]?.cerrado;
@@ -25816,14 +25086,7 @@
     } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 17, fontWeight: 600, color: C.label, fontFamily: FONT } }, MESES[periodo.mes], " ", periodo.anio), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.label3, fontFamily: FONT } }, periodo.ventas.length, " transacciones")), /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "right" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 22, fontWeight: 800, color: marca?.color, fontFamily: FONT } }, $(periodo.bruto)), cierres[`${periodo.mk}-${marcaId}`]?.cerrado && /* @__PURE__ */ import_react.default.createElement(Chip, { color: C.green, small: true }, "\u2713 Cerrado"))), periodo.ventas.map((v, i) => /* @__PURE__ */ import_react.default.createElement("div", { key: v.id, style: {
       padding: "13px 16px",
       borderBottom: i < periodo.ventas.length - 1 ? `1px solid ${C.sep}` : ""
-    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", marginBottom: 6 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontFamily: "monospace", fontSize: 12, color: C.gold } }, v.id), v.conFactura && /* @__PURE__ */ import_react.default.createElement("span", { style: {
-      fontSize: 10,
-      fontWeight: 700,
-      color: C.blue,
-      background: `${C.blue}15`,
-      borderRadius: 5,
-      padding: "2px 6px"
-    } }, "\u{1F9FE} FACTURA")), /* @__PURE__ */ import_react.default.createElement(Chip, { color: v.metodoPago === "tarjeta" ? C.amber : v.metodoPago === "qr" ? C.blue : C.green, small: true }, PAGOS.find((p) => p.id === v.metodoPago)?.label)), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 16, fontWeight: 700, color: C.gold, fontFamily: FONT } }, $(v.subMarca))), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT, marginBottom: 6 } }, v.fecha, " ", v.hora), v.itsMarca.map((it, ii) => /* @__PURE__ */ import_react.default.createElement("div", { key: `${v.id}-${it.prodId}-${ii}`, style: { fontSize: 13, color: C.label2, fontFamily: FONT } }, "\xB7 ", it.nombre, " ", /* @__PURE__ */ import_react.default.createElement("span", { style: { fontFamily: "monospace", fontSize: 11, color: C.label3 } }, it.codigo), " ", "\xD7", it.cantidad))))))), sub === "productos" && /* @__PURE__ */ import_react.default.createElement("div", null, prods.length === 0 ? /* @__PURE__ */ import_react.default.createElement(EmptyState, { icon: "\u{1F4E6}", title: "Sin productos", sub: `No hay \xEDtems registrados para ${marca?.nombre}` }) : prods.map((p, i) => {
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", marginBottom: 6 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontFamily: "monospace", fontSize: 12, color: C.gold } }, v.id), /* @__PURE__ */ import_react.default.createElement(Chip, { color: colorPago(v.metodoPago), small: true }, iconPago(v.metodoPago), " ", labelPago(v.metodoPago))), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 16, fontWeight: 700, color: C.gold, fontFamily: FONT } }, $(v.subMarca))), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT, marginBottom: 6 } }, v.fecha, " ", v.hora), v.itsMarca.map((it, ii) => /* @__PURE__ */ import_react.default.createElement("div", { key: `${v.id}-${it.prodId}-${ii}`, style: { fontSize: 13, color: C.label2, fontFamily: FONT } }, "\xB7 ", it.nombre, " ", /* @__PURE__ */ import_react.default.createElement("span", { style: { fontFamily: "monospace", fontSize: 11, color: C.label3 } }, it.codigo), " ", "\xD7", it.cantidad))))))), sub === "productos" && /* @__PURE__ */ import_react.default.createElement("div", null, prods.length === 0 ? /* @__PURE__ */ import_react.default.createElement(EmptyState, { icon: "\u{1F4E6}", title: "Sin productos", sub: `No hay \xEDtems registrados para ${marca?.nombre}` }) : prods.map((p, i) => {
       const vendidas = p.stockInicial - p.stock;
       return /* @__PURE__ */ import_react.default.createElement("div", { key: p.id, style: {
         background: C.bg2,
@@ -25893,14 +25156,21 @@
     } }, "Ventas del per\xEDodo"), liq.vMarca.map((v) => {
       const its = v.items.filter((i) => i.marcaId === marcaId);
       const sub2 = its.reduce((s, i) => s + i.subtotal, 0);
-      return /* @__PURE__ */ import_react.default.createElement("div", { key: v.id, style: { background: C.bg2, borderRadius: 14, padding: 14, marginBottom: 10 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", marginBottom: 6 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontFamily: "monospace", fontSize: 12, color: C.gold } }, v.id), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 16, fontWeight: 700, color: C.gold, fontFamily: FONT } }, $(sub2))), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.label3, fontFamily: FONT, marginBottom: 4 } }, v.fecha, " ", v.hora, " \xB7 ", PAGOS.find((p) => p.id === v.metodoPago)?.label), its.map((it, ii) => /* @__PURE__ */ import_react.default.createElement("div", { key: `liq-${v.id}-${it.prodId}-${ii}`, style: { fontSize: 13, color: C.label2, fontFamily: FONT } }, "\xB7 ", it.nombre, " \xD7", it.cantidad, " = ", $(it.subtotal))));
+      return /* @__PURE__ */ import_react.default.createElement("div", { key: v.id, style: { background: C.bg2, borderRadius: 14, padding: 14, marginBottom: 10 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", marginBottom: 6 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontFamily: "monospace", fontSize: 12, color: C.gold } }, v.id), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 16, fontWeight: 700, color: C.gold, fontFamily: FONT } }, $(sub2))), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.label3, fontFamily: FONT, marginBottom: 4 } }, v.fecha, " ", v.hora, " \xB7 ", labelPago(v.metodoPago)), its.map((it, ii) => /* @__PURE__ */ import_react.default.createElement("div", { key: `liq-${v.id}-${it.prodId}-${ii}`, style: { fontSize: 13, color: C.label2, fontFamily: FONT } }, "\xB7 ", it.nombre, " \xD7", it.cantidad, " = ", $(it.subtotal))));
     }))));
   }
-  function HistorialTab({ ventas, inv, cierres }) {
+  function HistorialTab({ ventas, inv, cierres, onVentaClick }) {
     const now = /* @__PURE__ */ new Date();
-    const [mesSel, setMesSel] = (0, import_react.useState)(now.getMonth());
-    const [anioSel, setAnioSel] = (0, import_react.useState)(now.getFullYear());
-    const [vista, setVista] = (0, import_react.useState)("resumen");
+    var _hN152 = (0, import_react.useState)(now.getMonth());
+    var mesSel = _hN152[0];
+    var setMesSel = _hN152[1];
+    var _hN153 = (0, import_react.useState)(now.getFullYear());
+    var anioSel = _hN153[0];
+    var setAnioSel = _hN153[1];
+    var _hN154 = (0, import_react.useState)("resumen");
+    var vista = _hN154[0];
+    var setVista = _hN154[1];
+    ;
     const MKSel = mkKey(mesSel, anioSel);
     const ventasPer = (0, import_react.useMemo)(
       () => ventas.filter((v) => v.mk === MKSel),
@@ -26063,19 +25333,34 @@
         opacity: val > 0 ? 1 : 0.4
       } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13 } }, icon), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, fontWeight: 700, color, fontFamily: FONT } }, val > 0 ? $(val) : "\u2014")))));
     })), vista === "ventas" && /* @__PURE__ */ import_react.default.createElement("div", null, ventasPer.length === 0 ? /* @__PURE__ */ import_react.default.createElement(EmptyState, { icon: "\u{1F4CA}", title: "Sin ventas", sub: `${MESES[mesSel]} ${anioSel}` }) : [...ventasPer].reverse().map((v) => {
-      const pg = PAGOS.find((p) => p.id === v.metodoPago);
-      return /* @__PURE__ */ import_react.default.createElement("div", { key: v.id, style: { background: C.bg2, borderRadius: 14, padding: "14px 16px", marginBottom: 10 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", marginBottom: 6 } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontFamily: "monospace", fontSize: 12, color: C.gold } }, v.id), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT } }, v.fecha, " ", v.hora)), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } }, /* @__PURE__ */ import_react.default.createElement(Chip, { color: pg?.color || C.green }, pg?.icon, " ", pg?.label), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 17, fontWeight: 800, color: C.gold, fontFamily: FONT } }, $(v.total)))), v.items.map((it, ii) => {
-        const m = MARCAS.find((x) => x.id === it.marcaId);
-        return /* @__PURE__ */ import_react.default.createElement("div", { key: ii, style: {
-          fontSize: 13,
-          color: C.label2,
-          fontFamily: FONT,
-          display: "flex",
-          alignItems: "center",
-          gap: 6,
-          marginBottom: 3
-        } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { width: 6, height: 6, borderRadius: "50%", background: m?.color, flexShrink: 0 } }), it.nombre, " \xD7", it.cantidad, " = ", $(it.subtotal));
-      }));
+      return /* @__PURE__ */ import_react.default.createElement(
+        "div",
+        {
+          key: v.id,
+          onClick: () => onVentaClick && onVentaClick(v),
+          style: {
+            background: C.bg2,
+            borderRadius: 14,
+            padding: "14px 16px",
+            marginBottom: 10,
+            cursor: "pointer",
+            WebkitTapHighlightColor: "transparent"
+          }
+        },
+        /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", marginBottom: 6 } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontFamily: "monospace", fontSize: 12, color: C.gold } }, v.id), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT } }, v.fecha, " ", v.hora)), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } }, /* @__PURE__ */ import_react.default.createElement(Chip, { color: colorPago(v.metodoPago) }, iconPago(v.metodoPago), " ", labelPago(v.metodoPago)), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 17, fontWeight: 800, color: C.gold, fontFamily: FONT } }, $(v.total)))),
+        v.items.map((it, ii) => {
+          const m = MARCAS.find((x) => x.id === it.marcaId);
+          return /* @__PURE__ */ import_react.default.createElement("div", { key: ii, style: {
+            fontSize: 13,
+            color: C.label2,
+            fontFamily: FONT,
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+            marginBottom: 3
+          } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { width: 6, height: 6, borderRadius: "50%", background: m?.color, flexShrink: 0 } }), it.nombre, " \xD7", it.cantidad, " = ", $(it.subtotal));
+        })
+      );
     })), vista === "stock" && /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT, marginBottom: 12 } }, "Inventario registrado \u2014 estado actual"), inv.length === 0 ? /* @__PURE__ */ import_react.default.createElement(EmptyState, { icon: "\u{1F4E6}", title: "Sin productos en inventario" }) : MARCAS.map((m) => {
       const prods = inv.filter((i) => i.marcaId === m.id);
       if (!prods.length) return null;
@@ -26114,14 +25399,19 @@
     })));
   }
   function ConfigTab({ user, logout }) {
-    const [subTab, setSubTab] = (0, import_react.useState)("cuenta");
-    const [usuarios, setUsuarios] = (0, import_react.useState)(() => {
+    var _hN155 = (0, import_react.useState)("cuenta");
+    var subTab = _hN155[0];
+    var setSubTab = _hN155[1];
+    ;
+    var _hN156 = (0, import_react.useState)(function() {
       try {
         return JSON.parse(localStorage.getItem("th_usuarios") || "null") || USUARIOS;
       } catch {
         return USUARIOS;
       }
     });
+    var usuarios = _hN156[0];
+    var setUsuarios = _hN156[1];
     function guardarUsuarios(u) {
       setUsuarios(u);
       localStorage.setItem("th_usuarios", JSON.stringify(u));
@@ -26150,11 +25440,26 @@
     } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 15, color: C.label2, fontFamily: FONT } }, k), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 15, color: C.label, fontFamily: FONT, fontWeight: 500 } }, v)))), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: logout, variant: "danger", full: true, icon: "\u{1F6AA}" }, "Cerrar sesi\xF3n")));
   }
   function CambiarContrasena({ user, usuarios, onGuardar }) {
-    const [passActual, setPassActual] = (0, import_react.useState)("");
-    const [passNueva, setPassNueva] = (0, import_react.useState)("");
-    const [passConfirm, setPassConfirm] = (0, import_react.useState)("");
-    const [msg, setMsg] = (0, import_react.useState)(null);
-    const [show, setShow] = (0, import_react.useState)(false);
+    var _hN157 = (0, import_react.useState)("");
+    var passActual = _hN157[0];
+    var setPassActual = _hN157[1];
+    ;
+    var _hN158 = (0, import_react.useState)("");
+    var passNueva = _hN158[0];
+    var setPassNueva = _hN158[1];
+    ;
+    var _hN159 = (0, import_react.useState)("");
+    var passConfirm = _hN159[0];
+    var setPassConfirm = _hN159[1];
+    ;
+    var _hN160 = (0, import_react.useState)(null);
+    var msg = _hN160[0];
+    var setMsg = _hN160[1];
+    ;
+    var _hN161 = (0, import_react.useState)(false);
+    var show = _hN161[0];
+    var setShow = _hN161[1];
+    ;
     function cambiar() {
       setMsg(null);
       const u = usuarios.find((x) => x.usuario === user.usuario);
@@ -26242,10 +25547,22 @@
     } }, msg.txt), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: cambiar, variant: "primary", full: true, icon: "\u{1F512}" }, "Actualizar contrase\xF1a"));
   }
   function GestionUsuarios({ user, usuarios, onGuardar }) {
-    const [modo, setModo] = (0, import_react.useState)(null);
-    const [editUser, setEditUser] = (0, import_react.useState)(null);
-    const [fUser, setFUser] = (0, import_react.useState)({ usuario: "", password: "", nombre: "", rol: "caja" });
-    const [msg, setMsg] = (0, import_react.useState)(null);
+    var _hN162 = (0, import_react.useState)(null);
+    var modo = _hN162[0];
+    var setModo = _hN162[1];
+    ;
+    var _hN163 = (0, import_react.useState)(null);
+    var editUser = _hN163[0];
+    var setEditUser = _hN163[1];
+    ;
+    var _hN164 = (0, import_react.useState)({ usuario: "", password: "", nombre: "", rol: "caja" });
+    var fUser = _hN164[0];
+    var setFUser = _hN164[1];
+    ;
+    var _hN165 = (0, import_react.useState)(null);
+    var msg = _hN165[0];
+    var setMsg = _hN165[1];
+    ;
     if (user.rol !== "admin") {
       return /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center", padding: "48px 20px", color: C.label3 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 40, marginBottom: 12, opacity: 0.4 } }, "\u{1F512}"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 16, fontWeight: 600, color: C.label2, fontFamily: FONT } }, "Solo administradores"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.label3, fontFamily: FONT, marginTop: 6 } }, "Tu cuenta no tiene permisos para gestionar usuarios"));
     }
@@ -26403,9 +25720,247 @@
       "Agregar nuevo usuario"
     ));
   }
-  function VentasTab({ vMes, totalVtas, mes, anio }) {
-    const [vistaActiva, setVistaActiva] = (0, import_react.useState)("marcas");
-    const [marcaFiltro, setMarcaFiltro] = (0, import_react.useState)(null);
+  function DashboardVentas({ ventas, onVentaClick }) {
+    const now = /* @__PURE__ */ new Date();
+    const [fechaIni, setFechaIni] = (0, import_react.useState)(now.toISOString().slice(0, 7) + "-01");
+    const [fechaFin, setFechaFin] = (0, import_react.useState)(now.toISOString().slice(0, 10));
+    const [codBusq, setCodBusq] = (0, import_react.useState)("");
+    const [vistaD, setVistaD] = (0, import_react.useState)("dashboard");
+    const ventasFiltradas = (0, import_react.useMemo)(() => {
+      return ventas.filter((v) => v.fecha >= fechaIni && v.fecha <= fechaFin);
+    }, [ventas, fechaIni, fechaFin]);
+    const ventasBusqueda = (0, import_react.useMemo)(() => {
+      if (!codBusq.trim()) return [];
+      const q = codBusq.trim().toLowerCase();
+      return [...ventas].reverse().filter(
+        (v) => v.items.some((it) => it.codigo.toLowerCase().includes(q) || it.nombre.toLowerCase().includes(q))
+      );
+    }, [ventas, codBusq]);
+    const totalFil = ventasFiltradas.reduce((s, v) => s + v.total, 0);
+    const efectivoFil = ventasFiltradas.filter((v) => v.metodoPago === "efectivo").reduce((s, v) => s + v.total, 0);
+    const qrFil = ventasFiltradas.filter((v) => v.metodoPago === "qr").reduce((s, v) => s + v.total, 0);
+    const tarjetaFil = ventasFiltradas.filter((v) => v.metodoPago === "tarjeta").reduce((s, v) => s + v.total, 0);
+    const mixtoFil = ventasFiltradas.filter((v) => v.metodoPago?.startsWith("mixto|")).reduce((s, v) => s + v.total, 0);
+    const porMarcaFil = (0, import_react.useMemo)(() => {
+      const map = {};
+      ventasFiltradas.forEach((v) => v.items.forEach((it) => {
+        if (!map[it.marcaId]) map[it.marcaId] = { marcaId: it.marcaId, marcaNombre: it.marcaNombre, total: 0, cant: 0 };
+        map[it.marcaId].total += it.subtotal;
+        map[it.marcaId].cant += it.cantidad;
+      }));
+      return Object.values(map).sort((a, b) => b.total - a.total);
+    }, [ventasFiltradas]);
+    const fmtDate = (d) => d ? d.split("-").reverse().join("/") : "";
+    return /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      background: C.bg1,
+      borderRadius: 14,
+      padding: 16,
+      marginBottom: 14,
+      border: `1px solid ${C.sep}`,
+      boxShadow: "0 1px 4px rgba(0,0,0,0.06)"
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      fontSize: 12,
+      fontWeight: 600,
+      color: C.label3,
+      textTransform: "uppercase",
+      letterSpacing: 0.6,
+      marginBottom: 10,
+      fontFamily: FONT
+    } }, "Per\xEDodo"), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1, minWidth: 120 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT, marginBottom: 4 } }, "Desde"), /* @__PURE__ */ import_react.default.createElement(
+      "input",
+      {
+        type: "date",
+        value: fechaIni,
+        onChange: (e) => setFechaIni(e.target.value),
+        style: {
+          width: "100%",
+          padding: "9px 12px",
+          border: `1px solid ${C.sep}`,
+          borderRadius: 8,
+          background: C.bg2,
+          fontSize: 13,
+          color: C.label,
+          fontFamily: FONT,
+          outline: "none",
+          boxSizing: "border-box"
+        }
+      }
+    )), /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1, minWidth: 120 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT, marginBottom: 4 } }, "Hasta"), /* @__PURE__ */ import_react.default.createElement(
+      "input",
+      {
+        type: "date",
+        value: fechaFin,
+        onChange: (e) => setFechaFin(e.target.value),
+        style: {
+          width: "100%",
+          padding: "9px 12px",
+          border: `1px solid ${C.sep}`,
+          borderRadius: 8,
+          background: C.bg2,
+          fontSize: 13,
+          color: C.label,
+          fontFamily: FONT,
+          outline: "none",
+          boxSizing: "border-box"
+        }
+      }
+    )))), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      display: "flex",
+      gap: 4,
+      marginBottom: 14,
+      background: C.bg2,
+      borderRadius: 10,
+      padding: 3,
+      border: `1px solid ${C.sep}`
+    } }, [{ id: "dashboard", label: "\u{1F4CA} Dashboard" }, { id: "lista", label: "\u{1F4CB} Lista" }, { id: "busqueda", label: "\u{1F50D} Por C\xF3digo" }].map((t) => /* @__PURE__ */ import_react.default.createElement("button", { key: t.id, onClick: () => setVistaD(t.id), style: {
+      flex: 1,
+      border: "none",
+      borderRadius: 8,
+      padding: "8px 4px",
+      fontSize: 11,
+      fontWeight: vistaD === t.id ? 700 : 400,
+      cursor: "pointer",
+      fontFamily: FONT,
+      background: vistaD === t.id ? C.bg1 : "transparent",
+      color: vistaD === t.id ? C.blue : C.label3,
+      boxShadow: vistaD === t.id ? "0 1px 3px rgba(0,0,0,0.08)" : "none",
+      transition: "all .15s",
+      WebkitTapHighlightColor: "transparent"
+    } }, t.label))), vistaD === "dashboard" && /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      background: C.blue,
+      borderRadius: 16,
+      padding: "20px 24px",
+      marginBottom: 12,
+      boxShadow: "0 4px 16px rgba(21,101,192,0.25)"
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      fontSize: 12,
+      color: "rgba(255,255,255,0.8)",
+      fontFamily: FONT,
+      marginBottom: 6,
+      textTransform: "uppercase",
+      letterSpacing: 0.8
+    } }, "Total facturado \xB7 ", fmtDate(fechaIni), " \u2013 ", fmtDate(fechaFin)), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 32, fontWeight: 800, color: "#fff", fontFamily: FONT, lineHeight: 1 } }, $(totalFil)), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: "rgba(255,255,255,0.75)", fontFamily: FONT, marginTop: 6 } }, ventasFiltradas.length, " venta", ventasFiltradas.length !== 1 ? "s" : "", " en el per\xEDodo")), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 12 } }, [
+      { icon: "\u{1F4B5}", label: "Efectivo", val: efectivoFil, color: C.green },
+      { icon: "\u{1F4F1}", label: "QR", val: qrFil, color: C.blue },
+      { icon: "\u{1F4B3}", label: "Tarjeta", val: tarjetaFil, color: C.amber },
+      ...mixtoFil > 0 ? [{ icon: "\u{1F500}", label: "Mixto", val: mixtoFil, color: "#6A1B9A" }] : []
+    ].map((s) => /* @__PURE__ */ import_react.default.createElement("div", { key: s.label, style: {
+      background: C.bg1,
+      borderRadius: 12,
+      padding: "14px 16px",
+      border: `1px solid ${C.sep}`,
+      boxShadow: "0 1px 3px rgba(0,0,0,0.05)"
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 6 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 18 } }, s.icon), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 12, color: C.label3, fontFamily: FONT } }, s.label)), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 16, fontWeight: 800, color: s.color, fontFamily: FONT } }, $(s.val)), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT, marginTop: 2 } }, Math.round(totalFil > 0 ? s.val / totalFil * 100 : 0), "% del total")))), porMarcaFil.length > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      background: C.bg1,
+      borderRadius: 14,
+      padding: 16,
+      border: `1px solid ${C.sep}`,
+      boxShadow: "0 1px 4px rgba(0,0,0,0.06)"
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, fontWeight: 700, color: C.label, fontFamily: FONT, marginBottom: 12 } }, "Ventas por marca"), porMarcaFil.map((x, i) => {
+      const marca = MARCAS.find((m) => m.id === x.marcaId);
+      const pct = totalFil > 0 ? Math.round(x.total / totalFil * 100) : 0;
+      return /* @__PURE__ */ import_react.default.createElement("div", { key: x.marcaId, style: { marginBottom: 12 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", marginBottom: 4 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 14 } }, marca?.emoji || "\u{1F3F7}"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, color: C.label, fontFamily: FONT, fontWeight: 500 } }, x.marcaNombre)), /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "right" } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, fontWeight: 700, color: marca?.color || C.label, fontFamily: FONT } }, $(x.total)), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 11, color: C.label3, fontFamily: FONT, marginLeft: 6 } }, pct, "%"))), /* @__PURE__ */ import_react.default.createElement("div", { style: { background: C.sep, borderRadius: 4, height: 5, overflow: "hidden" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+        width: `${pct}%`,
+        height: 5,
+        borderRadius: 4,
+        background: marca?.color || C.blue,
+        transition: "width .5s"
+      } })));
+    })), porMarcaFil.length === 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center", padding: "30px 0", color: C.label3, fontFamily: FONT, fontSize: 13 } }, "Sin ventas en el per\xEDodo seleccionado")), vistaD === "lista" && /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, color: C.label3, fontFamily: FONT } }, ventasFiltradas.length, " venta", ventasFiltradas.length !== 1 ? "s" : "", " \xB7 ", $(totalFil))), ventasFiltradas.length === 0 ? /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center", padding: "30px 0", color: C.label3, fontFamily: FONT, fontSize: 13 } }, "Sin ventas en el per\xEDodo") : [...ventasFiltradas].reverse().map((v) => /* @__PURE__ */ import_react.default.createElement(
+      "div",
+      {
+        key: v.id,
+        onClick: () => onVentaClick && onVentaClick(v),
+        style: {
+          background: C.bg1,
+          borderRadius: 12,
+          padding: "14px 16px",
+          marginBottom: 8,
+          border: `1px solid ${C.sep}`,
+          cursor: "pointer",
+          boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
+          WebkitTapHighlightColor: "transparent"
+        }
+      },
+      /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", marginBottom: 6 } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontFamily: "monospace", fontSize: 11, color: C.label3 } }, v.id), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT } }, v.fecha, " ", v.hora, " \xB7 ", v.vendedor || "Tienda")), /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "right" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 15, fontWeight: 800, color: C.blue, fontFamily: FONT } }, $(v.total)), /* @__PURE__ */ import_react.default.createElement(Chip, { color: colorPago(v.metodoPago), small: true }, iconPago(v.metodoPago), " ", labelPago(v.metodoPago)))),
+      /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 4 } }, v.items.map((it, i) => /* @__PURE__ */ import_react.default.createElement("span", { key: i, style: { fontSize: 11, color: C.label3, fontFamily: FONT } }, it.nombre, " \xD7", it.cantidad, i < v.items.length - 1 ? " \xB7" : "")))
+    ))), vistaD === "busqueda" && /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { position: "relative", marginBottom: 14 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: {
+      position: "absolute",
+      left: 12,
+      top: "50%",
+      transform: "translateY(-50%)",
+      fontSize: 16,
+      color: C.label3
+    } }, "\u{1F50D}"), /* @__PURE__ */ import_react.default.createElement(
+      "input",
+      {
+        value: codBusq,
+        onChange: (e) => setCodBusq(e.target.value),
+        placeholder: "C\xF3digo de producto o nombre del \xEDtem\u2026",
+        style: {
+          width: "100%",
+          padding: "12px 12px 12px 40px",
+          border: `1px solid ${C.sep}`,
+          borderRadius: 10,
+          background: C.bg1,
+          fontSize: 14,
+          color: C.label,
+          fontFamily: FONT,
+          outline: "none",
+          boxSizing: "border-box",
+          boxShadow: "0 1px 3px rgba(0,0,0,0.05)"
+        }
+      }
+    )), codBusq.trim() && /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 8, fontSize: 12, color: C.label3, fontFamily: FONT } }, ventasBusqueda.length, " resultado", ventasBusqueda.length !== 1 ? "s" : "", ventasBusqueda.length > 0 && ` \xB7 Total: ${$(ventasBusqueda.reduce((s, v) => s + v.total, 0))}`), !codBusq.trim() && /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center", padding: "40px 0", color: C.label3, fontFamily: FONT, fontSize: 13 } }, "Escribe un c\xF3digo o nombre para buscar en todas las ventas"), ventasBusqueda.map((v) => {
+      const itsMatch = v.items.filter((it) => {
+        const q = codBusq.trim().toLowerCase();
+        return it.codigo.toLowerCase().includes(q) || it.nombre.toLowerCase().includes(q);
+      });
+      return /* @__PURE__ */ import_react.default.createElement(
+        "div",
+        {
+          key: v.id,
+          onClick: () => onVentaClick && onVentaClick(v),
+          style: {
+            background: C.bg1,
+            borderRadius: 12,
+            padding: "14px 16px",
+            marginBottom: 8,
+            border: `1px solid ${C.sep}`,
+            cursor: "pointer",
+            boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
+            WebkitTapHighlightColor: "transparent"
+          }
+        },
+        /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", marginBottom: 8 } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontFamily: "monospace", fontSize: 11, color: C.label3 } }, v.id), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT } }, v.fecha, " \xB7 ", v.vendedor || "Tienda")), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 15, fontWeight: 800, color: C.blue, fontFamily: FONT } }, $(v.total))),
+        /* @__PURE__ */ import_react.default.createElement("div", { style: { borderTop: `1px solid ${C.sep}`, paddingTop: 8 } }, itsMatch.map((it, i) => /* @__PURE__ */ import_react.default.createElement("div", { key: i, style: {
+          display: "flex",
+          justifyContent: "space-between",
+          fontSize: 13,
+          color: C.label,
+          fontFamily: FONT,
+          marginBottom: 4
+        } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("span", { style: {
+          fontFamily: "monospace",
+          fontSize: 11,
+          background: C.accent,
+          color: C.blue,
+          padding: "1px 6px",
+          borderRadius: 4,
+          marginRight: 6
+        } }, it.codigo), it.nombre, " \xD7", it.cantidad), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontWeight: 600, color: C.label2 } }, $(it.subtotal)))))
+      );
+    })));
+  }
+  function VentasTab({ vMes, totalVtas, mes, anio, onVentaClick }) {
+    var _hN166 = (0, import_react.useState)("marcas");
+    var vistaActiva = _hN166[0];
+    var setVistaActiva = _hN166[1];
+    ;
+    var _hN167 = (0, import_react.useState)(null);
+    var marcaFiltro = _hN167[0];
+    var setMarcaFiltro = _hN167[1];
+    ;
     const porMarca = (0, import_react.useMemo)(() => {
       return MARCAS.map((m) => {
         const efectivo = vMes.filter((v) => v.metodoPago === "efectivo").reduce((s, v) => s + v.items.filter((i) => i.marcaId === m.id).reduce((ss, i) => ss + i.subtotal, 0), 0);
@@ -26419,6 +25974,7 @@
     const totalEfectivo = vMes.filter((v) => v.metodoPago === "efectivo").reduce((s, v) => s + v.total, 0);
     const totalQR = vMes.filter((v) => v.metodoPago === "qr").reduce((s, v) => s + v.total, 0);
     const totalTarjeta = vMes.filter((v) => v.metodoPago === "tarjeta").reduce((s, v) => s + v.total, 0);
+    const totalMixto = vMes.filter((v) => v.metodoPago?.startsWith("mixto|")).reduce((s, v) => s + v.total, 0);
     const maxVenta = Math.max(...porMarca.map((x) => x.total), 1);
     const ventasFiltradas = (0, import_react.useMemo)(() => {
       if (!marcaFiltro) return [...vMes].reverse();
@@ -26436,7 +25992,8 @@
     } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.7, marginBottom: 3 } }, "Total ", MESES[mes]), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 28, fontWeight: 800, color: C.gold, fontFamily: FONT, lineHeight: 1 } }, $(totalVtas)), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT, marginTop: 3 } }, vMes.length, " transacciones \xB7 ", porMarca.length, " marcas activas")), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 36, opacity: 0.4 } }, "\u{1F4B0}")), [
       { icon: "\u{1F4B5}", label: "Efectivo", value: totalEfectivo, color: "#4A9B6F" },
       { icon: "\u{1F4F1}", label: "QR", value: totalQR, color: "#5B8DB8" },
-      { icon: "\u{1F4B3}", label: "Tarjeta", value: totalTarjeta, color: "#C8922A" }
+      { icon: "\u{1F4B3}", label: "Tarjeta", value: totalTarjeta, color: "#C8922A" },
+      ...totalMixto > 0 ? [{ icon: "\u{1F500}", label: "Mixto", value: totalMixto, color: "#6C5CE7" }] : []
     ].map((s) => /* @__PURE__ */ import_react.default.createElement(
       StatCard,
       {
@@ -26550,31 +26107,48 @@
       alignItems: "center",
       gap: 5
     } }, /* @__PURE__ */ import_react.default.createElement("span", null, m.emoji), m.nombre))), ventasFiltradas.length === 0 ? /* @__PURE__ */ import_react.default.createElement(EmptyState, { icon: "\u{1F4CB}", title: "Sin ventas", sub: marcaFiltro ? "Esta marca no tiene ventas" : "Sin ventas en el per\xEDodo" }) : ventasFiltradas.map((v) => {
-      const pg = PAGOS.find((p) => p.id === v.metodoPago);
       const itemsMostrar = marcaFiltro ? v.items.filter((i) => i.marcaId === marcaFiltro) : v.items;
       const totalMostrar = itemsMostrar.reduce((s, i) => s + i.subtotal, 0);
-      return /* @__PURE__ */ import_react.default.createElement("div", { key: v.id, style: { background: C.bg2, borderRadius: 16, padding: "14px 16px", marginBottom: 10 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontFamily: "monospace", fontSize: 12, color: C.gold, fontWeight: 700 } }, v.id), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT, marginTop: 2 } }, v.fecha, " ", v.hora, " \xB7 ", v.vendedor || "Tienda")), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } }, /* @__PURE__ */ import_react.default.createElement(Chip, { color: pg?.color || C.green }, pg?.icon, " ", pg?.label), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 18, fontWeight: 800, color: C.gold, fontFamily: FONT } }, $(totalMostrar)))), (() => {
-        const byMarca = {};
-        itemsMostrar.forEach((it) => {
-          if (!byMarca[it.marcaId]) byMarca[it.marcaId] = { marca: MARCAS.find((m) => m.id === it.marcaId), items: [], sub: 0 };
-          byMarca[it.marcaId].items.push(it);
-          byMarca[it.marcaId].sub += it.subtotal;
-        });
-        return Object.values(byMarca).map((g) => /* @__PURE__ */ import_react.default.createElement("div", { key: g.marca?.id, style: {
-          marginBottom: 8,
-          padding: "8px 10px",
-          background: `${g.marca?.color}10`,
-          borderRadius: 10,
-          borderLeft: `3px solid ${g.marca?.color}`
-        } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 14 } }, g.marca?.emoji), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, fontWeight: 700, color: g.marca?.color, fontFamily: FONT } }, g.marca?.nombre)), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, fontWeight: 700, color: g.marca?.color, fontFamily: FONT } }, $(g.sub))), g.items.map((it, ii) => /* @__PURE__ */ import_react.default.createElement("div", { key: ii, style: { fontSize: 12, color: C.label2, fontFamily: FONT } }, "\xB7 ", it.nombre, " \xD7", it.cantidad, " = ", $(it.subtotal)))));
-      })(), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => sendWA(v), variant: "fill", small: true, full: true, icon: "\u{1F4F2}" }, "Enviar por WhatsApp"), v.etiquetaImg && /* @__PURE__ */ import_react.default.createElement(
-        "img",
+      return /* @__PURE__ */ import_react.default.createElement(
+        "div",
         {
-          src: v.etiquetaImg,
-          alt: "etiqueta",
-          style: { width: "100%", maxHeight: 80, objectFit: "cover", borderRadius: 10, marginTop: 10 }
-        }
-      ));
+          key: v.id,
+          onClick: () => onVentaClick && onVentaClick(v),
+          style: {
+            background: C.bg2,
+            borderRadius: 16,
+            padding: "14px 16px",
+            marginBottom: 10,
+            cursor: "pointer",
+            WebkitTapHighlightColor: "transparent"
+          }
+        },
+        /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontFamily: "monospace", fontSize: 12, color: C.gold, fontWeight: 700 } }, v.id), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT, marginTop: 2 } }, v.fecha, " ", v.hora, " \xB7 ", v.vendedor || "Tienda")), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } }, /* @__PURE__ */ import_react.default.createElement(Chip, { color: colorPago(v.metodoPago) }, iconPago(v.metodoPago), " ", labelPago(v.metodoPago)), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 18, fontWeight: 800, color: C.gold, fontFamily: FONT } }, $(totalMostrar)))),
+        (() => {
+          const byMarca = {};
+          itemsMostrar.forEach((it) => {
+            if (!byMarca[it.marcaId]) byMarca[it.marcaId] = { marca: MARCAS.find((m) => m.id === it.marcaId), items: [], sub: 0 };
+            byMarca[it.marcaId].items.push(it);
+            byMarca[it.marcaId].sub += it.subtotal;
+          });
+          return Object.values(byMarca).map((g) => /* @__PURE__ */ import_react.default.createElement("div", { key: g.marca?.id, style: {
+            marginBottom: 8,
+            padding: "8px 10px",
+            background: `${g.marca?.color}10`,
+            borderRadius: 10,
+            borderLeft: `3px solid ${g.marca?.color}`
+          } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 14 } }, g.marca?.emoji), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, fontWeight: 700, color: g.marca?.color, fontFamily: FONT } }, g.marca?.nombre)), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, fontWeight: 700, color: g.marca?.color, fontFamily: FONT } }, $(g.sub))), g.items.map((it, ii) => /* @__PURE__ */ import_react.default.createElement("div", { key: ii, style: { fontSize: 12, color: C.label2, fontFamily: FONT } }, "\xB7 ", it.nombre, " \xD7", it.cantidad, " = ", $(it.subtotal)))));
+        })(),
+        /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => sendWA(v), variant: "fill", small: true, full: true, icon: "\u{1F4F2}" }, "Enviar por WhatsApp"),
+        v.etiquetaImg && /* @__PURE__ */ import_react.default.createElement(
+          "img",
+          {
+            src: v.etiquetaImg,
+            alt: "etiqueta",
+            style: { width: "100%", maxHeight: 80, objectFit: "cover", borderRadius: 10, marginTop: 10 }
+          }
+        )
+      );
     })));
   }
   function EmptyState({ icon, title, sub }) {
