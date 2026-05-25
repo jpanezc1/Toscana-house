@@ -206,6 +206,21 @@ function loadZXing() {
   });
 }
 
+// Load html5-qrcode for real-time scanning
+let _H5QRPromise = null;
+function loadHtml5Qrcode() {
+  if (_H5QRPromise) return _H5QRPromise;
+  _H5QRPromise = new Promise((resolve, reject) => {
+    if (window.Html5Qrcode) { resolve(window.Html5Qrcode); return; }
+    const s = document.createElement("script");
+    s.src = "https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js";
+    s.onload = () => resolve(window.Html5Qrcode);
+    s.onerror = () => reject(new Error("No se pudo cargar html5-qrcode"));
+    document.head.appendChild(s);
+  });
+  return _H5QRPromise;
+}
+
 // Lee código de barras/QR desde un archivo de imagen
 async function leerCodigoDeImagen(file) {
   try {
@@ -653,7 +668,7 @@ function descargarArchivo(blob, nombre) {
 }
 
 // ── REPORTE MENSUAL COMPLETO (todas las marcas, una pestaña c/u) ──
-async function generarExcelMensual(ventas, inventario, mes, anio, setGenerando) {
+async function generarExcelMensual(ventas, inventario, mes, anio, setGenerando, retiros) {
   setGenerando(true);
   try {
     const XLSX  = await loadXLSX();
@@ -739,6 +754,26 @@ async function generarExcelMensual(ventas, inventario, mes, anio, setGenerando) 
       const tabName = m.nombre.slice(0, 28);
       XLSX.utils.book_append_sheet(wb, ws, tabName);
     });
+
+    // ── Pestaña RETIROS ──────────────────────────────────────
+    const year = anio, month = mes;
+    const mkFechaIni = `${year}-${String(month+1).padStart(2,"0")}-01`;
+    const lastDay = new Date(year, month+1, 0).getDate();
+    const mkFechaFin = `${year}-${String(month+1).padStart(2,"0")}-${String(lastDay).padStart(2,"0")}`;
+    const retirosMes = (retiros||[]).filter(r => r.fecha >= mkFechaIni && r.fecha <= mkFechaFin);
+    const retRows = [
+      [`TOSCANA HOUSE — RETIROS — ${mesNom} ${anio}`],
+      [],
+      ["ID","Fecha","Hora","Código","Producto","Marca","Cantidad","Destinatario","Motivo"],
+    ];
+    retirosMes.forEach(r=>{
+      retRows.push([r.id, r.fecha, r.hora, r.codigo, r.nombre, r.marcaNombre||"", r.cantidad, r.destinatario, r.motivo||""]);
+    });
+    if(retirosMes.length===0) retRows.push(["Sin retiros en este período"]);
+    retRows.push([], ["","","","","","Total unidades retiradas",retirosMes.reduce((s,r)=>s+r.cantidad,0),"",""]);
+    const wsRet = XLSX.utils.aoa_to_sheet(retRows);
+    wsRet["!cols"] = [{wch:16},{wch:12},{wch:8},{wch:16},{wch:24},{wch:18},{wch:10},{wch:20},{wch:20}];
+    XLSX.utils.book_append_sheet(wb, wsRet, "📤 Retiros");
 
     // ── Pestaña STOCK ACTUAL ─────────────────────────────────
     const stockRows = [
@@ -1475,28 +1510,138 @@ function StatCard({icon,label,value,sub,color=C.gold}){
 function LiqModal({marcaId,ventas,mes,anio,MK,cierres,setCierres,onClose,syncCierre}){
   if(!marcaId) return null;
   const marca=MARCAS.find(x=>x.id===marcaId);
+  const cfgKey = `th_liq_cfg_${MK}_${marcaId}`;
+  const defCfg = {pctQR:2, pctTarjeta:2.5, pctComision:10, alquiler:0};
+  const [cfg, setCfg] = useState(()=>{
+    try{ return {...defCfg, ...JSON.parse(localStorage.getItem(cfgKey)||"{}")}; }
+    catch{ return defCfg; }
+  });
+  const [showCfg, setShowCfg] = useState(false);
+  const pctQR = Number(cfg.pctQR)||0;
+  const pctTarjeta = Number(cfg.pctTarjeta)||0;
+  const pctComision = Number(cfg.pctComision)||0;
+  const alquiler = Number(cfg.alquiler)||0;
+
+  function saveCfg(newCfg){
+    setCfg(newCfg);
+    try{ localStorage.setItem(cfgKey, JSON.stringify(newCfg)); }catch{}
+  }
+
   const vMes=ventas.filter(v=>v.mk===MK);
   const vMarca=vMes.filter(v=>v.items.some(i=>i.marcaId===marcaId));
-  const bruto=vMarca.reduce((s,v)=>s+v.items.filter(i=>i.marcaId===marcaId).reduce((ss,i)=>ss+i.subtotal,0),0);
-  const comision=bruto*0.10;
-  const neto=bruto*0.90;
   const cerrado=cierres[`${MK}-${marcaId}`]?.cerrado;
+
+  function getMontosMixtos(venta){
+    if(venta.metodoPago?.startsWith("mixto|")){
+      const parts = venta.metodoPago.split("|").slice(1);
+      const obj = {efectivo:0,qr:0,tarjeta:0};
+      parts.forEach(p=>{const[k,v]=p.split(":");obj[k]=parseFloat(v)||0;});
+      const total = obj.efectivo+obj.qr+obj.tarjeta;
+      return total>0?obj:{efectivo:venta.total,qr:0,tarjeta:0};
+    }
+    if(venta.metodoPago==="qr") return {efectivo:0,qr:venta.total,tarjeta:0};
+    if(venta.metodoPago==="tarjeta") return {efectivo:0,qr:0,tarjeta:venta.total};
+    return {efectivo:venta.total,qr:0,tarjeta:0};
+  }
+
+  let brutoEfect=0, brutoQR=0, brutoTarjeta=0;
+  vMarca.forEach(v=>{
+    const sub = v.items.filter(i=>i.marcaId===marcaId).reduce((s,i)=>s+i.subtotal,0);
+    const ventaTotal = v.total || v.items.reduce((s,i)=>s+i.subtotal,0) || sub;
+    const pct = ventaTotal > 0 ? sub/ventaTotal : 1;
+    const montos = getMontosMixtos(v);
+    brutoEfect += montos.efectivo * pct;
+    brutoQR += montos.qr * pct;
+    brutoTarjeta += montos.tarjeta * pct;
+  });
+
+  const bruto = brutoEfect + brutoQR + brutoTarjeta;
+  const descQR = brutoQR * pctQR/100;
+  const descTarjeta = brutoTarjeta * pctTarjeta/100;
+  const subtotalBanco = bruto - descQR - descTarjeta;
+  const comision = subtotalBanco * pctComision/100;
+  const neto = subtotalBanco - comision - alquiler;
 
   return (
     <Sheet open={!!marcaId} onClose={onClose} title={`${marca?.emoji} ${marca?.nombre} — ${MESES[mes]}`} tall>
-      {/* Financiero */}
+      {/* Configuración */}
+      <div style={{marginBottom:16}}>
+        <button onClick={()=>setShowCfg(s=>!s)} style={{
+          width:"100%",background:C.bg2,border:`1px solid ${C.sep}`,borderRadius:12,
+          padding:"10px 16px",display:"flex",justifyContent:"space-between",alignItems:"center",
+          cursor:"pointer",fontFamily:FONT,WebkitTapHighlightColor:"transparent"}}>
+          <span style={{fontSize:13,fontWeight:600,color:C.label2,fontFamily:FONT}}>⚙ Configurar porcentajes</span>
+          <span style={{color:C.label3,fontSize:18}}>{showCfg?"▲":"▼"}</span>
+        </button>
+        {showCfg&&(
+          <div style={{background:C.bg2,borderRadius:"0 0 12px 12px",padding:16,
+            border:`1px solid ${C.sep}`,borderTop:"none"}}>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:12}}>
+              {[
+                {key:"pctQR",label:"Comisión banco QR (%)",placeholder:"2"},
+                {key:"pctTarjeta",label:"Comisión banco Tarjeta (%)",placeholder:"2.5"},
+                {key:"pctComision",label:"Comisión ventas (%)",placeholder:"10"},
+                {key:"alquiler",label:"Alquiler fijo (Bs)",placeholder:"0"},
+              ].map(f=>(
+                <div key={f.key}>
+                  <div style={{fontSize:11,color:C.label3,fontFamily:FONT,marginBottom:4}}>{f.label}</div>
+                  <input
+                    type="number" min="0" step="0.1"
+                    value={cfg[f.key]}
+                    placeholder={f.placeholder}
+                    onChange={e=>saveCfg({...cfg,[f.key]:e.target.value})}
+                    style={{width:"100%",padding:"8px 10px",borderRadius:8,
+                      border:`1px solid ${C.sep}`,background:C.bg1,
+                      fontSize:14,color:C.label,fontFamily:FONT,
+                      boxSizing:"border-box",outline:"none"}}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Desglose financiero */}
       <div style={{background:C.bg2,borderRadius:16,overflow:"hidden",marginBottom:16}}>
-        {[["Ventas brutas",$(bruto),C.label],["Comisión (10%)",`-${$(comision)}`,C.red],["Neto a liquidar",$(neto),C.green]].map(([k,v,c],i,arr)=>(
+        {/* Ventas por método */}
+        <div style={{padding:"12px 16px",borderBottom:`1px solid ${C.sep}`}}>
+          <div style={{fontSize:11,fontWeight:700,color:C.label3,textTransform:"uppercase",
+            letterSpacing:.6,marginBottom:8,fontFamily:FONT}}>Desglose por método de pago</div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
+            {[
+              {label:"Efectivo",val:brutoEfect,color:C.green},
+              {label:`QR (-${pctQR}%)`,val:brutoQR,color:C.blue},
+              {label:`Tarjeta (-${pctTarjeta}%)`,val:brutoTarjeta,color:C.amber},
+            ].map(s=>(
+              <div key={s.label} style={{textAlign:"center",padding:"8px 4px",
+                background:`${s.color}10`,borderRadius:10}}>
+                <div style={{fontSize:13,fontWeight:700,color:s.color,fontFamily:FONT}}>{$(Math.round(s.val))}</div>
+                <div style={{fontSize:10,color:C.label3,fontFamily:FONT}}>{s.label}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Cálculo paso a paso */}
+        {[
+          ["Ventas brutas",$(Math.round(bruto)),C.label],
+          [`− Desc. banco QR (${pctQR}%)`,`-${$(Math.round(descQR))}`,C.red],
+          [`− Desc. banco Tarjeta (${pctTarjeta}%)`,`-${$(Math.round(descTarjeta))}`,C.red],
+          [`= Subtotal sin banco`,$(Math.round(subtotalBanco)),C.label2],
+          [`− Comisión ventas (${pctComision}%)`,`-${$(Math.round(comision))}`,C.red],
+          alquiler>0?[`− Alquiler`,`-${$(alquiler)}`,C.amber]:null,
+        ].filter(Boolean).map(([k,v,c],i,arr)=>(
           <div key={k} style={{display:"flex",justifyContent:"space-between",alignItems:"center",
-            padding:"15px 16px",borderBottom:i<arr.length-1?`1px solid ${C.sep}`:""}}>
-            <span style={{fontSize:16,color:C.label2,fontFamily:FONT}}>{k}</span>
-            <span style={{fontSize:16,fontWeight:600,color:c,fontFamily:FONT}}>{v}</span>
+            padding:"12px 16px",borderBottom:i<arr.length-1?`1px solid ${C.sep}`:""}}>
+            <span style={{fontSize:14,color:C.label2,fontFamily:FONT}}>{k}</span>
+            <span style={{fontSize:14,fontWeight:600,color:c,fontFamily:FONT}}>{v}</span>
           </div>
         ))}
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",
           padding:"18px 16px",background:`${C.gold}12`}}>
-          <span style={{fontSize:17,fontWeight:700,color:C.label,fontFamily:FONT}}>TOTAL A PAGAR</span>
-          <span style={{fontSize:22,fontWeight:800,color:C.gold,fontFamily:FONT}}>{$(neto)}</span>
+          <span style={{fontSize:17,fontWeight:700,color:C.label,fontFamily:FONT}}>TOTAL NETO</span>
+          <span style={{fontSize:22,fontWeight:800,color:C.gold,fontFamily:FONT}}>{$(Math.round(neto))}</span>
         </div>
       </div>
 
@@ -1750,6 +1895,7 @@ function RetirosTab({inv, retiros, onRetiro}){
   const [fechaFin, setFechaFin] = useState("");
   const [scanStatus, setScanStatus] = useState(null); // null | "leyendo" | "ok" | "notfound"
   const [scanMsg, setScanMsg]   = useState("");
+  const [showScanner, setShowScanner] = useState(false);
   const fileRef = useRef(null);
 
   function buscarProdPorCod(cod){
@@ -1841,9 +1987,16 @@ function RetirosTab({inv, retiros, onRetiro}){
         </div>
 
         {/* ── Scanner de etiqueta ── toca para abrir cámara directamente */}
+        {showScanner && <CameraScanner onDetect={(codigo)=>{
+          setShowScanner(false);
+          setCodBusq(codigo);
+          buscarProdPorCod(codigo);
+          setScanStatus("ok"); setScanMsg(`Código: ${codigo}`);
+          setTimeout(()=>{setScanStatus(null);setScanMsg("");},3000);
+        }} onClose={()=>setShowScanner(false)}/>}
         <input ref={fileRef} type="file" accept="image/*" capture="environment"
           onChange={handleScanRetiro} style={{display:"none"}}/>
-        <label htmlFor="_retiro_scan_input" onClick={()=>fileRef.current?.click()}
+        <label htmlFor="_retiro_scan_input" onClick={()=>setShowScanner(true)}
           style={{display:"block",background:C.bg2,borderRadius:13,
             border:scanStatus==="ok"?`1.5px solid ${C.green}`:scanStatus==="notfound"?`1.5px solid ${C.amber}`:`1px solid ${C.sep}`,
             padding:"13px 16px",marginBottom:14,cursor:"pointer",
@@ -2600,18 +2753,411 @@ function KPICard({icon, label, val, sub, color}){
 }
 
 // ══════════════════════════════════════════════════════════
+// CLOCK WIDGET — pequeño reloj en tiempo real (para NavBar)
+// ══════════════════════════════════════════════════════════
+function ClockWidget(){
+  const [clock, setClock] = useState(
+    ()=>new Date().toLocaleTimeString("es-BO",{hour:"2-digit",minute:"2-digit",second:"2-digit"})
+  );
+  useEffect(()=>{
+    const t=setInterval(()=>setClock(
+      new Date().toLocaleTimeString("es-BO",{hour:"2-digit",minute:"2-digit",second:"2-digit"})
+    ),1000);
+    return ()=>clearInterval(t);
+  },[]);
+  return (
+    <div style={{
+      fontSize:13,fontWeight:700,color:C.label2,fontFamily:"monospace",
+      letterSpacing:.5,textAlign:"right",lineHeight:1,marginTop:2,
+    }}>{clock}</div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════
 // HOME DASHBOARD — vista en tiempo real (KPIs, chart, feed)
 // ══════════════════════════════════════════════════════════
-function HomeDashboard({ventas, inv, vMes, mes, anio, onGoTab}){
-  const [clock, setClock] = useState(
-    () => new Date().toLocaleTimeString("es-BO", {hour:"2-digit", minute:"2-digit", second:"2-digit"})
+function CameraScanner({onDetect, onClose}){
+  const idRef = useRef("th-qr-" + Date.now());
+  const scannerRef = useRef(null);
+  const [status, setStatus] = useState("cargando"); // cargando | activo | error
+
+  useEffect(()=>{
+    let stopped = false;
+    loadHtml5Qrcode().then(Html5Qrcode => {
+      if(stopped) return;
+      const scanner = new Html5Qrcode(idRef.current, {verbose:false});
+      scannerRef.current = scanner;
+      const config = {
+        fps: 15,
+        qrbox: { width: 250, height: 250 },
+        aspectRatio: 1.0,
+        formatsToSupport: [0,1,2,3,4,5,6,7,8,9,10,11,12,13],
+      };
+      scanner.start(
+        { facingMode: "environment" },
+        config,
+        (decodedText) => {
+          try{ if(navigator.vibrate) navigator.vibrate(100); }catch(e){}
+          try{
+            const ctx = new (window.AudioContext||window.webkitAudioContext)();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.connect(gain); gain.connect(ctx.destination);
+            osc.frequency.value = 880; gain.gain.value = 0.3;
+            osc.start(); osc.stop(ctx.currentTime + 0.12);
+          }catch(e){}
+          scanner.stop().catch(()=>{});
+          onDetect(decodedText);
+        },
+        () => {}
+      ).then(()=>{ if(!stopped) setStatus("activo"); })
+       .catch(err=>{ if(!stopped){ setStatus("error"); console.warn("Scanner error:", err); }});
+    }).catch(()=>{ if(!stopped) setStatus("error"); });
+
+    return ()=>{
+      stopped = true;
+      if(scannerRef.current){
+        scannerRef.current.stop().catch(()=>{});
+      }
+    };
+  },[]);
+
+  return (
+    <div style={{position:"fixed",inset:0,zIndex:9500,background:"#000",
+      display:"flex",flexDirection:"column"}}>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",
+        padding:"12px 16px",background:"rgba(0,0,0,0.7)",zIndex:2}}>
+        <div style={{fontSize:16,fontWeight:700,color:"#fff"}}>
+          {status==="cargando"?"⏳ Iniciando cámara…":status==="activo"?"📷 Apunta al código":"⚠ Error de cámara"}
+        </div>
+        <button onClick={onClose} style={{
+          background:"rgba(255,255,255,0.2)",border:"1px solid rgba(255,255,255,0.3)",
+          borderRadius:8,padding:"8px 14px",color:"#fff",fontSize:14,
+          cursor:"pointer",fontWeight:600}}>
+          Cerrar
+        </button>
+      </div>
+      <div style={{flex:1,position:"relative",overflow:"hidden"}}>
+        <div id={idRef.current} style={{width:"100%",height:"100%"}}/>
+        {status==="cargando"&&(
+          <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",
+            justifyContent:"center",background:"rgba(0,0,0,0.6)"}}>
+            <div style={{color:"#fff",fontSize:16,textAlign:"center"}}>
+              <div style={{fontSize:32,marginBottom:12}}>📷</div>
+              Iniciando cámara…
+            </div>
+          </div>
+        )}
+        {status==="error"&&(
+          <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",
+            justifyContent:"center",background:"rgba(0,0,0,0.8)"}}>
+            <div style={{color:"#fff",fontSize:15,textAlign:"center",padding:20}}>
+              <div style={{fontSize:40,marginBottom:12}}>⚠️</div>
+              <div style={{marginBottom:8}}>No se pudo acceder a la cámara.</div>
+              <div style={{fontSize:12,color:"#aaa"}}>Verifica los permisos de cámara en tu navegador.</div>
+            </div>
+          </div>
+        )}
+      </div>
+      {status==="activo"&&(
+        <div style={{padding:"12px 16px",background:"rgba(0,0,0,0.7)",
+          textAlign:"center",color:"rgba(255,255,255,0.7)",fontSize:13}}>
+          Centra el código de barras o QR en el recuadro
+        </div>
+      )}
+    </div>
   );
-  useEffect(() => {
-    const t = setInterval(() => setClock(
-      new Date().toLocaleTimeString("es-BO", {hour:"2-digit", minute:"2-digit", second:"2-digit"})
-    ), 1000);
-    return () => clearInterval(t);
-  }, []);
+}
+
+// ══════════════════════════════════════════════════════════
+// ImportarExcelModal — Importación masiva de inventario
+// ══════════════════════════════════════════════════════════
+function ImportarExcelModal({inv, onImportar, onClose}){
+  const [archivo, setArchivo] = useState(null);
+  const [preview, setPreview] = useState([]);
+  const [errores, setErrores] = useState([]);
+  const [estado, setEstado] = useState("idle"); // idle|leyendo|preview|importando|done
+  const [stats, setStats] = useState(null);
+  const fileRef = useRef(null);
+
+  async function parsearExcel(file){
+    setEstado("leyendo");
+    try{
+      const XLSX = await loadXLSX();
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, {type:"array"});
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const raw = XLSX.utils.sheet_to_json(ws, {header:1, defval:""});
+
+      if(raw.length < 2){ setEstado("idle"); alert("El archivo está vacío"); return; }
+
+      let headerRow = -1;
+      for(let i=0;i<Math.min(5,raw.length);i++){
+        const row = raw[i].map(c=>String(c).toLowerCase());
+        if(row.some(c=>c.includes("sku")||c.includes("código")||c.includes("codigo"))){
+          headerRow = i; break;
+        }
+      }
+      if(headerRow === -1) headerRow = 0;
+
+      const headers = raw[headerRow].map(h=>String(h).toLowerCase().trim());
+      const findCol = (...names) => {
+        for(const n of names){
+          const idx = headers.findIndex(h=>h.includes(n));
+          if(idx>=0) return idx;
+        }
+        return -1;
+      };
+
+      const colSKU = findCol("sku","código","codigo","cod");
+      const colMarca = findCol("marca","brand");
+      const colDesc = findCol("descripción","descripcion","nombre","producto","desc");
+      const colPrecio = findCol("precio","price","valor");
+      const colCat = findCol("categoría","categoria","cat","tipo");
+      const colTalla = findCol("talla","size","talle");
+      const colColor = findCol("color");
+      const colStock = findCol("stock","cantidad","qty","existencia");
+
+      const filas = [];
+      const errs = [];
+
+      for(let i=headerRow+1;i<raw.length;i++){
+        const row = raw[i];
+        if(row.every(c=>!c)) continue;
+
+        const sku = colSKU>=0 ? String(row[colSKU]).trim().toUpperCase() : "";
+        const marcaNom = colMarca>=0 ? String(row[colMarca]).trim() : "";
+        const desc = colDesc>=0 ? String(row[colDesc]).trim() : "";
+        const precio = colPrecio>=0 ? parseFloat(String(row[colPrecio]).replace(/[^\d.]/g,"")) : 0;
+        const cat = colCat>=0 ? String(row[colCat]).trim() : "";
+        const talla = colTalla>=0 ? String(row[colTalla]).trim() : "";
+        const color = colColor>=0 ? String(row[colColor]).trim() : "";
+        const stock = colStock>=0 ? parseInt(String(row[colStock])) || 1 : 1;
+
+        const fila = {_row:i+1, sku, marcaNom, desc, precio, cat, talla, color, stock, _errs:[]};
+
+        if(!sku) fila._errs.push("SKU vacío");
+        if(!desc) fila._errs.push("Descripción vacía");
+        if(!precio || isNaN(precio)) fila._errs.push("Precio inválido");
+
+        const existe = inv.find(p=>p.codigo.toUpperCase()===sku);
+        if(existe) fila._dup = true;
+
+        const marcaEnc = MARCAS.find(m=>m.nombre.toLowerCase()===marcaNom.toLowerCase());
+        fila.marcaId = marcaEnc?.id || null;
+        fila.marcaNombre = marcaEnc?.nombre || marcaNom;
+        if(!marcaEnc) fila._errs.push(`Marca "${marcaNom}" no encontrada`);
+
+        if(fila._errs.length > 0) errs.push({row:i+1, errs:fila._errs});
+        filas.push(fila);
+      }
+
+      setPreview(filas);
+      setErrores(errs);
+      setEstado("preview");
+    }catch(e){
+      setEstado("idle");
+      alert("Error leyendo Excel: " + e.message);
+    }
+  }
+
+  async function importar(soloValidas){
+    setEstado("importando");
+    const filas = soloValidas ? preview.filter(f=>f._errs.length===0) : preview;
+    let ok=0, skip=0, upd=0;
+
+    for(const f of filas){
+      if(f._errs.length>0 && soloValidas) continue;
+      if(!f.sku || !f.desc || !f.marcaId) { skip++; continue; }
+
+      if(f._dup){
+        upd++;
+        onImportar({tipo:"update", codigo:f.sku, stock:f.stock});
+      } else {
+        ok++;
+        onImportar({tipo:"create", producto:{
+          codigo: f.sku,
+          nombre: f.desc,
+          marcaId: f.marcaId,
+          marcaNombre: f.marcaNombre,
+          categoria: [f.cat, f.talla, f.color].filter(Boolean).join(" / ") || "General",
+          precio: f.precio,
+          stock: f.stock,
+          stockInicial: f.stock,
+          fecha: new Date().toISOString().slice(0,10),
+        }});
+      }
+    }
+
+    setStats({ok, upd, skip});
+    setEstado("done");
+  }
+
+  return (
+    <Sheet open title="Importar Excel — Inventario" onClose={onClose} tall>
+      {estado==="idle"&&(
+        <div>
+          <div style={{textAlign:"center",marginBottom:20}}>
+            <div style={{fontSize:48,marginBottom:10}}>📥</div>
+            <div style={{fontSize:16,fontWeight:700,color:C.label,fontFamily:FONT,marginBottom:6}}>
+              Importación masiva desde Excel
+            </div>
+            <div style={{fontSize:13,color:C.label3,fontFamily:FONT}}>
+              Sube un archivo .xlsx con los productos a importar
+            </div>
+          </div>
+
+          <div style={{background:C.bg2,borderRadius:14,padding:16,marginBottom:16,border:`1px solid ${C.sep}`}}>
+            <div style={{fontSize:13,fontWeight:700,color:C.label,fontFamily:FONT,marginBottom:8}}>
+              Columnas esperadas (en cualquier orden):
+            </div>
+            {[["SKU / Código","Código único del producto (obligatorio)"],
+              ["Marca","Nombre exacto de la marca (obligatorio)"],
+              ["Descripción / Nombre","Nombre del producto (obligatorio)"],
+              ["Precio","Precio en Bs (obligatorio)"],
+              ["Stock / Cantidad","Unidades (opcional, default 1)"],
+              ["Categoría","Tipo de prenda (opcional)"],
+              ["Talla / Color","Características (opcional)"],
+            ].map(([col,desc])=>(
+              <div key={col} style={{display:"flex",gap:8,marginBottom:4}}>
+                <span style={{fontSize:12,fontFamily:"monospace",background:C.fill2,
+                  padding:"1px 6px",borderRadius:4,color:C.gold,fontWeight:700}}>{col}</span>
+                <span style={{fontSize:12,color:C.label3,fontFamily:FONT}}>{desc}</span>
+              </div>
+            ))}
+          </div>
+
+          <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv"
+            onChange={e=>{const f=e.target.files?.[0];if(f){setArchivo(f);parsearExcel(f);}}}
+            style={{display:"none"}}/>
+          <button onClick={()=>fileRef.current?.click()}
+            style={{width:"100%",background:`linear-gradient(135deg,${C.gold},${C.goldD})`,
+              border:"none",borderRadius:14,padding:16,fontSize:16,fontWeight:700,
+              color:"#fff",cursor:"pointer",fontFamily:FONT}}>
+            📂 Seleccionar archivo Excel
+          </button>
+        </div>
+      )}
+
+      {estado==="leyendo"&&(
+        <div style={{textAlign:"center",padding:40}}>
+          <div style={{fontSize:32,marginBottom:12}}>⏳</div>
+          <div style={{fontSize:15,color:C.label,fontFamily:FONT}}>Leyendo archivo…</div>
+        </div>
+      )}
+
+      {estado==="preview"&&(
+        <div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:16}}>
+            {[
+              {v:preview.length,l:"Total filas",c:C.label},
+              {v:preview.filter(f=>f._errs.length===0).length,l:"Válidas",c:C.green},
+              {v:errores.length,l:"Con errores",c:C.red},
+            ].map(s=>(
+              <div key={s.l} style={{background:C.bg2,borderRadius:12,padding:"12px 10px",
+                textAlign:"center",border:`1px solid ${s.c}25`}}>
+                <div style={{fontSize:24,fontWeight:800,color:s.c,fontFamily:FONT}}>{s.v}</div>
+                <div style={{fontSize:11,color:C.label3,fontFamily:FONT}}>{s.l}</div>
+              </div>
+            ))}
+          </div>
+
+          {errores.length>0&&(
+            <div style={{background:`${C.red}08`,borderRadius:12,padding:12,marginBottom:12,
+              border:`1px solid ${C.red}30`,maxHeight:120,overflowY:"auto"}}>
+              <div style={{fontSize:12,fontWeight:700,color:C.red,fontFamily:FONT,marginBottom:4}}>
+                ⚠ Filas con errores:
+              </div>
+              {errores.slice(0,10).map(e=>(
+                <div key={e.row} style={{fontSize:11,color:C.red,fontFamily:FONT}}>
+                  Fila {e.row}: {e.errs.join(", ")}
+                </div>
+              ))}
+              {errores.length>10&&<div style={{fontSize:11,color:C.red,fontFamily:FONT}}>...y {errores.length-10} más</div>}
+            </div>
+          )}
+
+          <div style={{maxHeight:280,overflowY:"auto",borderRadius:12,
+            border:`1px solid ${C.sep}`,marginBottom:16}}>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr auto",
+              background:C.sep,padding:"8px 12px",position:"sticky",top:0}}>
+              {["SKU","Marca","Descripción","Precio"].map(h=>(
+                <span key={h} style={{fontSize:11,fontWeight:700,color:C.label2,fontFamily:FONT,
+                  textTransform:"uppercase",letterSpacing:.5}}>{h}</span>
+              ))}
+            </div>
+            {preview.map((f,i)=>(
+              <div key={i} style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr auto",
+                padding:"8px 12px",borderBottom:`1px solid ${C.sep}`,
+                background:f._errs.length>0?`${C.red}06`:f._dup?`${C.amber}06`:"transparent"}}>
+                <span style={{fontSize:12,fontFamily:"monospace",color:C.gold}}>{f.sku}</span>
+                <span style={{fontSize:12,color:C.label,fontFamily:FONT}}>{f.marcaNombre||"—"}</span>
+                <span style={{fontSize:12,color:C.label,fontFamily:FONT}}>{f.desc.slice(0,25)}{f.desc.length>25?"…":""}</span>
+                <span style={{fontSize:12,color:C.green,fontFamily:FONT,fontWeight:600}}>Bs {f.precio}</span>
+              </div>
+            ))}
+          </div>
+
+          <div style={{display:"flex",flexDirection:"column",gap:8}}>
+            {preview.filter(f=>f._errs.length===0).length>0&&(
+              <button onClick={()=>importar(true)}
+                style={{background:`linear-gradient(135deg,${C.green},#2E7D32)`,
+                  border:"none",borderRadius:14,padding:14,fontSize:15,fontWeight:700,
+                  color:"#fff",cursor:"pointer",fontFamily:FONT}}>
+                ✓ Importar {preview.filter(f=>f._errs.length===0).length} filas válidas
+              </button>
+            )}
+            {errores.length>0&&preview.filter(f=>f._errs.length===0).length<preview.length&&(
+              <button onClick={()=>importar(false)}
+                style={{background:`${C.amber}20`,border:`1px solid ${C.amber}40`,
+                  borderRadius:14,padding:14,fontSize:14,fontWeight:600,
+                  color:C.amber,cursor:"pointer",fontFamily:FONT}}>
+                Importar todo (incluyendo filas con errores)
+              </button>
+            )}
+            <button onClick={()=>{setEstado("idle");setPreview([]);setErrores([]);}}
+              style={{background:"none",border:`1px solid ${C.sep}`,borderRadius:14,
+                padding:12,fontSize:14,color:C.label3,cursor:"pointer",fontFamily:FONT}}>
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
+
+      {estado==="importando"&&(
+        <div style={{textAlign:"center",padding:40}}>
+          <div style={{fontSize:32,marginBottom:12}}>⚙️</div>
+          <div style={{fontSize:15,color:C.label,fontFamily:FONT}}>Importando productos…</div>
+        </div>
+      )}
+
+      {estado==="done"&&stats&&(
+        <div style={{textAlign:"center",padding:20}}>
+          <div style={{fontSize:48,marginBottom:12}}>✅</div>
+          <div style={{fontSize:18,fontWeight:700,color:C.green,fontFamily:FONT,marginBottom:16}}>
+            Importación completada
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:20}}>
+            {[{v:stats.ok,l:"Creados",c:C.green},{v:stats.upd,l:"Actualizados",c:C.blue},{v:stats.skip,l:"Omitidos",c:C.label3}].map(s=>(
+              <div key={s.l} style={{background:C.bg2,borderRadius:12,padding:"12px 10px",textAlign:"center"}}>
+                <div style={{fontSize:24,fontWeight:800,color:s.c,fontFamily:FONT}}>{s.v}</div>
+                <div style={{fontSize:11,color:C.label3,fontFamily:FONT}}>{s.l}</div>
+              </div>
+            ))}
+          </div>
+          <button onClick={onClose} style={{
+            background:`linear-gradient(135deg,${C.gold},${C.goldD})`,
+            border:"none",borderRadius:14,padding:14,fontSize:15,fontWeight:700,
+            color:"#fff",cursor:"pointer",fontFamily:FONT,width:"100%"}}>
+            Cerrar
+          </button>
+        </div>
+      )}
+    </Sheet>
+  );
+}
+
+function HomeDashboard({ventas, inv, vMes, mes, anio, onGoTab}){
 
   const hoyStr = new Date().toISOString().slice(0,10);
   const vHoy   = ventas.filter(v => v.fecha === hoyStr);
@@ -2688,7 +3234,7 @@ function HomeDashboard({ventas, inv, vMes, mes, anio, onGoTab}){
           marginBottom:4,
         }}>
           <div style={{
-            fontSize:46,fontWeight:900,color:C.gold,
+            fontSize:46,fontWeight:900,color:C.label,
             fontFamily:"Georgia,'Times New Roman',serif",
             letterSpacing:6,lineHeight:1,
           }}>TH</div>
@@ -2706,11 +3252,9 @@ function HomeDashboard({ventas, inv, vMes, mes, anio, onGoTab}){
         </div>
       </div>
 
-      {/* ── Reloj / fecha ── */}
-      <div style={{textAlign:"center", marginBottom:20}}>
-        <div style={{fontSize:38, fontWeight:800, color:C.gold, fontFamily:FONT_UI,
-          letterSpacing:-1, lineHeight:1}}>{clock}</div>
-        <div style={{fontSize:13, color:C.label3, fontFamily:FONT_UI, marginTop:4}}>{dateStr}</div>
+      {/* ── Fecha ── */}
+      <div style={{textAlign:"center", marginBottom:16, marginTop:-6}}>
+        <div style={{fontSize:12, color:C.label3, fontFamily:FONT_UI}}>{dateStr}</div>
       </div>
 
       {/* ── KPI 2×2 grid ── */}
@@ -2919,6 +3463,7 @@ function App(){
   const[generando,setGenerando]=useState(false);
   const[retiros,setRetiros]    =useState(()=>{ try{return JSON.parse(localStorage.getItem("th_retiros_v1")||"[]");}catch{return[];} });
   const[ventaDetalle,setVentaDetalle]=useState(null);
+  const[shImportarExcel,setShImportarExcel]=useState(false);
   const drive = useDriveSync();
 
   // Cargar retiros desde Supabase al inicio
@@ -2988,6 +3533,22 @@ function App(){
     setInv(p=>p.map(i=>i.id===prod.id?{...i,stock:0}:i));
     setBajaMsg({ok:true,msg:`✓ "${prod.nombre}" dado de baja`});
     setBajaCod("");
+  }
+
+  function handleImportarExcel({tipo, codigo, stock, producto}){
+    if(tipo==="update"){
+      setInv(prev=>prev.map(p=>p.codigo===codigo?{...p,stock:p.stock+stock}:p));
+      // sync updated stock to supabase
+      const prod = inv.find(p=>p.codigo===codigo);
+      if(prod) sbActualizarStock(prod.id, (prod.stock||0)+stock);
+    } else if(tipo==="create"){
+      const newProd = {
+        id: `IMPORT-${Date.now()}-${Math.random().toString(36).slice(2,6)}`,
+        ...producto,
+      };
+      setInv(prev=>[...prev, newProd]);
+      sbGuardarProducto(newProd);
+    }
   }
 
   function handleVenta(v){
@@ -3100,25 +3661,28 @@ function App(){
           title="Toscana House"
           subtitle={`${MESES[mes]} ${anio} · ${dbStatus==="ok"?"☁ Nube ✓":dbStatus==="error"?"Sin conexión":"Conectando…"}`}
           right={
-            <div style={{display:"flex",alignItems:"center",gap:10}}>
-              <DriveIndicator syncing={drive.syncing} connected={!!drive.url}/>
-              <button onClick={()=>setShDrive(true)} style={{
-                background:"none",border:"none",fontSize:20,cursor:"pointer",
-                color:drive.url?C.green:C.label3,padding:"4px",
-                WebkitTapHighlightColor:"transparent",lineHeight:1,
-              }}>☁</button>
-              <button onClick={logout} style={{
-                background:"none",fontSize:13,cursor:"pointer",
-                color:C.label3,padding:"4px 8px",fontFamily:FONT,
-                WebkitTapHighlightColor:"transparent",
-                border:`1px solid ${C.sep}`,borderRadius:8,
-              }}>Salir</button>
-              <select value={mes} onChange={e=>setMes(Number(e.target.value))}
-                style={{background:"none",border:"none",color:C.gold,fontSize:14,
-                  fontFamily:FONT,cursor:"pointer",outline:"none",
-                  WebkitAppearance:"none",padding:"4px 0"}}>
-                {MESES.map((m,i)=><option key={i} value={i} style={{background:C.bg1}}>{m.slice(0,3)}</option>)}
-              </select>
+            <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:2}}>
+              <div style={{display:"flex",alignItems:"center",gap:10}}>
+                <DriveIndicator syncing={drive.syncing} connected={!!drive.url}/>
+                <button onClick={()=>setShDrive(true)} style={{
+                  background:"none",border:"none",fontSize:20,cursor:"pointer",
+                  color:drive.url?C.green:C.label3,padding:"4px",
+                  WebkitTapHighlightColor:"transparent",lineHeight:1,
+                }}>☁</button>
+                <button onClick={logout} style={{
+                  background:"none",fontSize:13,cursor:"pointer",
+                  color:C.label3,padding:"4px 8px",fontFamily:FONT,
+                  WebkitTapHighlightColor:"transparent",
+                  border:`1px solid ${C.sep}`,borderRadius:8,
+                }}>Salir</button>
+                <select value={mes} onChange={e=>setMes(Number(e.target.value))}
+                  style={{background:"none",border:"none",color:C.gold,fontSize:14,
+                    fontFamily:FONT,cursor:"pointer",outline:"none",
+                    WebkitAppearance:"none",padding:"4px 0"}}>
+                  {MESES.map((m,i)=><option key={i} value={i} style={{background:C.bg1}}>{m.slice(0,3)}</option>)}
+                </select>
+              </div>
+              {tab==="inicio"&&<ClockWidget/>}
             </div>
           }
         />
@@ -3141,7 +3705,7 @@ function App(){
 
         {/* INVENTARIO — por marca */}
         {tab==="inventario" && (
-          <InventarioPorMarca inv={inv} ventas={ventas} onRecibir={()=>setShInv(true)} onBaja={()=>{setShBaja(true);setBajaMsg(null);setBajaCod("");}}/>
+          <InventarioPorMarca inv={inv} ventas={ventas} onRecibir={()=>setShInv(true)} onBaja={()=>{setShBaja(true);setBajaMsg(null);setBajaCod("");}} onImportarExcel={()=>setShImportarExcel(true)}/>
         )}
 
         {/* MARCAS — lista */}
@@ -3326,7 +3890,7 @@ function App(){
                 </button>
               </div>
               <div style={{display:"flex",gap:8,marginBottom:16}}>
-                <button onClick={()=>generarExcelMensual(ventas,inv,mes,anio,setGenerando)}
+                <button onClick={()=>generarExcelMensual(ventas,inv,mes,anio,setGenerando,retiros)}
                   disabled={generando}
                   style={{flex:1,background:generando?C.bg2:`${C.green}20`,border:`1px solid ${generando?C.sep:C.green}40`,
                     borderRadius:12,padding:"12px 10px",color:generando?C.label3:C.green,
@@ -3533,6 +4097,9 @@ function App(){
         onClose={()=>setMLiq(null)}
         syncCierre={drive.syncCierre}
       />
+
+      {/* Modal: Importar Excel */}
+      {shImportarExcel && <ImportarExcelModal inv={inv} onImportar={handleImportarExcel} onClose={()=>setShImportarExcel(false)}/>}
     </div>
   );
 }
@@ -3586,6 +4153,7 @@ function POS({inv,onVenta,onVerNota}){
   var _hNm2 = useState({efectivo:"", qr:"", tarjeta:""}); var montosMixtos = _hNm2[0]; var setMontosMixtos = _hNm2[1];
   var _hN144 = useState(null); var scanStatus = _hN144[0]; var setScanStatus = _hN144[1];; // null | "leyendo" | "ok" | "notfound"
   var _hN145 = useState(""); var scanMsg = _hN145[0]; var setScanMsg = _hN145[1];;
+  const [showScanner, setShowScanner] = useState(false);
   const inputRef=useRef();
   const fileRef=useRef();
 
@@ -3794,9 +4362,16 @@ function POS({inv,onVenta,onVerNota}){
       )}
 
       {/* Escanear Etiqueta — toca para abrir cámara directamente */}
+      {showScanner && <CameraScanner onDetect={(codigo)=>{
+        setShowScanner(false);
+        const prod=inv.find(i=>i.codigo.toUpperCase()===codigo.toUpperCase());
+        if(prod){ add(prod); setScanStatus("ok"); setScanMsg(`✓ "${prod.nombre}" agregado al carrito`); }
+        else { setBusq(codigo); setScanStatus("notfound"); setScanMsg(`Código "${codigo}" — busca manualmente`); }
+        setTimeout(()=>setScanStatus(null),3000);
+      }} onClose={()=>setShowScanner(false)}/>}
       <input ref={fileRef} type="file" accept="image/*" capture="environment"
         onChange={handleEtiqueta} style={{display:"none"}}/>
-      <div onClick={()=>!etiqueta&&fileRef.current?.click()}
+      <div onClick={()=>!etiqueta&&setShowScanner(true)}
         style={{background:C.bg2,borderRadius:14,padding:"14px 16px",marginBottom:14,
           border:scanStatus==="ok"?`1.5px solid ${C.green}`:scanStatus==="notfound"?`1.5px solid ${C.amber}`:`1px solid ${C.sep}`,
           cursor:etiqueta?"default":"pointer",WebkitTapHighlightColor:"transparent"}}>
@@ -4162,7 +4737,7 @@ function SheetRecibir({open, onClose, inv, onAdd, fInv, setFInv}){
 // ══════════════════════════════════════════════════════════
 // INVENTARIO POR MARCA — pestaña con scroll horizontal
 // ══════════════════════════════════════════════════════════
-function InventarioPorMarca({inv, ventas, onRecibir, onBaja}){
+function InventarioPorMarca({inv, ventas, onRecibir, onBaja, onImportarExcel}){
   var _hN149 = useState(MARCAS[0].id); var marcaSelec = _hN149[0]; var setMarcaSelec = _hN149[1];;
   var _hInvBq = useState(""); var invBusq = _hInvBq[0]; var setInvBusq = _hInvBq[1];;
   var _hInvFd = useState(""); var invFechaFin = _hInvFd[0]; var setInvFechaFin = _hInvFd[1];;
@@ -4384,9 +4959,12 @@ function InventarioPorMarca({inv, ventas, onRecibir, onBaja}){
       }
 
       {/* Botones acción */}
-      <div style={{display:"flex",gap:10,marginBottom:20}}>
+      <div style={{display:"flex",gap:10,marginBottom:12}}>
         <IOSBtn onPress={onBaja} variant="fill" full icon="🗑">Dar de Baja</IOSBtn>
         <IOSBtn onPress={onRecibir} full icon="+">Recibir</IOSBtn>
+      </div>
+      <div style={{marginBottom:20}}>
+        <IOSBtn onPress={onImportarExcel} variant="fill" full icon="📥">Importar Excel</IOSBtn>
       </div>
     </div>
   );
