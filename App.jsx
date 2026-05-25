@@ -539,6 +539,23 @@ const PAGOS = [
   {id:"tarjeta",  label:"Tarjeta",  icon:"💳", desc:2.5, color:"#C8922A"},
 ];
 
+// ── Helpers pago mixto ────────────────────────────────────
+function labelPago(mp){
+  if(!mp) return "—";
+  if(mp.startsWith("mixto|")) return "Mixto";
+  return PAGOS.find(p=>p.id===mp)?.label||mp;
+}
+function colorPago(mp){
+  if(!mp) return "#4A9B6F";
+  if(mp.startsWith("mixto|")) return "#6C5CE7";
+  return PAGOS.find(p=>p.id===mp)?.color||"#4A9B6F";
+}
+function iconPago(mp){
+  if(!mp) return "";
+  if(mp.startsWith("mixto|")) return "🔀";
+  return PAGOS.find(p=>p.id===mp)?.icon||"";
+}
+
 // ── Helpers ───────────────────────────────────────────────
 const $    = n => "Bs " + new Intl.NumberFormat("es-BO",{minimumFractionDigits:0,maximumFractionDigits:2}).format(n||0);
 const hoy  = () => new Date().toISOString().slice(0,10);
@@ -914,8 +931,7 @@ function exportTodasCSV(ventas,mes,anio){
 
 function sendWA(venta){
   const lines=venta.items.map(it=>{const m=MARCAS.find(x=>x.id===it.marcaId);return `• ${it.nombre} (${m?.nombre}) x${it.cantidad} = ${$(it.subtotal)}`;});
-  const pg=PAGOS.find(p=>p.id===venta.metodoPago);
-  const msg=[`🏡 *TOSCANA HOUSE — ${venta.id}*`,`📅 ${venta.fecha} ${venta.hora}`,`💳 ${pg?.label}${venta.descPct?` (-${venta.descPct}%)`:""}`,"",  ...lines,"",`💰 *TOTAL: ${$(venta.total)}*`].join("\n");
+  const msg=[`🏡 *TOSCANA HOUSE — ${venta.id}*`,`📅 ${venta.fecha} ${venta.hora}`,`💳 ${labelPago(venta.metodoPago)}${venta.descPct?` (-${venta.descPct}%)`:""}`,"",  ...lines,"",`💰 *TOTAL: ${$(venta.total)}*`].join("\n");
   window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`,"_blank");
 }
 
@@ -1311,7 +1327,7 @@ function LiqModal({marcaId,ventas,mes,anio,MK,cierres,setCierres,onClose,syncCie
                   <span style={{fontSize:16,fontWeight:700,color:C.gold,fontFamily:FONT}}>{$(sub)}</span>
                 </div>
                 <div style={{fontSize:13,color:C.label3,fontFamily:FONT,marginBottom:6}}>
-                  {v.fecha} {v.hora} · {PAGOS.find(p=>p.id===v.metodoPago)?.label}
+                  {v.fecha} {v.hora} · {labelPago(v.metodoPago)}
                 </div>
                 {its.map((it,ii)=>(
                   <div key={`${v.id}-${it.prodId}-${ii}`} style={{fontSize:13,color:C.label2,fontFamily:FONT}}>
@@ -2118,6 +2134,10 @@ function POS({inv,onVenta}){
 
   function cobrar(){
     if(!carrito.length)return;
+    if(pagoMixto){
+      const suma=(parseFloat(montosMixtos.efectivo)||0)+(parseFloat(montosMixtos.qr)||0)+(parseFloat(montosMixtos.tarjeta)||0);
+      if(Math.abs(suma-total)>0.01){alert(`Los montos (${$(suma)}) no cuadran con el total (${$(total)})`);return;}
+    }
     const factor=1-descPct/100;
     const items=carrito.map(it=>({prodId:it.prodId,codigo:it.codigo,nombre:it.nombre,
       marcaId:it.marcaId,marcaNombre:it.marcaNombre,
@@ -2870,8 +2890,8 @@ function MarcaDetalle({marcaId,inv,ventas,vMes,mes,anio,MK,cierres,setCierres,ge
                       <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
                         <div style={{display:"flex",alignItems:"center",gap:8}}>
                           <span style={{fontFamily:"monospace",fontSize:12,color:C.gold}}>{v.id}</span>
-                          <Chip color={v.metodoPago==="tarjeta"?C.amber:v.metodoPago==="qr"?C.blue:C.green} small>
-                            {PAGOS.find(p=>p.id===v.metodoPago)?.label}
+                          <Chip color={colorPago(v.metodoPago)} small>
+                            {iconPago(v.metodoPago)} {labelPago(v.metodoPago)}
                           </Chip>
                         </div>
                         <span style={{fontSize:16,fontWeight:700,color:C.gold,fontFamily:FONT}}>{$(v.subMarca)}</span>
@@ -2988,7 +3008,7 @@ function MarcaDetalle({marcaId,inv,ventas,vMes,mes,anio,MK,cierres,setCierres,ge
                       <span style={{fontSize:16,fontWeight:700,color:C.gold,fontFamily:FONT}}>{$(sub2)}</span>
                     </div>
                     <div style={{fontSize:13,color:C.label3,fontFamily:FONT,marginBottom:4}}>
-                      {v.fecha} {v.hora} · {PAGOS.find(p=>p.id===v.metodoPago)?.label}
+                      {v.fecha} {v.hora} · {labelPago(v.metodoPago)}
                     </div>
                     {its.map((it,ii)=>(
                       <div key={`liq-${v.id}-${it.prodId}-${ii}`} style={{fontSize:13,color:C.label2,fontFamily:FONT}}>
@@ -3228,7 +3248,6 @@ function HistorialTab({ventas, inv, cierres}){
           {ventasPer.length===0
             ? <EmptyState icon="📊" title="Sin ventas" sub={`${MESES[mesSel]} ${anioSel}`}/>
             : [...ventasPer].reverse().map(v=>{
-                const pg=PAGOS.find(p=>p.id===v.metodoPago);
                 return (
                   <div key={v.id} style={{background:C.bg2,borderRadius:14,padding:"14px 16px",marginBottom:10}}>
                     <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
@@ -3237,7 +3256,7 @@ function HistorialTab({ventas, inv, cierres}){
                         <div style={{fontSize:12,color:C.label3,fontFamily:FONT}}>{v.fecha} {v.hora}</div>
                       </div>
                       <div style={{display:"flex",alignItems:"center",gap:8}}>
-                        <Chip color={pg?.color||C.green}>{pg?.icon} {pg?.label}</Chip>
+                        <Chip color={colorPago(v.metodoPago)}>{iconPago(v.metodoPago)} {labelPago(v.metodoPago)}</Chip>
                         <span style={{fontSize:17,fontWeight:800,color:C.gold,fontFamily:FONT}}>{$(v.total)}</span>
                       </div>
                     </div>
@@ -3617,6 +3636,7 @@ function VentasTab({vMes, totalVtas, mes, anio}){
   const totalEfectivo = vMes.filter(v=>v.metodoPago==="efectivo").reduce((s,v)=>s+v.total,0);
   const totalQR       = vMes.filter(v=>v.metodoPago==="qr").reduce((s,v)=>s+v.total,0);
   const totalTarjeta  = vMes.filter(v=>v.metodoPago==="tarjeta").reduce((s,v)=>s+v.total,0);
+  const totalMixto    = vMes.filter(v=>v.metodoPago?.startsWith("mixto|")).reduce((s,v)=>s+v.total,0);
   const maxVenta      = Math.max(...porMarca.map(x=>x.total), 1);
 
   // Ventas filtradas por marca para el historial
@@ -3642,6 +3662,7 @@ function VentasTab({vMes, totalVtas, mes, anio}){
           {icon:"💵",label:"Efectivo",value:totalEfectivo,color:"#4A9B6F"},
           {icon:"📱",label:"QR",value:totalQR,color:"#5B8DB8"},
           {icon:"💳",label:"Tarjeta",value:totalTarjeta,color:"#C8922A"},
+          ...(totalMixto>0?[{icon:"🔀",label:"Mixto",value:totalMixto,color:"#6C5CE7"}]:[]),
         ].map(s=>(
           <StatCard key={s.label} icon={s.icon} label={s.label} value={$(s.value)}
             sub={`${Math.round(totalVtas>0?(s.value/totalVtas)*100:0)}% del total`} color={s.color}/>
@@ -3769,7 +3790,6 @@ function VentasTab({vMes, totalVtas, mes, anio}){
           {ventasFiltradas.length===0
             ? <EmptyState icon="📋" title="Sin ventas" sub={marcaFiltro?"Esta marca no tiene ventas":"Sin ventas en el período"}/>
             : ventasFiltradas.map(v=>{
-                const pg=PAGOS.find(p=>p.id===v.metodoPago);
                 const itemsMostrar=marcaFiltro
                   ? v.items.filter(i=>i.marcaId===marcaFiltro)
                   : v.items;
@@ -3784,7 +3804,7 @@ function VentasTab({vMes, totalVtas, mes, anio}){
                         </div>
                       </div>
                       <div style={{display:"flex",alignItems:"center",gap:8}}>
-                        <Chip color={pg?.color||C.green}>{pg?.icon} {pg?.label}</Chip>
+                        <Chip color={colorPago(v.metodoPago)}>{iconPago(v.metodoPago)} {labelPago(v.metodoPago)}</Chip>
                         <span style={{fontSize:18,fontWeight:800,color:C.gold,fontFamily:FONT}}>{$(totalMostrar)}</span>
                       </div>
                     </div>
