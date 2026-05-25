@@ -22660,55 +22660,59 @@
       left: 0,
       right: 0,
       zIndex: 200,
-      background: "rgba(255,255,255,0.96)",
+      background: "rgba(255,255,255,0.97)",
       backdropFilter: "blur(20px) saturate(180%)",
       WebkitBackdropFilter: "blur(20px) saturate(180%)",
       borderTop: `1px solid ${C.sep}`,
       display: "flex",
-      overflowX: "auto",
-      WebkitOverflowScrolling: "touch",
-      scrollbarWidth: "none",
-      paddingBottom: 16,
-      boxShadow: "0 -4px 24px rgba(21,101,192,0.07)"
+      justifyContent: "center",
+      alignItems: "stretch",
+      paddingBottom: "env(safe-area-inset-bottom,12px)",
+      boxShadow: "0 -2px 16px rgba(21,101,192,0.07)"
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      display: "flex",
+      width: "100%",
+      maxWidth: 560
     } }, tabs.map((t) => {
       const isActive = active === t.id;
       const tabColor = TAB_COLORS[t.id] || C.gold;
       return /* @__PURE__ */ import_react.default.createElement("button", { key: t.id, onClick: () => onChange(t.id), style: {
-        flex: "0 0 auto",
-        minWidth: 64,
+        flex: 1,
         border: "none",
-        background: isActive ? `${tabColor}18` : "transparent",
+        background: "transparent",
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
-        padding: "10px 0 4px",
+        justifyContent: "center",
+        padding: "8px 2px 6px",
         cursor: "pointer",
         WebkitTapHighlightColor: "transparent",
-        gap: 4,
-        borderTop: isActive ? `3px solid ${tabColor}` : "3px solid transparent",
-        transition: "all .2s"
+        gap: 3,
+        borderTop: isActive ? `2px solid ${tabColor}` : "2px solid transparent",
+        transition: "border-color .2s",
+        minWidth: 0
       } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
-        width: 32,
-        height: 32,
-        borderRadius: 10,
-        background: isActive ? tabColor : "transparent",
+        width: 28,
+        height: 28,
+        borderRadius: 8,
+        background: isActive ? `${tabColor}18` : "transparent",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        fontSize: isActive ? 18 : 20,
+        fontSize: 16,
         lineHeight: 1,
-        transform: isActive ? "scale(1.05)" : "scale(1)",
-        transition: "all .2s cubic-bezier(.34,1.56,.64,1)",
-        boxShadow: isActive ? `0 4px 12px ${tabColor}50` : "none"
+        transform: isActive ? "scale(1.1)" : "scale(1)",
+        transition: "all .2s cubic-bezier(.34,1.56,.64,1)"
       } }, t.icon), /* @__PURE__ */ import_react.default.createElement("span", { style: {
-        fontSize: 10,
-        fontFamily: FONT,
-        fontWeight: isActive ? 700 : 400,
+        fontSize: 9,
+        fontFamily: FONT_UI,
+        fontWeight: isActive ? 700 : 500,
         color: isActive ? tabColor : C.label3,
         transition: "color .2s",
-        letterSpacing: 0.3
+        letterSpacing: 0.2,
+        whiteSpace: "nowrap"
       } }, t.label));
-    }));
+    })));
   }
   function IOSBtn({ children, onPress, variant = "primary", full, disabled, small, icon }) {
     const { pressed, ...handlers } = usePress();
