@@ -1994,10 +1994,11 @@ function NotaVentaModal({venta, onClose, numVenta}){
       {/* Datos de la venta */}
       <div style={{background:C.bg2,borderRadius:14,padding:"0 16px",marginBottom:16,
         border:`1px solid ${C.sep}`}}>
-        {filaInfo("Fecha", `${venta.fecha} ${venta.hora}`)}
+        {filaInfo("Fecha", `${venta.fecha} ${venta.hora||""}`)}
+        {venta.clienteNombre&&filaInfo("Cliente", venta.clienteNombre)}
         {filaInfo("Vendedor", venta.vendedor||"Tienda")}
         {filaInfo("Sucursal", SUCURSAL_EMP)}
-        {filaInfo("Referencia", venta.id)}
+        {filaInfo("Código", venta.id)}
       </div>
 
       {/* Tabla de ítems */}
@@ -2045,38 +2046,41 @@ function NotaVentaModal({venta, onClose, numVenta}){
       </div>
 
       {/* Acciones */}
-      <div style={{position:"relative",marginBottom:10}}>
+      <div style={{display:"flex",gap:10,marginBottom:10}}>
         <button
-          onClick={()=>setMenuOpen(m=>!m)}
-          style={{width:"100%",background:`linear-gradient(135deg,${C.green},#28A047)`,
-            border:"none",borderRadius:14,padding:"14px 20px",
-            display:"flex",justifyContent:"space-between",alignItems:"center",
+          onClick={()=>imprimirNotaVenta(venta,num)}
+          style={{flex:1,background:`linear-gradient(135deg,${C.gold},${C.goldD})`,
+            border:"none",borderRadius:14,padding:"14px 10px",
+            display:"flex",flexDirection:"column",alignItems:"center",gap:4,
             cursor:"pointer",WebkitTapHighlightColor:"transparent"}}>
-          <span style={{fontSize:15,fontWeight:700,color:"#fff",fontFamily:FONT}}>
-            🖨 Obtener Nota de Venta
-          </span>
-          <span style={{fontSize:18,color:"#fff",transform:menuOpen?"rotate(180deg)":"rotate(0)",
-            transition:".2s",display:"inline-block"}}>⌄</span>
+          <span style={{fontSize:22}}>🖨</span>
+          <span style={{fontSize:13,fontWeight:700,color:"#fff",fontFamily:FONT_UI}}>Imprimir</span>
         </button>
-        {menuOpen&&(
-          <div style={{position:"absolute",top:"calc(100% + 4px)",left:0,right:0,zIndex:10,
-            background:C.bg1,borderRadius:14,border:`1px solid ${C.sep}`,
-            boxShadow:"0 8px 32px rgba(0,0,0,0.12)",overflow:"hidden"}}>
-            {[
-              {icon:"🖨", label:"Imprimir PDF", fn:()=>{imprimirNotaVenta(venta,num);setMenuOpen(false);}},
-              {icon:"📱", label:"Compartir por WhatsApp", fn:()=>{sendWA(venta);setMenuOpen(false);}},
-            ].map((o,i,arr)=>(
-              <button key={o.label} onClick={o.fn} style={{
-                width:"100%",background:"none",border:"none",
-                borderBottom:i<arr.length-1?`1px solid ${C.sep}`:"none",
-                padding:"14px 18px",display:"flex",alignItems:"center",gap:12,
-                cursor:"pointer",textAlign:"left",WebkitTapHighlightColor:"transparent"}}>
-                <span style={{fontSize:18}}>{o.icon}</span>
-                <span style={{fontSize:14,fontFamily:FONT,color:C.label}}>{o.label}</span>
-              </button>
-            ))}
-          </div>
-        )}
+        <button
+          onClick={()=>sendWA(venta)}
+          style={{flex:1,background:`linear-gradient(135deg,#25D366,#128C7E)`,
+            border:"none",borderRadius:14,padding:"14px 10px",
+            display:"flex",flexDirection:"column",alignItems:"center",gap:4,
+            cursor:"pointer",WebkitTapHighlightColor:"transparent"}}>
+          <span style={{fontSize:22}}>📲</span>
+          <span style={{fontSize:13,fontWeight:700,color:"#fff",fontFamily:FONT_UI}}>WhatsApp</span>
+        </button>
+        <button
+          onClick={()=>{
+            if(navigator.share){
+              navigator.share({title:`Nota de Venta #${num}`,text:`Toscana House\nVenta: ${venta.id}\nTotal: Bs ${venta.total}\nFecha: ${venta.fecha}`});
+            } else {
+              navigator.clipboard.writeText(`Toscana House\nVenta: ${venta.id}\nTotal: Bs ${venta.total}\nFecha: ${venta.fecha}`);
+              alert("Copiado al portapapeles");
+            }
+          }}
+          style={{flex:1,background:`linear-gradient(135deg,${C.indigo},#283593)`,
+            border:"none",borderRadius:14,padding:"14px 10px",
+            display:"flex",flexDirection:"column",alignItems:"center",gap:4,
+            cursor:"pointer",WebkitTapHighlightColor:"transparent"}}>
+          <span style={{fontSize:22}}>⬆</span>
+          <span style={{fontSize:13,fontWeight:700,color:"#fff",fontFamily:FONT_UI}}>Compartir</span>
+        </button>
       </div>
 
       <button onClick={onClose} style={{
@@ -2992,7 +2996,7 @@ function App(){
         )}
 
         {/* POS */}
-        {tab==="pos" && <POSContainer inv={inv} onVenta={handleVenta} retiros={retiros} onRetiro={registrarRetiro}/>}
+        {tab==="pos" && <POSContainer inv={inv} onVenta={handleVenta} retiros={retiros} onRetiro={registrarRetiro} onVerNota={v=>setVentaDetalle(v)}/>}
 
         {/* INVENTARIO — por marca */}
         {tab==="inventario" && (
@@ -3395,7 +3399,7 @@ function App(){
 // ══════════════════════════════════════════════════════════
 // POSContainer — Caja con sub-tabs Venta | Retiros
 // ══════════════════════════════════════════════════════════
-function POSContainer({inv,onVenta,retiros,onRetiro}){
+function POSContainer({inv,onVenta,retiros,onRetiro,onVerNota}){
   const [subTab, setSubTab] = useState("venta");
   const tabs=[{id:"venta",label:"💳 Venta"},{id:"retiros",label:"📤 Retiros"}];
   return (
@@ -3417,7 +3421,7 @@ function POSContainer({inv,onVenta,retiros,onRetiro}){
         ))}
       </div>
       {subTab==="venta"
-        ? <POS inv={inv} onVenta={onVenta}/>
+        ? <POS inv={inv} onVenta={onVenta} onVerNota={onVerNota}/>
         : <RetirosTab inv={inv} retiros={retiros} onRetiro={onRetiro}/>
       }
     </div>
@@ -3426,11 +3430,12 @@ function POSContainer({inv,onVenta,retiros,onRetiro}){
 
 // POS — Caja de ventas
 // ══════════════════════════════════════════════════════════
-function POS({inv,onVenta}){
+function POS({inv,onVenta,onVerNota}){
   var _hN135 = useState([]); var carrito = _hN135[0]; var setCarrito = _hN135[1];;
   var _hN136 = useState(""); var busq = _hN136[0]; var setBusq = _hN136[1];;
   var _hN137 = useState("efectivo"); var pago = _hN137[0]; var setPago = _hN137[1];;
   var _hN138 = useState(""); var vendedor = _hN138[0]; var setVendedor = _hN138[1];;
+  var _hNcl  = useState(""); var cliente  = _hNcl[0];  var setCliente  = _hNcl[1];;
   var _hN139 = useState(0); var descExtra = _hN139[0]; var setDescExtra = _hN139[1];;
   var _hN140 = useState(null); var etiqueta = _hN140[0]; var setEtiqueta = _hN140[1];;
   var _hN141 = useState(null); var ultima = _hN141[0]; var setUltima = _hN141[1];;
@@ -3534,9 +3539,9 @@ function POS({inv,onVenta}){
       if(parseFloat(montosMixtos.tarjeta)>0) partes.push("tarjeta:"+montosMixtos.tarjeta);
       metodoPagoFinal = partes.length > 0 ? "mixto|" + partes.join("|") : pago;
     }
-    const vf=onVenta({items,total,subtotal,descPct,metodoPago:metodoPagoFinal,vendedor:vendedor||"Tienda",etiquetaImg:etiqueta});
+    const vf=onVenta({items,total,subtotal,descPct,metodoPago:metodoPagoFinal,vendedor:vendedor||"Tienda",clienteNombre:cliente,etiquetaImg:etiqueta});
     setUltima(vf);setShowOk(true);setShowPago(false);
-    setCarrito([]);setDescExtra(0);setBusq("");setEtiqueta(null);
+    setCarrito([]);setDescExtra(0);setBusq("");setEtiqueta(null);setCliente("");
     setPagoMixto(false);setMontosMixtos({efectivo:"",qr:"",tarjeta:""});
   }
 
@@ -3707,7 +3712,10 @@ function POS({inv,onVenta}){
               → {i.nombre} ×{i.cantidad} ({i.marcaNombre})
             </div>
           ))}
-          <div style={{marginTop:12}}>
+          <div style={{marginTop:12,display:"flex",flexDirection:"column",gap:8}}>
+            <IOSBtn onPress={()=>onVerNota&&onVerNota(ultima)} variant="primary" full small icon="🧾">
+              Ver Nota de Venta
+            </IOSBtn>
             <IOSBtn onPress={()=>sendWA(ultima)} variant="fill" full small icon="📲">
               Enviar por WhatsApp
             </IOSBtn>
@@ -3851,6 +3859,8 @@ function POS({inv,onVenta}){
           value={descExtra} onChange={e=>setDescExtra(Number(e.target.value))}/>
         <IOSInput label="Vendedor (opcional)" value={vendedor}
           onChange={e=>setVendedor(e.target.value)} placeholder="Nombre del vendedor"/>
+        <IOSInput label="Nombre del cliente (opcional)" value={cliente}
+          onChange={e=>setCliente(e.target.value)} placeholder="Ej: María García"/>
 
         {/* Apropiación */}
         {porMarca.length>0&&(
@@ -4008,6 +4018,8 @@ function SheetRecibir({open, onClose, inv, onAdd, fInv, setFInv}){
 // ══════════════════════════════════════════════════════════
 function InventarioPorMarca({inv, ventas, onRecibir, onBaja}){
   var _hN149 = useState(MARCAS[0].id); var marcaSelec = _hN149[0]; var setMarcaSelec = _hN149[1];;
+  var _hInvBq = useState(""); var invBusq = _hInvBq[0]; var setInvBusq = _hInvBq[1];;
+  var _hInvFd = useState(""); var invFechaFin = _hInvFd[0]; var setInvFechaFin = _hInvFd[1];;
   const marca = MARCAS.find(m=>m.id===marcaSelec);
 
   // Calcular unidades vendidas por producto
@@ -4019,7 +4031,15 @@ function InventarioPorMarca({inv, ventas, onRecibir, onBaja}){
     return map;
   },[ventas]);
 
-  const productos = inv.filter(i=>i.marcaId===marcaSelec);
+  const productos = useMemo(()=>{
+    let r = inv.filter(i=>i.marcaId===marcaSelec);
+    if(invBusq.trim()){
+      const q=invBusq.trim().toLowerCase();
+      r=r.filter(p=>p.codigo.toLowerCase().includes(q)||p.nombre.toLowerCase().includes(q));
+    }
+    if(invFechaFin) r=r.filter(p=>p.fecha&&p.fecha<=invFechaFin);
+    return r;
+  },[inv,marcaSelec,invBusq,invFechaFin]);
   const totalStock = productos.reduce((s,p)=>s+p.stock,0);
   const totalVendidas = productos.reduce((s,p)=>s+(vendidosPorProd[p.id]||0),0);
   const agotados = productos.filter(p=>p.stock===0).length;
@@ -4056,6 +4076,36 @@ function InventarioPorMarca({inv, ventas, onRecibir, onBaja}){
             );
           })}
         </div>
+      </div>
+
+      {/* Buscador + filtro fecha */}
+      <div style={{display:"flex",gap:8,marginBottom:12,flexWrap:"wrap"}}>
+        <div style={{flex:2,minWidth:160,position:"relative"}}>
+          <span style={{position:"absolute",left:10,top:"50%",transform:"translateY(-50%)",fontSize:14,color:C.label3}}>🔍</span>
+          <input
+            value={invBusq}
+            onChange={e=>setInvBusq(e.target.value)}
+            placeholder="Código o nombre del producto…"
+            style={{width:"100%",padding:"10px 12px 10px 34px",border:`1px solid ${C.sep}`,
+              borderRadius:10,background:C.bg1,fontSize:13,color:C.label,
+              fontFamily:FONT_UI,outline:"none",boxSizing:"border-box"}}
+          />
+        </div>
+        <div style={{flex:1,minWidth:120}}>
+          <input type="date" value={invFechaFin} onChange={e=>setInvFechaFin(e.target.value)}
+            title="Filtrar por fecha de ingreso hasta…"
+            style={{width:"100%",padding:"10px 12px",border:`1px solid ${C.sep}`,
+              borderRadius:10,background:C.bg1,fontSize:13,color:C.label,
+              fontFamily:FONT_UI,outline:"none",boxSizing:"border-box"}}/>
+        </div>
+        {(invBusq||invFechaFin)&&(
+          <button onClick={()=>{setInvBusq("");setInvFechaFin("");}}
+            style={{padding:"10px 14px",borderRadius:10,border:`1px solid ${C.sep}`,
+              background:C.bg2,fontSize:12,color:C.label3,cursor:"pointer",fontFamily:FONT_UI,
+              whiteSpace:"nowrap",WebkitTapHighlightColor:"transparent"}}>
+            ✕ Limpiar
+          </button>
+        )}
       </div>
 
       {/* Stats de la marca */}
@@ -5064,7 +5114,7 @@ function DashboardVentas({ventas, onVentaClick}){
       {/* Sub-navegación */}
       <div style={{display:"flex",gap:4,marginBottom:14,background:C.bg2,
         borderRadius:10,padding:3,border:`1px solid ${C.sep}`}}>
-        {[{id:"dashboard",label:"📊 Dashboard"},{id:"lista",label:"📋 Lista"},{id:"busqueda",label:"🔍 Por Código"}].map(t=>(
+        {[{id:"dashboard",label:"📊 Dashboard"},{id:"items",label:"📦 Items"},{id:"lista",label:"📋 Lista"},{id:"busqueda",label:"🔍 Buscar"}].map(t=>(
           <button key={t.id} onClick={()=>setVistaD(t.id)} style={{
             flex:1,border:"none",borderRadius:8,padding:"8px 4px",
             fontSize:11,fontWeight:vistaD===t.id?700:400,cursor:"pointer",
@@ -5162,6 +5212,71 @@ function DashboardVentas({ventas, onVentaClick}){
           )}
         </div>
       )}
+
+      {/* ── ITEMS VENDIDOS ── */}
+      {vistaD==="items"&&(()=>{
+        // Agrupar todos los items vendidos en el período
+        const itemsMap={};
+        ventasFiltradas.forEach(v=>v.items.forEach(it=>{
+          const k=it.prodId||it.codigo;
+          if(!itemsMap[k])itemsMap[k]={codigo:it.codigo,nombre:it.nombre,marcaNombre:it.marcaNombre,
+            marcaId:it.marcaId,precioUnit:it.precioUnit,cant:0,total:0};
+          itemsMap[k].cant+=it.cantidad;
+          itemsMap[k].total+=it.subtotal;
+        }));
+        const items=Object.values(itemsMap).sort((a,b)=>b.total-a.total);
+        const totalUds=items.reduce((s,i)=>s+i.cant,0);
+        return (
+          <div>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12,
+              background:C.bg1,borderRadius:12,padding:"12px 16px",border:`1px solid ${C.sep}`}}>
+              <div>
+                <div style={{fontSize:12,color:C.label3,fontFamily:FONT_UI,fontWeight:600,textTransform:"uppercase",letterSpacing:.5}}>Items vendidos</div>
+                <div style={{fontSize:20,fontWeight:800,color:C.gold,fontFamily:FONT_UI}}>{totalUds} unidades</div>
+              </div>
+              <div style={{textAlign:"right"}}>
+                <div style={{fontSize:12,color:C.label3,fontFamily:FONT_UI,fontWeight:600,textTransform:"uppercase",letterSpacing:.5}}>Revenue</div>
+                <div style={{fontSize:20,fontWeight:800,color:C.green,fontFamily:FONT_UI}}>{$(totalFil)}</div>
+              </div>
+            </div>
+            {items.length===0
+              ? <div style={{textAlign:"center",padding:"30px 0",color:C.label3,fontFamily:FONT_UI,fontSize:13}}>Sin items en el período</div>
+              : <div style={{background:C.bg1,borderRadius:14,overflow:"hidden",border:`1px solid ${C.sep}`}}>
+                  {/* Header */}
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 60px 70px",gap:0,
+                    background:C.bg3,padding:"8px 14px",borderBottom:`1px solid ${C.sep}`}}>
+                    <span style={{fontSize:11,fontWeight:700,color:C.label3,fontFamily:FONT_UI,textTransform:"uppercase",letterSpacing:.5}}>Ítem</span>
+                    <span style={{fontSize:11,fontWeight:700,color:C.label3,fontFamily:FONT_UI,textTransform:"uppercase",letterSpacing:.5,textAlign:"center"}}>Cant.</span>
+                    <span style={{fontSize:11,fontWeight:700,color:C.label3,fontFamily:FONT_UI,textTransform:"uppercase",letterSpacing:.5,textAlign:"right"}}>Total</span>
+                  </div>
+                  {items.map((it,i)=>{
+                    const marca=MARCAS.find(m=>m.id===it.marcaId);
+                    return (
+                      <div key={it.codigo} style={{
+                        display:"grid",gridTemplateColumns:"1fr 60px 70px",gap:0,
+                        padding:"10px 14px",
+                        borderBottom:i<items.length-1?`1px solid ${C.sep}`:"",
+                        alignItems:"center",
+                      }}>
+                        <div>
+                          <div style={{fontSize:13,fontWeight:600,color:C.label,fontFamily:FONT_UI,
+                            overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{it.nombre}</div>
+                          <div style={{display:"flex",alignItems:"center",gap:6,marginTop:2}}>
+                            <span style={{fontSize:10,fontFamily:"monospace",color:C.gold,
+                              background:`${C.gold}15`,padding:"1px 5px",borderRadius:4}}>{it.codigo}</span>
+                            {marca&&<span style={{fontSize:10,color:marca.color,fontFamily:FONT_UI}}>{marca.emoji} {it.marcaNombre}</span>}
+                          </div>
+                        </div>
+                        <div style={{textAlign:"center",fontSize:15,fontWeight:700,color:C.blue,fontFamily:FONT_UI}}>{it.cant}</div>
+                        <div style={{textAlign:"right",fontSize:14,fontWeight:700,color:C.green,fontFamily:FONT_UI}}>{$(it.total)}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+            }
+          </div>
+        );
+      })()}
 
       {/* ── LISTA DE VENTAS ── */}
       {vistaD==="lista"&&(
