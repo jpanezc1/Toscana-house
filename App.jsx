@@ -1016,8 +1016,8 @@ function numeroALetras(monto){
   return (conv(entero)+" "+String(cts).padStart(2,"0")+"/100 BOLIVIANOS").toUpperCase();
 }
 
-// ── Imprimir nota de venta formal ─────────────────────────
-function imprimirNotaVenta(venta, numSecuencial){
+// ── Ver / Imprimir nota de venta formal ───────────────────
+function abrirNotaVenta(venta, numSecuencial, autoPrint=false){
   const win=window.open("","_blank","width=860,height=900");
   if(!win){alert("Activa las ventanas emergentes para imprimir");return;}
   const num=numSecuencial||venta.id.replace(/\D/g,"").slice(-4).padStart(4,"0");
@@ -1106,10 +1106,13 @@ function imprimirNotaVenta(venta, numSecuencial){
 </div>
 <div class="letras">Son: <strong>${numeroALetras(venta.total)}</strong></div>
 <div class="foot">Toscana House · ${SUCURSAL_EMP} · ${TELEFONO_EMP} · ${CIUDAD_EMP}</div>
-<script>window.onload=function(){setTimeout(function(){window.print();},600);}<\/script>
+${autoPrint?`<script>window.onload=function(){setTimeout(function(){window.print();},600);}<\/script>`:""}
 </body></html>`);
   win.document.close();
 }
+// Wrappers de conveniencia
+function imprimirNotaVenta(v,n){abrirNotaVenta(v,n,true);}
+function verNotaVenta(v,n){abrirNotaVenta(v,n,false);}
 
 // ══════════════════════════════════════════════════════════
 // iOS DESIGN ATOMS
@@ -1276,15 +1279,15 @@ function TabBar({tabs, active, onChange}){
               minWidth:0,
             }}>
               <div style={{
-                width:28,height:28,borderRadius:8,
+                width:33,height:33,borderRadius:9,
                 background:isActive?`${tabColor}18`:"transparent",
                 display:"flex",alignItems:"center",justifyContent:"center",
-                fontSize:16,lineHeight:1,
+                fontSize:19,lineHeight:1,
                 transform:isActive?"scale(1.1)":"scale(1)",
                 transition:"all .2s cubic-bezier(.34,1.56,.64,1)",
               }}>{t.icon}</div>
               <span style={{
-                fontSize:9,fontFamily:FONT_UI,fontWeight:isActive?700:500,
+                fontSize:9,fontFamily:FONT_UI,fontWeight:700,
                 color:isActive?tabColor:C.label3,
                 transition:"color .2s",
                 letterSpacing:.2,
@@ -1743,15 +1746,42 @@ function RetirosTab({inv, retiros, onRetiro}){
   const [motivo, setMotivo] = useState("");
   const [msg, setMsg] = useState(null);
   const [busqHist, setBusqHist] = useState("");
+  const [fechaIni, setFechaIni] = useState("");
+  const [fechaFin, setFechaFin] = useState("");
+  const [scanStatus, setScanStatus] = useState(null); // null | "leyendo" | "ok" | "notfound"
+  const [scanMsg, setScanMsg]   = useState("");
+  const fileRef = useRef(null);
 
-  function buscarProd(){
-    const cod = codBusq.trim().toUpperCase();
-    const p = inv.find(i=>i.codigo.toUpperCase()===cod);
-    if(!p){ setMsg({ok:false,txt:`Código "${cod}" no encontrado`}); setProdEncontrado(null); return; }
+  function buscarProdPorCod(cod){
+    const c = cod.trim().toUpperCase();
+    if(!c) return;
+    const p = inv.find(i=>i.codigo.toUpperCase()===c);
+    if(!p){ setMsg({ok:false,txt:`Código "${c}" no encontrado`}); setProdEncontrado(null); return; }
     if(p.stock<=0){ setMsg({ok:false,txt:`"${p.nombre}" no tiene stock disponible`}); setProdEncontrado(null); return; }
-    setProdEncontrado(p);
-    setMsg(null);
-    setCantidad("1");
+    setProdEncontrado(p); setMsg(null); setCantidad("1");
+  }
+
+  function buscarProd(){ buscarProdPorCod(codBusq); }
+
+  async function handleScanRetiro(e){
+    const f = e.target.files?.[0];
+    if(!f) return;
+    setScanStatus("leyendo"); setScanMsg("Leyendo código…");
+    try {
+      const codigo = await leerCodigoDeImagen(f);
+      if(codigo){
+        setScanStatus("ok"); setScanMsg(`Código: ${codigo}`);
+        setCodBusq(codigo);
+        buscarProdPorCod(codigo);
+      } else {
+        setScanStatus("notfound"); setScanMsg("No se detectó código — ingresa manualmente");
+      }
+    } catch(err){
+      setScanStatus("notfound"); setScanMsg("Error al leer la imagen");
+    }
+    setTimeout(()=>{ setScanStatus(null); setScanMsg(""); }, 4000);
+    // reset input so same file can be re-scanned
+    e.target.value = "";
   }
 
   function confirmarRetiro(){
@@ -1772,19 +1802,37 @@ function RetirosTab({inv, retiros, onRetiro}){
     setProdEncontrado(null); setCodBusq(""); setDestinatario(""); setMotivo(""); setCantidad("1");
   }
 
+  // Filtrado + agrupación por marca
   const retirosFiltrados = useMemo(()=>{
-    if(!busqHist.trim()) return [...retiros].reverse();
-    const q=busqHist.toLowerCase();
-    return [...retiros].reverse().filter(r=>
-      r.codigo.toLowerCase().includes(q)||
-      r.nombre.toLowerCase().includes(q)||
-      r.destinatario.toLowerCase().includes(q)
-    );
-  },[retiros,busqHist]);
+    let lista = [...retiros].reverse();
+    if(busqHist.trim()){
+      const q = busqHist.toLowerCase();
+      lista = lista.filter(r=>
+        r.codigo.toLowerCase().includes(q)||
+        r.nombre.toLowerCase().includes(q)||
+        (r.marcaNombre||"").toLowerCase().includes(q)||
+        r.destinatario.toLowerCase().includes(q)
+      );
+    }
+    if(fechaIni) lista = lista.filter(r=>r.fecha>=fechaIni);
+    if(fechaFin) lista = lista.filter(r=>r.fecha<=fechaFin);
+    return lista;
+  },[retiros,busqHist,fechaIni,fechaFin]);
+
+  // Agrupar por marca
+  const porMarca = useMemo(()=>{
+    const map = {};
+    retirosFiltrados.forEach(r=>{
+      const key = r.marcaId || "SIN_MARCA";
+      if(!map[key]) map[key] = {marcaId:key, marcaNombre:r.marcaNombre||"Sin marca", items:[]};
+      map[key].items.push(r);
+    });
+    return Object.values(map).sort((a,b)=>a.marcaNombre.localeCompare(b.marcaNombre));
+  },[retirosFiltrados]);
 
   return (
     <div>
-      {/* Formulario retiro */}
+      {/* ── Formulario retiro ── */}
       <div style={{background:C.bg1,borderRadius:16,padding:20,marginBottom:16,
         border:`1px solid ${C.sep}`,boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}>
         <div style={{fontSize:16,fontWeight:700,color:C.label,fontFamily:FONT,marginBottom:16,
@@ -1792,13 +1840,37 @@ function RetirosTab({inv, retiros, onRetiro}){
           <span style={{fontSize:20}}>📤</span> Registrar Retiro
         </div>
 
-        {/* Buscar producto */}
+        {/* ── Scanner de etiqueta ── toca para abrir cámara directamente */}
+        <input ref={fileRef} type="file" accept="image/*" capture="environment"
+          onChange={handleScanRetiro} style={{display:"none"}}/>
+        <label htmlFor="_retiro_scan_input" onClick={()=>fileRef.current?.click()}
+          style={{display:"block",background:C.bg2,borderRadius:13,
+            border:scanStatus==="ok"?`1.5px solid ${C.green}`:scanStatus==="notfound"?`1.5px solid ${C.amber}`:`1px solid ${C.sep}`,
+            padding:"13px 16px",marginBottom:14,cursor:"pointer",
+            WebkitTapHighlightColor:"transparent"}}>
+          <div style={{display:"flex",alignItems:"center",gap:10}}>
+            <span style={{fontSize:26}}>📷</span>
+            <div style={{flex:1}}>
+              <div style={{fontSize:13,fontWeight:700,color:C.label,fontFamily:FONT}}>
+                {scanStatus==="leyendo"?"Leyendo código…":"Escanear código de barras"}
+              </div>
+              <div style={{fontSize:11,color:C.label3,fontFamily:FONT,marginTop:2}}>
+                {scanMsg||"Toca para abrir la cámara y leer la etiqueta"}
+              </div>
+            </div>
+            <span style={{fontSize:20,color:C.gold}}>›</span>
+          </div>
+          {scanStatus==="ok"&&<div style={{marginTop:6,fontSize:12,color:C.green,fontFamily:FONT}}>✓ {scanMsg}</div>}
+        </label>
+
+        {/* Buscar por código manual */}
         <div style={{display:"flex",gap:8,marginBottom:16}}>
           <div style={{flex:1}}>
             <IOSInput
-              label="Código del producto"
+              label="O ingresa el código manualmente"
               value={codBusq}
               onChange={e=>{setCodBusq(e.target.value.toUpperCase());setProdEncontrado(null);setMsg(null);}}
+              onKeyDown={e=>{if(e.key==="Enter") buscarProd();}}
               placeholder="Ej: DON-CREM-0001"
               style={{fontFamily:"monospace",textTransform:"uppercase"}}
             />
@@ -1897,48 +1969,78 @@ function RetirosTab({inv, retiros, onRetiro}){
         </button>
       </div>
 
-      {/* Historial de retiros */}
+      {/* ── Historial de retiros ── */}
       <div style={{background:C.bg1,borderRadius:16,padding:20,
         border:`1px solid ${C.sep}`,boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}>
         <div style={{fontSize:16,fontWeight:700,color:C.label,fontFamily:FONT,marginBottom:12,
           display:"flex",alignItems:"center",justifyContent:"space-between"}}>
           <span>📋 Historial de Retiros</span>
-          <span style={{fontSize:13,color:C.label3,fontWeight:400}}>{retiros.length} registrado{retiros.length!==1?"s":""}</span>
+          <span style={{fontSize:13,color:C.label3,fontWeight:400}}>{retirosFiltrados.length}/{retiros.length}</span>
         </div>
 
-        {/* Buscador historial */}
-        <div style={{position:"relative",marginBottom:14}}>
-          <span style={{position:"absolute",left:12,top:"50%",transform:"translateY(-50%)",
-            fontSize:14,color:C.label3}}>🔍</span>
-          <input
-            value={busqHist} onChange={e=>setBusqHist(e.target.value)}
-            placeholder="Buscar por código, nombre o destinatario…"
-            style={{width:"100%",padding:"10px 12px 10px 36px",border:`1px solid ${C.sep}`,
-              borderRadius:10,background:C.bg2,fontSize:13,color:C.label,
-              fontFamily:FONT,outline:"none",boxSizing:"border-box"}}
-          />
+        {/* Buscador + rango de fechas */}
+        <div style={{marginBottom:14,display:"flex",flexDirection:"column",gap:8}}>
+          <div style={{position:"relative"}}>
+            <span style={{position:"absolute",left:12,top:"50%",transform:"translateY(-50%)",
+              fontSize:14,color:C.label3}}>🔍</span>
+            <input
+              value={busqHist} onChange={e=>setBusqHist(e.target.value)}
+              placeholder="Buscar por código, marca, nombre o destinatario…"
+              style={{width:"100%",padding:"10px 12px 10px 36px",border:`1px solid ${C.sep}`,
+                borderRadius:10,background:C.bg2,fontSize:13,color:C.label,
+                fontFamily:FONT,outline:"none",boxSizing:"border-box"}}
+            />
+          </div>
+          <div style={{display:"flex",gap:8,alignItems:"center"}}>
+            <span style={{fontSize:12,color:C.label3,fontFamily:FONT,whiteSpace:"nowrap"}}>📅 Desde</span>
+            <input type="date" value={fechaIni} onChange={e=>setFechaIni(e.target.value)}
+              style={{flex:1,padding:"8px 10px",border:`1px solid ${C.sep}`,borderRadius:10,
+                background:C.bg2,fontSize:13,color:C.label,fontFamily:FONT,outline:"none"}}/>
+            <span style={{fontSize:12,color:C.label3,fontFamily:FONT,whiteSpace:"nowrap"}}>Hasta</span>
+            <input type="date" value={fechaFin} onChange={e=>setFechaFin(e.target.value)}
+              style={{flex:1,padding:"8px 10px",border:`1px solid ${C.sep}`,borderRadius:10,
+                background:C.bg2,fontSize:13,color:C.label,fontFamily:FONT,outline:"none"}}/>
+            {(fechaIni||fechaFin)&&(
+              <button onClick={()=>{setFechaIni("");setFechaFin("");}}
+                style={{background:"none",border:"none",color:C.red,fontSize:16,cursor:"pointer",
+                  padding:"4px",WebkitTapHighlightColor:"transparent"}}>✕</button>
+            )}
+          </div>
         </div>
 
+        {/* Lista agrupada por marca */}
         {retirosFiltrados.length===0
           ? <div style={{textAlign:"center",padding:30,color:C.label3,fontFamily:FONT,fontSize:13}}>
               {retiros.length===0?"Sin retiros registrados":"No se encontraron resultados"}
             </div>
-          : retirosFiltrados.map(r=>{
-              const marca=MARCAS.find(m=>m.id===r.marcaId);
-              return (
-                <div key={r.id} style={{borderBottom:`1px solid ${C.sep}`,padding:"12px 0",
-                  display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:12}}>
+          : porMarca.map(grupo=>(
+            <div key={grupo.marcaId} style={{marginBottom:16}}>
+              {/* Encabezado de marca */}
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",
+                borderBottom:`2px solid ${C.gold}30`,paddingBottom:6,marginBottom:8}}>
+                <div style={{fontSize:13,fontWeight:700,color:C.gold,fontFamily:FONT,
+                  textTransform:"uppercase",letterSpacing:.5}}>
+                  {grupo.marcaNombre}
+                </div>
+                <span style={{fontSize:11,color:C.label3,fontFamily:FONT,fontWeight:600}}>
+                  {grupo.items.reduce((s,r)=>s+r.cantidad,0)} u. · {grupo.items.length} retiro{grupo.items.length!==1?"s":""}
+                </span>
+              </div>
+              {/* Items de la marca */}
+              {grupo.items.map((r,ri)=>(
+                <div key={r.id} style={{borderBottom:ri<grupo.items.length-1?`1px solid ${C.sep}`:"none",
+                  padding:"10px 0",display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:12}}>
                   <div style={{flex:1}}>
                     <div style={{fontSize:14,fontWeight:600,color:C.label,fontFamily:FONT}}>
                       {r.nombre}
                     </div>
                     <div style={{fontSize:12,color:C.label3,fontFamily:FONT,marginTop:2}}>
-                      {r.codigo} · {marca?.nombre||r.marcaNombre} · x{r.cantidad}
+                      {r.codigo} · x{r.cantidad}
                     </div>
                     <div style={{fontSize:12,color:C.blue,fontFamily:FONT,marginTop:3,fontWeight:500}}>
                       Para: {r.destinatario}
                     </div>
-                    {r.motivo&&<div style={{fontSize:11,color:C.label3,fontFamily:FONT,marginTop:2}}>
+                    {r.motivo&&<div style={{fontSize:11,color:C.label3,fontFamily:FONT,marginTop:2,fontStyle:"italic"}}>
                       {r.motivo}
                     </div>}
                   </div>
@@ -1955,8 +2057,9 @@ function RetirosTab({inv, retiros, onRetiro}){
                     </div>
                   </div>
                 </div>
-              );
-            })
+              ))}
+            </div>
+          ))
         }
       </div>
     </div>
@@ -2045,11 +2148,20 @@ function NotaVentaModal({venta, onClose, numVenta}){
         </div>
       </div>
 
-      {/* Acciones */}
-      <div style={{display:"flex",gap:10,marginBottom:10}}>
+      {/* Acciones — 2×2 grid */}
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+        <button
+          onClick={()=>verNotaVenta(venta,num)}
+          style={{background:`linear-gradient(135deg,${C.indigo},#283593)`,
+            border:"none",borderRadius:14,padding:"14px 10px",
+            display:"flex",flexDirection:"column",alignItems:"center",gap:4,
+            cursor:"pointer",WebkitTapHighlightColor:"transparent"}}>
+          <span style={{fontSize:22}}>🧾</span>
+          <span style={{fontSize:13,fontWeight:700,color:"#fff",fontFamily:FONT_UI}}>Ver Nota</span>
+        </button>
         <button
           onClick={()=>imprimirNotaVenta(venta,num)}
-          style={{flex:1,background:`linear-gradient(135deg,${C.gold},${C.goldD})`,
+          style={{background:`linear-gradient(135deg,${C.gold},${C.goldD})`,
             border:"none",borderRadius:14,padding:"14px 10px",
             display:"flex",flexDirection:"column",alignItems:"center",gap:4,
             cursor:"pointer",WebkitTapHighlightColor:"transparent"}}>
@@ -2058,7 +2170,7 @@ function NotaVentaModal({venta, onClose, numVenta}){
         </button>
         <button
           onClick={()=>sendWA(venta)}
-          style={{flex:1,background:`linear-gradient(135deg,#25D366,#128C7E)`,
+          style={{background:`linear-gradient(135deg,#25D366,#128C7E)`,
             border:"none",borderRadius:14,padding:"14px 10px",
             display:"flex",flexDirection:"column",alignItems:"center",gap:4,
             cursor:"pointer",WebkitTapHighlightColor:"transparent"}}>
@@ -2074,7 +2186,7 @@ function NotaVentaModal({venta, onClose, numVenta}){
               alert("Copiado al portapapeles");
             }
           }}
-          style={{flex:1,background:`linear-gradient(135deg,${C.indigo},#283593)`,
+          style={{background:`linear-gradient(135deg,#546E7A,#37474F)`,
             border:"none",borderRadius:14,padding:"14px 10px",
             display:"flex",flexDirection:"column",alignItems:"center",gap:4,
             cursor:"pointer",WebkitTapHighlightColor:"transparent"}}>
@@ -2564,6 +2676,35 @@ function HomeDashboard({ventas, inv, vMes, mes, anio, onGoTab}){
 
   return (
     <div style={{paddingBottom:8}}>
+
+      {/* ── Logo / Marca ── */}
+      <div style={{textAlign:"center", marginBottom:14, paddingTop:4}}>
+        <div style={{
+          display:"inline-flex",flexDirection:"column",alignItems:"center",gap:0,
+          background:"linear-gradient(135deg,#EBF1F9,#F8FAFD)",
+          borderRadius:20, padding:"18px 32px 14px",
+          border:`1px solid ${C.sep}`,
+          boxShadow:"0 2px 12px rgba(21,101,192,0.10)",
+          marginBottom:4,
+        }}>
+          <div style={{
+            fontSize:46,fontWeight:900,color:C.gold,
+            fontFamily:"Georgia,'Times New Roman',serif",
+            letterSpacing:6,lineHeight:1,
+          }}>TH</div>
+          <div style={{width:80,height:1.5,background:`${C.gold}50`,margin:"6px 0 4px"}}/>
+          <div style={{
+            fontSize:20,fontWeight:800,color:C.label,
+            fontFamily:FONT_UI,letterSpacing:5,lineHeight:1,
+            textTransform:"uppercase",
+          }}>TOSCANA HOUSE</div>
+          <div style={{
+            fontSize:9,fontWeight:500,color:C.label3,
+            fontFamily:FONT_UI,letterSpacing:5,lineHeight:1.6,
+            textTransform:"uppercase",
+          }}>CASA DE MODA</div>
+        </div>
+      </div>
 
       {/* ── Reloj / fecha ── */}
       <div style={{textAlign:"center", marginBottom:20}}>
@@ -3652,26 +3793,34 @@ function POS({inv,onVenta,onVerNota}){
         </div>
       )}
 
-      {/* Escanear Etiqueta */}
-      <div style={{background:C.bg2,borderRadius:14,padding:"14px 16px",marginBottom:14,
-        border:scanStatus==="ok"?`1.5px solid ${C.green}`:scanStatus==="notfound"?`1.5px solid ${C.amber}`:`1px solid ${C.sep}`}}>
-        <div style={{fontSize:13,fontWeight:600,color:C.label3,textTransform:"uppercase",
-          letterSpacing:.6,marginBottom:10}}>📷 Escanear Etiqueta</div>
-        <input ref={fileRef} type="file" accept="image/*" capture="environment"
-          onChange={handleEtiqueta} style={{display:"none"}}/>
-        <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:scanMsg?10:0}}>
-          <IOSBtn onPress={()=>fileRef.current?.click()} variant="fill" small icon="📷">
-            {scanStatus==="leyendo"?"Leyendo…":etiqueta?"Nueva foto":"Fotografiar código"}
-          </IOSBtn>
+      {/* Escanear Etiqueta — toca para abrir cámara directamente */}
+      <input ref={fileRef} type="file" accept="image/*" capture="environment"
+        onChange={handleEtiqueta} style={{display:"none"}}/>
+      <div onClick={()=>!etiqueta&&fileRef.current?.click()}
+        style={{background:C.bg2,borderRadius:14,padding:"14px 16px",marginBottom:14,
+          border:scanStatus==="ok"?`1.5px solid ${C.green}`:scanStatus==="notfound"?`1.5px solid ${C.amber}`:`1px solid ${C.sep}`,
+          cursor:etiqueta?"default":"pointer",WebkitTapHighlightColor:"transparent"}}>
+        <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:scanMsg||etiqueta?10:0}}>
+          <span style={{fontSize:26}}>📷</span>
+          <div style={{flex:1}}>
+            <div style={{fontSize:13,fontWeight:700,color:C.label,fontFamily:FONT}}>
+              {scanStatus==="leyendo"?"Leyendo código…":"Escanear Etiqueta"}
+            </div>
+            <div style={{fontSize:11,color:C.label3,fontFamily:FONT,marginTop:2}}>
+              {scanMsg||"Toca para abrir la cámara y leer el código"}
+            </div>
+          </div>
+          {!etiqueta&&<span style={{fontSize:18,color:C.gold}}>›</span>}
           {etiqueta&&(
-            <>
+            <div style={{display:"flex",alignItems:"center",gap:8}}>
               <img src={etiqueta} alt="etiqueta"
                 style={{height:44,borderRadius:8,border:`1px solid ${C.sep}`}}/>
-              <button onClick={()=>{setEtiqueta(null);setScanStatus(null);setScanMsg("");}} style={{
-                background:"none",border:"none",color:C.red,fontSize:18,cursor:"pointer",
-                WebkitTapHighlightColor:"transparent",
-              }}>×</button>
-            </>
+              <button onClick={e=>{e.stopPropagation();setEtiqueta(null);setScanStatus(null);setScanMsg("");fileRef.current?.click();}} style={{
+                background:C.fill2,border:`1px solid ${C.sep}`,color:C.label2,
+                fontSize:12,borderRadius:8,padding:"4px 10px",cursor:"pointer",
+                fontFamily:FONT,fontWeight:600,WebkitTapHighlightColor:"transparent",
+              }}>Nueva foto</button>
+            </div>
           )}
         </div>
         {scanMsg&&(
@@ -3681,9 +3830,6 @@ function POS({inv,onVenta,onVerNota}){
             {scanStatus==="leyendo"&&"⏳ "}{scanMsg}
           </div>
         )}
-        <div style={{fontSize:11,color:C.label3,fontFamily:FONT,marginTop:8}}>
-          Apunta al código de barras o QR de la prenda → se agrega automáticamente al carrito
-        </div>
       </div>
 
       {/* Botón cobrar */}
