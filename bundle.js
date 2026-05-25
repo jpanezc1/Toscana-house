@@ -24063,6 +24063,7 @@
         return [];
       }
     });
+    const [ventaDetalle, setVentaDetalle] = (0, import_react.useState)(null);
     const drive = useDriveSync();
     (0, import_react.useEffect)(() => {
       sbCargarRetiros().then((data) => {
