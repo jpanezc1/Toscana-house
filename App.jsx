@@ -2765,6 +2765,7 @@ function App(){
   const[filInvM,setFilInvM] =useState("");
   const[driveUrl,setDriveUrlLocal]=useState(()=>{ try{return localStorage.getItem("th_drive_url")||"";}catch{return "";} });
   const[generando,setGenerando]=useState(false);
+  const[retiros,setRetiros]    =useState(()=>{ try{return JSON.parse(localStorage.getItem("th_retiros_v1")||"[]");}catch{return[];} });
   const drive = useDriveSync();
 
   // Cargar retiros desde Supabase al inicio

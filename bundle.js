@@ -23200,7 +23200,7 @@
       textAlign: "center"
     } }, "Toscana House \xA9 ", (/* @__PURE__ */ new Date()).getFullYear()));
   }
-  function RetirosTab({ inv, retiros: retiros2, onRetiro }) {
+  function RetirosTab({ inv, retiros, onRetiro }) {
     const [codBusq, setCodBusq] = (0, import_react.useState)("");
     const [prodEncontrado, setProdEncontrado] = (0, import_react.useState)(null);
     const [cantidad, setCantidad] = (0, import_react.useState)("1");
@@ -23258,12 +23258,12 @@
       setCantidad("1");
     }
     const retirosFiltrados = (0, import_react.useMemo)(() => {
-      if (!busqHist.trim()) return [...retiros2].reverse();
+      if (!busqHist.trim()) return [...retiros].reverse();
       const q = busqHist.toLowerCase();
-      return [...retiros2].reverse().filter(
+      return [...retiros].reverse().filter(
         (r) => r.codigo.toLowerCase().includes(q) || r.nombre.toLowerCase().includes(q) || r.destinatario.toLowerCase().includes(q)
       );
-    }, [retiros2, busqHist]);
+    }, [retiros, busqHist]);
     return /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: {
       background: C.bg1,
       borderRadius: 16,
@@ -23428,7 +23428,7 @@
       display: "flex",
       alignItems: "center",
       justifyContent: "space-between"
-    } }, /* @__PURE__ */ import_react.default.createElement("span", null, "\u{1F4CB} Historial de Retiros"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, color: C.label3, fontWeight: 400 } }, retiros2.length, " registrado", retiros2.length !== 1 ? "s" : "")), /* @__PURE__ */ import_react.default.createElement("div", { style: { position: "relative", marginBottom: 14 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: {
+    } }, /* @__PURE__ */ import_react.default.createElement("span", null, "\u{1F4CB} Historial de Retiros"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, color: C.label3, fontWeight: 400 } }, retiros.length, " registrado", retiros.length !== 1 ? "s" : "")), /* @__PURE__ */ import_react.default.createElement("div", { style: { position: "relative", marginBottom: 14 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: {
       position: "absolute",
       left: 12,
       top: "50%",
@@ -23454,7 +23454,7 @@
           boxSizing: "border-box"
         }
       }
-    )), retirosFiltrados.length === 0 ? /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center", padding: 30, color: C.label3, fontFamily: FONT, fontSize: 13 } }, retiros2.length === 0 ? "Sin retiros registrados" : "No se encontraron resultados") : retirosFiltrados.map((r) => {
+    )), retirosFiltrados.length === 0 ? /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center", padding: 30, color: C.label3, fontFamily: FONT, fontSize: 13 } }, retiros.length === 0 ? "Sin retiros registrados" : "No se encontraron resultados") : retirosFiltrados.map((r) => {
       const marca = MARCAS.find((m) => m.id === r.marcaId);
       return /* @__PURE__ */ import_react.default.createElement("div", { key: r.id, style: {
         borderBottom: `1px solid ${C.sep}`,
@@ -24056,6 +24056,13 @@
       }
     });
     const [generando, setGenerando] = (0, import_react.useState)(false);
+    const [retiros, setRetiros] = (0, import_react.useState)(() => {
+      try {
+        return JSON.parse(localStorage.getItem("th_retiros_v1") || "[]");
+      } catch {
+        return [];
+      }
+    });
     const drive = useDriveSync();
     (0, import_react.useEffect)(() => {
       sbCargarRetiros().then((data) => {
@@ -24712,7 +24719,7 @@
       }
     ));
   }
-  function POSContainer({ inv, onVenta, retiros: retiros2, onRetiro }) {
+  function POSContainer({ inv, onVenta, retiros, onRetiro }) {
     const [subTab, setSubTab] = (0, import_react.useState)("venta");
     const tabs = [{ id: "venta", label: "\u{1F4B3} Venta" }, { id: "retiros", label: "\u{1F4E4} Retiros" }];
     return /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: {
@@ -24737,7 +24744,7 @@
       boxShadow: subTab === t.id ? "0 1px 4px rgba(0,0,0,0.10)" : "none",
       transition: "all .15s",
       WebkitTapHighlightColor: "transparent"
-    } }, t.label))), subTab === "venta" ? /* @__PURE__ */ import_react.default.createElement(POS, { inv, onVenta }) : /* @__PURE__ */ import_react.default.createElement(RetirosTab, { inv, retiros: retiros2, onRetiro }));
+    } }, t.label))), subTab === "venta" ? /* @__PURE__ */ import_react.default.createElement(POS, { inv, onVenta }) : /* @__PURE__ */ import_react.default.createElement(RetirosTab, { inv, retiros, onRetiro }));
   }
   function POS({ inv, onVenta }) {
     var _hN135 = (0, import_react.useState)([]);
