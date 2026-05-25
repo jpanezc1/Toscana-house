@@ -7,6 +7,14 @@ import { useState, useMemo, useRef, useCallback, useEffect } from "react";
 const SUPA_URL  = "https://uqphxiixdulqscbfyxhz.supabase.co";
 const SUPA_KEY  = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVxcGh4aWl4ZHVscXNjYmZ5eGh6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcwMzc0NjQsImV4cCI6MjA5MjYxMzQ2NH0.U1EIf4JWqfrvga7CApClLl7nzBuFoPpD8BlicxvfB-w";
 
+// ── Datos de la empresa ──────────────────────────────────
+const NIT_EMPRESA   = "690053037";
+const PROPIETARIA   = "SYLVIA CAROLINA GRANIER ZALLES";
+const DIRECCION_EMP = "Calle La Plata 8 Oeste, Equipetrol";
+const TELEFONO_EMP  = "69895217";
+const CIUDAD_EMP    = "Santa Cruz, Bolivia";
+const SUCURSAL_EMP  = "Casa Matriz";
+
 // Carga Supabase SDK desde CDN
 let _supabase = null;
 async function getSupabase() {
@@ -935,6 +943,127 @@ function sendWA(venta){
   window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`,"_blank");
 }
 
+// ── Número a letras (es-BO) ───────────────────────────────
+function numeroALetras(monto){
+  const entero=Math.floor(monto), cts=Math.round((monto-entero)*100);
+  const un=["","uno","dos","tres","cuatro","cinco","seis","siete","ocho","nueve",
+    "diez","once","doce","trece","catorce","quince","dieciséis","diecisiete","dieciocho","diecinueve"];
+  const de=["","","veinte","treinta","cuarenta","cincuenta","sesenta","setenta","ochenta","noventa"];
+  const ct=["","ciento","doscientos","trescientos","cuatrocientos","quinientos","seiscientos","setecientos","ochocientos","novecientos"];
+  function m1000(n){
+    if(!n)return "";
+    let r="";
+    const c=Math.floor(n/100),d=n%100;
+    if(c)r+=(c===1&&!d?"cien":ct[c])+(d?" ":"");
+    if(d<20)r+=un[d];
+    else{r+=de[Math.floor(d/10)];if(d%10)r+=" y "+un[d%10];}
+    return r.trim();
+  }
+  function conv(n){
+    if(!n)return "cero";
+    let r="";
+    if(n>=1000){const m=Math.floor(n/1000);r+=(m===1?"mil":m1000(m)+" mil")+" ";n%=1000;}
+    if(n)r+=m1000(n);
+    return r.trim();
+  }
+  return (conv(entero)+" "+String(cts).padStart(2,"0")+"/100 BOLIVIANOS").toUpperCase();
+}
+
+// ── Imprimir nota de venta formal ─────────────────────────
+function imprimirNotaVenta(venta, numSecuencial){
+  const win=window.open("","_blank","width=860,height=900");
+  if(!win){alert("Activa las ventanas emergentes para imprimir");return;}
+  const num=numSecuencial||venta.id.replace(/\D/g,"").slice(-4).padStart(4,"0");
+  const fmt2=n=>Number(n||0).toLocaleString("es-BO",{minimumFractionDigits:2,maximumFractionDigits:2});
+  const subtotalBruto=venta.items.reduce((s,i)=>s+i.precioUnit*i.cantidad,0);
+  const descAdicional=subtotalBruto-venta.total;
+  const rows=venta.items.map(it=>`
+    <tr>
+      <td>${it.codigo}</td>
+      <td>${it.nombre}${it.marcaNombre?" — "+it.marcaNombre:""}</td>
+      <td style="text-align:center">UNIDAD (BIENES)</td>
+      <td style="text-align:center">${it.cantidad}</td>
+      <td style="text-align:right">${fmt2(it.precioUnit)}</td>
+      <td style="text-align:right">${venta.descPct?venta.descPct+"%":"—"}</td>
+      <td style="text-align:right">${fmt2(it.subtotal)}</td>
+    </tr>`).join("");
+  win.document.write(`<!DOCTYPE html>
+<html lang="es"><head>
+<meta charset="UTF-8">
+<title>Nota de Venta N° ${num}</title>
+<style>
+  @page{size:A4;margin:20mm 18mm}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:Arial,sans-serif;font-size:11px;color:#111;background:#fff}
+  .hdr{display:flex;justify-content:space-between;align-items:flex-start;
+    padding-bottom:12px;border-bottom:2px solid #111;margin-bottom:14px}
+  .logo{font-size:20px;font-weight:900;letter-spacing:3px;text-transform:uppercase}
+  .logo-sub{font-size:7px;letter-spacing:5px;color:#666;margin-top:2px}
+  .nv-r{text-align:right}
+  .nv-r h2{font-size:15px;font-weight:700;text-transform:uppercase}
+  .nv-r p{font-size:11px;margin-top:3px}
+  .prop{font-size:13px;font-weight:700;text-transform:uppercase;
+    border-bottom:1px solid #ccc;padding-bottom:6px;margin-bottom:12px}
+  .info{display:grid;grid-template-columns:1fr 1fr;gap:4px 20px;margin-bottom:14px;font-size:11px}
+  .lbl{color:#666;font-size:9px;text-transform:uppercase;letter-spacing:.5px;margin-bottom:1px}
+  table{width:100%;border-collapse:collapse;margin-bottom:12px}
+  thead tr{background:#f0f0f0}
+  th,td{padding:6px 8px;border:1px solid #ccc;font-size:10px;vertical-align:middle}
+  th{font-weight:700;text-transform:uppercase;font-size:9px}
+  .tots{margin-left:auto;width:280px;border-collapse:collapse}
+  .tots td{padding:3px 8px;font-size:11px;border:none}
+  .tots td:last-child{text-align:right;font-weight:600}
+  .tots td:first-child{color:#555}
+  .tf td{font-weight:800;font-size:14px;border-top:2px solid #111!important;padding-top:7px!important}
+  .letras{background:#f8f8f8;border:1px solid #ccc;padding:8px 12px;border-radius:4px;
+    font-size:10px;margin-bottom:14px}
+  .foot{border-top:1px dashed #aaa;padding-top:8px;text-align:center;font-size:9px;color:#888;margin-top:12px}
+  @media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+</style>
+</head>
+<body>
+<div class="hdr">
+  <div>
+    <div class="logo">Toscana House</div>
+    <div class="logo-sub">CASA DE MODA</div>
+  </div>
+  <div class="nv-r">
+    <h2>Nota de venta</h2>
+    <p>NIT &nbsp; ${NIT_EMPRESA}</p>
+    <p>Nota de venta N° &nbsp; <strong>${num}</strong></p>
+  </div>
+</div>
+<div class="prop">${PROPIETARIA}</div>
+<div class="info">
+  <div><div class="lbl">Sucursal</div>${SUCURSAL_EMP}</div>
+  <div><div class="lbl">Lugar y fecha</div>${CIUDAD_EMP}, ${venta.fecha} ${venta.hora}</div>
+  <div><div class="lbl">Dirección</div>${DIRECCION_EMP}</div>
+  <div><div class="lbl">Vendedores</div>${venta.vendedor||"Tienda"}</div>
+  <div><div class="lbl">Teléfono</div>${TELEFONO_EMP}</div>
+  <div><div class="lbl">Método de pago</div>${labelPago(venta.metodoPago)}</div>
+</div>
+<table>
+  <thead>
+    <tr><th>Código</th><th>Descripción</th><th>Unidad</th>
+    <th>Cant.</th><th>Precio Unit.</th><th>Desc.</th><th>Subtotal</th></tr>
+  </thead>
+  <tbody>${rows}</tbody>
+</table>
+<div style="display:flex;justify-content:flex-end;margin-bottom:12px">
+  <table class="tots">
+    <tr><td>Subtotal:</td><td>${fmt2(subtotalBruto)}</td></tr>
+    ${descAdicional>0.01?`<tr><td>Descuento adicional:</td><td>- ${fmt2(descAdicional)}</td></tr>`:""}
+    <tr><td>Total Valor:</td><td>${fmt2(venta.total)}</td></tr>
+    <tr class="tf"><td>Monto a pagar Bs</td><td>${fmt2(venta.total)}</td></tr>
+  </table>
+</div>
+<div class="letras">Son: <strong>${numeroALetras(venta.total)}</strong></div>
+<div class="foot">Toscana House · ${SUCURSAL_EMP} · ${TELEFONO_EMP} · ${CIUDAD_EMP}</div>
+<script>window.onload=function(){setTimeout(function(){window.print();},600);}<\/script>
+</body></html>`);
+  win.document.close();
+}
+
 // ══════════════════════════════════════════════════════════
 // iOS DESIGN ATOMS
 // ══════════════════════════════════════════════════════════
@@ -1058,8 +1187,9 @@ const TAB_COLORS = {
   marcas:       C.tabMar,
   ventas:       C.tabVen,
   liquidaciones:C.tabLiq,
-  config:       "#7A9A7A",
+  cajas:        "#5A8E8E",
   historial:    "#6B8BAE",
+  config:       "#7A9A7A",
 };
 
 function TabBar({tabs, active, onChange}){
@@ -1071,6 +1201,9 @@ function TabBar({tabs, active, onChange}){
       WebkitBackdropFilter:"blur(20px) saturate(180%)",
       borderTop:`2px solid ${C.sep}`,
       display:"flex",
+      overflowX:"auto",
+      WebkitOverflowScrolling:"touch",
+      scrollbarWidth:"none",
       paddingBottom:16,
       boxShadow:"0 -4px 24px rgba(74,107,74,0.10)",
     }}>
@@ -1079,7 +1212,7 @@ function TabBar({tabs, active, onChange}){
         const tabColor=TAB_COLORS[t.id]||C.gold;
         return (
           <button key={t.id} onClick={()=>onChange(t.id)} style={{
-            flex:1,border:"none",
+            flex:"0 0 auto",minWidth:64,border:"none",
             background:isActive?`${tabColor}18`:"transparent",
             display:"flex",flexDirection:"column",alignItems:"center",
             padding:"10px 0 4px",
@@ -1546,6 +1679,298 @@ function LoginScreen({ onLogin }) {
 }
 
 // ══════════════════════════════════════════════════════════
+// NOTA DE VENTA — Modal detalle
+// ══════════════════════════════════════════════════════════
+function NotaVentaModal({venta, onClose, numVenta}){
+  if(!venta) return null;
+  const [menuOpen, setMenuOpen] = useState(false);
+  const num = numVenta || venta.id.replace(/\D/g,"").slice(-4).padStart(4,"0");
+
+  const filaInfo = (lbl, val) => (
+    <div style={{borderBottom:`1px solid ${C.sep}`,padding:"10px 0",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+      <span style={{fontSize:13,color:C.label3,fontFamily:FONT}}>{lbl}</span>
+      <span style={{fontSize:13,fontWeight:500,color:C.label,fontFamily:FONT}}>{val}</span>
+    </div>
+  );
+
+  return (
+    <Sheet open={!!venta} onClose={onClose} title="Detalle de Nota de venta" tall>
+      {/* Encabezado */}
+      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:16,flexWrap:"wrap"}}>
+        <span style={{fontFamily:"monospace",fontSize:14,fontWeight:700,color:C.label}}>
+          # {num}
+        </span>
+        <Chip color={colorPago(venta.metodoPago)}>
+          {iconPago(venta.metodoPago)} {labelPago(venta.metodoPago)}
+        </Chip>
+        <Chip color={C.green}>✓ Pagado</Chip>
+      </div>
+
+      {/* Datos de la venta */}
+      <div style={{background:C.bg2,borderRadius:14,padding:"0 16px",marginBottom:16,
+        border:`1px solid ${C.sep}`}}>
+        {filaInfo("Fecha", `${venta.fecha} ${venta.hora}`)}
+        {filaInfo("Vendedor", venta.vendedor||"Tienda")}
+        {filaInfo("Sucursal", SUCURSAL_EMP)}
+        {filaInfo("Referencia", venta.id)}
+      </div>
+
+      {/* Tabla de ítems */}
+      <div style={{background:C.bg2,borderRadius:14,overflow:"hidden",
+        border:`1px solid ${C.sep}`,marginBottom:16}}>
+        <div style={{display:"grid",gridTemplateColumns:"1fr auto auto",gap:0,
+          background:C.sep,padding:"8px 14px"}}>
+          <span style={{fontSize:11,fontWeight:700,color:C.label2,fontFamily:FONT,textTransform:"uppercase",letterSpacing:.5}}>Ítem</span>
+          <span style={{fontSize:11,fontWeight:700,color:C.label2,fontFamily:FONT,textTransform:"uppercase",letterSpacing:.5,textAlign:"right",minWidth:60}}>P. Unit.</span>
+          <span style={{fontSize:11,fontWeight:700,color:C.label2,fontFamily:FONT,textTransform:"uppercase",letterSpacing:.5,textAlign:"right",minWidth:70}}>Total</span>
+        </div>
+        {venta.items.map((it,i)=>(
+          <div key={i} style={{display:"grid",gridTemplateColumns:"1fr auto auto",gap:0,
+            padding:"10px 14px",borderBottom:i<venta.items.length-1?`1px solid ${C.sep}`:""}}>
+            <div>
+              <div style={{fontSize:13,fontWeight:500,color:C.label,fontFamily:FONT}}>{it.nombre}</div>
+              <div style={{fontSize:11,color:C.label3,fontFamily:FONT}}>
+                {it.marcaNombre} · x{it.cantidad}
+              </div>
+            </div>
+            <div style={{fontSize:13,color:C.label2,fontFamily:FONT,textAlign:"right",minWidth:60,paddingLeft:8}}>
+              {$(it.precioUnit)}
+            </div>
+            <div style={{fontSize:13,fontWeight:600,color:C.label,fontFamily:FONT,textAlign:"right",minWidth:70,paddingLeft:8}}>
+              {$(it.subtotal)}
+            </div>
+          </div>
+        ))}
+        {/* Descuento si hay */}
+        {venta.descPct>0&&(
+          <div style={{display:"flex",justifyContent:"space-between",padding:"8px 14px",
+            background:`${C.amber}10`,borderTop:`1px solid ${C.sep}`}}>
+            <span style={{fontSize:13,color:C.amber,fontFamily:FONT}}>Descuento ({venta.descPct}%)</span>
+            <span style={{fontSize:13,color:C.amber,fontFamily:FONT,fontWeight:600}}>
+              -{$(venta.items.reduce((s,i)=>s+i.precioUnit*i.cantidad,0)-venta.total)}
+            </span>
+          </div>
+        )}
+        {/* Total */}
+        <div style={{display:"flex",justifyContent:"space-between",padding:"12px 14px",
+          background:`${C.gold}12`,borderTop:`2px solid ${C.sep}`}}>
+          <span style={{fontSize:15,fontWeight:700,color:C.label,fontFamily:FONT}}>Total</span>
+          <span style={{fontSize:18,fontWeight:800,color:C.gold,fontFamily:FONT}}>{$(venta.total)}</span>
+        </div>
+      </div>
+
+      {/* Acciones */}
+      <div style={{position:"relative",marginBottom:10}}>
+        <button
+          onClick={()=>setMenuOpen(m=>!m)}
+          style={{width:"100%",background:`linear-gradient(135deg,${C.green},#28A047)`,
+            border:"none",borderRadius:14,padding:"14px 20px",
+            display:"flex",justifyContent:"space-between",alignItems:"center",
+            cursor:"pointer",WebkitTapHighlightColor:"transparent"}}>
+          <span style={{fontSize:15,fontWeight:700,color:"#fff",fontFamily:FONT}}>
+            🖨 Obtener Nota de Venta
+          </span>
+          <span style={{fontSize:18,color:"#fff",transform:menuOpen?"rotate(180deg)":"rotate(0)",
+            transition:".2s",display:"inline-block"}}>⌄</span>
+        </button>
+        {menuOpen&&(
+          <div style={{position:"absolute",top:"calc(100% + 4px)",left:0,right:0,zIndex:10,
+            background:C.bg1,borderRadius:14,border:`1px solid ${C.sep}`,
+            boxShadow:"0 8px 32px rgba(0,0,0,0.12)",overflow:"hidden"}}>
+            {[
+              {icon:"🖨", label:"Imprimir PDF", fn:()=>{imprimirNotaVenta(venta,num);setMenuOpen(false);}},
+              {icon:"📱", label:"Compartir por WhatsApp", fn:()=>{sendWA(venta);setMenuOpen(false);}},
+            ].map((o,i,arr)=>(
+              <button key={o.label} onClick={o.fn} style={{
+                width:"100%",background:"none",border:"none",
+                borderBottom:i<arr.length-1?`1px solid ${C.sep}`:"none",
+                padding:"14px 18px",display:"flex",alignItems:"center",gap:12,
+                cursor:"pointer",textAlign:"left",WebkitTapHighlightColor:"transparent"}}>
+                <span style={{fontSize:18}}>{o.icon}</span>
+                <span style={{fontSize:14,fontFamily:FONT,color:C.label}}>{o.label}</span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <button onClick={onClose} style={{
+        width:"100%",background:C.bg2,border:`1px solid ${C.sep}`,
+        borderRadius:14,padding:"14px",fontSize:14,fontFamily:FONT,
+        color:C.label2,cursor:"pointer",fontWeight:500,
+        WebkitTapHighlightColor:"transparent",marginBottom:6}}>
+        Cerrar
+      </button>
+
+      {/* Historial / pie */}
+      <div style={{marginTop:8,padding:"10px 14px",background:C.bg2,borderRadius:12,
+        border:`1px solid ${C.sep}`}}>
+        <div style={{fontSize:11,color:C.label3,fontFamily:FONT,fontWeight:600,
+          textTransform:"uppercase",letterSpacing:.5,marginBottom:4}}>
+          Historial de movimientos
+        </div>
+        <div style={{fontSize:12,color:C.label2,fontFamily:FONT}}>
+          Registrado por: {venta.vendedor||"Tienda"} — {venta.fecha} {venta.hora}
+        </div>
+      </div>
+    </Sheet>
+  );
+}
+
+// ══════════════════════════════════════════════════════════
+// CAJAS — Gestión de turnos
+// ══════════════════════════════════════════════════════════
+function CajasTab(){
+  const CAJAS_KEY = "th_cajas_v1";
+  const defaultCajas = [
+    {id:1,nombre:"Caja Turno en la mañana",isOpen:false,ultimoCierre:null,balanceCierre:0},
+    {id:2,nombre:"Caja Turno en la tarde", isOpen:false,ultimoCierre:null,balanceCierre:0},
+  ];
+  const [cajas, setCajas] = useState(()=>{
+    try{return JSON.parse(localStorage.getItem(CAJAS_KEY))||defaultCajas;}catch{return defaultCajas;}
+  });
+  const [balInput, setBalInput] = useState({});
+  const [showBal, setShowBal] = useState(null);
+
+  function saveCajas(updated){
+    setCajas(updated);
+    try{localStorage.setItem(CAJAS_KEY,JSON.stringify(updated));}catch{}
+  }
+  function abrirCaja(id){
+    saveCajas(cajas.map(c=>c.id===id?{...c,isOpen:true}:c));
+  }
+  function cerrarCaja(id){
+    const bal=parseFloat(balInput[id])||0;
+    saveCajas(cajas.map(c=>c.id===id?{...c,isOpen:false,ultimoCierre:hoy(),balanceCierre:bal}:c));
+    setShowBal(null);
+    setBalInput(p=>({...p,[id]:""}));
+  }
+
+  const abiertas=cajas.filter(c=>c.isOpen).length;
+  const porAbrir=cajas.filter(c=>!c.isOpen).length;
+
+  return (
+    <div>
+      {/* Stats */}
+      <div style={{background:C.bg2,borderRadius:16,padding:"18px 20px",
+        display:"flex",justifyContent:"space-between",alignItems:"center",
+        border:`1px solid ${C.sep}`,marginBottom:16}}>
+        <div>
+          <div style={{fontSize:28,fontWeight:800,color:C.gold,fontFamily:FONT,lineHeight:1}}>
+            {cajas.length} cajas
+          </div>
+          <div style={{fontSize:13,color:C.label3,fontFamily:FONT,marginTop:4}}>
+            {SUCURSAL_EMP}
+          </div>
+        </div>
+        <div style={{display:"flex",gap:24}}>
+          <div style={{textAlign:"center"}}>
+            <div style={{fontSize:22,fontWeight:800,color:C.green,fontFamily:FONT}}>{abiertas}</div>
+            <div style={{fontSize:11,color:C.label3,fontFamily:FONT}}>Cajas abiertas</div>
+          </div>
+          <div style={{textAlign:"center"}}>
+            <div style={{fontSize:22,fontWeight:800,color:C.amber,fontFamily:FONT}}>{porAbrir}</div>
+            <div style={{fontSize:11,color:C.label3,fontFamily:FONT}}>Cajas por abrir</div>
+          </div>
+        </div>
+      </div>
+
+      <div style={{marginBottom:8,fontSize:13,fontWeight:600,color:C.label3,
+        textTransform:"uppercase",letterSpacing:.8,fontFamily:FONT}}>
+        Ir a Configuración de cajas →
+      </div>
+
+      {/* Lista de cajas */}
+      {cajas.map((c,i)=>(
+        <div key={c.id} style={{background:C.bg2,borderRadius:16,padding:20,
+          marginBottom:12,border:`1px solid ${C.sep}`,
+          opacity:c.isOpen?1:0.85}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:12}}>
+            <div style={{flex:1}}>
+              <div style={{fontSize:16,fontWeight:700,color:C.label,fontFamily:FONT,marginBottom:12}}>
+                {c.nombre}
+              </div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                <div>
+                  <div style={{fontSize:11,color:C.label3,fontFamily:FONT,textTransform:"uppercase",
+                    letterSpacing:.5,marginBottom:2}}>Último cierre</div>
+                  <div style={{fontSize:14,fontWeight:500,color:c.ultimoCierre?C.label:C.label3,fontFamily:FONT}}>
+                    {c.ultimoCierre||"---"}
+                  </div>
+                </div>
+                <div>
+                  <div style={{fontSize:11,color:C.label3,fontFamily:FONT,textTransform:"uppercase",
+                    letterSpacing:.5,marginBottom:2}}>Balance al Cierre</div>
+                  <div style={{fontSize:14,fontWeight:500,color:c.balanceCierre>0?C.gold:C.label3,fontFamily:FONT}}>
+                    {c.balanceCierre>0?`Bs ${Number(c.balanceCierre).toLocaleString("es-BO",{minimumFractionDigits:2})}`:"---"}
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div>
+              {c.isOpen
+                ? <button onClick={()=>setShowBal(showBal===c.id?null:c.id)} style={{
+                    background:"#1565C0",border:"none",borderRadius:12,
+                    padding:"10px 16px",color:"#fff",fontSize:13,fontWeight:700,
+                    cursor:"pointer",fontFamily:FONT,WebkitTapHighlightColor:"transparent",
+                    whiteSpace:"nowrap"}}>
+                    CERRAR CAJA
+                  </button>
+                : <button onClick={()=>abrirCaja(c.id)} style={{
+                    background:C.green,border:"none",borderRadius:12,
+                    padding:"10px 16px",color:"#fff",fontSize:13,fontWeight:700,
+                    cursor:"pointer",fontFamily:FONT,WebkitTapHighlightColor:"transparent",
+                    whiteSpace:"nowrap"}}>
+                    ABRIR CAJA
+                  </button>
+              }
+            </div>
+          </div>
+
+          {c.isOpen&&(
+            <div style={{marginTop:10,paddingTop:10,borderTop:`1px solid ${C.sep}`,
+              display:"flex",alignItems:"center",gap:6}}>
+              <div style={{width:8,height:8,borderRadius:"50%",background:C.green,flexShrink:0}}/>
+              <span style={{fontSize:12,color:C.green,fontFamily:FONT,fontWeight:600}}>Abierta</span>
+            </div>
+          )}
+
+          {showBal===c.id&&(
+            <div style={{marginTop:14,padding:16,background:C.bg3,borderRadius:12,
+              border:`1px solid ${C.sep}`}}>
+              <div style={{fontSize:13,color:C.label2,fontFamily:FONT,marginBottom:10,fontWeight:500}}>
+                Ingresa el balance al momento del cierre:
+              </div>
+              <IOSInput
+                label="Balance al cierre (Bs)"
+                value={balInput[c.id]||""}
+                onChange={e=>setBalInput(p=>({...p,[c.id]:e.target.value}))}
+                placeholder="0.00"
+                type="number"
+              />
+              <div style={{display:"flex",gap:8,marginTop:8}}>
+                <button onClick={()=>setShowBal(null)} style={{
+                  flex:1,background:C.bg2,border:`1px solid ${C.sep}`,borderRadius:12,
+                  padding:"11px",fontSize:13,color:C.label2,cursor:"pointer",fontFamily:FONT,
+                  WebkitTapHighlightColor:"transparent"}}>
+                  Cancelar
+                </button>
+                <button onClick={()=>cerrarCaja(c.id)} style={{
+                  flex:1,background:"#1565C0",border:"none",borderRadius:12,
+                  padding:"11px",fontSize:13,fontWeight:700,color:"#fff",
+                  cursor:"pointer",fontFamily:FONT,WebkitTapHighlightColor:"transparent"}}>
+                  Confirmar Cierre
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════
 // APP PRINCIPAL
 // ══════════════════════════════════════════════════════════
 export default function App(){
@@ -1572,6 +1997,7 @@ export default function App(){
   var _hN132 = useState(""); var filInvM = _hN132[0]; var setFilInvM = _hN132[1];;
   var _hN133 = useState(function(){ try{return localStorage.getItem("th_drive_url")||"";}catch{return "";} }); var driveUrl = _hN133[0]; var setDriveUrlLocal = _hN133[1];
   var _hN134 = useState(false); var generando = _hN134[0]; var setGenerando = _hN134[1];;
+  const [ventaDetalle, setVentaDetalle] = useState(null); // para NotaVentaModal
   const drive = useDriveSync();
 
   // Cargar datos desde Supabase al inicio
@@ -1674,6 +2100,7 @@ export default function App(){
     {id:"marcas",icon:"◆",label:"Marcas"},
     {id:"ventas",icon:"◈",label:"Ventas"},
     {id:"liquidaciones",icon:"◎",label:"Liquidar"},
+    {id:"cajas",icon:"🏦",label:"Cajas"},
     {id:"historial",icon:"📅",label:"Historial"},
     {id:"config",icon:"⚙",label:"Config"},
   ];
@@ -1828,7 +2255,8 @@ export default function App(){
 
         {/* VENTAS */}
         {tab==="ventas" && (
-          <VentasTab vMes={vMes} totalVtas={totalVtas} mes={mes} anio={anio}/>
+          <VentasTab vMes={vMes} totalVtas={totalVtas} mes={mes} anio={anio}
+            onVentaClick={v=>setVentaDetalle(v)}/>
         )}
 
         {/* LIQUIDACIONES */}
@@ -1894,9 +2322,13 @@ export default function App(){
           </div>
         )}
 
+        {/* CAJAS */}
+        {tab==="cajas" && <CajasTab/>}
+
         {/* HISTORIAL */}
         {tab==="historial" && (
-          <HistorialTab ventas={ventas} inv={inv} cierres={cierres}/>
+          <HistorialTab ventas={ventas} inv={inv} cierres={cierres}
+            onVentaClick={v=>setVentaDetalle(v)}/>
         )}
 
         {/* CONFIG */}
@@ -1907,6 +2339,13 @@ export default function App(){
 
       {/* ── BOTTOM TAB BAR ── */}
       <TabBar tabs={TABS} active={tab} onChange={t=>{setTab(t);setMD(null);}}/>
+
+      {/* ── NOTA DE VENTA MODAL ── */}
+      <NotaVentaModal
+        venta={ventaDetalle}
+        numVenta={ventaDetalle?ventaDetalle.id.replace(/\D/g,"").slice(-4).padStart(4,"0"):null}
+        onClose={()=>setVentaDetalle(null)}
+      />
 
       {/* ══ SHEETS ══ */}
 
@@ -3029,7 +3468,7 @@ function MarcaDetalle({marcaId,inv,ventas,vMes,mes,anio,MK,cierres,setCierres,ge
 // ══════════════════════════════════════════════════════════
 // HISTORIAL TAB — Navegación por mes/año
 // ══════════════════════════════════════════════════════════
-function HistorialTab({ventas, inv, cierres}){
+function HistorialTab({ventas, inv, cierres, onVentaClick}){
   const now = new Date();
   var _hN152 = useState(now.getMonth()); var mesSel = _hN152[0]; var setMesSel = _hN152[1];
   var _hN153 = useState(now.getFullYear()); var anioSel = _hN153[0]; var setAnioSel = _hN153[1];
@@ -3249,7 +3688,9 @@ function HistorialTab({ventas, inv, cierres}){
             ? <EmptyState icon="📊" title="Sin ventas" sub={`${MESES[mesSel]} ${anioSel}`}/>
             : [...ventasPer].reverse().map(v=>{
                 return (
-                  <div key={v.id} style={{background:C.bg2,borderRadius:14,padding:"14px 16px",marginBottom:10}}>
+                  <div key={v.id} onClick={()=>onVentaClick&&onVentaClick(v)}
+                    style={{background:C.bg2,borderRadius:14,padding:"14px 16px",marginBottom:10,
+                      cursor:"pointer",WebkitTapHighlightColor:"transparent"}}>
                     <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
                       <div>
                         <span style={{fontFamily:"monospace",fontSize:12,color:C.gold}}>{v.id}</span>
@@ -3614,7 +4055,7 @@ function GestionUsuarios({user, usuarios, onGuardar}){
 // ══════════════════════════════════════════════════════════
 // VENTAS TAB — totales globales + desglose por marca
 // ══════════════════════════════════════════════════════════
-function VentasTab({vMes, totalVtas, mes, anio}){
+function VentasTab({vMes, totalVtas, mes, anio, onVentaClick}){
   var _hN166 = useState("marcas"); var vistaActiva = _hN166[0]; var setVistaActiva = _hN166[1];; // "marcas" | "historial"
   var _hN167 = useState(null); var marcaFiltro = _hN167[0]; var setMarcaFiltro = _hN167[1];; // id marca o null = todas
 
@@ -3795,7 +4236,9 @@ function VentasTab({vMes, totalVtas, mes, anio}){
                   : v.items;
                 const totalMostrar=itemsMostrar.reduce((s,i)=>s+i.subtotal,0);
                 return (
-                  <div key={v.id} style={{background:C.bg2,borderRadius:16,padding:"14px 16px",marginBottom:10}}>
+                  <div key={v.id} onClick={()=>onVentaClick&&onVentaClick(v)}
+                    style={{background:C.bg2,borderRadius:16,padding:"14px 16px",marginBottom:10,
+                      cursor:"pointer",WebkitTapHighlightColor:"transparent"}}>
                     <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
                       <div>
                         <span style={{fontFamily:"monospace",fontSize:12,color:C.gold,fontWeight:700}}>{v.id}</span>
