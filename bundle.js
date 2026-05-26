@@ -28525,75 +28525,94 @@ Fecha: ${venta.fecha}`);
         {
           key: m.id,
           style: {
-            background: C.bg2,
-            borderRadius: isDesktop ? 12 : i === 0 ? "14px 14px 2px 2px" : i === marcasState.length - 1 ? "2px 2px 14px 14px" : "2px",
-            padding: isDesktop ? "10px 14px" : "14px 16px",
+            background: C.bg1,
+            borderRadius: isDesktop ? 14 : i === 0 ? "16px 16px 4px 4px" : i === marcasState.length - 1 ? "4px 4px 16px 16px" : "4px",
+            padding: isDesktop ? "12px 16px" : "12px 14px",
             borderBottom: isDesktop ? "none" : i < marcasState.length - 1 ? `1px solid ${C.sep}` : "",
-            border: isDesktop ? `1px solid ${C.sep}` : void 0,
+            border: isDesktop ? `1px solid ${C.sep}` : `1px solid ${C.sep}`,
             display: "flex",
             alignItems: "center",
-            gap: isDesktop ? 10 : 14,
+            gap: 14,
             opacity: inactiva ? 0.5 : 1,
             WebkitTapHighlightColor: "transparent",
             userSelect: "none",
-            transition: isDesktop ? "background .12s, box-shadow .12s" : void 0,
-            cursor: isDesktop && !inactiva ? "pointer" : void 0
+            transition: "background .15s, box-shadow .15s",
+            cursor: !inactiva ? "pointer" : "default",
+            boxShadow: "0 1px 3px rgba(0,0,0,0.04)"
           },
-          onClick: isDesktop && !inactiva ? () => setMD(m.id) : void 0,
-          onMouseEnter: isDesktop && !inactiva ? (e) => {
-            e.currentTarget.style.background = `${m.color}10`;
-            e.currentTarget.style.boxShadow = `0 2px 12px ${m.color}20`;
+          onClick: !inactiva ? () => setMD(m.id) : void 0,
+          onMouseEnter: !inactiva ? (e) => {
+            e.currentTarget.style.background = `${m.color}08`;
+            e.currentTarget.style.boxShadow = `0 4px 16px ${m.color}18`;
           } : void 0,
-          onMouseLeave: isDesktop && !inactiva ? (e) => {
-            e.currentTarget.style.background = C.bg2;
-            e.currentTarget.style.boxShadow = "none";
+          onMouseLeave: !inactiva ? (e) => {
+            e.currentTarget.style.background = C.bg1;
+            e.currentTarget.style.boxShadow = "0 1px 3px rgba(0,0,0,0.04)";
           } : void 0
         },
+        /* @__PURE__ */ import_react.default.createElement("div", { style: {
+          width: isDesktop ? 52 : 58,
+          height: isDesktop ? 52 : 58,
+          borderRadius: isDesktop ? 14 : 16,
+          flexShrink: 0,
+          background: `${m.color}18`,
+          overflow: "hidden",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontSize: 26,
+          border: `1.5px solid ${m.color}30`,
+          boxShadow: `0 2px 10px ${m.color}20`
+        } }, m.imagen ? /* @__PURE__ */ import_react.default.createElement(
+          "img",
+          {
+            src: m.imagen,
+            alt: m.nombre,
+            style: { width: "100%", height: "100%", objectFit: "cover" }
+          }
+        ) : m.emoji),
         /* @__PURE__ */ import_react.default.createElement(
           "div",
           {
-            onClick: !isDesktop ? (() => !inactiva && setMD(m.id)) : void 0,
-            style: {
-              width: isDesktop ? 36 : 42,
-              height: isDesktop ? 36 : 42,
-              borderRadius: 12,
-              flexShrink: 0,
-              background: `${m.color}22`,
-              overflow: "hidden",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontSize: 20,
-              cursor: inactiva ? "default" : "pointer"
-            }
+            onClick: (e) => e.stopPropagation(),
+            style: { flex: 1, minWidth: 0 }
           },
-          m.imagen ? /* @__PURE__ */ import_react.default.createElement(
-            "img",
-            {
-              src: m.imagen,
-              alt: m.nombre,
-              style: { width: isDesktop ? 36 : 42, height: isDesktop ? 36 : 42, objectFit: "cover" }
-            }
-          ) : m.emoji
-        ),
-        /* @__PURE__ */ import_react.default.createElement(
-          "div",
-          {
-            onClick: !isDesktop ? (() => !inactiva && setMD(m.id)) : void 0,
-            style: { flex: 1, minWidth: 0, cursor: inactiva ? "default" : "pointer" }
-          },
-          /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: isDesktop ? 14 : 16, fontWeight: 600, color: C.label, fontFamily: FONT, letterSpacing: "0.02em" } }, m.nombre, inactiva && /* @__PURE__ */ import_react.default.createElement("span", { style: {
-            fontSize: 11,
+          /* @__PURE__ */ import_react.default.createElement("div", { style: {
+            fontSize: isDesktop ? 15 : 17,
+            fontWeight: 600,
+            color: C.label,
+            fontFamily: FONT,
+            letterSpacing: "0.02em",
+            marginBottom: 3,
+            lineHeight: 1.2
+          } }, m.nombre, inactiva && /* @__PURE__ */ import_react.default.createElement("span", { style: {
+            fontSize: 10,
             color: C.red,
             fontWeight: 600,
             marginLeft: 8,
             padding: "2px 7px",
             borderRadius: 8,
-            background: `${C.red}15`
+            background: `${C.red}12`,
+            letterSpacing: "0.04em",
+            textTransform: "uppercase"
           } }, "inactiva")),
-          /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: isDesktop ? 12 : 13, color: C.label3, fontFamily: FONT } }, prods, " producto", prods !== 1 ? "s" : "", total > 0 && ` \xB7 ${$(total)}`)
+          /* @__PURE__ */ import_react.default.createElement("div", { style: {
+            fontSize: 12,
+            color: C.label3,
+            fontFamily: FONT,
+            display: "flex",
+            alignItems: "center",
+            gap: 6
+          } }, /* @__PURE__ */ import_react.default.createElement("span", { style: {
+            display: "inline-block",
+            width: 6,
+            height: 6,
+            borderRadius: 3,
+            background: prods > 0 ? C.green : C.label4,
+            flexShrink: 0
+          } }), prods, " producto", prods !== 1 ? "s" : "", total > 0 && /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.gold, fontWeight: 500 } }, " \xB7 ", $(total)))
         ),
-        /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 } }, cerrado && /* @__PURE__ */ import_react.default.createElement(Chip, { color: C.green, small: true }, "\u2713"), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6 } }, user.rol === "admin" && /* @__PURE__ */ import_react.default.createElement(
+        /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6, flexShrink: 0 } }, cerrado && /* @__PURE__ */ import_react.default.createElement(Chip, { color: C.green, small: true }, "\u2713"), user.rol === "admin" && /* @__PURE__ */ import_react.default.createElement(
           MarcaEditBtn,
           {
             onClick: (e) => {
@@ -28603,14 +28622,7 @@ Fecha: ${venta.fecha}`);
             },
             accentColor: m.color
           }
-        ), !inactiva && !isDesktop && /* @__PURE__ */ import_react.default.createElement(
-          "span",
-          {
-            onClick: () => setMD(m.id),
-            style: { color: C.label3, fontSize: 22, cursor: "pointer" }
-          },
-          "\u203A"
-        ), !inactiva && isDesktop && /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.label3, fontSize: 18 } }, "\u203A")))
+        ), !inactiva && /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.label3, fontSize: 20, lineHeight: 1, opacity: 0.5 } }, "\u203A"))
       );
     }))), tab === "marcas" && marcaDetalle && /* @__PURE__ */ import_react.default.createElement(
       MarcaDetalle,

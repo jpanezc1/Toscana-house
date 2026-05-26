@@ -6699,65 +6699,87 @@ function App(){
                 const inactiva=m.estado==="inactiva";
                 return (
                   <div key={m.id} style={{
-                    background:C.bg2,
-                    borderRadius: isDesktop ? 12 : (i===0?"14px 14px 2px 2px":i===marcasState.length-1?"2px 2px 14px 14px":"2px"),
-                    padding: isDesktop ? "10px 14px" : "14px 16px",
+                    background:C.bg1,
+                    borderRadius: isDesktop ? 14 : (i===0?"16px 16px 4px 4px":i===marcasState.length-1?"4px 4px 16px 16px":"4px"),
+                    padding: isDesktop ? "12px 16px" : "12px 14px",
                     borderBottom: isDesktop ? "none" : (i<marcasState.length-1?`1px solid ${C.sep}`:""),
-                    border: isDesktop ? `1px solid ${C.sep}` : undefined,
-                    display:"flex",alignItems:"center",gap: isDesktop ? 10 : 14,
+                    border: isDesktop ? `1px solid ${C.sep}` : `1px solid ${C.sep}`,
+                    display:"flex",alignItems:"center",gap:14,
                     opacity:inactiva?.5:1,
                     WebkitTapHighlightColor:"transparent",
                     userSelect:"none",
-                    transition: isDesktop ? "background .12s, box-shadow .12s" : undefined,
-                    cursor: isDesktop && !inactiva ? "pointer" : undefined,
+                    transition:"background .15s, box-shadow .15s",
+                    cursor: !inactiva ? "pointer" : "default",
+                    boxShadow:"0 1px 3px rgba(0,0,0,0.04)",
                   }}
-                  onClick={ isDesktop && !inactiva ? ()=>setMD(m.id) : undefined}
-                  onMouseEnter={isDesktop && !inactiva ? e=>{ e.currentTarget.style.background=`${m.color}10`; e.currentTarget.style.boxShadow=`0 2px 12px ${m.color}20`; } : undefined}
-                  onMouseLeave={isDesktop && !inactiva ? e=>{ e.currentTarget.style.background=C.bg2; e.currentTarget.style.boxShadow="none"; } : undefined}
+                  onClick={!inactiva ? ()=>setMD(m.id) : undefined}
+                  onMouseEnter={!inactiva ? e=>{ e.currentTarget.style.background=`${m.color}08`; e.currentTarget.style.boxShadow=`0 4px 16px ${m.color}18`; } : undefined}
+                  onMouseLeave={!inactiva ? e=>{ e.currentTarget.style.background=C.bg1; e.currentTarget.style.boxShadow="0 1px 3px rgba(0,0,0,0.04)"; } : undefined}
                   >
-                    {/* Avatar */}
-                    <div onClick={!isDesktop ? (()=>!inactiva&&setMD(m.id)) : undefined}
-                      style={{width: isDesktop ? 36 : 42, height: isDesktop ? 36 : 42, borderRadius:12,flexShrink:0,
-                        background:`${m.color}22`,overflow:"hidden",
-                        display:"flex",alignItems:"center",justifyContent:"center",
-                        fontSize:20,cursor:inactiva?"default":"pointer"}}>
+                    {/* Avatar — bigger, more visible */}
+                    <div style={{
+                      width: isDesktop ? 52 : 58,
+                      height: isDesktop ? 52 : 58,
+                      borderRadius: isDesktop ? 14 : 16,
+                      flexShrink:0,
+                      background:`${m.color}18`,
+                      overflow:"hidden",
+                      display:"flex",alignItems:"center",justifyContent:"center",
+                      fontSize:26,
+                      border:`1.5px solid ${m.color}30`,
+                      boxShadow:`0 2px 10px ${m.color}20`,
+                    }}>
                       {m.imagen
                         ? <img src={m.imagen} alt={m.nombre}
-                            style={{width: isDesktop ? 36 : 42, height: isDesktop ? 36 : 42, objectFit:"cover"}}/>
+                            style={{width:"100%",height:"100%",objectFit:"cover"}}/>
                         : m.emoji}
                     </div>
+
                     {/* Info */}
-                    <div onClick={!isDesktop ? (()=>!inactiva&&setMD(m.id)) : undefined}
-                      style={{flex:1,minWidth:0,cursor:inactiva?"default":"pointer"}}>
-                      <div style={{fontSize: isDesktop ? 14 : 16, fontWeight:600, color:C.label, fontFamily:FONT, letterSpacing:"0.02em"}}>
+                    <div onClick={e=>e.stopPropagation()}
+                      style={{flex:1,minWidth:0}}>
+                      <div style={{
+                        fontSize: isDesktop ? 15 : 17,
+                        fontWeight:600,
+                        color:C.label,
+                        fontFamily:FONT,
+                        letterSpacing:"0.02em",
+                        marginBottom:3,
+                        lineHeight:1.2,
+                      }}>
                         {m.nombre}
-                        {inactiva&&<span style={{fontSize:11,color:C.red,fontWeight:600,
+                        {inactiva&&<span style={{fontSize:10,color:C.red,fontWeight:600,
                           marginLeft:8,padding:"2px 7px",borderRadius:8,
-                          background:`${C.red}15`}}>inactiva</span>}
+                          background:`${C.red}12`,letterSpacing:"0.04em",
+                          textTransform:"uppercase"}}>inactiva</span>}
                       </div>
-                      <div style={{fontSize: isDesktop ? 12 : 13, color:C.label3,fontFamily:FONT}}>
+                      <div style={{
+                        fontSize:12,
+                        color:C.label3,
+                        fontFamily:FONT,
+                        display:"flex",alignItems:"center",gap:6,
+                      }}>
+                        <span style={{
+                          display:"inline-block",width:6,height:6,borderRadius:3,
+                          background:prods>0?C.green:C.label4,flexShrink:0,
+                        }}/>
                         {prods} producto{prods!==1?"s":""}
-                        {total>0&&` · ${$(total)}`}
+                        {total>0&&<span style={{color:C.gold,fontWeight:500}}> · {$(total)}</span>}
                       </div>
                     </div>
+
                     {/* Acciones */}
-                    <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:4}}>
+                    <div style={{display:"flex",alignItems:"center",gap:6,flexShrink:0}}>
                       {cerrado&&<Chip color={C.green} small>✓</Chip>}
-                      <div style={{display:"flex",alignItems:"center",gap:6}}>
-                        {user.rol==="admin"&&(
-                          <MarcaEditBtn
-                            onClick={e=>{e.stopPropagation();setEditMarca(m);setModalNuevaMarca(true);}}
-                            accentColor={m.color}
-                          />
-                        )}
-                        {!inactiva&&!isDesktop&&(
-                          <span onClick={()=>setMD(m.id)}
-                            style={{color:C.label3,fontSize:22,cursor:"pointer"}}>›</span>
-                        )}
-                        {!inactiva&&isDesktop&&(
-                          <span style={{color:C.label3,fontSize:18}}>›</span>
-                        )}
-                      </div>
+                      {user.rol==="admin"&&(
+                        <MarcaEditBtn
+                          onClick={e=>{e.stopPropagation();setEditMarca(m);setModalNuevaMarca(true);}}
+                          accentColor={m.color}
+                        />
+                      )}
+                      {!inactiva&&(
+                        <span style={{color:C.label3,fontSize:20,lineHeight:1,opacity:.5}}>›</span>
+                      )}
                     </div>
                   </div>
                 );
