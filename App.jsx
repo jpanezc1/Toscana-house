@@ -5278,9 +5278,10 @@ const MARCA_COLORS = [
   "#D4B8A8","#A8B8C4","#C4D4A8","#D4A8A8","#A8C4D4","#C4A8D4",
 ];
 
-function NuevaMarcaModal({editMarca, onClose, onGuardar}){
+function NuevaMarcaModal({editMarca, marcasActuales, onClose, onGuardar}){
   const isNew = !editMarca;
-  const nextId = useMemo(()=> isNew ? Math.max(...MARCAS.map(m=>m.id),17)+1 : editMarca.id, []);
+  const lista = marcasActuales || MARCAS;
+  const nextId = useMemo(()=> isNew ? Math.max(...lista.map(m=>m.id),17)+1 : editMarca.id, []);
 
   const [f, setF] = useState(isNew
     ? {nombre:"", emoji:"✨", color:MARCA_COLORS[0], email:"", telefono:"",
@@ -5680,25 +5681,28 @@ function App(){
   const[shImportarExcel,setShImportarExcel]=useState(false);
   const[modalNuevaMarca,setModalNuevaMarca]=useState(false);
   const[editMarca,setEditMarca]           =useState(null);
-  const[marcasVer,setMarcasVer]           =useState(0); // bump → re-render con MARCAS actualizado
+  // marcasState es la fuente de verdad React para la lista de marcas.
+  // MARCAS (global mutable) se mantiene en sync para el resto del código.
+  const[marcasState,setMarcasState]       =useState(()=>cargarMarcas());
   const drive = useDriveSync();
 
-  // Guarda marca nueva o editada en localStorage y recarga MARCAS global
+  // Guarda marca nueva o editada → actualiza React state + global + localStorage
   function onMarcaGuardada(marca, isNew, nuevoUsuario){
-    const lista = isNew
-      ? [...MARCAS, marca]
-      : MARCAS.map(m => m.id===marca.id ? {...m,...marca} : m);
-    localStorage.setItem("th_marcas", JSON.stringify(lista));
-    MARCAS = lista; // actualizar referencia global
-    setMarcasVer(v=>v+1);
+    setMarcasState(prev => {
+      const lista = isNew
+        ? [...prev, marca]
+        : prev.map(m => m.id===marca.id ? {...m,...marca} : m);
+      localStorage.setItem("th_marcas", JSON.stringify(lista));
+      MARCAS = lista; // mantener global en sync para genCod, calcLiqMarca, etc.
+      return lista;
+    });
     // Si se pidió crear usuario brand, añadirlo
     if(nuevoUsuario){
       const usuarios = (() => {
         try{ return JSON.parse(localStorage.getItem("th_usuarios")||"null")||USUARIOS; }
         catch{ return USUARIOS; }
       })();
-      const nuevosU = [...usuarios, nuevoUsuario];
-      localStorage.setItem("th_usuarios", JSON.stringify(nuevosU));
+      localStorage.setItem("th_usuarios", JSON.stringify([...usuarios, nuevoUsuario]));
     }
   }
 
@@ -5973,10 +5977,10 @@ function App(){
               marginBottom:14}}>
               <div style={{fontSize:13,fontWeight:600,color:C.label3,textTransform:"uppercase",
                 letterSpacing:.8,paddingLeft:4}}>
-                {MARCAS.filter(m=>m.estado!=="inactiva").length} marca{MARCAS.filter(m=>m.estado!=="inactiva").length!==1?"s":""} activa{MARCAS.filter(m=>m.estado!=="inactiva").length!==1?"s":""}
-                {MARCAS.filter(m=>m.estado==="inactiva").length>0&&(
+                {marcasState.filter(m=>m.estado!=="inactiva").length} marca{marcasState.filter(m=>m.estado!=="inactiva").length!==1?"s":""} activa{marcasState.filter(m=>m.estado!=="inactiva").length!==1?"s":""}
+                {marcasState.filter(m=>m.estado==="inactiva").length>0&&(
                   <span style={{color:C.label3,fontWeight:400}}>
-                    {" "}· {MARCAS.filter(m=>m.estado==="inactiva").length} inactiva{MARCAS.filter(m=>m.estado==="inactiva").length!==1?"s":""}
+                    {" "}· {marcasState.filter(m=>m.estado==="inactiva").length} inactiva{marcasState.filter(m=>m.estado==="inactiva").length!==1?"s":""}
                   </span>
                 )}
               </div>
@@ -5994,7 +5998,7 @@ function App(){
             </div>
 
             <div style={{display:"flex",flexDirection:"column",gap:2}}>
-              {MARCAS.map((m,i)=>{
+              {marcasState.map((m,i)=>{
                 const total=vMes.reduce((s,v)=>s+v.items.filter(it=>it.marcaId===m.id).reduce((ss,it)=>ss+it.subtotal,0),0);
                 const prods=inv.filter(it=>it.marcaId===m.id).filter(p=>p.stock>0).length;
                 const cerrado=cierres[`${MK}-${m.id}`]?.cerrado;
@@ -6002,9 +6006,9 @@ function App(){
                 return (
                   <div key={m.id} style={{
                     background:C.bg2,
-                    borderRadius:i===0?"14px 14px 2px 2px":i===MARCAS.length-1?"2px 2px 14px 14px":"2px",
+                    borderRadius:i===0?"14px 14px 2px 2px":i===marcasState.length-1?"2px 2px 14px 14px":"2px",
                     padding:"14px 16px",
-                    borderBottom:i<MARCAS.length-1?`1px solid ${C.sep}`:"",
+                    borderBottom:i<marcasState.length-1?`1px solid ${C.sep}`:"",
                     display:"flex",alignItems:"center",gap:14,
                     opacity:inactiva?.5:1,
                     WebkitTapHighlightColor:"transparent",
@@ -6412,6 +6416,7 @@ function App(){
       {modalNuevaMarca && (
         <NuevaMarcaModal
           editMarca={editMarca}
+          marcasActuales={marcasState}
           onClose={()=>{setModalNuevaMarca(false);setEditMarca(null);}}
           onGuardar={onMarcaGuardada}
         />

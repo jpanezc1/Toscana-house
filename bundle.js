@@ -26780,9 +26780,10 @@ Fecha: ${venta.fecha}`);
     "#A8C4D4",
     "#C4A8D4"
   ];
-  function NuevaMarcaModal({ editMarca, onClose, onGuardar }) {
+  function NuevaMarcaModal({ editMarca, marcasActuales, onClose, onGuardar }) {
     const isNew = !editMarca;
-    const nextId = (0, import_react.useMemo)(() => isNew ? Math.max(...MARCAS.map((m) => m.id), 17) + 1 : editMarca.id, []);
+    const lista = marcasActuales || MARCAS;
+    const nextId = (0, import_react.useMemo)(() => isNew ? Math.max(...lista.map((m) => m.id), 17) + 1 : editMarca.id, []);
     const [f, setF] = (0, import_react.useState)(
       isNew ? {
         nombre: "",
@@ -27372,13 +27373,15 @@ Fecha: ${venta.fecha}`);
     const [shImportarExcel, setShImportarExcel] = (0, import_react.useState)(false);
     const [modalNuevaMarca, setModalNuevaMarca] = (0, import_react.useState)(false);
     const [editMarca, setEditMarca] = (0, import_react.useState)(null);
-    const [marcasVer, setMarcasVer] = (0, import_react.useState)(0);
+    const [marcasState, setMarcasState] = (0, import_react.useState)(() => cargarMarcas());
     const drive = useDriveSync();
     function onMarcaGuardada(marca, isNew, nuevoUsuario) {
-      const lista = isNew ? [...MARCAS, marca] : MARCAS.map((m) => m.id === marca.id ? { ...m, ...marca } : m);
-      localStorage.setItem("th_marcas", JSON.stringify(lista));
-      MARCAS = lista;
-      setMarcasVer((v) => v + 1);
+      setMarcasState((prev) => {
+        const lista = isNew ? [...prev, marca] : prev.map((m) => m.id === marca.id ? { ...m, ...marca } : m);
+        localStorage.setItem("th_marcas", JSON.stringify(lista));
+        MARCAS = lista;
+        return lista;
+      });
       if (nuevoUsuario) {
         const usuarios = (() => {
           try {
@@ -27387,8 +27390,7 @@ Fecha: ${venta.fecha}`);
             return USUARIOS;
           }
         })();
-        const nuevosU = [...usuarios, nuevoUsuario];
-        localStorage.setItem("th_usuarios", JSON.stringify(nuevosU));
+        localStorage.setItem("th_usuarios", JSON.stringify([...usuarios, nuevoUsuario]));
       }
     }
     (0, import_react.useEffect)(() => {
@@ -27695,7 +27697,7 @@ Fecha: ${venta.fecha}`);
       textTransform: "uppercase",
       letterSpacing: 0.8,
       paddingLeft: 4
-    } }, MARCAS.filter((m) => m.estado !== "inactiva").length, " marca", MARCAS.filter((m) => m.estado !== "inactiva").length !== 1 ? "s" : "", " activa", MARCAS.filter((m) => m.estado !== "inactiva").length !== 1 ? "s" : "", MARCAS.filter((m) => m.estado === "inactiva").length > 0 && /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.label3, fontWeight: 400 } }, " ", "\xB7 ", MARCAS.filter((m) => m.estado === "inactiva").length, " inactiva", MARCAS.filter((m) => m.estado === "inactiva").length !== 1 ? "s" : "")), user.rol === "admin" && /* @__PURE__ */ import_react.default.createElement(
+    } }, marcasState.filter((m) => m.estado !== "inactiva").length, " marca", marcasState.filter((m) => m.estado !== "inactiva").length !== 1 ? "s" : "", " activa", marcasState.filter((m) => m.estado !== "inactiva").length !== 1 ? "s" : "", marcasState.filter((m) => m.estado === "inactiva").length > 0 && /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.label3, fontWeight: 400 } }, " ", "\xB7 ", marcasState.filter((m) => m.estado === "inactiva").length, " inactiva", marcasState.filter((m) => m.estado === "inactiva").length !== 1 ? "s" : "")), user.rol === "admin" && /* @__PURE__ */ import_react.default.createElement(
       "button",
       {
         onClick: () => {
@@ -27721,16 +27723,16 @@ Fecha: ${venta.fecha}`);
       },
       /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 15, fontWeight: 400 } }, "+"),
       " A\xF1adir marca"
-    )), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 2 } }, MARCAS.map((m, i) => {
+    )), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 2 } }, marcasState.map((m, i) => {
       const total = vMes.reduce((s, v) => s + v.items.filter((it) => it.marcaId === m.id).reduce((ss, it) => ss + it.subtotal, 0), 0);
       const prods = inv.filter((it) => it.marcaId === m.id).filter((p) => p.stock > 0).length;
       const cerrado = cierres[`${MK}-${m.id}`]?.cerrado;
       const inactiva = m.estado === "inactiva";
       return /* @__PURE__ */ import_react.default.createElement("div", { key: m.id, style: {
         background: C.bg2,
-        borderRadius: i === 0 ? "14px 14px 2px 2px" : i === MARCAS.length - 1 ? "2px 2px 14px 14px" : "2px",
+        borderRadius: i === 0 ? "14px 14px 2px 2px" : i === marcasState.length - 1 ? "2px 2px 14px 14px" : "2px",
         padding: "14px 16px",
-        borderBottom: i < MARCAS.length - 1 ? `1px solid ${C.sep}` : "",
+        borderBottom: i < marcasState.length - 1 ? `1px solid ${C.sep}` : "",
         display: "flex",
         alignItems: "center",
         gap: 14,
@@ -28162,6 +28164,7 @@ Fecha: ${venta.fecha}`);
       NuevaMarcaModal,
       {
         editMarca,
+        marcasActuales: marcasState,
         onClose: () => {
           setModalNuevaMarca(false);
           setEditMarca(null);
