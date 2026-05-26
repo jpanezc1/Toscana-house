@@ -698,6 +698,74 @@ function calcLiqMarca(vMarca, marcaId, MK) {
   return { bruto, brutoEf, brutoQR, brutoTJ, descQR, descTJ, subBanco, comision, alquiler, neto, cfg };
 }
 
+// ── FACTURACIÓN SIAT BOLIVIA — CUCU API ────────────────────────
+const CUCU_CFG_KEY = "th_cucu_cfg";
+const CUCU_DEF = {
+  apiKey: "",
+  endpoint: "https://app.cucu.bo/api/v1/invoices",
+  codigoActividad: "470000",
+  codigoProductoSin: "58311",
+  modoApi: true,
+};
+const CUCU_MP = { efectivo:1, qr:5, tarjeta:2, transferencia:4 };
+
+function leerCfgCUCU(){
+  try{ return {...CUCU_DEF,...JSON.parse(localStorage.getItem(CUCU_CFG_KEY)||"{}")}; }
+  catch{ return CUCU_DEF; }
+}
+function guardarFacturaLocal(ventaId, data){
+  try{ localStorage.setItem(`th_fac_${ventaId}`, JSON.stringify(data)); }catch{}
+}
+function leerFacturaLocal(ventaId){
+  try{ return JSON.parse(localStorage.getItem(`th_fac_${ventaId}`)||"null"); }catch{return null;}
+}
+async function emitirFacturaCUCU(venta, nitComprador, nombreComprador){
+  const cfg = leerCfgCUCU();
+  if(!cfg.apiKey) throw new Error("API Key de CUCU no configurada. Ir a Config → Sistema → Facturación.");
+  const mp = venta.metodoPago;
+  let codPago = 1;
+  if(mp?.startsWith("mixto|")){
+    const obj={efectivo:0,qr:0,tarjeta:0};
+    mp.split("|").slice(1).forEach(p=>{const[k,v]=p.split(":");obj[k]=parseFloat(v)||0;});
+    const dom=Object.keys(obj).reduce((a,b)=>obj[a]>=obj[b]?a:b,"efectivo");
+    codPago=CUCU_MP[dom]||1;
+  } else { codPago=CUCU_MP[mp]||1; }
+  const payload = {
+    actividadEconomica: cfg.codigoActividad,
+    metodoPago: codPago,
+    cliente: { nit: Number(nitComprador)||0, razonSocial:(nombreComprador||"Sin Nombre").trim() },
+    items: venta.items.map(it=>({
+      codigoProducto: Number(cfg.codigoProductoSin)||58311,
+      descripcion: (it.nombre||"Producto").slice(0,100),
+      cantidad: it.cantidad||1,
+      precioUnitario: it.precioUnit||0,
+      descuento: 0,
+      subtotal: it.subtotal||0,
+    })),
+    total: venta.total||0,
+  };
+  const r = await fetch(cfg.endpoint, {
+    method:"POST",
+    headers:{"Authorization":`Bearer ${cfg.apiKey}`,"Content-Type":"application/json"},
+    body:JSON.stringify(payload),
+  });
+  if(!r.ok){
+    let msg="";
+    try{const j=await r.json();msg=j.message||j.error||JSON.stringify(j);}catch{msg=await r.text();}
+    throw new Error(`CUCU ${r.status}: ${msg.slice(0,200)}`);
+  }
+  const body=await r.json();
+  const d=body.data||body;
+  return {
+    cuf: d.cuf||d.CUF||d.codigoCuf||"",
+    numero: d.numero||d.nroFactura||d.numeroFactura||d.number||"",
+    qrUrl: d.qr||d.qrUrl||d.urlQr||"",
+    pdf: d.pdf||d.pdfUrl||d.urlPdf||"",
+    nitComprador: Number(nitComprador)||0,
+    nombreComprador: (nombreComprador||"Sin Nombre").trim(),
+  };
+}
+
 // ── REPORTE MENSUAL COMPLETO (todas las marcas, una pestaña c/u) ──
 async function generarExcelMensual(ventas, inventario, mes, anio, setGenerando, retiros) {
   setGenerando(true);
@@ -1191,6 +1259,21 @@ function abrirNotaVenta(venta, numSecuencial, autoPrint=false){
   </table>
 </div>
 <div class="letras">Son: <strong>${numeroALetras(venta.total)}</strong></div>
+${(()=>{
+  const fac=leerFacturaLocal(venta.id);
+  if(!fac) return "";
+  return `<div style="margin:12px 0;padding:10px 12px;border:1.5px solid #1A237E;border-radius:6px;background:#F3F4FC">
+    <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#1A237E;margin-bottom:4px">
+      🧾 Factura Electrónica SIAT Bolivia
+    </div>
+    <div style="font-size:10px;color:#111">
+      N° <strong>${fac.numero||"—"}</strong> &nbsp;|&nbsp;
+      ${fac.nitComprador&&fac.nitComprador!==0?`NIT: ${fac.nitComprador}`:"Sin NIT (CF)"} &nbsp;|&nbsp;
+      ${fac.nombreComprador||"Sin Nombre"}
+    </div>
+    ${fac.cuf?`<div style="font-size:8px;color:#555;margin-top:3px;font-family:monospace;word-break:break-all">CUF: ${fac.cuf}</div>`:""}
+  </div>`;
+})()}
 <div class="foot">Toscana House · ${SUCURSAL_EMP} · ${TELEFONO_EMP} · ${CIUDAD_EMP}</div>
 ${autoPrint?`<script>window.onload=function(){setTimeout(function(){window.print();},600);}<\/script>`:""}
 </body></html>`);
@@ -2272,12 +2355,214 @@ function RetirosTab({inv, retiros, onRetiro}){
 }
 
 // ══════════════════════════════════════════════════════════
+// FACTURA MODAL — SIAT Bolivia (CUCU API)
+// ══════════════════════════════════════════════════════════
+function FacturaModal({venta, open, onClose, onFacturada}){
+  const [nit,setNit]     = useState("0");
+  const [nombre,setNombre] = useState("Sin Nombre");
+  const [modo,setModo]   = useState("api");
+  const [estado,setEstado] = useState("idle");
+  const [resultado,setResultado] = useState(null);
+  const [errMsg,setErrMsg] = useState("");
+  const [manNro,setManNro] = useState("");
+  const [manCuf,setManCuf] = useState("");
+
+  const cfg = leerCfgCUCU();
+
+  useEffect(()=>{
+    if(open){
+      setNit("0"); setNombre("Sin Nombre");
+      setModo(cfg.modoApi!==false?"api":"manual");
+      setEstado("idle"); setResultado(null); setErrMsg("");
+      setManNro(""); setManCuf("");
+    }
+  },[open]);
+
+  const factExist = venta ? leerFacturaLocal(venta.id) : null;
+
+  async function emitir(){
+    setEstado("enviando"); setErrMsg("");
+    try{
+      const r = await emitirFacturaCUCU(venta,nit,nombre);
+      guardarFacturaLocal(venta.id,r);
+      setResultado(r); setEstado("ok");
+      onFacturada&&onFacturada(r);
+    }catch(e){ setErrMsg(e.message); setEstado("error"); }
+  }
+
+  function guardarManual(){
+    if(!manNro&&!manCuf){ setErrMsg("Ingresá el número de factura o CUF."); return; }
+    const r={cuf:manCuf,numero:manNro,qrUrl:"",pdf:"",nitComprador:Number(nit)||0,nombreComprador:nombre.trim()};
+    guardarFacturaLocal(venta.id,r);
+    setResultado(r); setEstado("ok");
+    onFacturada&&onFacturada(r);
+  }
+
+  const FacturaOK = ({r})=>(
+    <div>
+      <div style={{textAlign:"center",marginBottom:20}}>
+        <div style={{width:60,height:60,borderRadius:"50%",background:`${C.green}15`,
+          display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 12px",fontSize:28}}>✓</div>
+        <div style={{fontSize:20,fontWeight:500,color:C.green,fontFamily:FONT_DISPLAY,letterSpacing:.5}}>
+          Factura Emitida
+        </div>
+        <div style={{fontSize:12,color:C.label3,fontFamily:FONT,marginTop:4}}>SIAT Bolivia</div>
+      </div>
+      <div style={{background:C.bg2,borderRadius:14,overflow:"hidden",marginBottom:16,border:`1px solid ${C.sep}`}}>
+        {[["N° Factura",r.numero],["Cliente",r.nombreComprador],
+          ["NIT",r.nitComprador===0?"Sin NIT (CF)":r.nitComprador]
+        ].filter(([,v])=>v!==undefined&&v!=="").map(([k,v],i,a)=>(
+          <div key={k} style={{display:"flex",justifyContent:"space-between",
+            padding:"12px 16px",borderBottom:i<a.length-1?`1px solid ${C.sep}`:""}}>
+            <span style={{fontSize:13,color:C.label3,fontFamily:FONT}}>{k}</span>
+            <span style={{fontSize:13,fontWeight:600,color:C.label,fontFamily:FONT}}>{String(v)}</span>
+          </div>
+        ))}
+      </div>
+      {r.cuf&&(
+        <div style={{background:C.bg2,borderRadius:12,padding:12,marginBottom:16,border:`1px solid ${C.sep}`}}>
+          <div style={{fontSize:10,fontWeight:700,color:C.label3,fontFamily:FONT,
+            textTransform:"uppercase",letterSpacing:.5,marginBottom:4}}>CUF</div>
+          <div style={{fontSize:11,fontFamily:"monospace",color:C.label,lineHeight:1.6,wordBreak:"break-all"}}>{r.cuf}</div>
+        </div>
+      )}
+      {r.qrUrl&&<div style={{textAlign:"center",marginBottom:16}}>
+        <img src={r.qrUrl} style={{width:140,height:140,borderRadius:8}} alt="QR Factura"/>
+      </div>}
+      {r.pdf&&<a href={r.pdf} target="_blank" rel="noopener noreferrer" style={{display:"block",marginBottom:10,textDecoration:"none"}}>
+        <IOSBtn variant="fill" full icon="📄">Ver PDF Factura</IOSBtn>
+      </a>}
+      <IOSBtn onPress={onClose} variant="primary" full>Cerrar</IOSBtn>
+    </div>
+  );
+
+  return (
+    <Sheet open={open} onClose={onClose} title="🧾 Factura SIAT Bolivia" tall>
+      {/* Ya facturada */}
+      {factExist&&estado==="idle"?(
+        <div>
+          <div style={{background:`${C.green}12`,border:`1px solid ${C.green}30`,
+            borderRadius:14,padding:16,marginBottom:16}}>
+            <div style={{fontSize:15,fontWeight:700,color:C.green,fontFamily:FONT,marginBottom:6}}>
+              ✓ Factura ya emitida
+            </div>
+            {factExist.numero&&<div style={{fontSize:13,color:C.label,fontFamily:FONT}}>
+              N° <strong>{factExist.numero}</strong>
+            </div>}
+            {factExist.cuf&&<div style={{fontSize:11,color:C.label3,fontFamily:"monospace",marginTop:4,
+              wordBreak:"break-all"}}>
+              CUF: {factExist.cuf.slice(0,32)}{factExist.cuf.length>32?"…":""}
+            </div>}
+          </div>
+          {factExist.qrUrl&&<div style={{textAlign:"center",marginBottom:16}}>
+            <img src={factExist.qrUrl} style={{width:140,height:140,borderRadius:8}} alt="QR"/>
+          </div>}
+          {factExist.pdf&&<a href={factExist.pdf} target="_blank" rel="noopener noreferrer" style={{display:"block",marginBottom:10,textDecoration:"none"}}>
+            <IOSBtn variant="fill" full icon="📄">Ver PDF Factura</IOSBtn>
+          </a>}
+          <IOSBtn onPress={()=>setEstado("form")} variant="fill" full style={{marginTop:8}}>
+            Emitir nueva factura
+          </IOSBtn>
+        </div>
+      ) : estado==="ok"&&resultado?(
+        <FacturaOK r={resultado}/>
+      ):(
+        /* ── Formulario ── */
+        <>
+          {/* Resumen venta */}
+          <div style={{background:C.bg2,borderRadius:14,padding:14,marginBottom:16,border:`1px solid ${C.sep}`}}>
+            <div style={{fontSize:11,fontWeight:700,color:C.label3,fontFamily:FONT,
+              textTransform:"uppercase",letterSpacing:.5,marginBottom:8}}>Venta a facturar</div>
+            {venta?.items?.slice(0,3).map((it,i)=>(
+              <div key={i} style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
+                <span style={{fontSize:13,color:C.label2,fontFamily:FONT}}>{it.nombre} ×{it.cantidad}</span>
+                <span style={{fontSize:13,fontWeight:600,color:C.gold,fontFamily:FONT}}>{$(it.subtotal)}</span>
+              </div>
+            ))}
+            {(venta?.items?.length||0)>3&&<div style={{fontSize:12,color:C.label3,fontFamily:FONT}}>
+              +{venta.items.length-3} más…</div>}
+            <div style={{display:"flex",justifyContent:"space-between",marginTop:8,
+              paddingTop:8,borderTop:`1px solid ${C.sep}`}}>
+              <span style={{fontSize:15,fontWeight:700,color:C.label,fontFamily:FONT}}>Total</span>
+              <span style={{fontSize:17,fontWeight:800,color:C.gold,fontFamily:FONT}}>{$(venta?.total)}</span>
+            </div>
+          </div>
+
+          {/* Modo toggle */}
+          <div style={{display:"flex",gap:8,marginBottom:16}}>
+            {[["api","🌐 API CUCU"],["manual","✏️ Manual"]].map(([m,l])=>(
+              <button key={m} onClick={()=>{setModo(m);setErrMsg("");}} style={{
+                flex:1,padding:"10px",borderRadius:12,cursor:"pointer",fontFamily:FONT,fontSize:13,
+                border:`2px solid ${modo===m?C.blue:C.sep}`,
+                background:modo===m?`${C.blue}15`:C.bg2,
+                color:modo===m?C.blue:C.label2,fontWeight:modo===m?700:400,
+                WebkitTapHighlightColor:"transparent",
+              }}>{l}</button>
+            ))}
+          </div>
+
+          {/* Datos comprador */}
+          <IOSInput label="NIT Comprador (0 = Sin NIT / CF)" type="number"
+            value={nit} onChange={e=>setNit(e.target.value)} placeholder="0"/>
+          <IOSInput label="Razón Social / Nombre"
+            value={nombre} onChange={e=>setNombre(e.target.value)} placeholder="Sin Nombre"/>
+
+          {/* API CUCU */}
+          {modo==="api"&&(
+            <>
+              <div style={{background:`${C.blue}10`,borderRadius:12,padding:12,
+                marginBottom:16,border:`1px solid ${C.blue}20`}}>
+                <div style={{fontSize:12,color:C.blue,fontFamily:FONT,lineHeight:1.7}}>
+                  🏢 <strong>SYLVIA CAROLINA GRANIER ZALLES</strong><br/>
+                  NIT Emisor: <strong>{NIT_EMPRESA}</strong>
+                  {!cfg.apiKey&&<><br/><span style={{color:C.red}}>
+                    ⚠ Sin API Key — ir a Config → Sistema → Facturación
+                  </span></>}
+                </div>
+              </div>
+              {errMsg&&<div style={{background:`${C.red}12`,border:`1px solid ${C.red}30`,
+                borderRadius:12,padding:12,marginBottom:16}}>
+                <div style={{fontSize:13,color:C.red,fontFamily:FONT}}>⚠ {errMsg}</div>
+              </div>}
+              <IOSBtn onPress={emitir} variant="primary" full
+                disabled={estado==="enviando"} icon={estado==="enviando"?"⏳":"🧾"}>
+                {estado==="enviando"?"Emitiendo…":"Emitir Factura SIAT"}
+              </IOSBtn>
+            </>
+          )}
+
+          {/* Modo manual */}
+          {modo==="manual"&&(
+            <>
+              <IOSInput label="N° de Factura" type="number"
+                value={manNro} onChange={e=>setManNro(e.target.value)} placeholder="00042"/>
+              <IOSInput label="CUF (Código Único de Factura)"
+                value={manCuf} onChange={e=>setManCuf(e.target.value)}
+                placeholder="Código CUF de CUCU / SIAT"/>
+              {errMsg&&<div style={{background:`${C.red}12`,border:`1px solid ${C.red}30`,
+                borderRadius:12,padding:12,marginBottom:16}}>
+                <div style={{fontSize:13,color:C.red,fontFamily:FONT}}>⚠ {errMsg}</div>
+              </div>}
+              <IOSBtn onPress={guardarManual} variant="primary" full icon="💾">
+                Guardar Factura
+              </IOSBtn>
+            </>
+          )}
+        </>
+      )}
+    </Sheet>
+  );
+}
+
+// ══════════════════════════════════════════════════════════
 // NOTA DE VENTA — Modal detalle
 // ══════════════════════════════════════════════════════════
 function NotaVentaModal({venta, onClose, numVenta}){
   if(!venta) return null;
   const [menuOpen, setMenuOpen] = useState(false);
+  const [showFactura, setShowFactura] = useState(false);
   const num = numVenta || venta.id.replace(/\D/g,"").slice(-4).padStart(4,"0");
+  const facturaGuardada = leerFacturaLocal(venta.id);
 
   const filaInfo = (lbl, val) => (
     <div style={{borderBottom:`1px solid ${C.sep}`,padding:"10px 0",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
@@ -2400,6 +2685,24 @@ function NotaVentaModal({venta, onClose, numVenta}){
         </button>
       </div>
 
+      {/* ── Facturar SIAT ── */}
+      <button
+        onClick={()=>setShowFactura(true)}
+        style={{
+          width:"100%",marginBottom:10,
+          background: facturaGuardada
+            ? `linear-gradient(135deg,${C.green},#1B5E20)`
+            : `linear-gradient(135deg,#1A237E,#283593)`,
+          border:"none",borderRadius:14,padding:"14px 10px",
+          display:"flex",alignItems:"center",justifyContent:"center",gap:10,
+          cursor:"pointer",WebkitTapHighlightColor:"transparent",
+        }}>
+        <span style={{fontSize:20}}>{facturaGuardada?"✅":"🧾"}</span>
+        <span style={{fontSize:14,fontWeight:700,color:"#fff",fontFamily:FONT_UI}}>
+          {facturaGuardada?`Factura N° ${facturaGuardada.numero||"emitida"}`:"Emitir Factura SIAT"}
+        </span>
+      </button>
+
       <button onClick={onClose} style={{
         width:"100%",background:C.bg2,border:`1px solid ${C.sep}`,
         borderRadius:14,padding:"14px",fontSize:14,fontFamily:FONT,
@@ -2419,6 +2722,14 @@ function NotaVentaModal({venta, onClose, numVenta}){
           Registrado por: {venta.vendedor||"Tienda"} — {venta.fecha} {venta.hora}
         </div>
       </div>
+
+      {/* FacturaModal */}
+      <FacturaModal
+        venta={venta}
+        open={showFactura}
+        onClose={()=>setShowFactura(false)}
+        onFacturada={()=>setShowFactura(false)}
+      />
     </Sheet>
   );
 }
@@ -4436,6 +4747,7 @@ function POS({inv,onVenta,onVerNota}){
   var _hN140 = useState(null); var etiqueta = _hN140[0]; var setEtiqueta = _hN140[1];;
   var _hN141 = useState(null); var ultima = _hN141[0]; var setUltima = _hN141[1];;
   var _hN142 = useState(false); var showOk = _hN142[0]; var setShowOk = _hN142[1];;
+  var _hN142b = useState(false); var showFacPOS = _hN142b[0]; var setShowFacPOS = _hN142b[1];;
   var _hN143 = useState(false); var showPago = _hN143[0]; var setShowPago = _hN143[1];
   var _hNm1 = useState(false); var pagoMixto = _hNm1[0]; var setPagoMixto = _hNm1[1];
   var _hNm2 = useState({efectivo:"", qr:"", tarjeta:""}); var montosMixtos = _hNm2[0]; var setMontosMixtos = _hNm2[1];
@@ -4746,12 +5058,23 @@ function POS({inv,onVenta,onVerNota}){
             <IOSBtn onPress={()=>onVerNota&&onVerNota(ultima)} variant="primary" full small icon="🧾">
               Ver Nota de Venta
             </IOSBtn>
+            <IOSBtn onPress={()=>setShowFacPOS(true)} variant="fill" full small icon="🧾"
+              style={{background:`linear-gradient(135deg,#1A237E,#283593)`}}>
+              Emitir Factura SIAT
+            </IOSBtn>
             <IOSBtn onPress={()=>sendWA(ultima)} variant="fill" full small icon="📲">
               Enviar por WhatsApp
             </IOSBtn>
           </div>
         </div>
       )}
+      {/* Factura POS */}
+      <FacturaModal
+        venta={ultima}
+        open={showFacPOS}
+        onClose={()=>setShowFacPOS(false)}
+        onFacturada={()=>setShowFacPOS(false)}
+      />
 
       {/* Sheet: Cobro */}
       <Sheet open={showPago} onClose={()=>setShowPago(false)} title="Confirmar Cobro" tall>
@@ -5804,6 +6127,101 @@ function HistorialTab({ventas, inv, cierres, onVentaClick}){
 // ══════════════════════════════════════════════════════════
 // CONFIG TAB — Gestión de usuarios y contraseñas
 // ══════════════════════════════════════════════════════════
+// ── Facturación CUCU Config ────────────────────────────────
+function FacturacionConfig(){
+  const [cfg,setCfg]   = useState(leerCfgCUCU);
+  const [saved,setSaved] = useState(false);
+  const [testing,setTesting] = useState(false);
+  const [testMsg,setTestMsg] = useState(null);
+
+  function save(newCfg){
+    setCfg(newCfg);
+    localStorage.setItem(CUCU_CFG_KEY,JSON.stringify(newCfg));
+    setSaved(true); setTimeout(()=>setSaved(false),2000);
+  }
+  async function testConexion(){
+    if(!cfg.apiKey){setTestMsg({ok:false,txt:"Ingresá el API Key primero."});return;}
+    setTesting(true); setTestMsg(null);
+    try{
+      const r=await fetch(cfg.endpoint.replace("/invoices","/health")||cfg.endpoint,{
+        headers:{"Authorization":`Bearer ${cfg.apiKey}`},
+        signal:AbortSignal.timeout(6000),
+      });
+      setTestMsg(r.ok?{ok:true,txt:`✓ Conexión OK (${r.status})`}:{ok:false,txt:`Error ${r.status}`});
+    }catch(e){ setTestMsg({ok:false,txt:`Error: ${e.message.slice(0,80)}`}); }
+    setTesting(false);
+  }
+  const fld=(label,key,placeholder,type="text")=>(
+    <div style={{marginBottom:12}}>
+      <div style={{fontSize:12,fontWeight:600,color:C.label3,fontFamily:FONT,marginBottom:4}}>{label}</div>
+      <input value={cfg[key]||""} type={type} placeholder={placeholder}
+        onChange={e=>setCfg(p=>({...p,[key]:e.target.value}))}
+        style={{width:"100%",padding:"10px 12px",borderRadius:11,border:`1.5px solid ${C.sep}`,
+          background:C.bg3,fontSize:14,color:C.label,fontFamily:FONT,outline:"none",
+          boxSizing:"border-box",WebkitAppearance:"none"}}/>
+    </div>
+  );
+  return (
+    <div style={{background:C.bg2,borderRadius:16,padding:16,border:`1px solid ${C.sep}`,marginBottom:16}}>
+      <div style={{fontSize:13,fontWeight:700,color:C.label2,fontFamily:FONT,
+        marginBottom:14,display:"flex",alignItems:"center",gap:8}}>
+        🧾 Facturación SIAT Bolivia
+        <span style={{fontSize:11,fontWeight:400,color:C.label3}}>(CUCU API)</span>
+      </div>
+
+      {/* Modo */}
+      <div style={{display:"flex",gap:8,marginBottom:16}}>
+        {[["true","🌐 API Automática"],["false","✏️ Modo Manual"]].map(([v,l])=>{
+          const active=(v==="true")===(cfg.modoApi!==false);
+          return(
+            <button key={v} onClick={()=>save({...cfg,modoApi:v==="true"})} style={{
+              flex:1,padding:"9px 6px",borderRadius:11,cursor:"pointer",fontFamily:FONT,fontSize:12,
+              border:`2px solid ${active?C.gold:C.sep}`,
+              background:active?`${C.gold}15`:C.bg3,
+              color:active?C.gold:C.label2,fontWeight:active?700:400,
+              WebkitTapHighlightColor:"transparent",
+            }}>{l}</button>
+          );
+        })}
+      </div>
+
+      {cfg.modoApi!==false&&(
+        <>
+          {fld("API Key CUCU","apiKey","Bearer token de tu cuenta CUCU")}
+          {fld("Endpoint","endpoint","https://app.cucu.bo/api/v1/invoices")}
+          {fld("Código Actividad Económica","codigoActividad","470000")}
+          {fld("Código Producto SIN","codigoProductoSin","58311")}
+
+          {testMsg&&<div style={{background:testMsg.ok?`${C.green}12`:`${C.red}12`,
+            border:`1px solid ${testMsg.ok?C.green:C.red}30`,borderRadius:10,
+            padding:10,marginBottom:12,fontSize:13,color:testMsg.ok?C.green:C.red,fontFamily:FONT}}>
+            {testMsg.txt}
+          </div>}
+
+          <button onClick={testConexion} disabled={testing} style={{
+            width:"100%",padding:"10px",borderRadius:11,cursor:"pointer",fontFamily:FONT,
+            fontSize:13,background:"none",border:`1.5px solid ${C.blue}`,
+            color:C.blue,fontWeight:600,marginBottom:10,
+            WebkitTapHighlightColor:"transparent",
+          }}>{testing?"Probando…":"Probar conexión"}</button>
+        </>
+      )}
+
+      <div style={{padding:10,background:C.bg3,borderRadius:10,border:`1px solid ${C.sep}`,marginBottom:12}}>
+        <div style={{fontSize:11,color:C.label3,fontFamily:FONT,lineHeight:1.7}}>
+          📋 Obtener API Key → <strong>cucu.bo</strong><br/>
+          Docs → <strong>docs.cucu.bo</strong><br/>
+          Actividad <strong>470000</strong> = Comercio al por menor<br/>
+          Código SIN <strong>58311</strong> = Prendas de vestir
+        </div>
+      </div>
+
+      {saved&&<div style={{fontSize:13,color:C.green,fontFamily:FONT,textAlign:"center",marginBottom:8}}>✓ Guardado</div>}
+      <IOSBtn onPress={()=>save(cfg)} variant="primary" full icon="💾">Guardar Configuración</IOSBtn>
+    </div>
+  );
+}
+
 function ConfigTab({user, logout}){
   var _hN155 = useState("cuenta"); var subTab = _hN155[0]; var setSubTab = _hN155[1];;
   // Usuarios guardados en localStorage (sobre los defaults)
@@ -5827,9 +6245,10 @@ function ConfigTab({user, logout}){
       <div style={{marginBottom:20}}>
         <SegControl
           options={[
-            {value:"cuenta",  label:"Mi cuenta"},
-            {value:"usuarios",label:"Usuarios"},
-            {value:"sistema", label:"Sistema"},
+            {value:"cuenta",   label:"Mi cuenta"},
+            {value:"usuarios", label:"Usuarios"},
+            {value:"sistema",  label:"Sistema"},
+            {value:"factura",  label:"Facturación"},
           ]}
           value={subTab} onChange={setSubTab}
         />
@@ -5844,7 +6263,6 @@ function ConfigTab({user, logout}){
       {/* ── SISTEMA ── */}
       {subTab==="sistema" && (
         <div>
-          {/* Info sistema */}
           <div style={{background:C.bg2,borderRadius:16,overflow:"hidden",marginBottom:16}}>
             {[
               ["Versión","Toscana House v3.0"],
@@ -5859,11 +6277,32 @@ function ConfigTab({user, logout}){
               </div>
             ))}
           </div>
+          <IOSBtn onPress={logout} variant="danger" full icon="🚪">Cerrar sesión</IOSBtn>
+        </div>
+      )}
 
-          {/* Cerrar sesión */}
-          <IOSBtn onPress={logout} variant="danger" full icon="🚪">
-            Cerrar sesión
-          </IOSBtn>
+      {/* ── FACTURACIÓN SIAT ── */}
+      {subTab==="factura" && (
+        <div>
+          <FacturacionConfig/>
+          <div style={{padding:14,background:`${C.blue}08`,borderRadius:14,
+            border:`1px solid ${C.blue}20`}}>
+            <div style={{fontSize:13,fontWeight:700,color:C.blue,fontFamily:FONT,marginBottom:6}}>
+              🏢 Datos del Emisor (fijos)
+            </div>
+            {[
+              ["Razón Social", "SYLVIA CAROLINA GRANIER ZALLES"],
+              ["NIT Emisor", NIT_EMPRESA],
+              ["Sucursal", SUCURSAL_EMP],
+              ["Dirección", DIRECCION_EMP],
+            ].map(([k,v])=>(
+              <div key={k} style={{display:"flex",justifyContent:"space-between",
+                padding:"7px 0",borderBottom:`1px solid ${C.sep}`}}>
+                <span style={{fontSize:12,color:C.label3,fontFamily:FONT}}>{k}</span>
+                <span style={{fontSize:12,fontWeight:600,color:C.label,fontFamily:FONT}}>{v}</span>
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>

@@ -22152,6 +22152,91 @@
     const neto = subBanco - comision - alquiler;
     return { bruto, brutoEf, brutoQR, brutoTJ, descQR, descTJ, subBanco, comision, alquiler, neto, cfg };
   }
+  var CUCU_CFG_KEY = "th_cucu_cfg";
+  var CUCU_DEF = {
+    apiKey: "",
+    endpoint: "https://app.cucu.bo/api/v1/invoices",
+    codigoActividad: "470000",
+    codigoProductoSin: "58311",
+    modoApi: true
+  };
+  var CUCU_MP = { efectivo: 1, qr: 5, tarjeta: 2, transferencia: 4 };
+  function leerCfgCUCU() {
+    try {
+      return { ...CUCU_DEF, ...JSON.parse(localStorage.getItem(CUCU_CFG_KEY) || "{}") };
+    } catch {
+      return CUCU_DEF;
+    }
+  }
+  function guardarFacturaLocal(ventaId, data) {
+    try {
+      localStorage.setItem(`th_fac_${ventaId}`, JSON.stringify(data));
+    } catch {
+    }
+  }
+  function leerFacturaLocal(ventaId) {
+    try {
+      return JSON.parse(localStorage.getItem(`th_fac_${ventaId}`) || "null");
+    } catch {
+      return null;
+    }
+  }
+  async function emitirFacturaCUCU(venta, nitComprador, nombreComprador) {
+    const cfg = leerCfgCUCU();
+    if (!cfg.apiKey) throw new Error("API Key de CUCU no configurada. Ir a Config \u2192 Sistema \u2192 Facturaci\xF3n.");
+    const mp = venta.metodoPago;
+    let codPago = 1;
+    if (mp?.startsWith("mixto|")) {
+      const obj = { efectivo: 0, qr: 0, tarjeta: 0 };
+      mp.split("|").slice(1).forEach((p) => {
+        const [k, v] = p.split(":");
+        obj[k] = parseFloat(v) || 0;
+      });
+      const dom = Object.keys(obj).reduce((a, b) => obj[a] >= obj[b] ? a : b, "efectivo");
+      codPago = CUCU_MP[dom] || 1;
+    } else {
+      codPago = CUCU_MP[mp] || 1;
+    }
+    const payload = {
+      actividadEconomica: cfg.codigoActividad,
+      metodoPago: codPago,
+      cliente: { nit: Number(nitComprador) || 0, razonSocial: (nombreComprador || "Sin Nombre").trim() },
+      items: venta.items.map((it) => ({
+        codigoProducto: Number(cfg.codigoProductoSin) || 58311,
+        descripcion: (it.nombre || "Producto").slice(0, 100),
+        cantidad: it.cantidad || 1,
+        precioUnitario: it.precioUnit || 0,
+        descuento: 0,
+        subtotal: it.subtotal || 0
+      })),
+      total: venta.total || 0
+    };
+    const r = await fetch(cfg.endpoint, {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${cfg.apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    if (!r.ok) {
+      let msg = "";
+      try {
+        const j = await r.json();
+        msg = j.message || j.error || JSON.stringify(j);
+      } catch {
+        msg = await r.text();
+      }
+      throw new Error(`CUCU ${r.status}: ${msg.slice(0, 200)}`);
+    }
+    const body = await r.json();
+    const d = body.data || body;
+    return {
+      cuf: d.cuf || d.CUF || d.codigoCuf || "",
+      numero: d.numero || d.nroFactura || d.numeroFactura || d.number || "",
+      qrUrl: d.qr || d.qrUrl || d.urlQr || "",
+      pdf: d.pdf || d.pdfUrl || d.urlPdf || "",
+      nitComprador: Number(nitComprador) || 0,
+      nombreComprador: (nombreComprador || "Sin Nombre").trim()
+    };
+  }
   async function generarExcelMensual(ventas, inventario, mes, anio, setGenerando, retiros) {
     setGenerando(true);
     try {
@@ -22633,6 +22718,21 @@
   </table>
 </div>
 <div class="letras">Son: <strong>${numeroALetras(venta.total)}</strong></div>
+${(() => {
+      const fac = leerFacturaLocal(venta.id);
+      if (!fac) return "";
+      return `<div style="margin:12px 0;padding:10px 12px;border:1.5px solid #1A237E;border-radius:6px;background:#F3F4FC">
+    <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#1A237E;margin-bottom:4px">
+      \u{1F9FE} Factura Electr\xF3nica SIAT Bolivia
+    </div>
+    <div style="font-size:10px;color:#111">
+      N\xB0 <strong>${fac.numero || "\u2014"}</strong> &nbsp;|&nbsp;
+      ${fac.nitComprador && fac.nitComprador !== 0 ? `NIT: ${fac.nitComprador}` : "Sin NIT (CF)"} &nbsp;|&nbsp;
+      ${fac.nombreComprador || "Sin Nombre"}
+    </div>
+    ${fac.cuf ? `<div style="font-size:8px;color:#555;margin-top:3px;font-family:monospace;word-break:break-all">CUF: ${fac.cuf}</div>` : ""}
+  </div>`;
+    })()}
 <div class="foot">Toscana House \xB7 ${SUCURSAL_EMP} \xB7 ${TELEFONO_EMP} \xB7 ${CIUDAD_EMP}</div>
 ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.print();},600);}<\/script>` : ""}
 </body></html>`);
@@ -23845,10 +23945,196 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       fontFamily: FONT
     } }, "RETIRADO")))))))));
   }
+  function FacturaModal({ venta, open, onClose, onFacturada }) {
+    const [nit, setNit] = (0, import_react.useState)("0");
+    const [nombre, setNombre] = (0, import_react.useState)("Sin Nombre");
+    const [modo, setModo] = (0, import_react.useState)("api");
+    const [estado, setEstado] = (0, import_react.useState)("idle");
+    const [resultado, setResultado] = (0, import_react.useState)(null);
+    const [errMsg, setErrMsg] = (0, import_react.useState)("");
+    const [manNro, setManNro] = (0, import_react.useState)("");
+    const [manCuf, setManCuf] = (0, import_react.useState)("");
+    const cfg = leerCfgCUCU();
+    (0, import_react.useEffect)(() => {
+      if (open) {
+        setNit("0");
+        setNombre("Sin Nombre");
+        setModo(cfg.modoApi !== false ? "api" : "manual");
+        setEstado("idle");
+        setResultado(null);
+        setErrMsg("");
+        setManNro("");
+        setManCuf("");
+      }
+    }, [open]);
+    const factExist = venta ? leerFacturaLocal(venta.id) : null;
+    async function emitir() {
+      setEstado("enviando");
+      setErrMsg("");
+      try {
+        const r = await emitirFacturaCUCU(venta, nit, nombre);
+        guardarFacturaLocal(venta.id, r);
+        setResultado(r);
+        setEstado("ok");
+        onFacturada && onFacturada(r);
+      } catch (e) {
+        setErrMsg(e.message);
+        setEstado("error");
+      }
+    }
+    function guardarManual() {
+      if (!manNro && !manCuf) {
+        setErrMsg("Ingres\xE1 el n\xFAmero de factura o CUF.");
+        return;
+      }
+      const r = { cuf: manCuf, numero: manNro, qrUrl: "", pdf: "", nitComprador: Number(nit) || 0, nombreComprador: nombre.trim() };
+      guardarFacturaLocal(venta.id, r);
+      setResultado(r);
+      setEstado("ok");
+      onFacturada && onFacturada(r);
+    }
+    const FacturaOK = ({ r }) => /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center", marginBottom: 20 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      width: 60,
+      height: 60,
+      borderRadius: "50%",
+      background: `${C.green}15`,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      margin: "0 auto 12px",
+      fontSize: 28
+    } }, "\u2713"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 20, fontWeight: 500, color: C.green, fontFamily: FONT_DISPLAY, letterSpacing: 0.5 } }, "Factura Emitida"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT, marginTop: 4 } }, "SIAT Bolivia")), /* @__PURE__ */ import_react.default.createElement("div", { style: { background: C.bg2, borderRadius: 14, overflow: "hidden", marginBottom: 16, border: `1px solid ${C.sep}` } }, [
+      ["N\xB0 Factura", r.numero],
+      ["Cliente", r.nombreComprador],
+      ["NIT", r.nitComprador === 0 ? "Sin NIT (CF)" : r.nitComprador]
+    ].filter(([, v]) => v !== void 0 && v !== "").map(([k, v], i, a) => /* @__PURE__ */ import_react.default.createElement("div", { key: k, style: {
+      display: "flex",
+      justifyContent: "space-between",
+      padding: "12px 16px",
+      borderBottom: i < a.length - 1 ? `1px solid ${C.sep}` : ""
+    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, color: C.label3, fontFamily: FONT } }, k), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, fontWeight: 600, color: C.label, fontFamily: FONT } }, String(v))))), r.cuf && /* @__PURE__ */ import_react.default.createElement("div", { style: { background: C.bg2, borderRadius: 12, padding: 12, marginBottom: 16, border: `1px solid ${C.sep}` } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      fontSize: 10,
+      fontWeight: 700,
+      color: C.label3,
+      fontFamily: FONT,
+      textTransform: "uppercase",
+      letterSpacing: 0.5,
+      marginBottom: 4
+    } }, "CUF"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, fontFamily: "monospace", color: C.label, lineHeight: 1.6, wordBreak: "break-all" } }, r.cuf)), r.qrUrl && /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center", marginBottom: 16 } }, /* @__PURE__ */ import_react.default.createElement("img", { src: r.qrUrl, style: { width: 140, height: 140, borderRadius: 8 }, alt: "QR Factura" })), r.pdf && /* @__PURE__ */ import_react.default.createElement("a", { href: r.pdf, target: "_blank", rel: "noopener noreferrer", style: { display: "block", marginBottom: 10, textDecoration: "none" } }, /* @__PURE__ */ import_react.default.createElement(IOSBtn, { variant: "fill", full: true, icon: "\u{1F4C4}" }, "Ver PDF Factura")), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: onClose, variant: "primary", full: true }, "Cerrar"));
+    return /* @__PURE__ */ import_react.default.createElement(Sheet, { open, onClose, title: "\u{1F9FE} Factura SIAT Bolivia", tall: true }, factExist && estado === "idle" ? /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      background: `${C.green}12`,
+      border: `1px solid ${C.green}30`,
+      borderRadius: 14,
+      padding: 16,
+      marginBottom: 16
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 15, fontWeight: 700, color: C.green, fontFamily: FONT, marginBottom: 6 } }, "\u2713 Factura ya emitida"), factExist.numero && /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.label, fontFamily: FONT } }, "N\xB0 ", /* @__PURE__ */ import_react.default.createElement("strong", null, factExist.numero)), factExist.cuf && /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      fontSize: 11,
+      color: C.label3,
+      fontFamily: "monospace",
+      marginTop: 4,
+      wordBreak: "break-all"
+    } }, "CUF: ", factExist.cuf.slice(0, 32), factExist.cuf.length > 32 ? "\u2026" : "")), factExist.qrUrl && /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center", marginBottom: 16 } }, /* @__PURE__ */ import_react.default.createElement("img", { src: factExist.qrUrl, style: { width: 140, height: 140, borderRadius: 8 }, alt: "QR" })), factExist.pdf && /* @__PURE__ */ import_react.default.createElement("a", { href: factExist.pdf, target: "_blank", rel: "noopener noreferrer", style: { display: "block", marginBottom: 10, textDecoration: "none" } }, /* @__PURE__ */ import_react.default.createElement(IOSBtn, { variant: "fill", full: true, icon: "\u{1F4C4}" }, "Ver PDF Factura")), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => setEstado("form"), variant: "fill", full: true, style: { marginTop: 8 } }, "Emitir nueva factura")) : estado === "ok" && resultado ? /* @__PURE__ */ import_react.default.createElement(FacturaOK, { r: resultado }) : (
+      /* ── Formulario ── */
+      /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, null, /* @__PURE__ */ import_react.default.createElement("div", { style: { background: C.bg2, borderRadius: 14, padding: 14, marginBottom: 16, border: `1px solid ${C.sep}` } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+        fontSize: 11,
+        fontWeight: 700,
+        color: C.label3,
+        fontFamily: FONT,
+        textTransform: "uppercase",
+        letterSpacing: 0.5,
+        marginBottom: 8
+      } }, "Venta a facturar"), venta?.items?.slice(0, 3).map((it, i) => /* @__PURE__ */ import_react.default.createElement("div", { key: i, style: { display: "flex", justifyContent: "space-between", marginBottom: 4 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, color: C.label2, fontFamily: FONT } }, it.nombre, " \xD7", it.cantidad), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, fontWeight: 600, color: C.gold, fontFamily: FONT } }, $(it.subtotal)))), (venta?.items?.length || 0) > 3 && /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT } }, "+", venta.items.length - 3, " m\xE1s\u2026"), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+        display: "flex",
+        justifyContent: "space-between",
+        marginTop: 8,
+        paddingTop: 8,
+        borderTop: `1px solid ${C.sep}`
+      } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 15, fontWeight: 700, color: C.label, fontFamily: FONT } }, "Total"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 17, fontWeight: 800, color: C.gold, fontFamily: FONT } }, $(venta?.total)))), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 8, marginBottom: 16 } }, [["api", "\u{1F310} API CUCU"], ["manual", "\u270F\uFE0F Manual"]].map(([m, l]) => /* @__PURE__ */ import_react.default.createElement("button", { key: m, onClick: () => {
+        setModo(m);
+        setErrMsg("");
+      }, style: {
+        flex: 1,
+        padding: "10px",
+        borderRadius: 12,
+        cursor: "pointer",
+        fontFamily: FONT,
+        fontSize: 13,
+        border: `2px solid ${modo === m ? C.blue : C.sep}`,
+        background: modo === m ? `${C.blue}15` : C.bg2,
+        color: modo === m ? C.blue : C.label2,
+        fontWeight: modo === m ? 700 : 400,
+        WebkitTapHighlightColor: "transparent"
+      } }, l))), /* @__PURE__ */ import_react.default.createElement(
+        IOSInput,
+        {
+          label: "NIT Comprador (0 = Sin NIT / CF)",
+          type: "number",
+          value: nit,
+          onChange: (e) => setNit(e.target.value),
+          placeholder: "0"
+        }
+      ), /* @__PURE__ */ import_react.default.createElement(
+        IOSInput,
+        {
+          label: "Raz\xF3n Social / Nombre",
+          value: nombre,
+          onChange: (e) => setNombre(e.target.value),
+          placeholder: "Sin Nombre"
+        }
+      ), modo === "api" && /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, null, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+        background: `${C.blue}10`,
+        borderRadius: 12,
+        padding: 12,
+        marginBottom: 16,
+        border: `1px solid ${C.blue}20`
+      } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.blue, fontFamily: FONT, lineHeight: 1.7 } }, "\u{1F3E2} ", /* @__PURE__ */ import_react.default.createElement("strong", null, "SYLVIA CAROLINA GRANIER ZALLES"), /* @__PURE__ */ import_react.default.createElement("br", null), "NIT Emisor: ", /* @__PURE__ */ import_react.default.createElement("strong", null, NIT_EMPRESA), !cfg.apiKey && /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, null, /* @__PURE__ */ import_react.default.createElement("br", null), /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.red } }, "\u26A0 Sin API Key \u2014 ir a Config \u2192 Sistema \u2192 Facturaci\xF3n")))), errMsg && /* @__PURE__ */ import_react.default.createElement("div", { style: {
+        background: `${C.red}12`,
+        border: `1px solid ${C.red}30`,
+        borderRadius: 12,
+        padding: 12,
+        marginBottom: 16
+      } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.red, fontFamily: FONT } }, "\u26A0 ", errMsg)), /* @__PURE__ */ import_react.default.createElement(
+        IOSBtn,
+        {
+          onPress: emitir,
+          variant: "primary",
+          full: true,
+          disabled: estado === "enviando",
+          icon: estado === "enviando" ? "\u23F3" : "\u{1F9FE}"
+        },
+        estado === "enviando" ? "Emitiendo\u2026" : "Emitir Factura SIAT"
+      )), modo === "manual" && /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, null, /* @__PURE__ */ import_react.default.createElement(
+        IOSInput,
+        {
+          label: "N\xB0 de Factura",
+          type: "number",
+          value: manNro,
+          onChange: (e) => setManNro(e.target.value),
+          placeholder: "00042"
+        }
+      ), /* @__PURE__ */ import_react.default.createElement(
+        IOSInput,
+        {
+          label: "CUF (C\xF3digo \xDAnico de Factura)",
+          value: manCuf,
+          onChange: (e) => setManCuf(e.target.value),
+          placeholder: "C\xF3digo CUF de CUCU / SIAT"
+        }
+      ), errMsg && /* @__PURE__ */ import_react.default.createElement("div", { style: {
+        background: `${C.red}12`,
+        border: `1px solid ${C.red}30`,
+        borderRadius: 12,
+        padding: 12,
+        marginBottom: 16
+      } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.red, fontFamily: FONT } }, "\u26A0 ", errMsg)), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: guardarManual, variant: "primary", full: true, icon: "\u{1F4BE}" }, "Guardar Factura")))
+    ));
+  }
   function NotaVentaModal({ venta, onClose, numVenta }) {
     if (!venta) return null;
     const [menuOpen, setMenuOpen] = (0, import_react.useState)(false);
+    const [showFactura, setShowFactura] = (0, import_react.useState)(false);
     const num = numVenta || venta.id.replace(/\D/g, "").slice(-4).padStart(4, "0");
+    const facturaGuardada = leerFacturaLocal(venta.id);
     const filaInfo = (lbl, val) => /* @__PURE__ */ import_react.default.createElement("div", { style: { borderBottom: `1px solid ${C.sep}`, padding: "10px 0", display: "flex", justifyContent: "space-between", alignItems: "center" } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, color: C.label3, fontFamily: FONT } }, lbl), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, fontWeight: 500, color: C.label, fontFamily: FONT } }, val));
     return /* @__PURE__ */ import_react.default.createElement(Sheet, { open: !!venta, onClose, title: "Detalle de Nota de venta", tall: true }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 16, flexWrap: "wrap" } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontFamily: "monospace", fontSize: 14, fontWeight: 700, color: C.label } }, "# ", num), /* @__PURE__ */ import_react.default.createElement(Chip, { color: colorPago(venta.metodoPago) }, iconPago(venta.metodoPago), " ", labelPago(venta.metodoPago)), /* @__PURE__ */ import_react.default.createElement(Chip, { color: C.green }, "\u2713 Pagado")), /* @__PURE__ */ import_react.default.createElement("div", { style: {
       background: C.bg2,
@@ -23975,7 +24261,28 @@ Fecha: ${venta.fecha}`);
       },
       /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 22 } }, "\u2B06"),
       /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, fontWeight: 700, color: "#fff", fontFamily: FONT_UI } }, "Compartir")
-    )), /* @__PURE__ */ import_react.default.createElement("button", { onClick: onClose, style: {
+    )), /* @__PURE__ */ import_react.default.createElement(
+      "button",
+      {
+        onClick: () => setShowFactura(true),
+        style: {
+          width: "100%",
+          marginBottom: 10,
+          background: facturaGuardada ? `linear-gradient(135deg,${C.green},#1B5E20)` : `linear-gradient(135deg,#1A237E,#283593)`,
+          border: "none",
+          borderRadius: 14,
+          padding: "14px 10px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 10,
+          cursor: "pointer",
+          WebkitTapHighlightColor: "transparent"
+        }
+      },
+      /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 20 } }, facturaGuardada ? "\u2705" : "\u{1F9FE}"),
+      /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 14, fontWeight: 700, color: "#fff", fontFamily: FONT_UI } }, facturaGuardada ? `Factura N\xB0 ${facturaGuardada.numero || "emitida"}` : "Emitir Factura SIAT")
+    ), /* @__PURE__ */ import_react.default.createElement("button", { onClick: onClose, style: {
       width: "100%",
       background: C.bg2,
       border: `1px solid ${C.sep}`,
@@ -24002,7 +24309,15 @@ Fecha: ${venta.fecha}`);
       textTransform: "uppercase",
       letterSpacing: 0.5,
       marginBottom: 4
-    } }, "Historial de movimientos"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label2, fontFamily: FONT } }, "Registrado por: ", venta.vendedor || "Tienda", " \u2014 ", venta.fecha, " ", venta.hora)));
+    } }, "Historial de movimientos"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label2, fontFamily: FONT } }, "Registrado por: ", venta.vendedor || "Tienda", " \u2014 ", venta.fecha, " ", venta.hora)), /* @__PURE__ */ import_react.default.createElement(
+      FacturaModal,
+      {
+        venta,
+        open: showFactura,
+        onClose: () => setShowFactura(false),
+        onFacturada: () => setShowFactura(false)
+      }
+    ));
   }
   function CajasTab() {
     const CAJAS_KEY = "th_cajas_v1";
@@ -25845,6 +26160,10 @@ Fecha: ${venta.fecha}`);
     var showOk = _hN142[0];
     var setShowOk = _hN142[1];
     ;
+    var _hN142b = (0, import_react.useState)(false);
+    var showFacPOS = _hN142b[0];
+    var setShowFacPOS = _hN142b[1];
+    ;
     var _hN143 = (0, import_react.useState)(false);
     var showPago = _hN143[0];
     var setShowPago = _hN143[1];
@@ -26230,7 +26549,26 @@ Fecha: ${venta.fecha}`);
       marginBottom: 3,
       paddingLeft: 8,
       borderLeft: `2px solid ${C.gold}40`
-    } }, it.nombre, " ", /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.label3 } }, "\xD7", it.cantidad), /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.label3 } }, " \xB7 ", it.marcaNombre))), /* @__PURE__ */ import_react.default.createElement("div", { style: { marginTop: 14, display: "flex", flexDirection: "column", gap: 8 } }, /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => onVerNota && onVerNota(ultima), variant: "primary", full: true, small: true, icon: "\u{1F9FE}" }, "Ver Nota de Venta"), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => sendWA(ultima), variant: "fill", full: true, small: true, icon: "\u{1F4F2}" }, "Enviar por WhatsApp"))), /* @__PURE__ */ import_react.default.createElement(Sheet, { open: showPago, onClose: () => setShowPago(false), title: "Confirmar Cobro", tall: true }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+    } }, it.nombre, " ", /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.label3 } }, "\xD7", it.cantidad), /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.label3 } }, " \xB7 ", it.marcaNombre))), /* @__PURE__ */ import_react.default.createElement("div", { style: { marginTop: 14, display: "flex", flexDirection: "column", gap: 8 } }, /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => onVerNota && onVerNota(ultima), variant: "primary", full: true, small: true, icon: "\u{1F9FE}" }, "Ver Nota de Venta"), /* @__PURE__ */ import_react.default.createElement(
+      IOSBtn,
+      {
+        onPress: () => setShowFacPOS(true),
+        variant: "fill",
+        full: true,
+        small: true,
+        icon: "\u{1F9FE}",
+        style: { background: `linear-gradient(135deg,#1A237E,#283593)` }
+      },
+      "Emitir Factura SIAT"
+    ), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => sendWA(ultima), variant: "fill", full: true, small: true, icon: "\u{1F4F2}" }, "Enviar por WhatsApp"))), /* @__PURE__ */ import_react.default.createElement(
+      FacturaModal,
+      {
+        venta: ultima,
+        open: showFacPOS,
+        onClose: () => setShowFacPOS(false),
+        onFacturada: () => setShowFacPOS(false)
+      }
+    ), /* @__PURE__ */ import_react.default.createElement(Sheet, { open: showPago, onClose: () => setShowPago(false), title: "Confirmar Cobro", tall: true }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
       background: `${C.gold}12`,
       border: `1px solid ${C.gold}30`,
       borderRadius: 16,
@@ -27182,6 +27520,105 @@ Fecha: ${venta.fecha}`);
       } }, p.stock, " uds"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT } }, $(p.precio))))));
     })));
   }
+  function FacturacionConfig() {
+    const [cfg, setCfg] = (0, import_react.useState)(leerCfgCUCU);
+    const [saved, setSaved] = (0, import_react.useState)(false);
+    const [testing, setTesting] = (0, import_react.useState)(false);
+    const [testMsg, setTestMsg] = (0, import_react.useState)(null);
+    function save(newCfg) {
+      setCfg(newCfg);
+      localStorage.setItem(CUCU_CFG_KEY, JSON.stringify(newCfg));
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2e3);
+    }
+    async function testConexion() {
+      if (!cfg.apiKey) {
+        setTestMsg({ ok: false, txt: "Ingres\xE1 el API Key primero." });
+        return;
+      }
+      setTesting(true);
+      setTestMsg(null);
+      try {
+        const r = await fetch(cfg.endpoint.replace("/invoices", "/health") || cfg.endpoint, {
+          headers: { "Authorization": `Bearer ${cfg.apiKey}` },
+          signal: AbortSignal.timeout(6e3)
+        });
+        setTestMsg(r.ok ? { ok: true, txt: `\u2713 Conexi\xF3n OK (${r.status})` } : { ok: false, txt: `Error ${r.status}` });
+      } catch (e) {
+        setTestMsg({ ok: false, txt: `Error: ${e.message.slice(0, 80)}` });
+      }
+      setTesting(false);
+    }
+    const fld = (label, key, placeholder, type = "text") => /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 12 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, fontWeight: 600, color: C.label3, fontFamily: FONT, marginBottom: 4 } }, label), /* @__PURE__ */ import_react.default.createElement(
+      "input",
+      {
+        value: cfg[key] || "",
+        type,
+        placeholder,
+        onChange: (e) => setCfg((p) => ({ ...p, [key]: e.target.value })),
+        style: {
+          width: "100%",
+          padding: "10px 12px",
+          borderRadius: 11,
+          border: `1.5px solid ${C.sep}`,
+          background: C.bg3,
+          fontSize: 14,
+          color: C.label,
+          fontFamily: FONT,
+          outline: "none",
+          boxSizing: "border-box",
+          WebkitAppearance: "none"
+        }
+      }
+    ));
+    return /* @__PURE__ */ import_react.default.createElement("div", { style: { background: C.bg2, borderRadius: 16, padding: 16, border: `1px solid ${C.sep}`, marginBottom: 16 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      fontSize: 13,
+      fontWeight: 700,
+      color: C.label2,
+      fontFamily: FONT,
+      marginBottom: 14,
+      display: "flex",
+      alignItems: "center",
+      gap: 8
+    } }, "\u{1F9FE} Facturaci\xF3n SIAT Bolivia", /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 11, fontWeight: 400, color: C.label3 } }, "(CUCU API)")), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 8, marginBottom: 16 } }, [["true", "\u{1F310} API Autom\xE1tica"], ["false", "\u270F\uFE0F Modo Manual"]].map(([v, l]) => {
+      const active = v === "true" === (cfg.modoApi !== false);
+      return /* @__PURE__ */ import_react.default.createElement("button", { key: v, onClick: () => save({ ...cfg, modoApi: v === "true" }), style: {
+        flex: 1,
+        padding: "9px 6px",
+        borderRadius: 11,
+        cursor: "pointer",
+        fontFamily: FONT,
+        fontSize: 12,
+        border: `2px solid ${active ? C.gold : C.sep}`,
+        background: active ? `${C.gold}15` : C.bg3,
+        color: active ? C.gold : C.label2,
+        fontWeight: active ? 700 : 400,
+        WebkitTapHighlightColor: "transparent"
+      } }, l);
+    })), cfg.modoApi !== false && /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, null, fld("API Key CUCU", "apiKey", "Bearer token de tu cuenta CUCU"), fld("Endpoint", "endpoint", "https://app.cucu.bo/api/v1/invoices"), fld("C\xF3digo Actividad Econ\xF3mica", "codigoActividad", "470000"), fld("C\xF3digo Producto SIN", "codigoProductoSin", "58311"), testMsg && /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      background: testMsg.ok ? `${C.green}12` : `${C.red}12`,
+      border: `1px solid ${testMsg.ok ? C.green : C.red}30`,
+      borderRadius: 10,
+      padding: 10,
+      marginBottom: 12,
+      fontSize: 13,
+      color: testMsg.ok ? C.green : C.red,
+      fontFamily: FONT
+    } }, testMsg.txt), /* @__PURE__ */ import_react.default.createElement("button", { onClick: testConexion, disabled: testing, style: {
+      width: "100%",
+      padding: "10px",
+      borderRadius: 11,
+      cursor: "pointer",
+      fontFamily: FONT,
+      fontSize: 13,
+      background: "none",
+      border: `1.5px solid ${C.blue}`,
+      color: C.blue,
+      fontWeight: 600,
+      marginBottom: 10,
+      WebkitTapHighlightColor: "transparent"
+    } }, testing ? "Probando\u2026" : "Probar conexi\xF3n")), /* @__PURE__ */ import_react.default.createElement("div", { style: { padding: 10, background: C.bg3, borderRadius: 10, border: `1px solid ${C.sep}`, marginBottom: 12 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT, lineHeight: 1.7 } }, "\u{1F4CB} Obtener API Key \u2192 ", /* @__PURE__ */ import_react.default.createElement("strong", null, "cucu.bo"), /* @__PURE__ */ import_react.default.createElement("br", null), "Docs \u2192 ", /* @__PURE__ */ import_react.default.createElement("strong", null, "docs.cucu.bo"), /* @__PURE__ */ import_react.default.createElement("br", null), "Actividad ", /* @__PURE__ */ import_react.default.createElement("strong", null, "470000"), " = Comercio al por menor", /* @__PURE__ */ import_react.default.createElement("br", null), "C\xF3digo SIN ", /* @__PURE__ */ import_react.default.createElement("strong", null, "58311"), " = Prendas de vestir")), saved && /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.green, fontFamily: FONT, textAlign: "center", marginBottom: 8 } }, "\u2713 Guardado"), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => save(cfg), variant: "primary", full: true, icon: "\u{1F4BE}" }, "Guardar Configuraci\xF3n"));
+  }
   function ConfigTab({ user, logout }) {
     var _hN155 = (0, import_react.useState)("cuenta");
     var subTab = _hN155[0];
@@ -27206,7 +27643,8 @@ Fecha: ${venta.fecha}`);
         options: [
           { value: "cuenta", label: "Mi cuenta" },
           { value: "usuarios", label: "Usuarios" },
-          { value: "sistema", label: "Sistema" }
+          { value: "sistema", label: "Sistema" },
+          { value: "factura", label: "Facturaci\xF3n" }
         ],
         value: subTab,
         onChange: setSubTab
@@ -27221,7 +27659,22 @@ Fecha: ${venta.fecha}`);
       justifyContent: "space-between",
       padding: "14px 16px",
       borderBottom: i < arr.length - 1 ? `1px solid ${C.sep}` : ""
-    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 15, color: C.label2, fontFamily: FONT } }, k), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 15, color: C.label, fontFamily: FONT, fontWeight: 500 } }, v)))), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: logout, variant: "danger", full: true, icon: "\u{1F6AA}" }, "Cerrar sesi\xF3n")));
+    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 15, color: C.label2, fontFamily: FONT } }, k), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 15, color: C.label, fontFamily: FONT, fontWeight: 500 } }, v)))), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: logout, variant: "danger", full: true, icon: "\u{1F6AA}" }, "Cerrar sesi\xF3n")), subTab === "factura" && /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement(FacturacionConfig, null), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      padding: 14,
+      background: `${C.blue}08`,
+      borderRadius: 14,
+      border: `1px solid ${C.blue}20`
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, fontWeight: 700, color: C.blue, fontFamily: FONT, marginBottom: 6 } }, "\u{1F3E2} Datos del Emisor (fijos)"), [
+      ["Raz\xF3n Social", "SYLVIA CAROLINA GRANIER ZALLES"],
+      ["NIT Emisor", NIT_EMPRESA],
+      ["Sucursal", SUCURSAL_EMP],
+      ["Direcci\xF3n", DIRECCION_EMP]
+    ].map(([k, v]) => /* @__PURE__ */ import_react.default.createElement("div", { key: k, style: {
+      display: "flex",
+      justifyContent: "space-between",
+      padding: "7px 0",
+      borderBottom: `1px solid ${C.sep}`
+    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 12, color: C.label3, fontFamily: FONT } }, k), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 12, fontWeight: 600, color: C.label, fontFamily: FONT } }, v))))));
   }
   function CambiarContrasena({ user, usuarios, onGuardar }) {
     var _hN157 = (0, import_react.useState)("");
