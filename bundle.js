@@ -21937,62 +21937,52 @@
     } }), /* @__PURE__ */ import_react.default.createElement("style", null, `@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}`), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 11, color: syncing ? C.amber : connected ? C.green : C.label3, fontFamily: FONT } }, syncing ? "Sync\u2026" : connected ? "Drive \u2713" : "Drive"));
   }
   var C = {
-    bg0: "#F4F7FB",
-    // blue-gray page background
+    bg0: "#FAF9F7",
+    // warm ivory — main background
     bg1: "#FFFFFF",
-    // white cards
-    bg2: "#F8FAFD",
-    // subtle card fill
-    bg3: "#EBF1F9",
-    // blue-tinted section bg
-    label: "#0F172A",
-    // slate-900
-    label2: "#334155",
-    // slate-700
-    label3: "#64748B",
-    // slate-500
-    label4: "rgba(15,23,42,0.15)",
-    sep: "rgba(100,116,139,0.14)",
-    sepH: "rgba(100,116,139,0.28)",
-    gold: "#1565C0",
-    // primary blue (kept key name for compat)
-    goldL: "#1976D2",
-    // blue lighter
-    goldD: "#0D47A1",
-    // blue darker
-    accent: "#90CAF9",
-    // blue accent
-    cream: "#F4F7FB",
-    green: "#2E7D32",
-    // success green
-    red: "#C62828",
-    // error red
-    blue: "#1565C0",
-    // alias for gold
-    amber: "#E65100",
-    // warning orange
-    indigo: "#3949AB",
-    // indigo/violet
-    tabPos: "#1565C0",
-    // Caja — blue
-    tabInv: "#0277BD",
-    // Inventario — dark blue
-    tabMar: "#6A1B9A",
-    // Marcas — purple
-    tabVen: "#00695C",
-    // Ventas — teal
-    tabLiq: "#AD1457",
-    // Liquidar — pink
-    fill1: "rgba(21,101,192,0.04)",
-    fill2: "rgba(21,101,192,0.09)",
-    fill3: "rgba(21,101,192,0.16)",
-    stockOk: "#E8F5E9",
-    stockLow: "#FFF8E1",
-    stockOut: "#FFEBEE",
-    stockSold: "#EDE7F6",
-    greenBg: "#E8F5E9",
-    redBg: "#FFEBEE",
-    amberBg: "#FFF8E1"
+    // white — cards
+    bg2: "#F5F1EB",
+    // stone — secondary bg
+    bg3: "#EDE8DF",
+    // warm beige — tertiary
+    label: "#1A1714",
+    // warm black — primary text
+    label2: "#44403C",
+    // graphite — secondary text
+    label3: "#78716C",
+    // stone gray — muted text
+    label4: "rgba(26,23,20,0.12)",
+    sep: "rgba(120,113,108,0.13)",
+    sepH: "rgba(120,113,108,0.26)",
+    // Warm champagne gold — primary accent (replaces blue)
+    gold: "#9A7B4F",
+    goldL: "#B8965E",
+    goldD: "#7A5F38",
+    accent: "#D4B896",
+    cream: "#FAF9F7",
+    green: "#2D6A4F",
+    red: "#9B2335",
+    blue: "#1E3A5F",
+    amber: "#92400E",
+    indigo: "#4A3D8F",
+    // Tab accent colors — rich, sophisticated
+    tabPos: "#1A1714",
+    tabInv: "#2D6A4F",
+    tabMar: "#6B4E71",
+    tabVen: "#1E3A5F",
+    tabLiq: "#9B2335",
+    // Fill tints
+    fill1: "rgba(154,123,79,0.05)",
+    fill2: "rgba(154,123,79,0.09)",
+    fill3: "rgba(154,123,79,0.15)",
+    // Status backgrounds
+    stockOk: "#EFF7F2",
+    stockLow: "#FEFAEF",
+    stockOut: "#FDF0F2",
+    stockSold: "#F2F0F8",
+    greenBg: "#EFF7F2",
+    redBg: "#FDF0F2",
+    amberBg: "#FEFAEF"
   };
   var ALQUILERES = {
     1: { alquiler: 2e3, comision: 0 },
@@ -22593,6 +22583,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
   }
   var FONT = "'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
   var FONT_UI = "'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+  var FONT_DISPLAY = "'Cormorant Garamond', Georgia, 'Times New Roman', serif";
   function LogoMark({ size = 36, color = "#1565C0" }) {
     return /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", flexDirection: "column", alignItems: "center", lineHeight: 1 } }, /* @__PURE__ */ import_react.default.createElement(
       "div",
@@ -22638,44 +22629,52 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
   }
   function NavBar({ title, subtitle, back, onBack, right }) {
     return /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      background: "rgba(255,255,255,0.96)",
-      backdropFilter: "blur(20px) saturate(180%)",
-      WebkitBackdropFilter: "blur(20px) saturate(180%)",
+      background: "rgba(255,255,255,0.97)",
+      backdropFilter: "blur(24px) saturate(180%)",
+      WebkitBackdropFilter: "blur(24px) saturate(180%)",
       borderBottom: `1px solid ${C.sep}`,
-      boxShadow: "0 2px 16px rgba(21,101,192,0.07)",
-      padding: "0 16px",
+      boxShadow: "0 1px 0 rgba(120,113,108,0.08)",
+      padding: "0 20px",
       position: "sticky",
       top: 0,
       zIndex: 100,
       display: "flex",
       alignItems: "center",
-      height: 56,
-      gap: 8
+      minHeight: 54,
+      gap: 10
     } }, back && /* @__PURE__ */ import_react.default.createElement("button", { onClick: onBack, style: {
       background: "none",
       border: "none",
-      color: C.gold,
-      fontSize: 16,
+      color: C.label3,
+      fontSize: 13,
       fontFamily: FONT,
-      fontWeight: 400,
+      fontWeight: 500,
       cursor: "pointer",
       padding: "8px 0",
       display: "flex",
       alignItems: "center",
       gap: 4,
       WebkitTapHighlightColor: "transparent",
-      minWidth: 44
-    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 22, lineHeight: 1 } }, "\u2039"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 16 } }, typeof back === "string" ? back : "")), /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1, textAlign: "center" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 17, fontWeight: 600, color: C.label, fontFamily: FONT, lineHeight: 1.2 } }, title), subtitle && /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label2, fontFamily: FONT, marginTop: 1 } }, subtitle)), /* @__PURE__ */ import_react.default.createElement("div", { style: { minWidth: back ? 44 : 0, display: "flex", justifyContent: "flex-end" } }, right));
+      minWidth: 44,
+      letterSpacing: 0.3
+    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 18, lineHeight: 1, marginTop: -1 } }, "\u2039"), typeof back === "string" ? back : ""), /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1, textAlign: "center" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      fontSize: 16,
+      fontWeight: 500,
+      color: C.label,
+      fontFamily: FONT_DISPLAY,
+      letterSpacing: 0.5,
+      lineHeight: 1.2
+    } }, title), subtitle && /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT, marginTop: 1, letterSpacing: 0.2 } }, subtitle)), /* @__PURE__ */ import_react.default.createElement("div", { style: { minWidth: back ? 44 : 0, display: "flex", justifyContent: "flex-end" } }, right));
   }
   var TAB_COLORS = {
-    inicio: "#1565C0",
+    inicio: C.gold,
     pos: C.tabPos,
     inventario: C.tabInv,
     marcas: C.tabMar,
     ventas: C.tabVen,
     liquidaciones: C.tabLiq,
-    config: "#455A64",
-    historial: "#546E7A"
+    config: "#78716C",
+    historial: "#78716C"
   };
   function TabBar({ tabs, active, onChange }) {
     return /* @__PURE__ */ import_react.default.createElement("div", { style: {
@@ -22684,20 +22683,16 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       left: 0,
       right: 0,
       zIndex: 200,
-      background: "rgba(255,255,255,0.97)",
-      backdropFilter: "blur(20px) saturate(180%)",
-      WebkitBackdropFilter: "blur(20px) saturate(180%)",
+      background: "rgba(255,255,255,0.98)",
+      backdropFilter: "blur(24px) saturate(160%)",
+      WebkitBackdropFilter: "blur(24px) saturate(160%)",
       borderTop: `1px solid ${C.sep}`,
       display: "flex",
       justifyContent: "center",
       alignItems: "stretch",
-      paddingBottom: "env(safe-area-inset-bottom,12px)",
-      boxShadow: "0 -2px 16px rgba(21,101,192,0.07)"
-    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      display: "flex",
-      width: "100%",
-      maxWidth: 560
-    } }, tabs.map((t) => {
+      paddingBottom: "env(safe-area-inset-bottom,10px)",
+      boxShadow: "0 -1px 0 rgba(120,113,108,0.06)"
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", width: "100%", maxWidth: 560 } }, tabs.map((t) => {
       const isActive = active === t.id;
       const tabColor = TAB_COLORS[t.id] || C.gold;
       return /* @__PURE__ */ import_react.default.createElement("button", { key: t.id, onClick: () => onChange(t.id), style: {
@@ -22708,7 +22703,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
         flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
-        padding: "8px 2px 6px",
+        padding: "7px 2px 5px",
         cursor: "pointer",
         WebkitTapHighlightColor: "transparent",
         gap: 3,
@@ -22719,13 +22714,13 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
         width: 33,
         height: 33,
         borderRadius: 9,
-        background: isActive ? `${tabColor}18` : "transparent",
+        background: isActive ? `${tabColor}14` : "transparent",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
         fontSize: 19,
         lineHeight: 1,
-        transform: isActive ? "scale(1.1)" : "scale(1)",
+        transform: isActive ? "scale(1.08)" : "scale(1)",
         transition: "all .2s cubic-bezier(.34,1.56,.64,1)"
       } }, t.icon), /* @__PURE__ */ import_react.default.createElement("span", { style: {
         fontSize: 9,
@@ -22733,7 +22728,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
         fontWeight: 700,
         color: isActive ? tabColor : C.label3,
         transition: "color .2s",
-        letterSpacing: 0.2,
+        letterSpacing: 0.3,
         whiteSpace: "nowrap"
       } }, t.label));
     })));
@@ -22742,8 +22737,8 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
     const { pressed, ...handlers } = usePress();
     const bg = {
       primary: `linear-gradient(135deg,${C.gold},${C.goldD})`,
-      success: `linear-gradient(135deg,${C.green},#28A047)`,
-      danger: `linear-gradient(135deg,${C.red},#C0392B)`,
+      success: `linear-gradient(135deg,${C.green},#1E5C3A)`,
+      danger: `linear-gradient(135deg,${C.red},#7A1B28)`,
       ghost: "transparent",
       fill: C.fill2
     };
@@ -22820,7 +22815,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       justifyContent: "space-between",
       alignItems: "center",
       padding: "8px 20px 16px"
-    } }, /* @__PURE__ */ import_react.default.createElement("h3", { style: { margin: 0, fontSize: 17, fontWeight: 600, color: C.label, fontFamily: FONT } }, title), /* @__PURE__ */ import_react.default.createElement("button", { onClick: onClose, style: {
+    } }, /* @__PURE__ */ import_react.default.createElement("h3", { style: { margin: 0, fontSize: 18, fontWeight: 500, color: C.label, fontFamily: FONT_DISPLAY, letterSpacing: 0.5 } }, title), /* @__PURE__ */ import_react.default.createElement("button", { onClick: onClose, style: {
       background: C.fill2,
       border: "none",
       borderRadius: "50%",
@@ -23186,48 +23181,59 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
     }
     return /* @__PURE__ */ import_react.default.createElement("div", { style: {
       minHeight: "100vh",
-      background: "linear-gradient(160deg, #F2F7F2 0%, #E8F2E8 50%, #D8EDD8 100%)",
+      background: C.bg0,
       display: "flex",
       flexDirection: "column",
       alignItems: "center",
       justifyContent: "center",
       fontFamily: FONT,
       padding: 24
-    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 40, textAlign: "center" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 48, marginBottom: 8 } }, "\u{1F3E1}"), /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      fontSize: 28,
-      fontWeight: 800,
-      color: "#3D6B3D",
-      fontFamily: "Georgia,serif",
-      letterSpacing: 3
-    } }, "TOSCANA HOUSE"), /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      fontSize: 12,
-      color: "#7A9A7A",
-      letterSpacing: 6,
-      fontFamily: "Georgia,serif",
-      marginTop: 4
-    } }, "CASA DE MODA"), /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      width: 80,
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 40, textAlign: "center" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      fontSize: 52,
+      fontWeight: 300,
+      color: C.label,
+      fontFamily: FONT_DISPLAY,
+      letterSpacing: 8,
+      lineHeight: 1,
+      marginBottom: 10
+    } }, "TH"), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      width: 48,
       height: 1,
-      background: "#A8C5A0",
-      margin: "12px auto 0"
-    } })), /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      background: "rgba(255,255,255,0.95)",
+      background: `${C.gold}60`,
+      margin: "0 auto 10px"
+    } }), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      fontSize: 14,
+      fontWeight: 500,
+      color: C.label,
+      fontFamily: FONT_UI,
+      letterSpacing: 6,
+      textTransform: "uppercase"
+    } }, "TOSCANA HOUSE"), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      fontSize: 10,
+      color: C.label3,
+      letterSpacing: 5,
+      fontFamily: FONT_UI,
+      marginTop: 4,
+      textTransform: "uppercase"
+    } }, "CASA DE MODA")), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      background: C.bg1,
       borderRadius: 24,
       padding: "32px 28px",
       width: "100%",
       maxWidth: 380,
-      boxShadow: "0 8px 40px rgba(74,107,74,0.15)",
-      border: "1px solid rgba(168,197,160,0.4)"
+      boxShadow: "0 8px 40px rgba(120,113,108,0.12)",
+      border: `1px solid ${C.sep}`
     } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
       fontSize: 20,
-      fontWeight: 700,
-      color: "#1A2E1A",
+      fontWeight: 500,
+      color: C.label,
       marginBottom: 6,
-      fontFamily: FONT
-    } }, "Iniciar sesi\xF3n"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 14, color: "#7A9A7A", marginBottom: 28, fontFamily: FONT } }, "Ingresa tus credenciales para continuar"), /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 16 } }, /* @__PURE__ */ import_react.default.createElement("label", { style: {
+      fontFamily: FONT_DISPLAY,
+      letterSpacing: 0.5
+    } }, "Iniciar sesi\xF3n"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 14, color: C.label3, marginBottom: 28, fontFamily: FONT } }, "Ingresa tus credenciales para continuar"), /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 16 } }, /* @__PURE__ */ import_react.default.createElement("label", { style: {
       fontSize: 11,
       fontWeight: 700,
-      color: "#4A6B4A",
+      color: C.label3,
       textTransform: "uppercase",
       letterSpacing: 0.8,
       display: "block",
@@ -23248,22 +23254,22 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
           width: "100%",
           padding: "13px 16px",
           borderRadius: 12,
-          border: `1.5px solid ${error ? "#C0504A" : "rgba(168,197,160,0.6)"}`,
-          background: "#F7FAF7",
+          border: `1.5px solid ${error ? C.red : C.sep}`,
+          background: C.bg2,
           fontSize: 16,
-          color: "#1A2E1A",
+          color: C.label,
           outline: "none",
           fontFamily: FONT,
           boxSizing: "border-box",
           WebkitAppearance: "none"
         },
-        onFocus: (e) => e.target.style.borderColor = "#5C8A5C",
-        onBlur: (e) => e.target.style.borderColor = error ? "#C0504A" : "rgba(168,197,160,0.6)"
+        onFocus: (e) => e.target.style.borderColor = C.gold,
+        onBlur: (e) => e.target.style.borderColor = error ? C.red : C.sep
       }
     )), /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 24 } }, /* @__PURE__ */ import_react.default.createElement("label", { style: {
       fontSize: 11,
       fontWeight: 700,
-      color: "#4A6B4A",
+      color: C.label3,
       textTransform: "uppercase",
       letterSpacing: 0.8,
       display: "block",
@@ -23283,17 +23289,17 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
           width: "100%",
           padding: "13px 44px 13px 16px",
           borderRadius: 12,
-          border: `1.5px solid ${error ? "#C0504A" : "rgba(168,197,160,0.6)"}`,
-          background: "#F7FAF7",
+          border: `1.5px solid ${error ? C.red : C.sep}`,
+          background: C.bg2,
           fontSize: 16,
-          color: "#1A2E1A",
+          color: C.label,
           outline: "none",
           fontFamily: FONT,
           boxSizing: "border-box",
           WebkitAppearance: "none"
         },
-        onFocus: (e) => e.target.style.borderColor = "#5C8A5C",
-        onBlur: (e) => e.target.style.borderColor = error ? "#C0504A" : "rgba(168,197,160,0.6)"
+        onFocus: (e) => e.target.style.borderColor = C.gold,
+        onBlur: (e) => e.target.style.borderColor = error ? C.red : C.sep
       }
     ), /* @__PURE__ */ import_react.default.createElement("button", { onClick: () => setShowPass((p) => !p), style: {
       position: "absolute",
@@ -23304,14 +23310,14 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       border: "none",
       cursor: "pointer",
       fontSize: 18,
-      color: "#7A9A7A",
+      color: C.label3,
       WebkitTapHighlightColor: "transparent"
     } }, showPass ? "\u{1F648}" : "\u{1F441}"))), error && /* @__PURE__ */ import_react.default.createElement("div", { style: {
       padding: "10px 14px",
-      background: "#FFF0EE",
+      background: C.redBg,
       borderRadius: 10,
-      border: "1px solid #F4A8A8",
-      color: "#C0504A",
+      border: `1px solid ${C.red}30`,
+      color: C.red,
       fontSize: 13,
       fontFamily: FONT,
       marginBottom: 16,
@@ -23326,10 +23332,10 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
           padding: "15px",
           borderRadius: 14,
           border: "none",
-          background: loading ? "#A8C5A0" : "linear-gradient(135deg,#5C8A5C,#3D6B3D)",
-          color: "white",
+          background: loading ? C.fill3 : `linear-gradient(135deg,${C.gold},${C.goldD})`,
+          color: loading ? C.label3 : "#fff",
           fontSize: 16,
-          fontWeight: 700,
+          fontWeight: 600,
           cursor: loading ? "not-allowed" : "pointer",
           fontFamily: FONT,
           letterSpacing: 0.5,
@@ -23341,7 +23347,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
     )), /* @__PURE__ */ import_react.default.createElement("div", { style: {
       marginTop: 24,
       fontSize: 12,
-      color: "#7A9A7A",
+      color: C.label3,
       fontFamily: FONT,
       textAlign: "center"
     } }, "Toscana House \xA9 ", (/* @__PURE__ */ new Date()).getFullYear()));
@@ -24161,21 +24167,35 @@ Fecha: ${venta.fecha}`);
   }
   function KPICard({ icon, label, val, sub, color }) {
     return /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      background: "#fff",
-      borderRadius: 14,
-      padding: "14px 16px",
-      border: "1px solid #E2E8F0",
-      boxShadow: "0 1px 4px rgba(21,101,192,0.06)"
-    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 8 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      background: C.bg1,
+      borderRadius: 16,
+      padding: "16px 18px",
+      border: `1px solid ${C.sep}`,
+      boxShadow: "0 2px 8px rgba(120,113,108,0.06), 0 1px 2px rgba(120,113,108,0.04)"
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 10 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
       width: 32,
       height: 32,
       borderRadius: 10,
-      background: `${color}18`,
+      background: `${color}14`,
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
-      fontSize: 16
-    } }, icon), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 12, color: "#64748B", fontFamily: FONT_UI, fontWeight: 500 } }, label)), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 22, fontWeight: 800, color, fontFamily: FONT_UI, lineHeight: 1 } }, val), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: "#94A3B8", fontFamily: FONT_UI, marginTop: 4 } }, sub));
+      fontSize: 15
+    } }, icon), /* @__PURE__ */ import_react.default.createElement("span", { style: {
+      fontSize: 11,
+      color: C.label3,
+      fontFamily: FONT,
+      fontWeight: 500,
+      letterSpacing: 0.4,
+      textTransform: "uppercase"
+    } }, label)), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      fontSize: 26,
+      fontWeight: 600,
+      color: C.label,
+      fontFamily: FONT_DISPLAY,
+      lineHeight: 1,
+      letterSpacing: -0.3
+    } }, val), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT, marginTop: 5, letterSpacing: 0.2 } }, sub));
   }
   function ClockWidget() {
     const [clock, setClock] = (0, import_react.useState)(
@@ -24773,42 +24793,42 @@ Fecha: ${venta.fecha}`);
     const dayNames = ["Dom", "Lun", "Mar", "Mi\xE9", "Jue", "Vie", "S\xE1b"];
     const dateStr = `${dayNames[today.getDay()]}, ${today.getDate()} de ${MESES[today.getMonth()]} ${today.getFullYear()}`;
     const cardStyle = {
-      background: "#fff",
-      borderRadius: 14,
-      padding: "14px 16px",
-      border: "1px solid #E2E8F0",
-      boxShadow: "0 1px 4px rgba(21,101,192,0.06)",
+      background: C.bg1,
+      borderRadius: 16,
+      padding: "16px 18px",
+      border: `1px solid ${C.sep}`,
+      boxShadow: "0 2px 8px rgba(120,113,108,0.06)",
       marginBottom: 14
     };
-    return /* @__PURE__ */ import_react.default.createElement("div", { style: { paddingBottom: 8 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center", marginBottom: 14, paddingTop: 4 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+    return /* @__PURE__ */ import_react.default.createElement("div", { style: { paddingBottom: 8 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center", marginBottom: 16, paddingTop: 4 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
       display: "inline-flex",
       flexDirection: "column",
       alignItems: "center",
       gap: 0,
-      background: "linear-gradient(135deg,#EBF1F9,#F8FAFD)",
+      background: C.bg1,
       borderRadius: 20,
-      padding: "18px 32px 14px",
+      padding: "20px 36px 16px",
       border: `1px solid ${C.sep}`,
-      boxShadow: "0 2px 12px rgba(21,101,192,0.10)",
+      boxShadow: "0 4px 24px rgba(120,113,108,0.08)",
       marginBottom: 4
     } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      fontSize: 46,
-      fontWeight: 900,
+      fontSize: 52,
+      fontWeight: 300,
       color: C.label,
-      fontFamily: "Georgia,'Times New Roman',serif",
-      letterSpacing: 6,
+      fontFamily: FONT_DISPLAY,
+      letterSpacing: 8,
       lineHeight: 1
-    } }, "TH"), /* @__PURE__ */ import_react.default.createElement("div", { style: { width: 80, height: 1.5, background: `${C.gold}50`, margin: "6px 0 4px" } }), /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      fontSize: 20,
-      fontWeight: 800,
+    } }, "TH"), /* @__PURE__ */ import_react.default.createElement("div", { style: { width: 64, height: 1, background: `${C.gold}60`, margin: "8px 0 5px" } }), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      fontSize: 13,
+      fontWeight: 500,
       color: C.label,
       fontFamily: FONT_UI,
-      letterSpacing: 5,
+      letterSpacing: 6,
       lineHeight: 1,
       textTransform: "uppercase"
     } }, "TOSCANA HOUSE"), /* @__PURE__ */ import_react.default.createElement("div", { style: {
       fontSize: 9,
-      fontWeight: 500,
+      fontWeight: 400,
       color: C.label3,
       fontFamily: FONT_UI,
       letterSpacing: 5,
@@ -24850,7 +24870,63 @@ Fecha: ${venta.fecha}`);
         sub: "marcas en tienda",
         color: C.amber
       }
-    )), /* @__PURE__ */ import_react.default.createElement("div", { style: cardStyle }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, fontWeight: 700, color: C.label2, fontFamily: FONT_UI, marginBottom: 14 } }, "\xDAltimos 7 d\xEDas"), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "flex-end", gap: 6, height: 80 } }, last7.map((d, i) => {
+    )), (() => {
+      const feed = [
+        ...ultVentas.slice(0, 6).map((v) => ({
+          id: v.id,
+          hora: v.hora || "\u2014",
+          tipo: "Venta",
+          producto: v.items?.[0]?.nombre || "\u2014",
+          marca: v.items?.[0]?.marcaNombre || "\u2014",
+          usuario: v.vendedor || "Tienda",
+          color: C.green,
+          bg: C.greenBg
+        }))
+      ].slice(0, 6);
+      if (feed.length === 0) return null;
+      return /* @__PURE__ */ import_react.default.createElement("div", { style: { ...cardStyle, marginBottom: 14, overflow: "hidden" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+        fontSize: 11,
+        fontWeight: 700,
+        color: C.label3,
+        fontFamily: FONT,
+        textTransform: "uppercase",
+        letterSpacing: 0.8,
+        marginBottom: 12
+      } }, "Actividad del showroom"), feed.map((a, i) => /* @__PURE__ */ import_react.default.createElement("div", { key: a.id, style: {
+        display: "grid",
+        gridTemplateColumns: "44px 52px 1fr 80px",
+        alignItems: "center",
+        gap: 8,
+        padding: "9px 0",
+        borderTop: i > 0 ? `1px solid ${C.sep}` : ""
+      } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 11, color: C.label3, fontFamily: "monospace", fontWeight: 500 } }, a.hora), /* @__PURE__ */ import_react.default.createElement("span", { style: {
+        fontSize: 10,
+        fontWeight: 700,
+        color: a.color,
+        fontFamily: FONT,
+        background: a.bg,
+        padding: "2px 7px",
+        borderRadius: 20,
+        textAlign: "center",
+        letterSpacing: 0.3
+      } }, a.tipo), /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+        fontSize: 13,
+        color: C.label,
+        fontFamily: FONT,
+        fontWeight: 500,
+        whiteSpace: "nowrap",
+        overflow: "hidden",
+        textOverflow: "ellipsis"
+      } }, a.producto), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT } }, a.marca)), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label2, fontFamily: FONT, textAlign: "right" } }, a.usuario))));
+    })(), /* @__PURE__ */ import_react.default.createElement("div", { style: cardStyle }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      fontSize: 11,
+      fontWeight: 700,
+      color: C.label3,
+      fontFamily: FONT,
+      textTransform: "uppercase",
+      letterSpacing: 0.8,
+      marginBottom: 14
+    } }, "\xDAltimos 7 d\xEDas"), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "flex-end", gap: 6, height: 80 } }, last7.map((d, i) => {
       const pct = d.total / maxDay;
       const isToday = d.str === hoyStr;
       return /* @__PURE__ */ import_react.default.createElement("div", { key: i, style: { flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { width: "100%", display: "flex", flexDirection: "column", justifyContent: "flex-end", height: 64 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
@@ -24884,8 +24960,8 @@ Fecha: ${venta.fecha}`);
       border: "none",
       cursor: "pointer",
       padding: 0
-    } }, "Ver todas \u2192")), topMarcas.map((m, i) => /* @__PURE__ */ import_react.default.createElement("div", { key: m.marca.id, style: { marginBottom: i < topMarcas.length - 1 ? 12 : 0 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 14 } }, m.marca.emoji), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, fontWeight: 600, color: C.label, fontFamily: FONT_UI } }, m.marca.nombre)), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 12, fontWeight: 700, color: m.marca.color, fontFamily: FONT_UI } }, "Bs ", new Intl.NumberFormat("es-BO", { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(m.total))), /* @__PURE__ */ import_react.default.createElement("div", { style: { height: 6, background: "#F1F5F9", borderRadius: 3, overflow: "hidden" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      height: 6,
+    } }, "Ver todas \u2192")), topMarcas.map((m, i) => /* @__PURE__ */ import_react.default.createElement("div", { key: m.marca.id, style: { marginBottom: i < topMarcas.length - 1 ? 12 : 0 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 14 } }, m.marca.emoji), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, fontWeight: 600, color: C.label, fontFamily: FONT_UI } }, m.marca.nombre)), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 12, fontWeight: 700, color: m.marca.color, fontFamily: FONT_UI } }, "Bs ", new Intl.NumberFormat("es-BO", { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(m.total))), /* @__PURE__ */ import_react.default.createElement("div", { style: { height: 5, background: C.bg3, borderRadius: 3, overflow: "hidden" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      height: 5,
       width: `${m.total / maxMarca * 100}%`,
       background: m.marca.color,
       borderRadius: 3,
@@ -25149,7 +25225,7 @@ Fecha: ${venta.fecha}`);
       background: C.gold,
       borderRadius: 2,
       animation: "loadbar 1.2s ease-in-out infinite"
-    } })), /* @__PURE__ */ import_react.default.createElement("style", null, `@keyframes loadbar{0%{transform:translateX(-100%)}100%{transform:translateX(200%)}}`)), showingDetail ? /* @__PURE__ */ import_react.default.createElement(
+    } })), /* @__PURE__ */ import_react.default.createElement("style", null, `@keyframes loadbar{0%{transform:translateX(-100%)}100%{transform:translateX(200%)}}@keyframes slideUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}`)), showingDetail ? /* @__PURE__ */ import_react.default.createElement(
       NavBar,
       {
         title: MARCAS.find((m) => m.id === marcaDetalle)?.nombre,
@@ -26043,19 +26119,55 @@ Fecha: ${venta.fecha}`);
       },
       carrito.length ? `\u{1F4B3}  COBRAR ${$(total)}` : "Agrega productos"
     ), showOk && ultima && /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      background: `${C.green}15`,
+      background: C.bg1,
       border: `1px solid ${C.green}30`,
-      borderRadius: 16,
-      padding: "16px",
-      marginTop: 14
-    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, fontWeight: 700, color: C.green, textTransform: "uppercase", letterSpacing: 0.5 } }, "\u2713 Venta Registrada"), /* @__PURE__ */ import_react.default.createElement("button", { onClick: () => setShowOk(false), style: {
+      borderRadius: 20,
+      padding: "20px",
+      marginTop: 14,
+      boxShadow: "0 8px 32px rgba(45,106,79,0.12)",
+      animation: "slideUp .4s cubic-bezier(.34,1.56,.64,1)"
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center", marginBottom: 14 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      width: 52,
+      height: 52,
+      borderRadius: "50%",
+      background: `${C.green}15`,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      margin: "0 auto 10px",
+      fontSize: 24
+    } }, "\u2713"), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      fontSize: 22,
+      fontWeight: 500,
+      color: C.green,
+      fontFamily: FONT_DISPLAY,
+      letterSpacing: 0.5
+    } }, "Venta realizada"), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      fontSize: 28,
+      fontWeight: 600,
+      color: C.label,
+      fontFamily: FONT_DISPLAY,
+      marginTop: 4
+    } }, $(ultima.total))), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 10
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, fontFamily: "monospace", color: C.label3 } }, ultima.id), /* @__PURE__ */ import_react.default.createElement("button", { onClick: () => setShowOk(false), style: {
       background: "none",
       border: "none",
       color: C.label3,
       cursor: "pointer",
       fontSize: 18,
       WebkitTapHighlightColor: "transparent"
-    } }, "\xD7")), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontFamily: "monospace", fontSize: 13, color: C.gold } }, ultima.id), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 26, fontWeight: 800, color: C.green, fontFamily: FONT, margin: "4px 0 10px" } }, $(ultima.total)), ultima.items.map((i, ii) => /* @__PURE__ */ import_react.default.createElement("div", { key: `ok-${ii}`, style: { fontSize: 13, color: C.label2, fontFamily: FONT, marginBottom: 2 } }, "\u2192 ", i.nombre, " \xD7", i.cantidad, " (", i.marcaNombre, ")")), /* @__PURE__ */ import_react.default.createElement("div", { style: { marginTop: 12, display: "flex", flexDirection: "column", gap: 8 } }, /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => onVerNota && onVerNota(ultima), variant: "primary", full: true, small: true, icon: "\u{1F9FE}" }, "Ver Nota de Venta"), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => sendWA(ultima), variant: "fill", full: true, small: true, icon: "\u{1F4F2}" }, "Enviar por WhatsApp"))), /* @__PURE__ */ import_react.default.createElement(Sheet, { open: showPago, onClose: () => setShowPago(false), title: "Confirmar Cobro", tall: true }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+    } }, "\xD7")), ultima.items.map((it, ii) => /* @__PURE__ */ import_react.default.createElement("div", { key: `ok-${ii}`, style: {
+      fontSize: 13,
+      color: C.label2,
+      fontFamily: FONT,
+      marginBottom: 3,
+      paddingLeft: 8,
+      borderLeft: `2px solid ${C.gold}40`
+    } }, it.nombre, " ", /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.label3 } }, "\xD7", it.cantidad), /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.label3 } }, " \xB7 ", it.marcaNombre))), /* @__PURE__ */ import_react.default.createElement("div", { style: { marginTop: 14, display: "flex", flexDirection: "column", gap: 8 } }, /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => onVerNota && onVerNota(ultima), variant: "primary", full: true, small: true, icon: "\u{1F9FE}" }, "Ver Nota de Venta"), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => sendWA(ultima), variant: "fill", full: true, small: true, icon: "\u{1F4F2}" }, "Enviar por WhatsApp"))), /* @__PURE__ */ import_react.default.createElement(Sheet, { open: showPago, onClose: () => setShowPago(false), title: "Confirmar Cobro", tall: true }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
       background: `${C.gold}12`,
       border: `1px solid ${C.gold}30`,
       borderRadius: 16,

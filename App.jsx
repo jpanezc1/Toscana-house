@@ -508,43 +508,47 @@ function DriveIndicator({ syncing, connected }) {
    · Dark mode premium  · Haptic-feel micro-animations
 ═══════════════════════════════════════════════════════════ */
 
-// ── Paleta Profesional — Toscana House (iZi-style blue/white) ──
+// ── Paleta Luxury — Toscana House (warm ivory / champagne gold) ──
 const C = {
-  bg0:   "#F4F7FB",       // blue-gray page background
-  bg1:   "#FFFFFF",       // white cards
-  bg2:   "#F8FAFD",       // subtle card fill
-  bg3:   "#EBF1F9",       // blue-tinted section bg
-  label:    "#0F172A",    // slate-900
-  label2:   "#334155",    // slate-700
-  label3:   "#64748B",    // slate-500
-  label4:   "rgba(15,23,42,0.15)",
-  sep:   "rgba(100,116,139,0.14)",
-  sepH:  "rgba(100,116,139,0.28)",
-  gold:  "#1565C0",       // primary blue (kept key name for compat)
-  goldL: "#1976D2",       // blue lighter
-  goldD: "#0D47A1",       // blue darker
-  accent:"#90CAF9",       // blue accent
-  cream: "#F4F7FB",
-  green: "#2E7D32",       // success green
-  red:   "#C62828",       // error red
-  blue:  "#1565C0",       // alias for gold
-  amber: "#E65100",       // warning orange
-  indigo:"#3949AB",       // indigo/violet
-  tabPos:"#1565C0",       // Caja — blue
-  tabInv:"#0277BD",       // Inventario — dark blue
-  tabMar:"#6A1B9A",       // Marcas — purple
-  tabVen:"#00695C",       // Ventas — teal
-  tabLiq:"#AD1457",       // Liquidar — pink
-  fill1: "rgba(21,101,192,0.04)",
-  fill2: "rgba(21,101,192,0.09)",
-  fill3: "rgba(21,101,192,0.16)",
-  stockOk:  "#E8F5E9",
-  stockLow: "#FFF8E1",
-  stockOut: "#FFEBEE",
-  stockSold:"#EDE7F6",
-  greenBg:  "#E8F5E9",
-  redBg:    "#FFEBEE",
-  amberBg:  "#FFF8E1",
+  bg0:   "#FAF9F7",    // warm ivory — main background
+  bg1:   "#FFFFFF",    // white — cards
+  bg2:   "#F5F1EB",    // stone — secondary bg
+  bg3:   "#EDE8DF",    // warm beige — tertiary
+  label:    "#1A1714", // warm black — primary text
+  label2:   "#44403C", // graphite — secondary text
+  label3:   "#78716C", // stone gray — muted text
+  label4:   "rgba(26,23,20,0.12)",
+  sep:   "rgba(120,113,108,0.13)",
+  sepH:  "rgba(120,113,108,0.26)",
+  // Warm champagne gold — primary accent (replaces blue)
+  gold:  "#9A7B4F",
+  goldL: "#B8965E",
+  goldD: "#7A5F38",
+  accent:"#D4B896",
+  cream: "#FAF9F7",
+  green: "#2D6A4F",
+  red:   "#9B2335",
+  blue:  "#1E3A5F",
+  amber: "#92400E",
+  indigo:"#4A3D8F",
+  // Tab accent colors — rich, sophisticated
+  tabPos:"#1A1714",
+  tabInv:"#2D6A4F",
+  tabMar:"#6B4E71",
+  tabVen:"#1E3A5F",
+  tabLiq:"#9B2335",
+  // Fill tints
+  fill1: "rgba(154,123,79,0.05)",
+  fill2: "rgba(154,123,79,0.09)",
+  fill3: "rgba(154,123,79,0.15)",
+  // Status backgrounds
+  stockOk:  "#EFF7F2",
+  stockLow: "#FEFAEF",
+  stockOut: "#FDF0F2",
+  stockSold:"#F2F0F8",
+  greenBg:  "#EFF7F2",
+  redBg:    "#FDF0F2",
+  amberBg:  "#FEFAEF",
 };
 
 const ALQUILERES = {
@@ -1143,6 +1147,7 @@ function verNotaVenta(v,n){abrirNotaVenta(v,n,false);}
 // Font stack — unified DM Sans for professional/clean look
 const FONT = "'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
 const FONT_UI = "'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+const FONT_DISPLAY = "'Cormorant Garamond', Georgia, 'Times New Roman', serif";
 
 // Logo SVG inline de Toscana House
 const LOGO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 120" fill="none">
@@ -1221,32 +1226,35 @@ function Cell({icon,iconBg,label,value,chevron,onPress,danger,first,last,badge})
 function NavBar({title, subtitle, back, onBack, right}){
   return (
     <div style={{
-      background:"rgba(255,255,255,0.96)",
-      backdropFilter:"blur(20px) saturate(180%)",
-      WebkitBackdropFilter:"blur(20px) saturate(180%)",
+      background:"rgba(255,255,255,0.97)",
+      backdropFilter:"blur(24px) saturate(180%)",
+      WebkitBackdropFilter:"blur(24px) saturate(180%)",
       borderBottom:`1px solid ${C.sep}`,
-      boxShadow:"0 2px 16px rgba(21,101,192,0.07)",
-      padding:"0 16px",
+      boxShadow:"0 1px 0 rgba(120,113,108,0.08)",
+      padding:"0 20px",
       position:"sticky",top:0,zIndex:100,
-      display:"flex",alignItems:"center",height:56,
-      gap:8,
+      display:"flex",alignItems:"center",minHeight:54,
+      gap:10,
     }}>
       {back&&(
         <button onClick={onBack} style={{
           background:"none",border:"none",
-          color:C.gold,fontSize:16,fontFamily:FONT,fontWeight:400,
+          color:C.label3,fontSize:13,fontFamily:FONT,fontWeight:500,
           cursor:"pointer",padding:"8px 0",
           display:"flex",alignItems:"center",gap:4,
           WebkitTapHighlightColor:"transparent",
-          minWidth:44,
+          minWidth:44,letterSpacing:.3,
         }}>
-          <span style={{fontSize:22,lineHeight:1}}>‹</span>
-          <span style={{fontSize:16}}>{typeof back==="string"?back:""}</span>
+          <span style={{fontSize:18,lineHeight:1,marginTop:-1}}>‹</span>
+          {typeof back==="string"?back:""}
         </button>
       )}
       <div style={{flex:1,textAlign:"center"}}>
-        <div style={{fontSize:17,fontWeight:600,color:C.label,fontFamily:FONT,lineHeight:1.2}}>{title}</div>
-        {subtitle&&<div style={{fontSize:11,color:C.label2,fontFamily:FONT,marginTop:1}}>{subtitle}</div>}
+        <div style={{
+          fontSize:16,fontWeight:500,color:C.label,
+          fontFamily:FONT_DISPLAY,letterSpacing:.5,lineHeight:1.2,
+        }}>{title}</div>
+        {subtitle&&<div style={{fontSize:11,color:C.label3,fontFamily:FONT,marginTop:1,letterSpacing:.2}}>{subtitle}</div>}
       </div>
       <div style={{minWidth:back?44:0,display:"flex",justifyContent:"flex-end"}}>{right}</div>
     </div>
@@ -1255,35 +1263,29 @@ function NavBar({title, subtitle, back, onBack, right}){
 
 // iOS Bottom Tab Bar
 const TAB_COLORS = {
-  inicio:        "#1565C0",
+  inicio:        C.gold,
   pos:           C.tabPos,
   inventario:    C.tabInv,
   marcas:        C.tabMar,
   ventas:        C.tabVen,
   liquidaciones: C.tabLiq,
-  config:        "#455A64",
-  historial:     "#546E7A",
+  config:        "#78716C",
+  historial:     "#78716C",
 };
 
 function TabBar({tabs, active, onChange}){
   return (
     <div style={{
       position:"fixed",bottom:0,left:0,right:0,zIndex:200,
-      background:"rgba(255,255,255,0.97)",
-      backdropFilter:"blur(20px) saturate(180%)",
-      WebkitBackdropFilter:"blur(20px) saturate(180%)",
+      background:"rgba(255,255,255,0.98)",
+      backdropFilter:"blur(24px) saturate(160%)",
+      WebkitBackdropFilter:"blur(24px) saturate(160%)",
       borderTop:`1px solid ${C.sep}`,
-      display:"flex",
-      justifyContent:"center",
-      alignItems:"stretch",
-      paddingBottom:"env(safe-area-inset-bottom,12px)",
-      boxShadow:"0 -2px 16px rgba(21,101,192,0.07)",
+      display:"flex",justifyContent:"center",alignItems:"stretch",
+      paddingBottom:"env(safe-area-inset-bottom,10px)",
+      boxShadow:"0 -1px 0 rgba(120,113,108,0.06)",
     }}>
-      <div style={{
-        display:"flex",
-        width:"100%",
-        maxWidth:560,
-      }}>
+      <div style={{display:"flex",width:"100%",maxWidth:560}}>
         {tabs.map(t=>{
           const isActive=active===t.id;
           const tabColor=TAB_COLORS[t.id]||C.gold;
@@ -1292,7 +1294,7 @@ function TabBar({tabs, active, onChange}){
               flex:1,border:"none",
               background:"transparent",
               display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",
-              padding:"8px 2px 6px",
+              padding:"7px 2px 5px",
               cursor:"pointer",
               WebkitTapHighlightColor:"transparent",
               gap:3,
@@ -1302,17 +1304,16 @@ function TabBar({tabs, active, onChange}){
             }}>
               <div style={{
                 width:33,height:33,borderRadius:9,
-                background:isActive?`${tabColor}18`:"transparent",
+                background:isActive?`${tabColor}14`:"transparent",
                 display:"flex",alignItems:"center",justifyContent:"center",
                 fontSize:19,lineHeight:1,
-                transform:isActive?"scale(1.1)":"scale(1)",
+                transform:isActive?"scale(1.08)":"scale(1)",
                 transition:"all .2s cubic-bezier(.34,1.56,.64,1)",
               }}>{t.icon}</div>
               <span style={{
                 fontSize:9,fontFamily:FONT_UI,fontWeight:700,
                 color:isActive?tabColor:C.label3,
-                transition:"color .2s",
-                letterSpacing:.2,
+                transition:"color .2s",letterSpacing:.3,
                 whiteSpace:"nowrap",
               }}>{t.label}</span>
             </button>
@@ -1328,8 +1329,8 @@ function IOSBtn({children,onPress,variant="primary",full,disabled,small,icon}){
   const {pressed,...handlers}=usePress();
   const bg = {
     primary: `linear-gradient(135deg,${C.gold},${C.goldD})`,
-    success: `linear-gradient(135deg,${C.green},#28A047)`,
-    danger:  `linear-gradient(135deg,${C.red},#C0392B)`,
+    success: `linear-gradient(135deg,${C.green},#1E5C3A)`,
+    danger:  `linear-gradient(135deg,${C.red},#7A1B28)`,
     ghost:   "transparent",
     fill:    C.fill2,
   };
@@ -1394,7 +1395,7 @@ function Sheet({open,onClose,title,children,tall}){
         {/* Title */}
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",
           padding:"8px 20px 16px"}}>
-          <h3 style={{margin:0,fontSize:17,fontWeight:600,color:C.label,fontFamily:FONT}}>{title}</h3>
+          <h3 style={{margin:0,fontSize:18,fontWeight:500,color:C.label,fontFamily:FONT_DISPLAY,letterSpacing:.5}}>{title}</h3>
           <button onClick={onClose} style={{
             background:C.fill2,border:"none",borderRadius:"50%",
             width:30,height:30,cursor:"pointer",
@@ -1747,39 +1748,43 @@ function LoginScreen({ onLogin }) {
   return (
     <div style={{
       minHeight:"100vh",
-      background:"linear-gradient(160deg, #F2F7F2 0%, #E8F2E8 50%, #D8EDD8 100%)",
+      background:C.bg0,
       display:"flex", flexDirection:"column",
       alignItems:"center", justifyContent:"center",
       fontFamily:FONT, padding:24,
     }}>
       {/* Logo */}
       <div style={{marginBottom:40, textAlign:"center"}}>
-        <div style={{fontSize:48, marginBottom:8}}>🏡</div>
-        <div style={{fontSize:28, fontWeight:800, color:"#3D6B3D",
-          fontFamily:"Georgia,serif", letterSpacing:3}}>TOSCANA HOUSE</div>
-        <div style={{fontSize:12, color:"#7A9A7A", letterSpacing:6,
-          fontFamily:"Georgia,serif", marginTop:4}}>CASA DE MODA</div>
-        <div style={{width:80, height:1, background:"#A8C5A0",
-          margin:"12px auto 0"}}/>
+        <div style={{
+          fontSize:52,fontWeight:300,color:C.label,
+          fontFamily:FONT_DISPLAY,letterSpacing:8,lineHeight:1,
+          marginBottom:10,
+        }}>TH</div>
+        <div style={{width:48, height:1, background:`${C.gold}60`,
+          margin:"0 auto 10px"}}/>
+        <div style={{fontSize:14, fontWeight:500, color:C.label,
+          fontFamily:FONT_UI, letterSpacing:6, textTransform:"uppercase"}}>TOSCANA HOUSE</div>
+        <div style={{fontSize:10, color:C.label3, letterSpacing:5,
+          fontFamily:FONT_UI, marginTop:4, textTransform:"uppercase"}}>CASA DE MODA</div>
       </div>
 
       {/* Card login */}
       <div style={{
-        background:"rgba(255,255,255,0.95)",
+        background:C.bg1,
         borderRadius:24, padding:"32px 28px",
         width:"100%", maxWidth:380,
-        boxShadow:"0 8px 40px rgba(74,107,74,0.15)",
-        border:"1px solid rgba(168,197,160,0.4)",
+        boxShadow:"0 8px 40px rgba(120,113,108,0.12)",
+        border:`1px solid ${C.sep}`,
       }}>
-        <div style={{fontSize:20, fontWeight:700, color:"#1A2E1A",
-          marginBottom:6, fontFamily:FONT}}>Iniciar sesión</div>
-        <div style={{fontSize:14, color:"#7A9A7A", marginBottom:28, fontFamily:FONT}}>
+        <div style={{fontSize:20, fontWeight:500, color:C.label,
+          marginBottom:6, fontFamily:FONT_DISPLAY,letterSpacing:.5}}>Iniciar sesión</div>
+        <div style={{fontSize:14, color:C.label3, marginBottom:28, fontFamily:FONT}}>
           Ingresa tus credenciales para continuar
         </div>
 
         {/* Usuario */}
         <div style={{marginBottom:16}}>
-          <label style={{fontSize:11, fontWeight:700, color:"#4A6B4A",
+          <label style={{fontSize:11, fontWeight:700, color:C.label3,
             textTransform:"uppercase", letterSpacing:.8, display:"block", marginBottom:6}}>
             Usuario
           </label>
@@ -1791,18 +1796,18 @@ function LoginScreen({ onLogin }) {
             autoCapitalize="none"
             autoCorrect="off"
             style={{width:"100%", padding:"13px 16px", borderRadius:12,
-              border:`1.5px solid ${error?"#C0504A":"rgba(168,197,160,0.6)"}`,
-              background:"#F7FAF7", fontSize:16, color:"#1A2E1A",
+              border:`1.5px solid ${error?C.red:C.sep}`,
+              background:C.bg2, fontSize:16, color:C.label,
               outline:"none", fontFamily:FONT, boxSizing:"border-box",
               WebkitAppearance:"none"}}
-            onFocus={e=>e.target.style.borderColor="#5C8A5C"}
-            onBlur={e=>e.target.style.borderColor=error?"#C0504A":"rgba(168,197,160,0.6)"}
+            onFocus={e=>e.target.style.borderColor=C.gold}
+            onBlur={e=>e.target.style.borderColor=error?C.red:C.sep}
           />
         </div>
 
         {/* Contraseña */}
         <div style={{marginBottom:24}}>
-          <label style={{fontSize:11, fontWeight:700, color:"#4A6B4A",
+          <label style={{fontSize:11, fontWeight:700, color:C.label3,
             textTransform:"uppercase", letterSpacing:.8, display:"block", marginBottom:6}}>
             Contraseña
           </label>
@@ -1814,18 +1819,18 @@ function LoginScreen({ onLogin }) {
               onKeyDown={e=>e.key==="Enter"&&handleLogin()}
               placeholder="••••••••"
               style={{width:"100%", padding:"13px 44px 13px 16px", borderRadius:12,
-                border:`1.5px solid ${error?"#C0504A":"rgba(168,197,160,0.6)"}`,
-                background:"#F7FAF7", fontSize:16, color:"#1A2E1A",
+                border:`1.5px solid ${error?C.red:C.sep}`,
+                background:C.bg2, fontSize:16, color:C.label,
                 outline:"none", fontFamily:FONT, boxSizing:"border-box",
                 WebkitAppearance:"none"}}
-              onFocus={e=>e.target.style.borderColor="#5C8A5C"}
-              onBlur={e=>e.target.style.borderColor=error?"#C0504A":"rgba(168,197,160,0.6)"}
+              onFocus={e=>e.target.style.borderColor=C.gold}
+              onBlur={e=>e.target.style.borderColor=error?C.red:C.sep}
             />
             <button onClick={()=>setShowPass(p=>!p)} style={{
               position:"absolute", right:12, top:"50%",
               transform:"translateY(-50%)",
               background:"none", border:"none", cursor:"pointer",
-              fontSize:18, color:"#7A9A7A",
+              fontSize:18, color:C.label3,
               WebkitTapHighlightColor:"transparent",
             }}>{showPass?"🙈":"👁"}</button>
           </div>
@@ -1833,9 +1838,9 @@ function LoginScreen({ onLogin }) {
 
         {/* Error */}
         {error&&(
-          <div style={{padding:"10px 14px", background:"#FFF0EE",
-            borderRadius:10, border:"1px solid #F4A8A8",
-            color:"#C0504A", fontSize:13, fontFamily:FONT,
+          <div style={{padding:"10px 14px", background:C.redBg,
+            borderRadius:10, border:`1px solid ${C.red}30`,
+            color:C.red, fontSize:13, fontFamily:FONT,
             marginBottom:16, textAlign:"center"}}>
             {error}
           </div>
@@ -1848,8 +1853,8 @@ function LoginScreen({ onLogin }) {
           style={{
             width:"100%", padding:"15px",
             borderRadius:14, border:"none",
-            background:loading?"#A8C5A0":"linear-gradient(135deg,#5C8A5C,#3D6B3D)",
-            color:"white", fontSize:16, fontWeight:700,
+            background:loading?C.fill3:`linear-gradient(135deg,${C.gold},${C.goldD})`,
+            color:loading?C.label3:"#fff", fontSize:16, fontWeight:600,
             cursor:loading?"not-allowed":"pointer",
             fontFamily:FONT, letterSpacing:.5,
             transition:"all .2s",
@@ -1859,7 +1864,7 @@ function LoginScreen({ onLogin }) {
         </button>
       </div>
 
-      <div style={{marginTop:24, fontSize:12, color:"#7A9A7A",
+      <div style={{marginTop:24, fontSize:12, color:C.label3,
         fontFamily:FONT, textAlign:"center"}}>
         Toscana House © {new Date().getFullYear()}
       </div>
@@ -2720,21 +2725,23 @@ function generarPlanillaAlquileres(ventas, mes, anio) {
 function KPICard({icon, label, val, sub, color}){
   return (
     <div style={{
-      background:"#fff", borderRadius:14, padding:"14px 16px",
-      border:"1px solid #E2E8F0",
-      boxShadow:"0 1px 4px rgba(21,101,192,0.06)",
+      background:C.bg1, borderRadius:16, padding:"16px 18px",
+      border:`1px solid ${C.sep}`,
+      boxShadow:"0 2px 8px rgba(120,113,108,0.06), 0 1px 2px rgba(120,113,108,0.04)",
     }}>
-      <div style={{display:"flex", alignItems:"center", gap:8, marginBottom:8}}>
+      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
         <div style={{
-          width:32, height:32, borderRadius:10,
-          background:`${color}18`,
-          display:"flex", alignItems:"center", justifyContent:"center",
-          fontSize:16,
+          width:32,height:32,borderRadius:10,
+          background:`${color}14`,
+          display:"flex",alignItems:"center",justifyContent:"center",
+          fontSize:15,
         }}>{icon}</div>
-        <span style={{fontSize:12, color:"#64748B", fontFamily:FONT_UI, fontWeight:500}}>{label}</span>
+        <span style={{fontSize:11,color:C.label3,fontFamily:FONT,fontWeight:500,
+          letterSpacing:.4,textTransform:"uppercase"}}>{label}</span>
       </div>
-      <div style={{fontSize:22, fontWeight:800, color:color, fontFamily:FONT_UI, lineHeight:1}}>{val}</div>
-      <div style={{fontSize:11, color:"#94A3B8", fontFamily:FONT_UI, marginTop:4}}>{sub}</div>
+      <div style={{fontSize:26,fontWeight:600,color:C.label,fontFamily:FONT_DISPLAY,
+        lineHeight:1,letterSpacing:-.3}}>{val}</div>
+      <div style={{fontSize:11,color:C.label3,fontFamily:FONT,marginTop:5,letterSpacing:.2}}>{sub}</div>
     </div>
   );
 }
@@ -3383,37 +3390,37 @@ function HomeDashboard({ventas, inv, vMes, mes, anio, onGoTab}){
   const dateStr  = `${dayNames[today.getDay()]}, ${today.getDate()} de ${MESES[today.getMonth()]} ${today.getFullYear()}`;
 
   const cardStyle = {
-    background:"#fff", borderRadius:14, padding:"14px 16px",
-    border:"1px solid #E2E8F0", boxShadow:"0 1px 4px rgba(21,101,192,0.06)",
+    background:C.bg1, borderRadius:16, padding:"16px 18px",
+    border:`1px solid ${C.sep}`,
+    boxShadow:"0 2px 8px rgba(120,113,108,0.06)",
     marginBottom:14,
   };
 
   return (
     <div style={{paddingBottom:8}}>
 
-      {/* ── Logo / Marca ── */}
-      <div style={{textAlign:"center", marginBottom:14, paddingTop:4}}>
+      {/* ── Logo editorial ── */}
+      <div style={{textAlign:"center",marginBottom:16,paddingTop:4}}>
         <div style={{
           display:"inline-flex",flexDirection:"column",alignItems:"center",gap:0,
-          background:"linear-gradient(135deg,#EBF1F9,#F8FAFD)",
-          borderRadius:20, padding:"18px 32px 14px",
+          background:C.bg1,borderRadius:20,padding:"20px 36px 16px",
           border:`1px solid ${C.sep}`,
-          boxShadow:"0 2px 12px rgba(21,101,192,0.10)",
+          boxShadow:"0 4px 24px rgba(120,113,108,0.08)",
           marginBottom:4,
         }}>
           <div style={{
-            fontSize:46,fontWeight:900,color:C.label,
-            fontFamily:"Georgia,'Times New Roman',serif",
-            letterSpacing:6,lineHeight:1,
+            fontSize:52,fontWeight:300,color:C.label,
+            fontFamily:FONT_DISPLAY,
+            letterSpacing:8,lineHeight:1,
           }}>TH</div>
-          <div style={{width:80,height:1.5,background:`${C.gold}50`,margin:"6px 0 4px"}}/>
+          <div style={{width:64,height:1,background:`${C.gold}60`,margin:"8px 0 5px"}}/>
           <div style={{
-            fontSize:20,fontWeight:800,color:C.label,
-            fontFamily:FONT_UI,letterSpacing:5,lineHeight:1,
+            fontSize:13,fontWeight:500,color:C.label,
+            fontFamily:FONT_UI,letterSpacing:6,lineHeight:1,
             textTransform:"uppercase",
           }}>TOSCANA HOUSE</div>
           <div style={{
-            fontSize:9,fontWeight:500,color:C.label3,
+            fontSize:9,fontWeight:400,color:C.label3,
             fontFamily:FONT_UI,letterSpacing:5,lineHeight:1.6,
             textTransform:"uppercase",
           }}>CASA DE MODA</div>
@@ -3445,9 +3452,62 @@ function HomeDashboard({ventas, inv, vMes, mes, anio, onGoTab}){
           color={C.amber}/>
       </div>
 
+      {/* ── Actividad showroom ── */}
+      {(() => {
+        // combine last 6 ventas into a live activity feed
+        const feed = [
+          ...ultVentas.slice(0,6).map(v=>({
+            id:v.id, hora:v.hora||"—", tipo:"Venta",
+            producto:v.items?.[0]?.nombre||"—",
+            marca:v.items?.[0]?.marcaNombre||"—",
+            usuario:v.vendedor||"Tienda",
+            color:C.green, bg:C.greenBg,
+          })),
+        ].slice(0,6);
+        if(feed.length===0) return null;
+        return (
+          <div style={{...cardStyle,marginBottom:14,overflow:"hidden"}}>
+            <div style={{fontSize:11,fontWeight:700,color:C.label3,fontFamily:FONT,
+              textTransform:"uppercase",letterSpacing:.8,marginBottom:12}}>
+              Actividad del showroom
+            </div>
+            {feed.map((a,i)=>(
+              <div key={a.id} style={{
+                display:"grid",gridTemplateColumns:"44px 52px 1fr 80px",
+                alignItems:"center",gap:8,
+                padding:"9px 0",
+                borderTop:i>0?`1px solid ${C.sep}`:"",
+              }}>
+                <span style={{fontSize:11,color:C.label3,fontFamily:"monospace",fontWeight:500}}>
+                  {a.hora}
+                </span>
+                <span style={{
+                  fontSize:10,fontWeight:700,color:a.color,fontFamily:FONT,
+                  background:a.bg,padding:"2px 7px",borderRadius:20,
+                  textAlign:"center",letterSpacing:.3,
+                }}>{a.tipo}</span>
+                <div>
+                  <div style={{fontSize:13,color:C.label,fontFamily:FONT,fontWeight:500,
+                    whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>
+                    {a.producto}
+                  </div>
+                  <div style={{fontSize:11,color:C.label3,fontFamily:FONT}}>
+                    {a.marca}
+                  </div>
+                </div>
+                <div style={{fontSize:11,color:C.label2,fontFamily:FONT,textAlign:"right"}}>
+                  {a.usuario}
+                </div>
+              </div>
+            ))}
+          </div>
+        );
+      })()}
+
       {/* ── Bar chart últimos 7 días ── */}
       <div style={cardStyle}>
-        <div style={{fontSize:13, fontWeight:700, color:C.label2, fontFamily:FONT_UI, marginBottom:14}}>
+        <div style={{fontSize:11, fontWeight:700, color:C.label3, fontFamily:FONT,
+          textTransform:"uppercase",letterSpacing:.8, marginBottom:14}}>
           Últimos 7 días
         </div>
         <div style={{display:"flex", alignItems:"flex-end", gap:6, height:80}}>
@@ -3532,9 +3592,9 @@ function HomeDashboard({ventas, inv, vMes, mes, anio, onGoTab}){
                   Bs {new Intl.NumberFormat("es-BO",{minimumFractionDigits:0,maximumFractionDigits:0}).format(m.total)}
                 </span>
               </div>
-              <div style={{height:6, background:"#F1F5F9", borderRadius:3, overflow:"hidden"}}>
+              <div style={{height:5, background:C.bg3, borderRadius:3, overflow:"hidden"}}>
                 <div style={{
-                  height:6,
+                  height:5,
                   width:`${(m.total / maxMarca) * 100}%`,
                   background:m.marca.color,
                   borderRadius:3,
@@ -3798,7 +3858,7 @@ function App(){
             <div style={{width:"60%",height:4,background:C.gold,borderRadius:2,
               animation:"loadbar 1.2s ease-in-out infinite"}}/>
           </div>
-          <style>{`@keyframes loadbar{0%{transform:translateX(-100%)}100%{transform:translateX(200%)}}`}</style>
+          <style>{`@keyframes loadbar{0%{transform:translateX(-100%)}100%{transform:translateX(200%)}}@keyframes slideUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}`}</style>
         </div>
       )}
 
@@ -4587,21 +4647,42 @@ function POS({inv,onVenta,onVerNota}){
 
       {/* Última venta */}
       {showOk&&ultima&&(
-        <div style={{background:`${C.green}15`,border:`1px solid ${C.green}30`,
-          borderRadius:16,padding:"16px",marginTop:14}}>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10}}>
-            <div style={{fontSize:13,fontWeight:700,color:C.green,textTransform:"uppercase",letterSpacing:.5}}>✓ Venta Registrada</div>
-            <button onClick={()=>setShowOk(false)} style={{background:"none",border:"none",
-              color:C.label3,cursor:"pointer",fontSize:18,WebkitTapHighlightColor:"transparent"}}>×</button>
+        <div style={{
+          background:C.bg1,border:`1px solid ${C.green}30`,
+          borderRadius:20,padding:"20px",marginTop:14,
+          boxShadow:"0 8px 32px rgba(45,106,79,0.12)",
+          animation:"slideUp .4s cubic-bezier(.34,1.56,.64,1)",
+        }}>
+          <div style={{textAlign:"center",marginBottom:14}}>
+            <div style={{
+              width:52,height:52,borderRadius:"50%",
+              background:`${C.green}15`,
+              display:"flex",alignItems:"center",justifyContent:"center",
+              margin:"0 auto 10px",fontSize:24,
+            }}>✓</div>
+            <div style={{fontSize:22,fontWeight:500,color:C.green,
+              fontFamily:FONT_DISPLAY,letterSpacing:.5}}>Venta realizada</div>
+            <div style={{fontSize:28,fontWeight:600,color:C.label,
+              fontFamily:FONT_DISPLAY,marginTop:4}}>{$(ultima.total)}</div>
           </div>
-          <div style={{fontFamily:"monospace",fontSize:13,color:C.gold}}>{ultima.id}</div>
-          <div style={{fontSize:26,fontWeight:800,color:C.green,fontFamily:FONT,margin:"4px 0 10px"}}>{$(ultima.total)}</div>
-          {ultima.items.map((i,ii)=>(
-            <div key={`ok-${ii}`} style={{fontSize:13,color:C.label2,fontFamily:FONT,marginBottom:2}}>
-              → {i.nombre} ×{i.cantidad} ({i.marcaNombre})
+          <div style={{display:"flex",justifyContent:"space-between",
+            alignItems:"center",marginBottom:10}}>
+            <div style={{fontSize:11,fontFamily:"monospace",color:C.label3}}>{ultima.id}</div>
+            <button onClick={()=>setShowOk(false)} style={{
+              background:"none",border:"none",color:C.label3,
+              cursor:"pointer",fontSize:18,WebkitTapHighlightColor:"transparent"
+            }}>×</button>
+          </div>
+          {ultima.items.map((it,ii)=>(
+            <div key={`ok-${ii}`} style={{
+              fontSize:13,color:C.label2,fontFamily:FONT,marginBottom:3,
+              paddingLeft:8,borderLeft:`2px solid ${C.gold}40`,
+            }}>
+              {it.nombre} <span style={{color:C.label3}}>×{it.cantidad}</span>
+              <span style={{color:C.label3}}> · {it.marcaNombre}</span>
             </div>
           ))}
-          <div style={{marginTop:12,display:"flex",flexDirection:"column",gap:8}}>
+          <div style={{marginTop:14,display:"flex",flexDirection:"column",gap:8}}>
             <IOSBtn onPress={()=>onVerNota&&onVerNota(ultima)} variant="primary" full small icon="🧾">
               Ver Nota de Venta
             </IOSBtn>
