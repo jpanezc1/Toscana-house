@@ -23350,6 +23350,9 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
         (u) => u.usuario.toLowerCase() === usuario.toLowerCase() && u.password === password
       );
       if (found) {
+        if (found.estado === "inactivo") {
+          return { ok: false, error: "Cuenta desactivada. Contact\xE1 al administrador." };
+        }
         const session = { ...found, loginAt: Date.now() };
         localStorage.setItem("th_user", JSON.stringify(session));
         setUser(session);
@@ -28963,84 +28966,25 @@ Fecha: ${venta.fecha}`);
       WebkitTapHighlightColor: "transparent"
     } }, testing ? "Probando\u2026" : "Probar conexi\xF3n")), /* @__PURE__ */ import_react.default.createElement("div", { style: { padding: 10, background: C.bg3, borderRadius: 10, border: `1px solid ${C.sep}`, marginBottom: 12 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT, lineHeight: 1.7 } }, "\u{1F4CB} Obtener API Key \u2192 ", /* @__PURE__ */ import_react.default.createElement("strong", null, "cucu.bo"), /* @__PURE__ */ import_react.default.createElement("br", null), "Docs \u2192 ", /* @__PURE__ */ import_react.default.createElement("strong", null, "docs.cucu.bo"), /* @__PURE__ */ import_react.default.createElement("br", null), "Actividad ", /* @__PURE__ */ import_react.default.createElement("strong", null, "470000"), " = Comercio al por menor", /* @__PURE__ */ import_react.default.createElement("br", null), "C\xF3digo SIN ", /* @__PURE__ */ import_react.default.createElement("strong", null, "58311"), " = Prendas de vestir")), saved && /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.green, fontFamily: FONT, textAlign: "center", marginBottom: 8 } }, "\u2713 Guardado"), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => save(cfg), variant: "primary", full: true, icon: "\u{1F4BE}" }, "Guardar Configuraci\xF3n"));
   }
-  function ConfigTab({ user, logout }) {
-    var _hN155 = (0, import_react.useState)("cuenta");
-    var subTab = _hN155[0];
-    var setSubTab = _hN155[1];
-    ;
-    var _hN156 = (0, import_react.useState)(function() {
-      try {
-        return JSON.parse(localStorage.getItem("th_usuarios") || "null") || USUARIOS;
-      } catch {
-        return USUARIOS;
-      }
-    });
-    var usuarios = _hN156[0];
-    var setUsuarios = _hN156[1];
-    function guardarUsuarios(u) {
-      setUsuarios(u);
-      localStorage.setItem("th_usuarios", JSON.stringify(u));
+  var AUDIT_KEY = "th_audit_log";
+  function agregarAudit(accion, afectado, admin) {
+    try {
+      const logs = JSON.parse(localStorage.getItem(AUDIT_KEY) || "[]");
+      logs.unshift({ id: Date.now(), fecha: (/* @__PURE__ */ new Date()).toLocaleString("es-BO"), accion, afectado, admin });
+      localStorage.setItem(AUDIT_KEY, JSON.stringify(logs.slice(0, 200)));
+    } catch {
     }
-    return /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 20 } }, /* @__PURE__ */ import_react.default.createElement("h2", { style: { margin: 0, fontSize: 22, fontWeight: 800, color: C.label, fontFamily: FONT } }, "Configuraci\xF3n"), /* @__PURE__ */ import_react.default.createElement("p", { style: { margin: "4px 0 0", color: C.label3, fontFamily: FONT, fontSize: 13 } }, "Sesi\xF3n activa: ", /* @__PURE__ */ import_react.default.createElement("strong", { style: { color: C.gold } }, user.nombre), " \xB7 ", user.rol)), /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 20 } }, /* @__PURE__ */ import_react.default.createElement(
-      SegControl,
-      {
-        options: [
-          { value: "cuenta", label: "Mi cuenta" },
-          { value: "usuarios", label: "Usuarios" },
-          { value: "sistema", label: "Sistema" },
-          { value: "factura", label: "Facturaci\xF3n" }
-        ],
-        value: subTab,
-        onChange: setSubTab
-      }
-    )), subTab === "cuenta" && /* @__PURE__ */ import_react.default.createElement(CambiarContrasena, { user, usuarios, onGuardar: guardarUsuarios }), subTab === "usuarios" && /* @__PURE__ */ import_react.default.createElement(GestionUsuarios, { user, usuarios, onGuardar: guardarUsuarios }), subTab === "sistema" && /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { background: C.bg2, borderRadius: 16, overflow: "hidden", marginBottom: 16 } }, [
-      ["Versi\xF3n", "Toscana House v3.0"],
-      ["Base de datos", "Supabase (nube)"],
-      ["Usuario activo", user.nombre],
-      ["Rol", user.rol === "admin" ? "Administrador" : "Cajero"]
-    ].map(([k, v], i, arr) => /* @__PURE__ */ import_react.default.createElement("div", { key: k, style: {
-      display: "flex",
-      justifyContent: "space-between",
-      padding: "14px 16px",
-      borderBottom: i < arr.length - 1 ? `1px solid ${C.sep}` : ""
-    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 15, color: C.label2, fontFamily: FONT } }, k), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 15, color: C.label, fontFamily: FONT, fontWeight: 500 } }, v)))), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: logout, variant: "danger", full: true, icon: "\u{1F6AA}" }, "Cerrar sesi\xF3n")), subTab === "factura" && /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement(FacturacionConfig, null), /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      padding: 14,
-      background: `${C.blue}08`,
-      borderRadius: 14,
-      border: `1px solid ${C.blue}20`
-    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, fontWeight: 700, color: C.blue, fontFamily: FONT, marginBottom: 6 } }, "\u{1F3E2} Datos del Emisor (fijos)"), [
-      ["Raz\xF3n Social", "SYLVIA CAROLINA GRANIER ZALLES"],
-      ["NIT Emisor", NIT_EMPRESA],
-      ["Sucursal", SUCURSAL_EMP],
-      ["Direcci\xF3n", DIRECCION_EMP]
-    ].map(([k, v]) => /* @__PURE__ */ import_react.default.createElement("div", { key: k, style: {
-      display: "flex",
-      justifyContent: "space-between",
-      padding: "7px 0",
-      borderBottom: `1px solid ${C.sep}`
-    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 12, color: C.label3, fontFamily: FONT } }, k), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 12, fontWeight: 600, color: C.label, fontFamily: FONT } }, v))))));
   }
-  function CambiarContrasena({ user, usuarios, onGuardar }) {
-    var _hN157 = (0, import_react.useState)("");
-    var passActual = _hN157[0];
-    var setPassActual = _hN157[1];
-    ;
-    var _hN158 = (0, import_react.useState)("");
-    var passNueva = _hN158[0];
-    var setPassNueva = _hN158[1];
-    ;
-    var _hN159 = (0, import_react.useState)("");
-    var passConfirm = _hN159[0];
-    var setPassConfirm = _hN159[1];
-    ;
-    var _hN160 = (0, import_react.useState)(null);
-    var msg = _hN160[0];
-    var setMsg = _hN160[1];
-    ;
-    var _hN161 = (0, import_react.useState)(false);
-    var show = _hN161[0];
-    var setShow = _hN161[1];
-    ;
+  function generarTempPassword() {
+    const chars = "abcdefghjkmnpqrstuvwxyz23456789";
+    return Array.from({ length: 10 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
+  }
+  function PanelCambiarPass({ user, usuarios, onGuardar }) {
+    const [passActual, setPassActual] = (0, import_react.useState)("");
+    const [passNueva, setPassNueva] = (0, import_react.useState)("");
+    const [passConfirm, setPassConfirm] = (0, import_react.useState)("");
+    const [show, setShow] = (0, import_react.useState)(false);
+    const [msg, setMsg] = (0, import_react.useState)(null);
     function cambiar() {
       setMsg(null);
       const u = usuarios.find((x) => x.usuario === user.usuario);
@@ -29053,289 +28997,1108 @@ Fecha: ${venta.fecha}`);
         return;
       }
       if (passNueva.length < 6) {
-        setMsg({ ok: false, txt: "La nueva contrase\xF1a debe tener al menos 6 caracteres" });
+        setMsg({ ok: false, txt: "M\xEDnimo 6 caracteres" });
         return;
       }
       if (passNueva !== passConfirm) {
         setMsg({ ok: false, txt: "Las contrase\xF1as no coinciden" });
         return;
       }
-      const nuevos = usuarios.map((x) => x.usuario === user.usuario ? { ...x, password: passNueva } : x);
-      onGuardar(nuevos);
+      onGuardar(usuarios.map((x) => x.usuario === user.usuario ? { ...x, password: passNueva } : x));
       setMsg({ ok: true, txt: "\u2713 Contrase\xF1a actualizada correctamente" });
       setPassActual("");
       setPassNueva("");
       setPassConfirm("");
     }
-    return /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      background: C.bg2,
-      borderRadius: 16,
-      padding: 16,
+    const ipt = (label, val, set, placeholder) => /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 12 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      fontSize: 11,
+      fontWeight: 700,
+      color: C.label3,
+      textTransform: "uppercase",
+      letterSpacing: 0.7,
+      marginBottom: 6,
+      fontFamily: FONT
+    } }, label), /* @__PURE__ */ import_react.default.createElement(
+      "input",
+      {
+        type: show ? "text" : "password",
+        value: val,
+        onChange: (e) => set(e.target.value),
+        placeholder,
+        style: {
+          width: "100%",
+          padding: "12px 14px",
+          borderRadius: 12,
+          border: `1.5px solid ${C.sep}`,
+          background: C.bg0,
+          fontSize: 15,
+          color: C.label,
+          fontFamily: FONT,
+          outline: "none",
+          boxSizing: "border-box"
+        }
+      }
+    ));
+    return /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      background: C.bg1,
+      borderRadius: 18,
+      padding: 18,
+      border: `1px solid ${C.sep}`,
+      boxShadow: "0 1px 8px rgba(0,0,0,0.05)"
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      fontSize: 14,
+      fontWeight: 700,
+      color: C.label,
+      fontFamily: FONT,
       marginBottom: 16,
-      border: `1px solid ${C.sep}`
-    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 14, marginBottom: 16 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      width: 48,
-      height: 48,
+      display: "flex",
+      alignItems: "center",
+      gap: 8
+    } }, /* @__PURE__ */ import_react.default.createElement("span", null, "\u{1F512}"), " Cambiar contrase\xF1a"), ipt("Contrase\xF1a actual", passActual, setPassActual, "\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022"), ipt("Nueva contrase\xF1a", passNueva, setPassNueva, "M\xEDnimo 6 caracteres"), ipt("Confirmar contrase\xF1a", passConfirm, setPassConfirm, "Repetir nueva contrase\xF1a"), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 14 } }, /* @__PURE__ */ import_react.default.createElement(
+      "input",
+      {
+        type: "checkbox",
+        id: "showPassCP",
+        checked: show,
+        onChange: (e) => setShow(e.target.checked),
+        style: { cursor: "pointer" }
+      }
+    ), /* @__PURE__ */ import_react.default.createElement("label", { htmlFor: "showPassCP", style: { fontSize: 13, color: C.label3, fontFamily: FONT, cursor: "pointer" } }, "Mostrar contrase\xF1as")), msg && /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      padding: "11px 14px",
+      borderRadius: 12,
+      marginBottom: 12,
+      background: msg.ok ? `${C.green}15` : `${C.red}15`,
+      border: `1px solid ${msg.ok ? C.green : C.red}40`,
+      color: msg.ok ? C.green : C.red,
+      fontSize: 13,
+      fontFamily: FONT
+    } }, msg.txt), /* @__PURE__ */ import_react.default.createElement("button", { onClick: cambiar, style: {
+      width: "100%",
+      padding: "13px",
+      borderRadius: 12,
+      border: "none",
+      background: C.label,
+      cursor: "pointer",
+      fontSize: 14,
+      fontWeight: 700,
+      color: C.bg0,
+      fontFamily: FONT,
+      WebkitTapHighlightColor: "transparent"
+    } }, "Actualizar contrase\xF1a"));
+  }
+  function UserFormModal({ editUser, usuarios, onClose, onGuardar }) {
+    const isNew = !editUser;
+    const [f, setF] = (0, import_react.useState)(
+      editUser ? { ...editUser, password: "", marcaId: String(editUser.marcaId || "") } : { usuario: "", password: "", nombre: "", rol: "caja", marcaId: "", estado: "activo" }
+    );
+    const [msg, setMsg] = (0, import_react.useState)(null);
+    const [showP, setShowP] = (0, import_react.useState)(false);
+    function guardar() {
+      setMsg(null);
+      if (!f.nombre.trim()) {
+        setMsg("Nombre requerido");
+        return;
+      }
+      if (!f.usuario.trim()) {
+        setMsg("Usuario requerido");
+        return;
+      }
+      if (isNew && !f.password) {
+        setMsg("Contrase\xF1a requerida");
+        return;
+      }
+      if (isNew && f.password.length < 6) {
+        setMsg("M\xEDnimo 6 caracteres en contrase\xF1a");
+        return;
+      }
+      if (f.rol === "marca" && !f.marcaId) {
+        setMsg("Seleccion\xE1 la marca");
+        return;
+      }
+      if (isNew && usuarios.find((u) => u.usuario === f.usuario.toLowerCase())) {
+        setMsg("Ese nombre de usuario ya existe");
+        return;
+      }
+      onGuardar({ ...f, usuario: f.usuario.toLowerCase().trim() }, isNew);
+    }
+    const ipt = (label, val, set, placeholder, type = "text", opts = {}) => /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 14 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      fontSize: 11,
+      fontWeight: 700,
+      color: C.label3,
+      textTransform: "uppercase",
+      letterSpacing: 0.7,
+      marginBottom: 6,
+      fontFamily: FONT
+    } }, label), /* @__PURE__ */ import_react.default.createElement(
+      "input",
+      {
+        type,
+        value: val,
+        onChange: (e) => set(e.target.value),
+        placeholder,
+        ...opts,
+        style: {
+          width: "100%",
+          padding: "12px 14px",
+          borderRadius: 12,
+          border: `1.5px solid ${C.sep}`,
+          background: C.bg0,
+          fontSize: 15,
+          color: C.label,
+          fontFamily: FONT,
+          outline: "none",
+          boxSizing: "border-box"
+        }
+      }
+    ));
+    return /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      position: "fixed",
+      inset: 0,
+      zIndex: 600,
+      background: "rgba(0,0,0,0.45)",
+      backdropFilter: "blur(6px)",
+      display: "flex",
+      flexDirection: "column",
+      justifyContent: "flex-end"
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      background: C.bg0,
+      borderRadius: "24px 24px 0 0",
+      maxHeight: "92vh",
+      display: "flex",
+      flexDirection: "column",
+      boxShadow: "0 -8px 40px rgba(0,0,0,0.18)"
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      padding: "18px 20px 14px",
+      borderBottom: `1px solid ${C.sep}`,
+      background: C.bg1,
+      borderRadius: "24px 24px 0 0",
+      flexShrink: 0
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between" } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      fontSize: 11,
+      color: C.label3,
+      fontFamily: FONT,
+      textTransform: "uppercase",
+      letterSpacing: 0.6,
+      marginBottom: 3
+    } }, isNew ? "Nuevo usuario" : "Editar usuario"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 19, fontWeight: 800, color: C.label, fontFamily: FONT_DISPLAY } }, isNew ? "Crear cuenta" : "Modificar cuenta")), /* @__PURE__ */ import_react.default.createElement("button", { onClick: onClose, style: {
+      width: 32,
+      height: 32,
       borderRadius: "50%",
+      border: `1px solid ${C.sep}`,
+      background: C.bg2,
+      cursor: "pointer",
+      fontSize: 16,
+      color: C.label2,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      WebkitTapHighlightColor: "transparent"
+    } }, "\u2715"))), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      overflowY: "auto",
+      flex: 1,
+      padding: "20px 20px 40px",
+      WebkitOverflowScrolling: "touch"
+    } }, ipt("Nombre completo", f.nombre, (v) => setF((p) => ({ ...p, nombre: v })), "Ej: Mar\xEDa Garc\xEDa"), ipt(
+      "Usuario (login)",
+      f.usuario,
+      (v) => setF((p) => ({ ...p, usuario: v.toLowerCase().replace(/ /g, "").replace(/[^a-z0-9._]/g, "") })),
+      "Ej: maria",
+      "text",
+      { autoCapitalize: "none", autoCorrect: "off", spellCheck: false }
+    ), /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 14 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      fontSize: 11,
+      fontWeight: 700,
+      color: C.label3,
+      textTransform: "uppercase",
+      letterSpacing: 0.7,
+      marginBottom: 6,
+      fontFamily: FONT
+    } }, "Contrase\xF1a ", !isNew && "(dejar vac\xEDo para no cambiar)"), /* @__PURE__ */ import_react.default.createElement("div", { style: { position: "relative" } }, /* @__PURE__ */ import_react.default.createElement(
+      "input",
+      {
+        type: showP ? "text" : "password",
+        value: f.password,
+        onChange: (e) => setF((p) => ({ ...p, password: e.target.value })),
+        placeholder: isNew ? "M\xEDnimo 6 caracteres" : "Sin cambios",
+        style: {
+          width: "100%",
+          padding: "12px 44px 12px 14px",
+          borderRadius: 12,
+          border: `1.5px solid ${C.sep}`,
+          background: C.bg0,
+          fontSize: 15,
+          color: C.label,
+          fontFamily: FONT,
+          outline: "none",
+          boxSizing: "border-box"
+        }
+      }
+    ), /* @__PURE__ */ import_react.default.createElement("button", { onClick: () => setShowP((p) => !p), style: {
+      position: "absolute",
+      right: 12,
+      top: "50%",
+      transform: "translateY(-50%)",
+      background: "none",
+      border: "none",
+      cursor: "pointer",
+      fontSize: 16,
+      color: C.label3,
+      padding: 4
+    } }, showP ? "\u{1F648}" : "\u{1F441}"))), /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 14 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      fontSize: 11,
+      fontWeight: 700,
+      color: C.label3,
+      textTransform: "uppercase",
+      letterSpacing: 0.7,
+      marginBottom: 8,
+      fontFamily: FONT
+    } }, "Rol"), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 } }, [
+      ["admin", "\u{1F451}", "Admin", "Acceso total"],
+      ["caja", "\u{1F6D2}", "Staff", "Solo POS"],
+      ["marca", "\u{1F3F7}", "Brand", "Solo lectura"]
+    ].map(([r, ic, label, desc]) => /* @__PURE__ */ import_react.default.createElement(
+      "button",
+      {
+        key: r,
+        onClick: () => setF((p) => ({ ...p, rol: r, marcaId: r === "marca" ? p.marcaId : "" })),
+        style: {
+          padding: "12px 8px",
+          borderRadius: 14,
+          cursor: "pointer",
+          fontFamily: FONT,
+          border: `2px solid ${f.rol === r ? C.gold : C.sep}`,
+          background: f.rol === r ? `${C.gold}12` : C.bg2,
+          textAlign: "center",
+          WebkitTapHighlightColor: "transparent"
+        }
+      },
+      /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 20, marginBottom: 4 } }, ic),
+      /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, fontWeight: 700, color: f.rol === r ? C.gold : C.label } }, label),
+      /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: C.label3, marginTop: 2 } }, desc)
+    )))), f.rol === "marca" && /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 14 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      fontSize: 11,
+      fontWeight: 700,
+      color: C.label3,
+      textTransform: "uppercase",
+      letterSpacing: 0.7,
+      marginBottom: 6,
+      fontFamily: FONT
+    } }, "Marca asignada"), /* @__PURE__ */ import_react.default.createElement(
+      "select",
+      {
+        value: f.marcaId || "",
+        onChange: (e) => setF((p) => ({ ...p, marcaId: e.target.value })),
+        style: {
+          width: "100%",
+          padding: "12px 14px",
+          borderRadius: 12,
+          border: `1.5px solid ${f.marcaId ? C.gold : C.sep}`,
+          background: C.bg0,
+          fontSize: 15,
+          color: C.label,
+          fontFamily: FONT,
+          outline: "none",
+          WebkitAppearance: "none",
+          boxSizing: "border-box"
+        }
+      },
+      /* @__PURE__ */ import_react.default.createElement("option", { value: "" }, "\u2014 Seleccion\xE1 una marca \u2014"),
+      MARCAS.map((m) => /* @__PURE__ */ import_react.default.createElement("option", { key: m.id, value: m.id }, m.emoji, " ", m.nombre))
+    )), !isNew && /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 14 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      fontSize: 11,
+      fontWeight: 700,
+      color: C.label3,
+      textTransform: "uppercase",
+      letterSpacing: 0.7,
+      marginBottom: 6,
+      fontFamily: FONT
+    } }, "Estado"), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 } }, [["activo", "\u2705", "Activo"], ["inactivo", "\u23F8", "Inactivo"]].map(([s, ic, lbl]) => /* @__PURE__ */ import_react.default.createElement(
+      "button",
+      {
+        key: s,
+        onClick: () => setF((p) => ({ ...p, estado: s })),
+        style: {
+          padding: "10px",
+          borderRadius: 12,
+          cursor: "pointer",
+          fontFamily: FONT,
+          border: `2px solid ${f.estado === s ? s === "activo" ? C.green : C.red : C.sep}`,
+          background: f.estado === s ? s === "activo" ? `${C.green}12` : `${C.red}10` : C.bg2,
+          fontWeight: f.estado === s ? 700 : 400,
+          fontSize: 13,
+          color: f.estado === s ? s === "activo" ? C.green : C.red : C.label2,
+          WebkitTapHighlightColor: "transparent"
+        }
+      },
+      ic,
+      " ",
+      lbl
+    )))), msg && /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      padding: "11px 14px",
+      borderRadius: 12,
+      marginBottom: 14,
+      background: `${C.red}12`,
+      border: `1px solid ${C.red}30`,
+      color: C.red,
+      fontSize: 13,
+      fontFamily: FONT
+    } }, msg), /* @__PURE__ */ import_react.default.createElement(
+      "button",
+      {
+        onClick: guardar,
+        style: {
+          width: "100%",
+          padding: "14px",
+          borderRadius: 14,
+          border: "none",
+          background: C.label,
+          cursor: "pointer",
+          fontSize: 15,
+          fontWeight: 700,
+          color: C.bg0,
+          fontFamily: FONT,
+          WebkitTapHighlightColor: "transparent"
+        }
+      },
+      isNew ? "Crear usuario" : "Guardar cambios"
+    ))));
+  }
+  function ConfigTab({ user, logout }) {
+    const [subTab, setSubTab] = (0, import_react.useState)("perfil");
+    const [usuarios, setUsuarios] = (0, import_react.useState)(() => {
+      try {
+        return JSON.parse(localStorage.getItem("th_usuarios") || "null") || USUARIOS;
+      } catch {
+        return USUARIOS;
+      }
+    });
+    const [auditLog, setAuditLog] = (0, import_react.useState)(() => {
+      try {
+        return JSON.parse(localStorage.getItem(AUDIT_KEY) || "[]");
+      } catch {
+        return [];
+      }
+    });
+    function guardarUsuarios(u, accion, afectado) {
+      setUsuarios(u);
+      localStorage.setItem("th_usuarios", JSON.stringify(u));
+      if (accion && afectado) {
+        agregarAudit(accion, afectado, user.nombre);
+        setAuditLog(JSON.parse(localStorage.getItem(AUDIT_KEY) || "[]"));
+      }
+    }
+    const [modalAdd, setModalAdd] = (0, import_react.useState)(false);
+    const [editando, setEditando] = (0, import_react.useState)(null);
+    const [confirmAct, setConfirmAct] = (0, import_react.useState)(null);
+    const [tempPass, setTempPass] = (0, import_react.useState)(null);
+    const [menuAbierto, setMenuAbierto] = (0, import_react.useState)(null);
+    const isAdmin = user.rol === "admin";
+    const ROL_CFG = {
+      admin: { label: "Admin", icon: "\u{1F451}", bg: `${C.gold}20`, color: C.gold },
+      caja: { label: "Staff", icon: "\u{1F6D2}", bg: `${C.green}18`, color: C.green },
+      marca: { label: "Brand", icon: "\u{1F3F7}", bg: `${C.blue}18`, color: C.blue }
+    };
+    const SETTINGS_TABS = [
+      { id: "perfil", icon: "\u{1F464}", label: "Perfil" },
+      ...isAdmin ? [
+        { id: "equipo", icon: "\u{1F465}", label: "Equipo" },
+        { id: "auditoria", icon: "\u{1F4CB}", label: "Auditor\xEDa" }
+      ] : [],
+      { id: "seguridad", icon: "\u{1F512}", label: "Seguridad" },
+      { id: "sistema", icon: "\u2699", label: "Sistema" },
+      { id: "factura", icon: "\u{1F9FE}", label: "Facturaci\xF3n" }
+    ];
+    function rolBadge(u) {
+      const rc = ROL_CFG[u.rol] || ROL_CFG.caja;
+      return /* @__PURE__ */ import_react.default.createElement("span", { style: {
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 4,
+        background: rc.bg,
+        color: rc.color,
+        padding: "2px 9px",
+        borderRadius: 20,
+        fontSize: 11,
+        fontWeight: 700,
+        fontFamily: FONT
+      } }, rc.label);
+    }
+    function estadoBadge(u) {
+      const off = u.estado === "inactivo";
+      return /* @__PURE__ */ import_react.default.createElement("span", { style: {
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 5,
+        background: off ? C.redBg : C.greenBg,
+        color: off ? C.red : C.green,
+        padding: "2px 9px",
+        borderRadius: 20,
+        fontSize: 11,
+        fontWeight: 600,
+        fontFamily: FONT
+      } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { width: 6, height: 6, borderRadius: "50%", background: "currentColor", display: "inline-block" } }), off ? "Inactivo" : "Activo");
+    }
+    function avatarU(u) {
+      const m = u.rol === "marca" ? MARCAS.find((x) => x.id === Number(u.marcaId)) : null;
+      const rc = ROL_CFG[u.rol] || ROL_CFG.caja;
+      return /* @__PURE__ */ import_react.default.createElement("div", { style: {
+        width: 44,
+        height: 44,
+        borderRadius: 14,
+        flexShrink: 0,
+        background: u.rol === "marca" ? `${m?.color || C.blue}25` : rc.bg,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        fontSize: 20
+      } }, u.rol === "marca" ? m?.emoji || "\u{1F3F7}" : rc.icon);
+    }
+    function handleResetPass(u) {
+      const temp = generarTempPassword();
+      guardarUsuarios(
+        usuarios.map((x) => x.usuario === u.usuario ? { ...x, password: temp } : x),
+        `Reset contrase\xF1a \u2192 [oculto]`,
+        u.usuario
+      );
+      setTempPass({ usuario: u.usuario, nombre: u.nombre, password: temp });
+      setConfirmAct(null);
+      setMenuAbierto(null);
+    }
+    function handleToggle(u) {
+      const ns = u.estado === "inactivo" ? "activo" : "inactivo";
+      guardarUsuarios(
+        usuarios.map((x) => x.usuario === u.usuario ? { ...x, estado: ns } : x),
+        `${ns === "inactivo" ? "Desactiv\xF3" : "Activ\xF3"} cuenta`,
+        u.usuario
+      );
+      setConfirmAct(null);
+      setMenuAbierto(null);
+    }
+    function handleEliminar(u) {
+      guardarUsuarios(
+        usuarios.filter((x) => x.usuario !== u.usuario),
+        "Elimin\xF3 usuario",
+        u.usuario
+      );
+      setConfirmAct(null);
+      setMenuAbierto(null);
+    }
+    function handleGuardarUsuario(data, isNew) {
+      if (isNew) {
+        guardarUsuarios(
+          [...usuarios, { ...data, estado: "activo", marcaId: data.marcaId ? Number(data.marcaId) : void 0 }],
+          "Cre\xF3 usuario",
+          data.usuario
+        );
+      } else {
+        guardarUsuarios(
+          usuarios.map((u) => u.usuario === data.usuario ? { ...u, ...data, marcaId: data.marcaId ? Number(data.marcaId) : void 0 } : u),
+          "Edit\xF3 usuario",
+          data.usuario
+        );
+      }
+      setModalAdd(false);
+      setEditando(null);
+    }
+    return /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 22 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      fontSize: 24,
+      fontWeight: 800,
+      color: C.label,
+      fontFamily: FONT_DISPLAY,
+      letterSpacing: 0.3,
+      marginBottom: 4
+    } }, "Configuraci\xF3n"), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      fontSize: 13,
+      color: C.label3,
+      fontFamily: FONT,
+      display: "flex",
+      alignItems: "center",
+      gap: 8
+    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: {
+      width: 7,
+      height: 7,
+      borderRadius: "50%",
+      background: C.green,
+      display: "inline-block",
+      boxShadow: `0 0 0 2px ${C.green}30`
+    } }), user.nombre, " \xB7 ", ROL_CFG[user.rol]?.label || user.rol)), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      overflowX: "auto",
+      WebkitOverflowScrolling: "touch",
+      marginBottom: 22,
+      marginLeft: -16,
+      marginRight: -16,
+      paddingLeft: 16
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 6, paddingRight: 16, minWidth: "max-content" } }, SETTINGS_TABS.map((t) => /* @__PURE__ */ import_react.default.createElement("button", { key: t.id, onClick: () => setSubTab(t.id), style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 7,
+      padding: "9px 16px",
+      borderRadius: 24,
+      border: "none",
+      cursor: "pointer",
+      background: subTab === t.id ? C.label : C.bg2,
+      color: subTab === t.id ? "#fff" : C.label2,
+      fontFamily: FONT,
+      fontSize: 13,
+      fontWeight: subTab === t.id ? 700 : 500,
+      flexShrink: 0,
+      boxShadow: subTab === t.id ? "0 2px 10px rgba(0,0,0,0.18)" : "none",
+      transition: "background .15s",
+      WebkitTapHighlightColor: "transparent"
+    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 14 } }, t.icon), t.label)))), subTab === "perfil" && /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      background: C.bg1,
+      borderRadius: 20,
+      padding: 20,
+      marginBottom: 20,
+      border: `1px solid ${C.sep}`,
+      boxShadow: "0 2px 12px rgba(0,0,0,0.05)"
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 16,
+      marginBottom: 16,
+      paddingBottom: 16,
+      borderBottom: `1px solid ${C.sep}`
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      width: 62,
+      height: 62,
+      borderRadius: 18,
       background: `${C.gold}20`,
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
-      fontSize: 22
-    } }, "\u{1F464}"), /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 17, fontWeight: 700, color: C.label, fontFamily: FONT } }, user.nombre), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.label3, fontFamily: FONT } }, "@", user.usuario)))), /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      fontSize: 13,
-      fontWeight: 700,
+      fontSize: 28,
+      flexShrink: 0
+    } }, user.rol === "admin" ? "\u{1F451}" : user.rol === "marca" ? "\u{1F3F7}" : "\u{1F6D2}"), /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      fontSize: 20,
+      fontWeight: 800,
+      color: C.label,
+      fontFamily: FONT_DISPLAY,
+      lineHeight: 1.2
+    } }, user.nombre), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.label3, fontFamily: FONT, marginTop: 3 } }, "@", user.usuario), /* @__PURE__ */ import_react.default.createElement("div", { style: { marginTop: 8, display: "flex", gap: 6, flexWrap: "wrap" } }, rolBadge(user), estadoBadge(user)))), [
+      ["Rol", ROL_CFG[user.rol]?.label || user.rol],
+      ["Sesi\xF3n iniciada", new Date(user.loginAt || 0).toLocaleString("es-BO")]
+    ].map(([k, v]) => /* @__PURE__ */ import_react.default.createElement("div", { key: k, style: {
+      display: "flex",
+      justifyContent: "space-between",
+      padding: "9px 0",
+      borderBottom: `1px solid ${C.sep}`
+    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, color: C.label3, fontFamily: FONT } }, k), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, fontWeight: 600, color: C.label, fontFamily: FONT } }, v)))), /* @__PURE__ */ import_react.default.createElement(
+      PanelCambiarPass,
+      {
+        user,
+        usuarios,
+        onGuardar: (u) => guardarUsuarios(u, "Cambi\xF3 su contrase\xF1a", user.usuario)
+      }
+    )), subTab === "equipo" && isAdmin && /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8, marginBottom: 20 } }, [
+      { l: "Total", v: usuarios.length, i: "\u{1F465}" },
+      { l: "Admin", v: usuarios.filter((u) => u.rol === "admin").length, i: "\u{1F451}" },
+      { l: "Staff", v: usuarios.filter((u) => u.rol === "caja").length, i: "\u{1F6D2}" },
+      { l: "Brands", v: usuarios.filter((u) => u.rol === "marca").length, i: "\u{1F3F7}" }
+    ].map((s) => /* @__PURE__ */ import_react.default.createElement("div", { key: s.l, style: {
+      background: C.bg1,
+      borderRadius: 14,
+      padding: "10px 8px",
+      textAlign: "center",
+      border: `1px solid ${C.sep}`,
+      boxShadow: "0 1px 6px rgba(0,0,0,0.04)"
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 18, marginBottom: 2 } }, s.i), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      fontSize: 22,
+      fontWeight: 800,
+      color: C.label,
+      fontFamily: FONT_DISPLAY,
+      lineHeight: 1
+    } }, s.v), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      fontSize: 9,
       color: C.label3,
+      fontFamily: FONT,
+      marginTop: 2,
       textTransform: "uppercase",
-      letterSpacing: 0.8,
-      marginBottom: 12
-    } }, "Cambiar contrase\xF1a"), /* @__PURE__ */ import_react.default.createElement(
-      IOSInput,
-      {
-        label: "Contrase\xF1a actual",
-        type: show ? "text" : "password",
-        value: passActual,
-        onChange: (e) => setPassActual(e.target.value),
-        placeholder: "\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022"
-      }
-    ), /* @__PURE__ */ import_react.default.createElement(
-      IOSInput,
-      {
-        label: "Nueva contrase\xF1a",
-        type: show ? "text" : "password",
-        value: passNueva,
-        onChange: (e) => setPassNueva(e.target.value),
-        placeholder: "M\xEDnimo 6 caracteres"
-      }
-    ), /* @__PURE__ */ import_react.default.createElement(
-      IOSInput,
-      {
-        label: "Confirmar nueva contrase\xF1a",
-        type: show ? "text" : "password",
-        value: passConfirm,
-        onChange: (e) => setPassConfirm(e.target.value),
-        placeholder: "Repetir contrase\xF1a"
-      }
-    ), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 16 } }, /* @__PURE__ */ import_react.default.createElement("input", { type: "checkbox", id: "showPass", checked: show, onChange: (e) => setShow(e.target.checked) }), /* @__PURE__ */ import_react.default.createElement("label", { htmlFor: "showPass", style: { fontSize: 13, color: C.label3, fontFamily: FONT, cursor: "pointer" } }, "Mostrar contrase\xF1as")), msg && /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      padding: "12px 14px",
-      borderRadius: 12,
-      marginBottom: 12,
-      background: msg.ok ? `${C.green}15` : `${C.red}15`,
-      border: `1px solid ${msg.ok ? C.green : C.red}40`,
-      color: msg.ok ? C.green : C.red,
+      letterSpacing: 0.3
+    } }, s.l)))), /* @__PURE__ */ import_react.default.createElement("button", { onClick: () => setModalAdd(true), style: {
+      width: "100%",
+      padding: "13px",
+      borderRadius: 14,
+      border: `1.5px dashed ${C.gold}60`,
+      background: `${C.gold}08`,
+      cursor: "pointer",
       fontSize: 14,
-      fontFamily: FONT
-    } }, msg.txt), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: cambiar, variant: "primary", full: true, icon: "\u{1F512}" }, "Actualizar contrase\xF1a"));
-  }
-  function GestionUsuarios({ user, usuarios, onGuardar }) {
-    var _hN162 = (0, import_react.useState)(null);
-    var modo = _hN162[0];
-    var setModo = _hN162[1];
-    ;
-    var _hN163 = (0, import_react.useState)(null);
-    var editUser = _hN163[0];
-    var setEditUser = _hN163[1];
-    ;
-    var _hN164 = (0, import_react.useState)({ usuario: "", password: "", nombre: "", rol: "caja", marcaId: "" });
-    var fUser = _hN164[0];
-    var setFUser = _hN164[1];
-    ;
-    var _hN165 = (0, import_react.useState)(null);
-    var msg = _hN165[0];
-    var setMsg = _hN165[1];
-    ;
-    if (user.rol !== "admin") {
-      return /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center", padding: "48px 20px", color: C.label3 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 40, marginBottom: 12, opacity: 0.4 } }, "\u{1F512}"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 16, fontWeight: 600, color: C.label2, fontFamily: FONT } }, "Solo administradores"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.label3, fontFamily: FONT, marginTop: 6 } }, "Tu cuenta no tiene permisos para gestionar usuarios"));
-    }
-    function guardar() {
-      setMsg(null);
-      if (!fUser.usuario || !fUser.password || !fUser.nombre) {
-        setMsg({ ok: false, txt: "Completa todos los campos" });
-        return;
-      }
-      if (fUser.password.length < 6) {
-        setMsg({ ok: false, txt: "La contrase\xF1a debe tener al menos 6 caracteres" });
-        return;
-      }
-      if (fUser.rol === "marca" && !fUser.marcaId) {
-        setMsg({ ok: false, txt: "Seleccion\xE1 la marca para este usuario" });
-        return;
-      }
-      if (modo === "nuevo") {
-        if (usuarios.find((u) => u.usuario === fUser.usuario)) {
-          setMsg({ ok: false, txt: "Ese usuario ya existe" });
-          return;
-        }
-        onGuardar([...usuarios, { ...fUser, marcaId: fUser.marcaId ? Number(fUser.marcaId) : void 0 }]);
-      } else {
-        onGuardar(usuarios.map((u) => u.usuario === editUser ? { ...u, ...fUser, marcaId: fUser.marcaId ? Number(fUser.marcaId) : void 0 } : u));
-      }
-      setMsg({ ok: true, txt: `\u2713 Usuario ${modo === "nuevo" ? "creado" : "actualizado"}` });
-      setTimeout(() => {
-        setModo(null);
-        setMsg(null);
-      }, 1500);
-    }
-    function eliminar(usr) {
-      if (usr === user.usuario) {
-        setMsg({ ok: false, txt: "No puedes eliminar tu propio usuario" });
-        return;
-      }
-      if (!window.confirm(`\xBFEliminar usuario "${usr}"?`)) return;
-      onGuardar(usuarios.filter((u) => u.usuario !== usr));
-    }
-    if (modo) {
-      return /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10, marginBottom: 20 } }, /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => {
-        setModo(null);
-        setMsg(null);
-      }, variant: "fill", small: true }, "\u2190 Volver"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 17, fontWeight: 700, color: C.label, fontFamily: FONT } }, modo === "nuevo" ? "Nuevo usuario" : "Editar usuario")), /* @__PURE__ */ import_react.default.createElement(
-        IOSInput,
-        {
-          label: "Nombre completo",
-          value: fUser.nombre,
-          onChange: (e) => setFUser((p) => ({ ...p, nombre: e.target.value })),
-          placeholder: "Ej: Mar\xEDa Garc\xEDa"
-        }
-      ), /* @__PURE__ */ import_react.default.createElement(
-        IOSInput,
-        {
-          label: "Usuario (para login)",
-          value: fUser.usuario,
-          onChange: (e) => setFUser((p) => ({ ...p, usuario: e.target.value.toLowerCase().replace(/ /g, "") })),
-          placeholder: "Ej: maria",
-          autoCapitalize: "none"
-        }
-      ), /* @__PURE__ */ import_react.default.createElement(
-        IOSInput,
-        {
-          label: "Contrase\xF1a",
-          type: "password",
-          value: fUser.password,
-          onChange: (e) => setFUser((p) => ({ ...p, password: e.target.value })),
-          placeholder: "M\xEDnimo 6 caracteres"
-        }
-      ), /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 12 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
-        fontSize: 11,
-        fontWeight: 700,
-        color: C.label2,
-        textTransform: "uppercase",
-        letterSpacing: 0.8,
-        marginBottom: 8
-      } }, "Rol"), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 } }, [["admin", "\u{1F451} Admin", "Acceso total"], ["caja", "\u{1F6D2} Cajero", "Solo POS"], ["marca", "\u{1F3F7} Marca", "Portal solo lectura"]].map(([r, label, desc]) => /* @__PURE__ */ import_react.default.createElement("button", { key: r, onClick: () => setFUser((p) => ({ ...p, rol: r, marcaId: r === "marca" ? p.marcaId : "" })), style: {
-        padding: "10px 8px",
-        borderRadius: 12,
-        cursor: "pointer",
-        fontFamily: FONT,
-        border: `2px solid ${fUser.rol === r ? C.gold : C.sep}`,
-        background: fUser.rol === r ? `${C.gold}15` : C.bg2,
-        textAlign: "left",
-        WebkitTapHighlightColor: "transparent"
-      } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, fontWeight: 700, color: fUser.rol === r ? C.gold : C.label } }, label), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: C.label3, marginTop: 2 } }, desc))))), fUser.rol === "marca" && /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 12 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
-        fontSize: 11,
-        fontWeight: 700,
-        color: C.label2,
-        textTransform: "uppercase",
-        letterSpacing: 0.8,
-        marginBottom: 8
-      } }, "Marca asignada"), /* @__PURE__ */ import_react.default.createElement(
-        "select",
-        {
-          value: fUser.marcaId || "",
-          onChange: (e) => setFUser((p) => ({ ...p, marcaId: e.target.value })),
-          style: {
-            width: "100%",
-            padding: "11px 14px",
-            borderRadius: 12,
-            border: `1.5px solid ${C.sep}`,
-            background: C.bg3,
-            fontSize: 15,
-            color: C.label,
-            fontFamily: FONT,
-            outline: "none",
-            WebkitAppearance: "none",
-            appearance: "none"
-          }
-        },
-        /* @__PURE__ */ import_react.default.createElement("option", { value: "" }, "\u2014 Seleccion\xE1 una marca \u2014"),
-        MARCAS.map((m) => /* @__PURE__ */ import_react.default.createElement("option", { key: m.id, value: m.id }, m.emoji, " ", m.nombre))
-      )), msg && /* @__PURE__ */ import_react.default.createElement("div", { style: {
-        padding: "12px 14px",
-        borderRadius: 12,
-        marginBottom: 12,
-        background: msg.ok ? `${C.green}15` : `${C.red}15`,
-        border: `1px solid ${msg.ok ? C.green : C.red}40`,
-        color: msg.ok ? C.green : C.red,
-        fontSize: 14,
-        fontFamily: FONT
-      } }, msg.txt), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: guardar, variant: "primary", full: true, icon: "\u{1F4BE}" }, modo === "nuevo" ? "Crear usuario" : "Guardar cambios"));
-    }
-    return /* @__PURE__ */ import_react.default.createElement("div", null, msg && /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      padding: "12px 14px",
-      borderRadius: 12,
-      marginBottom: 12,
-      background: msg.ok ? `${C.green}15` : `${C.red}15`,
-      border: `1px solid ${msg.ok ? C.green : C.red}40`,
-      color: msg.ok ? C.green : C.red,
-      fontSize: 14,
-      fontFamily: FONT
-    } }, msg.txt), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 2, marginBottom: 16 } }, usuarios.map((u, i) => /* @__PURE__ */ import_react.default.createElement("div", { key: u.usuario, style: {
-      background: C.bg2,
-      borderRadius: i === 0 ? "14px 14px 2px 2px" : i === usuarios.length - 1 ? "2px 2px 14px 14px" : "2px",
-      padding: "14px 16px",
-      borderBottom: i < usuarios.length - 1 ? `1px solid ${C.sep}` : "",
+      fontWeight: 700,
+      color: C.gold,
+      fontFamily: FONT,
+      marginBottom: 20,
       display: "flex",
       alignItems: "center",
-      gap: 12
-    } }, (() => {
-      const m = u.rol === "marca" ? MARCAS.find((x) => x.id === u.marcaId) : null;
-      return /* @__PURE__ */ import_react.default.createElement("div", { style: {
-        width: 40,
-        height: 40,
-        borderRadius: "50%",
-        background: u.rol === "admin" ? `${C.gold}20` : u.rol === "marca" ? `${m?.color || C.blue}30` : `${C.green}20`,
+      justifyContent: "center",
+      gap: 8,
+      WebkitTapHighlightColor: "transparent"
+    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 20, lineHeight: 1 } }, "+"), " Agregar usuario"), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 8 } }, usuarios.map((u) => {
+      const m = u.rol === "marca" ? MARCAS.find((x) => x.id === Number(u.marcaId)) : null;
+      const open = menuAbierto === u.usuario;
+      return /* @__PURE__ */ import_react.default.createElement("div", { key: u.usuario, style: {
+        background: C.bg1,
+        borderRadius: 18,
+        border: `1px solid ${C.sep}`,
+        overflow: "hidden",
+        boxShadow: "0 1px 8px rgba(0,0,0,0.05)",
+        opacity: u.estado === "inactivo" ? 0.65 : 1
+      } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+        padding: "14px 16px",
         display: "flex",
         alignItems: "center",
-        justifyContent: "center",
-        fontSize: 18,
-        flexShrink: 0
-      } }, u.rol === "admin" ? "\u{1F451}" : u.rol === "marca" ? m?.emoji || "\u{1F3F7}" : "\u{1F6D2}");
-    })(), /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 15, fontWeight: 600, color: C.label, fontFamily: FONT } }, u.nombre), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.label3, fontFamily: FONT } }, "@", u.usuario, " \xB7 ", u.rol === "admin" ? "Administrador" : u.rol === "marca" ? `Marca \xB7 ${MARCAS.find((m) => m.id === u.marcaId)?.nombre || "?"}` : "Cajero")), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 8, flexShrink: 0 } }, /* @__PURE__ */ import_react.default.createElement("button", { onClick: () => {
-      setEditUser(u.usuario);
-      setFUser({ ...u });
-      setModo("editar");
-    }, style: {
-      background: `${C.gold}15`,
-      border: `1px solid ${C.gold}30`,
-      borderRadius: 8,
-      padding: "6px 12px",
-      color: C.gold,
-      fontSize: 12,
-      fontFamily: FONT,
-      fontWeight: 600,
-      cursor: "pointer"
-    } }, "Editar"), u.usuario !== user.usuario && /* @__PURE__ */ import_react.default.createElement("button", { onClick: () => eliminar(u.usuario), style: {
-      background: `${C.red}10`,
-      border: `1px solid ${C.red}30`,
-      borderRadius: 8,
-      padding: "6px 12px",
-      color: C.red,
-      fontSize: 12,
-      fontFamily: FONT,
-      fontWeight: 600,
-      cursor: "pointer"
-    } }, "Eliminar"))))), /* @__PURE__ */ import_react.default.createElement(
-      IOSBtn,
-      {
-        onPress: () => {
-          setFUser({ usuario: "", password: "", nombre: "", rol: "caja", marcaId: "" });
-          setModo("nuevo");
+        gap: 14
+      } }, avatarU(u), /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 7,
+        flexWrap: "wrap",
+        marginBottom: 4
+      } }, /* @__PURE__ */ import_react.default.createElement("span", { style: {
+        fontSize: 15,
+        fontWeight: 700,
+        color: C.label,
+        fontFamily: FONT
+      } }, u.nombre), rolBadge(u), estadoBadge(u)), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT } }, "@", u.usuario, m && /* @__PURE__ */ import_react.default.createElement("span", { style: { marginLeft: 6, color: m.color } }, "\xB7 ", m.emoji, " ", m.nombre))), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 6, flexShrink: 0 } }, /* @__PURE__ */ import_react.default.createElement(
+        "button",
+        {
+          onClick: () => setEditando(u),
+          style: {
+            padding: "6px 12px",
+            borderRadius: 10,
+            border: `1px solid ${C.sep}`,
+            background: C.bg2,
+            cursor: "pointer",
+            fontSize: 12,
+            fontWeight: 600,
+            color: C.label2,
+            fontFamily: FONT,
+            WebkitTapHighlightColor: "transparent"
+          }
         },
-        variant: "primary",
-        full: true,
-        icon: "+ "
+        "Editar"
+      ), /* @__PURE__ */ import_react.default.createElement(
+        "button",
+        {
+          onClick: () => setMenuAbierto(open ? null : u.usuario),
+          style: {
+            width: 32,
+            height: 32,
+            borderRadius: 10,
+            border: `1px solid ${C.sep}`,
+            background: open ? C.label : C.bg2,
+            cursor: "pointer",
+            fontSize: 18,
+            color: open ? "#fff" : C.label2,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            WebkitTapHighlightColor: "transparent",
+            lineHeight: 1
+          }
+        },
+        "\u22EF"
+      ))), open && /* @__PURE__ */ import_react.default.createElement("div", { style: {
+        borderTop: `1px solid ${C.sep}`,
+        background: C.bg2,
+        padding: "10px 12px",
+        display: "flex",
+        gap: 8,
+        flexWrap: "wrap"
+      } }, /* @__PURE__ */ import_react.default.createElement(
+        "button",
+        {
+          onClick: () => setConfirmAct({
+            type: "reset",
+            user: u,
+            msg: `\xBFResetear la contrase\xF1a de ${u.nombre}?
+Se generar\xE1 una contrase\xF1a temporal.`,
+            onConfirm: () => handleResetPass(u)
+          }),
+          style: {
+            padding: "8px 14px",
+            borderRadius: 10,
+            border: `1px solid ${C.amber}40`,
+            background: `${C.amber}12`,
+            cursor: "pointer",
+            fontSize: 12,
+            fontWeight: 600,
+            color: C.amber,
+            fontFamily: FONT,
+            WebkitTapHighlightColor: "transparent"
+          }
+        },
+        "\u{1F511} Reset contrase\xF1a"
+      ), u.usuario !== user.usuario && /* @__PURE__ */ import_react.default.createElement(
+        "button",
+        {
+          onClick: () => setConfirmAct({
+            type: "toggle",
+            user: u,
+            msg: `\xBF${u.estado === "inactivo" ? "Activar" : "Desactivar"} la cuenta de ${u.nombre}?`,
+            onConfirm: () => handleToggle(u)
+          }),
+          style: {
+            padding: "8px 14px",
+            borderRadius: 10,
+            border: `1px solid ${u.estado === "inactivo" ? C.green : C.amber}40`,
+            background: u.estado === "inactivo" ? `${C.green}12` : `${C.amber}12`,
+            cursor: "pointer",
+            fontSize: 12,
+            fontWeight: 600,
+            color: u.estado === "inactivo" ? C.green : C.amber,
+            fontFamily: FONT,
+            WebkitTapHighlightColor: "transparent"
+          }
+        },
+        u.estado === "inactivo" ? "\u2705 Activar" : "\u23F8 Desactivar"
+      ), u.usuario !== user.usuario && /* @__PURE__ */ import_react.default.createElement(
+        "button",
+        {
+          onClick: () => setConfirmAct({
+            type: "delete",
+            user: u,
+            msg: `\xBFEliminar permanentemente a ${u.nombre} (@${u.usuario})?
+Esta acci\xF3n no se puede deshacer.`,
+            onConfirm: () => handleEliminar(u)
+          }),
+          style: {
+            padding: "8px 14px",
+            borderRadius: 10,
+            border: `1px solid ${C.red}40`,
+            background: `${C.red}10`,
+            cursor: "pointer",
+            fontSize: 12,
+            fontWeight: 600,
+            color: C.red,
+            fontFamily: FONT,
+            WebkitTapHighlightColor: "transparent"
+          }
+        },
+        "\u{1F5D1} Eliminar"
+      )));
+    }))), subTab === "auditoria" && isAdmin && /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 14
+    } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 15, fontWeight: 700, color: C.label, fontFamily: FONT } }, "Registro de actividad"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT, marginTop: 2 } }, auditLog.length, " entradas \xB7 \xFAltimas 200 acciones")), auditLog.length > 0 && /* @__PURE__ */ import_react.default.createElement(
+      "button",
+      {
+        onClick: () => {
+          localStorage.removeItem(AUDIT_KEY);
+          setAuditLog([]);
+        },
+        style: {
+          padding: "6px 12px",
+          borderRadius: 10,
+          border: `1px solid ${C.sep}`,
+          background: C.bg2,
+          fontSize: 11,
+          color: C.label3,
+          fontFamily: FONT,
+          cursor: "pointer"
+        }
       },
-      "Agregar nuevo usuario"
-    ));
+      "Limpiar"
+    )), auditLog.length === 0 ? /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center", padding: "48px 0", color: C.label3 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 36, marginBottom: 8, opacity: 0.3 } }, "\u{1F4CB}"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontFamily: FONT, fontSize: 14 } }, "Sin actividad registrada")) : /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      background: C.bg1,
+      borderRadius: 16,
+      overflow: "hidden",
+      border: `1px solid ${C.sep}`,
+      boxShadow: "0 1px 6px rgba(0,0,0,0.04)"
+    } }, auditLog.slice(0, 50).map((log, i) => /* @__PURE__ */ import_react.default.createElement("div", { key: log.id, style: {
+      display: "grid",
+      gridTemplateColumns: "8px 1fr",
+      gap: "0 14px",
+      padding: "11px 16px",
+      alignItems: "start",
+      borderBottom: i < auditLog.slice(0, 50).length - 1 ? `1px solid ${C.sep}` : ""
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      width: 8,
+      height: 8,
+      borderRadius: "50%",
+      background: C.gold,
+      marginTop: 5
+    } }), /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      display: "flex",
+      justifyContent: "space-between",
+      gap: 8,
+      marginBottom: 2
+    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: {
+      fontSize: 13,
+      fontWeight: 600,
+      color: C.label,
+      fontFamily: FONT
+    } }, log.accion), /* @__PURE__ */ import_react.default.createElement("span", { style: {
+      fontSize: 10,
+      color: C.label3,
+      fontFamily: FONT,
+      flexShrink: 0
+    } }, log.fecha)), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT } }, "@", log.afectado, " \xB7 por ", log.admin)))))), subTab === "seguridad" && /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      background: C.bg1,
+      borderRadius: 16,
+      padding: 16,
+      border: `1px solid ${C.sep}`,
+      marginBottom: 20,
+      boxShadow: "0 1px 6px rgba(0,0,0,0.04)"
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      fontSize: 13,
+      fontWeight: 700,
+      color: C.label,
+      fontFamily: FONT,
+      marginBottom: 12,
+      display: "flex",
+      alignItems: "center",
+      gap: 6
+    } }, "\u{1F510} Sesi\xF3n activa"), [
+      ["Usuario", `@${user.usuario}`],
+      ["Rol", ROL_CFG[user.rol]?.label || user.rol],
+      ["Login", new Date(user.loginAt || 0).toLocaleString("es-BO")]
+    ].map(([k, v]) => /* @__PURE__ */ import_react.default.createElement("div", { key: k, style: {
+      display: "flex",
+      justifyContent: "space-between",
+      padding: "9px 0",
+      borderBottom: `1px solid ${C.sep}`
+    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, color: C.label3, fontFamily: FONT } }, k), /* @__PURE__ */ import_react.default.createElement("span", { style: {
+      fontSize: 13,
+      fontWeight: 600,
+      color: C.label,
+      fontFamily: FONT
+    } }, v)))), /* @__PURE__ */ import_react.default.createElement(
+      PanelCambiarPass,
+      {
+        user,
+        usuarios,
+        onGuardar: (u) => guardarUsuarios(u, "Cambi\xF3 su contrase\xF1a", user.usuario)
+      }
+    )), subTab === "sistema" && /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      background: C.bg1,
+      borderRadius: 16,
+      overflow: "hidden",
+      border: `1px solid ${C.sep}`,
+      marginBottom: 20,
+      boxShadow: "0 1px 6px rgba(0,0,0,0.04)"
+    } }, [
+      ["Versi\xF3n", "Toscana House OS v3.1"],
+      ["Base de datos", "Supabase (nube)"],
+      ["Almacenamiento", "localStorage"],
+      ["Usuario activo", user.nombre],
+      ["Rol", ROL_CFG[user.rol]?.label || user.rol]
+    ].map(([k, v], i, arr) => /* @__PURE__ */ import_react.default.createElement("div", { key: k, style: {
+      display: "flex",
+      justifyContent: "space-between",
+      padding: "13px 16px",
+      borderBottom: i < arr.length - 1 ? `1px solid ${C.sep}` : ""
+    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 14, color: C.label2, fontFamily: FONT } }, k), /* @__PURE__ */ import_react.default.createElement("span", { style: {
+      fontSize: 14,
+      fontWeight: 500,
+      color: C.label,
+      fontFamily: FONT
+    } }, v)))), /* @__PURE__ */ import_react.default.createElement("button", { onClick: logout, style: {
+      width: "100%",
+      padding: "14px",
+      borderRadius: 14,
+      border: `1.5px solid ${C.red}30`,
+      background: `${C.red}10`,
+      cursor: "pointer",
+      fontSize: 14,
+      fontWeight: 700,
+      color: C.red,
+      fontFamily: FONT,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 8,
+      WebkitTapHighlightColor: "transparent"
+    } }, "\u{1F6AA} Cerrar sesi\xF3n")), subTab === "factura" && /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement(FacturacionConfig, null), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      padding: 14,
+      background: `${C.blue}08`,
+      borderRadius: 14,
+      border: `1px solid ${C.blue}20`,
+      marginTop: 16
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      fontSize: 13,
+      fontWeight: 700,
+      color: C.blue,
+      fontFamily: FONT,
+      marginBottom: 8
+    } }, "\u{1F3E2} Datos del emisor"), [
+      ["Raz\xF3n Social", "SYLVIA CAROLINA GRANIER ZALLES"],
+      ["NIT Emisor", NIT_EMPRESA],
+      ["Sucursal", SUCURSAL_EMP],
+      ["Direcci\xF3n", DIRECCION_EMP]
+    ].map(([k, v]) => /* @__PURE__ */ import_react.default.createElement("div", { key: k, style: {
+      display: "flex",
+      justifyContent: "space-between",
+      padding: "7px 0",
+      borderBottom: `1px solid ${C.sep}`
+    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 12, color: C.label3, fontFamily: FONT } }, k), /* @__PURE__ */ import_react.default.createElement("span", { style: {
+      fontSize: 12,
+      fontWeight: 600,
+      color: C.label,
+      fontFamily: FONT
+    } }, v))))), (modalAdd || editando) && /* @__PURE__ */ import_react.default.createElement(
+      UserFormModal,
+      {
+        editUser: editando,
+        usuarios,
+        onClose: () => {
+          setModalAdd(false);
+          setEditando(null);
+        },
+        onGuardar: handleGuardarUsuario
+      }
+    ), confirmAct && /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      position: "fixed",
+      inset: 0,
+      zIndex: 700,
+      background: "rgba(0,0,0,0.5)",
+      backdropFilter: "blur(8px)",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      padding: 20
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      background: C.bg1,
+      borderRadius: 28,
+      padding: 28,
+      maxWidth: 360,
+      width: "100%",
+      boxShadow: "0 28px 70px rgba(0,0,0,0.25)"
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 44, textAlign: "center", marginBottom: 14 } }, confirmAct.type === "delete" ? "\u{1F5D1}\uFE0F" : confirmAct.type === "reset" ? "\u{1F511}" : "\u26A0\uFE0F"), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      fontSize: 17,
+      fontWeight: 800,
+      color: C.label,
+      fontFamily: FONT,
+      textAlign: "center",
+      marginBottom: 8,
+      lineHeight: 1.4
+    } }, confirmAct.type === "delete" ? "Eliminar usuario" : confirmAct.type === "reset" ? "Resetear contrase\xF1a" : "Cambiar estado"), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      fontSize: 14,
+      color: C.label2,
+      fontFamily: FONT,
+      textAlign: "center",
+      marginBottom: 28,
+      lineHeight: 1.6,
+      whiteSpace: "pre-line"
+    } }, confirmAct.msg), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 10 } }, /* @__PURE__ */ import_react.default.createElement(
+      "button",
+      {
+        onClick: () => {
+          setConfirmAct(null);
+          setMenuAbierto(null);
+        },
+        style: {
+          flex: 1,
+          padding: "13px",
+          borderRadius: 14,
+          border: `1.5px solid ${C.sep}`,
+          background: C.bg2,
+          cursor: "pointer",
+          fontSize: 14,
+          fontWeight: 600,
+          color: C.label2,
+          fontFamily: FONT,
+          WebkitTapHighlightColor: "transparent"
+        }
+      },
+      "Cancelar"
+    ), /* @__PURE__ */ import_react.default.createElement(
+      "button",
+      {
+        onClick: confirmAct.onConfirm,
+        style: {
+          flex: 1,
+          padding: "13px",
+          borderRadius: 14,
+          border: "none",
+          background: confirmAct.type === "delete" ? C.red : confirmAct.type === "reset" ? C.amber : C.green,
+          cursor: "pointer",
+          fontSize: 14,
+          fontWeight: 700,
+          color: "#fff",
+          fontFamily: FONT,
+          WebkitTapHighlightColor: "transparent"
+        }
+      },
+      confirmAct.type === "delete" ? "Eliminar" : confirmAct.type === "reset" ? "Resetear" : "Confirmar"
+    )))), tempPass && /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      position: "fixed",
+      inset: 0,
+      zIndex: 700,
+      background: "rgba(0,0,0,0.5)",
+      backdropFilter: "blur(8px)",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      padding: 20
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      background: C.bg1,
+      borderRadius: 28,
+      padding: 28,
+      maxWidth: 360,
+      width: "100%",
+      boxShadow: "0 28px 70px rgba(0,0,0,0.25)"
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 44, textAlign: "center", marginBottom: 12 } }, "\u{1F511}"), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      fontSize: 18,
+      fontWeight: 800,
+      color: C.label,
+      fontFamily: FONT,
+      textAlign: "center",
+      marginBottom: 6
+    } }, "Contrase\xF1a temporal"), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      fontSize: 13,
+      color: C.label3,
+      fontFamily: FONT,
+      textAlign: "center",
+      marginBottom: 20,
+      lineHeight: 1.5
+    } }, "Entreg\xE1 esta contrase\xF1a a", " ", /* @__PURE__ */ import_react.default.createElement("strong", { style: { color: C.label } }, tempPass.nombre), ". Solo se muestra una vez."), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      background: C.bg0,
+      borderRadius: 16,
+      padding: "18px 20px",
+      textAlign: "center",
+      marginBottom: 16,
+      border: `2.5px solid ${C.gold}50`
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      fontSize: 10,
+      color: C.label3,
+      fontFamily: FONT,
+      marginBottom: 6,
+      textTransform: "uppercase",
+      letterSpacing: 0.6
+    } }, "Contrase\xF1a temporal \xB7 @", tempPass.usuario), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      fontSize: 26,
+      fontWeight: 900,
+      fontFamily: "monospace",
+      color: C.gold,
+      letterSpacing: 4
+    } }, tempPass.password)), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      background: `${C.amber}12`,
+      borderRadius: 12,
+      padding: "10px 14px",
+      marginBottom: 20,
+      border: `1px solid ${C.amber}30`
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.amber, fontFamily: FONT, lineHeight: 1.5 } }, "\u26A0\uFE0F Copi\xE1 esta contrase\xF1a ahora. No podr\xE1s volver a verla.")), /* @__PURE__ */ import_react.default.createElement(
+      "button",
+      {
+        onClick: () => setTempPass(null),
+        style: {
+          width: "100%",
+          padding: "14px",
+          borderRadius: 14,
+          border: "none",
+          background: C.label,
+          cursor: "pointer",
+          fontSize: 14,
+          fontWeight: 700,
+          color: C.bg0,
+          fontFamily: FONT,
+          WebkitTapHighlightColor: "transparent"
+        }
+      },
+      "Entendido \xB7 Cerrar"
+    ))));
   }
   function DashboardVentas({ ventas, onVentaClick }) {
     const now = /* @__PURE__ */ new Date();

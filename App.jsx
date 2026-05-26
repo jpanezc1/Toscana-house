@@ -1911,6 +1911,9 @@ function useAuth() {
       u.password === password
     );
     if (found) {
+      if (found.estado === "inactivo") {
+        return { ok: false, error: "Cuenta desactivada. Contactá al administrador." };
+      }
       const session = { ...found, loginAt: Date.now() };
       localStorage.setItem("th_user", JSON.stringify(session));
       setUser(session);
@@ -7456,321 +7459,821 @@ function FacturacionConfig(){
   );
 }
 
-function ConfigTab({user, logout}){
-  var _hN155 = useState("cuenta"); var subTab = _hN155[0]; var setSubTab = _hN155[1];;
-  // Usuarios guardados en localStorage (sobre los defaults)
-  var _hN156 = useState(function(){ try{return JSON.parse(localStorage.getItem("th_usuarios")||"null")||USUARIOS;}catch{return USUARIOS;} }); var usuarios = _hN156[0]; var setUsuarios = _hN156[1];
-  function guardarUsuarios(u){
-    setUsuarios(u);
-    localStorage.setItem("th_usuarios", JSON.stringify(u));
-  }
-
-  return (
-    <div>
-      {/* Header */}
-      <div style={{marginBottom:20}}>
-        <h2 style={{margin:0,fontSize:22,fontWeight:800,color:C.label,fontFamily:FONT}}>Configuración</h2>
-        <p style={{margin:"4px 0 0",color:C.label3,fontFamily:FONT,fontSize:13}}>
-          Sesión activa: <strong style={{color:C.gold}}>{user.nombre}</strong> · {user.rol}
-        </p>
-      </div>
-
-      {/* Sub tabs */}
-      <div style={{marginBottom:20}}>
-        <SegControl
-          options={[
-            {value:"cuenta",   label:"Mi cuenta"},
-            {value:"usuarios", label:"Usuarios"},
-            {value:"sistema",  label:"Sistema"},
-            {value:"factura",  label:"Facturación"},
-          ]}
-          value={subTab} onChange={setSubTab}
-        />
-      </div>
-
-      {/* ── MI CUENTA ── */}
-      {subTab==="cuenta" && <CambiarContrasena user={user} usuarios={usuarios} onGuardar={guardarUsuarios}/>}
-
-      {/* ── USUARIOS ── */}
-      {subTab==="usuarios" && <GestionUsuarios user={user} usuarios={usuarios} onGuardar={guardarUsuarios}/>}
-
-      {/* ── SISTEMA ── */}
-      {subTab==="sistema" && (
-        <div>
-          <div style={{background:C.bg2,borderRadius:16,overflow:"hidden",marginBottom:16}}>
-            {[
-              ["Versión","Toscana House v3.0"],
-              ["Base de datos","Supabase (nube)"],
-              ["Usuario activo",user.nombre],
-              ["Rol",user.rol==="admin"?"Administrador":"Cajero"],
-            ].map(([k,v],i,arr)=>(
-              <div key={k} style={{display:"flex",justifyContent:"space-between",
-                padding:"14px 16px",borderBottom:i<arr.length-1?`1px solid ${C.sep}`:""}}>
-                <span style={{fontSize:15,color:C.label2,fontFamily:FONT}}>{k}</span>
-                <span style={{fontSize:15,color:C.label,fontFamily:FONT,fontWeight:500}}>{v}</span>
-              </div>
-            ))}
-          </div>
-          <IOSBtn onPress={logout} variant="danger" full icon="🚪">Cerrar sesión</IOSBtn>
-        </div>
-      )}
-
-      {/* ── FACTURACIÓN SIAT ── */}
-      {subTab==="factura" && (
-        <div>
-          <FacturacionConfig/>
-          <div style={{padding:14,background:`${C.blue}08`,borderRadius:14,
-            border:`1px solid ${C.blue}20`}}>
-            <div style={{fontSize:13,fontWeight:700,color:C.blue,fontFamily:FONT,marginBottom:6}}>
-              🏢 Datos del Emisor (fijos)
-            </div>
-            {[
-              ["Razón Social", "SYLVIA CAROLINA GRANIER ZALLES"],
-              ["NIT Emisor", NIT_EMPRESA],
-              ["Sucursal", SUCURSAL_EMP],
-              ["Dirección", DIRECCION_EMP],
-            ].map(([k,v])=>(
-              <div key={k} style={{display:"flex",justifyContent:"space-between",
-                padding:"7px 0",borderBottom:`1px solid ${C.sep}`}}>
-                <span style={{fontSize:12,color:C.label3,fontFamily:FONT}}>{k}</span>
-                <span style={{fontSize:12,fontWeight:600,color:C.label,fontFamily:FONT}}>{v}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  );
+// ── Audit log helpers ─────────────────────────────────────────────────────────
+const AUDIT_KEY = "th_audit_log";
+function agregarAudit(accion, afectado, admin){
+  try{
+    const logs = JSON.parse(localStorage.getItem(AUDIT_KEY)||"[]");
+    logs.unshift({id:Date.now(), fecha:new Date().toLocaleString("es-BO"), accion, afectado, admin});
+    localStorage.setItem(AUDIT_KEY, JSON.stringify(logs.slice(0,200)));
+  }catch{}
+}
+function generarTempPassword(){
+  const chars="abcdefghjkmnpqrstuvwxyz23456789";
+  return Array.from({length:10},()=>chars[Math.floor(Math.random()*chars.length)]).join("");
 }
 
-// ── Cambiar contraseña ────────────────────────────────────
-function CambiarContrasena({user, usuarios, onGuardar}){
-  var _hN157 = useState(""); var passActual = _hN157[0]; var setPassActual = _hN157[1];;
-  var _hN158 = useState(""); var passNueva = _hN158[0]; var setPassNueva = _hN158[1];;
-  var _hN159 = useState(""); var passConfirm = _hN159[0]; var setPassConfirm = _hN159[1];;
-  var _hN160 = useState(null); var msg = _hN160[0]; var setMsg = _hN160[1];;
-  var _hN161 = useState(false); var show = _hN161[0]; var setShow = _hN161[1];;
+// ── Panel cambio contraseña propia ────────────────────────────────────────────
+function PanelCambiarPass({user, usuarios, onGuardar}){
+  const [passActual,  setPassActual]  = useState("");
+  const [passNueva,   setPassNueva]   = useState("");
+  const [passConfirm, setPassConfirm] = useState("");
+  const [show, setShow] = useState(false);
+  const [msg,  setMsg]  = useState(null);
 
   function cambiar(){
     setMsg(null);
     const u = usuarios.find(x=>x.usuario===user.usuario);
-    if (!u) { setMsg({ok:false,txt:"Usuario no encontrado"}); return; }
-    if (u.password !== passActual) { setMsg({ok:false,txt:"Contraseña actual incorrecta"}); return; }
-    if (passNueva.length < 6) { setMsg({ok:false,txt:"La nueva contraseña debe tener al menos 6 caracteres"}); return; }
-    if (passNueva !== passConfirm) { setMsg({ok:false,txt:"Las contraseñas no coinciden"}); return; }
-    const nuevos = usuarios.map(x=>x.usuario===user.usuario?{...x,password:passNueva}:x);
-    onGuardar(nuevos);
+    if(!u){ setMsg({ok:false,txt:"Usuario no encontrado"}); return; }
+    if(u.password!==passActual){ setMsg({ok:false,txt:"Contraseña actual incorrecta"}); return; }
+    if(passNueva.length<6){ setMsg({ok:false,txt:"Mínimo 6 caracteres"}); return; }
+    if(passNueva!==passConfirm){ setMsg({ok:false,txt:"Las contraseñas no coinciden"}); return; }
+    onGuardar(usuarios.map(x=>x.usuario===user.usuario?{...x,password:passNueva}:x));
     setMsg({ok:true,txt:"✓ Contraseña actualizada correctamente"});
     setPassActual(""); setPassNueva(""); setPassConfirm("");
   }
 
+  const ipt=(label,val,set,placeholder)=>(
+    <div style={{marginBottom:12}}>
+      <div style={{fontSize:11,fontWeight:700,color:C.label3,textTransform:"uppercase",
+        letterSpacing:.7,marginBottom:6,fontFamily:FONT}}>{label}</div>
+      <input type={show?"text":"password"} value={val}
+        onChange={e=>set(e.target.value)} placeholder={placeholder}
+        style={{width:"100%",padding:"12px 14px",borderRadius:12,
+          border:`1.5px solid ${C.sep}`,background:C.bg0,
+          fontSize:15,color:C.label,fontFamily:FONT,outline:"none",
+          boxSizing:"border-box"}}/>
+    </div>
+  );
+
   return (
-    <div>
-      <div style={{background:C.bg2,borderRadius:16,padding:16,marginBottom:16,
-        border:`1px solid ${C.sep}`}}>
-        <div style={{display:"flex",alignItems:"center",gap:14,marginBottom:16}}>
-          <div style={{width:48,height:48,borderRadius:"50%",
-            background:`${C.gold}20`,display:"flex",alignItems:"center",
-            justifyContent:"center",fontSize:22}}>👤</div>
-          <div>
-            <div style={{fontSize:17,fontWeight:700,color:C.label,fontFamily:FONT}}>{user.nombre}</div>
-            <div style={{fontSize:13,color:C.label3,fontFamily:FONT}}>@{user.usuario}</div>
-          </div>
-        </div>
+    <div style={{background:C.bg1,borderRadius:18,padding:18,
+      border:`1px solid ${C.sep}`,boxShadow:"0 1px 8px rgba(0,0,0,0.05)"}}>
+      <div style={{fontSize:14,fontWeight:700,color:C.label,fontFamily:FONT,marginBottom:16,
+        display:"flex",alignItems:"center",gap:8}}>
+        <span>🔒</span> Cambiar contraseña
       </div>
-
-      <div style={{fontSize:13,fontWeight:700,color:C.label3,textTransform:"uppercase",
-        letterSpacing:.8,marginBottom:12}}>Cambiar contraseña</div>
-
-      <IOSInput label="Contraseña actual" type={show?"text":"password"}
-        value={passActual} onChange={e=>setPassActual(e.target.value)} placeholder="••••••••"/>
-      <IOSInput label="Nueva contraseña" type={show?"text":"password"}
-        value={passNueva} onChange={e=>setPassNueva(e.target.value)} placeholder="Mínimo 6 caracteres"/>
-      <IOSInput label="Confirmar nueva contraseña" type={show?"text":"password"}
-        value={passConfirm} onChange={e=>setPassConfirm(e.target.value)} placeholder="Repetir contraseña"/>
-
-      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:16}}>
-        <input type="checkbox" id="showPass" checked={show} onChange={e=>setShow(e.target.checked)}/>
-        <label htmlFor="showPass" style={{fontSize:13,color:C.label3,fontFamily:FONT,cursor:"pointer"}}>
+      {ipt("Contraseña actual",   passActual,  setPassActual,  "••••••••")}
+      {ipt("Nueva contraseña",    passNueva,   setPassNueva,   "Mínimo 6 caracteres")}
+      {ipt("Confirmar contraseña",passConfirm, setPassConfirm, "Repetir nueva contraseña")}
+      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:14}}>
+        <input type="checkbox" id="showPassCP" checked={show}
+          onChange={e=>setShow(e.target.checked)} style={{cursor:"pointer"}}/>
+        <label htmlFor="showPassCP" style={{fontSize:13,color:C.label3,fontFamily:FONT,cursor:"pointer"}}>
           Mostrar contraseñas
         </label>
       </div>
-
       {msg&&(
-        <div style={{padding:"12px 14px",borderRadius:12,marginBottom:12,
+        <div style={{padding:"11px 14px",borderRadius:12,marginBottom:12,
           background:msg.ok?`${C.green}15`:`${C.red}15`,
           border:`1px solid ${msg.ok?C.green:C.red}40`,
-          color:msg.ok?C.green:C.red,fontSize:14,fontFamily:FONT}}>{msg.txt}</div>
+          color:msg.ok?C.green:C.red,fontSize:13,fontFamily:FONT}}>{msg.txt}</div>
       )}
-
-      <IOSBtn onPress={cambiar} variant="primary" full icon="🔒">
+      <button onClick={cambiar} style={{width:"100%",padding:"13px",borderRadius:12,
+        border:"none",background:C.label,cursor:"pointer",fontSize:14,
+        fontWeight:700,color:C.bg0,fontFamily:FONT,
+        WebkitTapHighlightColor:"transparent"}}>
         Actualizar contraseña
-      </IOSBtn>
+      </button>
     </div>
   );
 }
 
-// ── Gestión de usuarios ───────────────────────────────────
-function GestionUsuarios({user, usuarios, onGuardar}){
-  var _hN162 = useState(null); var modo = _hN162[0]; var setModo = _hN162[1];; // null | "nuevo" | "editar"
-  var _hN163 = useState(null); var editUser = _hN163[0]; var setEditUser = _hN163[1];;
-  var _hN164 = useState({usuario:"",password:"",nombre:"",rol:"caja",marcaId:""}); var fUser = _hN164[0]; var setFUser = _hN164[1];;
-  var _hN165 = useState(null); var msg = _hN165[0]; var setMsg = _hN165[1];;
-
-  if (user.rol !== "admin") {
-    return (
-      <div style={{textAlign:"center",padding:"48px 20px",color:C.label3}}>
-        <div style={{fontSize:40,marginBottom:12,opacity:.4}}>🔒</div>
-        <div style={{fontSize:16,fontWeight:600,color:C.label2,fontFamily:FONT}}>
-          Solo administradores
-        </div>
-        <div style={{fontSize:13,color:C.label3,fontFamily:FONT,marginTop:6}}>
-          Tu cuenta no tiene permisos para gestionar usuarios
-        </div>
-      </div>
-    );
-  }
+// ── Modal formulario nuevo/editar usuario ─────────────────────────────────────
+function UserFormModal({editUser, usuarios, onClose, onGuardar}){
+  const isNew = !editUser;
+  const [f, setF] = useState(editUser
+    ? {...editUser, password:"", marcaId:String(editUser.marcaId||"")}
+    : {usuario:"",password:"",nombre:"",rol:"caja",marcaId:"",estado:"activo"}
+  );
+  const [msg, setMsg] = useState(null);
+  const [showP, setShowP] = useState(false);
 
   function guardar(){
     setMsg(null);
-    if(!fUser.usuario||!fUser.password||!fUser.nombre){setMsg({ok:false,txt:"Completa todos los campos"});return;}
-    if(fUser.password.length<6){setMsg({ok:false,txt:"La contraseña debe tener al menos 6 caracteres"});return;}
-    if(fUser.rol==="marca"&&!fUser.marcaId){setMsg({ok:false,txt:"Seleccioná la marca para este usuario"});return;}
-    if(modo==="nuevo"){
-      if(usuarios.find(u=>u.usuario===fUser.usuario)){setMsg({ok:false,txt:"Ese usuario ya existe"});return;}
-      onGuardar([...usuarios,{...fUser,marcaId:fUser.marcaId?Number(fUser.marcaId):undefined}]);
-    } else {
-      onGuardar(usuarios.map(u=>u.usuario===editUser?{...u,...fUser,marcaId:fUser.marcaId?Number(fUser.marcaId):undefined}:u));
+    if(!f.nombre.trim()){ setMsg("Nombre requerido"); return; }
+    if(!f.usuario.trim()){ setMsg("Usuario requerido"); return; }
+    if(isNew&&!f.password){ setMsg("Contraseña requerida"); return; }
+    if(isNew&&f.password.length<6){ setMsg("Mínimo 6 caracteres en contraseña"); return; }
+    if(f.rol==="marca"&&!f.marcaId){ setMsg("Seleccioná la marca"); return; }
+    if(isNew&&usuarios.find(u=>u.usuario===f.usuario.toLowerCase())){
+      setMsg("Ese nombre de usuario ya existe"); return;
     }
-    setMsg({ok:true,txt:`✓ Usuario ${modo==="nuevo"?"creado":"actualizado"}`});
-    setTimeout(()=>{setModo(null);setMsg(null);},1500);
+    onGuardar({...f,usuario:f.usuario.toLowerCase().trim()},isNew);
   }
 
-  function eliminar(usr){
-    if(usr===user.usuario){setMsg({ok:false,txt:"No puedes eliminar tu propio usuario"});return;}
-    if(!window.confirm(`¿Eliminar usuario "${usr}"?`)) return;
-    onGuardar(usuarios.filter(u=>u.usuario!==usr));
-  }
+  const ipt=(label,val,set,placeholder,type="text",opts={})=>(
+    <div style={{marginBottom:14}}>
+      <div style={{fontSize:11,fontWeight:700,color:C.label3,textTransform:"uppercase",
+        letterSpacing:.7,marginBottom:6,fontFamily:FONT}}>{label}</div>
+      <input type={type} value={val} onChange={e=>set(e.target.value)}
+        placeholder={placeholder} {...opts}
+        style={{width:"100%",padding:"12px 14px",borderRadius:12,
+          border:`1.5px solid ${C.sep}`,background:C.bg0,
+          fontSize:15,color:C.label,fontFamily:FONT,outline:"none",
+          boxSizing:"border-box"}}/>
+    </div>
+  );
 
-  if(modo){
-    return (
-      <div>
-        <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:20}}>
-          <IOSBtn onPress={()=>{setModo(null);setMsg(null);}} variant="fill" small>← Volver</IOSBtn>
-          <span style={{fontSize:17,fontWeight:700,color:C.label,fontFamily:FONT}}>
-            {modo==="nuevo"?"Nuevo usuario":"Editar usuario"}
-          </span>
+  return (
+    <div style={{position:"fixed",inset:0,zIndex:600,
+      background:"rgba(0,0,0,0.45)",backdropFilter:"blur(6px)",
+      display:"flex",flexDirection:"column",justifyContent:"flex-end"}}>
+      <div style={{background:C.bg0,borderRadius:"24px 24px 0 0",
+        maxHeight:"92vh",display:"flex",flexDirection:"column",
+        boxShadow:"0 -8px 40px rgba(0,0,0,0.18)"}}>
+        {/* Header */}
+        <div style={{padding:"18px 20px 14px",borderBottom:`1px solid ${C.sep}`,
+          background:C.bg1,borderRadius:"24px 24px 0 0",flexShrink:0}}>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+            <div>
+              <div style={{fontSize:11,color:C.label3,fontFamily:FONT,
+                textTransform:"uppercase",letterSpacing:.6,marginBottom:3}}>
+                {isNew?"Nuevo usuario":"Editar usuario"}
+              </div>
+              <div style={{fontSize:19,fontWeight:800,color:C.label,fontFamily:FONT_DISPLAY}}>
+                {isNew?"Crear cuenta":"Modificar cuenta"}
+              </div>
+            </div>
+            <button onClick={onClose} style={{width:32,height:32,borderRadius:"50%",
+              border:`1px solid ${C.sep}`,background:C.bg2,cursor:"pointer",
+              fontSize:16,color:C.label2,display:"flex",alignItems:"center",
+              justifyContent:"center",WebkitTapHighlightColor:"transparent"}}>✕</button>
+          </div>
         </div>
-        <IOSInput label="Nombre completo" value={fUser.nombre}
-          onChange={e=>setFUser(p=>({...p,nombre:e.target.value}))} placeholder="Ej: María García"/>
-        <IOSInput label="Usuario (para login)" value={fUser.usuario}
-          onChange={e=>setFUser(p=>({...p,usuario:e.target.value.toLowerCase().replace(/ /g,"")}))}
-          placeholder="Ej: maria" autoCapitalize="none"/>
-        <IOSInput label="Contraseña" type="password" value={fUser.password}
-          onChange={e=>setFUser(p=>({...p,password:e.target.value}))} placeholder="Mínimo 6 caracteres"/>
-        <div style={{marginBottom:12}}>
-          <div style={{fontSize:11,fontWeight:700,color:C.label2,textTransform:"uppercase",
-            letterSpacing:.8,marginBottom:8}}>Rol</div>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
-            {[["admin","👑 Admin","Acceso total"],["caja","🛒 Cajero","Solo POS"],["marca","🏷 Marca","Portal solo lectura"]].map(([r,label,desc])=>(
-              <button key={r} onClick={()=>setFUser(p=>({...p,rol:r,marcaId:r==="marca"?p.marcaId:"" }))} style={{
-                padding:"10px 8px",borderRadius:12,cursor:"pointer",fontFamily:FONT,
-                border:`2px solid ${fUser.rol===r?C.gold:C.sep}`,
-                background:fUser.rol===r?`${C.gold}15`:C.bg2,
-                textAlign:"left",WebkitTapHighlightColor:"transparent",
-              }}>
-                <div style={{fontSize:13,fontWeight:700,color:fUser.rol===r?C.gold:C.label}}>{label}</div>
-                <div style={{fontSize:10,color:C.label3,marginTop:2}}>{desc}</div>
+        {/* Body scroll */}
+        <div style={{overflowY:"auto",flex:1,padding:"20px 20px 40px",
+          WebkitOverflowScrolling:"touch"}}>
+          {ipt("Nombre completo",f.nombre,v=>setF(p=>({...p,nombre:v})),"Ej: María García")}
+          {ipt("Usuario (login)",f.usuario,v=>setF(p=>({...p,usuario:v.toLowerCase().replace(/ /g,"").replace(/[^a-z0-9._]/g,"")})),"Ej: maria",
+            "text",{autoCapitalize:"none",autoCorrect:"off",spellCheck:false})}
+          <div style={{marginBottom:14}}>
+            <div style={{fontSize:11,fontWeight:700,color:C.label3,textTransform:"uppercase",
+              letterSpacing:.7,marginBottom:6,fontFamily:FONT}}>
+              Contraseña {!isNew&&"(dejar vacío para no cambiar)"}
+            </div>
+            <div style={{position:"relative"}}>
+              <input type={showP?"text":"password"} value={f.password}
+                onChange={e=>setF(p=>({...p,password:e.target.value}))}
+                placeholder={isNew?"Mínimo 6 caracteres":"Sin cambios"}
+                style={{width:"100%",padding:"12px 44px 12px 14px",borderRadius:12,
+                  border:`1.5px solid ${C.sep}`,background:C.bg0,
+                  fontSize:15,color:C.label,fontFamily:FONT,outline:"none",
+                  boxSizing:"border-box"}}/>
+              <button onClick={()=>setShowP(p=>!p)} style={{position:"absolute",right:12,
+                top:"50%",transform:"translateY(-50%)",background:"none",border:"none",
+                cursor:"pointer",fontSize:16,color:C.label3,padding:4}}>
+                {showP?"🙈":"👁"}
               </button>
-            ))}
+            </div>
           </div>
-        </div>
-        {/* Selector de marca — solo aparece si rol="marca" */}
-        {fUser.rol==="marca"&&(
-          <div style={{marginBottom:12}}>
-            <div style={{fontSize:11,fontWeight:700,color:C.label2,textTransform:"uppercase",
-              letterSpacing:.8,marginBottom:8}}>Marca asignada</div>
-            <select value={fUser.marcaId||""} onChange={e=>setFUser(p=>({...p,marcaId:e.target.value}))}
-              style={{width:"100%",padding:"11px 14px",borderRadius:12,border:`1.5px solid ${C.sep}`,
-                background:C.bg3,fontSize:15,color:C.label,fontFamily:FONT,outline:"none",
-                WebkitAppearance:"none",appearance:"none"}}>
-              <option value="">— Seleccioná una marca —</option>
-              {MARCAS.map(m=>(
-                <option key={m.id} value={m.id}>{m.emoji} {m.nombre}</option>
+
+          {/* Rol */}
+          <div style={{marginBottom:14}}>
+            <div style={{fontSize:11,fontWeight:700,color:C.label3,textTransform:"uppercase",
+              letterSpacing:.7,marginBottom:8,fontFamily:FONT}}>Rol</div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
+              {[
+                ["admin","👑","Admin","Acceso total"],
+                ["caja","🛒","Staff","Solo POS"],
+                ["marca","🏷","Brand","Solo lectura"],
+              ].map(([r,ic,label,desc])=>(
+                <button key={r}
+                  onClick={()=>setF(p=>({...p,rol:r,marcaId:r==="marca"?p.marcaId:""}))}
+                  style={{padding:"12px 8px",borderRadius:14,cursor:"pointer",fontFamily:FONT,
+                    border:`2px solid ${f.rol===r?C.gold:C.sep}`,
+                    background:f.rol===r?`${C.gold}12`:C.bg2,
+                    textAlign:"center",WebkitTapHighlightColor:"transparent"}}>
+                  <div style={{fontSize:20,marginBottom:4}}>{ic}</div>
+                  <div style={{fontSize:12,fontWeight:700,color:f.rol===r?C.gold:C.label}}>{label}</div>
+                  <div style={{fontSize:10,color:C.label3,marginTop:2}}>{desc}</div>
+                </button>
               ))}
-            </select>
+            </div>
           </div>
-        )}
-        {msg&&(
-          <div style={{padding:"12px 14px",borderRadius:12,marginBottom:12,
-            background:msg.ok?`${C.green}15`:`${C.red}15`,
-            border:`1px solid ${msg.ok?C.green:C.red}40`,
-            color:msg.ok?C.green:C.red,fontSize:14,fontFamily:FONT}}>{msg.txt}</div>
-        )}
-        <IOSBtn onPress={guardar} variant="primary" full icon="💾">
-          {modo==="nuevo"?"Crear usuario":"Guardar cambios"}
-        </IOSBtn>
+
+          {/* Marca selector */}
+          {f.rol==="marca"&&(
+            <div style={{marginBottom:14}}>
+              <div style={{fontSize:11,fontWeight:700,color:C.label3,textTransform:"uppercase",
+                letterSpacing:.7,marginBottom:6,fontFamily:FONT}}>Marca asignada</div>
+              <select value={f.marcaId||""} onChange={e=>setF(p=>({...p,marcaId:e.target.value}))}
+                style={{width:"100%",padding:"12px 14px",borderRadius:12,
+                  border:`1.5px solid ${f.marcaId?C.gold:C.sep}`,background:C.bg0,
+                  fontSize:15,color:C.label,fontFamily:FONT,outline:"none",
+                  WebkitAppearance:"none",boxSizing:"border-box"}}>
+                <option value="">— Seleccioná una marca —</option>
+                {MARCAS.map(m=><option key={m.id} value={m.id}>{m.emoji} {m.nombre}</option>)}
+              </select>
+            </div>
+          )}
+
+          {/* Estado */}
+          {!isNew&&(
+            <div style={{marginBottom:14}}>
+              <div style={{fontSize:11,fontWeight:700,color:C.label3,textTransform:"uppercase",
+                letterSpacing:.7,marginBottom:6,fontFamily:FONT}}>Estado</div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                {[["activo","✅","Activo"],["inactivo","⏸","Inactivo"]].map(([s,ic,lbl])=>(
+                  <button key={s} onClick={()=>setF(p=>({...p,estado:s}))}
+                    style={{padding:"10px",borderRadius:12,cursor:"pointer",fontFamily:FONT,
+                      border:`2px solid ${f.estado===s?(s==="activo"?C.green:C.red):C.sep}`,
+                      background:f.estado===s?(s==="activo"?`${C.green}12`:`${C.red}10`):C.bg2,
+                      fontWeight:f.estado===s?700:400,fontSize:13,
+                      color:f.estado===s?(s==="activo"?C.green:C.red):C.label2,
+                      WebkitTapHighlightColor:"transparent"}}>
+                    {ic} {lbl}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {msg&&(
+            <div style={{padding:"11px 14px",borderRadius:12,marginBottom:14,
+              background:`${C.red}12`,border:`1px solid ${C.red}30`,
+              color:C.red,fontSize:13,fontFamily:FONT}}>{msg}</div>
+          )}
+          <button onClick={guardar}
+            style={{width:"100%",padding:"14px",borderRadius:14,border:"none",
+              background:C.label,cursor:"pointer",fontSize:15,fontWeight:700,
+              color:C.bg0,fontFamily:FONT,WebkitTapHighlightColor:"transparent"}}>
+            {isNew?"Crear usuario":"Guardar cambios"}
+          </button>
+        </div>
       </div>
+    </div>
+  );
+}
+
+// ── Panel configuración principal ─────────────────────────────────────────────
+function ConfigTab({user, logout}){
+  const [subTab, setSubTab] = useState("perfil");
+  const [usuarios, setUsuarios] = useState(()=>{
+    try{return JSON.parse(localStorage.getItem("th_usuarios")||"null")||USUARIOS;}
+    catch{return USUARIOS;}
+  });
+  const [auditLog, setAuditLog] = useState(()=>{
+    try{return JSON.parse(localStorage.getItem(AUDIT_KEY)||"[]");}
+    catch{return [];}
+  });
+
+  function guardarUsuarios(u, accion, afectado){
+    setUsuarios(u);
+    localStorage.setItem("th_usuarios", JSON.stringify(u));
+    if(accion&&afectado){
+      agregarAudit(accion, afectado, user.nombre);
+      setAuditLog(JSON.parse(localStorage.getItem(AUDIT_KEY)||"[]"));
+    }
+  }
+
+  // ── Estado UI ──
+  const [modalAdd,     setModalAdd]     = useState(false);
+  const [editando,     setEditando]     = useState(null);
+  const [confirmAct,   setConfirmAct]   = useState(null);
+  const [tempPass,     setTempPass]     = useState(null);
+  const [menuAbierto,  setMenuAbierto]  = useState(null);
+  const isAdmin = user.rol === "admin";
+
+  const ROL_CFG = {
+    admin:{label:"Admin",    icon:"👑", bg:`${C.gold}20`,  color:C.gold},
+    caja: {label:"Staff",    icon:"🛒", bg:`${C.green}18`, color:C.green},
+    marca:{label:"Brand",    icon:"🏷", bg:`${C.blue}18`,  color:C.blue},
+  };
+
+  const SETTINGS_TABS = [
+    {id:"perfil",    icon:"👤", label:"Perfil"},
+    ...(isAdmin ? [
+      {id:"equipo",    icon:"👥", label:"Equipo"},
+      {id:"auditoria", icon:"📋", label:"Auditoría"},
+    ] : []),
+    {id:"seguridad", icon:"🔒", label:"Seguridad"},
+    {id:"sistema",   icon:"⚙",  label:"Sistema"},
+    {id:"factura",   icon:"🧾", label:"Facturación"},
+  ];
+
+  // helpers de badge
+  function rolBadge(u){
+    const rc=ROL_CFG[u.rol]||ROL_CFG.caja;
+    return <span style={{display:"inline-flex",alignItems:"center",gap:4,background:rc.bg,
+      color:rc.color,padding:"2px 9px",borderRadius:20,fontSize:11,fontWeight:700,
+      fontFamily:FONT}}>{rc.label}</span>;
+  }
+  function estadoBadge(u){
+    const off=u.estado==="inactivo";
+    return <span style={{display:"inline-flex",alignItems:"center",gap:5,
+      background:off?C.redBg:C.greenBg,color:off?C.red:C.green,
+      padding:"2px 9px",borderRadius:20,fontSize:11,fontWeight:600,fontFamily:FONT}}>
+      <span style={{width:6,height:6,borderRadius:"50%",background:"currentColor",display:"inline-block"}}/>
+      {off?"Inactivo":"Activo"}
+    </span>;
+  }
+  function avatarU(u){
+    const m=u.rol==="marca"?MARCAS.find(x=>x.id===Number(u.marcaId)):null;
+    const rc=ROL_CFG[u.rol]||ROL_CFG.caja;
+    return <div style={{width:44,height:44,borderRadius:14,flexShrink:0,
+      background:u.rol==="marca"?`${m?.color||C.blue}25`:rc.bg,
+      display:"flex",alignItems:"center",justifyContent:"center",fontSize:20}}>
+      {u.rol==="marca"?(m?.emoji||"🏷"):rc.icon}
+    </div>;
+  }
+
+  // acciones
+  function handleResetPass(u){
+    const temp=generarTempPassword();
+    guardarUsuarios(
+      usuarios.map(x=>x.usuario===u.usuario?{...x,password:temp}:x),
+      `Reset contraseña → [oculto]`, u.usuario
     );
+    setTempPass({usuario:u.usuario,nombre:u.nombre,password:temp});
+    setConfirmAct(null); setMenuAbierto(null);
+  }
+  function handleToggle(u){
+    const ns=u.estado==="inactivo"?"activo":"inactivo";
+    guardarUsuarios(
+      usuarios.map(x=>x.usuario===u.usuario?{...x,estado:ns}:x),
+      `${ns==="inactivo"?"Desactivó":"Activó"} cuenta`, u.usuario
+    );
+    setConfirmAct(null); setMenuAbierto(null);
+  }
+  function handleEliminar(u){
+    guardarUsuarios(
+      usuarios.filter(x=>x.usuario!==u.usuario),
+      "Eliminó usuario", u.usuario
+    );
+    setConfirmAct(null); setMenuAbierto(null);
+  }
+  function handleGuardarUsuario(data,isNew){
+    if(isNew){
+      guardarUsuarios(
+        [...usuarios,{...data,estado:"activo",marcaId:data.marcaId?Number(data.marcaId):undefined}],
+        "Creó usuario", data.usuario
+      );
+    } else {
+      guardarUsuarios(
+        usuarios.map(u=>u.usuario===data.usuario
+          ?{...u,...data,marcaId:data.marcaId?Number(data.marcaId):undefined}:u),
+        "Editó usuario", data.usuario
+      );
+    }
+    setModalAdd(false); setEditando(null);
   }
 
   return (
     <div>
-      {msg&&(
-        <div style={{padding:"12px 14px",borderRadius:12,marginBottom:12,
-          background:msg.ok?`${C.green}15`:`${C.red}15`,
-          border:`1px solid ${msg.ok?C.green:C.red}40`,
-          color:msg.ok?C.green:C.red,fontSize:14,fontFamily:FONT}}>{msg.txt}</div>
-      )}
-
-      {/* Lista usuarios */}
-      <div style={{display:"flex",flexDirection:"column",gap:2,marginBottom:16}}>
-        {usuarios.map((u,i)=>(
-          <div key={u.usuario} style={{
-            background:C.bg2,
-            borderRadius:i===0?"14px 14px 2px 2px":i===usuarios.length-1?"2px 2px 14px 14px":"2px",
-            padding:"14px 16px",
-            borderBottom:i<usuarios.length-1?`1px solid ${C.sep}`:"",
-            display:"flex",alignItems:"center",gap:12,
-          }}>
-            {(()=>{
-              const m=u.rol==="marca"?MARCAS.find(x=>x.id===u.marcaId):null;
-              return (
-                <div style={{width:40,height:40,borderRadius:"50%",
-                  background:u.rol==="admin"?`${C.gold}20`:u.rol==="marca"?`${m?.color||C.blue}30`:`${C.green}20`,
-                  display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>
-                  {u.rol==="admin"?"👑":u.rol==="marca"?(m?.emoji||"🏷"):"🛒"}
-                </div>
-              );
-            })()}
-            <div style={{flex:1,minWidth:0}}>
-              <div style={{fontSize:15,fontWeight:600,color:C.label,fontFamily:FONT}}>{u.nombre}</div>
-              <div style={{fontSize:13,color:C.label3,fontFamily:FONT}}>
-                @{u.usuario} · {u.rol==="admin"?"Administrador":u.rol==="marca"?`Marca · ${MARCAS.find(m=>m.id===u.marcaId)?.nombre||"?"}` :"Cajero"}
-              </div>
-            </div>
-            <div style={{display:"flex",gap:8,flexShrink:0}}>
-              <button onClick={()=>{setEditUser(u.usuario);setFUser({...u});setModo("editar");}} style={{
-                background:`${C.gold}15`,border:`1px solid ${C.gold}30`,
-                borderRadius:8,padding:"6px 12px",color:C.gold,
-                fontSize:12,fontFamily:FONT,fontWeight:600,cursor:"pointer",
-              }}>Editar</button>
-              {u.usuario!==user.usuario&&(
-                <button onClick={()=>eliminar(u.usuario)} style={{
-                  background:`${C.red}10`,border:`1px solid ${C.red}30`,
-                  borderRadius:8,padding:"6px 12px",color:C.red,
-                  fontSize:12,fontFamily:FONT,fontWeight:600,cursor:"pointer",
-                }}>Eliminar</button>
-              )}
-            </div>
-          </div>
-        ))}
+      {/* ── Header ── */}
+      <div style={{marginBottom:22}}>
+        <div style={{fontSize:24,fontWeight:800,color:C.label,fontFamily:FONT_DISPLAY,
+          letterSpacing:.3,marginBottom:4}}>Configuración</div>
+        <div style={{fontSize:13,color:C.label3,fontFamily:FONT,
+          display:"flex",alignItems:"center",gap:8}}>
+          <span style={{width:7,height:7,borderRadius:"50%",background:C.green,
+            display:"inline-block",boxShadow:`0 0 0 2px ${C.green}30`}}/>
+          {user.nombre} · {ROL_CFG[user.rol]?.label||user.rol}
+        </div>
       </div>
 
-      <IOSBtn onPress={()=>{setFUser({usuario:"",password:"",nombre:"",rol:"caja",marcaId:""});setModo("nuevo");}}
-        variant="primary" full icon="+ ">
-        Agregar nuevo usuario
-      </IOSBtn>
+      {/* ── Tab pills ── */}
+      <div style={{overflowX:"auto",WebkitOverflowScrolling:"touch",
+        marginBottom:22,marginLeft:-16,marginRight:-16,paddingLeft:16}}>
+        <div style={{display:"flex",gap:6,paddingRight:16,minWidth:"max-content"}}>
+          {SETTINGS_TABS.map(t=>(
+            <button key={t.id} onClick={()=>setSubTab(t.id)} style={{
+              display:"flex",alignItems:"center",gap:7,
+              padding:"9px 16px",borderRadius:24,border:"none",cursor:"pointer",
+              background:subTab===t.id?C.label:C.bg2,
+              color:subTab===t.id?"#fff":C.label2,
+              fontFamily:FONT,fontSize:13,fontWeight:subTab===t.id?700:500,
+              flexShrink:0,boxShadow:subTab===t.id?"0 2px 10px rgba(0,0,0,0.18)":"none",
+              transition:"background .15s",WebkitTapHighlightColor:"transparent"}}>
+              <span style={{fontSize:14}}>{t.icon}</span>{t.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* ════ PERFIL ════ */}
+      {subTab==="perfil"&&(
+        <div>
+          <div style={{background:C.bg1,borderRadius:20,padding:20,marginBottom:20,
+            border:`1px solid ${C.sep}`,boxShadow:"0 2px 12px rgba(0,0,0,0.05)"}}>
+            <div style={{display:"flex",alignItems:"center",gap:16,marginBottom:16,
+              paddingBottom:16,borderBottom:`1px solid ${C.sep}`}}>
+              <div style={{width:62,height:62,borderRadius:18,background:`${C.gold}20`,
+                display:"flex",alignItems:"center",justifyContent:"center",fontSize:28,
+                flexShrink:0}}>
+                {user.rol==="admin"?"👑":user.rol==="marca"?"🏷":"🛒"}
+              </div>
+              <div>
+                <div style={{fontSize:20,fontWeight:800,color:C.label,
+                  fontFamily:FONT_DISPLAY,lineHeight:1.2}}>{user.nombre}</div>
+                <div style={{fontSize:13,color:C.label3,fontFamily:FONT,marginTop:3}}>
+                  @{user.usuario}</div>
+                <div style={{marginTop:8,display:"flex",gap:6,flexWrap:"wrap"}}>
+                  {rolBadge(user)}{estadoBadge(user)}
+                </div>
+              </div>
+            </div>
+            {[
+              ["Rol",ROL_CFG[user.rol]?.label||user.rol],
+              ["Sesión iniciada",new Date(user.loginAt||0).toLocaleString("es-BO")],
+            ].map(([k,v])=>(
+              <div key={k} style={{display:"flex",justifyContent:"space-between",
+                padding:"9px 0",borderBottom:`1px solid ${C.sep}`}}>
+                <span style={{fontSize:13,color:C.label3,fontFamily:FONT}}>{k}</span>
+                <span style={{fontSize:13,fontWeight:600,color:C.label,fontFamily:FONT}}>{v}</span>
+              </div>
+            ))}
+          </div>
+          <PanelCambiarPass user={user} usuarios={usuarios}
+            onGuardar={u=>guardarUsuarios(u,"Cambió su contraseña",user.usuario)}/>
+        </div>
+      )}
+
+      {/* ════ EQUIPO (admin) ════ */}
+      {subTab==="equipo"&&isAdmin&&(
+        <div>
+          {/* Stats */}
+          <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8,marginBottom:20}}>
+            {[
+              {l:"Total",  v:usuarios.length,                              i:"👥"},
+              {l:"Admin",  v:usuarios.filter(u=>u.rol==="admin").length,   i:"👑"},
+              {l:"Staff",  v:usuarios.filter(u=>u.rol==="caja").length,    i:"🛒"},
+              {l:"Brands", v:usuarios.filter(u=>u.rol==="marca").length,   i:"🏷"},
+            ].map(s=>(
+              <div key={s.l} style={{background:C.bg1,borderRadius:14,padding:"10px 8px",
+                textAlign:"center",border:`1px solid ${C.sep}`,
+                boxShadow:"0 1px 6px rgba(0,0,0,0.04)"}}>
+                <div style={{fontSize:18,marginBottom:2}}>{s.i}</div>
+                <div style={{fontSize:22,fontWeight:800,color:C.label,
+                  fontFamily:FONT_DISPLAY,lineHeight:1}}>{s.v}</div>
+                <div style={{fontSize:9,color:C.label3,fontFamily:FONT,marginTop:2,
+                  textTransform:"uppercase",letterSpacing:.3}}>{s.l}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* Botón agregar */}
+          <button onClick={()=>setModalAdd(true)} style={{
+            width:"100%",padding:"13px",borderRadius:14,
+            border:`1.5px dashed ${C.gold}60`,background:`${C.gold}08`,
+            cursor:"pointer",fontSize:14,fontWeight:700,color:C.gold,
+            fontFamily:FONT,marginBottom:20,display:"flex",
+            alignItems:"center",justifyContent:"center",gap:8,
+            WebkitTapHighlightColor:"transparent"}}>
+            <span style={{fontSize:20,lineHeight:1}}>+</span> Agregar usuario
+          </button>
+
+          {/* Lista */}
+          <div style={{display:"flex",flexDirection:"column",gap:8}}>
+            {usuarios.map(u=>{
+              const m=u.rol==="marca"?MARCAS.find(x=>x.id===Number(u.marcaId)):null;
+              const open=menuAbierto===u.usuario;
+              return (
+                <div key={u.usuario} style={{background:C.bg1,borderRadius:18,
+                  border:`1px solid ${C.sep}`,overflow:"hidden",
+                  boxShadow:"0 1px 8px rgba(0,0,0,0.05)",
+                  opacity:u.estado==="inactivo"?0.65:1}}>
+                  <div style={{padding:"14px 16px",display:"flex",
+                    alignItems:"center",gap:14}}>
+                    {avatarU(u)}
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{display:"flex",alignItems:"center",gap:7,
+                        flexWrap:"wrap",marginBottom:4}}>
+                        <span style={{fontSize:15,fontWeight:700,color:C.label,
+                          fontFamily:FONT}}>{u.nombre}</span>
+                        {rolBadge(u)}{estadoBadge(u)}
+                      </div>
+                      <div style={{fontSize:12,color:C.label3,fontFamily:FONT}}>
+                        @{u.usuario}
+                        {m&&<span style={{marginLeft:6,color:m.color}}>
+                          · {m.emoji} {m.nombre}</span>}
+                      </div>
+                    </div>
+                    <div style={{display:"flex",gap:6,flexShrink:0}}>
+                      <button onClick={()=>setEditando(u)}
+                        style={{padding:"6px 12px",borderRadius:10,
+                          border:`1px solid ${C.sep}`,background:C.bg2,
+                          cursor:"pointer",fontSize:12,fontWeight:600,
+                          color:C.label2,fontFamily:FONT,
+                          WebkitTapHighlightColor:"transparent"}}>
+                        Editar
+                      </button>
+                      <button onClick={()=>setMenuAbierto(open?null:u.usuario)}
+                        style={{width:32,height:32,borderRadius:10,
+                          border:`1px solid ${C.sep}`,
+                          background:open?C.label:C.bg2,cursor:"pointer",
+                          fontSize:18,color:open?"#fff":C.label2,
+                          display:"flex",alignItems:"center",justifyContent:"center",
+                          WebkitTapHighlightColor:"transparent",lineHeight:1}}>
+                        ⋯
+                      </button>
+                    </div>
+                  </div>
+                  {open&&(
+                    <div style={{borderTop:`1px solid ${C.sep}`,background:C.bg2,
+                      padding:"10px 12px",display:"flex",gap:8,flexWrap:"wrap"}}>
+                      <button onClick={()=>setConfirmAct({
+                          type:"reset",user:u,
+                          msg:`¿Resetear la contraseña de ${u.nombre}?\nSe generará una contraseña temporal.`,
+                          onConfirm:()=>handleResetPass(u),
+                        })}
+                        style={{padding:"8px 14px",borderRadius:10,
+                          border:`1px solid ${C.amber}40`,background:`${C.amber}12`,
+                          cursor:"pointer",fontSize:12,fontWeight:600,color:C.amber,
+                          fontFamily:FONT,WebkitTapHighlightColor:"transparent"}}>
+                        🔑 Reset contraseña
+                      </button>
+                      {u.usuario!==user.usuario&&(
+                        <button onClick={()=>setConfirmAct({
+                            type:"toggle",user:u,
+                            msg:`¿${u.estado==="inactivo"?"Activar":"Desactivar"} la cuenta de ${u.nombre}?`,
+                            onConfirm:()=>handleToggle(u),
+                          })}
+                          style={{padding:"8px 14px",borderRadius:10,
+                            border:`1px solid ${u.estado==="inactivo"?C.green:C.amber}40`,
+                            background:u.estado==="inactivo"?`${C.green}12`:`${C.amber}12`,
+                            cursor:"pointer",fontSize:12,fontWeight:600,
+                            color:u.estado==="inactivo"?C.green:C.amber,
+                            fontFamily:FONT,WebkitTapHighlightColor:"transparent"}}>
+                          {u.estado==="inactivo"?"✅ Activar":"⏸ Desactivar"}
+                        </button>
+                      )}
+                      {u.usuario!==user.usuario&&(
+                        <button onClick={()=>setConfirmAct({
+                            type:"delete",user:u,
+                            msg:`¿Eliminar permanentemente a ${u.nombre} (@${u.usuario})?\nEsta acción no se puede deshacer.`,
+                            onConfirm:()=>handleEliminar(u),
+                          })}
+                          style={{padding:"8px 14px",borderRadius:10,
+                            border:`1px solid ${C.red}40`,background:`${C.red}10`,
+                            cursor:"pointer",fontSize:12,fontWeight:600,color:C.red,
+                            fontFamily:FONT,WebkitTapHighlightColor:"transparent"}}>
+                          🗑 Eliminar
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ════ AUDITORÍA (admin) ════ */}
+      {subTab==="auditoria"&&isAdmin&&(
+        <div>
+          <div style={{display:"flex",justifyContent:"space-between",
+            alignItems:"center",marginBottom:14}}>
+            <div>
+              <div style={{fontSize:15,fontWeight:700,color:C.label,fontFamily:FONT}}>
+                Registro de actividad
+              </div>
+              <div style={{fontSize:12,color:C.label3,fontFamily:FONT,marginTop:2}}>
+                {auditLog.length} entradas · últimas 200 acciones
+              </div>
+            </div>
+            {auditLog.length>0&&(
+              <button onClick={()=>{localStorage.removeItem(AUDIT_KEY);
+                setAuditLog([]);}}
+                style={{padding:"6px 12px",borderRadius:10,border:`1px solid ${C.sep}`,
+                  background:C.bg2,fontSize:11,color:C.label3,
+                  fontFamily:FONT,cursor:"pointer"}}>Limpiar</button>
+            )}
+          </div>
+          {auditLog.length===0
+            ? <div style={{textAlign:"center",padding:"48px 0",color:C.label3}}>
+                <div style={{fontSize:36,marginBottom:8,opacity:.3}}>📋</div>
+                <div style={{fontFamily:FONT,fontSize:14}}>Sin actividad registrada</div>
+              </div>
+            : <div style={{background:C.bg1,borderRadius:16,overflow:"hidden",
+                border:`1px solid ${C.sep}`,
+                boxShadow:"0 1px 6px rgba(0,0,0,0.04)"}}>
+                {auditLog.slice(0,50).map((log,i)=>(
+                  <div key={log.id} style={{
+                    display:"grid",gridTemplateColumns:"8px 1fr",
+                    gap:"0 14px",padding:"11px 16px",alignItems:"start",
+                    borderBottom:i<auditLog.slice(0,50).length-1
+                      ?`1px solid ${C.sep}`:""}}>
+                    <div style={{width:8,height:8,borderRadius:"50%",
+                      background:C.gold,marginTop:5}}/>
+                    <div>
+                      <div style={{display:"flex",justifyContent:"space-between",
+                        gap:8,marginBottom:2}}>
+                        <span style={{fontSize:13,fontWeight:600,color:C.label,
+                          fontFamily:FONT}}>{log.accion}</span>
+                        <span style={{fontSize:10,color:C.label3,fontFamily:FONT,
+                          flexShrink:0}}>{log.fecha}</span>
+                      </div>
+                      <div style={{fontSize:11,color:C.label3,fontFamily:FONT}}>
+                        @{log.afectado} · por {log.admin}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+          }
+        </div>
+      )}
+
+      {/* ════ SEGURIDAD ════ */}
+      {subTab==="seguridad"&&(
+        <div>
+          <div style={{background:C.bg1,borderRadius:16,padding:16,
+            border:`1px solid ${C.sep}`,marginBottom:20,
+            boxShadow:"0 1px 6px rgba(0,0,0,0.04)"}}>
+            <div style={{fontSize:13,fontWeight:700,color:C.label,
+              fontFamily:FONT,marginBottom:12,display:"flex",
+              alignItems:"center",gap:6}}>
+              🔐 Sesión activa
+            </div>
+            {[
+              ["Usuario",`@${user.usuario}`],
+              ["Rol",ROL_CFG[user.rol]?.label||user.rol],
+              ["Login",new Date(user.loginAt||0).toLocaleString("es-BO")],
+            ].map(([k,v])=>(
+              <div key={k} style={{display:"flex",justifyContent:"space-between",
+                padding:"9px 0",borderBottom:`1px solid ${C.sep}`}}>
+                <span style={{fontSize:13,color:C.label3,fontFamily:FONT}}>{k}</span>
+                <span style={{fontSize:13,fontWeight:600,color:C.label,
+                  fontFamily:FONT}}>{v}</span>
+              </div>
+            ))}
+          </div>
+          <PanelCambiarPass user={user} usuarios={usuarios}
+            onGuardar={u=>guardarUsuarios(u,"Cambió su contraseña",user.usuario)}/>
+        </div>
+      )}
+
+      {/* ════ SISTEMA ════ */}
+      {subTab==="sistema"&&(
+        <div>
+          <div style={{background:C.bg1,borderRadius:16,overflow:"hidden",
+            border:`1px solid ${C.sep}`,marginBottom:20,
+            boxShadow:"0 1px 6px rgba(0,0,0,0.04)"}}>
+            {[
+              ["Versión","Toscana House OS v3.1"],
+              ["Base de datos","Supabase (nube)"],
+              ["Almacenamiento","localStorage"],
+              ["Usuario activo",user.nombre],
+              ["Rol",ROL_CFG[user.rol]?.label||user.rol],
+            ].map(([k,v],i,arr)=>(
+              <div key={k} style={{display:"flex",justifyContent:"space-between",
+                padding:"13px 16px",
+                borderBottom:i<arr.length-1?`1px solid ${C.sep}`:""}}>
+                <span style={{fontSize:14,color:C.label2,fontFamily:FONT}}>{k}</span>
+                <span style={{fontSize:14,fontWeight:500,color:C.label,
+                  fontFamily:FONT}}>{v}</span>
+              </div>
+            ))}
+          </div>
+          <button onClick={logout} style={{
+            width:"100%",padding:"14px",borderRadius:14,
+            border:`1.5px solid ${C.red}30`,background:`${C.red}10`,
+            cursor:"pointer",fontSize:14,fontWeight:700,color:C.red,
+            fontFamily:FONT,display:"flex",alignItems:"center",
+            justifyContent:"center",gap:8,
+            WebkitTapHighlightColor:"transparent"}}>
+            🚪 Cerrar sesión
+          </button>
+        </div>
+      )}
+
+      {/* ════ FACTURACIÓN ════ */}
+      {subTab==="factura"&&(
+        <div>
+          <FacturacionConfig/>
+          <div style={{padding:14,background:`${C.blue}08`,borderRadius:14,
+            border:`1px solid ${C.blue}20`,marginTop:16}}>
+            <div style={{fontSize:13,fontWeight:700,color:C.blue,
+              fontFamily:FONT,marginBottom:8}}>🏢 Datos del emisor</div>
+            {[
+              ["Razón Social","SYLVIA CAROLINA GRANIER ZALLES"],
+              ["NIT Emisor",NIT_EMPRESA],
+              ["Sucursal",SUCURSAL_EMP],
+              ["Dirección",DIRECCION_EMP],
+            ].map(([k,v])=>(
+              <div key={k} style={{display:"flex",justifyContent:"space-between",
+                padding:"7px 0",borderBottom:`1px solid ${C.sep}`}}>
+                <span style={{fontSize:12,color:C.label3,fontFamily:FONT}}>{k}</span>
+                <span style={{fontSize:12,fontWeight:600,color:C.label,
+                  fontFamily:FONT}}>{v}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ════ MODALES ════ */}
+
+      {/* Add / Edit usuario */}
+      {(modalAdd||editando)&&(
+        <UserFormModal
+          editUser={editando}
+          usuarios={usuarios}
+          onClose={()=>{setModalAdd(false);setEditando(null);}}
+          onGuardar={handleGuardarUsuario}
+        />
+      )}
+
+      {/* Confirm acción sensible */}
+      {confirmAct&&(
+        <div style={{position:"fixed",inset:0,zIndex:700,
+          background:"rgba(0,0,0,0.5)",backdropFilter:"blur(8px)",
+          display:"flex",alignItems:"center",justifyContent:"center",
+          padding:20}}>
+          <div style={{background:C.bg1,borderRadius:28,padding:28,
+            maxWidth:360,width:"100%",
+            boxShadow:"0 28px 70px rgba(0,0,0,0.25)"}}>
+            <div style={{fontSize:44,textAlign:"center",marginBottom:14}}>
+              {confirmAct.type==="delete"?"🗑️":
+               confirmAct.type==="reset"?"🔑":"⚠️"}
+            </div>
+            <div style={{fontSize:17,fontWeight:800,color:C.label,fontFamily:FONT,
+              textAlign:"center",marginBottom:8,lineHeight:1.4}}>
+              {confirmAct.type==="delete"?"Eliminar usuario":
+               confirmAct.type==="reset"?"Resetear contraseña":
+               "Cambiar estado"}
+            </div>
+            <div style={{fontSize:14,color:C.label2,fontFamily:FONT,
+              textAlign:"center",marginBottom:28,lineHeight:1.6,
+              whiteSpace:"pre-line"}}>
+              {confirmAct.msg}
+            </div>
+            <div style={{display:"flex",gap:10}}>
+              <button onClick={()=>{setConfirmAct(null);setMenuAbierto(null);}}
+                style={{flex:1,padding:"13px",borderRadius:14,
+                  border:`1.5px solid ${C.sep}`,background:C.bg2,
+                  cursor:"pointer",fontSize:14,fontWeight:600,
+                  color:C.label2,fontFamily:FONT,
+                  WebkitTapHighlightColor:"transparent"}}>
+                Cancelar
+              </button>
+              <button onClick={confirmAct.onConfirm}
+                style={{flex:1,padding:"13px",borderRadius:14,border:"none",
+                  background:confirmAct.type==="delete"?C.red:
+                             confirmAct.type==="reset"?C.amber:C.green,
+                  cursor:"pointer",fontSize:14,fontWeight:700,
+                  color:"#fff",fontFamily:FONT,
+                  WebkitTapHighlightColor:"transparent"}}>
+                {confirmAct.type==="delete"?"Eliminar":
+                 confirmAct.type==="reset"?"Resetear":
+                 "Confirmar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Temp password reveal */}
+      {tempPass&&(
+        <div style={{position:"fixed",inset:0,zIndex:700,
+          background:"rgba(0,0,0,0.5)",backdropFilter:"blur(8px)",
+          display:"flex",alignItems:"center",justifyContent:"center",
+          padding:20}}>
+          <div style={{background:C.bg1,borderRadius:28,padding:28,
+            maxWidth:360,width:"100%",
+            boxShadow:"0 28px 70px rgba(0,0,0,0.25)"}}>
+            <div style={{fontSize:44,textAlign:"center",marginBottom:12}}>🔑</div>
+            <div style={{fontSize:18,fontWeight:800,color:C.label,fontFamily:FONT,
+              textAlign:"center",marginBottom:6}}>Contraseña temporal</div>
+            <div style={{fontSize:13,color:C.label3,fontFamily:FONT,
+              textAlign:"center",marginBottom:20,lineHeight:1.5}}>
+              Entregá esta contraseña a{" "}
+              <strong style={{color:C.label}}>{tempPass.nombre}</strong>.
+              Solo se muestra una vez.
+            </div>
+            <div style={{background:C.bg0,borderRadius:16,padding:"18px 20px",
+              textAlign:"center",marginBottom:16,
+              border:`2.5px solid ${C.gold}50`}}>
+              <div style={{fontSize:10,color:C.label3,fontFamily:FONT,
+                marginBottom:6,textTransform:"uppercase",letterSpacing:.6}}>
+                Contraseña temporal · @{tempPass.usuario}
+              </div>
+              <div style={{fontSize:26,fontWeight:900,fontFamily:"monospace",
+                color:C.gold,letterSpacing:4}}>
+                {tempPass.password}
+              </div>
+            </div>
+            <div style={{background:`${C.amber}12`,borderRadius:12,
+              padding:"10px 14px",marginBottom:20,
+              border:`1px solid ${C.amber}30`}}>
+              <div style={{fontSize:12,color:C.amber,fontFamily:FONT,lineHeight:1.5}}>
+                ⚠️ Copiá esta contraseña ahora.
+                No podrás volver a verla.
+              </div>
+            </div>
+            <button onClick={()=>setTempPass(null)}
+              style={{width:"100%",padding:"14px",borderRadius:14,border:"none",
+                background:C.label,cursor:"pointer",fontSize:14,fontWeight:700,
+                color:C.bg0,fontFamily:FONT,
+                WebkitTapHighlightColor:"transparent"}}>
+              Entendido · Cerrar
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
