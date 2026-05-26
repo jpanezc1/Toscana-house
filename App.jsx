@@ -5917,6 +5917,24 @@ function App(){
             </div>
           }
         />
+      ):tab==="marcas"?(
+        <NavBar
+          title="Marcas"
+          subtitle={`${marcasState.length} marcas en tienda`}
+          right={
+            user.rol==="admin"&&(
+              <button onClick={()=>{setEditMarca(null);setModalNuevaMarca(true);}}
+                style={{display:"flex",alignItems:"center",gap:5,
+                  padding:"7px 14px",borderRadius:20,border:"none",
+                  background:C.gold,color:"#fff",cursor:"pointer",
+                  fontSize:13,fontWeight:700,fontFamily:FONT,
+                  boxShadow:`0 2px 10px ${C.gold}45`,
+                  WebkitTapHighlightColor:"transparent"}}>
+                <span style={{fontSize:17,lineHeight:1,fontWeight:300}}>+</span> Añadir
+              </button>
+            )
+          }
+        />
       ):(
         <NavBar
           title="Toscana House"
@@ -5972,30 +5990,16 @@ function App(){
         {/* MARCAS — lista */}
         {tab==="marcas" && !marcaDetalle && (
           <div>
-            {/* Header con contador + botón admin */}
-            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",
-              marginBottom:14}}>
+            {/* Contador de estados */}
+            {marcasState.filter(m=>m.estado==="inactiva").length>0&&(
               <div style={{fontSize:13,fontWeight:600,color:C.label3,textTransform:"uppercase",
-                letterSpacing:.8,paddingLeft:4}}>
-                {marcasState.filter(m=>m.estado!=="inactiva").length} marca{marcasState.filter(m=>m.estado!=="inactiva").length!==1?"s":""} activa{marcasState.filter(m=>m.estado!=="inactiva").length!==1?"s":""}
-                {marcasState.filter(m=>m.estado==="inactiva").length>0&&(
-                  <span style={{color:C.label3,fontWeight:400}}>
-                    {" "}· {marcasState.filter(m=>m.estado==="inactiva").length} inactiva{marcasState.filter(m=>m.estado==="inactiva").length!==1?"s":""}
-                  </span>
-                )}
+                letterSpacing:.8,paddingLeft:4,marginBottom:12}}>
+                {marcasState.filter(m=>m.estado!=="inactiva").length} activa{marcasState.filter(m=>m.estado!=="inactiva").length!==1?"s":""}
+                <span style={{fontWeight:400}}>
+                  {" "}· {marcasState.filter(m=>m.estado==="inactiva").length} inactiva{marcasState.filter(m=>m.estado==="inactiva").length!==1?"s":""}
+                </span>
               </div>
-              {user.rol==="admin"&&(
-                <button onClick={()=>{setEditMarca(null);setModalNuevaMarca(true);}}
-                  style={{display:"flex",alignItems:"center",gap:7,
-                    padding:"8px 16px",borderRadius:20,border:"none",
-                    background:C.gold,color:"#fff",cursor:"pointer",
-                    fontSize:13,fontWeight:700,fontFamily:FONT,
-                    boxShadow:`0 2px 12px ${C.gold}40`,
-                    WebkitTapHighlightColor:"transparent"}}>
-                  <span style={{fontSize:15,fontWeight:400}}>+</span> Añadir marca
-                </button>
-              )}
-            </div>
+            )}
 
             <div style={{display:"flex",flexDirection:"column",gap:2}}>
               {marcasState.map((m,i)=>{

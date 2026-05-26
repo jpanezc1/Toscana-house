@@ -27627,6 +27627,39 @@ Fecha: ${venta.fecha}`);
           generando ? "\u2026" : "\u{1F4CA} Excel"
         ))
       }
+    ) : tab === "marcas" ? /* @__PURE__ */ import_react.default.createElement(
+      NavBar,
+      {
+        title: "Marcas",
+        subtitle: `${marcasState.length} marcas en tienda`,
+        right: user.rol === "admin" && /* @__PURE__ */ import_react.default.createElement(
+          "button",
+          {
+            onClick: () => {
+              setEditMarca(null);
+              setModalNuevaMarca(true);
+            },
+            style: {
+              display: "flex",
+              alignItems: "center",
+              gap: 5,
+              padding: "7px 14px",
+              borderRadius: 20,
+              border: "none",
+              background: C.gold,
+              color: "#fff",
+              cursor: "pointer",
+              fontSize: 13,
+              fontWeight: 700,
+              fontFamily: FONT,
+              boxShadow: `0 2px 10px ${C.gold}45`,
+              WebkitTapHighlightColor: "transparent"
+            }
+          },
+          /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 17, lineHeight: 1, fontWeight: 300 } }, "+"),
+          " A\xF1adir"
+        )
+      }
     ) : /* @__PURE__ */ import_react.default.createElement(
       NavBar,
       {
@@ -27685,45 +27718,15 @@ Fecha: ${venta.fecha}`);
       setShBaja(true);
       setBajaMsg(null);
       setBajaCod("");
-    }, onImportarExcel: () => setShImportarExcel(true) }), tab === "marcas" && !marcaDetalle && /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "space-between",
-      marginBottom: 14
-    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+    }, onImportarExcel: () => setShImportarExcel(true) }), tab === "marcas" && !marcaDetalle && /* @__PURE__ */ import_react.default.createElement("div", null, marcasState.filter((m) => m.estado === "inactiva").length > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: {
       fontSize: 13,
       fontWeight: 600,
       color: C.label3,
       textTransform: "uppercase",
       letterSpacing: 0.8,
-      paddingLeft: 4
-    } }, marcasState.filter((m) => m.estado !== "inactiva").length, " marca", marcasState.filter((m) => m.estado !== "inactiva").length !== 1 ? "s" : "", " activa", marcasState.filter((m) => m.estado !== "inactiva").length !== 1 ? "s" : "", marcasState.filter((m) => m.estado === "inactiva").length > 0 && /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.label3, fontWeight: 400 } }, " ", "\xB7 ", marcasState.filter((m) => m.estado === "inactiva").length, " inactiva", marcasState.filter((m) => m.estado === "inactiva").length !== 1 ? "s" : "")), user.rol === "admin" && /* @__PURE__ */ import_react.default.createElement(
-      "button",
-      {
-        onClick: () => {
-          setEditMarca(null);
-          setModalNuevaMarca(true);
-        },
-        style: {
-          display: "flex",
-          alignItems: "center",
-          gap: 7,
-          padding: "8px 16px",
-          borderRadius: 20,
-          border: "none",
-          background: C.gold,
-          color: "#fff",
-          cursor: "pointer",
-          fontSize: 13,
-          fontWeight: 700,
-          fontFamily: FONT,
-          boxShadow: `0 2px 12px ${C.gold}40`,
-          WebkitTapHighlightColor: "transparent"
-        }
-      },
-      /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 15, fontWeight: 400 } }, "+"),
-      " A\xF1adir marca"
-    )), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 2 } }, marcasState.map((m, i) => {
+      paddingLeft: 4,
+      marginBottom: 12
+    } }, marcasState.filter((m) => m.estado !== "inactiva").length, " activa", marcasState.filter((m) => m.estado !== "inactiva").length !== 1 ? "s" : "", /* @__PURE__ */ import_react.default.createElement("span", { style: { fontWeight: 400 } }, " ", "\xB7 ", marcasState.filter((m) => m.estado === "inactiva").length, " inactiva", marcasState.filter((m) => m.estado === "inactiva").length !== 1 ? "s" : "")), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 2 } }, marcasState.map((m, i) => {
       const total = vMes.reduce((s, v) => s + v.items.filter((it) => it.marcaId === m.id).reduce((ss, it) => ss + it.subtotal, 0), 0);
       const prods = inv.filter((it) => it.marcaId === m.id).filter((p) => p.stock > 0).length;
       const cerrado = cierres[`${MK}-${m.id}`]?.cerrado;
