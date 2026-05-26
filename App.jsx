@@ -556,35 +556,35 @@ function DriveIndicator({ syncing, connected }) {
 
 // ── Paleta Luxury — Toscana House (warm ivory / champagne gold) ──
 const C = {
-  bg0:   "#FAF9F7",    // warm ivory — main background
+  bg0:   "#FCFAF7",    // warm-white — main background
   bg1:   "#FFFFFF",    // white — cards
-  bg2:   "#F5F1EB",    // stone — secondary bg
+  bg2:   "#F5F1EB",    // ivory — secondary bg
   bg3:   "#EDE8DF",    // warm beige — tertiary
-  label:    "#1A1714", // warm black — primary text
-  label2:   "#44403C", // graphite — secondary text
-  label3:   "#78716C", // stone gray — muted text
-  label4:   "rgba(26,23,20,0.12)",
-  sep:   "rgba(120,113,108,0.13)",
-  sepH:  "rgba(120,113,108,0.26)",
-  // Warm champagne gold — primary accent (replaces blue)
+  label:    "#171717", // soft-black — primary text
+  label2:   "#2B2B2B", // graphite — secondary text
+  label3:   "#9B8F83", // stone — muted text
+  label4:   "rgba(23,23,23,0.10)",
+  sep:   "rgba(0,0,0,0.08)",
+  sepH:  "rgba(0,0,0,0.15)",
+  // Warm champagne gold — primary accent
   gold:  "#9A7B4F",
   goldL: "#B8965E",
   goldD: "#7A5F38",
   accent:"#D4B896",
-  cream: "#FAF9F7",
+  cream: "#FCFAF7",
   green: "#2D6A4F",
   red:   "#9B2335",
   blue:  "#1E3A5F",
   amber: "#92400E",
   indigo:"#4A3D8F",
-  // Tab accent colors — rich, sophisticated
-  tabPos:"#1A1714",
+  // Tab accent colors
+  tabPos:"#171717",
   tabInv:"#2D6A4F",
   tabMar:"#6B4E71",
   tabVen:"#1E3A5F",
   tabLiq:"#9B2335",
   // Fill tints
-  fill1: "rgba(154,123,79,0.05)",
+  fill1: "rgba(154,123,79,0.04)",
   fill2: "rgba(154,123,79,0.09)",
   fill3: "rgba(154,123,79,0.15)",
   // Status backgrounds
@@ -1417,9 +1417,9 @@ function verNotaVenta(v,n){abrirNotaVenta(v,n,false);}
 // iOS DESIGN ATOMS
 // ══════════════════════════════════════════════════════════
 
-// Font stack — unified DM Sans for professional/clean look
-const FONT = "'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
-const FONT_UI = "'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+// Font stack — Inter para UI, Cormorant para display editorial
+const FONT = "'Inter', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif";
+const FONT_UI = "'Inter', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif";
 const FONT_DISPLAY = "'Cormorant Garamond', Georgia, 'Times New Roman', serif";
 
 // Logo SVG inline de Toscana House
@@ -1475,22 +1475,22 @@ function MarcaEditBtn({ onClick, accentColor }){
       onMouseLeave={()=>setHov(false)}
       title="Editar marca"
       style={{
-        padding:"0 10px",
+        padding:"0 12px",
         height:28,
         borderRadius:20,
-        border:`1px solid ${hov ? accentColor+"55" : "rgba(120,113,108,0.18)"}`,
-        background: hov ? accentColor+"12" : "transparent",
+        border:`1px solid ${hov ? accentColor+"50" : C.sep}`,
+        background: hov ? accentColor+"10" : "transparent",
         cursor:"pointer",
         display:"flex", alignItems:"center", justifyContent:"center",
         gap:4,
         transition:"background .18s, border-color .18s, color .18s",
         WebkitTapHighlightColor:"transparent",
         flexShrink:0,
-        fontSize:11,
-        fontWeight:500,
-        letterSpacing:"0.06em",
+        fontSize:10,
+        fontWeight:600,
+        letterSpacing:"0.08em",
         fontFamily:FONT,
-        color: hov ? accentColor : "rgba(120,113,108,0.7)",
+        color: hov ? accentColor : C.label3,
         textTransform:"uppercase",
       }}>
       Editar
@@ -1600,41 +1600,42 @@ function DotsMenu({ items, open, onToggle, align="right" }){
 // iOS-style pill badge
 function Chip({children, color=C.gold, small}){
   return <span style={{
-    background:`${color}30`, color,
-    border:`1px solid ${color}40`,
-    borderRadius:20, padding: small?"1px 8px":"3px 10px",
-    fontSize: small?10:12, fontWeight:600, fontFamily:FONT,
-    letterSpacing:.2, whiteSpace:"nowrap",
+    background:`${color}14`, color,
+    border:`1px solid ${color}28`,
+    borderRadius:20, padding: small?"2px 8px":"4px 11px",
+    fontSize: small?9.5:11, fontWeight:600, fontFamily:FONT,
+    letterSpacing:"0.04em", whiteSpace:"nowrap",
+    textTransform:"uppercase",
   }}>{children}</span>;
 }
 
-// iOS-style grouped list cell
+// List cell — editorial premium
 function Cell({icon,iconBg,label,value,chevron,onPress,danger,first,last,badge}){
   const {pressed,...handlers}=usePress(onPress);
   return (
     <div {...handlers} style={{
-      background: pressed?C.fill3:C.bg2,
-      padding:"14px 16px",
-      borderRadius: first&&last?"14px":first?"14px 14px 0 0":last?"0 0 14px 14px":"0",
-      display:"flex",alignItems:"center",gap:14,
+      background: pressed?"rgba(0,0,0,0.03)":"rgba(255,255,255,0.75)",
+      padding:"13px 16px",
+      borderRadius: first&&last?"16px":first?"16px 16px 0 0":last?"0 0 16px 16px":"0",
+      display:"flex",alignItems:"center",gap:13,
       cursor:onPress?"pointer":"default",
       transition:"background .12s",
-      borderBottom: last?"":`1px solid ${C.sep}`,
+      borderBottom: last?"none":`1px solid ${C.sep}`,
       userSelect:"none", WebkitTapHighlightColor:"transparent",
     }}>
       {icon&&<div style={{
-        width:32,height:32,borderRadius:8,
-        background:iconBg||`${C.gold}30`,
+        width:32,height:32,borderRadius:9,
+        background:iconBg||`${C.gold}14`,border:`1px solid ${C.gold}20`,
         display:"flex",alignItems:"center",justifyContent:"center",
-        fontSize:16,flexShrink:0,
+        fontSize:15,flexShrink:0,
       }}>{icon}</div>}
       <div style={{flex:1,minWidth:0}}>
-        <div style={{fontSize:16,fontWeight:400,color:danger?C.red:C.label,fontFamily:FONT,
-          overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{label}</div>
+        <div style={{fontSize:15,fontWeight:500,color:danger?C.red:C.label,fontFamily:FONT,
+          overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",letterSpacing:"-0.01em"}}>{label}</div>
       </div>
       {badge&&<Chip color={C.gold} small>{badge}</Chip>}
-      {value&&<span style={{fontSize:16,color:C.label2,fontFamily:FONT}}>{value}</span>}
-      {chevron&&<span style={{color:C.label3,fontSize:18,fontWeight:400}}>›</span>}
+      {value&&<span style={{fontSize:14,color:C.label3,fontFamily:FONT,fontWeight:400}}>{value}</span>}
+      {chevron&&<span style={{color:C.label3,fontSize:16,fontWeight:400,opacity:.6}}>›</span>}
     </div>
   );
 }
@@ -1643,13 +1644,13 @@ function Cell({icon,iconBg,label,value,chevron,onPress,danger,first,last,badge})
 function NavBar({title, subtitle, back, onBack, right}){
   return (
     <div style={{
-      background:"rgba(250,249,247,0.96)",
-      backdropFilter:"blur(20px) saturate(180%)",
-      WebkitBackdropFilter:"blur(20px) saturate(180%)",
-      borderBottom:"1px solid rgba(120,113,108,0.10)",
-      padding:"0 18px",
+      background:"rgba(252,250,247,0.94)",
+      backdropFilter:"blur(24px) saturate(200%)",
+      WebkitBackdropFilter:"blur(24px) saturate(200%)",
+      borderBottom:`1px solid ${C.sep}`,
+      padding:"0 16px",
       position:"sticky",top:0,zIndex:100,
-      display:"flex",alignItems:"center",minHeight:52,
+      display:"flex",alignItems:"center",minHeight:50,
       gap:10,
     }}>
       {back&&(
@@ -1657,20 +1658,20 @@ function NavBar({title, subtitle, back, onBack, right}){
           background:"none",border:"none",
           color:C.label3,fontSize:13,fontFamily:FONT,fontWeight:500,
           cursor:"pointer",padding:"8px 0",
-          display:"flex",alignItems:"center",gap:3,
+          display:"flex",alignItems:"center",gap:4,
           WebkitTapHighlightColor:"transparent",
-          minWidth:44,letterSpacing:.2,
+          minWidth:44,letterSpacing:"-0.01em",
         }}>
-          <span style={{fontSize:20,lineHeight:1,marginTop:-1,opacity:.6}}>‹</span>
-          {typeof back==="string"?<span style={{opacity:.75}}>{back}</span>:""}
+          <span style={{fontSize:18,lineHeight:1,opacity:.7}}>‹</span>
+          {typeof back==="string"?<span style={{opacity:.8}}>{back}</span>:""}
         </button>
       )}
       <div style={{flex:1,textAlign:"center"}}>
         <div style={{
-          fontSize:15,fontWeight:600,color:C.label,
-          fontFamily:FONT_UI,letterSpacing:"0.01em",lineHeight:1.2,
+          fontSize:14,fontWeight:600,color:C.label,
+          fontFamily:FONT,letterSpacing:"-0.01em",lineHeight:1.2,
         }}>{title}</div>
-        {subtitle&&<div style={{fontSize:10.5,color:C.label3,fontFamily:FONT,marginTop:1,letterSpacing:.3}}>{subtitle}</div>}
+        {subtitle&&<div style={{fontSize:10,color:C.label3,fontFamily:FONT,marginTop:2,letterSpacing:"0.04em",textTransform:"uppercase"}}>{subtitle}</div>}
       </div>
       <div style={{minWidth:back?44:0,display:"flex",justifyContent:"flex-end"}}>{right}</div>
     </div>
@@ -1682,13 +1683,13 @@ function TabBar({tabs, active, onChange}){
   return (
     <div style={{
       position:"fixed",bottom:0,left:0,right:0,zIndex:200,
-      background:"rgba(250,249,247,0.97)",
-      backdropFilter:"blur(28px) saturate(180%)",
-      WebkitBackdropFilter:"blur(28px) saturate(180%)",
-      borderTop:"1px solid rgba(120,113,108,0.12)",
+      background:"rgba(252,250,247,0.97)",
+      backdropFilter:"blur(32px) saturate(200%)",
+      WebkitBackdropFilter:"blur(32px) saturate(200%)",
+      borderTop:`1px solid ${C.sep}`,
       display:"flex",justifyContent:"center",alignItems:"stretch",
       paddingBottom:"env(safe-area-inset-bottom,8px)",
-      boxShadow:"0 -4px 20px rgba(0,0,0,0.06)",
+      boxShadow:"0 -1px 0 rgba(0,0,0,0.05), 0 -8px 24px rgba(0,0,0,0.04)",
     }}>
       <div style={{display:"flex",width:"100%",maxWidth:560}}>
         {tabs.map(t=>{
@@ -1718,23 +1719,24 @@ function TabBar({tabs, active, onChange}){
 
               {/* Icon container */}
               <div style={{
-                width:32,height:28,
-                borderRadius:8,
-                background: isActive ? "rgba(154,123,79,0.14)" : "transparent",
+                width:34,height:28,
+                borderRadius:9,
+                background: isActive ? `${C.gold}14` : "transparent",
                 display:"flex",alignItems:"center",justifyContent:"center",
                 fontSize:17,lineHeight:1,
                 transition:"background .2s",
-                opacity: isActive ? 1 : 0.38,
+                opacity: isActive ? 1 : 0.36,
               }}>{t.icon}</div>
 
               {/* Label */}
               <span style={{
-                fontSize:9,fontFamily:FONT_UI,
+                fontSize:9,fontFamily:FONT,
                 fontWeight: isActive ? 600 : 400,
-                color: isActive ? C.gold : "rgba(120,113,108,0.55)",
-                transition:"color .2s, font-weight .2s",
-                letterSpacing: isActive ? "0.04em" : "0.02em",
+                color: isActive ? C.gold : C.label3,
+                transition:"color .2s",
+                letterSpacing: isActive ? "0.05em" : "0.02em",
                 whiteSpace:"nowrap",
+                textTransform:"uppercase",
               }}>{t.label}</span>
             </button>
           );
@@ -1747,36 +1749,49 @@ function TabBar({tabs, active, onChange}){
 // iOS-style large button
 function IOSBtn({children,onPress,variant="primary",full,disabled,small,icon}){
   const {pressed,...handlers}=usePress();
+  var _hBtnHov=useState(false); var btnHov=_hBtnHov[0]; var setBtnHov=_hBtnHov[1];
   const bg = {
-    primary: `linear-gradient(135deg,${C.gold},${C.goldD})`,
-    success: `linear-gradient(135deg,${C.green},#1E5C3A)`,
-    danger:  `linear-gradient(135deg,${C.red},#7A1B28)`,
+    primary: disabled ? "rgba(0,0,0,0.08)" : C.label,
+    success: disabled ? "rgba(0,0,0,0.08)" : C.green,
+    danger:  disabled ? "rgba(0,0,0,0.08)" : C.red,
     ghost:   "transparent",
     fill:    C.fill2,
+  };
+  const textColor = {
+    primary: disabled ? C.label3 : "#FFFFFF",
+    success: disabled ? C.label3 : "#FFFFFF",
+    danger:  disabled ? C.label3 : "#FFFFFF",
+    ghost:   C.label,
+    fill:    C.label,
   };
   return (
     <button
       disabled={disabled}
       onClick={onPress}
+      onMouseEnter={()=>setBtnHov(true)}
+      onMouseLeave={()=>setBtnHov(false)}
       {...handlers}
       style={{
-        background:disabled?"#2C2C2E":bg[variant],
-        border:variant==="ghost"?`1px solid ${C.gold}50`:"none",
-        borderRadius:14,
-        padding:small?"10px 16px":"15px 20px",
-        width:full?"100%":"auto",
-        cursor:disabled?"not-allowed":"pointer",
-        display:"flex",alignItems:"center",justifyContent:"center",gap:8,
-        fontFamily:FONT,fontWeight:600,
-        fontSize:small?14:16,
-        color:disabled?C.label3:variant==="ghost"?C.gold:variant==="fill"?C.label:"#000",
-        transform: pressed&&!disabled?"scale(0.97)":"scale(1)",
-        transition:"transform .12s cubic-bezier(.34,1.56,.64,1), opacity .12s",
-        opacity:disabled?.5:pressed?.9:1,
-        WebkitTapHighlightColor:"transparent",
-        userSelect:"none",
+        background: bg[variant],
+        border: variant==="ghost" ? `1px solid ${C.sep}` : "none",
+        borderRadius: small ? 14 : 18,
+        padding: small ? "10px 18px" : "15px 24px",
+        minHeight: small ? 40 : 52,
+        width: full ? "100%" : "auto",
+        cursor: disabled ? "not-allowed" : "pointer",
+        display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+        fontFamily: FONT, fontWeight: 600,
+        fontSize: small ? 13 : 15,
+        letterSpacing: "0.01em",
+        color: textColor[variant],
+        transform: pressed&&!disabled ? "scale(0.97)" : btnHov&&!disabled ? "translateY(-1px)" : "scale(1)",
+        transition: "transform .18s cubic-bezier(.4,0,.2,1), opacity .18s, box-shadow .18s",
+        opacity: disabled ? 0.45 : pressed ? 0.88 : 1,
+        boxShadow: btnHov&&!disabled&&variant==="primary" ? "0 4px 16px rgba(0,0,0,0.18)" : "none",
+        WebkitTapHighlightColor: "transparent",
+        userSelect: "none",
       }}>
-      {icon&&<span style={{fontSize:small?16:18}}>{icon}</span>}
+      {icon&&<span style={{fontSize:small?15:17}}>{icon}</span>}
       {children}
     </button>
   );
@@ -1799,56 +1814,62 @@ function Sheet({open,onClose,title,children,tall}){
       display:"flex",alignItems:"flex-end",
     }} onClick={e=>e.target===e.currentTarget&&onClose()}>
       <div style={{
-        background:"#FFFFFF",
-        borderRadius:"22px 22px 0 0",
+        background:"rgba(255,255,255,0.97)",
+        backdropFilter:"blur(32px) saturate(180%)",
+        WebkitBackdropFilter:"blur(32px) saturate(180%)",
+        borderRadius:"28px 28px 0 0",
         width:"100%",
         maxHeight:tall?"90vh":"80vh",
         overflowY:"auto",
         transform:anim?"translateY(0)":"translateY(100%)",
         transition:"transform .32s cubic-bezier(.32,.72,0,1)",
         paddingBottom:"env(safe-area-inset-bottom,24px)",
+        boxShadow:"0 -2px 40px rgba(0,0,0,0.08)",
       }}>
         {/* Handle */}
-        <div style={{display:"flex",justifyContent:"center",padding:"12px 0 4px"}}>
-          <div style={{width:36,height:5,borderRadius:3,background:C.accent}}/>
+        <div style={{display:"flex",justifyContent:"center",padding:"14px 0 6px"}}>
+          <div style={{width:32,height:4,borderRadius:4,background:"rgba(0,0,0,0.12)"}}/>
         </div>
         {/* Title */}
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",
-          padding:"8px 20px 16px"}}>
-          <h3 style={{margin:0,fontSize:18,fontWeight:500,color:C.label,fontFamily:FONT_DISPLAY,letterSpacing:.5}}>{title}</h3>
+          padding:"6px 22px 18px"}}>
+          <h3 style={{margin:0,fontSize:17,fontWeight:600,color:C.label,fontFamily:FONT,letterSpacing:"-0.01em"}}>{title}</h3>
           <button onClick={onClose} style={{
-            background:C.fill2,border:"none",borderRadius:"50%",
-            width:30,height:30,cursor:"pointer",
+            background:"rgba(0,0,0,0.06)",border:"none",borderRadius:12,
+            width:32,height:32,cursor:"pointer",
             display:"flex",alignItems:"center",justifyContent:"center",
-            color:C.label2,fontSize:16,fontFamily:FONT,fontWeight:600,
+            color:C.label3,fontSize:14,fontFamily:FONT,fontWeight:600,
             WebkitTapHighlightColor:"transparent",
           }}>✕</button>
         </div>
-        <div style={{padding:"0 16px"}}>{children}</div>
+        <div style={{padding:"0 20px"}}>{children}</div>
       </div>
     </div>
   );
 }
 
-// iOS-style input
+// iOS-style input — editorial premium
 function IOSInput({label,prefix,style:st={},...p}){
   return (
-    <div style={{marginBottom:12}}>
-      {label&&<div style={{fontSize:13,fontWeight:500,color:C.label2,fontFamily:FONT,
-        marginBottom:6,paddingLeft:4}}>{label}</div>}
+    <div style={{marginBottom:14}}>
+      {label&&<div style={{
+        fontSize:11,fontWeight:600,color:C.label3,fontFamily:FONT,
+        marginBottom:6,paddingLeft:2,textTransform:"uppercase",letterSpacing:"0.07em",
+      }}>{label}</div>}
       <div style={{position:"relative"}}>
         {prefix&&<span style={{position:"absolute",left:14,top:"50%",transform:"translateY(-50%)",
           color:C.label3,fontSize:15,fontFamily:FONT,pointerEvents:"none"}}>{prefix}</span>}
         <input {...p} style={{
-          width:"100%",padding:"13px 14px",paddingLeft:prefix?"36px":"14px",
-          borderRadius:12,border:`1.5px solid ${C.sep}`,
-          background:C.bg2,fontSize:16,color:C.label,
+          width:"100%",padding:"13px 16px",paddingLeft:prefix?"38px":"16px",
+          borderRadius:14,border:`1px solid ${C.sep}`,
+          background:C.bg2,fontSize:15,color:C.label,
           outline:"none",fontFamily:FONT,boxSizing:"border-box",
-          WebkitAppearance:"none",
+          WebkitAppearance:"none",fontWeight:400,
+          transition:"border-color .15s, background .15s",
           ...st
         }}
-        onFocus={e=>{e.target.style.borderColor=C.gold;e.target.style.background=C.bg3;}}
-        onBlur={e=>{e.target.style.borderColor=C.sep;e.target.style.background=C.bg2;}}
+        onFocus={e=>{e.target.style.borderColor=C.gold;e.target.style.background="#FFFFFF";e.target.style.boxShadow=`0 0 0 3px ${C.gold}18`;}}
+        onBlur={e=>{e.target.style.borderColor=C.sep;e.target.style.background=C.bg2;e.target.style.boxShadow="none";}}
         />
       </div>
     </div>
@@ -1859,18 +1880,19 @@ function IOSInput({label,prefix,style:st={},...p}){
 function SegControl({options,value,onChange}){
   return (
     <div style={{
-      background:C.bg2,borderRadius:10,padding:3,
-      display:"flex",gap:3,
+      background:C.bg2,borderRadius:12,padding:3,
+      display:"flex",gap:3,border:`1px solid ${C.sep}`,
     }}>
       {options.map(o=>(
         <button key={o.value} onClick={()=>onChange(o.value)} style={{
-          flex:1,padding:"7px 0",borderRadius:8,border:"none",
-          background:value===o.value?C.bg3:"transparent",
-          color:value===o.value?C.label:C.label2,
-          fontFamily:FONT,fontSize:13,fontWeight:value===o.value?600:400,
-          cursor:"pointer",transition:"all .2s",
-          boxShadow:value===o.value?"0 1px 4px rgba(0,0,0,.3)":"none",
+          flex:1,padding:"8px 0",borderRadius:10,border:"none",
+          background:value===o.value?"#FFFFFF":"transparent",
+          color:value===o.value?C.label:C.label3,
+          fontFamily:FONT,fontSize:12,fontWeight:value===o.value?600:400,
+          cursor:"pointer",transition:"all .18s cubic-bezier(.4,0,.2,1)",
+          boxShadow:value===o.value?"0 1px 6px rgba(0,0,0,0.08), 0 0.5px 2px rgba(0,0,0,0.06)":"none",
           WebkitTapHighlightColor:"transparent",
+          letterSpacing:value===o.value?"-0.01em":"0",
         }}>{o.label}</button>
       ))}
     </div>
@@ -1880,14 +1902,17 @@ function SegControl({options,value,onChange}){
 // iOS-style select
 function IOSSel({label,children,style:st={},...p}){
   return (
-    <div style={{marginBottom:12}}>
-      {label&&<div style={{fontSize:13,fontWeight:500,color:C.label2,fontFamily:FONT,
-        marginBottom:6,paddingLeft:4}}>{label}</div>}
+    <div style={{marginBottom:14}}>
+      {label&&<div style={{
+        fontSize:10,fontWeight:600,color:C.label3,fontFamily:FONT,
+        marginBottom:7,paddingLeft:2,textTransform:"uppercase",letterSpacing:"0.08em",
+      }}>{label}</div>}
       <select {...p} style={{
-        width:"100%",padding:"13px 14px",borderRadius:12,
-        border:`1.5px solid ${C.sep}`,background:C.bg2,
-        fontSize:16,color:C.label,outline:"none",fontFamily:FONT,cursor:"pointer",
-        WebkitAppearance:"none",
+        width:"100%",padding:"13px 16px",borderRadius:14,
+        border:`1px solid ${C.sep}`,background:C.bg2,
+        fontSize:15,color:C.label,outline:"none",fontFamily:FONT,cursor:"pointer",
+        WebkitAppearance:"none",fontWeight:400,
+        transition:"border-color .15s",
         ...st
       }}>{children}</select>
     </div>
@@ -1898,16 +1923,29 @@ function IOSSel({label,children,style:st={},...p}){
 function StatCard({icon,label,value,sub,color=C.gold,compact}){
   return (
     <div style={{
-      background:C.bg2,borderRadius:14,padding: compact ? "12px 14px" : "16px",
+      background:"rgba(255,255,255,0.80)",
+      backdropFilter:"blur(16px)",
+      WebkitBackdropFilter:"blur(16px)",
+      borderRadius: compact ? 16 : 20,
+      padding: compact ? "13px 15px" : "16px 18px",
       border:`1px solid ${C.sep}`,
+      boxShadow:"0 2px 12px rgba(0,0,0,0.04)",
     }}>
-      <div style={{display:"flex",alignItems:"center",gap: compact ? 8 : 10, marginBottom: compact ? 6 : 8}}>
-        <div style={{width: compact ? 28 : 34, height: compact ? 28 : 34, borderRadius:10, background:`${color}25`,
-          display:"flex",alignItems:"center",justifyContent:"center",fontSize: compact ? 14 : 17}}>{icon}</div>
-        <span style={{fontSize: compact ? 11 : 13, color:C.label2,fontFamily:FONT,fontWeight:500}}>{label}</span>
+      <div style={{display:"flex",alignItems:"center",gap: compact ? 8 : 10, marginBottom: compact ? 8 : 10}}>
+        <div style={{
+          width: compact ? 28 : 34, height: compact ? 28 : 34,
+          borderRadius: compact ? 9 : 11,
+          background:`${color}12`,border:`1px solid ${color}20`,
+          display:"flex",alignItems:"center",justifyContent:"center",
+          fontSize: compact ? 14 : 16,
+        }}>{icon}</div>
+        <span style={{
+          fontSize:10,color:C.label3,fontFamily:FONT,fontWeight:600,
+          letterSpacing:"0.07em",textTransform:"uppercase",
+        }}>{label}</span>
       </div>
-      <div style={{fontSize: compact ? 20 : 24, fontWeight:700,color:C.label,fontFamily:FONT,lineHeight:1}}>{value}</div>
-      {sub&&<div style={{fontSize:12,color:C.label3,fontFamily:FONT,marginTop:4}}>{sub}</div>}
+      <div style={{fontSize: compact ? 20 : 24, fontWeight:600,color:C.label,fontFamily:FONT,lineHeight:1,letterSpacing:"-0.02em"}}>{value}</div>
+      {sub&&<div style={{fontSize:11,color:C.label3,fontFamily:FONT,marginTop:5}}>{sub}</div>}
     </div>
   );
 }
@@ -2190,43 +2228,61 @@ function LoginScreen({ onLogin }) {
       background:C.bg0,
       display:"flex", flexDirection:"column",
       alignItems:"center", justifyContent:"center",
-      fontFamily:FONT, padding:24,
+      fontFamily:FONT, padding:"24px 20px",
+      position:"relative",
     }}>
-      {/* Logo */}
-      <div style={{marginBottom:40, textAlign:"center"}}>
+      {/* Subtle background texture */}
+      <div style={{
+        position:"absolute",inset:0,
+        background:"radial-gradient(ellipse 80% 60% at 50% 0%, rgba(154,123,79,0.06) 0%, transparent 70%)",
+        pointerEvents:"none",
+      }}/>
+
+      {/* Logo mark */}
+      <div style={{marginBottom:48, textAlign:"center", position:"relative"}}>
         <div style={{
-          fontSize:52,fontWeight:300,color:C.label,
-          fontFamily:FONT_DISPLAY,letterSpacing:8,lineHeight:1,
-          marginBottom:10,
+          fontSize:11, fontWeight:600, color:C.label3,
+          fontFamily:FONT, letterSpacing:"0.22em",
+          textTransform:"uppercase", marginBottom:20,
+        }}>Toscana House</div>
+        <div style={{
+          fontSize:72, fontWeight:300, color:C.label,
+          fontFamily:FONT_DISPLAY, letterSpacing:12, lineHeight:0.9,
+          marginBottom:16,
         }}>TH</div>
-        <div style={{width:48, height:1, background:`${C.gold}60`,
-          margin:"0 auto 10px"}}/>
-        <div style={{fontSize:14, fontWeight:500, color:C.label,
-          fontFamily:FONT_UI, letterSpacing:6, textTransform:"uppercase"}}>TOSCANA HOUSE</div>
-        <div style={{fontSize:10, color:C.label3, letterSpacing:5,
-          fontFamily:FONT_UI, marginTop:4, textTransform:"uppercase"}}>CASA DE MODA</div>
+        <div style={{width:32, height:1, background:C.gold, margin:"0 auto 16px", opacity:0.6}}/>
+        <div style={{
+          fontSize:9, color:C.label3, letterSpacing:"0.28em",
+          fontFamily:FONT, textTransform:"uppercase",
+        }}>Casa de Moda · Bolivia</div>
       </div>
 
       {/* Card login */}
       <div style={{
-        background:C.bg1,
-        borderRadius:24, padding:"32px 28px",
-        width:"100%", maxWidth:380,
-        boxShadow:"0 8px 40px rgba(120,113,108,0.12)",
+        background:"rgba(255,255,255,0.90)",
+        backdropFilter:"blur(24px) saturate(180%)",
+        WebkitBackdropFilter:"blur(24px) saturate(180%)",
+        borderRadius:28, padding:"36px 32px",
+        width:"100%", maxWidth:400,
+        boxShadow:"0 8px 48px rgba(0,0,0,0.06), 0 2px 12px rgba(0,0,0,0.04)",
         border:`1px solid ${C.sep}`,
+        position:"relative",
       }}>
-        <div style={{fontSize:20, fontWeight:500, color:C.label,
-          marginBottom:6, fontFamily:FONT_DISPLAY,letterSpacing:.5}}>Iniciar sesión</div>
-        <div style={{fontSize:14, color:C.label3, marginBottom:28, fontFamily:FONT}}>
+        <div style={{
+          fontSize:22, fontWeight:600, color:C.label,
+          marginBottom:4, fontFamily:FONT, letterSpacing:"-0.02em",
+        }}>Bienvenida</div>
+        <div style={{fontSize:13, color:C.label3, marginBottom:32, fontFamily:FONT, fontWeight:400}}>
           Ingresa tus credenciales para continuar
         </div>
 
         {/* Usuario */}
-        <div style={{marginBottom:16}}>
-          <label style={{fontSize:11, fontWeight:700, color:C.label3,
-            textTransform:"uppercase", letterSpacing:.8, display:"block", marginBottom:6}}>
-            Usuario
-          </label>
+        <div style={{marginBottom:14}}>
+          <label style={{
+            fontSize:10, fontWeight:600, color:C.label3,
+            textTransform:"uppercase", letterSpacing:"0.10em", display:"block", marginBottom:8,
+            fontFamily:FONT,
+          }}>Usuario</label>
           <input
             value={usuario}
             onChange={e=>{setUsuario(e.target.value);setError("");}}
@@ -2234,22 +2290,26 @@ function LoginScreen({ onLogin }) {
             placeholder="tu usuario"
             autoCapitalize="none"
             autoCorrect="off"
-            style={{width:"100%", padding:"13px 16px", borderRadius:12,
-              border:`1.5px solid ${error?C.red:C.sep}`,
-              background:C.bg2, fontSize:16, color:C.label,
+            style={{
+              width:"100%", padding:"14px 16px", borderRadius:14,
+              border:`1px solid ${error ? C.red : C.sep}`,
+              background:C.bg2, fontSize:15, color:C.label,
               outline:"none", fontFamily:FONT, boxSizing:"border-box",
-              WebkitAppearance:"none"}}
-            onFocus={e=>e.target.style.borderColor=C.gold}
-            onBlur={e=>e.target.style.borderColor=error?C.red:C.sep}
+              WebkitAppearance:"none", fontWeight:400,
+              transition:"border-color .15s, box-shadow .15s",
+            }}
+            onFocus={e=>{e.target.style.borderColor=C.gold;e.target.style.boxShadow=`0 0 0 3px ${C.gold}18`;e.target.style.background="#FFF";}}
+            onBlur={e=>{e.target.style.borderColor=error?C.red:C.sep;e.target.style.boxShadow="none";e.target.style.background=C.bg2;}}
           />
         </div>
 
         {/* Contraseña */}
-        <div style={{marginBottom:24}}>
-          <label style={{fontSize:11, fontWeight:700, color:C.label3,
-            textTransform:"uppercase", letterSpacing:.8, display:"block", marginBottom:6}}>
-            Contraseña
-          </label>
+        <div style={{marginBottom:28}}>
+          <label style={{
+            fontSize:10, fontWeight:600, color:C.label3,
+            textTransform:"uppercase", letterSpacing:"0.10em", display:"block", marginBottom:8,
+            fontFamily:FONT,
+          }}>Contraseña</label>
           <div style={{position:"relative"}}>
             <input
               type={showPass?"text":"password"}
@@ -2257,55 +2317,65 @@ function LoginScreen({ onLogin }) {
               onChange={e=>{setPassword(e.target.value);setError("");}}
               onKeyDown={e=>e.key==="Enter"&&handleLogin()}
               placeholder="••••••••"
-              style={{width:"100%", padding:"13px 44px 13px 16px", borderRadius:12,
-                border:`1.5px solid ${error?C.red:C.sep}`,
-                background:C.bg2, fontSize:16, color:C.label,
+              style={{
+                width:"100%", padding:"14px 48px 14px 16px", borderRadius:14,
+                border:`1px solid ${error ? C.red : C.sep}`,
+                background:C.bg2, fontSize:15, color:C.label,
                 outline:"none", fontFamily:FONT, boxSizing:"border-box",
-                WebkitAppearance:"none"}}
-              onFocus={e=>e.target.style.borderColor=C.gold}
-              onBlur={e=>e.target.style.borderColor=error?C.red:C.sep}
+                WebkitAppearance:"none", fontWeight:400,
+                transition:"border-color .15s, box-shadow .15s",
+              }}
+              onFocus={e=>{e.target.style.borderColor=C.gold;e.target.style.boxShadow=`0 0 0 3px ${C.gold}18`;e.target.style.background="#FFF";}}
+              onBlur={e=>{e.target.style.borderColor=error?C.red:C.sep;e.target.style.boxShadow="none";e.target.style.background=C.bg2;}}
             />
             <button onClick={()=>setShowPass(p=>!p)} style={{
-              position:"absolute", right:12, top:"50%",
+              position:"absolute", right:14, top:"50%",
               transform:"translateY(-50%)",
               background:"none", border:"none", cursor:"pointer",
-              fontSize:18, color:C.label3,
+              fontSize:14, color:C.label3, fontFamily:FONT,
               WebkitTapHighlightColor:"transparent",
-            }}>{showPass?"🙈":"👁"}</button>
+            }}>{showPass?"Ocultar":"Ver"}</button>
           </div>
         </div>
 
         {/* Error */}
         {error&&(
-          <div style={{padding:"10px 14px", background:C.redBg,
-            borderRadius:10, border:`1px solid ${C.red}30`,
-            color:C.red, fontSize:13, fontFamily:FONT,
-            marginBottom:16, textAlign:"center"}}>
+          <div style={{
+            padding:"12px 16px", background:C.redBg,
+            borderRadius:12, border:`1px solid ${C.red}25`,
+            color:C.red, fontSize:13, fontFamily:FONT, fontWeight:500,
+            marginBottom:20, textAlign:"center",
+          }}>
             {error}
           </div>
         )}
 
-        {/* Botón */}
+        {/* Botón principal */}
         <button
           onClick={handleLogin}
           disabled={loading}
           style={{
             width:"100%", padding:"15px",
-            borderRadius:14, border:"none",
-            background:loading?C.fill3:`linear-gradient(135deg,${C.gold},${C.goldD})`,
-            color:loading?C.label3:"#fff", fontSize:16, fontWeight:600,
-            cursor:loading?"not-allowed":"pointer",
-            fontFamily:FONT, letterSpacing:.5,
-            transition:"all .2s",
+            borderRadius:18, border:"none",
+            background: loading ? C.bg3 : C.label,
+            color: loading ? C.label3 : "#FFFFFF",
+            fontSize:15, fontWeight:600,
+            cursor: loading ? "not-allowed" : "pointer",
+            fontFamily:FONT, letterSpacing:"0.01em",
+            transition:"all .2s cubic-bezier(.4,0,.2,1)",
             WebkitTapHighlightColor:"transparent",
-          }}>
-          {loading?"Verificando…":"Entrar"}
+            boxShadow: loading ? "none" : "0 4px 20px rgba(23,23,23,0.20)",
+          }}
+          onMouseEnter={e=>{ if(!loading){ e.currentTarget.style.transform="translateY(-1px)"; e.currentTarget.style.boxShadow="0 6px 28px rgba(23,23,23,0.28)"; }}}
+          onMouseLeave={e=>{ e.currentTarget.style.transform="none"; e.currentTarget.style.boxShadow=loading?"none":"0 4px 20px rgba(23,23,23,0.20)"; }}
+        >
+          {loading ? "Verificando…" : "Entrar"}
         </button>
       </div>
 
-      <div style={{marginTop:24, fontSize:12, color:C.label3,
-        fontFamily:FONT, textAlign:"center"}}>
-        Toscana House © {new Date().getFullYear()}
+      <div style={{marginTop:32, fontSize:11, color:C.label3,
+        fontFamily:FONT, textAlign:"center", letterSpacing:"0.04em"}}>
+        © {new Date().getFullYear()} Toscana House · Santa Cruz, Bolivia
       </div>
     </div>
   );
@@ -3576,23 +3646,33 @@ function generarPlanillaAlquileres(ventas, mes, anio) {
 function KPICard({icon, label, val, sub, color, compact}){
   return (
     <div style={{
-      background:C.bg1, borderRadius:14, padding: compact ? "12px 14px" : "16px 18px",
+      background:"rgba(255,255,255,0.85)",
+      backdropFilter:"blur(20px)",
+      WebkitBackdropFilter:"blur(20px)",
+      borderRadius: compact ? 18 : 22,
+      padding: compact ? "14px 16px" : "18px 20px",
       border:`1px solid ${C.sep}`,
-      boxShadow:"0 2px 8px rgba(120,113,108,0.06), 0 1px 2px rgba(120,113,108,0.04)",
+      boxShadow:"0 4px 24px rgba(0,0,0,0.04), 0 1px 4px rgba(0,0,0,0.03)",
     }}>
-      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom: compact ? 7 : 10}}>
+      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom: compact ? 9 : 12}}>
         <div style={{
-          width: compact ? 26 : 32, height: compact ? 26 : 32, borderRadius:10,
-          background:`${color}14`,
+          width: compact ? 28 : 34, height: compact ? 28 : 34,
+          borderRadius: compact ? 9 : 11,
+          background:`${color}12`,
           display:"flex",alignItems:"center",justifyContent:"center",
-          fontSize: compact ? 13 : 15,
+          fontSize: compact ? 14 : 16,
+          border:`1px solid ${color}20`,
         }}>{icon}</div>
-        <span style={{fontSize:11,color:C.label3,fontFamily:FONT,fontWeight:500,
-          letterSpacing:.4,textTransform:"uppercase"}}>{label}</span>
+        <span style={{
+          fontSize:10,color:C.label3,fontFamily:FONT,fontWeight:600,
+          letterSpacing:"0.08em",textTransform:"uppercase",
+        }}>{label}</span>
       </div>
-      <div style={{fontSize: compact ? 20 : 26, fontWeight:600,color:C.label,fontFamily:FONT_DISPLAY,
-        lineHeight:1,letterSpacing:-.3}}>{val}</div>
-      <div style={{fontSize:11,color:C.label3,fontFamily:FONT,marginTop: compact ? 4 : 5, letterSpacing:.2}}>{sub}</div>
+      <div style={{
+        fontSize: compact ? 21 : 27, fontWeight:600,color:C.label,fontFamily:FONT,
+        lineHeight:1,letterSpacing:"-0.02em",
+      }}>{val}</div>
+      {sub&&<div style={{fontSize:11,color:C.label3,fontFamily:FONT,marginTop: compact ? 5 : 6, letterSpacing:"0.01em"}}>{sub}</div>}
     </div>
   );
 }
