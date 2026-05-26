@@ -4304,6 +4304,242 @@ function MiniBarChart({data, color, height=64}){
   );
 }
 
+// ── Modal de detalle de venta para marca ─────────────────────────────────────
+function BrandVentaModal({venta, marca, onClose}){
+  if(!venta) return null;
+  const fac   = leerFacturaLocal(venta.id);
+  const num   = venta.id.replace(/\D/g,"").slice(-4).padStart(4,"0");
+  const items = venta.items.filter(i=>i.marcaId===marca.id);
+  const sub   = items.reduce((s,i)=>s+i.subtotal,0);
+
+  const FilaInfo=({lbl,val})=>(
+    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",
+      padding:"9px 0",borderBottom:`1px solid ${C.sep}`}}>
+      <span style={{fontSize:12,color:C.label3,fontFamily:FONT}}>{lbl}</span>
+      <span style={{fontSize:13,fontWeight:500,color:C.label,fontFamily:FONT}}>{val}</span>
+    </div>
+  );
+
+  return (
+    <div style={{position:"fixed",inset:0,zIndex:500,display:"flex",flexDirection:"column",
+      background:"rgba(0,0,0,0.45)",backdropFilter:"blur(4px)"}}>
+      {/* Tap outside to close */}
+      <div style={{flex:"0 0 60px"}} onClick={onClose}/>
+      {/* Panel */}
+      <div style={{flex:1,background:C.bg0,borderRadius:"24px 24px 0 0",
+        display:"flex",flexDirection:"column",overflow:"hidden",
+        boxShadow:"0 -8px 40px rgba(0,0,0,0.18)"}}>
+
+        {/* ── Header ── */}
+        <div style={{padding:"16px 20px 12px",borderBottom:`1px solid ${C.sep}`,
+          background:C.bg1,flexShrink:0}}>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+            <div>
+              <div style={{fontSize:11,color:C.label3,fontFamily:FONT,
+                textTransform:"uppercase",letterSpacing:.6,marginBottom:3}}>Venta N° {num}</div>
+              <div style={{fontSize:18,fontWeight:700,color:C.label,fontFamily:FONT_DISPLAY,
+                letterSpacing:.3}}>{venta.id}</div>
+            </div>
+            <div style={{display:"flex",alignItems:"center",gap:8}}>
+              {venta.anulada&&(
+                <span style={{fontSize:11,background:C.redBg,color:C.red,
+                  padding:"3px 10px",borderRadius:20,fontFamily:FONT,fontWeight:700}}>ANULADA</span>
+              )}
+              <button onClick={onClose} style={{width:32,height:32,borderRadius:"50%",
+                border:`1px solid ${C.sep}`,background:C.bg2,cursor:"pointer",
+                fontSize:16,display:"flex",alignItems:"center",justifyContent:"center",
+                color:C.label2,WebkitTapHighlightColor:"transparent"}}>✕</button>
+            </div>
+          </div>
+        </div>
+
+        {/* ── Scroll body ── */}
+        <div style={{flex:1,overflowY:"auto",padding:"16px 20px 32px",WebkitOverflowScrolling:"touch"}}>
+
+          {/* ═══ INFO GENERAL ═══ */}
+          <div style={{fontSize:11,fontWeight:700,color:C.label3,textTransform:"uppercase",
+            letterSpacing:.6,fontFamily:FONT,marginBottom:10}}>Información general</div>
+          <div style={{background:C.bg1,borderRadius:14,padding:"0 14px",
+            border:`1px solid ${C.sep}`,marginBottom:20,
+            boxShadow:"0 1px 6px rgba(0,0,0,0.04)"}}>
+            <FilaInfo lbl="Fecha" val={`${venta.fecha} ${venta.hora}`}/>
+            <FilaInfo lbl="Vendedor" val={venta.vendedor||"Tienda"}/>
+            <FilaInfo lbl="Método de pago" val={`${iconPago(venta.metodoPago)} ${labelPago(venta.metodoPago)}`}/>
+            <FilaInfo lbl="Estado" val={venta.anulada?"❌ Anulada":"✅ Completada"}/>
+            {venta.descPct>0&&<FilaInfo lbl="Descuento" val={`${venta.descPct}%`}/>}
+          </div>
+
+          {/* ═══ PRODUCTOS ═══ */}
+          <div style={{fontSize:11,fontWeight:700,color:C.label3,textTransform:"uppercase",
+            letterSpacing:.6,fontFamily:FONT,marginBottom:10}}>
+            Productos de {marca.nombre} ({items.length})
+          </div>
+          <div style={{background:C.bg1,borderRadius:14,overflow:"hidden",
+            border:`1px solid ${C.sep}`,marginBottom:20,
+            boxShadow:"0 1px 6px rgba(0,0,0,0.04)"}}>
+            {/* Encabezado tabla */}
+            <div style={{display:"grid",gridTemplateColumns:"1fr auto auto",gap:8,
+              padding:"8px 14px",background:C.bg2,borderBottom:`1px solid ${C.sep}`}}>
+              {["Producto / SKU","Cant.","Total"].map(h=>(
+                <span key={h} style={{fontSize:10,fontWeight:700,color:C.label3,
+                  fontFamily:FONT,textTransform:"uppercase",letterSpacing:.4,
+                  textAlign:h==="Producto / SKU"?"left":"right"}}>{h}</span>
+              ))}
+            </div>
+            {items.map((it,i)=>(
+              <div key={i} style={{display:"grid",gridTemplateColumns:"1fr auto auto",gap:8,
+                padding:"10px 14px",borderBottom:i<items.length-1?`1px solid ${C.sep}`:"",
+                alignItems:"center"}}>
+                <div>
+                  <div style={{fontSize:13,fontWeight:600,color:C.label,fontFamily:FONT,
+                    lineHeight:1.3}}>{it.nombre}</div>
+                  <div style={{fontSize:11,color:C.label3,fontFamily:"monospace",marginTop:2}}>
+                    {it.codigo}
+                  </div>
+                </div>
+                <div style={{textAlign:"right",fontSize:13,color:C.label2,fontFamily:FONT,
+                  fontWeight:500}}>×{it.cantidad}</div>
+                <div style={{textAlign:"right",fontSize:13,fontWeight:700,
+                  color:marca.color,fontFamily:FONT}}>{$(it.subtotal)}</div>
+              </div>
+            ))}
+            {/* Total */}
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",
+              padding:"12px 14px",background:`${marca.color}10`,
+              borderTop:`2px solid ${marca.color}30`}}>
+              <span style={{fontSize:14,fontWeight:700,color:C.label,fontFamily:FONT}}>
+                Subtotal {marca.nombre}
+              </span>
+              <span style={{fontSize:20,fontWeight:800,color:marca.color,fontFamily:FONT_DISPLAY}}>
+                {$(sub)}
+              </span>
+            </div>
+          </div>
+
+          {/* ═══ CLIENTE (si hay factura) ═══ */}
+          {fac&&(
+            <>
+              <div style={{fontSize:11,fontWeight:700,color:C.label3,textTransform:"uppercase",
+                letterSpacing:.6,fontFamily:FONT,marginBottom:10}}>Cliente</div>
+              <div style={{background:C.bg1,borderRadius:14,padding:"0 14px",
+                border:`1px solid ${C.sep}`,marginBottom:20,
+                boxShadow:"0 1px 6px rgba(0,0,0,0.04)"}}>
+                <FilaInfo lbl="Razón social" val={fac.nombreComprador||"Sin Nombre"}/>
+                <FilaInfo lbl="NIT / CI" val={fac.nitComprador&&fac.nitComprador!==0?fac.nitComprador:"Sin NIT (CF)"}/>
+                {fac.telefono&&<FilaInfo lbl="Teléfono" val={fac.telefono}/>}
+              </div>
+            </>
+          )}
+
+          {/* ═══ NOTA DE VENTA ═══ */}
+          <div style={{fontSize:11,fontWeight:700,color:C.label3,textTransform:"uppercase",
+            letterSpacing:.6,fontFamily:FONT,marginBottom:10}}>Nota de venta</div>
+          <div style={{background:C.bg1,borderRadius:14,padding:14,
+            border:`1px solid ${C.sep}`,marginBottom:20,
+            boxShadow:"0 1px 6px rgba(0,0,0,0.04)"}}>
+            <div style={{display:"flex",justifyContent:"space-between",
+              alignItems:"center",marginBottom:12}}>
+              <div>
+                <div style={{fontSize:15,fontWeight:700,color:C.label,fontFamily:FONT}}>
+                  N° {num}
+                </div>
+                <div style={{fontSize:12,color:C.label3,fontFamily:FONT,marginTop:2}}>
+                  {venta.fecha} · Total {$(venta.total)}
+                </div>
+              </div>
+              <span style={{fontSize:28}}>{iconPago(venta.metodoPago)}</span>
+            </div>
+            <div style={{display:"flex",gap:8}}>
+              <button onClick={()=>verNotaVenta(venta,num)}
+                style={{flex:1,padding:"10px 0",borderRadius:12,border:`1px solid ${C.sep}`,
+                  background:C.bg2,cursor:"pointer",fontSize:13,fontWeight:600,
+                  color:C.label,fontFamily:FONT,WebkitTapHighlightColor:"transparent"}}>
+                👁 Ver nota
+              </button>
+              <button onClick={()=>imprimirNotaVenta(venta,num)}
+                style={{flex:1,padding:"10px 0",borderRadius:12,border:"none",
+                  background:C.label,cursor:"pointer",fontSize:13,fontWeight:600,
+                  color:C.bg0,fontFamily:FONT,WebkitTapHighlightColor:"transparent"}}>
+                🖨 Imprimir
+              </button>
+            </div>
+          </div>
+
+          {/* ═══ FACTURA SIAT ═══ */}
+          {fac&&(
+            <>
+              <div style={{fontSize:11,fontWeight:700,color:C.label3,textTransform:"uppercase",
+                letterSpacing:.6,fontFamily:FONT,marginBottom:10}}>
+                Factura SIAT {fac.anulada&&"(anulada)"}
+              </div>
+              <div style={{background:"#F3F4FC",borderRadius:14,padding:14,
+                border:"1.5px solid #C5C8E8",marginBottom:20,
+                boxShadow:"0 1px 6px rgba(0,0,0,0.04)"}}>
+                <div style={{display:"flex",justifyContent:"space-between",
+                  alignItems:"flex-start",marginBottom:12}}>
+                  <div>
+                    <div style={{fontSize:11,fontWeight:700,color:"#1A237E",fontFamily:FONT,
+                      textTransform:"uppercase",letterSpacing:.5,marginBottom:4}}>
+                      🧾 Factura Electrónica Bolivia
+                    </div>
+                    <div style={{fontSize:18,fontWeight:800,color:"#1A237E",
+                      fontFamily:FONT_DISPLAY}}>N° {fac.numero||"—"}</div>
+                  </div>
+                  {fac.anulada&&(
+                    <span style={{fontSize:11,background:"#FDECEA",color:C.red,
+                      padding:"3px 10px",borderRadius:20,fontFamily:FONT,fontWeight:700}}>
+                      ANULADA
+                    </span>
+                  )}
+                </div>
+                <div style={{background:"rgba(255,255,255,0.7)",borderRadius:10,
+                  padding:"0 12px",marginBottom:12,border:"1px solid #C5C8E8"}}>
+                  {[
+                    ["Cliente",fac.nombreComprador||"Sin Nombre"],
+                    ["NIT",fac.nitComprador&&fac.nitComprador!==0?fac.nitComprador:"Sin NIT (CF)"],
+                    ["Fecha emisión",venta.fecha],
+                  ].map(([l,v])=>(
+                    <div key={l} style={{display:"flex",justifyContent:"space-between",
+                      padding:"8px 0",borderBottom:"1px solid #E0E2F0"}}>
+                      <span style={{fontSize:12,color:"#555",fontFamily:FONT}}>{l}</span>
+                      <span style={{fontSize:12,fontWeight:600,color:"#1A237E",fontFamily:FONT}}>{v}</span>
+                    </div>
+                  ))}
+                  {fac.cuf&&(
+                    <div style={{padding:"8px 0"}}>
+                      <div style={{fontSize:10,color:"#888",fontFamily:FONT,marginBottom:2}}>CUF</div>
+                      <div style={{fontSize:10,fontFamily:"monospace",color:"#333",
+                        wordBreak:"break-all",lineHeight:1.4}}>{fac.cuf}</div>
+                    </div>
+                  )}
+                </div>
+                {/* Acciones factura */}
+                <div style={{display:"flex",gap:8}}>
+                  {fac.pdf&&(
+                    <button onClick={()=>window.open(fac.pdf,"_blank")}
+                      style={{flex:1,padding:"10px 0",borderRadius:12,border:"none",
+                        background:"#1A237E",cursor:"pointer",fontSize:13,fontWeight:600,
+                        color:"#fff",fontFamily:FONT,WebkitTapHighlightColor:"transparent"}}>
+                      📄 Ver PDF
+                    </button>
+                  )}
+                  <button onClick={()=>verNotaVenta(venta,num)}
+                    style={{flex:1,padding:"10px 0",borderRadius:12,
+                      border:"1.5px solid #C5C8E8",background:"rgba(255,255,255,0.7)",
+                      cursor:"pointer",fontSize:13,fontWeight:600,
+                      color:"#1A237E",fontFamily:FONT,WebkitTapHighlightColor:"transparent"}}>
+                    🖨 Nota + Factura
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function BrandPortal({user, ventas, inv, logout}){
   // ── TODOS los hooks ANTES de cualquier return condicional ──
   const now = new Date();
@@ -4371,6 +4607,101 @@ function BrandPortal({user, ventas, inv, logout}){
 
   // Inventario de la marca
   const invMarca = useMemo(()=>inv.filter(i=>i.marcaId===mid),[inv, mid]);
+
+  // ── Estado UI adicional (ventas modal, búsquedas, filtros) ──
+  const [ventaSeleccionada, setVentaSeleccionada] = useState(null);
+  const [busqV,      setBusqV]      = useState("");
+  const [busqInvP,   setBusqInvP]   = useState("");
+  const [catFilP,    setCatFilP]    = useState("");
+  const [fechaDesde, setFechaDesde] = useState("");
+  const [fechaHasta, setFechaHasta] = useState("");
+  const [xlsxCarg,   setXlsxCarg]  = useState(false);
+
+  // Ventas filtradas + ordenadas para la tab Ventas
+  const vMesFiltradas = useMemo(()=>{
+    const q = busqV.trim().toLowerCase();
+    let r = q
+      ? vMes.filter(v=>
+          v.id.toLowerCase().includes(q) ||
+          v.items.some(i=>i.marcaId===mid&&(
+            i.nombre.toLowerCase().includes(q)||
+            i.codigo.toLowerCase().includes(q)
+          ))
+        )
+      : vMes;
+    return [...r].sort((a,b)=>b.id.localeCompare(a.id));
+  },[vMes,busqV,mid]);
+
+  // Categorías disponibles para filtro inventario
+  const categoriasMarca = useMemo(()=>
+    [...new Set(invMarca.map(i=>i.categoria||"General"))].sort()
+  ,[invMarca]);
+
+  // Inventario filtrado en tiempo real
+  const invFiltrado = useMemo(()=>{
+    const q = busqInvP.trim().toLowerCase();
+    let r = invMarca;
+    if(q) r = r.filter(i=>
+      i.nombre.toLowerCase().includes(q)||
+      i.codigo.toLowerCase().includes(q)||
+      (i.categoria||"").toLowerCase().includes(q)
+    );
+    if(catFilP) r = r.filter(i=>(i.categoria||"General")===catFilP);
+    if(fechaDesde) r = r.filter(i=>i.fecha>=fechaDesde);
+    if(fechaHasta) r = r.filter(i=>i.fecha<=fechaHasta);
+    return r;
+  },[invMarca,busqInvP,catFilP,fechaDesde,fechaHasta]);
+
+  // ── Descarga Excel inventario (solo esta marca) ──
+  async function descargarExcelInvMarca(){
+    if(xlsxCarg) return;
+    setXlsxCarg(true);
+    try{
+      const XLSX = await loadXLSX();
+      const ahora = new Date();
+      const fmtFecha = d=>d?d.split("/").reverse().join("-"):"-";
+
+      // Rows de datos
+      const dataRows = invFiltrado.map(p=>[
+        p.codigo||"",
+        p.nombre||"",
+        marca.nombre,
+        p.categoria||"General",
+        p.stock>2?"En stock":p.stock>0?"Bajo stock":"Agotado",
+        fmtFecha(p.fecha),
+        $(p.precio),
+        p.stock,
+        p.stockInicial||p.stock,
+        $(p.precio*p.stock),
+      ]);
+
+      const encabezados = [
+        ["TOSCANA HOUSE — Inventario", marca.nombre, "", "", "", "", "", "", "", ""],
+        [`Generado: ${ahora.toLocaleDateString("es-BO")} ${ahora.toLocaleTimeString("es-BO")}`, "", "", "", "", "", "", "", "", ""],
+        [],
+        ["SKU","Producto","Marca","Categoría","Estado","Fecha ingreso","Precio unit.","Stock actual","Stock inicial","Valor en stock"],
+        ...dataRows,
+        [],
+        ["","","","","","","","Total productos:",invFiltrado.length,""],
+        ["","","","","","","","Valor total stock:","",$(invFiltrado.reduce((s,p)=>s+p.precio*p.stock,0))],
+      ];
+
+      const ws = XLSX.utils.aoa_to_sheet(encabezados);
+
+      // Anchos de columna
+      ws["!cols"] = [
+        {wch:16},{wch:36},{wch:14},{wch:14},{wch:12},
+        {wch:14},{wch:13},{wch:12},{wch:12},{wch:16}
+      ];
+      // Freeze header
+      ws["!freeze"] = {xSplit:0,ySplit:4};
+
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, `${marca.nombre.slice(0,20)} - Inv.`);
+      XLSX.writeFile(wb, `Inventario_${marca.nombre.replace(/\s+/g,"_")}_${ahora.toISOString().slice(0,10)}.xlsx`);
+    }catch(e){ alert("Error al generar Excel: "+e.message); }
+    setXlsxCarg(false);
+  }
 
   // ── Ahora sí: return condicional DESPUÉS de todos los hooks ──
   if(!marca) return (
@@ -4584,47 +4915,102 @@ function BrandPortal({user, ventas, inv, logout}){
         {/* ══ VENTAS ══ */}
         {tab==="ventas"&&(
           <div>
-            <div style={{fontSize:13,color:C.label3,fontFamily:FONT,marginBottom:12}}>
-              {vMes.length} ventas · {$(brutoMes)} · {MESES[mes]} {anio}
+            {/* ── Buscador ventas ── */}
+            <div style={{position:"relative",marginBottom:12}}>
+              <span style={{position:"absolute",left:13,top:"50%",transform:"translateY(-50%)",
+                fontSize:15,pointerEvents:"none"}}>🔍</span>
+              <input
+                value={busqV}
+                onChange={e=>setBusqV(e.target.value)}
+                placeholder={`Buscar en ${MESES[mes]}…`}
+                style={{width:"100%",padding:"10px 14px 10px 38px",borderRadius:12,
+                  border:`1px solid ${C.sep}`,background:C.bg1,fontSize:13,
+                  color:C.label,fontFamily:FONT,outline:"none",boxSizing:"border-box",
+                  WebkitAppearance:"none"}}
+              />
+              {busqV&&(
+                <button onClick={()=>setBusqV("")} style={{position:"absolute",right:10,
+                  top:"50%",transform:"translateY(-50%)",background:"none",border:"none",
+                  cursor:"pointer",fontSize:16,color:C.label3,padding:4}}>✕</button>
+              )}
             </div>
-            {vMes.length===0
+
+            {/* ── Stats bar ── */}
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",
+              marginBottom:14}}>
+              <span style={{fontSize:12,color:C.label3,fontFamily:FONT}}>
+                {vMesFiltradas.length} {vMesFiltradas.length===1?"venta":"ventas"}
+                {busqV&&` · "${busqV}"`}
+              </span>
+              <span style={{fontSize:13,fontWeight:700,color:marca.color,fontFamily:FONT}}>
+                {$(brutoMes)}
+              </span>
+            </div>
+
+            {/* ── Lista ventas ── */}
+            {vMesFiltradas.length===0
               ? <div style={{textAlign:"center",padding:"48px 0",color:C.label3}}>
                   <div style={{fontSize:40,marginBottom:8}}>🛍</div>
-                  <div style={{fontFamily:FONT}}>Sin ventas en {MESES[mes]}</div>
+                  <div style={{fontFamily:FONT}}>
+                    {busqV ? `Sin resultados para "${busqV}"` : `Sin ventas en ${MESES[mes]}`}
+                  </div>
                 </div>
-              : [...vMes].sort((a,b)=>b.id.localeCompare(a.id)).map(v=>{
-                  const items=v.items.filter(i=>i.marcaId===marca.id);
-                  const sub=items.reduce((s,i)=>s+i.subtotal,0);
+              : vMesFiltradas.map(v=>{
+                  const citems = v.items.filter(i=>i.marcaId===marca.id);
+                  const csub   = citems.reduce((s,i)=>s+i.subtotal,0);
+                  const hasFac = !!leerFacturaLocal(v.id);
                   return (
-                    <div key={v.id} style={{background:C.bg1,borderRadius:16,
-                      padding:"14px 16px",marginBottom:10,border:`1px solid ${C.sep}`,
-                      boxShadow:"0 1px 6px rgba(0,0,0,0.04)"}}>
+                    <div key={v.id}
+                      onClick={()=>setVentaSeleccionada(v)}
+                      style={{background:C.bg1,borderRadius:16,padding:"14px 16px",
+                        marginBottom:10,border:`1px solid ${C.sep}`,
+                        boxShadow:"0 1px 6px rgba(0,0,0,0.04)",
+                        cursor:"pointer",WebkitTapHighlightColor:"transparent",
+                        transition:"box-shadow .15s",
+                        borderLeft:`4px solid ${v.anulada?C.red:marca.color}`}}>
+                      {/* Fila 1 — ID + total */}
                       <div style={{display:"flex",justifyContent:"space-between",
-                        alignItems:"flex-start",marginBottom:10}}>
+                        alignItems:"flex-start",marginBottom:8}}>
                         <div>
-                          <div style={{fontSize:12,fontFamily:"monospace",
-                            color:C.gold,fontWeight:700}}>{v.id}</div>
-                          <div style={{fontSize:12,color:C.label3,fontFamily:FONT,marginTop:2}}>
+                          <div style={{fontSize:11,fontFamily:"monospace",
+                            color:C.label3,fontWeight:600}}>{v.id}</div>
+                          <div style={{fontSize:12,color:C.label3,fontFamily:FONT,marginTop:1}}>
                             {v.fecha} {v.hora} · {v.vendedor||"Tienda"}
                           </div>
                         </div>
-                        <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:4}}>
-                          <Chip color={colorPago(v.metodoPago)} small>
+                        <div style={{textAlign:"right"}}>
+                          <div style={{fontSize:17,fontWeight:800,color:v.anulada?C.red:marca.color,
+                            fontFamily:FONT_DISPLAY,lineHeight:1}}>{$(csub)}</div>
+                          <div style={{fontSize:10,color:C.label3,fontFamily:FONT,marginTop:2}}>
                             {iconPago(v.metodoPago)} {labelPago(v.metodoPago)}
-                          </Chip>
-                          <span style={{fontSize:16,fontWeight:800,color:C.gold,fontFamily:FONT}}>
-                            {$(sub)}
-                          </span>
+                          </div>
                         </div>
                       </div>
-                      {items.map((it,ii)=>(
-                        <div key={ii} style={{fontSize:13,color:C.label2,fontFamily:FONT,
-                          padding:"6px 10px",background:`${marca.color}12`,borderRadius:8,
-                          marginBottom:4,display:"flex",justifyContent:"space-between"}}>
-                          <span>{it.nombre} ×{it.cantidad}</span>
-                          <span style={{fontWeight:600,color:marca.color}}>{$(it.subtotal)}</span>
-                        </div>
-                      ))}
+                      {/* Fila 2 — productos resumidos */}
+                      <div style={{fontSize:12,color:C.label2,fontFamily:FONT,
+                        overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",
+                        marginBottom:8}}>
+                        {citems.map(i=>`${i.nombre} ×${i.cantidad}`).join(" · ")}
+                      </div>
+                      {/* Fila 3 — badges */}
+                      <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
+                        {v.anulada&&(
+                          <span style={{fontSize:10,background:C.redBg,color:C.red,
+                            padding:"2px 8px",borderRadius:20,fontFamily:FONT,fontWeight:700}}>
+                            ANULADA
+                          </span>
+                        )}
+                        {hasFac&&(
+                          <span style={{fontSize:10,background:"#F3F4FC",color:"#1A237E",
+                            padding:"2px 8px",borderRadius:20,fontFamily:FONT,fontWeight:600}}>
+                            🧾 Facturada
+                          </span>
+                        )}
+                        <span style={{fontSize:10,color:C.label3,fontFamily:FONT,
+                          marginLeft:"auto"}}>
+                          Ver detalle →
+                        </span>
+                      </div>
                     </div>
                   );
                 })
@@ -4635,26 +5021,96 @@ function BrandPortal({user, ventas, inv, logout}){
         {/* ══ INVENTARIO ══ */}
         {tab==="inventario"&&(
           <div>
-            <div style={{fontSize:13,color:C.label3,fontFamily:FONT,marginBottom:12}}>
-              {invMarca.length} productos · valor {$(invMarca.reduce((s,i)=>s+i.precio*i.stock,0))} en stock
+            {/* ── Buscador ── */}
+            <div style={{position:"relative",marginBottom:10}}>
+              <span style={{position:"absolute",left:13,top:"50%",transform:"translateY(-50%)",
+                fontSize:15,pointerEvents:"none"}}>🔍</span>
+              <input
+                value={busqInvP}
+                onChange={e=>setBusqInvP(e.target.value)}
+                placeholder="SKU, nombre o categoría…"
+                style={{width:"100%",padding:"10px 14px 10px 38px",borderRadius:12,
+                  border:`1px solid ${C.sep}`,background:C.bg1,fontSize:13,
+                  color:C.label,fontFamily:FONT,outline:"none",boxSizing:"border-box"}}
+              />
+              {busqInvP&&(
+                <button onClick={()=>setBusqInvP("")} style={{position:"absolute",right:10,
+                  top:"50%",transform:"translateY(-50%)",background:"none",border:"none",
+                  cursor:"pointer",fontSize:16,color:C.label3,padding:4}}>✕</button>
+              )}
             </div>
+
+            {/* ── Filtros fila 2 ── */}
+            <div style={{display:"flex",gap:8,marginBottom:10,flexWrap:"wrap"}}>
+              <select value={catFilP} onChange={e=>setCatFilP(e.target.value)}
+                style={{flex:"1 1 120px",padding:"8px 10px",borderRadius:10,border:`1px solid ${C.sep}`,
+                  background:C.bg1,fontSize:12,color:catFilP?C.label:C.label3,fontFamily:FONT,
+                  outline:"none",WebkitAppearance:"none",cursor:"pointer"}}>
+                <option value="">Todas las categorías</option>
+                {categoriasMarca.map(c=><option key={c} value={c}>{c}</option>)}
+              </select>
+              <input type="date" value={fechaDesde} onChange={e=>setFechaDesde(e.target.value)}
+                title="Desde"
+                style={{flex:"1 1 130px",padding:"8px 10px",borderRadius:10,border:`1px solid ${C.sep}`,
+                  background:C.bg1,fontSize:12,color:fechaDesde?C.label:C.label3,fontFamily:FONT,
+                  outline:"none",cursor:"pointer"}}/>
+              <input type="date" value={fechaHasta} onChange={e=>setFechaHasta(e.target.value)}
+                title="Hasta"
+                style={{flex:"1 1 130px",padding:"8px 10px",borderRadius:10,border:`1px solid ${C.sep}`,
+                  background:C.bg1,fontSize:12,color:fechaHasta?C.label:C.label3,fontFamily:FONT,
+                  outline:"none",cursor:"pointer"}}/>
+            </div>
+
+            {/* ── Stats + acciones ── */}
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",
+              marginBottom:14,gap:8,flexWrap:"wrap"}}>
+              <span style={{fontSize:12,color:C.label3,fontFamily:FONT}}>
+                {invFiltrado.length} de {invMarca.length} productos ·{" "}
+                {$(invFiltrado.reduce((s,i)=>s+i.precio*i.stock,0))} en stock
+              </span>
+              <div style={{display:"flex",gap:8,alignItems:"center"}}>
+                {(busqInvP||catFilP||fechaDesde||fechaHasta)&&(
+                  <button onClick={()=>{setBusqInvP("");setCatFilP("");setFechaDesde("");setFechaHasta("");}}
+                    style={{padding:"6px 12px",borderRadius:10,border:`1px solid ${C.sep}`,
+                      background:C.bg2,cursor:"pointer",fontSize:11,color:C.label3,fontFamily:FONT}}>
+                    Limpiar filtros
+                  </button>
+                )}
+                <button onClick={descargarExcelInvMarca} disabled={xlsxCarg}
+                  style={{padding:"6px 14px",borderRadius:10,border:"none",
+                    background:xlsxCarg?C.label3:C.green,cursor:xlsxCarg?"not-allowed":"pointer",
+                    fontSize:12,fontWeight:700,color:"#fff",fontFamily:FONT,
+                    display:"flex",alignItems:"center",gap:6,
+                    WebkitTapHighlightColor:"transparent"}}>
+                  {xlsxCarg?"⏳":"📊"} {xlsxCarg?"Generando…":"Excel"}
+                </button>
+              </div>
+            </div>
+
+            {/* ── Lista inventario ── */}
             {invMarca.length===0
               ? <div style={{textAlign:"center",padding:"48px 0",color:C.label3}}>
                   <div style={{fontSize:40,marginBottom:8}}>📦</div>
                   <div style={{fontFamily:FONT}}>Sin productos registrados</div>
                 </div>
+              : invFiltrado.length===0
+              ? <div style={{textAlign:"center",padding:"48px 0",color:C.label3}}>
+                  <div style={{fontSize:32,marginBottom:8}}>🔍</div>
+                  <div style={{fontFamily:FONT}}>Sin resultados con los filtros aplicados</div>
+                </div>
               : (()=>{
-                  // Agrupar por estado
                   const grupos=[
-                    {label:"🔴 Agotados",    prods:invMarca.filter(i=>i.stock===0),    bg:C.redBg,   color:C.red},
-                    {label:"🟡 Bajo stock",  prods:invMarca.filter(i=>i.stock>0&&i.stock<=2), bg:C.amberBg, color:C.amber},
-                    {label:"🟢 En stock",    prods:invMarca.filter(i=>i.stock>2),      bg:C.greenBg, color:C.green},
+                    {label:"🔴 Agotados",   prods:invFiltrado.filter(i=>i.stock===0),           color:C.red},
+                    {label:"🟡 Bajo stock", prods:invFiltrado.filter(i=>i.stock>0&&i.stock<=2), color:C.amber},
+                    {label:"🟢 En stock",   prods:invFiltrado.filter(i=>i.stock>2),              color:C.green},
                   ].filter(g=>g.prods.length>0);
                   return grupos.map(g=>(
                     <div key={g.label} style={{marginBottom:16}}>
-                      <div style={{fontSize:12,fontWeight:700,color:g.color,fontFamily:FONT,
-                        textTransform:"uppercase",letterSpacing:.5,marginBottom:8}}>{g.label} ({g.prods.length})</div>
-                      {g.prods.map((p,i)=>(
+                      <div style={{fontSize:11,fontWeight:700,color:g.color,fontFamily:FONT,
+                        textTransform:"uppercase",letterSpacing:.5,marginBottom:8}}>
+                        {g.label} ({g.prods.length})
+                      </div>
+                      {g.prods.map(p=>(
                         <div key={p.id} style={{background:C.bg1,borderRadius:14,
                           padding:"12px 14px",marginBottom:6,border:`1px solid ${C.sep}`,
                           borderLeft:`4px solid ${g.color}`,
@@ -4662,23 +5118,27 @@ function BrandPortal({user, ventas, inv, logout}){
                           <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
                             <div style={{flex:1,minWidth:0}}>
                               <div style={{fontSize:13,fontWeight:600,color:C.label,fontFamily:FONT,
-                                overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.nombre}</div>
+                                overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                                {p.nombre}
+                              </div>
                               <div style={{fontSize:11,color:C.label3,fontFamily:FONT,marginTop:2}}>
                                 {p.codigo} · {p.categoria||"General"}
+                                {p.fecha&&<span style={{color:C.label3}}> · {p.fecha}</span>}
                               </div>
                             </div>
                             <div style={{textAlign:"right",flexShrink:0,marginLeft:10}}>
-                              <div style={{fontSize:14,fontWeight:700,color:C.gold,fontFamily:FONT}}>{$(p.precio)}</div>
+                              <div style={{fontSize:14,fontWeight:700,color:C.gold,fontFamily:FONT}}>
+                                {$(p.precio)}
+                              </div>
                               <div style={{fontSize:11,fontWeight:700,color:g.color,fontFamily:FONT,marginTop:2}}>
-                                Stock: {p.stock} / {p.stockInicial}
+                                {p.stock} / {p.stockInicial||p.stock} uds
                               </div>
                             </div>
                           </div>
-                          {/* Barra de progreso stock */}
                           <div style={{marginTop:8,height:4,background:`${g.color}20`,borderRadius:2}}>
-                            <div style={{height:"100%",
-                              background:g.color,borderRadius:2,
-                              width:`${p.stockInicial>0?Math.round((p.stock/p.stockInicial)*100):0}%`}}/>
+                            <div style={{height:"100%",background:g.color,borderRadius:2,
+                              width:`${(p.stockInicial||p.stock)>0?Math.round((p.stock/(p.stockInicial||p.stock))*100):0}%`,
+                              transition:"width .3s"}}/>
                           </div>
                         </div>
                       ))}
@@ -4773,6 +5233,15 @@ function BrandPortal({user, ventas, inv, logout}){
           </button>
         ))}
       </div>
+
+      {/* ── Modal detalle venta ── */}
+      {ventaSeleccionada&&(
+        <BrandVentaModal
+          venta={ventaSeleccionada}
+          marca={marca}
+          onClose={()=>setVentaSeleccionada(null)}
+        />
+      )}
     </div>
   );
 }
