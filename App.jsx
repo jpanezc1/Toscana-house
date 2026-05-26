@@ -641,6 +641,19 @@ function iconPago(mp){
   return PAGOS.find(p=>p.id===mp)?.icon||"";
 }
 
+// ── MarcaIcon: muestra imagen de logo o emoji como fallback ──────────────────
+// Usar en cualquier lugar del UI donde aparezca el ícono de una marca.
+function MarcaIcon({marca, size=20, radius=8, style={}}){
+  if(!marca) return null;
+  if(marca.imagen){
+    return <img src={marca.imagen} alt={marca.nombre||""}
+      style={{width:size,height:size,borderRadius:radius,
+        objectFit:"cover",flexShrink:0,display:"inline-block",...style}}/>;
+  }
+  return <span style={{fontSize:size*0.85,lineHeight:1,flexShrink:0,
+    display:"inline-block",...style}}>{marca.emoji||"◆"}</span>;
+}
+
 // ── Helpers ───────────────────────────────────────────────
 const $    = n => "Bs " + new Intl.NumberFormat("es-BO",{minimumFractionDigits:0,maximumFractionDigits:2}).format(n||0);
 const hoy  = () => new Date().toISOString().slice(0,10);
@@ -4219,7 +4232,7 @@ function HomeDashboard({ventas, inv, vMes, mes, anio, onGoTab}){
             <div key={m.marca.id} style={{marginBottom: i < topMarcas.length - 1 ? 12 : 0}}>
               <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:4}}>
                 <div style={{display:"flex", alignItems:"center", gap:6}}>
-                  <span style={{fontSize:14}}>{m.marca.emoji}</span>
+                  <MarcaIcon marca={m.marca} size={18} radius={6}/>
                   <span style={{fontSize:13, fontWeight:600, color:C.label, fontFamily:FONT_UI}}>{m.marca.nombre}</span>
                 </div>
                 <span style={{fontSize:12, fontWeight:700, color:m.marca.color, fontFamily:FONT_UI}}>
@@ -6742,7 +6755,9 @@ function POS({inv,onVenta,onVerNota}){
                 <div style={{display:"flex",alignItems:"center",gap:12}}>
                   <div style={{width:36,height:36,borderRadius:10,
                     background:`${m?.color||C.gold}22`,
-                    display:"flex",alignItems:"center",justifyContent:"center",fontSize:18}}>{m?.emoji}</div>
+                    display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,overflow:"hidden"}}>
+                    <MarcaIcon marca={m} size={34} radius={8}/>
+                  </div>
                   <div>
                     <div style={{fontSize:15,fontWeight:500,color:C.label,fontFamily:FONT}}>{p.nombre}</div>
                     <div style={{display:"flex",alignItems:"center",gap:6}}>
@@ -7272,7 +7287,7 @@ function InventarioPorMarca({inv, ventas, onRecibir, onBaja, onImportarExcel}){
                 display:"flex",flexDirection:"column",alignItems:"center",gap:3,
                 minWidth:80,transition:"all .2s",
               }}>
-                <span style={{fontSize:20}}>{m.emoji}</span>
+                <MarcaIcon marca={m} size={22} radius={6}/>
                 <span style={{fontSize:11,fontWeight:activa?700:500,
                   color:activa?m.color:C.label2,whiteSpace:"nowrap"}}>{m.nombre}</span>
                 <span style={{fontSize:10,color:activa?m.color:C.label3}}>
@@ -7473,7 +7488,7 @@ function MarcaDetalle({marcaId,inv,ventas,vMes,mes,anio,MK,cierres,setCierres,ge
     <div>
       {/* Stats */}
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:20}}>
-        <StatCard icon={marca?.emoji||"◆"} label="Total histórico" value={$(totalHist)}
+        <StatCard icon={marca?.imagen?<MarcaIcon marca={marca} size={22} radius={6}/>:(marca?.emoji||"◆")} label="Total histórico" value={$(totalHist)}
           sub={`${historial.reduce((s,h)=>s+h.ventas.length,0)} ventas`} color={marca?.color}/>
         <StatCard icon="📅" label={MESES[mes]} value={$(liq.bruto)}
           sub={`${liq.vMarca.length} ventas`} color={C.gold}/>
@@ -7824,7 +7839,7 @@ function HistorialTab({ventas, inv, cierres, onVentaClick}){
                         padding:"4px 10px",borderRadius:20,
                         background:cerrado?`${C.green}15`:`${C.amber}15`,
                         border:`1px solid ${cerrado?C.green:C.amber}30`}}>
-                        <span style={{fontSize:13}}>{m.emoji}</span>
+                        <MarcaIcon marca={m} size={16} radius={4}/>
                         <span style={{fontSize:12,fontFamily:FONT,
                           color:cerrado?C.green:C.amber}}>{m.nombre}</span>
                         <span style={{fontSize:11}}>{cerrado?"✓":"⏳"}</span>
@@ -7855,7 +7870,7 @@ function HistorialTab({ventas, inv, cierres, onVentaClick}){
                   }}>
                     <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
                       <div style={{display:"flex",alignItems:"center",gap:10}}>
-                        <span style={{fontSize:20}}>{x.marca.emoji}</span>
+                        <MarcaIcon marca={x.marca} size={22} radius={6}/>
                         <div>
                           <div style={{fontSize:15,fontWeight:700,color:C.label,fontFamily:FONT}}>{x.marca.nombre}</div>
                           <div style={{fontSize:12,color:C.label3,fontFamily:FONT}}>{x.txs} venta{x.txs!==1?"s":""}</div>
@@ -7941,7 +7956,7 @@ function HistorialTab({ventas, inv, cierres, onVentaClick}){
                     <div style={{display:"flex",justifyContent:"space-between",
                       alignItems:"center",marginBottom:10}}>
                       <div style={{display:"flex",alignItems:"center",gap:8}}>
-                        <span style={{fontSize:18}}>{m.emoji}</span>
+                        <MarcaIcon marca={m} size={20} radius={6}/>
                         <span style={{fontSize:15,fontWeight:700,color:C.label,fontFamily:FONT}}>{m.nombre}</span>
                       </div>
                       <div style={{textAlign:"right"}}>
@@ -8624,8 +8639,9 @@ function ConfigTab({user, logout}){
                       </div>
                       <div style={{fontSize:12,color:C.label3,fontFamily:FONT}}>
                         @{u.usuario}
-                        {m&&<span style={{marginLeft:6,color:m.color}}>
-                          · {m.emoji} {m.nombre}</span>}
+                        {m&&<span style={{marginLeft:6,color:m.color,
+                          display:"inline-flex",alignItems:"center",gap:3}}>
+                          · <MarcaIcon marca={m} size={12} radius={3}/> {m.nombre}</span>}
                       </div>
                     </div>
                     <div style={{display:"flex",gap:6,flexShrink:0}}>
@@ -9093,7 +9109,7 @@ function DashboardVentas({ventas, onVentaClick}){
                   <div key={x.marcaId} style={{marginBottom:12}}>
                     <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
                       <div style={{display:"flex",alignItems:"center",gap:6}}>
-                        <span style={{fontSize:14}}>{marca?.emoji||"🏷"}</span>
+                        <MarcaIcon marca={marca} size={16} radius={4}/>
                         <span style={{fontSize:13,color:C.label,fontFamily:FONT,fontWeight:500}}>
                           {x.marcaNombre}
                         </span>
@@ -9176,7 +9192,7 @@ function DashboardVentas({ventas, onVentaClick}){
                           <div style={{display:"flex",alignItems:"center",gap:6,marginTop:2}}>
                             <span style={{fontSize:10,fontFamily:"monospace",color:C.gold,
                               background:`${C.gold}15`,padding:"1px 5px",borderRadius:4}}>{it.codigo}</span>
-                            {marca&&<span style={{fontSize:10,color:marca.color,fontFamily:FONT_UI}}>{marca.emoji} {it.marcaNombre}</span>}
+                            {marca&&<span style={{fontSize:10,color:marca.color,fontFamily:FONT_UI,display:"inline-flex",alignItems:"center",gap:3}}><MarcaIcon marca={marca} size={12} radius={3}/>{it.marcaNombre}</span>}
                           </div>
                         </div>
                         <div style={{textAlign:"center",fontSize:15,fontWeight:700,color:C.blue,fontFamily:FONT_UI}}>{it.cant}</div>
@@ -9391,7 +9407,7 @@ function VentasTab({vMes, totalVtas, mes, anio, onVentaClick}){
                       <div style={{width:36,height:36,borderRadius:10,
                         background:`${x.marca.color}22`,display:"flex",
                         alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>
-                        {x.marca.emoji}
+                        <MarcaIcon marca={x.marca} size={20} radius={6}/>
                       </div>
                       <div>
                         <div style={{fontSize:15,fontWeight:700,color:C.label,fontFamily:FONT}}>{x.marca.nombre}</div>
@@ -9474,7 +9490,7 @@ function VentasTab({vMes, totalVtas, mes, anio, onVentaClick}){
                 cursor:"pointer",WebkitTapHighlightColor:"transparent",
                 display:"flex",alignItems:"center",gap:5,
               }}>
-                <span>{m.emoji}</span>{m.nombre}
+                <MarcaIcon marca={m} size={14} radius={4}/>{m.nombre}
               </button>
             ))}
           </div>
@@ -9526,7 +9542,7 @@ function VentasTab({vMes, totalVtas, mes, anio, onVentaClick}){
                           borderLeft:`3px solid ${g.marca?.color}`}}>
                           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
                             <div style={{display:"flex",alignItems:"center",gap:6}}>
-                              <span style={{fontSize:14}}>{g.marca?.emoji}</span>
+                              <MarcaIcon marca={g.marca} size={16} radius={4}/>
                               <span style={{fontSize:13,fontWeight:700,color:g.marca?.color,fontFamily:FONT}}>{g.marca?.nombre}</span>
                             </div>
                             <span style={{fontSize:13,fontWeight:700,color:g.marca?.color,fontFamily:FONT}}>{$(g.sub)}</span>

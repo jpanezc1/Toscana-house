@@ -22091,6 +22091,34 @@
     if (mp.startsWith("mixto|")) return "\u{1F500}";
     return PAGOS.find((p) => p.id === mp)?.icon || "";
   }
+  function MarcaIcon({ marca, size = 20, radius = 8, style = {} }) {
+    if (!marca) return null;
+    if (marca.imagen) {
+      return /* @__PURE__ */ import_react.default.createElement(
+        "img",
+        {
+          src: marca.imagen,
+          alt: marca.nombre || "",
+          style: {
+            width: size,
+            height: size,
+            borderRadius: radius,
+            objectFit: "cover",
+            flexShrink: 0,
+            display: "inline-block",
+            ...style
+          }
+        }
+      );
+    }
+    return /* @__PURE__ */ import_react.default.createElement("span", { style: {
+      fontSize: size * 0.85,
+      lineHeight: 1,
+      flexShrink: 0,
+      display: "inline-block",
+      ...style
+    } }, marca.emoji || "\u25C6");
+  }
   var $ = (n) => "Bs " + new Intl.NumberFormat("es-BO", { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(n || 0);
   var hoy = () => (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
   var hora = () => (/* @__PURE__ */ new Date()).toLocaleTimeString("es-BO", { hour: "2-digit", minute: "2-digit" });
@@ -25600,7 +25628,7 @@ Fecha: ${venta.fecha}`);
       border: "none",
       cursor: "pointer",
       padding: 0
-    } }, "Ver todas \u2192")), topMarcas.map((m, i) => /* @__PURE__ */ import_react.default.createElement("div", { key: m.marca.id, style: { marginBottom: i < topMarcas.length - 1 ? 12 : 0 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 14 } }, m.marca.emoji), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, fontWeight: 600, color: C.label, fontFamily: FONT_UI } }, m.marca.nombre)), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 12, fontWeight: 700, color: m.marca.color, fontFamily: FONT_UI } }, "Bs ", new Intl.NumberFormat("es-BO", { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(m.total))), /* @__PURE__ */ import_react.default.createElement("div", { style: { height: 5, background: C.bg3, borderRadius: 3, overflow: "hidden" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+    } }, "Ver todas \u2192")), topMarcas.map((m, i) => /* @__PURE__ */ import_react.default.createElement("div", { key: m.marca.id, style: { marginBottom: i < topMarcas.length - 1 ? 12 : 0 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6 } }, /* @__PURE__ */ import_react.default.createElement(MarcaIcon, { marca: m.marca, size: 18, radius: 6 }), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, fontWeight: 600, color: C.label, fontFamily: FONT_UI } }, m.marca.nombre)), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 12, fontWeight: 700, color: m.marca.color, fontFamily: FONT_UI } }, "Bs ", new Intl.NumberFormat("es-BO", { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(m.total))), /* @__PURE__ */ import_react.default.createElement("div", { style: { height: 5, background: C.bg3, borderRadius: 3, overflow: "hidden" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
       height: 5,
       width: `${m.total / maxMarca * 100}%`,
       background: m.marca.color,
@@ -28595,8 +28623,9 @@ Fecha: ${venta.fecha}`);
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        fontSize: 18
-      } }, m?.emoji), /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 15, fontWeight: 500, color: C.label, fontFamily: FONT } }, p.nombre), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: {
+        fontSize: 18,
+        overflow: "hidden"
+      } }, /* @__PURE__ */ import_react.default.createElement(MarcaIcon, { marca: m, size: 34, radius: 8 })), /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 15, fontWeight: 500, color: C.label, fontFamily: FONT } }, p.nombre), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: {
         fontFamily: "monospace",
         fontSize: 11,
         color: C.gold,
@@ -29197,7 +29226,7 @@ Fecha: ${venta.fecha}`);
         gap: 3,
         minWidth: 80,
         transition: "all .2s"
-      } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 20 } }, m.emoji), /* @__PURE__ */ import_react.default.createElement("span", { style: {
+      } }, /* @__PURE__ */ import_react.default.createElement(MarcaIcon, { marca: m, size: 22, radius: 6 }), /* @__PURE__ */ import_react.default.createElement("span", { style: {
         fontSize: 11,
         fontWeight: activa ? 700 : 500,
         color: activa ? m.color : C.label2,
@@ -29394,7 +29423,7 @@ Fecha: ${venta.fecha}`);
     return /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 20 } }, /* @__PURE__ */ import_react.default.createElement(
       StatCard,
       {
-        icon: marca?.emoji || "\u25C6",
+        icon: marca?.imagen ? /* @__PURE__ */ import_react.default.createElement(MarcaIcon, { marca, size: 22, radius: 6 }) : marca?.emoji || "\u25C6",
         label: "Total hist\xF3rico",
         value: $(totalHist),
         sub: `${historial.reduce((s, h) => s + h.ventas.length, 0)} ventas`,
@@ -29681,7 +29710,7 @@ Fecha: ${venta.fecha}`);
         borderRadius: 20,
         background: cerrado ? `${C.green}15` : `${C.amber}15`,
         border: `1px solid ${cerrado ? C.green : C.amber}30`
-      } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13 } }, m.emoji), /* @__PURE__ */ import_react.default.createElement("span", { style: {
+      } }, /* @__PURE__ */ import_react.default.createElement(MarcaIcon, { marca: m, size: 16, radius: 4 }), /* @__PURE__ */ import_react.default.createElement("span", { style: {
         fontSize: 12,
         fontFamily: FONT,
         color: cerrado ? C.green : C.amber
@@ -29694,7 +29723,7 @@ Fecha: ${venta.fecha}`);
         borderBottom: i < porMarcaPer.length - 1 ? `1px solid ${C.sep}` : "",
         padding: "14px 16px",
         borderLeft: `4px solid ${x.marca.color}`
-      } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 20 } }, x.marca.emoji), /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 15, fontWeight: 700, color: C.label, fontFamily: FONT } }, x.marca.nombre), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT } }, x.txs, " venta", x.txs !== 1 ? "s" : ""))), /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "right" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 18, fontWeight: 800, color: x.marca.color, fontFamily: FONT } }, $(x.total)), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.green, fontFamily: FONT } }, "Neto: ", $(x.total * 0.9)))), /* @__PURE__ */ import_react.default.createElement("div", { style: { background: "rgba(0,0,0,0.06)", borderRadius: 4, height: 5, marginBottom: 10 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { width: `${x.total / maxT * 100}%`, background: x.marca.color, height: 5, borderRadius: 4 } })), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6 } }, [["\u{1F4B5}", x.ef, "#4A9B6F"], ["\u{1F4F1}", x.qr, "#5B8DB8"], ["\u{1F4B3}", x.tj, "#C8922A"]].map(([icon, val, color]) => /* @__PURE__ */ import_react.default.createElement("div", { key: icon, style: {
+      } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10 } }, /* @__PURE__ */ import_react.default.createElement(MarcaIcon, { marca: x.marca, size: 22, radius: 6 }), /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 15, fontWeight: 700, color: C.label, fontFamily: FONT } }, x.marca.nombre), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT } }, x.txs, " venta", x.txs !== 1 ? "s" : ""))), /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "right" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 18, fontWeight: 800, color: x.marca.color, fontFamily: FONT } }, $(x.total)), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.green, fontFamily: FONT } }, "Neto: ", $(x.total * 0.9)))), /* @__PURE__ */ import_react.default.createElement("div", { style: { background: "rgba(0,0,0,0.06)", borderRadius: 4, height: 5, marginBottom: 10 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { width: `${x.total / maxT * 100}%`, background: x.marca.color, height: 5, borderRadius: 4 } })), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6 } }, [["\u{1F4B5}", x.ef, "#4A9B6F"], ["\u{1F4F1}", x.qr, "#5B8DB8"], ["\u{1F4B3}", x.tj, "#C8922A"]].map(([icon, val, color]) => /* @__PURE__ */ import_react.default.createElement("div", { key: icon, style: {
         padding: "7px",
         background: `${color}10`,
         borderRadius: 8,
@@ -29746,7 +29775,7 @@ Fecha: ${venta.fecha}`);
         justifyContent: "space-between",
         alignItems: "center",
         marginBottom: 10
-      } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 18 } }, m.emoji), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 15, fontWeight: 700, color: C.label, fontFamily: FONT } }, m.nombre)), /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "right" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.green, fontFamily: FONT } }, stockTotal, " en stock"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.blue, fontFamily: FONT } }, vendTotal, " vendidas"))), prods.map((p) => /* @__PURE__ */ import_react.default.createElement("div", { key: p.id, style: {
+      } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } }, /* @__PURE__ */ import_react.default.createElement(MarcaIcon, { marca: m, size: 20, radius: 6 }), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 15, fontWeight: 700, color: C.label, fontFamily: FONT } }, m.nombre)), /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "right" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.green, fontFamily: FONT } }, stockTotal, " en stock"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.blue, fontFamily: FONT } }, vendTotal, " vendidas"))), prods.map((p) => /* @__PURE__ */ import_react.default.createElement("div", { key: p.id, style: {
         display: "flex",
         justifyContent: "space-between",
         alignItems: "center",
@@ -30628,7 +30657,13 @@ Fecha: ${venta.fecha}`);
         fontWeight: 700,
         color: C.label,
         fontFamily: FONT
-      } }, u.nombre), rolBadge(u), estadoBadge(u)), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT } }, "@", u.usuario, m && /* @__PURE__ */ import_react.default.createElement("span", { style: { marginLeft: 6, color: m.color } }, "\xB7 ", m.emoji, " ", m.nombre))), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 6, flexShrink: 0 } }, /* @__PURE__ */ import_react.default.createElement(
+      } }, u.nombre), rolBadge(u), estadoBadge(u)), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT } }, "@", u.usuario, m && /* @__PURE__ */ import_react.default.createElement("span", { style: {
+        marginLeft: 6,
+        color: m.color,
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 3
+      } }, "\xB7 ", /* @__PURE__ */ import_react.default.createElement(MarcaIcon, { marca: m, size: 12, radius: 3 }), " ", m.nombre))), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 6, flexShrink: 0 } }, /* @__PURE__ */ import_react.default.createElement(
         "button",
         {
           onClick: () => setEditando(u),
@@ -31209,7 +31244,7 @@ Esta acci\xF3n no se puede deshacer.`,
     } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, fontWeight: 700, color: C.label, fontFamily: FONT, marginBottom: 12 } }, "Ventas por marca"), porMarcaFil.map((x, i) => {
       const marca = MARCAS.find((m) => m.id === x.marcaId);
       const pct = totalFil > 0 ? Math.round(x.total / totalFil * 100) : 0;
-      return /* @__PURE__ */ import_react.default.createElement("div", { key: x.marcaId, style: { marginBottom: 12 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", marginBottom: 4 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 14 } }, marca?.emoji || "\u{1F3F7}"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, color: C.label, fontFamily: FONT, fontWeight: 500 } }, x.marcaNombre)), /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "right" } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, fontWeight: 700, color: marca?.color || C.label, fontFamily: FONT } }, $(x.total)), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 11, color: C.label3, fontFamily: FONT, marginLeft: 6 } }, pct, "%"))), /* @__PURE__ */ import_react.default.createElement("div", { style: { background: C.sep, borderRadius: 4, height: 5, overflow: "hidden" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      return /* @__PURE__ */ import_react.default.createElement("div", { key: x.marcaId, style: { marginBottom: 12 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", marginBottom: 4 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6 } }, /* @__PURE__ */ import_react.default.createElement(MarcaIcon, { marca, size: 16, radius: 4 }), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, color: C.label, fontFamily: FONT, fontWeight: 500 } }, x.marcaNombre)), /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "right" } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, fontWeight: 700, color: marca?.color || C.label, fontFamily: FONT } }, $(x.total)), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 11, color: C.label3, fontFamily: FONT, marginLeft: 6 } }, pct, "%"))), /* @__PURE__ */ import_react.default.createElement("div", { style: { background: C.sep, borderRadius: 4, height: 5, overflow: "hidden" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
         width: `${pct}%`,
         height: 5,
         borderRadius: 4,
@@ -31274,7 +31309,7 @@ Esta acci\xF3n no se puede deshacer.`,
           background: `${C.gold}15`,
           padding: "1px 5px",
           borderRadius: 4
-        } }, it.codigo), marca && /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 10, color: marca.color, fontFamily: FONT_UI } }, marca.emoji, " ", it.marcaNombre))), /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center", fontSize: 15, fontWeight: 700, color: C.blue, fontFamily: FONT_UI } }, it.cant), /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "right", fontSize: 14, fontWeight: 700, color: C.green, fontFamily: FONT_UI } }, $(it.total)));
+        } }, it.codigo), marca && /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 10, color: marca.color, fontFamily: FONT_UI, display: "inline-flex", alignItems: "center", gap: 3 } }, /* @__PURE__ */ import_react.default.createElement(MarcaIcon, { marca, size: 12, radius: 3 }), it.marcaNombre))), /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center", fontSize: 15, fontWeight: 700, color: C.blue, fontFamily: FONT_UI } }, it.cant), /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "right", fontSize: 14, fontWeight: 700, color: C.green, fontFamily: FONT_UI } }, $(it.total)));
       })));
     })(), vistaD === "lista" && /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, color: C.label3, fontFamily: FONT } }, ventasFiltradas.length, " venta", ventasFiltradas.length !== 1 ? "s" : "", " \xB7 ", $(totalFil))), ventasFiltradas.length === 0 ? /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center", padding: "30px 0", color: C.label3, fontFamily: FONT, fontSize: 13 } }, "Sin ventas en el per\xEDodo") : [...ventasFiltradas].reverse().map((v) => /* @__PURE__ */ import_react.default.createElement(
       "div",
@@ -31449,7 +31484,7 @@ Esta acci\xF3n no se puede deshacer.`,
         justifyContent: "center",
         fontSize: 18,
         flexShrink: 0
-      } }, x.marca.emoji), /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 15, fontWeight: 700, color: C.label, fontFamily: FONT } }, x.marca.nombre), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT } }, x.txs, " venta", x.txs !== 1 ? "s" : ""))), /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "right" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 18, fontWeight: 800, color: x.marca.color, fontFamily: FONT } }, $(x.total)), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT } }, Math.round(x.total / totalVtas * 100), "% del total"))),
+      } }, /* @__PURE__ */ import_react.default.createElement(MarcaIcon, { marca: x.marca, size: 20, radius: 6 })), /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 15, fontWeight: 700, color: C.label, fontFamily: FONT } }, x.marca.nombre), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT } }, x.txs, " venta", x.txs !== 1 ? "s" : ""))), /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "right" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 18, fontWeight: 800, color: x.marca.color, fontFamily: FONT } }, $(x.total)), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT } }, Math.round(x.total / totalVtas * 100), "% del total"))),
       /* @__PURE__ */ import_react.default.createElement("div", { style: { background: "rgba(0,0,0,0.06)", borderRadius: 6, height: 6, marginBottom: 10, overflow: "hidden" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
         width: `${x.total / maxVenta * 100}%`,
         background: x.marca.color,
@@ -31516,7 +31551,7 @@ Esta acci\xF3n no se puede deshacer.`,
       display: "flex",
       alignItems: "center",
       gap: 5
-    } }, /* @__PURE__ */ import_react.default.createElement("span", null, m.emoji), m.nombre))), ventasFiltradas.length === 0 ? /* @__PURE__ */ import_react.default.createElement(EmptyState, { icon: "\u{1F4CB}", title: "Sin ventas", sub: marcaFiltro ? "Esta marca no tiene ventas" : "Sin ventas en el per\xEDodo" }) : ventasFiltradas.map((v) => {
+    } }, /* @__PURE__ */ import_react.default.createElement(MarcaIcon, { marca: m, size: 14, radius: 4 }), m.nombre))), ventasFiltradas.length === 0 ? /* @__PURE__ */ import_react.default.createElement(EmptyState, { icon: "\u{1F4CB}", title: "Sin ventas", sub: marcaFiltro ? "Esta marca no tiene ventas" : "Sin ventas en el per\xEDodo" }) : ventasFiltradas.map((v) => {
       const itemsMostrar = marcaFiltro ? v.items.filter((i) => i.marcaId === marcaFiltro) : v.items;
       const totalMostrar = itemsMostrar.reduce((s, i) => s + i.subtotal, 0);
       return /* @__PURE__ */ import_react.default.createElement(
@@ -31555,7 +31590,7 @@ Esta acci\xF3n no se puede deshacer.`,
             background: `${g.marca?.color}10`,
             borderRadius: 10,
             borderLeft: `3px solid ${g.marca?.color}`
-          } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 14 } }, g.marca?.emoji), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, fontWeight: 700, color: g.marca?.color, fontFamily: FONT } }, g.marca?.nombre)), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, fontWeight: 700, color: g.marca?.color, fontFamily: FONT } }, $(g.sub))), g.items.map((it, ii) => /* @__PURE__ */ import_react.default.createElement("div", { key: ii, style: { fontSize: 12, color: C.label2, fontFamily: FONT } }, "\xB7 ", it.nombre, " \xD7", it.cantidad, " = ", $(it.subtotal)))));
+          } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6 } }, /* @__PURE__ */ import_react.default.createElement(MarcaIcon, { marca: g.marca, size: 16, radius: 4 }), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, fontWeight: 700, color: g.marca?.color, fontFamily: FONT } }, g.marca?.nombre)), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, fontWeight: 700, color: g.marca?.color, fontFamily: FONT } }, $(g.sub))), g.items.map((it, ii) => /* @__PURE__ */ import_react.default.createElement("div", { key: ii, style: { fontSize: 12, color: C.label2, fontFamily: FONT } }, "\xB7 ", it.nombre, " \xD7", it.cantidad, " = ", $(it.subtotal)))));
         })(),
         /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => sendWA(v), variant: "fill", small: true, full: true, icon: "\u{1F4F2}" }, "Enviar por WhatsApp"),
         v.etiquetaImg && /* @__PURE__ */ import_react.default.createElement(
