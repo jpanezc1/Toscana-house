@@ -21632,6 +21632,14 @@
       return null;
     }
   }
+  async function sbEliminarUsuario(usuario) {
+    try {
+      const db = await getSupabase();
+      await db.from("usuarios").delete().eq("usuario", usuario);
+    } catch (e) {
+      console.warn("Supabase delete usuario:", e.message);
+    }
+  }
   async function sbCargarTodo() {
     try {
       const db = await getSupabase();
@@ -27613,14 +27621,16 @@ Fecha: ${venta.fecha}`);
         return lista;
       });
       if (nuevoUsuario) {
-        const usuarios = (() => {
+        const listaU = (() => {
           try {
             return JSON.parse(localStorage.getItem("th_usuarios") || "null") || USUARIOS;
           } catch {
             return USUARIOS;
           }
         })();
-        localStorage.setItem("th_usuarios", JSON.stringify([...usuarios, nuevoUsuario]));
+        const nueva = [...listaU, nuevoUsuario];
+        localStorage.setItem("th_usuarios", JSON.stringify(nueva));
+        sbGuardarUsuarios(nueva);
       }
     }
     (0, import_react.useEffect)(() => {
@@ -30560,6 +30570,7 @@ Fecha: ${venta.fecha}`);
       setMenuAbierto(null);
     }
     function handleEliminar(u) {
+      sbEliminarUsuario(u.usuario);
       guardarUsuarios(
         usuarios.filter((x) => x.usuario !== u.usuario),
         "Elimin\xF3 usuario",

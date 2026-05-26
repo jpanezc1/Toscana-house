@@ -144,6 +144,13 @@ async function sbCargarUsuarios() {
   } catch(e) { console.warn("Supabase load usuarios:", e.message); return null; }
 }
 
+async function sbEliminarUsuario(usuario) {
+  try {
+    const db = await getSupabase();
+    await db.from("usuarios").delete().eq("usuario", usuario);
+  } catch(e) { console.warn("Supabase delete usuario:", e.message); }
+}
+
 async function sbCargarTodo() {
   try {
     const db = await getSupabase();
@@ -5870,13 +5877,15 @@ function App(){
       MARCAS = lista; // mantener global en sync para genCod, calcLiqMarca, etc.
       return lista;
     });
-    // Si se pidió crear usuario brand, añadirlo
+    // Si se pidió crear usuario brand, añadirlo y sincronizar a Supabase
     if(nuevoUsuario){
-      const usuarios = (() => {
+      const listaU = (() => {
         try{ return JSON.parse(localStorage.getItem("th_usuarios")||"null")||USUARIOS; }
         catch{ return USUARIOS; }
       })();
-      localStorage.setItem("th_usuarios", JSON.stringify([...usuarios, nuevoUsuario]));
+      const nueva = [...listaU, nuevoUsuario];
+      localStorage.setItem("th_usuarios", JSON.stringify(nueva));
+      sbGuardarUsuarios(nueva); // ← también a la nube
     }
   }
 
@@ -8568,6 +8577,7 @@ function ConfigTab({user, logout}){
     setConfirmAct(null); setMenuAbierto(null);
   }
   function handleEliminar(u){
+    sbEliminarUsuario(u.usuario); // borrar de Supabase (upsert no lo elimina solo)
     guardarUsuarios(
       usuarios.filter(x=>x.usuario!==u.usuario),
       "Eliminó usuario", u.usuario,
