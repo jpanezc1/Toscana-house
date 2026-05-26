@@ -23158,15 +23158,15 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       left: 0,
       right: 0,
       zIndex: 200,
-      background: "rgba(22,19,16,0.97)",
+      background: "rgba(250,249,247,0.97)",
       backdropFilter: "blur(28px) saturate(180%)",
       WebkitBackdropFilter: "blur(28px) saturate(180%)",
-      borderTop: "1px solid rgba(255,255,255,0.07)",
+      borderTop: "1px solid rgba(120,113,108,0.12)",
       display: "flex",
       justifyContent: "center",
       alignItems: "stretch",
       paddingBottom: "env(safe-area-inset-bottom,8px)",
-      boxShadow: "0 -8px 32px rgba(0,0,0,0.18)"
+      boxShadow: "0 -4px 20px rgba(0,0,0,0.06)"
     } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", width: "100%", maxWidth: 560 } }, tabs.map((t) => {
       const isActive = active === t.id;
       return /* @__PURE__ */ import_react.default.createElement("button", { key: t.id, onClick: () => onChange(t.id), style: {
@@ -23197,20 +23197,19 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
         width: 32,
         height: 28,
         borderRadius: 8,
-        background: isActive ? "rgba(154,123,79,0.16)" : "transparent",
+        background: isActive ? "rgba(154,123,79,0.14)" : "transparent",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
         fontSize: 17,
         lineHeight: 1,
         transition: "background .2s",
-        opacity: isActive ? 1 : 0.42,
-        filter: isActive ? "none" : "grayscale(30%)"
+        opacity: isActive ? 1 : 0.38
       } }, t.icon), /* @__PURE__ */ import_react.default.createElement("span", { style: {
         fontSize: 9,
         fontFamily: FONT_UI,
         fontWeight: isActive ? 600 : 400,
-        color: isActive ? C.gold : "rgba(255,255,255,0.42)",
+        color: isActive ? C.gold : "rgba(120,113,108,0.55)",
         transition: "color .2s, font-weight .2s",
         letterSpacing: isActive ? "0.04em" : "0.02em",
         whiteSpace: "nowrap"
