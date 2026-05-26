@@ -4768,10 +4768,12 @@ function BrandPortal({user, ventas, inv, logout}){
         boxShadow:"0 1px 12px rgba(0,0,0,0.06)"}}>
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
           <div style={{display:"flex",alignItems:"center",gap:12}}>
-            <div style={{width:40,height:40,borderRadius:12,
-              background:`${marca.color}30`,display:"flex",alignItems:"center",
-              justifyContent:"center",fontSize:20,flexShrink:0}}>
-              {marca.emoji}
+            <div style={{width:40,height:40,borderRadius:12,flexShrink:0,
+              background:`${marca.color}30`,overflow:"hidden",
+              display:"flex",alignItems:"center",justifyContent:"center",fontSize:20}}>
+              {marca.imagen
+                ? <img src={marca.imagen} alt={marca.nombre} style={{width:40,height:40,objectFit:"cover"}}/>
+                : marca.emoji}
             </div>
             <div>
               <div style={{fontSize:17,fontWeight:700,color:C.label,fontFamily:FONT,lineHeight:1}}>
@@ -5278,16 +5280,36 @@ const MARCA_COLORS = [
   "#D4B8A8","#A8B8C4","#C4D4A8","#D4A8A8","#A8C4D4","#C4A8D4",
 ];
 
+// Redimensiona una imagen a maxPx y devuelve base64 JPEG
+function resizarImagen(file, maxPx=400){
+  return new Promise(resolve=>{
+    const reader=new FileReader();
+    reader.onload=e=>{
+      const img=new Image();
+      img.onload=()=>{
+        const scale=Math.min(maxPx/img.width, maxPx/img.height, 1);
+        const canvas=document.createElement("canvas");
+        canvas.width=Math.round(img.width*scale);
+        canvas.height=Math.round(img.height*scale);
+        canvas.getContext("2d").drawImage(img,0,0,canvas.width,canvas.height);
+        resolve(canvas.toDataURL("image/jpeg",0.82));
+      };
+      img.src=e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
 function NuevaMarcaModal({editMarca, marcasActuales, onClose, onGuardar}){
   const isNew = !editMarca;
   const lista = marcasActuales || MARCAS;
   const nextId = useMemo(()=> isNew ? Math.max(...lista.map(m=>m.id),17)+1 : editMarca.id, []);
 
   const [f, setF] = useState(isNew
-    ? {nombre:"", emoji:"✨", color:MARCA_COLORS[0], email:"", telefono:"",
+    ? {nombre:"", emoji:"✨", color:MARCA_COLORS[0], imagen:"", email:"", telefono:"",
        pctComision:10, alquiler:0, estado:"activa",
        portal:true, liquidaciones:true, analytics:true, excel:true, facturacion:false, dashboard:true}
-    : {...editMarca}
+    : {...editMarca, imagen: editMarca.imagen||""}
   );
   const [msg,       setMsg]       = useState(null);
   const [saving,    setSaving]    = useState(false);
@@ -5297,6 +5319,21 @@ function NuevaMarcaModal({editMarca, marcasActuales, onClose, onGuardar}){
   const [uPass,     setUPass]     = useState("");
   const [showPass,  setShowPass]  = useState(false);
   const [pagina,    setPagina]    = useState(0); // 0 = info, 1 = opciones, 2 = usuario
+  const [resizing,  setResizing]  = useState(false);
+  const imgRef = useRef(null);
+
+  async function onImagenSeleccionada(e){
+    const file = e.target.files?.[0];
+    if(!file) return;
+    if(!file.type.startsWith("image/")){ setMsg("Seleccioná un archivo de imagen (JPG, PNG, etc.)"); return; }
+    setResizing(true);
+    try{
+      const base64 = await resizarImagen(file, 400);
+      setF(p=>({...p, imagen: base64}));
+    }catch{ setMsg("No se pudo procesar la imagen"); }
+    setResizing(false);
+    e.target.value=""; // reset input para poder seleccionar la misma imagen de nuevo
+  }
 
   function guardar(){
     setMsg(null);
@@ -5317,6 +5354,7 @@ function NuevaMarcaModal({editMarca, marcasActuales, onClose, onGuardar}){
         nombre: f.nombre.trim(),
         emoji:  f.emoji,
         color:  f.color,
+        imagen: f.imagen||"",
         email:  f.email.trim(),
         telefono: f.telefono.trim(),
         pctComision: Number(f.pctComision)||10,
@@ -5381,8 +5419,13 @@ function NuevaMarcaModal({editMarca, marcasActuales, onClose, onGuardar}){
                 textTransform:"uppercase",letterSpacing:.6,marginBottom:3}}>
                 {isNew?"Nueva marca":"Editar marca"}
               </div>
-              <div style={{fontSize:20,fontWeight:800,color:C.label,fontFamily:FONT_DISPLAY}}>
-                {f.emoji} {f.nombre||"Sin nombre"}
+              <div style={{fontSize:20,fontWeight:800,color:C.label,fontFamily:FONT_DISPLAY,
+                display:"flex",alignItems:"center",gap:10}}>
+                {f.imagen
+                  ? <img src={f.imagen} alt="" style={{width:32,height:32,borderRadius:8,objectFit:"cover"}}/>
+                  : <span>{f.emoji}</span>
+                }
+                {f.nombre||"Sin nombre"}
               </div>
             </div>
             <button onClick={onClose} style={{width:32,height:32,borderRadius:"50%",
@@ -5414,20 +5457,86 @@ function NuevaMarcaModal({editMarca, marcasActuales, onClose, onGuardar}){
             <div>
               {ipt("Nombre de la marca",f.nombre,v=>setF(p=>({...p,nombre:v})),"Ej: Mi Marca")}
 
-              {/* Emoji picker */}
+              {/* Ícono: imagen o emoji */}
               <div style={{marginBottom:14}}>
                 <div style={{fontSize:11,fontWeight:700,color:C.label3,textTransform:"uppercase",
-                  letterSpacing:.7,marginBottom:8,fontFamily:FONT}}>Ícono</div>
-                <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
-                  {MARCA_EMOJIS.map(e=>(
-                    <button key={e} onClick={()=>setF(p=>({...p,emoji:e}))}
-                      style={{width:40,height:40,borderRadius:10,border:`2px solid ${f.emoji===e?C.gold:C.sep}`,
-                        background:f.emoji===e?`${C.gold}18`:C.bg2,fontSize:20,cursor:"pointer",
-                        WebkitTapHighlightColor:"transparent"}}>
-                      {e}
-                    </button>
-                  ))}
-                </div>
+                  letterSpacing:.7,marginBottom:8,fontFamily:FONT}}>Ícono / Logo</div>
+
+                {/* Zona de imagen */}
+                <input ref={imgRef} type="file" accept="image/*"
+                  onChange={onImagenSeleccionada}
+                  style={{display:"none"}}/>
+
+                {f.imagen ? (
+                  /* Preview de imagen cargada */
+                  <div style={{display:"flex",alignItems:"center",gap:12,
+                    background:C.bg2,borderRadius:14,padding:"12px 14px",
+                    border:`1.5px solid ${C.gold}50`,marginBottom:8}}>
+                    <img src={f.imagen} alt="logo"
+                      style={{width:64,height:64,borderRadius:12,objectFit:"cover",
+                        boxShadow:"0 2px 10px rgba(0,0,0,0.12)",flexShrink:0}}/>
+                    <div style={{flex:1}}>
+                      <div style={{fontSize:13,fontWeight:600,color:C.label,fontFamily:FONT,marginBottom:4}}>
+                        Imagen cargada ✓
+                      </div>
+                      <div style={{display:"flex",gap:8}}>
+                        <button onClick={()=>imgRef.current?.click()}
+                          style={{padding:"5px 12px",borderRadius:8,border:`1px solid ${C.gold}`,
+                            background:"none",color:C.gold,fontSize:12,fontWeight:600,
+                            fontFamily:FONT,cursor:"pointer",WebkitTapHighlightColor:"transparent"}}>
+                          Cambiar
+                        </button>
+                        <button onClick={()=>setF(p=>({...p,imagen:""}))}
+                          style={{padding:"5px 12px",borderRadius:8,border:`1px solid ${C.sep}`,
+                            background:"none",color:C.label3,fontSize:12,fontWeight:600,
+                            fontFamily:FONT,cursor:"pointer",WebkitTapHighlightColor:"transparent"}}>
+                          Quitar
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  /* Botón subir imagen */
+                  <button onClick={()=>imgRef.current?.click()} disabled={resizing}
+                    style={{width:"100%",padding:"14px",borderRadius:14,
+                      border:`2px dashed ${C.sep}`,background:C.bg2,
+                      cursor:"pointer",marginBottom:10,
+                      display:"flex",alignItems:"center",justifyContent:"center",gap:10,
+                      WebkitTapHighlightColor:"transparent"}}>
+                    <span style={{fontSize:24}}>{resizing?"⏳":"🖼"}</span>
+                    <div style={{textAlign:"left"}}>
+                      <div style={{fontSize:14,fontWeight:600,color:C.label,fontFamily:FONT}}>
+                        {resizing?"Procesando imagen…":"Subir logo desde Finder"}
+                      </div>
+                      <div style={{fontSize:11,color:C.label3,fontFamily:FONT,marginTop:2}}>
+                        JPG, PNG, WEBP · Se ajusta automáticamente
+                      </div>
+                    </div>
+                  </button>
+                )}
+
+                {/* Separador */}
+                {!f.imagen&&(
+                  <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
+                    <div style={{flex:1,height:1,background:C.sep}}/>
+                    <span style={{fontSize:11,color:C.label3,fontFamily:FONT}}>o elegí un emoji</span>
+                    <div style={{flex:1,height:1,background:C.sep}}/>
+                  </div>
+                )}
+
+                {/* Emoji picker (solo si no hay imagen) */}
+                {!f.imagen&&(
+                  <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+                    {MARCA_EMOJIS.map(e=>(
+                      <button key={e} onClick={()=>setF(p=>({...p,emoji:e}))}
+                        style={{width:40,height:40,borderRadius:10,border:`2px solid ${f.emoji===e?C.gold:C.sep}`,
+                          background:f.emoji===e?`${C.gold}18`:C.bg2,fontSize:20,cursor:"pointer",
+                          WebkitTapHighlightColor:"transparent"}}>
+                        {e}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Color picker */}
@@ -6020,10 +6129,15 @@ function App(){
                   }}>
                     {/* Avatar */}
                     <div onClick={()=>!inactiva&&setMD(m.id)}
-                      style={{width:42,height:42,borderRadius:12,
-                        background:`${m.color}22`,display:"flex",alignItems:"center",
-                        justifyContent:"center",fontSize:20,flexShrink:0,
-                        cursor:inactiva?"default":"pointer"}}>{m.emoji}</div>
+                      style={{width:42,height:42,borderRadius:12,flexShrink:0,
+                        background:`${m.color}22`,overflow:"hidden",
+                        display:"flex",alignItems:"center",justifyContent:"center",
+                        fontSize:20,cursor:inactiva?"default":"pointer"}}>
+                      {m.imagen
+                        ? <img src={m.imagen} alt={m.nombre}
+                            style={{width:42,height:42,objectFit:"cover"}}/>
+                        : m.emoji}
+                    </div>
                     {/* Info */}
                     <div onClick={()=>!inactiva&&setMD(m.id)}
                       style={{flex:1,minWidth:0,cursor:inactiva?"default":"pointer"}}>
@@ -6236,9 +6350,13 @@ function App(){
                     display:"flex",alignItems:"center",gap:12,
                     cursor:"pointer",WebkitTapHighlightColor:"transparent",
                   }}>
-                    <div style={{width:38,height:38,borderRadius:10,
-                      background:`${m.color}22`,display:"flex",alignItems:"center",
-                      justifyContent:"center",fontSize:18,flexShrink:0}}>{m.emoji}</div>
+                    <div style={{width:38,height:38,borderRadius:10,flexShrink:0,
+                      background:`${m.color}22`,overflow:"hidden",
+                      display:"flex",alignItems:"center",justifyContent:"center",fontSize:18}}>
+                      {m.imagen
+                        ? <img src={m.imagen} alt={m.nombre} style={{width:38,height:38,objectFit:"cover"}}/>
+                        : m.emoji}
+                    </div>
                     <div style={{flex:1}}>
                       <div style={{fontSize:16,fontWeight:500,color:C.label,fontFamily:FONT}}>{m.nombre}</div>
                       <div style={{fontSize:13,color:liq.bruto>0?C.gold:C.label3,fontFamily:FONT}}>

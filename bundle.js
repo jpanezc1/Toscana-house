@@ -26173,13 +26173,14 @@ Fecha: ${venta.fecha}`);
       width: 40,
       height: 40,
       borderRadius: 12,
+      flexShrink: 0,
       background: `${marca.color}30`,
+      overflow: "hidden",
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
-      fontSize: 20,
-      flexShrink: 0
-    } }, marca.emoji), /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 17, fontWeight: 700, color: C.label, fontFamily: FONT, lineHeight: 1 } }, marca.nombre), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT, marginTop: 2 } }, "Portal \xB7 Solo lectura"))), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10 } }, /* @__PURE__ */ import_react.default.createElement(
+      fontSize: 20
+    } }, marca.imagen ? /* @__PURE__ */ import_react.default.createElement("img", { src: marca.imagen, alt: marca.nombre, style: { width: 40, height: 40, objectFit: "cover" } }) : marca.emoji), /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 17, fontWeight: 700, color: C.label, fontFamily: FONT, lineHeight: 1 } }, marca.nombre), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT, marginTop: 2 } }, "Portal \xB7 Solo lectura"))), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10 } }, /* @__PURE__ */ import_react.default.createElement(
       "select",
       {
         value: `${mes}-${anio}`,
@@ -26780,6 +26781,24 @@ Fecha: ${venta.fecha}`);
     "#A8C4D4",
     "#C4A8D4"
   ];
+  function resizarImagen(file, maxPx = 400) {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          const scale = Math.min(maxPx / img.width, maxPx / img.height, 1);
+          const canvas = document.createElement("canvas");
+          canvas.width = Math.round(img.width * scale);
+          canvas.height = Math.round(img.height * scale);
+          canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+          resolve(canvas.toDataURL("image/jpeg", 0.82));
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    });
+  }
   function NuevaMarcaModal({ editMarca, marcasActuales, onClose, onGuardar }) {
     const isNew = !editMarca;
     const lista = marcasActuales || MARCAS;
@@ -26789,6 +26808,7 @@ Fecha: ${venta.fecha}`);
         nombre: "",
         emoji: "\u2728",
         color: MARCA_COLORS[0],
+        imagen: "",
         email: "",
         telefono: "",
         pctComision: 10,
@@ -26800,7 +26820,7 @@ Fecha: ${venta.fecha}`);
         excel: true,
         facturacion: false,
         dashboard: true
-      } : { ...editMarca }
+      } : { ...editMarca, imagen: editMarca.imagen || "" }
     );
     const [msg, setMsg] = (0, import_react.useState)(null);
     const [saving, setSaving] = (0, import_react.useState)(false);
@@ -26810,6 +26830,25 @@ Fecha: ${venta.fecha}`);
     const [uPass, setUPass] = (0, import_react.useState)("");
     const [showPass, setShowPass] = (0, import_react.useState)(false);
     const [pagina, setPagina] = (0, import_react.useState)(0);
+    const [resizing, setResizing] = (0, import_react.useState)(false);
+    const imgRef = (0, import_react.useRef)(null);
+    async function onImagenSeleccionada(e) {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      if (!file.type.startsWith("image/")) {
+        setMsg("Seleccion\xE1 un archivo de imagen (JPG, PNG, etc.)");
+        return;
+      }
+      setResizing(true);
+      try {
+        const base64 = await resizarImagen(file, 400);
+        setF((p) => ({ ...p, imagen: base64 }));
+      } catch {
+        setMsg("No se pudo procesar la imagen");
+      }
+      setResizing(false);
+      e.target.value = "";
+    }
     function guardar() {
       setMsg(null);
       if (!f.nombre.trim()) {
@@ -26842,6 +26881,7 @@ Fecha: ${venta.fecha}`);
           nombre: f.nombre.trim(),
           emoji: f.emoji,
           color: f.color,
+          imagen: f.imagen || "",
           email: f.email.trim(),
           telefono: f.telefono.trim(),
           pctComision: Number(f.pctComision) || 10,
@@ -26934,7 +26974,15 @@ Fecha: ${venta.fecha}`);
       textTransform: "uppercase",
       letterSpacing: 0.6,
       marginBottom: 3
-    } }, isNew ? "Nueva marca" : "Editar marca"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 20, fontWeight: 800, color: C.label, fontFamily: FONT_DISPLAY } }, f.emoji, " ", f.nombre || "Sin nombre")), /* @__PURE__ */ import_react.default.createElement("button", { onClick: onClose, style: {
+    } }, isNew ? "Nueva marca" : "Editar marca"), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      fontSize: 20,
+      fontWeight: 800,
+      color: C.label,
+      fontFamily: FONT_DISPLAY,
+      display: "flex",
+      alignItems: "center",
+      gap: 10
+    } }, f.imagen ? /* @__PURE__ */ import_react.default.createElement("img", { src: f.imagen, alt: "", style: { width: 32, height: 32, borderRadius: 8, objectFit: "cover" } }) : /* @__PURE__ */ import_react.default.createElement("span", null, f.emoji), f.nombre || "Sin nombre")), /* @__PURE__ */ import_react.default.createElement("button", { onClick: onClose, style: {
       width: 32,
       height: 32,
       borderRadius: "50%",
@@ -26980,7 +27028,103 @@ Fecha: ${venta.fecha}`);
       letterSpacing: 0.7,
       marginBottom: 8,
       fontFamily: FONT
-    } }, "\xCDcono"), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 6 } }, MARCA_EMOJIS.map((e) => /* @__PURE__ */ import_react.default.createElement(
+    } }, "\xCDcono / Logo"), /* @__PURE__ */ import_react.default.createElement(
+      "input",
+      {
+        ref: imgRef,
+        type: "file",
+        accept: "image/*",
+        onChange: onImagenSeleccionada,
+        style: { display: "none" }
+      }
+    ), f.imagen ? (
+      /* Preview de imagen cargada */
+      /* @__PURE__ */ import_react.default.createElement("div", { style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 12,
+        background: C.bg2,
+        borderRadius: 14,
+        padding: "12px 14px",
+        border: `1.5px solid ${C.gold}50`,
+        marginBottom: 8
+      } }, /* @__PURE__ */ import_react.default.createElement(
+        "img",
+        {
+          src: f.imagen,
+          alt: "logo",
+          style: {
+            width: 64,
+            height: 64,
+            borderRadius: 12,
+            objectFit: "cover",
+            boxShadow: "0 2px 10px rgba(0,0,0,0.12)",
+            flexShrink: 0
+          }
+        }
+      ), /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, fontWeight: 600, color: C.label, fontFamily: FONT, marginBottom: 4 } }, "Imagen cargada \u2713"), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 8 } }, /* @__PURE__ */ import_react.default.createElement(
+        "button",
+        {
+          onClick: () => imgRef.current?.click(),
+          style: {
+            padding: "5px 12px",
+            borderRadius: 8,
+            border: `1px solid ${C.gold}`,
+            background: "none",
+            color: C.gold,
+            fontSize: 12,
+            fontWeight: 600,
+            fontFamily: FONT,
+            cursor: "pointer",
+            WebkitTapHighlightColor: "transparent"
+          }
+        },
+        "Cambiar"
+      ), /* @__PURE__ */ import_react.default.createElement(
+        "button",
+        {
+          onClick: () => setF((p) => ({ ...p, imagen: "" })),
+          style: {
+            padding: "5px 12px",
+            borderRadius: 8,
+            border: `1px solid ${C.sep}`,
+            background: "none",
+            color: C.label3,
+            fontSize: 12,
+            fontWeight: 600,
+            fontFamily: FONT,
+            cursor: "pointer",
+            WebkitTapHighlightColor: "transparent"
+          }
+        },
+        "Quitar"
+      ))))
+    ) : (
+      /* Botón subir imagen */
+      /* @__PURE__ */ import_react.default.createElement(
+        "button",
+        {
+          onClick: () => imgRef.current?.click(),
+          disabled: resizing,
+          style: {
+            width: "100%",
+            padding: "14px",
+            borderRadius: 14,
+            border: `2px dashed ${C.sep}`,
+            background: C.bg2,
+            cursor: "pointer",
+            marginBottom: 10,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 10,
+            WebkitTapHighlightColor: "transparent"
+          }
+        },
+        /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 24 } }, resizing ? "\u23F3" : "\u{1F5BC}"),
+        /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "left" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 14, fontWeight: 600, color: C.label, fontFamily: FONT } }, resizing ? "Procesando imagen\u2026" : "Subir logo desde Finder"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT, marginTop: 2 } }, "JPG, PNG, WEBP \xB7 Se ajusta autom\xE1ticamente"))
+      )
+    ), !f.imagen && /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 8 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1, height: 1, background: C.sep } }), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 11, color: C.label3, fontFamily: FONT } }, "o eleg\xED un emoji"), /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1, height: 1, background: C.sep } })), !f.imagen && /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 6 } }, MARCA_EMOJIS.map((e) => /* @__PURE__ */ import_react.default.createElement(
       "button",
       {
         key: e,
@@ -27750,16 +27894,24 @@ Fecha: ${venta.fecha}`);
             width: 42,
             height: 42,
             borderRadius: 12,
+            flexShrink: 0,
             background: `${m.color}22`,
+            overflow: "hidden",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
             fontSize: 20,
-            flexShrink: 0,
             cursor: inactiva ? "default" : "pointer"
           }
         },
-        m.emoji
+        m.imagen ? /* @__PURE__ */ import_react.default.createElement(
+          "img",
+          {
+            src: m.imagen,
+            alt: m.nombre,
+            style: { width: 42, height: 42, objectFit: "cover" }
+          }
+        ) : m.emoji
       ), /* @__PURE__ */ import_react.default.createElement(
         "div",
         {
@@ -28006,13 +28158,14 @@ Fecha: ${venta.fecha}`);
         width: 38,
         height: 38,
         borderRadius: 10,
+        flexShrink: 0,
         background: `${m.color}22`,
+        overflow: "hidden",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        fontSize: 18,
-        flexShrink: 0
-      } }, m.emoji), /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 16, fontWeight: 500, color: C.label, fontFamily: FONT } }, m.nombre), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: liq.bruto > 0 ? C.gold : C.label3, fontFamily: FONT } }, liq.bruto > 0 ? `${$(liq.neto)} neto` : "Sin ventas")), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } }, cerrado ? /* @__PURE__ */ import_react.default.createElement(Chip, { color: C.green, small: true }, "\u2713 Cerrado") : liq.bruto > 0 && /* @__PURE__ */ import_react.default.createElement(Chip, { color: C.amber, small: true }, "Pendiente"), /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.label3, fontSize: 22 } }, "\u203A")));
+        fontSize: 18
+      } }, m.imagen ? /* @__PURE__ */ import_react.default.createElement("img", { src: m.imagen, alt: m.nombre, style: { width: 38, height: 38, objectFit: "cover" } }) : m.emoji), /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 16, fontWeight: 500, color: C.label, fontFamily: FONT } }, m.nombre), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: liq.bruto > 0 ? C.gold : C.label3, fontFamily: FONT } }, liq.bruto > 0 ? `${$(liq.neto)} neto` : "Sin ventas")), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } }, cerrado ? /* @__PURE__ */ import_react.default.createElement(Chip, { color: C.green, small: true }, "\u2713 Cerrado") : liq.bruto > 0 && /* @__PURE__ */ import_react.default.createElement(Chip, { color: C.amber, small: true }, "Pendiente"), /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.label3, fontSize: 22 } }, "\u203A")));
     }))), tab === "cajas" && /* @__PURE__ */ import_react.default.createElement(CajasTab, null), tab === "historial" && /* @__PURE__ */ import_react.default.createElement(
       HistorialTab,
       {
