@@ -1453,6 +1453,150 @@ function usePress(onPress) {
   };
 }
 
+// ── Desktop breakpoint hook ───────────────────────────────
+function useIsDesktop() {
+  var _hND = useState(function(){ return typeof window !== "undefined" && window.innerWidth >= 1024; });
+  var isDesktop = _hND[0]; var setIsDesktop = _hND[1];
+  useEffect(function(){
+    function check(){ setIsDesktop(window.innerWidth >= 1024); }
+    window.addEventListener("resize", check);
+    return function(){ window.removeEventListener("resize", check); };
+  },[]);
+  return isDesktop;
+}
+
+// ── Marca edit button — ultra-thin pen nib, brand-colored hover ──
+function MarcaEditBtn({ onClick, accentColor }){
+  var _hov = useState(false); var hov = _hov[0]; var setHov = _hov[1];
+  return (
+    <button
+      onClick={onClick}
+      onMouseEnter={()=>setHov(true)}
+      onMouseLeave={()=>setHov(false)}
+      title="Editar marca"
+      style={{
+        padding:"0 10px",
+        height:28,
+        borderRadius:20,
+        border:`1px solid ${hov ? accentColor+"55" : "rgba(120,113,108,0.18)"}`,
+        background: hov ? accentColor+"12" : "transparent",
+        cursor:"pointer",
+        display:"flex", alignItems:"center", justifyContent:"center",
+        gap:4,
+        transition:"background .18s, border-color .18s, color .18s",
+        WebkitTapHighlightColor:"transparent",
+        flexShrink:0,
+        fontSize:11,
+        fontWeight:500,
+        letterSpacing:"0.06em",
+        fontFamily:FONT,
+        color: hov ? accentColor : "rgba(120,113,108,0.7)",
+        textTransform:"uppercase",
+      }}>
+      Editar
+    </button>
+  );
+}
+
+// ── Elegant edit button — replaces ✏️ everywhere ─────────
+// Desktop: border-less ghost text. Mobile: same but always visible.
+function EditBtn({ onClick, label="Editar", stop=true }){
+  var _hov = useState(false); var hov = _hov[0]; var setHov = _hov[1];
+  return (
+    <button
+      onClick={e=>{ if(stop) e.stopPropagation(); onClick&&onClick(e); }}
+      onMouseEnter={()=>setHov(true)}
+      onMouseLeave={()=>setHov(false)}
+      style={{
+        padding:"5px 12px",
+        borderRadius:10,
+        border:`1px solid ${hov ? "rgba(95,90,84,0.22)" : "rgba(95,90,84,0.13)"}`,
+        background: hov ? "rgba(95,90,84,0.05)" : "transparent",
+        cursor:"pointer",
+        fontSize:12,
+        fontWeight:500,
+        letterSpacing:"0.03em",
+        color: hov ? C.label2 : C.label3,
+        fontFamily:FONT,
+        transition:"color .15s, background .15s, border-color .15s",
+        WebkitTapHighlightColor:"transparent",
+        lineHeight:1,
+        whiteSpace:"nowrap",
+        userSelect:"none",
+      }}>
+      {label}
+    </button>
+  );
+}
+
+// ── ⋯ Dots menu — opens an elegant floating context menu ──
+function DotsMenu({ items, open, onToggle, align="right" }){
+  // items: [{label, icon, color, onClick, danger}]
+  return (
+    <div style={{position:"relative",display:"inline-flex"}}>
+      <button
+        onClick={e=>{ e.stopPropagation(); onToggle(); }}
+        style={{
+          width:32, height:32, borderRadius:10,
+          border:`1px solid ${open ? "rgba(95,90,84,0.30)" : "rgba(95,90,84,0.15)"}`,
+          background: open ? "rgba(26,23,20,0.06)" : "transparent",
+          cursor:"pointer",
+          fontSize:17, letterSpacing:1,
+          color: open ? C.label : C.label3,
+          display:"flex", alignItems:"center", justifyContent:"center",
+          transition:"background .15s, border-color .15s, color .15s",
+          WebkitTapHighlightColor:"transparent",
+          lineHeight:1,
+          userSelect:"none",
+        }}>
+        ⋯
+      </button>
+
+      {open&&(
+        <div style={{
+          position:"absolute",
+          top:"calc(100% + 6px)",
+          [align==="right"?"right":"left"]: 0,
+          background: "#FFFFFF",
+          borderRadius:14,
+          border:"1px solid rgba(0,0,0,0.07)",
+          boxShadow:"0 8px 32px rgba(0,0,0,0.10), 0 2px 8px rgba(0,0,0,0.06)",
+          padding:"6px",
+          zIndex:500,
+          minWidth:160,
+          animation:"fadeIn .12s ease",
+        }}>
+          <style>{`@keyframes fadeIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}`}</style>
+          {items.map((item,i)=>(
+            <button key={i} onClick={e=>{ e.stopPropagation(); item.onClick&&item.onClick(e); }}
+              style={{
+                display:"flex", alignItems:"center", gap:10,
+                width:"100%", padding:"9px 12px",
+                borderRadius:9,
+                border:"none",
+                background:"transparent",
+                cursor:"pointer",
+                fontSize:13,
+                fontWeight:item.danger ? 600 : 500,
+                color: item.danger ? C.red : item.color || C.label,
+                fontFamily:FONT,
+                letterSpacing:"0.01em",
+                textAlign:"left",
+                transition:"background .1s",
+                WebkitTapHighlightColor:"transparent",
+              }}
+              onMouseEnter={e=>{ e.currentTarget.style.background = item.danger ? `${C.red}10` : "rgba(0,0,0,0.04)"; }}
+              onMouseLeave={e=>{ e.currentTarget.style.background = "transparent"; }}>
+              {item.icon&&<span style={{fontSize:14,opacity:.8,minWidth:16,textAlign:"center"}}>{item.icon}</span>}
+              {item.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // iOS-style pill badge
 function Chip({children, color=C.gold, small}){
   return <span style={{
@@ -1748,18 +1892,18 @@ function IOSSel({label,children,style:st={},...p}){
 }
 
 // Stat card iOS style
-function StatCard({icon,label,value,sub,color=C.gold}){
+function StatCard({icon,label,value,sub,color=C.gold,compact}){
   return (
     <div style={{
-      background:C.bg2,borderRadius:16,padding:"16px",
+      background:C.bg2,borderRadius:14,padding: compact ? "12px 14px" : "16px",
       border:`1px solid ${C.sep}`,
     }}>
-      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}>
-        <div style={{width:34,height:34,borderRadius:10,background:`${color}25`,
-          display:"flex",alignItems:"center",justifyContent:"center",fontSize:17}}>{icon}</div>
-        <span style={{fontSize:13,color:C.label2,fontFamily:FONT,fontWeight:500}}>{label}</span>
+      <div style={{display:"flex",alignItems:"center",gap: compact ? 8 : 10, marginBottom: compact ? 6 : 8}}>
+        <div style={{width: compact ? 28 : 34, height: compact ? 28 : 34, borderRadius:10, background:`${color}25`,
+          display:"flex",alignItems:"center",justifyContent:"center",fontSize: compact ? 14 : 17}}>{icon}</div>
+        <span style={{fontSize: compact ? 11 : 13, color:C.label2,fontFamily:FONT,fontWeight:500}}>{label}</span>
       </div>
-      <div style={{fontSize:24,fontWeight:700,color:C.label,fontFamily:FONT,lineHeight:1}}>{value}</div>
+      <div style={{fontSize: compact ? 20 : 24, fontWeight:700,color:C.label,fontFamily:FONT,lineHeight:1}}>{value}</div>
       {sub&&<div style={{fontSize:12,color:C.label3,fontFamily:FONT,marginTop:4}}>{sub}</div>}
     </div>
   );
@@ -2669,7 +2813,7 @@ function FacturaModal({venta, open, onClose, onFacturada}){
 
           {/* Modo toggle */}
           <div style={{display:"flex",gap:8,marginBottom:16}}>
-            {[["api","🌐 API CUCU"],["manual","✏️ Manual"]].map(([m,l])=>(
+            {[["api","🌐 API CUCU"],["manual","Manual"]].map(([m,l])=>(
               <button key={m} onClick={()=>{setModo(m);setErrMsg("");}} style={{
                 flex:1,padding:"10px",borderRadius:12,cursor:"pointer",fontFamily:FONT,fontSize:13,
                 border:`2px solid ${modo===m?C.blue:C.sep}`,
@@ -3426,26 +3570,26 @@ function generarPlanillaAlquileres(ventas, mes, anio) {
 // ══════════════════════════════════════════════════════════
 // KPI CARD — small metric tile
 // ══════════════════════════════════════════════════════════
-function KPICard({icon, label, val, sub, color}){
+function KPICard({icon, label, val, sub, color, compact}){
   return (
     <div style={{
-      background:C.bg1, borderRadius:16, padding:"16px 18px",
+      background:C.bg1, borderRadius:14, padding: compact ? "12px 14px" : "16px 18px",
       border:`1px solid ${C.sep}`,
       boxShadow:"0 2px 8px rgba(120,113,108,0.06), 0 1px 2px rgba(120,113,108,0.04)",
     }}>
-      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
+      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom: compact ? 7 : 10}}>
         <div style={{
-          width:32,height:32,borderRadius:10,
+          width: compact ? 26 : 32, height: compact ? 26 : 32, borderRadius:10,
           background:`${color}14`,
           display:"flex",alignItems:"center",justifyContent:"center",
-          fontSize:15,
+          fontSize: compact ? 13 : 15,
         }}>{icon}</div>
         <span style={{fontSize:11,color:C.label3,fontFamily:FONT,fontWeight:500,
           letterSpacing:.4,textTransform:"uppercase"}}>{label}</span>
       </div>
-      <div style={{fontSize:26,fontWeight:600,color:C.label,fontFamily:FONT_DISPLAY,
+      <div style={{fontSize: compact ? 20 : 26, fontWeight:600,color:C.label,fontFamily:FONT_DISPLAY,
         lineHeight:1,letterSpacing:-.3}}>{val}</div>
-      <div style={{fontSize:11,color:C.label3,fontFamily:FONT,marginTop:5,letterSpacing:.2}}>{sub}</div>
+      <div style={{fontSize:11,color:C.label3,fontFamily:FONT,marginTop: compact ? 4 : 5, letterSpacing:.2}}>{sub}</div>
     </div>
   );
 }
@@ -4037,6 +4181,7 @@ function ImportarExcelModal({inv, onImportar, onClose}){
 }
 
 function HomeDashboard({ventas, inv, vMes, mes, anio, onGoTab}){
+  const isDesktop = useIsDesktop();
 
   const hoyStr = new Date().toISOString().slice(0,10);
   const vHoy   = ventas.filter(v => v.fecha === hoyStr);
@@ -4094,30 +4239,30 @@ function HomeDashboard({ventas, inv, vMes, mes, anio, onGoTab}){
   const dateStr  = `${dayNames[today.getDay()]}, ${today.getDate()} de ${MESES[today.getMonth()]} ${today.getFullYear()}`;
 
   const cardStyle = {
-    background:C.bg1, borderRadius:16, padding:"16px 18px",
+    background:C.bg1, borderRadius:16, padding: isDesktop ? "12px 16px" : "16px 18px",
     border:`1px solid ${C.sep}`,
     boxShadow:"0 2px 8px rgba(120,113,108,0.06)",
-    marginBottom:14,
+    marginBottom: isDesktop ? 10 : 14,
   };
 
   return (
     <div style={{paddingBottom:8}}>
 
       {/* ── Logo editorial ── */}
-      <div style={{textAlign:"center",marginBottom:16,paddingTop:4}}>
+      <div style={{textAlign:"center",marginBottom: isDesktop ? 10 : 16, paddingTop: isDesktop ? 0 : 4}}>
         <div style={{
           display:"inline-flex",flexDirection:"column",alignItems:"center",gap:0,
-          background:C.bg1,borderRadius:20,padding:"20px 36px 16px",
+          background:C.bg1,borderRadius:20,padding: isDesktop ? "12px 28px 10px" : "20px 36px 16px",
           border:`1px solid ${C.sep}`,
           boxShadow:"0 4px 24px rgba(120,113,108,0.08)",
           marginBottom:4,
         }}>
           <div style={{
-            fontSize:52,fontWeight:300,color:C.label,
+            fontSize: isDesktop ? 38 : 52, fontWeight:300,color:C.label,
             fontFamily:FONT_DISPLAY,
             letterSpacing:8,lineHeight:1,
           }}>TH</div>
-          <div style={{width:64,height:1,background:`${C.gold}60`,margin:"8px 0 5px"}}/>
+          <div style={{width:64,height:1,background:`${C.gold}60`,margin: isDesktop ? "6px 0 4px" : "8px 0 5px"}}/>
           <div style={{
             fontSize:13,fontWeight:500,color:C.label,
             fontFamily:FONT_UI,letterSpacing:6,lineHeight:1,
@@ -4132,25 +4277,25 @@ function HomeDashboard({ventas, inv, vMes, mes, anio, onGoTab}){
       </div>
 
       {/* ── Fecha ── */}
-      <div style={{textAlign:"center", marginBottom:16, marginTop:-6}}>
+      <div style={{textAlign:"center", marginBottom: isDesktop ? 10 : 16, marginTop:-6}}>
         <div style={{fontSize:12, color:C.label3, fontFamily:FONT_UI}}>{dateStr}</div>
       </div>
 
       {/* ── KPI 2×2 grid ── */}
-      <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:14}}>
-        <KPICard icon="💰" label="Ventas hoy"
+      <div style={{display:"grid", gridTemplateColumns: isDesktop ? "1fr 1fr 1fr 1fr" : "1fr 1fr", gap: isDesktop ? 8 : 10, marginBottom: isDesktop ? 10 : 14}}>
+        <KPICard icon="💰" label="Ventas hoy" compact={isDesktop}
           val={`Bs ${new Intl.NumberFormat("es-BO",{minimumFractionDigits:0,maximumFractionDigits:0}).format(totalHoy)}`}
           sub={`${vHoy.length} transacción${vHoy.length!==1?"es":""}`}
           color="#2E7D32"/>
-        <KPICard icon="📅" label={`Ventas ${MESES[mes].slice(0,3)}`}
+        <KPICard icon="📅" label={`Ventas ${MESES[mes].slice(0,3)}`} compact={isDesktop}
           val={`Bs ${new Intl.NumberFormat("es-BO",{minimumFractionDigits:0,maximumFractionDigits:0}).format(totalMes)}`}
           sub={`${vMes.length} transacciones`}
           color={C.gold}/>
-        <KPICard icon="📦" label="Stock total"
+        <KPICard icon="📦" label="Stock total" compact={isDesktop}
           val={stockTotal.toLocaleString()}
           sub="unidades en tienda"
           color={C.indigo}/>
-        <KPICard icon="🏷️" label="Marcas activas"
+        <KPICard icon="🏷️" label="Marcas activas" compact={isDesktop}
           val={MARCAS.length}
           sub="marcas en tienda"
           color={C.amber}/>
@@ -4211,19 +4356,19 @@ function HomeDashboard({ventas, inv, vMes, mes, anio, onGoTab}){
       {/* ── Bar chart últimos 7 días ── */}
       <div style={cardStyle}>
         <div style={{fontSize:11, fontWeight:700, color:C.label3, fontFamily:FONT,
-          textTransform:"uppercase",letterSpacing:.8, marginBottom:14}}>
+          textTransform:"uppercase",letterSpacing:.8, marginBottom: isDesktop ? 10 : 14}}>
           Últimos 7 días
         </div>
-        <div style={{display:"flex", alignItems:"flex-end", gap:6, height:80}}>
+        <div style={{display:"flex", alignItems:"flex-end", gap:6, height: isDesktop ? 60 : 80}}>
           {last7.map((d, i) => {
             const pct    = d.total / maxDay;
             const isToday = d.str === hoyStr;
             return (
               <div key={i} style={{flex:1, display:"flex", flexDirection:"column", alignItems:"center", gap:4}}>
-                <div style={{width:"100%", display:"flex", flexDirection:"column", justifyContent:"flex-end", height:64}}>
+                <div style={{width:"100%", display:"flex", flexDirection:"column", justifyContent:"flex-end", height: isDesktop ? 46 : 64}}>
                   <div style={{
                     width:"100%",
-                    height: d.total > 0 ? Math.max(pct * 64, 4) : 0,
+                    height: d.total > 0 ? Math.max(pct * (isDesktop ? 46 : 64), 4) : 0,
                     background: isToday ? C.gold : `${C.gold}50`,
                     borderRadius:"4px 4px 0 0",
                     transition:"height .35s ease",
@@ -4290,7 +4435,7 @@ function HomeDashboard({ventas, inv, vMes, mes, anio, onGoTab}){
               <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:4}}>
                 <div style={{display:"flex", alignItems:"center", gap:6}}>
                   <MarcaIcon marca={m.marca} size={18} radius={6}/>
-                  <span style={{fontSize:13, fontWeight:600, color:C.label, fontFamily:FONT_UI}}>{m.marca.nombre}</span>
+                  <span style={{fontSize:13, fontWeight:600, color:C.label, fontFamily:FONT_UI, letterSpacing:"0.02em"}}>{m.marca.nombre}</span>
                 </div>
                 <span style={{fontSize:12, fontWeight:700, color:m.marca.color, fontFamily:FONT_UI}}>
                   Bs {new Intl.NumberFormat("es-BO",{minimumFractionDigits:0,maximumFractionDigits:0}).format(m.total)}
@@ -4344,7 +4489,7 @@ function HomeDashboard({ventas, inv, vMes, mes, anio, onGoTab}){
       )}
 
       {/* ── Accesos rápidos ── */}
-      <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:8}}>
+      <div style={{display:"grid", gridTemplateColumns: isDesktop ? "1fr 1fr 1fr 1fr" : "1fr 1fr", gap: isDesktop ? 8 : 10, marginBottom:8}}>
         {[
           {icon:"⊕", label:"Nueva venta",    tab:"pos",           color:C.gold},
           {icon:"◫", label:"Inventario",      tab:"inventario",    color:C.indigo},
@@ -4352,7 +4497,7 @@ function HomeDashboard({ventas, inv, vMes, mes, anio, onGoTab}){
           {icon:"◎", label:"Liquidaciones",   tab:"liquidaciones", color:"#AD1457"},
         ].map(a => (
           <button key={a.tab} onClick={() => onGoTab(a.tab)} style={{
-            background:`${a.color}10`, borderRadius:12, padding:"14px 12px",
+            background:`${a.color}10`, borderRadius:12, padding: isDesktop ? "10px 12px" : "14px 12px",
             border:`1px solid ${a.color}25`,
             display:"flex", alignItems:"center", gap:10,
             cursor:"pointer", WebkitTapHighlightColor:"transparent",
@@ -4846,7 +4991,7 @@ function BrandPortal({user, ventas, inv, logout}){
                 : marca.emoji}
             </div>
             <div>
-              <div style={{fontSize:17,fontWeight:700,color:C.label,fontFamily:FONT,lineHeight:1}}>
+              <div style={{fontSize:17,fontWeight:600,color:C.label,fontFamily:FONT,lineHeight:1,letterSpacing:"0.02em"}}>
                 {marca.nombre}
               </div>
               <div style={{fontSize:11,color:C.label3,fontFamily:FONT,marginTop:2}}>
@@ -5849,12 +5994,11 @@ function NuevaMarcaModal({editMarca, marcasActuales, onClose, onGuardar}){
                       </div>
                       <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
                         {logoOrigFile&&(
-                          <button onClick={()=>setLogoEditorFile(logoOrigFile)}
-                            style={{padding:"5px 11px",borderRadius:8,border:`1.5px solid ${C.gold}`,
-                              background:`${C.gold}12`,color:C.gold,fontSize:12,fontWeight:700,
-                              fontFamily:FONT,cursor:"pointer",WebkitTapHighlightColor:"transparent"}}>
-                            ✏️ Editar
-                          </button>
+                          <EditBtn
+                            onClick={()=>setLogoEditorFile(logoOrigFile)}
+                            label="Ajustar"
+                            stop={false}
+                          />
                         )}
                         <button onClick={()=>imgRef.current?.click()}
                           style={{padding:"5px 11px",borderRadius:8,border:`1px solid ${C.sep}`,
@@ -6164,6 +6308,7 @@ function NuevaMarcaModal({editMarca, marcasActuales, onClose, onGuardar}){
 
 function App(){
   const { user, login, logout } = useAuth();
+  const isDesktop = useIsDesktop();
   const now=new Date();
   const[tab,setTab]         =useState("inicio");
   const[inv,setInv]         =useState([]);
@@ -6500,7 +6645,11 @@ function App(){
       )}
 
       {/* ── CONTENT ── */}
-      <div style={{padding:"16px 16px 0"}}>
+      <div style={{
+        padding: isDesktop ? "16px 24px 0" : "16px 16px 0",
+        maxWidth: isDesktop ? 1100 : undefined,
+        margin: isDesktop ? "0 auto" : undefined,
+      }}>
 
         {/* INICIO — dashboard */}
         {tab==="inicio" && (
@@ -6533,7 +6682,12 @@ function App(){
               </div>
             )}
 
-            <div style={{display:"flex",flexDirection:"column",gap:2}}>
+            <div style={{
+              display: isDesktop ? "grid" : "flex",
+              gridTemplateColumns: isDesktop ? "1fr 1fr" : undefined,
+              flexDirection: isDesktop ? undefined : "column",
+              gap: isDesktop ? 6 : 2,
+            }}>
               {marcasState.map((m,i)=>{
                 const total=vMes.reduce((s,v)=>s+v.items.filter(it=>it.marcaId===m.id).reduce((ss,it)=>ss+it.subtotal,0),0);
                 const prods=inv.filter(it=>it.marcaId===m.id).filter(p=>p.stock>0).length;
@@ -6542,35 +6696,42 @@ function App(){
                 return (
                   <div key={m.id} style={{
                     background:C.bg2,
-                    borderRadius:i===0?"14px 14px 2px 2px":i===marcasState.length-1?"2px 2px 14px 14px":"2px",
-                    padding:"14px 16px",
-                    borderBottom:i<marcasState.length-1?`1px solid ${C.sep}`:"",
-                    display:"flex",alignItems:"center",gap:14,
+                    borderRadius: isDesktop ? 12 : (i===0?"14px 14px 2px 2px":i===marcasState.length-1?"2px 2px 14px 14px":"2px"),
+                    padding: isDesktop ? "10px 14px" : "14px 16px",
+                    borderBottom: isDesktop ? "none" : (i<marcasState.length-1?`1px solid ${C.sep}`:""),
+                    border: isDesktop ? `1px solid ${C.sep}` : undefined,
+                    display:"flex",alignItems:"center",gap: isDesktop ? 10 : 14,
                     opacity:inactiva?.5:1,
                     WebkitTapHighlightColor:"transparent",
                     userSelect:"none",
-                  }}>
+                    transition: isDesktop ? "background .12s, box-shadow .12s" : undefined,
+                    cursor: isDesktop && !inactiva ? "pointer" : undefined,
+                  }}
+                  onClick={ isDesktop && !inactiva ? ()=>setMD(m.id) : undefined}
+                  onMouseEnter={isDesktop && !inactiva ? e=>{ e.currentTarget.style.background=`${m.color}10`; e.currentTarget.style.boxShadow=`0 2px 12px ${m.color}20`; } : undefined}
+                  onMouseLeave={isDesktop && !inactiva ? e=>{ e.currentTarget.style.background=C.bg2; e.currentTarget.style.boxShadow="none"; } : undefined}
+                  >
                     {/* Avatar */}
-                    <div onClick={()=>!inactiva&&setMD(m.id)}
-                      style={{width:42,height:42,borderRadius:12,flexShrink:0,
+                    <div onClick={!isDesktop ? (()=>!inactiva&&setMD(m.id)) : undefined}
+                      style={{width: isDesktop ? 36 : 42, height: isDesktop ? 36 : 42, borderRadius:12,flexShrink:0,
                         background:`${m.color}22`,overflow:"hidden",
                         display:"flex",alignItems:"center",justifyContent:"center",
                         fontSize:20,cursor:inactiva?"default":"pointer"}}>
                       {m.imagen
                         ? <img src={m.imagen} alt={m.nombre}
-                            style={{width:42,height:42,objectFit:"cover"}}/>
+                            style={{width: isDesktop ? 36 : 42, height: isDesktop ? 36 : 42, objectFit:"cover"}}/>
                         : m.emoji}
                     </div>
                     {/* Info */}
-                    <div onClick={()=>!inactiva&&setMD(m.id)}
+                    <div onClick={!isDesktop ? (()=>!inactiva&&setMD(m.id)) : undefined}
                       style={{flex:1,minWidth:0,cursor:inactiva?"default":"pointer"}}>
-                      <div style={{fontSize:16,fontWeight:500,color:C.label,fontFamily:FONT}}>
+                      <div style={{fontSize: isDesktop ? 14 : 16, fontWeight:600, color:C.label, fontFamily:FONT, letterSpacing:"0.02em"}}>
                         {m.nombre}
                         {inactiva&&<span style={{fontSize:11,color:C.red,fontWeight:600,
                           marginLeft:8,padding:"2px 7px",borderRadius:8,
                           background:`${C.red}15`}}>inactiva</span>}
                       </div>
-                      <div style={{fontSize:13,color:C.label3,fontFamily:FONT}}>
+                      <div style={{fontSize: isDesktop ? 12 : 13, color:C.label3,fontFamily:FONT}}>
                         {prods} producto{prods!==1?"s":""}
                         {total>0&&` · ${$(total)}`}
                       </div>
@@ -6578,19 +6739,19 @@ function App(){
                     {/* Acciones */}
                     <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:4}}>
                       {cerrado&&<Chip color={C.green} small>✓</Chip>}
-                      <div style={{display:"flex",alignItems:"center",gap:8}}>
+                      <div style={{display:"flex",alignItems:"center",gap:6}}>
                         {user.rol==="admin"&&(
-                          <button onClick={e=>{e.stopPropagation();setEditMarca(m);setModalNuevaMarca(true);}}
-                            style={{padding:"5px 10px",borderRadius:8,border:`1px solid ${C.sep}`,
-                              background:C.bg1,cursor:"pointer",fontSize:12,fontWeight:600,
-                              color:C.label3,fontFamily:FONT,
-                              WebkitTapHighlightColor:"transparent"}}>
-                            ✏️
-                          </button>
+                          <MarcaEditBtn
+                            onClick={e=>{e.stopPropagation();setEditMarca(m);setModalNuevaMarca(true);}}
+                            accentColor={m.color}
+                          />
                         )}
-                        {!inactiva&&(
+                        {!inactiva&&!isDesktop&&(
                           <span onClick={()=>setMD(m.id)}
                             style={{color:C.label3,fontSize:22,cursor:"pointer"}}>›</span>
+                        )}
+                        {!inactiva&&isDesktop&&(
+                          <span style={{color:C.label3,fontSize:18}}>›</span>
                         )}
                       </div>
                     </div>
@@ -6760,29 +6921,39 @@ function App(){
               </div>
             </div>
 
-            <div style={{display:"flex",flexDirection:"column",gap:2}}>
+            <div style={{
+              display: isDesktop ? "grid" : "flex",
+              gridTemplateColumns: isDesktop ? "1fr 1fr" : undefined,
+              flexDirection: isDesktop ? undefined : "column",
+              gap: isDesktop ? 6 : 2,
+            }}>
               {MARCAS.map((m,i)=>{
                 const liq=getLiq(m.id);
                 const cerrado=cierres[`${MK}-${m.id}`]?.cerrado;
                 return (
                   <div key={m.id} onClick={()=>setMLiq(m.id)} style={{
                     background:C.bg2,
-                    borderRadius:i===0?"14px 14px 2px 2px":i===MARCAS.length-1?"2px 2px 14px 14px":"2px",
-                    padding:"14px 16px",
-                    borderBottom:i<MARCAS.length-1?`1px solid ${C.sep}`:"",
-                    display:"flex",alignItems:"center",gap:12,
+                    borderRadius: isDesktop ? 12 : (i===0?"14px 14px 2px 2px":i===MARCAS.length-1?"2px 2px 14px 14px":"2px"),
+                    padding: isDesktop ? "10px 14px" : "14px 16px",
+                    borderBottom: isDesktop ? "none" : (i<MARCAS.length-1?`1px solid ${C.sep}`:""),
+                    border: isDesktop ? `1px solid ${C.sep}` : undefined,
+                    display:"flex",alignItems:"center",gap: isDesktop ? 10 : 12,
                     cursor:"pointer",WebkitTapHighlightColor:"transparent",
-                  }}>
-                    <div style={{width:38,height:38,borderRadius:10,flexShrink:0,
+                    transition: isDesktop ? "background .12s, box-shadow .12s" : undefined,
+                  }}
+                  onMouseEnter={isDesktop ? e=>{ e.currentTarget.style.background=`${m.color}10`; e.currentTarget.style.boxShadow=`0 2px 10px ${m.color}20`; } : undefined}
+                  onMouseLeave={isDesktop ? e=>{ e.currentTarget.style.background=C.bg2; e.currentTarget.style.boxShadow="none"; } : undefined}
+                  >
+                    <div style={{width: isDesktop ? 32 : 38, height: isDesktop ? 32 : 38, borderRadius:10,flexShrink:0,
                       background:`${m.color}22`,overflow:"hidden",
                       display:"flex",alignItems:"center",justifyContent:"center",fontSize:18}}>
                       {m.imagen
-                        ? <img src={m.imagen} alt={m.nombre} style={{width:38,height:38,objectFit:"cover"}}/>
+                        ? <img src={m.imagen} alt={m.nombre} style={{width: isDesktop ? 32 : 38, height: isDesktop ? 32 : 38, objectFit:"cover"}}/>
                         : m.emoji}
                     </div>
                     <div style={{flex:1}}>
-                      <div style={{fontSize:16,fontWeight:500,color:C.label,fontFamily:FONT}}>{m.nombre}</div>
-                      <div style={{fontSize:13,color:liq.bruto>0?C.gold:C.label3,fontFamily:FONT}}>
+                      <div style={{fontSize: isDesktop ? 14 : 16, fontWeight:600, color:C.label, fontFamily:FONT, letterSpacing:"0.02em"}}>{m.nombre}</div>
+                      <div style={{fontSize: isDesktop ? 12 : 13, color:liq.bruto>0?C.gold:C.label3,fontFamily:FONT}}>
                         {liq.bruto>0 ? `${$(liq.neto)} neto` : "Sin ventas"}
                       </div>
                     </div>
@@ -7639,6 +7810,7 @@ function SheetRecibir({open, onClose, inv, onAdd, fInv, setFInv}){
 // INVENTARIO POR MARCA — pestaña con scroll horizontal
 // ══════════════════════════════════════════════════════════
 function InventarioPorMarca({inv, ventas, onRecibir, onBaja, onImportarExcel}){
+  const isDesktop = useIsDesktop();
   var _hN149 = useState(MARCAS[0].id); var marcaSelec = _hN149[0]; var setMarcaSelec = _hN149[1];;
   var _hInvBq = useState(""); var invBusq = _hInvBq[0]; var setInvBusq = _hInvBq[1];;
   var _hInvFd = useState(""); var invFechaFin = _hInvFd[0]; var setInvFechaFin = _hInvFd[1];;
@@ -7690,7 +7862,7 @@ function InventarioPorMarca({inv, ventas, onRecibir, onBaja, onImportarExcel}){
               }}>
                 <MarcaIcon marca={m} size={22} radius={6}/>
                 <span style={{fontSize:11,fontWeight:activa?700:500,
-                  color:activa?m.color:C.label2,whiteSpace:"nowrap"}}>{m.nombre}</span>
+                  color:activa?m.color:C.label2,whiteSpace:"nowrap",letterSpacing:"0.02em"}}>{m.nombre}</span>
                 <span style={{fontSize:10,color:activa?m.color:C.label3}}>
                   {stock} uds
                 </span>
@@ -7731,13 +7903,13 @@ function InventarioPorMarca({inv, ventas, onRecibir, onBaja, onImportarExcel}){
       </div>
 
       {/* Stats de la marca */}
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:16}}>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap: isDesktop ? 8 : 10, marginBottom: isDesktop ? 12 : 16}}>
         {[
           {icon:"📦",label:"En stock",value:totalStock,color:C.green},
           {icon:"✅",label:"Vendidas",value:totalVendidas,color:C.blue},
           {icon:"❌",label:"Agotados",value:agotados,color:C.red},
         ].map(s=>(
-          <div key={s.label} style={{background:C.bg2,borderRadius:14,padding:"12px 10px",
+          <div key={s.label} style={{background:C.bg2,borderRadius:14,padding: isDesktop ? "10px 8px" : "12px 10px",
             border:`1px solid ${C.sep}`,textAlign:"center"}}>
             <div style={{fontSize:20,marginBottom:4}}>{s.icon}</div>
             <div style={{fontSize:18,fontWeight:800,color:s.color,fontFamily:FONT}}>{s.value}</div>
@@ -7757,10 +7929,18 @@ function InventarioPorMarca({inv, ventas, onRecibir, onBaja, onImportarExcel}){
               Usa "Recibir" para agregar ítems
             </div>
           </div>
-        : <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:16}}>
+        : <div style={{
+            display: isDesktop ? "grid" : "flex",
+            gridTemplateColumns: isDesktop ? "1fr 1fr" : undefined,
+            flexDirection: isDesktop ? undefined : "column",
+            gap: isDesktop ? 8 : 8, marginBottom:16
+          }}>
             {/* Leyenda */}
-            <div style={{display:"flex",gap:12,padding:"8px 12px",background:C.bg2,
-              borderRadius:10,marginBottom:4}}>
+            <div style={{
+              display:"flex",gap:12,padding:"8px 12px",background:C.bg2,
+              borderRadius:10,marginBottom:4,
+              gridColumn: isDesktop ? "1 / -1" : undefined,
+            }}>
               {[
                 {color:C.stockOk,label:"En stock"},
                 {color:C.stockLow,label:"Stock bajo"},
@@ -7778,7 +7958,6 @@ function InventarioPorMarca({inv, ventas, onRecibir, onBaja, onImportarExcel}){
             {productos.map(prod=>{
               const vendidas=vendidosPorProd[prod.id]||0;
               const pctVendido=prod.stockInicial>0?Math.round((vendidas/prod.stockInicial)*100):0;
-              const estado=prod.stock===0?"agotado":prod.stock<3?"bajo":"ok";
               const bgColor=prod.stock===0?C.stockOut:prod.stock<3?C.stockLow:C.stockOk;
               const borderColor=prod.stock===0?"#F4A8A8":prod.stock<3?"#F4D4A8":"#A8D4A8";
 
@@ -7786,14 +7965,15 @@ function InventarioPorMarca({inv, ventas, onRecibir, onBaja, onImportarExcel}){
                 <div key={prod.id} style={{
                   background:bgColor,
                   border:`1.5px solid ${borderColor}`,
-                  borderRadius:16,padding:"14px 16px",
+                  borderRadius: isDesktop ? 12 : 16,
+                  padding: isDesktop ? "10px 12px" : "14px 16px",
                 }}>
                   {/* Header producto */}
                   <div style={{display:"flex",justifyContent:"space-between",
-                    alignItems:"flex-start",marginBottom:10}}>
+                    alignItems:"flex-start",marginBottom: isDesktop ? 6 : 10}}>
                     <div style={{flex:1,minWidth:0}}>
-                      <div style={{fontSize:15,fontWeight:700,color:C.label,
-                        fontFamily:FONT,marginBottom:4}}>{prod.nombre}</div>
+                      <div style={{fontSize: isDesktop ? 13 : 15, fontWeight:700, color:C.label,
+                        fontFamily:FONT,marginBottom: isDesktop ? 3 : 4}}>{prod.nombre}</div>
                       <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
                         <span style={{fontFamily:"monospace",fontSize:11,color:C.gold,
                           background:C.gold+"18",padding:"2px 7px",borderRadius:5,
@@ -7804,29 +7984,29 @@ function InventarioPorMarca({inv, ventas, onRecibir, onBaja, onImportarExcel}){
                       </div>
                     </div>
                     <div style={{textAlign:"right",flexShrink:0}}>
-                      <div style={{fontSize:16,fontWeight:800,color:C.gold,fontFamily:FONT}}>
+                      <div style={{fontSize: isDesktop ? 14 : 16, fontWeight:800, color:C.gold, fontFamily:FONT}}>
                         {$(prod.precio)}
                       </div>
                       <div style={{fontSize:12,fontFamily:FONT,fontWeight:600,
                         color:prod.stock===0?C.red:prod.stock<3?C.amber:C.green}}>
-                        {prod.stock===0?"AGOTADO":prod.stock<3?`⚠ ${prod.stock} restantes`:`✓ ${prod.stock} en stock`}
+                        {prod.stock===0?"AGOTADO":prod.stock<3?`⚠ ${prod.stock} rest.`:`✓ ${prod.stock} en stock`}
                       </div>
                     </div>
                   </div>
 
                   {/* Barra de progreso vendido/stock */}
-                  <div style={{marginBottom:8}}>
+                  <div style={{marginBottom: isDesktop ? 6 : 8}}>
                     <div style={{display:"flex",justifyContent:"space-between",
                       fontSize:11,color:C.label3,fontFamily:FONT,marginBottom:4}}>
                       <span>Vendidas: <strong style={{color:C.blue}}>{vendidas}</strong></span>
-                      <span>Inicial: <strong>{prod.stockInicial}</strong></span>
+                      {!isDesktop && <span>Inicial: <strong>{prod.stockInicial}</strong></span>}
                       <span>{pctVendido}% vendido</span>
                     </div>
-                    <div style={{background:"rgba(0,0,0,0.08)",borderRadius:6,height:8,overflow:"hidden"}}>
+                    <div style={{background:"rgba(0,0,0,0.08)",borderRadius:6,height: isDesktop ? 5 : 8, overflow:"hidden"}}>
                       <div style={{
                         width:`${pctVendido}%`,
                         background:prod.stock===0?"#C0504A":prod.stock<3?"#C8922A":"#4A9B6F",
-                        height:8,borderRadius:6,
+                        height:"100%",borderRadius:6,
                         transition:"width .4s ease",
                         minWidth:pctVendido>0?4:0,
                       }}/>
@@ -7834,23 +8014,23 @@ function InventarioPorMarca({inv, ventas, onRecibir, onBaja, onImportarExcel}){
                   </div>
 
                   {/* Footer: vendidas + botón imprimir */}
-                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,flexWrap:"wrap"}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,flexWrap:"wrap"}}>
                     {vendidas>0&&(
-                      <div style={{padding:"6px 10px",background:C.stockSold,
+                      <div style={{padding: isDesktop ? "4px 8px" : "6px 10px", background:C.stockSold,
                         borderRadius:8,border:`1px solid #C8D4F4`,
-                        fontSize:12,color:C.blue,fontFamily:FONT,flex:1}}>
+                        fontSize: isDesktop ? 11 : 12, color:C.blue,fontFamily:FONT,flex:1}}>
                         🛒 {vendidas} vendida{vendidas!==1?"s":""} · {prod.fecha}
                       </div>
                     )}
                     <button
                       onClick={()=>imprimirTicket(prod, marca?.nombre||"")}
                       style={{
-                        padding:"7px 14px",borderRadius:10,border:`1.5px solid ${C.gold}`,
+                        padding: isDesktop ? "5px 10px" : "7px 14px", borderRadius:10, border:`1.5px solid ${C.gold}`,
                         background:"white",color:C.gold,fontSize:12,fontFamily:FONT,
                         fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",gap:6,
                         WebkitTapHighlightColor:"transparent",whiteSpace:"nowrap",flexShrink:0,
                       }}>
-                      🖨 Imprimir ticket
+                      🖨 {isDesktop ? "Ticket" : "Imprimir ticket"}
                     </button>
                   </div>
                 </div>
@@ -7875,6 +8055,7 @@ function InventarioPorMarca({inv, ventas, onRecibir, onBaja, onImportarExcel}){
 // MARCA DETALLE — iOS navigation push style
 // ══════════════════════════════════════════════════════════
 function MarcaDetalle({marcaId,inv,ventas,vMes,mes,anio,MK,cierres,setCierres,getHist,getLiq}){
+  const isDesktop = useIsDesktop();
   var _hN150 = useState("historial"); var sub = _hN150[0]; var setSub = _hN150[1];;
   var _hN151 = useState(""); var filtroMk = _hN151[0]; var setFMk = _hN151[1];;
   const marca   =MARCAS.find(m=>m.id===marcaId);
@@ -7888,14 +8069,14 @@ function MarcaDetalle({marcaId,inv,ventas,vMes,mes,anio,MK,cierres,setCierres,ge
   return (
     <div>
       {/* Stats */}
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:20}}>
+      <div style={{display:"grid",gridTemplateColumns: isDesktop ? "1fr 1fr 1fr 1fr" : "1fr 1fr", gap: isDesktop ? 8 : 10, marginBottom: isDesktop ? 14 : 20}}>
         <StatCard icon={marca?.imagen?<MarcaIcon marca={marca} size={22} radius={6}/>:(marca?.emoji||"◆")} label="Total histórico" value={$(totalHist)}
-          sub={`${historial.reduce((s,h)=>s+h.ventas.length,0)} ventas`} color={marca?.color}/>
+          sub={`${historial.reduce((s,h)=>s+h.ventas.length,0)} ventas`} color={marca?.color} compact={isDesktop}/>
         <StatCard icon="📅" label={MESES[mes]} value={$(liq.bruto)}
-          sub={`${liq.vMarca.length} ventas`} color={C.gold}/>
+          sub={`${liq.vMarca.length} ventas`} color={C.gold} compact={isDesktop}/>
         <StatCard icon="📦" label="Productos" value={prods.filter(p=>p.stock>0).length}
-          sub={`${prods.reduce((s,p)=>s+p.stock,0)} uds`} color={C.blue}/>
-        <StatCard icon="🗓" label="Períodos" value={historial.length} color={C.indigo}/>
+          sub={`${prods.reduce((s,p)=>s+p.stock,0)} uds`} color={C.blue} compact={isDesktop}/>
+        <StatCard icon="🗓" label="Períodos" value={historial.length} color={C.indigo} compact={isDesktop}/>
       </div>
 
       {/* Segmented */}
@@ -7922,21 +8103,21 @@ function MarcaDetalle({marcaId,inv,ventas,vMes,mes,anio,MK,cierres,setCierres,ge
           {histFil.length===0
             ? <EmptyState icon="📋" title="Sin ventas registradas" sub={`No hay ventas para ${marca?.nombre}`}/>
             : histFil.map(periodo=>(
-                <div key={periodo.mk} style={{background:C.bg2,borderRadius:16,overflow:"hidden",marginBottom:14}}>
+                <div key={periodo.mk} style={{background:C.bg2,borderRadius:16,overflow:"hidden",marginBottom: isDesktop ? 8 : 14}}>
                   {/* Header período */}
-                  <div style={{padding:"14px 16px",borderBottom:`1px solid ${C.sep}`,
+                  <div style={{padding: isDesktop ? "10px 14px" : "14px 16px", borderBottom:`1px solid ${C.sep}`,
                     display:"flex",justifyContent:"space-between",alignItems:"center",
                     background:`${marca?.color}10`}}>
                     <div>
-                      <div style={{fontSize:17,fontWeight:600,color:C.label,fontFamily:FONT}}>
+                      <div style={{fontSize: isDesktop ? 14 : 17, fontWeight:600,color:C.label,fontFamily:FONT}}>
                         {MESES[periodo.mes]} {periodo.anio}
                       </div>
-                      <div style={{fontSize:13,color:C.label3,fontFamily:FONT}}>
+                      <div style={{fontSize: isDesktop ? 12 : 13, color:C.label3,fontFamily:FONT}}>
                         {periodo.ventas.length} transacciones
                       </div>
                     </div>
                     <div style={{textAlign:"right"}}>
-                      <div style={{fontSize:22,fontWeight:800,color:marca?.color,fontFamily:FONT}}>
+                      <div style={{fontSize: isDesktop ? 18 : 22, fontWeight:800,color:marca?.color,fontFamily:FONT}}>
                         {$(periodo.bruto)}
                       </div>
                       {cierres[`${periodo.mk}-${marcaId}`]?.cerrado&&<Chip color={C.green} small>✓ Cerrado</Chip>}
@@ -7944,18 +8125,18 @@ function MarcaDetalle({marcaId,inv,ventas,vMes,mes,anio,MK,cierres,setCierres,ge
                   </div>
                   {/* Ventas del período */}
                   {periodo.ventas.map((v,i)=>(
-                    <div key={v.id} style={{padding:"13px 16px",
+                    <div key={v.id} style={{padding: isDesktop ? "9px 14px" : "13px 16px",
                       borderBottom:i<periodo.ventas.length-1?`1px solid ${C.sep}`:""}}>
-                      <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
+                      <div style={{display:"flex",justifyContent:"space-between",marginBottom: isDesktop ? 4 : 6}}>
                         <div style={{display:"flex",alignItems:"center",gap:8}}>
                           <span style={{fontFamily:"monospace",fontSize:12,color:C.gold}}>{v.id}</span>
                           <Chip color={colorPago(v.metodoPago)} small>
                             {iconPago(v.metodoPago)} {labelPago(v.metodoPago)}
                           </Chip>
                         </div>
-                        <span style={{fontSize:16,fontWeight:700,color:C.gold,fontFamily:FONT}}>{$(v.subMarca)}</span>
+                        <span style={{fontSize: isDesktop ? 14 : 16, fontWeight:700,color:C.gold,fontFamily:FONT}}>{$(v.subMarca)}</span>
                       </div>
-                      <div style={{fontSize:12,color:C.label3,fontFamily:FONT,marginBottom:6}}>
+                      <div style={{fontSize:12,color:C.label3,fontFamily:FONT,marginBottom: isDesktop ? 3 : 6}}>
                         {v.fecha} {v.hora}
                       </div>
                       {v.itsMarca.map((it,ii)=>(
@@ -7975,7 +8156,12 @@ function MarcaDetalle({marcaId,inv,ventas,vMes,mes,anio,MK,cierres,setCierres,ge
 
       {/* PRODUCTOS */}
       {sub==="productos"&&(
-        <div>
+        <div style={{
+          display: isDesktop ? "grid" : "flex",
+          gridTemplateColumns: isDesktop ? "1fr 1fr 1fr" : undefined,
+          flexDirection: isDesktop ? undefined : "column",
+          gap: isDesktop ? 6 : 0,
+        }}>
           {prods.length===0
             ? <EmptyState icon="📦" title="Sin productos" sub={`No hay ítems registrados para ${marca?.nombre}`}/>
             : prods.map((p,i)=>{
@@ -7983,25 +8169,26 @@ function MarcaDetalle({marcaId,inv,ventas,vMes,mes,anio,MK,cierres,setCierres,ge
                 return (
                   <div key={p.id} style={{
                     background:C.bg2,
-                    borderRadius:i===0?"14px 14px 2px 2px":i===prods.length-1?"2px 2px 14px 14px":"2px",
-                    padding:"14px 16px",
-                    borderBottom:i<prods.length-1?`1px solid ${C.sep}`:"",
+                    borderRadius: isDesktop ? 12 : (i===0?"14px 14px 2px 2px":i===prods.length-1?"2px 2px 14px 14px":"2px"),
+                    padding: isDesktop ? "10px 12px" : "14px 16px",
+                    borderBottom: isDesktop ? "none" : (i<prods.length-1?`1px solid ${C.sep}`:""),
+                    border: isDesktop ? `1px solid ${C.sep}` : undefined,
                   }}>
                     <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
                       <div style={{flex:1}}>
-                        <div style={{fontSize:15,fontWeight:500,color:C.label,fontFamily:FONT,marginBottom:4}}>
+                        <div style={{fontSize: isDesktop ? 13 : 15, fontWeight:500,color:C.label,fontFamily:FONT,marginBottom: isDesktop ? 3 : 4}}>
                           {p.nombre}
                         </div>
                         <span style={{fontFamily:"monospace",fontSize:11,color:C.gold,
                           background:`${C.gold}18`,padding:"1px 7px",borderRadius:5}}>{p.codigo}</span>
                       </div>
                       <div style={{textAlign:"right"}}>
-                        <div style={{fontSize:16,fontWeight:700,color:C.gold,fontFamily:FONT}}>{$(p.precio)}</div>
-                        <div style={{fontSize:13,fontFamily:FONT,marginTop:2,
+                        <div style={{fontSize: isDesktop ? 14 : 16, fontWeight:700,color:C.gold,fontFamily:FONT}}>{$(p.precio)}</div>
+                        <div style={{fontSize: isDesktop ? 12 : 13, fontFamily:FONT,marginTop:2,
                           color:p.stock===0?C.red:p.stock<3?C.amber:C.green}}>
-                          {p.stock===0?"Agotado":p.stock<3?`${p.stock} (bajo)`:`${p.stock} disponibles`}
+                          {p.stock===0?"Agotado":p.stock<3?`${p.stock} (bajo)`:`${p.stock} disp.`}
                         </div>
-                        {vendidas>0&&<div style={{fontSize:12,color:C.label3,fontFamily:FONT}}>{vendidas} vendidas</div>}
+                        {vendidas>0&&<div style={{fontSize:12,color:C.label3,fontFamily:FONT}}>{vendidas} vend.</div>}
                       </div>
                     </div>
                   </div>
@@ -8273,7 +8460,7 @@ function HistorialTab({ventas, inv, cierres, onVentaClick}){
                       <div style={{display:"flex",alignItems:"center",gap:10}}>
                         <MarcaIcon marca={x.marca} size={22} radius={6}/>
                         <div>
-                          <div style={{fontSize:15,fontWeight:700,color:C.label,fontFamily:FONT}}>{x.marca.nombre}</div>
+                          <div style={{fontSize:15,fontWeight:600,color:C.label,fontFamily:FONT,letterSpacing:"0.02em"}}>{x.marca.nombre}</div>
                           <div style={{fontSize:12,color:C.label3,fontFamily:FONT}}>{x.txs} venta{x.txs!==1?"s":""}</div>
                         </div>
                       </div>
@@ -8440,7 +8627,7 @@ function FacturacionConfig(){
 
       {/* Modo */}
       <div style={{display:"flex",gap:8,marginBottom:16}}>
-        {[["true","🌐 API Automática"],["false","✏️ Modo Manual"]].map(([v,l])=>{
+        {[["true","🌐 API Automática"],["false","Modo Manual"]].map(([v,l])=>{
           const active=(v==="true")===(cfg.modoApi!==false);
           return(
             <button key={v} onClick={()=>save({...cfg,modoApi:v==="true"})} style={{
@@ -9107,69 +9294,45 @@ create policy "allow all usuarios" on usuarios
                       </div>
                     </div>
                     <div style={{display:"flex",gap:6,flexShrink:0}}>
-                      <button onClick={()=>setEditando(u)}
-                        style={{padding:"6px 12px",borderRadius:10,
-                          border:`1px solid ${C.sep}`,background:C.bg2,
-                          cursor:"pointer",fontSize:12,fontWeight:600,
-                          color:C.label2,fontFamily:FONT,
-                          WebkitTapHighlightColor:"transparent"}}>
-                        Editar
-                      </button>
-                      <button onClick={()=>setMenuAbierto(open?null:u.usuario)}
-                        style={{width:32,height:32,borderRadius:10,
-                          border:`1px solid ${C.sep}`,
-                          background:open?C.label:C.bg2,cursor:"pointer",
-                          fontSize:18,color:open?"#fff":C.label2,
-                          display:"flex",alignItems:"center",justifyContent:"center",
-                          WebkitTapHighlightColor:"transparent",lineHeight:1}}>
-                        ⋯
-                      </button>
+                      <EditBtn onClick={()=>setEditando(u)} label="Editar"/>
+                      <DotsMenu
+                        open={open}
+                        onToggle={()=>setMenuAbierto(open?null:u.usuario)}
+                        items={[
+                          {
+                            label:"Reset contraseña",
+                            icon:"⌗",
+                            color:C.amber,
+                            onClick:()=>setConfirmAct({
+                              type:"reset",user:u,
+                              msg:`¿Resetear la contraseña de ${u.nombre}?\nSe generará una contraseña temporal.`,
+                              onConfirm:()=>handleResetPass(u),
+                            }),
+                          },
+                          ...(u.usuario!==user.usuario?[{
+                            label: u.estado==="inactivo" ? "Activar cuenta" : "Desactivar",
+                            icon: u.estado==="inactivo" ? "◎" : "⊘",
+                            color: u.estado==="inactivo" ? C.green : C.amber,
+                            onClick:()=>setConfirmAct({
+                              type:"toggle",user:u,
+                              msg:`¿${u.estado==="inactivo"?"Activar":"Desactivar"} la cuenta de ${u.nombre}?`,
+                              onConfirm:()=>handleToggle(u),
+                            }),
+                          }]:[]),
+                          ...(u.usuario!==user.usuario?[{
+                            label:"Eliminar",
+                            icon:"×",
+                            danger:true,
+                            onClick:()=>setConfirmAct({
+                              type:"delete",user:u,
+                              msg:`¿Eliminar permanentemente a ${u.nombre} (@${u.usuario})?\nEsta acción no se puede deshacer.`,
+                              onConfirm:()=>handleEliminar(u),
+                            }),
+                          }]:[]),
+                        ]}
+                      />
                     </div>
                   </div>
-                  {open&&(
-                    <div style={{borderTop:`1px solid ${C.sep}`,background:C.bg2,
-                      padding:"10px 12px",display:"flex",gap:8,flexWrap:"wrap"}}>
-                      <button onClick={()=>setConfirmAct({
-                          type:"reset",user:u,
-                          msg:`¿Resetear la contraseña de ${u.nombre}?\nSe generará una contraseña temporal.`,
-                          onConfirm:()=>handleResetPass(u),
-                        })}
-                        style={{padding:"8px 14px",borderRadius:10,
-                          border:`1px solid ${C.amber}40`,background:`${C.amber}12`,
-                          cursor:"pointer",fontSize:12,fontWeight:600,color:C.amber,
-                          fontFamily:FONT,WebkitTapHighlightColor:"transparent"}}>
-                        🔑 Reset contraseña
-                      </button>
-                      {u.usuario!==user.usuario&&(
-                        <button onClick={()=>setConfirmAct({
-                            type:"toggle",user:u,
-                            msg:`¿${u.estado==="inactivo"?"Activar":"Desactivar"} la cuenta de ${u.nombre}?`,
-                            onConfirm:()=>handleToggle(u),
-                          })}
-                          style={{padding:"8px 14px",borderRadius:10,
-                            border:`1px solid ${u.estado==="inactivo"?C.green:C.amber}40`,
-                            background:u.estado==="inactivo"?`${C.green}12`:`${C.amber}12`,
-                            cursor:"pointer",fontSize:12,fontWeight:600,
-                            color:u.estado==="inactivo"?C.green:C.amber,
-                            fontFamily:FONT,WebkitTapHighlightColor:"transparent"}}>
-                          {u.estado==="inactivo"?"✅ Activar":"⏸ Desactivar"}
-                        </button>
-                      )}
-                      {u.usuario!==user.usuario&&(
-                        <button onClick={()=>setConfirmAct({
-                            type:"delete",user:u,
-                            msg:`¿Eliminar permanentemente a ${u.nombre} (@${u.usuario})?\nEsta acción no se puede deshacer.`,
-                            onConfirm:()=>handleEliminar(u),
-                          })}
-                          style={{padding:"8px 14px",borderRadius:10,
-                            border:`1px solid ${C.red}40`,background:`${C.red}10`,
-                            cursor:"pointer",fontSize:12,fontWeight:600,color:C.red,
-                            fontFamily:FONT,WebkitTapHighlightColor:"transparent"}}>
-                          🗑 Eliminar
-                        </button>
-                      )}
-                    </div>
-                  )}
                 </div>
               );
             })}
@@ -9785,6 +9948,7 @@ function DashboardVentas({ventas, onVentaClick}){
 // VENTAS TAB — totales globales + desglose por marca
 // ══════════════════════════════════════════════════════════
 function VentasTab({vMes, totalVtas, mes, anio, onVentaClick}){
+  const isDesktop = useIsDesktop();
   var _hN166 = useState("marcas"); var vistaActiva = _hN166[0]; var setVistaActiva = _hN166[1];; // "marcas" | "historial"
   var _hN167 = useState(null); var marcaFiltro = _hN167[0]; var setMarcaFiltro = _hN167[1];; // id marca o null = todas
 
@@ -9818,15 +9982,15 @@ function VentasTab({vMes, totalVtas, mes, anio, onVentaClick}){
   return (
     <div>
       {/* Stats globales */}
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:16}}>
-        <div style={{gridColumn:"1/-1",background:C.bg2,borderRadius:16,padding:"16px 20px",
+      <div style={{display:"grid",gridTemplateColumns: isDesktop ? "2fr 1fr 1fr 1fr" : "1fr 1fr",gap: isDesktop ? 8 : 10,marginBottom: isDesktop ? 12 : 16}}>
+        <div style={{background:C.bg2,borderRadius:16,padding: isDesktop ? "12px 16px" : "16px 20px",
           border:`1px solid ${C.sep}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
           <div>
             <div style={{fontSize:11,color:C.label3,fontWeight:700,textTransform:"uppercase",letterSpacing:.7,marginBottom:3}}>Total {MESES[mes]}</div>
-            <div style={{fontSize:28,fontWeight:800,color:C.gold,fontFamily:FONT,lineHeight:1}}>{$(totalVtas)}</div>
+            <div style={{fontSize: isDesktop ? 22 : 28,fontWeight:800,color:C.gold,fontFamily:FONT,lineHeight:1}}>{$(totalVtas)}</div>
             <div style={{fontSize:12,color:C.label3,fontFamily:FONT,marginTop:3}}>{vMes.length} transacciones · {porMarca.length} marcas activas</div>
           </div>
-          <div style={{fontSize:36,opacity:.4}}>💰</div>
+          <div style={{fontSize: isDesktop ? 28 : 36,opacity:.4}}>💰</div>
         </div>
         {[
           {icon:"💵",label:"Efectivo",value:totalEfectivo,color:"#4A9B6F"},
@@ -9835,7 +9999,7 @@ function VentasTab({vMes, totalVtas, mes, anio, onVentaClick}){
           ...(totalMixto>0?[{icon:"🔀",label:"Mixto",value:totalMixto,color:"#6C5CE7"}]:[]),
         ].map(s=>(
           <StatCard key={s.label} icon={s.icon} label={s.label} value={$(s.value)}
-            sub={`${Math.round(totalVtas>0?(s.value/totalVtas)*100:0)}% del total`} color={s.color}/>
+            sub={`${Math.round(totalVtas>0?(s.value/totalVtas)*100:0)}% del total`} color={s.color} compact={isDesktop}/>
         ))}
       </div>
 
@@ -9857,27 +10021,30 @@ function VentasTab({vMes, totalVtas, mes, anio, onVentaClick}){
                   background:C.bg2,
                   borderRadius:i===0?"16px 16px 4px 4px":i===porMarca.length-1?"4px 4px 16px 16px":"4px",
                   borderBottom:i<porMarca.length-1?`1px solid ${C.sep}`:"",
-                  padding:"14px 16px",
+                  padding: isDesktop ? "10px 14px" : "14px 16px",
                   cursor:"pointer",
                   WebkitTapHighlightColor:"transparent",
                   borderLeft:`4px solid ${x.marca.color}`,
+                  transition: isDesktop ? "background .12s" : undefined,
                 }}
+                onMouseEnter={isDesktop ? e=>{ e.currentTarget.style.background=`${x.marca.color}0A`; } : undefined}
+                onMouseLeave={isDesktop ? e=>{ e.currentTarget.style.background=C.bg2; } : undefined}
                 onClick={()=>{setMarcaFiltro(marcaFiltro===x.marca.id?null:x.marca.id);setVistaActiva("historial");}}>
                   {/* Cabecera marca */}
-                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
-                    <div style={{display:"flex",alignItems:"center",gap:10}}>
-                      <div style={{width:36,height:36,borderRadius:10,
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom: isDesktop ? 6 : 10}}>
+                    <div style={{display:"flex",alignItems:"center",gap: isDesktop ? 8 : 10}}>
+                      <div style={{width: isDesktop ? 30 : 36, height: isDesktop ? 30 : 36, borderRadius:10,
                         background:`${x.marca.color}22`,display:"flex",
                         alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>
-                        <MarcaIcon marca={x.marca} size={20} radius={6}/>
+                        <MarcaIcon marca={x.marca} size={isDesktop ? 17 : 20} radius={6}/>
                       </div>
                       <div>
-                        <div style={{fontSize:15,fontWeight:700,color:C.label,fontFamily:FONT}}>{x.marca.nombre}</div>
+                        <div style={{fontSize: isDesktop ? 13 : 15, fontWeight:600, color:C.label, fontFamily:FONT, letterSpacing:"0.02em"}}>{x.marca.nombre}</div>
                         <div style={{fontSize:12,color:C.label3,fontFamily:FONT}}>{x.txs} venta{x.txs!==1?"s":""}</div>
                       </div>
                     </div>
                     <div style={{textAlign:"right"}}>
-                      <div style={{fontSize:18,fontWeight:800,color:x.marca.color,fontFamily:FONT}}>{$(x.total)}</div>
+                      <div style={{fontSize: isDesktop ? 15 : 18, fontWeight:800, color:x.marca.color, fontFamily:FONT}}>{$(x.total)}</div>
                       <div style={{fontSize:11,color:C.label3,fontFamily:FONT}}>
                         {Math.round((x.total/totalVtas)*100)}% del total
                       </div>
@@ -9885,27 +10052,27 @@ function VentasTab({vMes, totalVtas, mes, anio, onVentaClick}){
                   </div>
 
                   {/* Barra total */}
-                  <div style={{background:"rgba(0,0,0,0.06)",borderRadius:6,height:6,marginBottom:10,overflow:"hidden"}}>
+                  <div style={{background:"rgba(0,0,0,0.06)",borderRadius:6,height: isDesktop ? 4 : 6, marginBottom: isDesktop ? 6 : 10, overflow:"hidden"}}>
                     <div style={{width:`${(x.total/maxVenta)*100}%`,background:x.marca.color,
-                      height:6,borderRadius:6,transition:"width .5s"}}/>
+                      height:"100%",borderRadius:6,transition:"width .5s"}}/>
                   </div>
 
                   {/* Desglose métodos de pago */}
-                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap: isDesktop ? 6 : 8}}>
                     {[
                       {icon:"💵",label:"Efectivo",value:x.efectivo,color:"#4A9B6F"},
                       {icon:"📱",label:"QR",value:x.qr,color:"#5B8DB8"},
                       {icon:"💳",label:"Tarjeta",value:x.tarjeta,color:"#C8922A"},
                     ].map(p=>(
                       <div key={p.label} style={{
-                        padding:"8px 10px",borderRadius:10,
+                        padding: isDesktop ? "6px 8px" : "8px 10px", borderRadius:10,
                         background:p.value>0?`${p.color}12`:"rgba(0,0,0,0.03)",
                         border:`1px solid ${p.value>0?p.color+"25":C.sep}`,
                         opacity:p.value>0?1:.5,
                       }}>
-                        <div style={{fontSize:14,marginBottom:3}}>{p.icon}</div>
+                        <div style={{fontSize: isDesktop ? 12 : 14, marginBottom: isDesktop ? 1 : 3}}>{p.icon}</div>
                         <div style={{fontSize:11,color:C.label3,fontFamily:FONT,marginBottom:2}}>{p.label}</div>
-                        <div style={{fontSize:13,fontWeight:700,
+                        <div style={{fontSize: isDesktop ? 12 : 13, fontWeight:700,
                           color:p.value>0?p.color:C.label3,fontFamily:FONT}}>
                           {p.value>0?$(p.value):"—"}
                         </div>
@@ -9918,10 +10085,12 @@ function VentasTab({vMes, totalVtas, mes, anio, onVentaClick}){
                     ))}
                   </div>
 
-                  <div style={{marginTop:10,fontSize:11,color:x.marca.color,
-                    fontFamily:FONT,textAlign:"right",fontWeight:600}}>
-                    Ver ventas de {x.marca.nombre} →
-                  </div>
+                  {!isDesktop && (
+                    <div style={{marginTop:10,fontSize:11,color:x.marca.color,
+                      fontFamily:FONT,textAlign:"right",fontWeight:600}}>
+                      Ver ventas de {x.marca.nombre} →
+                    </div>
+                  )}
                 </div>
               ))
           }
@@ -9966,12 +10135,16 @@ function VentasTab({vMes, totalVtas, mes, anio, onVentaClick}){
                 const totalMostrar=itemsMostrar.reduce((s,i)=>s+i.subtotal,0);
                 return (
                   <div key={v.id} onClick={()=>onVentaClick&&onVentaClick(v)}
-                    style={{background:v.anulada?`${C.red}06`:C.bg2,borderRadius:16,
-                      padding:"14px 16px",marginBottom:10,cursor:"pointer",
+                    style={{background:v.anulada?`${C.red}06`:C.bg2,borderRadius:14,
+                      padding: isDesktop ? "10px 14px" : "14px 16px", marginBottom: isDesktop ? 6 : 10, cursor:"pointer",
                       WebkitTapHighlightColor:"transparent",
                       opacity:v.anulada?0.7:1,
-                      border:v.anulada?`1px solid ${C.red}30`:"none"}}>
-                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
+                      border:v.anulada?`1px solid ${C.red}30`:"none",
+                      transition: isDesktop ? "background .12s" : undefined,
+                    }}
+                    onMouseEnter={isDesktop ? e=>{ e.currentTarget.style.background=v.anulada?`${C.red}06`:`${C.sep}`; } : undefined}
+                    onMouseLeave={isDesktop ? e=>{ e.currentTarget.style.background=v.anulada?`${C.red}06`:C.bg2; } : undefined}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom: isDesktop ? 5 : 8}}>
                       <div>
                         <span style={{fontFamily:"monospace",fontSize:12,color:v.anulada?C.red:C.gold,fontWeight:700}}>
                           {v.id}{v.anulada?" ⊘":""}</span>
@@ -9985,7 +10158,7 @@ function VentasTab({vMes, totalVtas, mes, anio, onVentaClick}){
                           ? <Chip color={C.red}>⊘ Anulada</Chip>
                           : <Chip color={colorPago(v.metodoPago)}>{iconPago(v.metodoPago)} {labelPago(v.metodoPago)}</Chip>
                         }
-                        <span style={{fontSize:18,fontWeight:800,
+                        <span style={{fontSize: isDesktop ? 15 : 18, fontWeight:800,
                           color:v.anulada?C.label3:C.gold,fontFamily:FONT,
                           textDecoration:v.anulada?"line-through":"none"}}>{$(totalMostrar)}</span>
                       </div>
@@ -9999,13 +10172,13 @@ function VentasTab({vMes, totalVtas, mes, anio, onVentaClick}){
                         byMarca[it.marcaId].sub+=it.subtotal;
                       });
                       return Object.values(byMarca).map(g=>(
-                        <div key={g.marca?.id} style={{marginBottom:8,padding:"8px 10px",
+                        <div key={g.marca?.id} style={{marginBottom: isDesktop ? 5 : 8, padding: isDesktop ? "5px 8px" : "8px 10px",
                           background:`${g.marca?.color}10`,borderRadius:10,
                           borderLeft:`3px solid ${g.marca?.color}`}}>
                           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
                             <div style={{display:"flex",alignItems:"center",gap:6}}>
                               <MarcaIcon marca={g.marca} size={16} radius={4}/>
-                              <span style={{fontSize:13,fontWeight:700,color:g.marca?.color,fontFamily:FONT}}>{g.marca?.nombre}</span>
+                              <span style={{fontSize:13,fontWeight:600,color:g.marca?.color,fontFamily:FONT,letterSpacing:"0.02em"}}>{g.marca?.nombre}</span>
                             </div>
                             <span style={{fontSize:13,fontWeight:700,color:g.marca?.color,fontFamily:FONT}}>{$(g.sub)}</span>
                           </div>
@@ -10017,11 +10190,13 @@ function VentasTab({vMes, totalVtas, mes, anio, onVentaClick}){
                         </div>
                       ));
                     })()}
-                    <IOSBtn onPress={()=>sendWA(v)} variant="fill" small full icon="📲">
-                      Enviar por WhatsApp
-                    </IOSBtn>
+                    {!isDesktop && (
+                      <IOSBtn onPress={()=>sendWA(v)} variant="fill" small full icon="📲">
+                        Enviar por WhatsApp
+                      </IOSBtn>
+                    )}
                     {v.etiquetaImg&&<img src={v.etiquetaImg} alt="etiqueta"
-                      style={{width:"100%",maxHeight:80,objectFit:"cover",borderRadius:10,marginTop:10}}/>}
+                      style={{width:"100%",maxHeight: isDesktop ? 50 : 80, objectFit:"cover",borderRadius:10,marginTop:10}}/>}
                   </div>
                 );
               })
