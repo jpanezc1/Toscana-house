@@ -5343,24 +5343,326 @@ const MARCA_COLORS = [
   "#D4B8A8","#A8B8C4","#C4D4A8","#D4A8A8","#A8C4D4","#C4A8D4",
 ];
 
-// Redimensiona una imagen a maxPx y devuelve base64 JPEG
-function resizarImagen(file, maxPx=400){
-  return new Promise(resolve=>{
-    const reader=new FileReader();
-    reader.onload=e=>{
-      const img=new Image();
-      img.onload=()=>{
-        const scale=Math.min(maxPx/img.width, maxPx/img.height, 1);
-        const canvas=document.createElement("canvas");
-        canvas.width=Math.round(img.width*scale);
-        canvas.height=Math.round(img.height*scale);
-        canvas.getContext("2d").drawImage(img,0,0,canvas.width,canvas.height);
-        resolve(canvas.toDataURL("image/jpeg",0.82));
-      };
-      img.src=e.target.result;
+// ── Editor de Logo Premium ─────────────────────────────────────────────────────
+// Canvas-based editor: drag, zoom, rotar, preview en tiempo real.
+// Exporta PNG (transparencia) o JPEG (fondo blanco) según el tipo de archivo.
+function LogoEditor({ file, onSave, onCancel }) {
+  const SIZE = 400; // resolución interna / tamaño de salida en px
+  const canvasRef = useRef(null);
+  const dragRef   = useRef({ on:false, lx:0, ly:0 });
+  const pinchRef  = useRef({ on:false, d:0 });
+
+  const [img,        setImg]        = useState(null);
+  const [pos,        setPos]        = useState({ x:0, y:0 });
+  const [scale,      setScale]      = useState(1);
+  const [rotation,   setRotation]   = useState(0);
+  const [initScale,  setInitScale]  = useState(1);
+  const [cursor,     setCursor]     = useState("grab");
+  const [previewUrl, setPreviewUrl] = useState("");
+
+  const isPng = file && file.type !== "image/jpeg";
+
+  // Cargar imagen desde el File
+  useEffect(()=>{
+    if(!file) return;
+    const url = URL.createObjectURL(file);
+    const image = new Image();
+    image.onload = ()=>{
+      const w = image.naturalWidth  || 200;
+      const h = image.naturalHeight || 200;
+      const s = Math.min(SIZE/w, SIZE/h) * 0.82;
+      setImg(image); setScale(s); setInitScale(s);
+      setPos({x:0,y:0}); setRotation(0);
     };
-    reader.readAsDataURL(file);
-  });
+    image.onerror = onCancel;
+    image.src = url;
+    return ()=> URL.revokeObjectURL(url);
+  },[]);
+
+  // Dibujar en canvas cada vez que cambia la posición/escala/rotación
+  useEffect(()=>{
+    const canvas = canvasRef.current;
+    if(!canvas || !img) return;
+    const ctx = canvas.getContext("2d");
+    ctx.clearRect(0,0,SIZE,SIZE);
+    // Damero de transparencia (muestra áreas alpha)
+    const tile = 14;
+    for(let xi=0; xi<SIZE; xi+=tile)
+      for(let yi=0; yi<SIZE; yi+=tile){
+        ctx.fillStyle = ((Math.floor(xi/tile)+Math.floor(yi/tile))%2)?"#dcdcdc":"#f0f0f0";
+        ctx.fillRect(xi,yi,Math.min(tile,SIZE-xi),Math.min(tile,SIZE-yi));
+      }
+    // Imagen centrada con transformaciones aplicadas
+    ctx.save();
+    ctx.translate(SIZE/2+pos.x, SIZE/2+pos.y);
+    ctx.rotate(rotation*Math.PI/180);
+    ctx.scale(scale,scale);
+    const iw = img.naturalWidth||200, ih = img.naturalHeight||200;
+    ctx.drawImage(img, -iw/2, -ih/2, iw, ih);
+    ctx.restore();
+    // Preview URL para los chips de referencia
+    setPreviewUrl(canvas.toDataURL("image/png"));
+  },[img, pos, scale, rotation]);
+
+  // — Mouse: listeners en window para no perder el drag fuera del canvas —
+  const onWinMove = useCallback((e)=>{
+    if(!dragRef.current.on) return;
+    const c = canvasRef.current;
+    const ratio = c ? SIZE/c.offsetWidth : 1;
+    const dx=(e.clientX-dragRef.current.lx)*ratio;
+    const dy=(e.clientY-dragRef.current.ly)*ratio;
+    dragRef.current.lx=e.clientX; dragRef.current.ly=e.clientY;
+    setPos(p=>({x:p.x+dx, y:p.y+dy}));
+  },[]);
+  const onWinUp = useCallback(()=>{ dragRef.current.on=false; setCursor("grab"); },[]);
+  useEffect(()=>{
+    window.addEventListener("mousemove", onWinMove);
+    window.addEventListener("mouseup",   onWinUp);
+    return ()=>{
+      window.removeEventListener("mousemove", onWinMove);
+      window.removeEventListener("mouseup",   onWinUp);
+    };
+  },[]);
+
+  // — Touch & Wheel con passive:false para poder hacer preventDefault —
+  useEffect(()=>{
+    const canvas = canvasRef.current;
+    if(!canvas) return;
+    function dist(t){
+      const dx=t[0].clientX-t[1].clientX, dy=t[0].clientY-t[1].clientY;
+      return Math.sqrt(dx*dx+dy*dy);
+    }
+    function tStart(e){
+      e.preventDefault();
+      if(e.touches.length===1){
+        dragRef.current={on:true,lx:e.touches[0].clientX,ly:e.touches[0].clientY};
+        pinchRef.current.on=false;
+      } else if(e.touches.length===2){
+        dragRef.current.on=false;
+        pinchRef.current={on:true,d:dist(e.touches)};
+      }
+    }
+    function tMove(e){
+      e.preventDefault();
+      if(e.touches.length===1 && dragRef.current.on){
+        const ratio=SIZE/(canvas.offsetWidth||SIZE);
+        const dx=(e.touches[0].clientX-dragRef.current.lx)*ratio;
+        const dy=(e.touches[0].clientY-dragRef.current.ly)*ratio;
+        dragRef.current.lx=e.touches[0].clientX; dragRef.current.ly=e.touches[0].clientY;
+        setPos(p=>({x:p.x+dx, y:p.y+dy}));
+      } else if(e.touches.length===2 && pinchRef.current.on){
+        const d=dist(e.touches), factor=d/pinchRef.current.d;
+        pinchRef.current.d=d;
+        setScale(s=>Math.max(0.05,Math.min(6,s*factor)));
+      }
+    }
+    function tEnd(e){
+      if(e.touches.length===0){ dragRef.current.on=false; pinchRef.current.on=false; }
+      else if(e.touches.length<2) pinchRef.current.on=false;
+    }
+    function wheel(e){
+      e.preventDefault();
+      const d=e.deltaY>0?-0.06:0.06;
+      setScale(s=>Math.max(0.05,Math.min(6,s*(1+d))));
+    }
+    canvas.addEventListener("touchstart",tStart,{passive:false});
+    canvas.addEventListener("touchmove", tMove, {passive:false});
+    canvas.addEventListener("touchend",  tEnd,  {passive:false});
+    canvas.addEventListener("wheel",     wheel, {passive:false});
+    return ()=>{
+      canvas.removeEventListener("touchstart",tStart);
+      canvas.removeEventListener("touchmove", tMove);
+      canvas.removeEventListener("touchend",  tEnd);
+      canvas.removeEventListener("wheel",     wheel);
+    };
+  },[]);
+
+  // Acciones
+  function handleCenter(){ setPos({x:0,y:0}); }
+  function handleReset(){ setPos({x:0,y:0}); setScale(initScale); setRotation(0); }
+  function handleSave(){
+    const canvas = canvasRef.current;
+    if(!canvas||!img) return;
+    if(!isPng){
+      // JPEG: redibujar con fondo blanco (sin damero)
+      const ctx=canvas.getContext("2d");
+      ctx.clearRect(0,0,SIZE,SIZE);
+      ctx.fillStyle="#ffffff"; ctx.fillRect(0,0,SIZE,SIZE);
+      ctx.save();
+      ctx.translate(SIZE/2+pos.x, SIZE/2+pos.y);
+      ctx.rotate(rotation*Math.PI/180);
+      ctx.scale(scale,scale);
+      const iw=img.naturalWidth||200, ih=img.naturalHeight||200;
+      ctx.drawImage(img,-iw/2,-ih/2,iw,ih);
+      ctx.restore();
+      onSave(canvas.toDataURL("image/jpeg",0.92));
+    } else {
+      onSave(canvas.toDataURL("image/png"));
+    }
+  }
+
+  const pct = Math.round(scale/initScale*100);
+
+  // Estilos compartidos
+  const btnSecondary = {
+    flex:1,padding:"12px 8px",borderRadius:12,
+    border:"1.5px solid rgba(255,255,255,0.15)",
+    background:"transparent",color:"rgba(255,255,255,0.65)",
+    fontSize:13,fontFamily:FONT,cursor:"pointer",fontWeight:500,
+    WebkitTapHighlightColor:"transparent",
+  };
+  const lbl = {fontSize:11,fontWeight:700,color:"rgba(255,255,255,0.4)",
+    fontFamily:FONT,textTransform:"uppercase",letterSpacing:.8};
+
+  return (
+    <div style={{
+      position:"fixed",inset:0,zIndex:900,
+      background:"rgba(6,6,10,0.97)",
+      display:"flex",flexDirection:"column",alignItems:"center",
+      overflowY:"auto",WebkitOverflowScrolling:"touch",
+    }}>
+      {/* ── Header ── */}
+      <div style={{width:"100%",maxWidth:440,padding:"20px 20px 12px",
+        display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0}}>
+        <div>
+          <div style={{fontSize:18,fontWeight:700,color:"#fff",
+            fontFamily:FONT_DISPLAY,letterSpacing:.3}}>Editor de Logo</div>
+          <div style={{fontSize:11,color:"rgba(255,255,255,0.35)",fontFamily:FONT,marginTop:2}}>
+            Mover · Zoom · Rotar · Preview en vivo
+          </div>
+        </div>
+        <button onClick={onCancel} style={{
+          background:"rgba(255,255,255,0.07)",
+          border:"1px solid rgba(255,255,255,0.12)",borderRadius:10,
+          padding:"8px 14px",color:"rgba(255,255,255,0.6)",
+          fontSize:13,fontFamily:FONT,cursor:"pointer",
+          WebkitTapHighlightColor:"transparent",
+        }}>✕ Cancelar</button>
+      </div>
+
+      {/* ── Canvas ── */}
+      <div style={{width:"100%",maxWidth:440,padding:"0 16px",flexShrink:0,position:"relative"}}>
+        <canvas ref={canvasRef} width={SIZE} height={SIZE}
+          onMouseDown={e=>{
+            dragRef.current={on:true,lx:e.clientX,ly:e.clientY};
+            setCursor("grabbing");
+          }}
+          style={{
+            width:"100%",aspectRatio:"1",display:"block",
+            borderRadius:20,cursor:cursor,touchAction:"none",
+            boxShadow:"0 16px 70px rgba(0,0,0,0.75)",
+          }}
+        />
+        {/* Porcentaje de zoom */}
+        <div style={{
+          position:"absolute",bottom:14,right:30,
+          background:"rgba(0,0,0,0.6)",backdropFilter:"blur(6px)",
+          borderRadius:8,padding:"3px 9px",
+          fontSize:11,fontWeight:700,color:"rgba(255,255,255,0.9)",
+          fontFamily:FONT,pointerEvents:"none",
+        }}>{pct}%</div>
+        {/* Hint de arrastre */}
+        {!img&&(
+          <div style={{
+            position:"absolute",inset:16,display:"flex",alignItems:"center",
+            justifyContent:"center",
+            fontSize:14,color:"rgba(255,255,255,0.25)",fontFamily:FONT,
+          }}>Cargando imagen…</div>
+        )}
+      </div>
+
+      {/* ── Controles ── */}
+      <div style={{width:"100%",maxWidth:440,padding:"20px 16px 0",flexShrink:0}}>
+
+        {/* Zoom */}
+        <div style={{marginBottom:18}}>
+          <div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}>
+            <span style={lbl}>🔍 Zoom</span>
+            <span style={{...lbl,color:"rgba(255,255,255,0.65)"}}>{pct}%</span>
+          </div>
+          <input type="range" min="0.05" max="6" step="0.005" value={scale}
+            onChange={e=>setScale(Number(e.target.value))}
+            style={{width:"100%",accentColor:C.gold,cursor:"pointer",height:4}}
+          />
+          <div style={{display:"flex",justifyContent:"space-between",marginTop:4}}>
+            <span style={{fontSize:10,color:"rgba(255,255,255,0.2)",fontFamily:FONT}}>Mínimo</span>
+            <span style={{fontSize:10,color:"rgba(255,255,255,0.2)",fontFamily:FONT}}>Máximo</span>
+          </div>
+        </div>
+
+        {/* Rotación */}
+        <div style={{marginBottom:4}}>
+          <div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}>
+            <span style={lbl}>↻ Rotación</span>
+            <span style={{...lbl,color:"rgba(255,255,255,0.65)"}}>{rotation > 0 ? "+" : ""}{rotation}°</span>
+          </div>
+          <input type="range" min="-180" max="180" step="1" value={rotation}
+            onChange={e=>setRotation(Number(e.target.value))}
+            style={{width:"100%",accentColor:C.gold,cursor:"pointer",height:4}}
+          />
+          <div style={{display:"flex",justifyContent:"space-between",marginTop:4}}>
+            <span style={{fontSize:10,color:"rgba(255,255,255,0.2)",fontFamily:FONT}}>-180°</span>
+            <button onClick={()=>setRotation(0)} style={{
+              fontSize:10,color:"rgba(255,255,255,0.3)",fontFamily:FONT,
+              background:"none",border:"none",cursor:"pointer",padding:0,
+            }}>Reset 0°</button>
+            <span style={{fontSize:10,color:"rgba(255,255,255,0.2)",fontFamily:FONT}}>+180°</span>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Preview en vivo ── */}
+      {previewUrl&&(
+        <div style={{width:"100%",maxWidth:440,padding:"18px 16px 0",flexShrink:0}}>
+          <div style={{...lbl,marginBottom:10}}>Preview en vivo</div>
+          <div style={{
+            background:"rgba(255,255,255,0.04)",borderRadius:16,padding:"14px 18px",
+            border:"1px solid rgba(255,255,255,0.07)",
+            display:"flex",alignItems:"center",gap:16,
+          }}>
+            {[{s:52,r:"50%",label:"Sidebar"},{s:40,r:10,label:"Card"},{s:24,r:6,label:"Ícono"}].map(({s,r,label})=>(
+              <div key={label} style={{textAlign:"center",flexShrink:0}}>
+                <img src={previewUrl} alt="" style={{width:s,height:s,borderRadius:r,objectFit:"cover",display:"block"}}/>
+                <div style={{fontSize:9,color:"rgba(255,255,255,0.3)",fontFamily:FONT,marginTop:4}}>{label}</div>
+              </div>
+            ))}
+            {/* Simulación de card de marca */}
+            <div style={{flex:1,background:"rgba(255,255,255,0.07)",borderRadius:10,
+              padding:"9px 11px",display:"flex",alignItems:"center",gap:9}}>
+              <img src={previewUrl} alt="" style={{width:30,height:30,borderRadius:8,objectFit:"cover",flexShrink:0}}/>
+              <div>
+                <div style={{fontSize:12,fontWeight:700,color:"rgba(255,255,255,0.9)",fontFamily:FONT,letterSpacing:.2}}>
+                  Mi Marca
+                </div>
+                <div style={{fontSize:9,color:"rgba(255,255,255,0.35)",fontFamily:FONT,marginTop:1}}>Dashboard</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Botones ── */}
+      <div style={{width:"100%",maxWidth:440,padding:"16px 16px 36px",flexShrink:0}}>
+        <div style={{display:"flex",gap:8,marginBottom:10}}>
+          <button onClick={handleReset} style={btnSecondary}>↺ Resetear</button>
+          <button onClick={handleCenter} style={btnSecondary}>⊕ Centrar</button>
+        </div>
+        <button onClick={handleSave} disabled={!img} style={{
+          width:"100%",padding:"16px",borderRadius:14,border:"none",
+          background:!img?"rgba(255,255,255,0.07)":`linear-gradient(135deg,${C.gold},${C.goldD})`,
+          color:!img?"rgba(255,255,255,0.3)":"#fff",
+          fontSize:16,fontWeight:700,fontFamily:FONT,
+          cursor:!img?"not-allowed":"pointer",letterSpacing:.3,
+          transition:"opacity .2s",WebkitTapHighlightColor:"transparent",
+          boxShadow:img?"0 4px 20px rgba(154,123,79,0.4)":"none",
+        }}>Guardar logo →</button>
+        <div style={{textAlign:"center",marginTop:10,fontSize:11,
+          color:"rgba(255,255,255,0.2)",fontFamily:FONT}}>
+          Arrastrá para mover · Scroll o pellizco para zoom
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function NuevaMarcaModal({editMarca, marcasActuales, onClose, onGuardar}){
@@ -5381,21 +5683,20 @@ function NuevaMarcaModal({editMarca, marcasActuales, onClose, onGuardar}){
   const [uLogin,    setULogin]    = useState("");
   const [uPass,     setUPass]     = useState("");
   const [showPass,  setShowPass]  = useState(false);
-  const [pagina,    setPagina]    = useState(0); // 0 = info, 1 = opciones, 2 = usuario
-  const [resizing,  setResizing]  = useState(false);
+  const [pagina,         setPagina]         = useState(0); // 0 = info, 1 = opciones, 2 = usuario
+  const [logoEditorFile, setLogoEditorFile] = useState(null); // File abierto en editor
+  const [logoOrigFile,   setLogoOrigFile]   = useState(null); // File original para re-editar
   const imgRef = useRef(null);
 
-  async function onImagenSeleccionada(e){
+  function onImagenSeleccionada(e){
     const file = e.target.files?.[0];
     if(!file) return;
-    if(!file.type.startsWith("image/")){ setMsg("Seleccioná un archivo de imagen (JPG, PNG, etc.)"); return; }
-    setResizing(true);
-    try{
-      const base64 = await resizarImagen(file, 400);
-      setF(p=>({...p, imagen: base64}));
-    }catch{ setMsg("No se pudo procesar la imagen"); }
-    setResizing(false);
-    e.target.value=""; // reset input para poder seleccionar la misma imagen de nuevo
+    if(!file.type.startsWith("image/")){
+      setMsg("Seleccioná un archivo de imagen (JPG, PNG, SVG, WEBP)"); return;
+    }
+    setLogoOrigFile(file);
+    setLogoEditorFile(file); // abre el editor visual
+    e.target.value="";       // reset para poder seleccionar el mismo archivo de nuevo
   }
 
   function guardar(){
@@ -5526,26 +5827,36 @@ function NuevaMarcaModal({editMarca, marcasActuales, onClose, onGuardar}){
                   style={{display:"none"}}/>
 
                 {f.imagen ? (
-                  /* Preview de imagen cargada */
+                  /* Preview con acciones: Editar · Cambiar · Quitar */
                   <div style={{display:"flex",alignItems:"center",gap:12,
                     background:C.bg2,borderRadius:14,padding:"12px 14px",
                     border:`1.5px solid ${C.gold}50`,marginBottom:8}}>
-                    <img src={f.imagen} alt="logo"
-                      style={{width:64,height:64,borderRadius:12,objectFit:"cover",
-                        boxShadow:"0 2px 10px rgba(0,0,0,0.12)",flexShrink:0}}/>
+                    <div style={{position:"relative",flexShrink:0}}>
+                      <img src={f.imagen} alt="logo"
+                        style={{width:64,height:64,borderRadius:12,objectFit:"cover",
+                          boxShadow:"0 2px 10px rgba(0,0,0,0.12)",display:"block"}}/>
+                    </div>
                     <div style={{flex:1}}>
-                      <div style={{fontSize:13,fontWeight:600,color:C.label,fontFamily:FONT,marginBottom:4}}>
-                        Imagen cargada ✓
+                      <div style={{fontSize:13,fontWeight:600,color:C.label,fontFamily:FONT,marginBottom:6}}>
+                        Logo cargado ✓
                       </div>
-                      <div style={{display:"flex",gap:8}}>
+                      <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                        {logoOrigFile&&(
+                          <button onClick={()=>setLogoEditorFile(logoOrigFile)}
+                            style={{padding:"5px 11px",borderRadius:8,border:`1.5px solid ${C.gold}`,
+                              background:`${C.gold}12`,color:C.gold,fontSize:12,fontWeight:700,
+                              fontFamily:FONT,cursor:"pointer",WebkitTapHighlightColor:"transparent"}}>
+                            ✏️ Editar
+                          </button>
+                        )}
                         <button onClick={()=>imgRef.current?.click()}
-                          style={{padding:"5px 12px",borderRadius:8,border:`1px solid ${C.gold}`,
-                            background:"none",color:C.gold,fontSize:12,fontWeight:600,
+                          style={{padding:"5px 11px",borderRadius:8,border:`1px solid ${C.sep}`,
+                            background:"none",color:C.label2,fontSize:12,fontWeight:600,
                             fontFamily:FONT,cursor:"pointer",WebkitTapHighlightColor:"transparent"}}>
                           Cambiar
                         </button>
-                        <button onClick={()=>setF(p=>({...p,imagen:""}))}
-                          style={{padding:"5px 12px",borderRadius:8,border:`1px solid ${C.sep}`,
+                        <button onClick={()=>{ setF(p=>({...p,imagen:""})); setLogoOrigFile(null); }}
+                          style={{padding:"5px 11px",borderRadius:8,border:`1px solid ${C.sep}`,
                             background:"none",color:C.label3,fontSize:12,fontWeight:600,
                             fontFamily:FONT,cursor:"pointer",WebkitTapHighlightColor:"transparent"}}>
                           Quitar
@@ -5554,20 +5865,22 @@ function NuevaMarcaModal({editMarca, marcasActuales, onClose, onGuardar}){
                     </div>
                   </div>
                 ) : (
-                  /* Botón subir imagen */
-                  <button onClick={()=>imgRef.current?.click()} disabled={resizing}
-                    style={{width:"100%",padding:"14px",borderRadius:14,
-                      border:`2px dashed ${C.sep}`,background:C.bg2,
+                  /* Botón subir logo → abre editor visual */
+                  <button onClick={()=>imgRef.current?.click()}
+                    style={{width:"100%",padding:"18px 14px",borderRadius:14,
+                      border:`2px dashed ${C.gold}50`,background:`${C.gold}06`,
                       cursor:"pointer",marginBottom:10,
-                      display:"flex",alignItems:"center",justifyContent:"center",gap:10,
-                      WebkitTapHighlightColor:"transparent"}}>
-                    <span style={{fontSize:24}}>{resizing?"⏳":"🖼"}</span>
+                      display:"flex",alignItems:"center",justifyContent:"center",gap:12,
+                      WebkitTapHighlightColor:"transparent",transition:"border-color .2s"}}>
+                    <div style={{width:44,height:44,borderRadius:12,
+                      background:`${C.gold}15`,display:"flex",alignItems:"center",
+                      justifyContent:"center",fontSize:22,flexShrink:0}}>🖼</div>
                     <div style={{textAlign:"left"}}>
-                      <div style={{fontSize:14,fontWeight:600,color:C.label,fontFamily:FONT}}>
-                        {resizing?"Procesando imagen…":"Subir logo desde Finder"}
+                      <div style={{fontSize:14,fontWeight:700,color:C.label,fontFamily:FONT}}>
+                        Subir logo desde Finder
                       </div>
-                      <div style={{fontSize:11,color:C.label3,fontFamily:FONT,marginTop:2}}>
-                        JPG, PNG, WEBP · Se ajusta automáticamente
+                      <div style={{fontSize:11,color:C.label3,fontFamily:FONT,marginTop:3}}>
+                        PNG · JPG · SVG · WEBP — Editor visual incluido
                       </div>
                     </div>
                   </button>
@@ -5827,6 +6140,17 @@ function NuevaMarcaModal({editMarca, marcasActuales, onClose, onGuardar}){
           </div>
         </div>
       </div>
+      {/* ── Editor de logo: overlay sobre el modal ── */}
+      {logoEditorFile&&(
+        <LogoEditor
+          file={logoEditorFile}
+          onSave={dataURL=>{
+            setF(p=>({...p, imagen:dataURL}));
+            setLogoEditorFile(null);
+          }}
+          onCancel={()=>setLogoEditorFile(null)}
+        />
+      )}
     </div>
   );
 }
