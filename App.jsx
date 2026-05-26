@@ -6763,7 +6763,7 @@ function App(){
   const getLiq=useCallback((marcaId)=>{
     const vM=vMes.filter(v=>v.items.some(i=>i.marcaId===marcaId));
     const liq=calcLiqMarca(vM, marcaId);
-    return{...liq, alqPagado:alqMes.find(a=>a.marcaId===marcaId)?.pagado||false};
+    return{...liq, vMarca:vM, alqPagado:alqMes.find(a=>a.marcaId===marcaId)?.pagado||false};
   },[vMes, alqMes, cfgLiqVersion]);
 
   const getHist=useCallback((marcaId)=>{
@@ -6985,8 +6985,7 @@ function App(){
                     </div>
 
                     {/* Info */}
-                    <div onClick={e=>e.stopPropagation()}
-                      style={{flex:1,minWidth:0}}>
+                    <div style={{flex:1,minWidth:0}}>
                       <div style={{
                         fontSize: isDesktop ? 15 : 17,
                         fontWeight:600,

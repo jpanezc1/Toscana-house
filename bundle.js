@@ -28582,7 +28582,7 @@ Fecha: ${venta.fecha}`);
     const getLiq = (0, import_react.useCallback)((marcaId) => {
       const vM = vMes.filter((v) => v.items.some((i) => i.marcaId === marcaId));
       const liq = calcLiqMarca(vM, marcaId);
-      return { ...liq, alqPagado: alqMes.find((a) => a.marcaId === marcaId)?.pagado || false };
+      return { ...liq, vMarca: vM, alqPagado: alqMes.find((a) => a.marcaId === marcaId)?.pagado || false };
     }, [vMes, alqMes, cfgLiqVersion]);
     const getHist = (0, import_react.useCallback)((marcaId) => {
       const map = {};
@@ -28840,47 +28840,39 @@ Fecha: ${venta.fecha}`);
             style: { width: "100%", height: "100%", objectFit: "cover" }
           }
         ) : m.emoji),
-        /* @__PURE__ */ import_react.default.createElement(
-          "div",
-          {
-            onClick: (e) => e.stopPropagation(),
-            style: { flex: 1, minWidth: 0 }
-          },
-          /* @__PURE__ */ import_react.default.createElement("div", { style: {
-            fontSize: isDesktop ? 15 : 17,
-            fontWeight: 600,
-            color: C.label,
-            fontFamily: FONT,
-            letterSpacing: "0.02em",
-            marginBottom: 3,
-            lineHeight: 1.2
-          } }, m.nombre, inactiva && /* @__PURE__ */ import_react.default.createElement("span", { style: {
-            fontSize: 10,
-            color: C.red,
-            fontWeight: 600,
-            marginLeft: 8,
-            padding: "2px 7px",
-            borderRadius: 8,
-            background: `${C.red}12`,
-            letterSpacing: "0.04em",
-            textTransform: "uppercase"
-          } }, "inactiva")),
-          /* @__PURE__ */ import_react.default.createElement("div", { style: {
-            fontSize: 12,
-            color: C.label3,
-            fontFamily: FONT,
-            display: "flex",
-            alignItems: "center",
-            gap: 6
-          } }, /* @__PURE__ */ import_react.default.createElement("span", { style: {
-            display: "inline-block",
-            width: 6,
-            height: 6,
-            borderRadius: 3,
-            background: prods > 0 ? C.green : C.label4,
-            flexShrink: 0
-          } }), prods, " producto", prods !== 1 ? "s" : "", total > 0 && /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.gold, fontWeight: 500 } }, " \xB7 ", $(total)))
-        ),
+        /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+          fontSize: isDesktop ? 15 : 17,
+          fontWeight: 600,
+          color: C.label,
+          fontFamily: FONT,
+          letterSpacing: "0.02em",
+          marginBottom: 3,
+          lineHeight: 1.2
+        } }, m.nombre, inactiva && /* @__PURE__ */ import_react.default.createElement("span", { style: {
+          fontSize: 10,
+          color: C.red,
+          fontWeight: 600,
+          marginLeft: 8,
+          padding: "2px 7px",
+          borderRadius: 8,
+          background: `${C.red}12`,
+          letterSpacing: "0.04em",
+          textTransform: "uppercase"
+        } }, "inactiva")), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+          fontSize: 12,
+          color: C.label3,
+          fontFamily: FONT,
+          display: "flex",
+          alignItems: "center",
+          gap: 6
+        } }, /* @__PURE__ */ import_react.default.createElement("span", { style: {
+          display: "inline-block",
+          width: 6,
+          height: 6,
+          borderRadius: 3,
+          background: prods > 0 ? C.green : C.label4,
+          flexShrink: 0
+        } }), prods, " producto", prods !== 1 ? "s" : "", total > 0 && /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.gold, fontWeight: 500 } }, " \xB7 ", $(total)))),
         /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6, flexShrink: 0 } }, cerrado && /* @__PURE__ */ import_react.default.createElement(Chip, { color: C.green, small: true }, "\u2713"), user.rol === "admin" && /* @__PURE__ */ import_react.default.createElement(
           MarcaEditBtn,
           {
