@@ -1643,14 +1643,13 @@ function Cell({icon,iconBg,label,value,chevron,onPress,danger,first,last,badge})
 function NavBar({title, subtitle, back, onBack, right}){
   return (
     <div style={{
-      background:"rgba(255,255,255,0.97)",
-      backdropFilter:"blur(24px) saturate(180%)",
-      WebkitBackdropFilter:"blur(24px) saturate(180%)",
-      borderBottom:`1px solid ${C.sep}`,
-      boxShadow:"0 1px 0 rgba(120,113,108,0.08)",
-      padding:"0 20px",
+      background:"rgba(250,249,247,0.96)",
+      backdropFilter:"blur(20px) saturate(180%)",
+      WebkitBackdropFilter:"blur(20px) saturate(180%)",
+      borderBottom:"1px solid rgba(120,113,108,0.10)",
+      padding:"0 18px",
       position:"sticky",top:0,zIndex:100,
-      display:"flex",alignItems:"center",minHeight:54,
+      display:"flex",alignItems:"center",minHeight:52,
       gap:10,
     }}>
       {back&&(
@@ -1658,79 +1657,84 @@ function NavBar({title, subtitle, back, onBack, right}){
           background:"none",border:"none",
           color:C.label3,fontSize:13,fontFamily:FONT,fontWeight:500,
           cursor:"pointer",padding:"8px 0",
-          display:"flex",alignItems:"center",gap:4,
+          display:"flex",alignItems:"center",gap:3,
           WebkitTapHighlightColor:"transparent",
-          minWidth:44,letterSpacing:.3,
+          minWidth:44,letterSpacing:.2,
         }}>
-          <span style={{fontSize:18,lineHeight:1,marginTop:-1}}>‹</span>
-          {typeof back==="string"?back:""}
+          <span style={{fontSize:20,lineHeight:1,marginTop:-1,opacity:.6}}>‹</span>
+          {typeof back==="string"?<span style={{opacity:.75}}>{back}</span>:""}
         </button>
       )}
       <div style={{flex:1,textAlign:"center"}}>
         <div style={{
-          fontSize:16,fontWeight:500,color:C.label,
-          fontFamily:FONT_DISPLAY,letterSpacing:.5,lineHeight:1.2,
+          fontSize:15,fontWeight:600,color:C.label,
+          fontFamily:FONT_UI,letterSpacing:"0.01em",lineHeight:1.2,
         }}>{title}</div>
-        {subtitle&&<div style={{fontSize:11,color:C.label3,fontFamily:FONT,marginTop:1,letterSpacing:.2}}>{subtitle}</div>}
+        {subtitle&&<div style={{fontSize:10.5,color:C.label3,fontFamily:FONT,marginTop:1,letterSpacing:.3}}>{subtitle}</div>}
       </div>
       <div style={{minWidth:back?44:0,display:"flex",justifyContent:"flex-end"}}>{right}</div>
     </div>
   );
 }
 
-// iOS Bottom Tab Bar
-const TAB_COLORS = {
-  inicio:        C.gold,
-  pos:           C.tabPos,
-  inventario:    C.tabInv,
-  marcas:        C.tabMar,
-  ventas:        C.tabVen,
-  liquidaciones: C.tabLiq,
-  config:        "#78716C",
-  historial:     "#78716C",
-};
-
+// Dark tab bar — corporate & editorial
 function TabBar({tabs, active, onChange}){
   return (
     <div style={{
       position:"fixed",bottom:0,left:0,right:0,zIndex:200,
-      background:"rgba(255,255,255,0.98)",
-      backdropFilter:"blur(24px) saturate(160%)",
-      WebkitBackdropFilter:"blur(24px) saturate(160%)",
-      borderTop:`1px solid ${C.sep}`,
+      background:"rgba(22,19,16,0.97)",
+      backdropFilter:"blur(28px) saturate(180%)",
+      WebkitBackdropFilter:"blur(28px) saturate(180%)",
+      borderTop:"1px solid rgba(255,255,255,0.07)",
       display:"flex",justifyContent:"center",alignItems:"stretch",
-      paddingBottom:"env(safe-area-inset-bottom,10px)",
-      boxShadow:"0 -1px 0 rgba(120,113,108,0.06)",
+      paddingBottom:"env(safe-area-inset-bottom,8px)",
+      boxShadow:"0 -8px 32px rgba(0,0,0,0.18)",
     }}>
       <div style={{display:"flex",width:"100%",maxWidth:560}}>
         {tabs.map(t=>{
           const isActive=active===t.id;
-          const tabColor=TAB_COLORS[t.id]||C.gold;
           return (
             <button key={t.id} onClick={()=>onChange(t.id)} style={{
               flex:1,border:"none",
               background:"transparent",
               display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",
-              padding:"7px 2px 5px",
+              padding:"8px 2px 6px",
               cursor:"pointer",
               WebkitTapHighlightColor:"transparent",
-              gap:3,
-              borderTop:isActive?`2px solid ${tabColor}`:"2px solid transparent",
-              transition:"border-color .2s",
+              gap:4,
               minWidth:0,
+              position:"relative",
             }}>
+              {/* Active pill indicator — top */}
               <div style={{
-                width:33,height:33,borderRadius:9,
-                background:isActive?`${tabColor}14`:"transparent",
+                position:"absolute",top:0,left:"50%",
+                transform:"translateX(-50%)",
+                width: isActive ? 20 : 0,
+                height:2,
+                borderRadius:2,
+                background:C.gold,
+                transition:"width .25s cubic-bezier(.34,1.56,.64,1)",
+              }}/>
+
+              {/* Icon container */}
+              <div style={{
+                width:32,height:28,
+                borderRadius:8,
+                background: isActive ? "rgba(154,123,79,0.16)" : "transparent",
                 display:"flex",alignItems:"center",justifyContent:"center",
-                fontSize:19,lineHeight:1,
-                transform:isActive?"scale(1.08)":"scale(1)",
-                transition:"all .2s cubic-bezier(.34,1.56,.64,1)",
+                fontSize:17,lineHeight:1,
+                transition:"background .2s",
+                opacity: isActive ? 1 : 0.42,
+                filter: isActive ? "none" : "grayscale(30%)",
               }}>{t.icon}</div>
+
+              {/* Label */}
               <span style={{
-                fontSize:9,fontFamily:FONT_UI,fontWeight:700,
-                color:isActive?tabColor:C.label3,
-                transition:"color .2s",letterSpacing:.3,
+                fontSize:9,fontFamily:FONT_UI,
+                fontWeight: isActive ? 600 : 400,
+                color: isActive ? C.gold : "rgba(255,255,255,0.42)",
+                transition:"color .2s, font-weight .2s",
+                letterSpacing: isActive ? "0.04em" : "0.02em",
                 whiteSpace:"nowrap",
               }}>{t.label}</span>
             </button>
