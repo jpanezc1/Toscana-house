@@ -4278,6 +4278,497 @@ function HomeDashboard({ventas, inv, vMes, mes, anio, onGoTab}){
   );
 }
 
+// ══════════════════════════════════════════════════════════
+// BRAND PORTAL — Portal de solo lectura para marcas
+// ══════════════════════════════════════════════════════════
+function MiniBarChart({data, color, height=64}){
+  const max = Math.max(...data.map(d=>d.value),1);
+  return (
+    <div style={{display:"flex",alignItems:"flex-end",gap:3,height}}>
+      {data.map((d,i)=>(
+        <div key={i} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:3}}>
+          <div style={{
+            width:"100%",
+            background:d.isCurrent?color:`${color}40`,
+            borderRadius:"3px 3px 0 0",
+            height:`${Math.max((d.value/max)*(height-18),d.value>0?3:0)}px`,
+            transition:"height .4s cubic-bezier(.4,0,.2,1)",
+          }}/>
+          <div style={{fontSize:8,color:C.label3,fontFamily:FONT,textAlign:"center",lineHeight:1,
+            fontWeight:d.isCurrent?700:400}}>
+            {d.label}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function BrandPortal({user, ventas, inv, logout}){
+  const marca = MARCAS.find(m=>m.id===user.marcaId);
+  if(!marca) return (
+    <div style={{padding:40,textAlign:"center",color:C.label3,fontFamily:FONT}}>
+      <div style={{fontSize:40,marginBottom:12}}>⚠️</div>
+      <div>Marca no encontrada. Contactá al administrador.</div>
+      <button onClick={logout} style={{marginTop:16,padding:"10px 24px",borderRadius:10,
+        background:C.red,border:"none",color:"#fff",cursor:"pointer",fontFamily:FONT}}>Salir</button>
+    </div>
+  );
+
+  const now = new Date();
+  const [mes,  setMes]  = useState(now.getMonth());
+  const [anio, setAnio] = useState(now.getFullYear());
+  const [tab,  setTab]  = useState("dashboard");
+
+  const MK = mkKey(mes, anio);
+
+  // Ventas filtradas por marca (excluir anuladas)
+  const todasMarca = useMemo(()=>
+    ventas.filter(v=>!v.anulada&&v.items.some(i=>i.marcaId===marca.id))
+  ,[ventas,marca.id]);
+
+  const vMes  = useMemo(()=>todasMarca.filter(v=>v.mk===MK),[todasMarca,MK]);
+  const vHoy  = useMemo(()=>todasMarca.filter(v=>v.fecha===hoy()),[todasMarca]);
+
+  // Helpers de bruto y unidades para esta marca
+  function brutoV(vs){ return vs.reduce((s,v)=>s+v.items.filter(i=>i.marcaId===marca.id).reduce((ss,i)=>ss+i.subtotal,0),0); }
+  function udsV(vs){   return vs.reduce((s,v)=>s+v.items.filter(i=>i.marcaId===marca.id).reduce((ss,i)=>ss+i.cantidad,0),0); }
+
+  const brutoMes = useMemo(()=>brutoV(vMes),[vMes]);
+  const brutoHoy = useMemo(()=>brutoV(vHoy),[vHoy]);
+  const udsMes   = useMemo(()=>udsV(vMes),[vMes]);
+  const udsHoy   = useMemo(()=>udsV(vHoy),[vHoy]);
+  const tktProm  = vMes.length>0?(brutoMes/vMes.length):0;
+
+  // Liquidación con config real
+  const liq = useMemo(()=>calcLiqMarca(vMes,marca.id,MK),[vMes,marca.id,MK]);
+
+  // Proyección fin de mes
+  const diaActual = (mes===now.getMonth()&&anio===now.getFullYear())?now.getDate():new Date(anio,mes+1,0).getDate();
+  const diasTotal = new Date(anio,mes+1,0).getDate();
+  const proyeccion = diaActual>0?(brutoMes/diaActual)*diasTotal:0;
+
+  // Mes anterior
+  const mPrev = mes===0?11:mes-1, aPrev = mes===0?anio-1:anio;
+  const vMesPrev = useMemo(()=>todasMarca.filter(v=>v.mk===mkKey(mPrev,aPrev)),[todasMarca,mPrev,aPrev]);
+  const brutoPrev = brutoV(vMesPrev), udsPrev = udsV(vMesPrev);
+  const varBruto  = brutoPrev>0?((brutoMes-brutoPrev)/brutoPrev*100):0;
+  const varUds    = udsPrev>0?((udsMes-udsPrev)/udsPrev*100):0;
+
+  // Últimos 6 meses para chart
+  const hist6 = useMemo(()=>Array.from({length:6},(_,i)=>{
+    const d=new Date(anio,mes-(5-i),1);
+    const m2=d.getMonth(),a2=d.getFullYear();
+    const vs=todasMarca.filter(v=>v.mk===mkKey(m2,a2));
+    return {label:MESES[m2].slice(0,3),value:brutoV(vs),isCurrent:m2===mes&&a2===anio};
+  }),[todasMarca,mes,anio]);
+
+  // Top productos del mes
+  const topProds = useMemo(()=>{
+    const map={};
+    vMes.forEach(v=>v.items.filter(i=>i.marcaId===marca.id).forEach(it=>{
+      if(!map[it.codigo])map[it.codigo]={nombre:it.nombre,codigo:it.codigo,uds:0,total:0};
+      map[it.codigo].uds+=it.cantidad; map[it.codigo].total+=it.subtotal;
+    }));
+    return Object.values(map).sort((a,b)=>b.uds-a.uds).slice(0,5);
+  },[vMes,marca.id]);
+
+  // Inventario de la marca
+  const invMarca = useMemo(()=>inv.filter(i=>i.marcaId===marca.id),[inv,marca.id]);
+  const stockOk  = invMarca.filter(i=>i.stock>2).length;
+  const stockBaj = invMarca.filter(i=>i.stock>0&&i.stock<=2).length;
+  const agotados = invMarca.filter(i=>i.stock===0).length;
+
+  // KPI card pequeño
+  const KCard=({icon,label,value,sub,color=C.gold})=>(
+    <div style={{background:C.bg1,borderRadius:16,padding:"14px 16px",border:`1px solid ${C.sep}`,
+      boxShadow:"0 2px 8px rgba(0,0,0,0.04)"}}>
+      <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",marginBottom:4}}>
+        <span style={{fontSize:20}}>{icon}</span>
+        {sub&&<span style={{fontSize:11,color:sub.startsWith("+")?C.green:sub.startsWith("-")?C.red:C.label3,
+          fontFamily:FONT,fontWeight:600}}>{sub}</span>}
+      </div>
+      <div style={{fontSize:22,fontWeight:700,color,fontFamily:FONT_DISPLAY,lineHeight:1,marginBottom:2}}>{value}</div>
+      <div style={{fontSize:11,color:C.label3,fontFamily:FONT,textTransform:"uppercase",letterSpacing:.4}}>{label}</div>
+    </div>
+  );
+
+  const PORTAL_TABS=[
+    {id:"dashboard",icon:"📊",label:"Dashboard"},
+    {id:"ventas",   icon:"🛍",label:"Ventas"},
+    {id:"inventario",icon:"📦",label:"Inventario"},
+    {id:"liquidacion",icon:"💰",label:"Liquidación"},
+  ];
+
+  return (
+    <div style={{minHeight:"100vh",background:C.bg0,fontFamily:FONT_UI,
+      WebkitFontSmoothing:"antialiased",paddingBottom:84}}>
+
+      {/* ── Header ── */}
+      <div style={{background:C.bg1,borderBottom:`1px solid ${C.sep}`,
+        padding:"14px 20px",position:"sticky",top:0,zIndex:100,
+        boxShadow:"0 1px 12px rgba(0,0,0,0.06)"}}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+          <div style={{display:"flex",alignItems:"center",gap:12}}>
+            <div style={{width:40,height:40,borderRadius:12,
+              background:`${marca.color}30`,display:"flex",alignItems:"center",
+              justifyContent:"center",fontSize:20,flexShrink:0}}>
+              {marca.emoji}
+            </div>
+            <div>
+              <div style={{fontSize:17,fontWeight:700,color:C.label,fontFamily:FONT,lineHeight:1}}>
+                {marca.nombre}
+              </div>
+              <div style={{fontSize:11,color:C.label3,fontFamily:FONT,marginTop:2}}>
+                Portal · Solo lectura
+              </div>
+            </div>
+          </div>
+          <div style={{display:"flex",alignItems:"center",gap:10}}>
+            {/* Selector de mes */}
+            <select value={`${mes}-${anio}`}
+              onChange={e=>{const[m,a]=e.target.value.split("-");setMes(Number(m));setAnio(Number(a));}}
+              style={{padding:"7px 10px",borderRadius:10,border:`1px solid ${C.sep}`,
+                background:C.bg2,fontSize:13,color:C.label,fontFamily:FONT,outline:"none",
+                WebkitAppearance:"none",cursor:"pointer"}}>
+              {Array.from({length:12},(_,i)=>{
+                const d=new Date(now.getFullYear(),now.getMonth()-i,1);
+                return <option key={i} value={`${d.getMonth()}-${d.getFullYear()}`}>
+                  {MESES[d.getMonth()].slice(0,3)} {d.getFullYear()}
+                </option>;
+              })}
+            </select>
+            <button onClick={logout} style={{padding:"7px 12px",borderRadius:10,
+              border:`1px solid ${C.sep}`,background:C.bg2,cursor:"pointer",
+              fontSize:12,color:C.label2,fontFamily:FONT,
+              WebkitTapHighlightColor:"transparent"}}>
+              Salir
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Content ── */}
+      <div style={{padding:"16px 16px 0"}}>
+
+        {/* ══ DASHBOARD ══ */}
+        {tab==="dashboard"&&(
+          <div>
+            {/* KPIs Hoy */}
+            <div style={{fontSize:12,fontWeight:700,color:C.label3,textTransform:"uppercase",
+              letterSpacing:.6,marginBottom:10,fontFamily:FONT}}>Hoy</div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:20}}>
+              <KCard icon="💰" label="Ventas hoy" value={$(brutoHoy)} color={C.gold}/>
+              <KCard icon="👜" label="Unidades" value={udsHoy} color={marca.color}/>
+            </div>
+
+            {/* KPIs Mes */}
+            <div style={{fontSize:12,fontWeight:700,color:C.label3,textTransform:"uppercase",
+              letterSpacing:.6,marginBottom:10,fontFamily:FONT}}>{MESES[mes]} {anio}</div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:20}}>
+              <KCard icon="📈" label="Ventas brutas" value={$(brutoMes)}
+                sub={varBruto!==0?(varBruto>0?`+${varBruto.toFixed(0)}%`:`${varBruto.toFixed(0)}%`):undefined}/>
+              <KCard icon="📦" label="Unidades" value={udsMes}
+                sub={varUds!==0?(varUds>0?`+${varUds.toFixed(0)}%`:`${varUds.toFixed(0)}%`):undefined}/>
+              <KCard icon="🧾" label="Ticket prom." value={$(tktProm)} color={C.blue}/>
+              <KCard icon="✓" label="Neto estimado" value={$(liq.neto)} color={C.green}/>
+            </div>
+
+            {/* Chart 6 meses */}
+            <div style={{background:C.bg1,borderRadius:18,padding:16,marginBottom:16,
+              border:`1px solid ${C.sep}`,boxShadow:"0 2px 8px rgba(0,0,0,0.04)"}}>
+              <div style={{fontSize:13,fontWeight:700,color:C.label,fontFamily:FONT,marginBottom:14}}>
+                Evolución mensual
+              </div>
+              <MiniBarChart data={hist6} color={marca.color} height={72}/>
+              <div style={{display:"flex",justifyContent:"space-between",marginTop:10,
+                paddingTop:10,borderTop:`1px solid ${C.sep}`}}>
+                <div>
+                  <div style={{fontSize:11,color:C.label3,fontFamily:FONT}}>Mes anterior</div>
+                  <div style={{fontSize:15,fontWeight:700,color:C.label,fontFamily:FONT}}>{$(brutoPrev)}</div>
+                </div>
+                <div style={{textAlign:"right"}}>
+                  <div style={{fontSize:11,color:C.label3,fontFamily:FONT}}>Proyección cierre</div>
+                  <div style={{fontSize:15,fontWeight:700,color:C.gold,fontFamily:FONT}}>{$(proyeccion)}</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Top productos */}
+            {topProds.length>0&&(
+              <div style={{background:C.bg1,borderRadius:18,padding:16,marginBottom:16,
+                border:`1px solid ${C.sep}`,boxShadow:"0 2px 8px rgba(0,0,0,0.04)"}}>
+                <div style={{fontSize:13,fontWeight:700,color:C.label,fontFamily:FONT,marginBottom:12}}>
+                  🏆 Top productos — {MESES[mes]}
+                </div>
+                {topProds.map((p,i)=>(
+                  <div key={p.codigo} style={{display:"flex",alignItems:"center",gap:12,
+                    padding:"10px 0",borderBottom:i<topProds.length-1?`1px solid ${C.sep}`:""}}>
+                    <div style={{width:28,height:28,borderRadius:"50%",
+                      background:`${marca.color}30`,display:"flex",alignItems:"center",
+                      justifyContent:"center",fontSize:13,fontWeight:800,
+                      color:marca.color,fontFamily:FONT,flexShrink:0}}>
+                      {i+1}
+                    </div>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:13,fontWeight:600,color:C.label,fontFamily:FONT,
+                        overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.nombre}</div>
+                      <div style={{fontSize:11,color:C.label3,fontFamily:FONT}}>{p.codigo}</div>
+                    </div>
+                    <div style={{textAlign:"right",flexShrink:0}}>
+                      <div style={{fontSize:13,fontWeight:700,color:C.gold,fontFamily:FONT}}>{$(p.total)}</div>
+                      <div style={{fontSize:11,color:C.label3,fontFamily:FONT}}>{p.uds} uds</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Inventario resumen */}
+            <div style={{background:C.bg1,borderRadius:18,padding:16,marginBottom:16,
+              border:`1px solid ${C.sep}`,boxShadow:"0 2px 8px rgba(0,0,0,0.04)"}}>
+              <div style={{fontSize:13,fontWeight:700,color:C.label,fontFamily:FONT,marginBottom:12}}>
+                📦 Stock actual
+              </div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
+                {[
+                  {label:"En stock",  value:stockOk,  color:C.green,  bg:C.greenBg},
+                  {label:"Bajo stock",value:stockBaj, color:C.amber,  bg:C.amberBg},
+                  {label:"Agotados",  value:agotados, color:C.red,    bg:C.redBg},
+                ].map(s=>(
+                  <div key={s.label} style={{background:s.bg,borderRadius:12,padding:"12px 10px",textAlign:"center"}}>
+                    <div style={{fontSize:22,fontWeight:800,color:s.color,fontFamily:FONT}}>{s.value}</div>
+                    <div style={{fontSize:10,color:s.color,fontFamily:FONT,marginTop:2,
+                      textTransform:"uppercase",letterSpacing:.4}}>{s.label}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Comparativo mes anterior */}
+            <div style={{background:C.bg1,borderRadius:18,padding:16,marginBottom:16,
+              border:`1px solid ${C.sep}`,boxShadow:"0 2px 8px rgba(0,0,0,0.04)"}}>
+              <div style={{fontSize:13,fontWeight:700,color:C.label,fontFamily:FONT,marginBottom:12}}>
+                📊 vs {MESES[mPrev]}
+              </div>
+              {[
+                ["Ventas brutas", $(brutoPrev), $(brutoMes), varBruto],
+                ["Unidades",      udsPrev,      udsMes,      varUds],
+                ["Transacciones", vMesPrev.length, vMes.length, vMesPrev.length>0?((vMes.length-vMesPrev.length)/vMesPrev.length*100):0],
+              ].map(([label,prev,curr,pct])=>(
+                <div key={label} style={{display:"flex",justifyContent:"space-between",
+                  alignItems:"center",padding:"10px 0",borderBottom:`1px solid ${C.sep}`}}>
+                  <div style={{fontSize:13,color:C.label2,fontFamily:FONT}}>{label}</div>
+                  <div style={{display:"flex",gap:12,alignItems:"center"}}>
+                    <div style={{fontSize:12,color:C.label3,fontFamily:FONT}}>{prev}</div>
+                    <div style={{fontSize:14,fontWeight:700,color:C.label,fontFamily:FONT}}>{curr}</div>
+                    <div style={{fontSize:12,fontWeight:700,
+                      color:pct>0?C.green:pct<0?C.red:C.label3,fontFamily:FONT,minWidth:42,textAlign:"right"}}>
+                      {pct>0?"+":""}{pct.toFixed(0)}%
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ══ VENTAS ══ */}
+        {tab==="ventas"&&(
+          <div>
+            <div style={{fontSize:13,color:C.label3,fontFamily:FONT,marginBottom:12}}>
+              {vMes.length} ventas · {$(brutoMes)} · {MESES[mes]} {anio}
+            </div>
+            {vMes.length===0
+              ? <div style={{textAlign:"center",padding:"48px 0",color:C.label3}}>
+                  <div style={{fontSize:40,marginBottom:8}}>🛍</div>
+                  <div style={{fontFamily:FONT}}>Sin ventas en {MESES[mes]}</div>
+                </div>
+              : [...vMes].sort((a,b)=>b.id.localeCompare(a.id)).map(v=>{
+                  const items=v.items.filter(i=>i.marcaId===marca.id);
+                  const sub=items.reduce((s,i)=>s+i.subtotal,0);
+                  return (
+                    <div key={v.id} style={{background:C.bg1,borderRadius:16,
+                      padding:"14px 16px",marginBottom:10,border:`1px solid ${C.sep}`,
+                      boxShadow:"0 1px 6px rgba(0,0,0,0.04)"}}>
+                      <div style={{display:"flex",justifyContent:"space-between",
+                        alignItems:"flex-start",marginBottom:10}}>
+                        <div>
+                          <div style={{fontSize:12,fontFamily:"monospace",
+                            color:C.gold,fontWeight:700}}>{v.id}</div>
+                          <div style={{fontSize:12,color:C.label3,fontFamily:FONT,marginTop:2}}>
+                            {v.fecha} {v.hora} · {v.vendedor||"Tienda"}
+                          </div>
+                        </div>
+                        <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:4}}>
+                          <Chip color={colorPago(v.metodoPago)} small>
+                            {iconPago(v.metodoPago)} {labelPago(v.metodoPago)}
+                          </Chip>
+                          <span style={{fontSize:16,fontWeight:800,color:C.gold,fontFamily:FONT}}>
+                            {$(sub)}
+                          </span>
+                        </div>
+                      </div>
+                      {items.map((it,ii)=>(
+                        <div key={ii} style={{fontSize:13,color:C.label2,fontFamily:FONT,
+                          padding:"6px 10px",background:`${marca.color}12`,borderRadius:8,
+                          marginBottom:4,display:"flex",justifyContent:"space-between"}}>
+                          <span>{it.nombre} ×{it.cantidad}</span>
+                          <span style={{fontWeight:600,color:marca.color}}>{$(it.subtotal)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })
+            }
+          </div>
+        )}
+
+        {/* ══ INVENTARIO ══ */}
+        {tab==="inventario"&&(
+          <div>
+            <div style={{fontSize:13,color:C.label3,fontFamily:FONT,marginBottom:12}}>
+              {invMarca.length} productos · valor {$(invMarca.reduce((s,i)=>s+i.precio*i.stock,0))} en stock
+            </div>
+            {invMarca.length===0
+              ? <div style={{textAlign:"center",padding:"48px 0",color:C.label3}}>
+                  <div style={{fontSize:40,marginBottom:8}}>📦</div>
+                  <div style={{fontFamily:FONT}}>Sin productos registrados</div>
+                </div>
+              : (()=>{
+                  // Agrupar por estado
+                  const grupos=[
+                    {label:"🔴 Agotados",    prods:invMarca.filter(i=>i.stock===0),    bg:C.redBg,   color:C.red},
+                    {label:"🟡 Bajo stock",  prods:invMarca.filter(i=>i.stock>0&&i.stock<=2), bg:C.amberBg, color:C.amber},
+                    {label:"🟢 En stock",    prods:invMarca.filter(i=>i.stock>2),      bg:C.greenBg, color:C.green},
+                  ].filter(g=>g.prods.length>0);
+                  return grupos.map(g=>(
+                    <div key={g.label} style={{marginBottom:16}}>
+                      <div style={{fontSize:12,fontWeight:700,color:g.color,fontFamily:FONT,
+                        textTransform:"uppercase",letterSpacing:.5,marginBottom:8}}>{g.label} ({g.prods.length})</div>
+                      {g.prods.map((p,i)=>(
+                        <div key={p.id} style={{background:C.bg1,borderRadius:14,
+                          padding:"12px 14px",marginBottom:6,border:`1px solid ${C.sep}`,
+                          borderLeft:`4px solid ${g.color}`,
+                          boxShadow:"0 1px 4px rgba(0,0,0,0.04)"}}>
+                          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+                            <div style={{flex:1,minWidth:0}}>
+                              <div style={{fontSize:13,fontWeight:600,color:C.label,fontFamily:FONT,
+                                overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.nombre}</div>
+                              <div style={{fontSize:11,color:C.label3,fontFamily:FONT,marginTop:2}}>
+                                {p.codigo} · {p.categoria||"General"}
+                              </div>
+                            </div>
+                            <div style={{textAlign:"right",flexShrink:0,marginLeft:10}}>
+                              <div style={{fontSize:14,fontWeight:700,color:C.gold,fontFamily:FONT}}>{$(p.precio)}</div>
+                              <div style={{fontSize:11,fontWeight:700,color:g.color,fontFamily:FONT,marginTop:2}}>
+                                Stock: {p.stock} / {p.stockInicial}
+                              </div>
+                            </div>
+                          </div>
+                          {/* Barra de progreso stock */}
+                          <div style={{marginTop:8,height:4,background:`${g.color}20`,borderRadius:2}}>
+                            <div style={{height:"100%",
+                              background:g.color,borderRadius:2,
+                              width:`${p.stockInicial>0?Math.round((p.stock/p.stockInicial)*100):0}%`}}/>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ));
+                })()
+            }
+          </div>
+        )}
+
+        {/* ══ LIQUIDACIÓN ══ */}
+        {tab==="liquidacion"&&(
+          <div>
+            <div style={{background:`${marca.color}15`,borderRadius:18,padding:16,
+              marginBottom:16,border:`1px solid ${marca.color}30`}}>
+              <div style={{fontSize:13,fontWeight:700,color:C.label,fontFamily:FONT,marginBottom:4}}>
+                {marca.emoji} Liquidación estimada — {MESES[mes]} {anio}
+              </div>
+              <div style={{fontSize:11,color:C.label3,fontFamily:FONT}}>
+                Basado en la configuración de comisiones de Toscana House
+              </div>
+            </div>
+
+            {/* Desglose */}
+            <div style={{background:C.bg1,borderRadius:18,overflow:"hidden",
+              border:`1px solid ${C.sep}`,marginBottom:16,boxShadow:"0 2px 8px rgba(0,0,0,0.04)"}}>
+              {[
+                {label:"Ventas brutas",            value:liq.bruto,      sign:"",  color:C.label, bold:false},
+                {label:"Efectivo",                 value:liq.brutoEf,    sign:"",  color:C.label3,bold:false,sub:true},
+                {label:"QR",                       value:liq.brutoQR,    sign:"",  color:C.label3,bold:false,sub:true},
+                {label:"Tarjeta",                  value:liq.brutoTJ,    sign:"",  color:C.label3,bold:false,sub:true},
+                {label:`Desc. QR (${liq.cfg.pctQR}%)`,      value:-liq.descQR,   sign:"−",color:C.red,   bold:false},
+                {label:`Desc. Tarjeta (${liq.cfg.pctTarjeta}%)`,value:-liq.descTJ,sign:"−",color:C.red,   bold:false},
+                {label:"Subtotal banco",           value:liq.subBanco,   sign:"",  color:C.blue,  bold:true},
+                {label:`Comisión Toscana (${liq.cfg.pctComision}%)`,value:-liq.comision,sign:"−",color:C.red,bold:false},
+                {label:"Alquiler",                 value:-liq.alquiler,  sign:"−",  color:C.red,  bold:false},
+              ].map((row,i,arr)=>(
+                <div key={row.label} style={{
+                  display:"flex",justifyContent:"space-between",alignItems:"center",
+                  padding:`${row.sub?"8px":"12px"} 16px ${row.sub?"8px":"12px"} ${row.sub?"28px":"16px"}`,
+                  borderBottom:i<arr.length-1?`1px solid ${C.sep}`:"",
+                  background:row.bold?`${C.blue}08`:undefined,
+                }}>
+                  <span style={{fontSize:row.sub?12:13,color:row.color||C.label2,fontFamily:FONT,
+                    fontWeight:row.bold?700:400}}>{row.label}</span>
+                  <span style={{fontSize:row.sub?12:14,fontWeight:row.bold?700:500,
+                    color:row.color||C.label,fontFamily:FONT}}>
+                    {row.sign} {$(Math.abs(row.value))}
+                  </span>
+                </div>
+              ))}
+              {/* Neto final */}
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",
+                padding:"16px",background:`${C.green}12`,borderTop:`2px solid ${C.green}30`}}>
+                <span style={{fontSize:15,fontWeight:700,color:C.green,fontFamily:FONT}}>
+                  💚 Total Neto Estimado
+                </span>
+                <span style={{fontSize:22,fontWeight:800,color:C.green,fontFamily:FONT_DISPLAY}}>
+                  {$(liq.neto)}
+                </span>
+              </div>
+            </div>
+
+            <div style={{background:C.bg2,borderRadius:14,padding:12,border:`1px solid ${C.sep}`}}>
+              <div style={{fontSize:11,color:C.label3,fontFamily:FONT,lineHeight:1.6}}>
+                ℹ️ Esta liquidación es una estimación automática. El monto final puede variar
+                según revisión de Toscana House. Contactá a la administración para confirmar.
+              </div>
+            </div>
+          </div>
+        )}
+
+      </div>
+
+      {/* ── Tab bar ── */}
+      <div style={{
+        position:"fixed",bottom:0,left:0,right:0,
+        background:C.bg1,borderTop:`1px solid ${C.sep}`,
+        display:"flex",paddingBottom:"env(safe-area-inset-bottom,0px)",
+        boxShadow:"0 -4px 20px rgba(0,0,0,0.08)",zIndex:200,
+      }}>
+        {PORTAL_TABS.map(t=>(
+          <button key={t.id} onClick={()=>setTab(t.id)} style={{
+            flex:1,padding:"10px 4px 8px",background:"none",border:"none",cursor:"pointer",
+            display:"flex",flexDirection:"column",alignItems:"center",gap:3,
+            WebkitTapHighlightColor:"transparent",
+          }}>
+            <span style={{fontSize:20,lineHeight:1}}>{t.icon}</span>
+            <span style={{fontSize:10,fontWeight:tab===t.id?800:500,fontFamily:FONT,
+              color:tab===t.id?marca.color:C.label3,letterSpacing:.2}}>{t.label}</span>
+            {tab===t.id&&<div style={{width:20,height:2.5,borderRadius:2,background:marca.color}}/>}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function App(){
   const { user, login, logout } = useAuth();
   const now=new Date();
@@ -4468,6 +4959,9 @@ function App(){
 
   // Early return si no hay sesión
   if (!user) return <LoginScreen onLogin={login}/>;
+
+  // Portal de marca (lectura)
+  if (user.rol === "marca") return <BrandPortal user={user} ventas={ventas} inv={inv} logout={logout}/>;
 
   return (
     <div style={{
@@ -6643,7 +7137,7 @@ function CambiarContrasena({user, usuarios, onGuardar}){
 function GestionUsuarios({user, usuarios, onGuardar}){
   var _hN162 = useState(null); var modo = _hN162[0]; var setModo = _hN162[1];; // null | "nuevo" | "editar"
   var _hN163 = useState(null); var editUser = _hN163[0]; var setEditUser = _hN163[1];;
-  var _hN164 = useState({usuario:"",password:"",nombre:"",rol:"caja"}); var fUser = _hN164[0]; var setFUser = _hN164[1];;
+  var _hN164 = useState({usuario:"",password:"",nombre:"",rol:"caja",marcaId:""}); var fUser = _hN164[0]; var setFUser = _hN164[1];;
   var _hN165 = useState(null); var msg = _hN165[0]; var setMsg = _hN165[1];;
 
   if (user.rol !== "admin") {
@@ -6664,11 +7158,12 @@ function GestionUsuarios({user, usuarios, onGuardar}){
     setMsg(null);
     if(!fUser.usuario||!fUser.password||!fUser.nombre){setMsg({ok:false,txt:"Completa todos los campos"});return;}
     if(fUser.password.length<6){setMsg({ok:false,txt:"La contraseña debe tener al menos 6 caracteres"});return;}
+    if(fUser.rol==="marca"&&!fUser.marcaId){setMsg({ok:false,txt:"Seleccioná la marca para este usuario"});return;}
     if(modo==="nuevo"){
       if(usuarios.find(u=>u.usuario===fUser.usuario)){setMsg({ok:false,txt:"Ese usuario ya existe"});return;}
-      onGuardar([...usuarios,{...fUser}]);
+      onGuardar([...usuarios,{...fUser,marcaId:fUser.marcaId?Number(fUser.marcaId):undefined}]);
     } else {
-      onGuardar(usuarios.map(u=>u.usuario===editUser?{...u,...fUser}:u));
+      onGuardar(usuarios.map(u=>u.usuario===editUser?{...u,...fUser,marcaId:fUser.marcaId?Number(fUser.marcaId):undefined}:u));
     }
     setMsg({ok:true,txt:`✓ Usuario ${modo==="nuevo"?"creado":"actualizado"}`});
     setTimeout(()=>{setModo(null);setMsg(null);},1500);
@@ -6699,20 +7194,36 @@ function GestionUsuarios({user, usuarios, onGuardar}){
         <div style={{marginBottom:12}}>
           <div style={{fontSize:11,fontWeight:700,color:C.label2,textTransform:"uppercase",
             letterSpacing:.8,marginBottom:8}}>Rol</div>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-            {[["admin","👑 Admin","Acceso total"],["caja","🛒 Cajero","Solo POS y ventas"]].map(([r,label,desc])=>(
-              <button key={r} onClick={()=>setFUser(p=>({...p,rol:r}))} style={{
-                padding:"12px",borderRadius:12,cursor:"pointer",fontFamily:FONT,
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
+            {[["admin","👑 Admin","Acceso total"],["caja","🛒 Cajero","Solo POS"],["marca","🏷 Marca","Portal solo lectura"]].map(([r,label,desc])=>(
+              <button key={r} onClick={()=>setFUser(p=>({...p,rol:r,marcaId:r==="marca"?p.marcaId:"" }))} style={{
+                padding:"10px 8px",borderRadius:12,cursor:"pointer",fontFamily:FONT,
                 border:`2px solid ${fUser.rol===r?C.gold:C.sep}`,
                 background:fUser.rol===r?`${C.gold}15`:C.bg2,
-                textAlign:"left",
+                textAlign:"left",WebkitTapHighlightColor:"transparent",
               }}>
-                <div style={{fontSize:14,fontWeight:700,color:fUser.rol===r?C.gold:C.label}}>{label}</div>
-                <div style={{fontSize:11,color:C.label3,marginTop:2}}>{desc}</div>
+                <div style={{fontSize:13,fontWeight:700,color:fUser.rol===r?C.gold:C.label}}>{label}</div>
+                <div style={{fontSize:10,color:C.label3,marginTop:2}}>{desc}</div>
               </button>
             ))}
           </div>
         </div>
+        {/* Selector de marca — solo aparece si rol="marca" */}
+        {fUser.rol==="marca"&&(
+          <div style={{marginBottom:12}}>
+            <div style={{fontSize:11,fontWeight:700,color:C.label2,textTransform:"uppercase",
+              letterSpacing:.8,marginBottom:8}}>Marca asignada</div>
+            <select value={fUser.marcaId||""} onChange={e=>setFUser(p=>({...p,marcaId:e.target.value}))}
+              style={{width:"100%",padding:"11px 14px",borderRadius:12,border:`1.5px solid ${C.sep}`,
+                background:C.bg3,fontSize:15,color:C.label,fontFamily:FONT,outline:"none",
+                WebkitAppearance:"none",appearance:"none"}}>
+              <option value="">— Seleccioná una marca —</option>
+              {MARCAS.map(m=>(
+                <option key={m.id} value={m.id}>{m.emoji} {m.nombre}</option>
+              ))}
+            </select>
+          </div>
+        )}
         {msg&&(
           <div style={{padding:"12px 14px",borderRadius:12,marginBottom:12,
             background:msg.ok?`${C.green}15`:`${C.red}15`,
@@ -6745,15 +7256,20 @@ function GestionUsuarios({user, usuarios, onGuardar}){
             borderBottom:i<usuarios.length-1?`1px solid ${C.sep}`:"",
             display:"flex",alignItems:"center",gap:12,
           }}>
-            <div style={{width:40,height:40,borderRadius:"50%",
-              background:u.rol==="admin"?`${C.gold}20`:`${C.green}20`,
-              display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>
-              {u.rol==="admin"?"👑":"🛒"}
-            </div>
+            {(()=>{
+              const m=u.rol==="marca"?MARCAS.find(x=>x.id===u.marcaId):null;
+              return (
+                <div style={{width:40,height:40,borderRadius:"50%",
+                  background:u.rol==="admin"?`${C.gold}20`:u.rol==="marca"?`${m?.color||C.blue}30`:`${C.green}20`,
+                  display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>
+                  {u.rol==="admin"?"👑":u.rol==="marca"?(m?.emoji||"🏷"):"🛒"}
+                </div>
+              );
+            })()}
             <div style={{flex:1,minWidth:0}}>
               <div style={{fontSize:15,fontWeight:600,color:C.label,fontFamily:FONT}}>{u.nombre}</div>
               <div style={{fontSize:13,color:C.label3,fontFamily:FONT}}>
-                @{u.usuario} · {u.rol==="admin"?"Administrador":"Cajero"}
+                @{u.usuario} · {u.rol==="admin"?"Administrador":u.rol==="marca"?`Marca · ${MARCAS.find(m=>m.id===u.marcaId)?.nombre||"?"}` :"Cajero"}
               </div>
             </div>
             <div style={{display:"flex",gap:8,flexShrink:0}}>
@@ -6774,7 +7290,7 @@ function GestionUsuarios({user, usuarios, onGuardar}){
         ))}
       </div>
 
-      <IOSBtn onPress={()=>{setFUser({usuario:"",password:"",nombre:"",rol:"caja"});setModo("nuevo");}}
+      <IOSBtn onPress={()=>{setFUser({usuario:"",password:"",nombre:"",rol:"caja",marcaId:""});setModo("nuevo");}}
         variant="primary" full icon="+ ">
         Agregar nuevo usuario
       </IOSBtn>
