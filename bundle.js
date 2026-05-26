@@ -24199,107 +24199,123 @@ Fecha: ${venta.fecha}`);
     } }, clock);
   }
   function CameraScanner({ onDetect, onClose }) {
+    const fileRef = (0, import_react.useRef)(null);
     const videoRef = (0, import_react.useRef)(null);
     const canvasRef = (0, import_react.useRef)(null);
     const streamRef = (0, import_react.useRef)(null);
     const timerRef = (0, import_react.useRef)(null);
     const firedRef = (0, import_react.useRef)(false);
-    const readerRef = (0, import_react.useRef)(null);
-    const [status, setStatus] = (0, import_react.useState)("cargando");
-    (0, import_react.useEffect)(() => {
-      let mounted = true;
-      async function iniciar() {
-        try {
-          const stream = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } },
-            audio: false
-          });
-          if (!mounted) {
-            stream.getTracks().forEach((t) => t.stop());
-            return;
-          }
-          streamRef.current = stream;
-          const video = videoRef.current;
-          video.srcObject = stream;
-          video.setAttribute("playsinline", "");
-          video.setAttribute("muted", "");
-          await video.play();
-          if (!mounted) return;
-          const ZXing = await loadZXing();
-          if (!mounted) return;
-          const hints = /* @__PURE__ */ new Map();
-          hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [
-            ZXing.BarcodeFormat.CODE_128,
-            ZXing.BarcodeFormat.CODE_39,
-            ZXing.BarcodeFormat.EAN_13,
-            ZXing.BarcodeFormat.EAN_8,
-            ZXing.BarcodeFormat.QR_CODE,
-            ZXing.BarcodeFormat.DATA_MATRIX,
-            ZXing.BarcodeFormat.ITF,
-            ZXing.BarcodeFormat.UPC_A,
-            ZXing.BarcodeFormat.UPC_E
-          ]);
-          hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
-          const reader = new ZXing.MultiFormatReader();
-          reader.setHints(hints);
-          readerRef.current = reader;
-          setStatus("activo");
-          timerRef.current = setInterval(() => {
-            if (!mounted || firedRef.current) return;
-            const vid = videoRef.current;
-            const cvs = canvasRef.current;
-            if (!vid || !cvs || vid.readyState < 2 || vid.videoWidth === 0) return;
-            cvs.width = vid.videoWidth;
-            cvs.height = vid.videoHeight;
-            cvs.getContext("2d").drawImage(vid, 0, 0);
-            try {
-              const lum = new ZXing.HTMLCanvasElementLuminanceSource(cvs);
-              const bitmap = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(lum));
-              const res = reader.decode(bitmap);
-              if (res && !firedRef.current) {
-                firedRef.current = true;
-                try {
-                  navigator.vibrate && navigator.vibrate(200);
-                } catch (_) {
-                }
-                try {
-                  const ac = new (window.AudioContext || window.webkitAudioContext)();
-                  const o = ac.createOscillator(), g = ac.createGain();
-                  o.connect(g);
-                  g.connect(ac.destination);
-                  o.frequency.value = 1046;
-                  g.gain.value = 0.25;
-                  o.start();
-                  o.stop(ac.currentTime + 0.12);
-                  setTimeout(() => ac.close(), 500);
-                } catch (_) {
-                }
-                detener();
-                onDetect(res.getText());
-              }
-            } catch (_) {
-            }
-          }, 250);
-        } catch (err) {
-          console.warn("CameraScanner:", err);
-          if (mounted) setStatus("error");
+    const [modo, setModo] = (0, import_react.useState)("foto");
+    const [liveStatus, setLiveStatus] = (0, import_react.useState)("parado");
+    const [scanMsg, setScanMsg] = (0, import_react.useState)("");
+    async function handleFoto(e) {
+      const f = e.target.files?.[0];
+      if (!f) return;
+      e.target.value = "";
+      setModo("leyendo");
+      setScanMsg("Leyendo c\xF3digo\u2026");
+      try {
+        const codigo = await leerCodigoDeImagen(f);
+        if (codigo) {
+          beep();
+          onDetect(codigo);
+        } else {
+          setScanMsg("No se detect\xF3 c\xF3digo \u2014 intenta de nuevo");
+          setModo("foto");
         }
+      } catch (_) {
+        setScanMsg("Error al leer la imagen");
+        setModo("foto");
       }
-      function detener() {
-        clearInterval(timerRef.current);
-        if (streamRef.current) streamRef.current.getTracks().forEach((t) => t.stop());
+    }
+    async function iniciarLive() {
+      setModo("live");
+      setLiveStatus("cargando");
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } },
+          audio: false
+        });
+        streamRef.current = stream;
+        const video = videoRef.current;
+        video.srcObject = stream;
+        await video.play();
+        const ZXing = await loadZXing();
+        const hints = /* @__PURE__ */ new Map();
+        hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [
+          ZXing.BarcodeFormat.CODE_128,
+          ZXing.BarcodeFormat.CODE_39,
+          ZXing.BarcodeFormat.EAN_13,
+          ZXing.BarcodeFormat.EAN_8,
+          ZXing.BarcodeFormat.QR_CODE,
+          ZXing.BarcodeFormat.DATA_MATRIX,
+          ZXing.BarcodeFormat.ITF,
+          ZXing.BarcodeFormat.UPC_A,
+          ZXing.BarcodeFormat.UPC_E
+        ]);
+        hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
+        const reader = new ZXing.MultiFormatReader();
+        reader.setHints(hints);
+        setLiveStatus("activo");
+        timerRef.current = setInterval(() => {
+          if (firedRef.current) return;
+          const vid = videoRef.current, cvs = canvasRef.current;
+          if (!vid || !cvs || vid.readyState < 2 || vid.videoWidth === 0) return;
+          cvs.width = vid.videoWidth;
+          cvs.height = vid.videoHeight;
+          cvs.getContext("2d").drawImage(vid, 0, 0);
+          try {
+            const res = reader.decode(
+              new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(
+                new ZXing.HTMLCanvasElementLuminanceSource(cvs)
+              ))
+            );
+            if (res && !firedRef.current) {
+              firedRef.current = true;
+              detenerLive();
+              beep();
+              onDetect(res.getText());
+            }
+          } catch (_) {
+          }
+        }, 250);
+      } catch (err) {
+        console.warn("Live scanner:", err);
+        detenerLive();
+        setLiveStatus("error");
+        setModo("foto");
       }
-      iniciar();
-      return () => {
-        mounted = false;
-        detener();
-      };
-    }, []);
-    function cerrar() {
+    }
+    function detenerLive() {
       clearInterval(timerRef.current);
-      if (streamRef.current) streamRef.current.getTracks().forEach((t) => t.stop());
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((t) => t.stop());
+        streamRef.current = null;
+      }
+    }
+    function beep() {
+      try {
+        navigator.vibrate && navigator.vibrate(180);
+      } catch (_) {
+      }
+      try {
+        const ac = new (window.AudioContext || window.webkitAudioContext)();
+        const o = ac.createOscillator(), g = ac.createGain();
+        o.connect(g);
+        g.connect(ac.destination);
+        o.frequency.value = 1046;
+        g.gain.value = 0.25;
+        o.start();
+        o.stop(ac.currentTime + 0.12);
+        setTimeout(() => ac.close(), 500);
+      } catch (_) {
+      }
+    }
+    function cerrar() {
+      detenerLive();
       onClose();
     }
+    (0, import_react.useEffect)(() => () => detenerLive(), []);
     return /* @__PURE__ */ import_react.default.createElement("div", { style: {
       position: "fixed",
       inset: 0,
@@ -24313,8 +24329,8 @@ Fecha: ${venta.fecha}`);
       alignItems: "center",
       justifyContent: "space-between",
       padding: "calc(env(safe-area-inset-top,0px) + 10px) 16px 10px",
-      background: "rgba(0,0,0,0.82)"
-    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 15, fontWeight: 700, color: "#fff" } }, status === "cargando" ? "\u23F3 Abriendo c\xE1mara\u2026" : status === "activo" ? "\u{1F4F7} Apunta al c\xF3digo de barras o QR" : "\u26A0 Sin acceso a c\xE1mara"), /* @__PURE__ */ import_react.default.createElement("button", { onClick: cerrar, style: {
+      background: "rgba(0,0,0,0.85)"
+    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 15, fontWeight: 700, color: "#fff" } }, modo === "live" && liveStatus === "activo" ? "\u{1F4F7} Apunta al c\xF3digo" : modo === "leyendo" ? "\u23F3 Leyendo\u2026" : "\u{1F4F7} Escanear c\xF3digo"), /* @__PURE__ */ import_react.default.createElement("button", { onClick: cerrar, style: {
       background: "rgba(255,255,255,0.15)",
       border: "1px solid rgba(255,255,255,0.3)",
       borderRadius: 9,
@@ -24324,7 +24340,47 @@ Fecha: ${venta.fecha}`);
       fontWeight: 700,
       cursor: "pointer",
       WebkitTapHighlightColor: "transparent"
-    } }, "\u2715 Cerrar")), /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1, position: "relative", overflow: "hidden", minHeight: 0 } }, /* @__PURE__ */ import_react.default.createElement(
+    } }, "\u2715 Cerrar")), (modo === "foto" || modo === "leyendo") && /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      flex: 1,
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      justifyContent: "center",
+      padding: 28,
+      gap: 20
+    } }, /* @__PURE__ */ import_react.default.createElement(
+      "input",
+      {
+        ref: fileRef,
+        type: "file",
+        accept: "image/*",
+        capture: "environment",
+        onChange: handleFoto,
+        style: { display: "none" }
+      }
+    ), modo === "leyendo" ? /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 52, marginBottom: 14 } }, "\u23F3"), /* @__PURE__ */ import_react.default.createElement("div", { style: { color: "#fff", fontSize: 16 } }, scanMsg)) : /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, null, /* @__PURE__ */ import_react.default.createElement("button", { onClick: () => fileRef.current?.click(), style: {
+      background: "linear-gradient(135deg,#1565C0,#0D47A1)",
+      border: "none",
+      borderRadius: 20,
+      padding: "22px 40px",
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      gap: 10,
+      cursor: "pointer",
+      WebkitTapHighlightColor: "transparent",
+      boxShadow: "0 8px 32px rgba(21,101,192,0.5)"
+    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 52 } }, "\u{1F4F7}"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 18, fontWeight: 800, color: "#fff" } }, "Abrir C\xE1mara"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, color: "rgba(255,255,255,0.7)" } }, "Apunta al c\xF3digo de barras o QR")), scanMsg && /* @__PURE__ */ import_react.default.createElement("div", { style: { color: "#f87171", fontSize: 13, textAlign: "center" } }, scanMsg), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 12, width: "100%", maxWidth: 300 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1, height: 1, background: "rgba(255,255,255,0.15)" } }), /* @__PURE__ */ import_react.default.createElement("span", { style: { color: "rgba(255,255,255,0.4)", fontSize: 12 } }, "o"), /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1, height: 1, background: "rgba(255,255,255,0.15)" } })), /* @__PURE__ */ import_react.default.createElement("button", { onClick: iniciarLive, style: {
+      background: "rgba(255,255,255,0.1)",
+      border: "1px solid rgba(255,255,255,0.25)",
+      borderRadius: 14,
+      padding: "14px 28px",
+      color: "rgba(255,255,255,0.8)",
+      fontSize: 14,
+      fontWeight: 600,
+      cursor: "pointer",
+      WebkitTapHighlightColor: "transparent"
+    } }, "\u{1F4F9} Escaneo en vivo (requiere permiso)"))), modo === "live" && /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1, position: "relative", overflow: "hidden", minHeight: 0 } }, /* @__PURE__ */ import_react.default.createElement(
       "video",
       {
         ref: videoRef,
@@ -24335,38 +24391,38 @@ Fecha: ${venta.fecha}`);
           width: "100%",
           height: "100%",
           objectFit: "cover",
-          display: status === "activo" ? "block" : "none"
+          display: liveStatus === "activo" ? "block" : "none"
         }
       }
-    ), /* @__PURE__ */ import_react.default.createElement("canvas", { ref: canvasRef, style: { display: "none" } }), status === "activo" && /* @__PURE__ */ import_react.default.createElement("div", { style: {
+    ), /* @__PURE__ */ import_react.default.createElement("canvas", { ref: canvasRef, style: { display: "none" } }), liveStatus === "activo" && /* @__PURE__ */ import_react.default.createElement("div", { style: {
       position: "absolute",
       inset: 0,
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
       pointerEvents: "none"
-    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { position: "relative", width: 272, height: 272 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { position: "relative", width: 260, height: 260 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
       position: "absolute",
       inset: 0,
-      boxShadow: "0 0 0 2000px rgba(0,0,0,0.48)",
+      boxShadow: "0 0 0 2000px rgba(0,0,0,0.5)",
       borderRadius: 4
     } }), /* @__PURE__ */ import_react.default.createElement("div", { style: {
       position: "absolute",
       inset: 0,
-      border: "2px solid rgba(255,255,255,0.55)",
+      border: "2px solid rgba(255,255,255,0.5)",
       borderRadius: 6
-    } }), [[0, 0, "tl"], [0, "auto", "tr"], ["auto", 0, "bl"], ["auto", "auto", "br"]].map(([t, r, k]) => /* @__PURE__ */ import_react.default.createElement("div", { key: k, style: {
+    } }), [{ t: 0, l: 0 }, { t: 0, r: 0 }, { b: 0, l: 0 }, { b: 0, r: 0 }].map((p, i) => /* @__PURE__ */ import_react.default.createElement("div", { key: i, style: {
       position: "absolute",
-      top: t,
-      right: r === 0 ? "auto" : r === "auto" ? "auto" : "unset",
-      left: r === 0 ? "auto" : r === "auto" ? "unset" : 0,
-      bottom: t === "auto" ? 0 : "auto",
-      width: 28,
-      height: 28,
-      borderTop: t === 0 ? "3px solid #2196F3" : "none",
-      borderBottom: t === "auto" ? "3px solid #2196F3" : "none",
-      borderLeft: r !== 0 ? "3px solid #2196F3" : "none",
-      borderRight: r === 0 ? "3px solid #2196F3" : "none"
+      width: 24,
+      height: 24,
+      top: p.t !== void 0 ? p.t : "auto",
+      bottom: p.b !== void 0 ? p.b : "auto",
+      left: p.l !== void 0 ? p.l : "auto",
+      right: p.r !== void 0 ? p.r : "auto",
+      borderTop: p.t === 0 ? "3px solid #2196F3" : "none",
+      borderBottom: p.b === 0 ? "3px solid #2196F3" : "none",
+      borderLeft: p.l === 0 ? "3px solid #2196F3" : "none",
+      borderRight: p.r === 0 ? "3px solid #2196F3" : "none"
     } })), /* @__PURE__ */ import_react.default.createElement("div", { style: {
       position: "absolute",
       left: 8,
@@ -24374,7 +24430,7 @@ Fecha: ${venta.fecha}`);
       height: 2,
       background: "linear-gradient(90deg,transparent,#2196F3,transparent)",
       animation: "thScan 1.8s ease-in-out infinite"
-    } }))), status === "cargando" && /* @__PURE__ */ import_react.default.createElement("div", { style: {
+    } }))), liveStatus === "cargando" && /* @__PURE__ */ import_react.default.createElement("div", { style: {
       position: "absolute",
       inset: 0,
       display: "flex",
@@ -24382,38 +24438,25 @@ Fecha: ${venta.fecha}`);
       alignItems: "center",
       justifyContent: "center",
       background: "#000"
-    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 52, marginBottom: 14 } }, "\u{1F4F7}"), /* @__PURE__ */ import_react.default.createElement("div", { style: { color: "#fff", fontSize: 16 } }, "Iniciando c\xE1mara\u2026")), status === "error" && /* @__PURE__ */ import_react.default.createElement("div", { style: {
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 42, marginBottom: 12 } }, "\u23F3"), /* @__PURE__ */ import_react.default.createElement("div", { style: { color: "#fff", fontSize: 15 } }, "Iniciando c\xE1mara\u2026"), /* @__PURE__ */ import_react.default.createElement("div", { style: { color: "rgba(255,255,255,0.5)", fontSize: 12, marginTop: 6 } }, "Acepta el permiso cuando aparezca")), liveStatus === "activo" && /* @__PURE__ */ import_react.default.createElement("button", { onClick: () => {
+      detenerLive();
+      setModo("foto");
+    }, style: {
       position: "absolute",
-      inset: 0,
-      display: "flex",
-      flexDirection: "column",
-      alignItems: "center",
-      justifyContent: "center",
-      background: "#111",
-      padding: 28,
-      textAlign: "center"
-    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 52, marginBottom: 14 } }, "\u26A0\uFE0F"), /* @__PURE__ */ import_react.default.createElement("div", { style: { color: "#fff", fontSize: 17, fontWeight: 700, marginBottom: 10 } }, "Sin acceso a la c\xE1mara"), /* @__PURE__ */ import_react.default.createElement("div", { style: { color: "#aaa", fontSize: 13, lineHeight: 1.7 } }, "Ve a Ajustes \u2192 Safari (o Chrome) \u2192 C\xE1mara \u2192 Permitir,", "\n", "luego recarga la p\xE1gina."), /* @__PURE__ */ import_react.default.createElement("button", { onClick: cerrar, style: {
-      marginTop: 24,
-      background: "rgba(255,255,255,0.15)",
+      bottom: 20,
+      left: "50%",
+      transform: "translateX(-50%)",
+      background: "rgba(0,0,0,0.6)",
       border: "1px solid rgba(255,255,255,0.3)",
       borderRadius: 10,
-      padding: "10px 26px",
+      padding: "8px 20px",
       color: "#fff",
-      fontSize: 14,
-      cursor: "pointer"
-    } }, "Cerrar"))), status === "activo" && /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      flexShrink: 0,
-      padding: "10px 16px calc(env(safe-area-inset-bottom,0px) + 10px)",
-      background: "rgba(0,0,0,0.82)",
-      textAlign: "center",
-      color: "rgba(255,255,255,0.6)",
-      fontSize: 13
-    } }, "Centra el c\xF3digo en el recuadro \u2014 se detecta solo"), /* @__PURE__ */ import_react.default.createElement("style", null, `
+      fontSize: 13,
+      cursor: "pointer",
+      WebkitTapHighlightColor: "transparent"
+    } }, "\u{1F4F7} Usar foto en cambio")), /* @__PURE__ */ import_react.default.createElement("style", null, `
         @keyframes thScan{
-          0%{top:8px;opacity:0}
-          15%{opacity:1}
-          85%{opacity:1}
-          100%{top:256px;opacity:0}
+          0%{top:8px;opacity:0} 15%{opacity:1} 85%{opacity:1} 100%{top:244px;opacity:0}
         }
       `));
   }

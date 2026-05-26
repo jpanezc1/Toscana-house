@@ -2767,121 +2767,135 @@ function ClockWidget(){
 // CAMERA SCANNER — getUserMedia + ZXing (sin librerías extra)
 // Compatible: iPhone Safari 14.3+, Android Chrome, desktop
 // ══════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════
+// CAMERA SCANNER — híbrido: foto nativa (sin permisos) +
+//                  escaneo en vivo (getUserMedia, opcional)
+// ══════════════════════════════════════════════════════════
 function CameraScanner({onDetect, onClose}){
-  const videoRef    = useRef(null);
-  const canvasRef   = useRef(null);
-  const streamRef   = useRef(null);
-  const timerRef    = useRef(null);
-  const firedRef    = useRef(false);
-  const readerRef   = useRef(null);
-  const [status, setStatus] = useState("cargando"); // cargando|activo|error
+  const fileRef   = useRef(null);
+  const videoRef  = useRef(null);
+  const canvasRef = useRef(null);
+  const streamRef = useRef(null);
+  const timerRef  = useRef(null);
+  const firedRef  = useRef(false);
 
-  useEffect(()=>{
-    let mounted = true;
+  // "foto" = input file (sin diálogo permisos, funciona siempre en iOS)
+  // "live" = getUserMedia en vivo
+  // "leyendo" = procesando foto capturada
+  const [modo, setModo] = useState("foto");
+  const [liveStatus, setLiveStatus] = useState("parado"); // parado|cargando|activo|error
+  const [scanMsg, setScanMsg] = useState("");
 
-    async function iniciar(){
-      try{
-        // 1. Pedir acceso a la cámara trasera
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video:{ facingMode:"environment", width:{ideal:1280}, height:{ideal:720} },
-          audio:false,
-        });
-        if(!mounted){ stream.getTracks().forEach(t=>t.stop()); return; }
-        streamRef.current = stream;
-
-        // 2. Conectar al elemento <video> (playsInline es crítico en iOS)
-        const video = videoRef.current;
-        video.srcObject = stream;
-        video.setAttribute("playsinline","");
-        video.setAttribute("muted","");
-        await video.play();
-        if(!mounted) return;
-
-        // 3. Cargar ZXing y preparar el lector
-        const ZXing = await loadZXing();
-        if(!mounted) return;
-        const hints = new Map();
-        hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS,[
-          ZXing.BarcodeFormat.CODE_128, ZXing.BarcodeFormat.CODE_39,
-          ZXing.BarcodeFormat.EAN_13,   ZXing.BarcodeFormat.EAN_8,
-          ZXing.BarcodeFormat.QR_CODE,  ZXing.BarcodeFormat.DATA_MATRIX,
-          ZXing.BarcodeFormat.ITF,      ZXing.BarcodeFormat.UPC_A,
-          ZXing.BarcodeFormat.UPC_E,
-        ]);
-        hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
-        const reader = new ZXing.MultiFormatReader();
-        reader.setHints(hints);
-        readerRef.current = reader;
-
-        setStatus("activo");
-
-        // 4. Loop de escaneo cada 250 ms
-        timerRef.current = setInterval(()=>{
-          if(!mounted || firedRef.current) return;
-          const vid = videoRef.current;
-          const cvs = canvasRef.current;
-          if(!vid || !cvs || vid.readyState < 2 || vid.videoWidth===0) return;
-
-          cvs.width  = vid.videoWidth;
-          cvs.height = vid.videoHeight;
-          cvs.getContext("2d").drawImage(vid, 0, 0);
-
-          try{
-            const lum    = new ZXing.HTMLCanvasElementLuminanceSource(cvs);
-            const bitmap = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(lum));
-            const res    = reader.decode(bitmap);
-            if(res && !firedRef.current){
-              firedRef.current = true;
-              // Vibración + beep
-              try{ navigator.vibrate && navigator.vibrate(200); }catch(_){}
-              try{
-                const ac=new(window.AudioContext||window.webkitAudioContext)();
-                const o=ac.createOscillator(),g=ac.createGain();
-                o.connect(g);g.connect(ac.destination);
-                o.frequency.value=1046;g.gain.value=0.25;
-                o.start();o.stop(ac.currentTime+0.12);
-                setTimeout(()=>ac.close(),500);
-              }catch(_){}
-              detener();
-              onDetect(res.getText());
-            }
-          }catch(_){/* frame sin código — normal */}
-        }, 250);
-
-      }catch(err){
-        console.warn("CameraScanner:", err);
-        if(mounted) setStatus("error");
+  // ── Foto nativa (sin permisos del navegador) ─────────────
+  async function handleFoto(e){
+    const f = e.target.files?.[0];
+    if(!f) return;
+    e.target.value = "";
+    setModo("leyendo");
+    setScanMsg("Leyendo código…");
+    try{
+      const codigo = await leerCodigoDeImagen(f);
+      if(codigo){
+        beep(); onDetect(codigo);
+      } else {
+        setScanMsg("No se detectó código — intenta de nuevo");
+        setModo("foto");
       }
+    }catch(_){
+      setScanMsg("Error al leer la imagen");
+      setModo("foto");
     }
-
-    function detener(){
-      clearInterval(timerRef.current);
-      if(streamRef.current) streamRef.current.getTracks().forEach(t=>t.stop());
-    }
-
-    iniciar();
-    return ()=>{ mounted=false; detener(); };
-  },[]);
-
-  function cerrar(){
-    clearInterval(timerRef.current);
-    if(streamRef.current) streamRef.current.getTracks().forEach(t=>t.stop());
-    onClose();
   }
 
+  // ── Escaneo en vivo (getUserMedia) ───────────────────────
+  async function iniciarLive(){
+    setModo("live"); setLiveStatus("cargando");
+    try{
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video:{facingMode:"environment",width:{ideal:1280},height:{ideal:720}},
+        audio:false,
+      });
+      streamRef.current = stream;
+      const video = videoRef.current;
+      video.srcObject = stream;
+      await video.play();
+
+      const ZXing = await loadZXing();
+      const hints = new Map();
+      hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS,[
+        ZXing.BarcodeFormat.CODE_128, ZXing.BarcodeFormat.CODE_39,
+        ZXing.BarcodeFormat.EAN_13,   ZXing.BarcodeFormat.EAN_8,
+        ZXing.BarcodeFormat.QR_CODE,  ZXing.BarcodeFormat.DATA_MATRIX,
+        ZXing.BarcodeFormat.ITF,      ZXing.BarcodeFormat.UPC_A,
+        ZXing.BarcodeFormat.UPC_E,
+      ]);
+      hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
+      const reader = new ZXing.MultiFormatReader();
+      reader.setHints(hints);
+
+      setLiveStatus("activo");
+
+      timerRef.current = setInterval(()=>{
+        if(firedRef.current) return;
+        const vid=videoRef.current, cvs=canvasRef.current;
+        if(!vid||!cvs||vid.readyState<2||vid.videoWidth===0) return;
+        cvs.width=vid.videoWidth; cvs.height=vid.videoHeight;
+        cvs.getContext("2d").drawImage(vid,0,0);
+        try{
+          const res=reader.decode(
+            new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(
+              new ZXing.HTMLCanvasElementLuminanceSource(cvs)
+            ))
+          );
+          if(res&&!firedRef.current){
+            firedRef.current=true;
+            detenerLive(); beep(); onDetect(res.getText());
+          }
+        }catch(_){}
+      }, 250);
+
+    }catch(err){
+      console.warn("Live scanner:", err);
+      detenerLive();
+      setLiveStatus("error");
+      setModo("foto");
+    }
+  }
+
+  function detenerLive(){
+    clearInterval(timerRef.current);
+    if(streamRef.current){ streamRef.current.getTracks().forEach(t=>t.stop()); streamRef.current=null; }
+  }
+
+  function beep(){
+    try{ navigator.vibrate&&navigator.vibrate(180); }catch(_){}
+    try{
+      const ac=new(window.AudioContext||window.webkitAudioContext)();
+      const o=ac.createOscillator(),g=ac.createGain();
+      o.connect(g);g.connect(ac.destination);
+      o.frequency.value=1046;g.gain.value=0.25;
+      o.start();o.stop(ac.currentTime+0.12);
+      setTimeout(()=>ac.close(),500);
+    }catch(_){}
+  }
+
+  function cerrar(){ detenerLive(); onClose(); }
+
+  useEffect(()=>()=>detenerLive(), []);
+
   return (
-    <div style={{position:"fixed",inset:0,zIndex:9500,background:"#000",
-      display:"flex",flexDirection:"column"}}>
+    <div style={{position:"fixed",inset:0,zIndex:9500,
+      background:"#000",display:"flex",flexDirection:"column"}}>
 
       {/* ── Barra superior ── */}
       <div style={{flexShrink:0,display:"flex",alignItems:"center",
         justifyContent:"space-between",
         padding:"calc(env(safe-area-inset-top,0px) + 10px) 16px 10px",
-        background:"rgba(0,0,0,0.82)"}}>
+        background:"rgba(0,0,0,0.85)"}}>
         <span style={{fontSize:15,fontWeight:700,color:"#fff"}}>
-          {status==="cargando"?"⏳ Abriendo cámara…"
-           :status==="activo" ?"📷 Apunta al código de barras o QR"
-           :"⚠ Sin acceso a cámara"}
+          {modo==="live"&&liveStatus==="activo"?"📷 Apunta al código"
+           :modo==="leyendo"?"⏳ Leyendo…"
+           :"📷 Escanear código"}
         </span>
         <button onClick={cerrar} style={{
           background:"rgba(255,255,255,0.15)",border:"1px solid rgba(255,255,255,0.3)",
@@ -2891,99 +2905,132 @@ function CameraScanner({onDetect, onClose}){
         </button>
       </div>
 
-      {/* ── Área de cámara ── */}
-      <div style={{flex:1,position:"relative",overflow:"hidden",minHeight:0}}>
+      {/* ── Modo foto (principal, sin permisos) ── */}
+      {(modo==="foto"||modo==="leyendo")&&(
+        <div style={{flex:1,display:"flex",flexDirection:"column",
+          alignItems:"center",justifyContent:"center",padding:28,gap:20}}>
 
-        {/* Video nativo — playsInline es CLAVE en iOS */}
-        <video ref={videoRef} playsInline muted autoPlay
-          style={{width:"100%",height:"100%",objectFit:"cover",
-            display:status==="activo"?"block":"none"}}/>
+          {/* Input oculto — abre cámara nativa iOS sin diálogo de permisos */}
+          <input ref={fileRef} type="file" accept="image/*" capture="environment"
+            onChange={handleFoto} style={{display:"none"}}/>
 
-        {/* Canvas oculto para ZXing */}
-        <canvas ref={canvasRef} style={{display:"none"}}/>
-
-        {/* Visor con esquinas y línea de barrido */}
-        {status==="activo"&&(
-          <div style={{position:"absolute",inset:0,display:"flex",
-            alignItems:"center",justifyContent:"center",pointerEvents:"none"}}>
-            <div style={{position:"relative",width:272,height:272}}>
-              {/* Fondo oscuro alrededor */}
-              <div style={{position:"absolute",inset:0,
-                boxShadow:"0 0 0 2000px rgba(0,0,0,0.48)",borderRadius:4}}/>
-              {/* Marco */}
-              <div style={{position:"absolute",inset:0,
-                border:"2px solid rgba(255,255,255,0.55)",borderRadius:6}}/>
-              {/* Esquinas azules */}
-              {[[0,0,"tl"],[0,"auto","tr"],["auto",0,"bl"],["auto","auto","br"]].map(([t,r,k])=>(
-                <div key={k} style={{position:"absolute",
-                  top:t,right:r===0?"auto":r==="auto"?"auto":"unset",
-                  left:r===0?"auto":r==="auto"?"unset":0,
-                  bottom:t==="auto"?0:"auto",
-                  width:28,height:28,
-                  borderTop:   t===0    ?"3px solid #2196F3":"none",
-                  borderBottom:t==="auto"?"3px solid #2196F3":"none",
-                  borderLeft:  r!==0    ?"3px solid #2196F3":"none",
-                  borderRight: r===0    ?"3px solid #2196F3":"none",
-                }}/>
-              ))}
-              {/* Línea de barrido */}
-              <div style={{position:"absolute",left:8,right:8,height:2,
-                background:"linear-gradient(90deg,transparent,#2196F3,transparent)",
-                animation:"thScan 1.8s ease-in-out infinite"}}/>
+          {modo==="leyendo"?(
+            <div style={{textAlign:"center"}}>
+              <div style={{fontSize:52,marginBottom:14}}>⏳</div>
+              <div style={{color:"#fff",fontSize:16}}>{scanMsg}</div>
             </div>
-          </div>
-        )}
+          ):(
+            <>
+              {/* Botón principal */}
+              <button onClick={()=>fileRef.current?.click()} style={{
+                background:"linear-gradient(135deg,#1565C0,#0D47A1)",
+                border:"none",borderRadius:20,padding:"22px 40px",
+                display:"flex",flexDirection:"column",alignItems:"center",gap:10,
+                cursor:"pointer",WebkitTapHighlightColor:"transparent",
+                boxShadow:"0 8px 32px rgba(21,101,192,0.5)",
+              }}>
+                <span style={{fontSize:52}}>📷</span>
+                <span style={{fontSize:18,fontWeight:800,color:"#fff"}}>
+                  Abrir Cámara
+                </span>
+                <span style={{fontSize:13,color:"rgba(255,255,255,0.7)"}}>
+                  Apunta al código de barras o QR
+                </span>
+              </button>
 
-        {/* Overlay cargando */}
-        {status==="cargando"&&(
-          <div style={{position:"absolute",inset:0,display:"flex",
-            flexDirection:"column",alignItems:"center",justifyContent:"center",
-            background:"#000"}}>
-            <div style={{fontSize:52,marginBottom:14}}>📷</div>
-            <div style={{color:"#fff",fontSize:16}}>Iniciando cámara…</div>
-          </div>
-        )}
+              {scanMsg&&(
+                <div style={{color:"#f87171",fontSize:13,textAlign:"center"}}>
+                  {scanMsg}
+                </div>
+              )}
 
-        {/* Overlay error */}
-        {status==="error"&&(
-          <div style={{position:"absolute",inset:0,display:"flex",
-            flexDirection:"column",alignItems:"center",justifyContent:"center",
-            background:"#111",padding:28,textAlign:"center"}}>
-            <div style={{fontSize:52,marginBottom:14}}>⚠️</div>
-            <div style={{color:"#fff",fontSize:17,fontWeight:700,marginBottom:10}}>
-              Sin acceso a la cámara
-            </div>
-            <div style={{color:"#aaa",fontSize:13,lineHeight:1.7}}>
-              Ve a Ajustes → Safari (o Chrome) → Cámara → Permitir,{"\n"}
-              luego recarga la página.
-            </div>
-            <button onClick={cerrar} style={{marginTop:24,
-              background:"rgba(255,255,255,0.15)",border:"1px solid rgba(255,255,255,0.3)",
-              borderRadius:10,padding:"10px 26px",color:"#fff",
-              fontSize:14,cursor:"pointer"}}>
-              Cerrar
-            </button>
-          </div>
-        )}
-      </div>
+              {/* Separador */}
+              <div style={{display:"flex",alignItems:"center",gap:12,width:"100%",maxWidth:300}}>
+                <div style={{flex:1,height:1,background:"rgba(255,255,255,0.15)"}}/>
+                <span style={{color:"rgba(255,255,255,0.4)",fontSize:12}}>o</span>
+                <div style={{flex:1,height:1,background:"rgba(255,255,255,0.15)"}}/>
+              </div>
 
-      {/* ── Pie ── */}
-      {status==="activo"&&(
-        <div style={{flexShrink:0,
-          padding:"10px 16px calc(env(safe-area-inset-bottom,0px) + 10px)",
-          background:"rgba(0,0,0,0.82)",textAlign:"center",
-          color:"rgba(255,255,255,0.6)",fontSize:13}}>
-          Centra el código en el recuadro — se detecta solo
+              {/* Botón escaneo en vivo */}
+              <button onClick={iniciarLive} style={{
+                background:"rgba(255,255,255,0.1)",
+                border:"1px solid rgba(255,255,255,0.25)",
+                borderRadius:14,padding:"14px 28px",
+                color:"rgba(255,255,255,0.8)",fontSize:14,fontWeight:600,
+                cursor:"pointer",WebkitTapHighlightColor:"transparent",
+              }}>
+                📹 Escaneo en vivo (requiere permiso)
+              </button>
+            </>
+          )}
         </div>
       )}
 
-      {/* Animación línea de barrido */}
+      {/* ── Modo live ── */}
+      {modo==="live"&&(
+        <div style={{flex:1,position:"relative",overflow:"hidden",minHeight:0}}>
+          <video ref={videoRef} playsInline muted autoPlay
+            style={{width:"100%",height:"100%",objectFit:"cover",
+              display:liveStatus==="activo"?"block":"none"}}/>
+          <canvas ref={canvasRef} style={{display:"none"}}/>
+
+          {/* Visor */}
+          {liveStatus==="activo"&&(
+            <div style={{position:"absolute",inset:0,display:"flex",
+              alignItems:"center",justifyContent:"center",pointerEvents:"none"}}>
+              <div style={{position:"relative",width:260,height:260}}>
+                <div style={{position:"absolute",inset:0,
+                  boxShadow:"0 0 0 2000px rgba(0,0,0,0.5)",borderRadius:4}}/>
+                <div style={{position:"absolute",inset:0,
+                  border:"2px solid rgba(255,255,255,0.5)",borderRadius:6}}/>
+                {[{t:0,l:0},{t:0,r:0},{b:0,l:0},{b:0,r:0}].map((p,i)=>(
+                  <div key={i} style={{position:"absolute",width:24,height:24,
+                    top:p.t!==undefined?p.t:"auto",
+                    bottom:p.b!==undefined?p.b:"auto",
+                    left:p.l!==undefined?p.l:"auto",
+                    right:p.r!==undefined?p.r:"auto",
+                    borderTop:   p.t===0?"3px solid #2196F3":"none",
+                    borderBottom:p.b===0?"3px solid #2196F3":"none",
+                    borderLeft:  p.l===0?"3px solid #2196F3":"none",
+                    borderRight: p.r===0?"3px solid #2196F3":"none",
+                  }}/>
+                ))}
+                <div style={{position:"absolute",left:8,right:8,height:2,
+                  background:"linear-gradient(90deg,transparent,#2196F3,transparent)",
+                  animation:"thScan 1.8s ease-in-out infinite"}}/>
+              </div>
+            </div>
+          )}
+
+          {liveStatus==="cargando"&&(
+            <div style={{position:"absolute",inset:0,display:"flex",
+              flexDirection:"column",alignItems:"center",justifyContent:"center",
+              background:"#000"}}>
+              <div style={{fontSize:42,marginBottom:12}}>⏳</div>
+              <div style={{color:"#fff",fontSize:15}}>Iniciando cámara…</div>
+              <div style={{color:"rgba(255,255,255,0.5)",fontSize:12,marginTop:6}}>
+                Acepta el permiso cuando aparezca
+              </div>
+            </div>
+          )}
+
+          {/* Botón para volver a foto */}
+          {liveStatus==="activo"&&(
+            <button onClick={()=>{detenerLive();setModo("foto");}} style={{
+              position:"absolute",bottom:20,left:"50%",transform:"translateX(-50%)",
+              background:"rgba(0,0,0,0.6)",border:"1px solid rgba(255,255,255,0.3)",
+              borderRadius:10,padding:"8px 20px",color:"#fff",fontSize:13,
+              cursor:"pointer",WebkitTapHighlightColor:"transparent",
+            }}>
+              📷 Usar foto en cambio
+            </button>
+          )}
+        </div>
+      )}
+
       <style>{`
         @keyframes thScan{
-          0%{top:8px;opacity:0}
-          15%{opacity:1}
-          85%{opacity:1}
-          100%{top:256px;opacity:0}
+          0%{top:8px;opacity:0} 15%{opacity:1} 85%{opacity:1} 100%{top:244px;opacity:0}
         }
       `}</style>
     </div>
