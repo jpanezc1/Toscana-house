@@ -25657,40 +25657,32 @@ Fecha: ${venta.fecha}`);
     } }, d.label))));
   }
   function BrandPortal({ user, ventas, inv, logout }) {
-    const marca = MARCAS.find((m) => m.id === user.marcaId);
-    if (!marca) return /* @__PURE__ */ import_react.default.createElement("div", { style: { padding: 40, textAlign: "center", color: C.label3, fontFamily: FONT } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 40, marginBottom: 12 } }, "\u26A0\uFE0F"), /* @__PURE__ */ import_react.default.createElement("div", null, "Marca no encontrada. Contact\xE1 al administrador."), /* @__PURE__ */ import_react.default.createElement("button", { onClick: logout, style: {
-      marginTop: 16,
-      padding: "10px 24px",
-      borderRadius: 10,
-      background: C.red,
-      border: "none",
-      color: "#fff",
-      cursor: "pointer",
-      fontFamily: FONT
-    } }, "Salir"));
     const now = /* @__PURE__ */ new Date();
     const [mes, setMes] = (0, import_react.useState)(now.getMonth());
     const [anio, setAnio] = (0, import_react.useState)(now.getFullYear());
     const [tab, setTab] = (0, import_react.useState)("dashboard");
+    const marcaId = Number(user.marcaId);
+    const marca = MARCAS.find((m) => m.id === marcaId) || null;
     const MK = mkKey(mes, anio);
     const todasMarca = (0, import_react.useMemo)(
-      () => ventas.filter((v) => !v.anulada && v.items.some((i) => i.marcaId === marca.id)),
-      [ventas, marca.id]
+      () => marca ? ventas.filter((v) => !v.anulada && v.items.some((i) => i.marcaId === marca.id)) : [],
+      [ventas, marca]
     );
     const vMes = (0, import_react.useMemo)(() => todasMarca.filter((v) => v.mk === MK), [todasMarca, MK]);
     const vHoy = (0, import_react.useMemo)(() => todasMarca.filter((v) => v.fecha === hoy()), [todasMarca]);
+    const mid = marca?.id ?? -1;
     function brutoV(vs) {
-      return vs.reduce((s, v) => s + v.items.filter((i) => i.marcaId === marca.id).reduce((ss, i) => ss + i.subtotal, 0), 0);
+      return vs.reduce((s, v) => s + v.items.filter((i) => i.marcaId === mid).reduce((ss, i) => ss + i.subtotal, 0), 0);
     }
     function udsV(vs) {
-      return vs.reduce((s, v) => s + v.items.filter((i) => i.marcaId === marca.id).reduce((ss, i) => ss + i.cantidad, 0), 0);
+      return vs.reduce((s, v) => s + v.items.filter((i) => i.marcaId === mid).reduce((ss, i) => ss + i.cantidad, 0), 0);
     }
     const brutoMes = (0, import_react.useMemo)(() => brutoV(vMes), [vMes]);
     const brutoHoy = (0, import_react.useMemo)(() => brutoV(vHoy), [vHoy]);
     const udsMes = (0, import_react.useMemo)(() => udsV(vMes), [vMes]);
     const udsHoy = (0, import_react.useMemo)(() => udsV(vHoy), [vHoy]);
     const tktProm = vMes.length > 0 ? brutoMes / vMes.length : 0;
-    const liq = (0, import_react.useMemo)(() => calcLiqMarca(vMes, marca.id, MK), [vMes, marca.id, MK]);
+    const liq = (0, import_react.useMemo)(() => calcLiqMarca(vMes, mid, MK), [vMes, mid, MK]);
     const diaActual = mes === now.getMonth() && anio === now.getFullYear() ? now.getDate() : new Date(anio, mes + 1, 0).getDate();
     const diasTotal = new Date(anio, mes + 1, 0).getDate();
     const proyeccion = diaActual > 0 ? brutoMes / diaActual * diasTotal : 0;
@@ -25707,14 +25699,33 @@ Fecha: ${venta.fecha}`);
     }), [todasMarca, mes, anio]);
     const topProds = (0, import_react.useMemo)(() => {
       const map = {};
-      vMes.forEach((v) => v.items.filter((i) => i.marcaId === marca.id).forEach((it) => {
+      vMes.forEach((v) => v.items.filter((i) => i.marcaId === mid).forEach((it) => {
         if (!map[it.codigo]) map[it.codigo] = { nombre: it.nombre, codigo: it.codigo, uds: 0, total: 0 };
         map[it.codigo].uds += it.cantidad;
         map[it.codigo].total += it.subtotal;
       }));
       return Object.values(map).sort((a, b) => b.uds - a.uds).slice(0, 5);
-    }, [vMes, marca.id]);
-    const invMarca = (0, import_react.useMemo)(() => inv.filter((i) => i.marcaId === marca.id), [inv, marca.id]);
+    }, [vMes, mid]);
+    const invMarca = (0, import_react.useMemo)(() => inv.filter((i) => i.marcaId === mid), [inv, mid]);
+    if (!marca) return /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      padding: 40,
+      textAlign: "center",
+      color: C.label3,
+      fontFamily: FONT,
+      minHeight: "100vh",
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      justifyContent: "center"
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 40, marginBottom: 12 } }, "\u26A0\uFE0F"), /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 8 } }, "Marca no encontrada."), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, marginBottom: 20 } }, "Contact\xE1 al administrador (marcaId: ", String(user.marcaId), ")"), /* @__PURE__ */ import_react.default.createElement("button", { onClick: logout, style: {
+      padding: "10px 24px",
+      borderRadius: 10,
+      background: C.red,
+      border: "none",
+      color: "#fff",
+      cursor: "pointer",
+      fontFamily: FONT
+    } }, "Salir"));
     const stockOk = invMarca.filter((i) => i.stock > 2).length;
     const stockBaj = invMarca.filter((i) => i.stock > 0 && i.stock <= 2).length;
     const agotados = invMarca.filter((i) => i.stock === 0).length;

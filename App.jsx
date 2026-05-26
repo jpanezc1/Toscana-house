@@ -4305,34 +4305,30 @@ function MiniBarChart({data, color, height=64}){
 }
 
 function BrandPortal({user, ventas, inv, logout}){
-  const marca = MARCAS.find(m=>m.id===user.marcaId);
-  if(!marca) return (
-    <div style={{padding:40,textAlign:"center",color:C.label3,fontFamily:FONT}}>
-      <div style={{fontSize:40,marginBottom:12}}>⚠️</div>
-      <div>Marca no encontrada. Contactá al administrador.</div>
-      <button onClick={logout} style={{marginTop:16,padding:"10px 24px",borderRadius:10,
-        background:C.red,border:"none",color:"#fff",cursor:"pointer",fontFamily:FONT}}>Salir</button>
-    </div>
-  );
-
+  // ── TODOS los hooks ANTES de cualquier return condicional ──
   const now = new Date();
   const [mes,  setMes]  = useState(now.getMonth());
   const [anio, setAnio] = useState(now.getFullYear());
   const [tab,  setTab]  = useState("dashboard");
 
+  // marcaId puede llegar como string o number; normalizar
+  const marcaId = Number(user.marcaId);
+  const marca   = MARCAS.find(m=>m.id===marcaId) || null;
+
   const MK = mkKey(mes, anio);
 
-  // Ventas filtradas por marca (excluir anuladas)
+  // Ventas filtradas por marca (excluir anuladas) — seguro si marca es null
   const todasMarca = useMemo(()=>
-    ventas.filter(v=>!v.anulada&&v.items.some(i=>i.marcaId===marca.id))
-  ,[ventas,marca.id]);
+    marca ? ventas.filter(v=>!v.anulada&&v.items.some(i=>i.marcaId===marca.id)) : []
+  ,[ventas, marca]);
 
   const vMes  = useMemo(()=>todasMarca.filter(v=>v.mk===MK),[todasMarca,MK]);
   const vHoy  = useMemo(()=>todasMarca.filter(v=>v.fecha===hoy()),[todasMarca]);
 
   // Helpers de bruto y unidades para esta marca
-  function brutoV(vs){ return vs.reduce((s,v)=>s+v.items.filter(i=>i.marcaId===marca.id).reduce((ss,i)=>ss+i.subtotal,0),0); }
-  function udsV(vs){   return vs.reduce((s,v)=>s+v.items.filter(i=>i.marcaId===marca.id).reduce((ss,i)=>ss+i.cantidad,0),0); }
+  const mid = marca?.id ?? -1;
+  function brutoV(vs){ return vs.reduce((s,v)=>s+v.items.filter(i=>i.marcaId===mid).reduce((ss,i)=>ss+i.subtotal,0),0); }
+  function udsV(vs){   return vs.reduce((s,v)=>s+v.items.filter(i=>i.marcaId===mid).reduce((ss,i)=>ss+i.cantidad,0),0); }
 
   const brutoMes = useMemo(()=>brutoV(vMes),[vMes]);
   const brutoHoy = useMemo(()=>brutoV(vHoy),[vHoy]);
@@ -4341,7 +4337,7 @@ function BrandPortal({user, ventas, inv, logout}){
   const tktProm  = vMes.length>0?(brutoMes/vMes.length):0;
 
   // Liquidación con config real
-  const liq = useMemo(()=>calcLiqMarca(vMes,marca.id,MK),[vMes,marca.id,MK]);
+  const liq = useMemo(()=>calcLiqMarca(vMes, mid, MK),[vMes, mid, MK]);
 
   // Proyección fin de mes
   const diaActual = (mes===now.getMonth()&&anio===now.getFullYear())?now.getDate():new Date(anio,mes+1,0).getDate();
@@ -4366,15 +4362,27 @@ function BrandPortal({user, ventas, inv, logout}){
   // Top productos del mes
   const topProds = useMemo(()=>{
     const map={};
-    vMes.forEach(v=>v.items.filter(i=>i.marcaId===marca.id).forEach(it=>{
+    vMes.forEach(v=>v.items.filter(i=>i.marcaId===mid).forEach(it=>{
       if(!map[it.codigo])map[it.codigo]={nombre:it.nombre,codigo:it.codigo,uds:0,total:0};
       map[it.codigo].uds+=it.cantidad; map[it.codigo].total+=it.subtotal;
     }));
     return Object.values(map).sort((a,b)=>b.uds-a.uds).slice(0,5);
-  },[vMes,marca.id]);
+  },[vMes, mid]);
 
   // Inventario de la marca
-  const invMarca = useMemo(()=>inv.filter(i=>i.marcaId===marca.id),[inv,marca.id]);
+  const invMarca = useMemo(()=>inv.filter(i=>i.marcaId===mid),[inv, mid]);
+
+  // ── Ahora sí: return condicional DESPUÉS de todos los hooks ──
+  if(!marca) return (
+    <div style={{padding:40,textAlign:"center",color:C.label3,fontFamily:FONT,
+      minHeight:"100vh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center"}}>
+      <div style={{fontSize:40,marginBottom:12}}>⚠️</div>
+      <div style={{marginBottom:8}}>Marca no encontrada.</div>
+      <div style={{fontSize:12,color:C.label3,marginBottom:20}}>Contactá al administrador (marcaId: {String(user.marcaId)})</div>
+      <button onClick={logout} style={{padding:"10px 24px",borderRadius:10,
+        background:C.red,border:"none",color:"#fff",cursor:"pointer",fontFamily:FONT}}>Salir</button>
+    </div>
+  );
   const stockOk  = invMarca.filter(i=>i.stock>2).length;
   const stockBaj = invMarca.filter(i=>i.stock>0&&i.stock<=2).length;
   const agotados = invMarca.filter(i=>i.stock===0).length;
