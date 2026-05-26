@@ -741,11 +741,15 @@ function descargarArchivo(blob, nombre) {
 }
 
 // ── Helpers de liquidación para planillas Excel ───────────────
-function leerCfgLiq(MK, marcaId) {
-  const key = `th_liq_cfg_${MK}_${marcaId}`;
+function leerCfgLiq(marcaId) {
+  const key = `th_liq_cfg_${marcaId}`;
   const def = { pctTarjeta: 2.5, pctComision: 10, alquiler: 0 };
   try { return { ...def, ...JSON.parse(localStorage.getItem(key) || "{}") }; }
   catch { return def; }
+}
+function guardarCfgLiq(marcaId, cfg) {
+  const key = `th_liq_cfg_${marcaId}`;
+  try { localStorage.setItem(key, JSON.stringify(cfg)); } catch {}
 }
 function parseMixtoXls(metodoPago, total) {
   if (metodoPago?.startsWith("mixto|")) {
@@ -758,8 +762,8 @@ function parseMixtoXls(metodoPago, total) {
   if (metodoPago === "tarjeta") return { efectivo: 0, qr: 0, tarjeta: total };
   return { efectivo: total, qr: 0, tarjeta: 0 };
 }
-function calcLiqMarca(vMarca, marcaId, MK) {
-  const cfg = leerCfgLiq(MK, marcaId);
+function calcLiqMarca(vMarca, marcaId) {
+  const cfg = leerCfgLiq(marcaId);
   let brutoEf = 0, brutoQR = 0, brutoTJ = 0;
   vMarca.forEach(v => {
     const sub   = v.items.filter(i => i.marcaId === marcaId).reduce((s, i) => s + i.subtotal, 0);
@@ -889,7 +893,7 @@ async function generarExcelMensual(ventas, inventario, mes, anio, setGenerando, 
     MARCAS.forEach(m => {
       const vM  = ventasMes.filter(v => v.items.some(i => i.marcaId === m.id));
       const uds = vM.reduce((s,v) => s + v.items.filter(i=>i.marcaId===m.id).reduce((ss,i)=>ss+i.cantidad,0), 0);
-      const liq = calcLiqMarca(vM, m.id, MK);
+      const liq = calcLiqMarca(vM, m.id);
       totalBruto += liq.bruto; totalNeto += liq.neto; totalVentas += vM.length;
       resumenRows.push([
         m.nombre,
@@ -941,7 +945,7 @@ async function generarExcelMensual(ventas, inventario, mes, anio, setGenerando, 
       }
 
       // Totales con config real de liquidación
-      const liqM = calcLiqMarca(vMarca, m.id, MK);
+      const liqM = calcLiqMarca(vMarca, m.id);
       rows.push(
         [],
         ["","","","","","","","VENTAS BRUTAS",       +liqM.bruto.toFixed(2),"","",""],
@@ -1100,7 +1104,7 @@ async function generarExcelMarca(marca, ventas, inventario, setGenerando) {
             rows.push([v.id, v.fecha, v.hora, it.codigo, it.nombre, it.categoria||"", it.cantidad, it.precioUnit, it.subtotal, v.descPct||0, v.metodoPago, v.vendedor||"Tienda"]);
           });
         });
-        const liqP = calcLiqMarca(p.ventas, marca.id, p.mk);
+        const liqP = calcLiqMarca(p.ventas, marca.id);
         rows.push(
           [],
           ["","","","","","","","Ventas brutas",        +liqP.bruto.toFixed(2),"","",""],
@@ -1203,7 +1207,7 @@ function exportCSV(marca,ventas,mes,anio){
   vm.forEach(v=>v.items.filter(i=>i.marcaId===marca.id).forEach(it=>{
     rows.push([v.id,v.fecha,v.hora,it.codigo,it.nombre,it.cantidad,it.precioUnit,it.subtotal,v.descPct||0,v.metodoPago]);
   }));
-  const liq=calcLiqMarca(vm,marca.id,MK);
+  const liq=calcLiqMarca(vm,marca.id);
   rows.push([],
     ["Ventas brutas","","","","","","",+liq.bruto.toFixed(2),"",""],
     [`Desc. Tarjeta (${liq.cfg.pctTarjeta}%)`, "","","","","","",-liq.descTJ.toFixed(2),"",""],
@@ -1951,17 +1955,181 @@ function StatCard({icon,label,value,sub,color=C.gold,compact}){
 }
 
 // ══════════════════════════════════════════════════════════
+// PctMarcasPanel — configuración centralizada de porcentajes
+// Persiste en localStorage sin depender del mes
+// ══════════════════════════════════════════════════════════
+function PctMarcasPanel({ onCfgChange }) {
+  const [open, setOpen] = useState(false);
+  const [cfgs, setCfgs] = useState(()=>{
+    const obj={};
+    MARCAS.forEach(m=>{ obj[m.id]=leerCfgLiq(m.id); });
+    return obj;
+  });
+
+  function handleChange(marcaId, field, val){
+    const newCfg = {...cfgs[marcaId], [field]: val};
+    setCfgs(prev=>({...prev, [marcaId]:newCfg}));
+    guardarCfgLiq(marcaId, newCfg);
+    if(typeof onCfgChange==="function") onCfgChange();
+  }
+
+  const FIELDS = [
+    {key:"pctTarjeta", label:"% Tarjeta", width:72, suffix:"%", placeholder:"2.5", step:"0.1"},
+    {key:"pctComision", label:"% Comisión", width:80, suffix:"%", placeholder:"10", step:"0.1"},
+    {key:"alquiler",   label:"Alquiler Bs", width:88, suffix:"Bs", placeholder:"0", step:"50"},
+  ];
+
+  return (
+    <div style={{marginBottom:16}}>
+      <button
+        onClick={()=>setOpen(s=>!s)}
+        style={{
+          width:"100%", display:"flex", alignItems:"center", justifyContent:"space-between",
+          padding:"12px 16px", borderRadius: open ? "14px 14px 0 0" : 14,
+          background: open ? C.label : C.bg2,
+          border:`1px solid ${open ? C.label : C.sep}`,
+          cursor:"pointer", fontFamily:FONT,
+          WebkitTapHighlightColor:"transparent",
+          transition:"background .18s, border-color .18s",
+        }}>
+        <div style={{display:"flex", alignItems:"center", gap:10}}>
+          <div style={{
+            width:28, height:28, borderRadius:8,
+            background: open ? "rgba(255,255,255,0.12)" : `${C.gold}14`,
+            border:`1px solid ${open ? "rgba(255,255,255,0.2)" : C.gold+"28"}`,
+            display:"flex", alignItems:"center", justifyContent:"center",
+            fontSize:13,
+          }}>⚙</div>
+          <div style={{textAlign:"left"}}>
+            <div style={{fontSize:13, fontWeight:600, color: open ? "#FFF" : C.label, fontFamily:FONT, letterSpacing:"-0.01em"}}>
+              Configurar porcentajes por marca
+            </div>
+            <div style={{fontSize:10, color: open ? "rgba(255,255,255,0.55)" : C.label3, fontFamily:FONT, marginTop:1}}>
+              Tarjeta · Comisión · Alquiler — persiste entre meses
+            </div>
+          </div>
+        </div>
+        <span style={{
+          fontSize:11, color: open ? "rgba(255,255,255,0.6)" : C.label3,
+          fontFamily:FONT, fontWeight:500,
+          transform: open ? "rotate(180deg)" : "rotate(0deg)",
+          transition:"transform .2s", display:"inline-block",
+        }}>▾</span>
+      </button>
+
+      {open && (
+        <div style={{
+          background:"rgba(255,255,255,0.92)",
+          backdropFilter:"blur(16px)",
+          WebkitBackdropFilter:"blur(16px)",
+          border:`1px solid ${C.sep}`, borderTop:"none",
+          borderRadius:"0 0 14px 14px",
+          overflow:"hidden",
+        }}>
+          {/* Header columnas */}
+          <div style={{
+            display:"grid",
+            gridTemplateColumns:`1fr ${FIELDS.map(f=>f.width+"px").join(" ")}`,
+            gap:0, padding:"8px 14px",
+            borderBottom:`1px solid ${C.sep}`,
+            background:C.bg2,
+          }}>
+            <div style={{fontSize:9, fontWeight:700, color:C.label3, fontFamily:FONT,
+              textTransform:"uppercase", letterSpacing:"0.08em"}}>Marca</div>
+            {FIELDS.map(f=>(
+              <div key={f.key} style={{fontSize:9, fontWeight:700, color:C.label3, fontFamily:FONT,
+                textTransform:"uppercase", letterSpacing:"0.08em", textAlign:"center"}}>{f.label}</div>
+            ))}
+          </div>
+
+          {/* Rows por marca */}
+          {MARCAS.map((m, i)=>{
+            const cfg = cfgs[m.id] || leerCfgLiq(m.id);
+            return (
+              <div key={m.id} style={{
+                display:"grid",
+                gridTemplateColumns:`1fr ${FIELDS.map(f=>f.width+"px").join(" ")}`,
+                gap:0, padding:"8px 14px", alignItems:"center",
+                borderBottom: i<MARCAS.length-1 ? `1px solid ${C.sep}` : "none",
+                transition:"background .1s",
+              }}
+              onMouseEnter={e=>e.currentTarget.style.background=`${m.color}06`}
+              onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+                {/* Brand name + avatar */}
+                <div style={{display:"flex", alignItems:"center", gap:8, minWidth:0}}>
+                  <div style={{
+                    width:26, height:26, borderRadius:7, flexShrink:0,
+                    background:`${m.color}18`, border:`1px solid ${m.color}28`,
+                    overflow:"hidden", display:"flex", alignItems:"center",
+                    justifyContent:"center", fontSize:13,
+                  }}>
+                    {m.imagen
+                      ? <img src={m.imagen} alt="" style={{width:26, height:26, objectFit:"cover"}}/>
+                      : m.emoji}
+                  </div>
+                  <span style={{
+                    fontSize:12, fontWeight:600, color:C.label, fontFamily:FONT,
+                    letterSpacing:"-0.01em", overflow:"hidden",
+                    textOverflow:"ellipsis", whiteSpace:"nowrap",
+                  }}>{m.nombre}</span>
+                </div>
+
+                {/* Inputs */}
+                {FIELDS.map(f=>(
+                  <div key={f.key} style={{position:"relative", paddingLeft:4}}>
+                    <input
+                      type="number" min="0" step={f.step}
+                      value={cfg[f.key] ?? ""}
+                      placeholder={f.placeholder}
+                      onChange={e=>handleChange(m.id, f.key, e.target.value)}
+                      style={{
+                        width:"100%", padding:"6px 22px 6px 8px",
+                        borderRadius:9, border:`1px solid ${C.sep}`,
+                        background:C.bg2, fontSize:13, color:C.label,
+                        fontFamily:FONT, fontWeight:500, outline:"none",
+                        boxSizing:"border-box", textAlign:"right",
+                        WebkitAppearance:"none", MozAppearance:"textfield",
+                        transition:"border-color .12s, background .12s",
+                      }}
+                      onFocus={e=>{e.target.style.borderColor=m.color;e.target.style.background="#FFF";}}
+                      onBlur={e=>{e.target.style.borderColor=C.sep;e.target.style.background=C.bg2;}}
+                    />
+                    <span style={{
+                      position:"absolute", right:8, top:"50%", transform:"translateY(-50%)",
+                      fontSize:10, color:C.label3, fontFamily:FONT, pointerEvents:"none",
+                    }}>{f.suffix}</span>
+                  </div>
+                ))}
+              </div>
+            );
+          })}
+
+          {/* Pie: guardar es automático */}
+          <div style={{
+            padding:"10px 16px", borderTop:`1px solid ${C.sep}`,
+            background:C.bg2, display:"flex", alignItems:"center", gap:6,
+          }}>
+            <div style={{
+              width:6, height:6, borderRadius:"50%", background:C.green, flexShrink:0,
+            }}/>
+            <span style={{fontSize:11, color:C.label3, fontFamily:FONT}}>
+              Los cambios se guardan automáticamente y aplican a todas las pestañas
+            </span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════
 // LiqModal — liquidación como componente iOS sheet
 // ══════════════════════════════════════════════════════════
-function LiqModal({marcaId,ventas,mes,anio,MK,cierres,setCierres,onClose,syncCierre}){
+function LiqModal({marcaId,ventas,mes,anio,MK,cierres,setCierres,onClose,syncCierre,onCfgChange}){
   if(!marcaId) return null;
   const marca=MARCAS.find(x=>x.id===marcaId);
-  const cfgKey = `th_liq_cfg_${MK}_${marcaId}`;
   const defCfg = {pctTarjeta:2.5, pctComision:10, alquiler:0};
-  const [cfg, setCfg] = useState(()=>{
-    try{ return {...defCfg, ...JSON.parse(localStorage.getItem(cfgKey)||"{}")}; }
-    catch{ return defCfg; }
-  });
+  const [cfg, setCfg] = useState(()=>leerCfgLiq(marcaId));
   const [showCfg, setShowCfg] = useState(false);
   const pctTarjeta = Number(cfg.pctTarjeta)||0;
   const pctComision = Number(cfg.pctComision)||0;
@@ -1969,7 +2137,8 @@ function LiqModal({marcaId,ventas,mes,anio,MK,cierres,setCierres,onClose,syncCie
 
   function saveCfg(newCfg){
     setCfg(newCfg);
-    try{ localStorage.setItem(cfgKey, JSON.stringify(newCfg)); }catch{}
+    guardarCfgLiq(marcaId, newCfg);
+    if(typeof onCfgChange==="function") onCfgChange();
   }
 
   const vMes=ventas.filter(v=>v.mk===MK&&!v.anulada);
@@ -4890,7 +5059,7 @@ function BrandPortal({user, ventas, inv, logout}){
   const tktProm  = vMes.length>0?(brutoMes/vMes.length):0;
 
   // Liquidación con config real
-  const liq = useMemo(()=>calcLiqMarca(vMes, mid, MK),[vMes, mid, MK]);
+  const liq = useMemo(()=>calcLiqMarca(vMes, mid),[vMes, mid]);
 
   // Proyección fin de mes
   const diaActual = (mes===now.getMonth()&&anio===now.getFullYear())?now.getDate():new Date(anio,mes+1,0).getDate();
@@ -6588,13 +6757,14 @@ function App(){
     else  setAlq(p=>[...p,{id:Date.now(),marcaId,mes,anio,pagado:true,fechaPago:hoy()}]);
   }
 
+  const [cfgLiqVersion, setCfgLiqVersion] = useState(0);
+  function bumpCfgLiq(){ setCfgLiqVersion(v=>v+1); }
+
   const getLiq=useCallback((marcaId)=>{
-    const marca=MARCAS.find(m=>m.id===marcaId);
     const vM=vMes.filter(v=>v.items.some(i=>i.marcaId===marcaId));
-    const bruto=vM.reduce((s,v)=>s+v.items.filter(i=>i.marcaId===marcaId).reduce((ss,i)=>ss+i.subtotal,0),0);
-    return{marca,vMarca:vM,bruto,comision:bruto*.1,neto:bruto*.9,
-           alqPagado:alqMes.find(a=>a.marcaId===marcaId)?.pagado||false};
-  },[vMes,alqMes]);
+    const liq=calcLiqMarca(vM, marcaId);
+    return{...liq, alqPagado:alqMes.find(a=>a.marcaId===marcaId)?.pagado||false};
+  },[vMes, alqMes, cfgLiqVersion]);
 
   const getHist=useCallback((marcaId)=>{
     const map={};
@@ -6996,6 +7166,9 @@ function App(){
                 );
               })()}
 
+              {/* ── PANEL CONFIGURAR PORCENTAJES POR MARCA ── */}
+              <PctMarcasPanel onCfgChange={bumpCfgLiq}/>
+
               {/* Botones Excel + Planilla */}
               <div style={{display:"flex",gap:8,marginBottom:16,flexWrap:"wrap"}}>
                 <button onClick={()=>generarPlanillaAlquileres(ventas,mes,anio)}
@@ -7228,6 +7401,7 @@ function App(){
         MK={MK} cierres={cierres} setCierres={setCierres}
         onClose={()=>setMLiq(null)}
         syncCierre={drive.syncCierre}
+        onCfgChange={bumpCfgLiq}
       />
 
       {/* Modal: Importar Excel */}
