@@ -1891,6 +1891,8 @@ const USUARIOS = [
 function useAuth() {
   // sessionStorage: la sesión muere al cerrar la pestaña o el navegador.
   // Nunca se usa localStorage para th_user → no hay sesiones persistentes.
+  // Limpiar cualquier sesión vieja que haya quedado en localStorage.
+  try { localStorage.removeItem("th_user"); } catch{}
   var _hN108 = useState(function(){ try{return JSON.parse(sessionStorage.getItem("th_user")||"null");}catch{return null;} }); var user = _hN108[0]; var setUser = _hN108[1];
 
   function login(usuario, password) {

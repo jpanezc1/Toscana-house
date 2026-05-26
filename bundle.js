@@ -23320,6 +23320,10 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
     { usuario: "tatiana", password: "toscana2024", nombre: "Tatiana", rol: "admin" }
   ];
   function useAuth() {
+    try {
+      localStorage.removeItem("th_user");
+    } catch {
+    }
     var _hN108 = (0, import_react.useState)(function() {
       try {
         return JSON.parse(sessionStorage.getItem("th_user") || "null");
