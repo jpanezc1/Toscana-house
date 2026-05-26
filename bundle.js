@@ -23322,7 +23322,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
   function useAuth() {
     var _hN108 = (0, import_react.useState)(function() {
       try {
-        return JSON.parse(localStorage.getItem("th_user") || "null");
+        return JSON.parse(sessionStorage.getItem("th_user") || "null");
       } catch {
         return null;
       }
@@ -23345,14 +23345,14 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
           return { ok: false, error: "Cuenta desactivada. Contact\xE1 al administrador." };
         }
         const session = { ...found, loginAt: Date.now() };
-        localStorage.setItem("th_user", JSON.stringify(session));
+        sessionStorage.setItem("th_user", JSON.stringify(session));
         setUser(session);
         return { ok: true };
       }
       return { ok: false, error: "Usuario o contrase\xF1a incorrectos" };
     }
     function logout() {
-      localStorage.removeItem("th_user");
+      sessionStorage.removeItem("th_user");
       setUser(null);
     }
     return { user, login, logout };

@@ -1889,10 +1889,12 @@ const USUARIOS = [
 ];
 
 function useAuth() {
-  var _hN108 = useState(function(){ try{return JSON.parse(localStorage.getItem("th_user")||"null");}catch{return null;} }); var user = _hN108[0]; var setUser = _hN108[1];
+  // sessionStorage: la sesión muere al cerrar la pestaña o el navegador.
+  // Nunca se usa localStorage para th_user → no hay sesiones persistentes.
+  var _hN108 = useState(function(){ try{return JSON.parse(sessionStorage.getItem("th_user")||"null");}catch{return null;} }); var user = _hN108[0]; var setUser = _hN108[1];
 
   function login(usuario, password) {
-    // Check localStorage users first, then defaults
+    // Usuarios viven en localStorage (configuración), sesión en sessionStorage (temporal)
     const listaActual = (() => {
       try { return JSON.parse(localStorage.getItem("th_usuarios")||"null") || USUARIOS; }
       catch { return USUARIOS; }
@@ -1906,7 +1908,7 @@ function useAuth() {
         return { ok: false, error: "Cuenta desactivada. Contactá al administrador." };
       }
       const session = { ...found, loginAt: Date.now() };
-      localStorage.setItem("th_user", JSON.stringify(session));
+      sessionStorage.setItem("th_user", JSON.stringify(session));
       setUser(session);
       return { ok: true };
     }
@@ -1914,7 +1916,7 @@ function useAuth() {
   }
 
   function logout() {
-    localStorage.removeItem("th_user");
+    sessionStorage.removeItem("th_user");
     setUser(null);
   }
 
