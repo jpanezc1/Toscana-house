@@ -21595,6 +21595,43 @@
       return [];
     }
   }
+  async function sbGuardarUsuarios(lista) {
+    try {
+      const db = await getSupabase();
+      const rows = lista.map((u) => ({
+        usuario: u.usuario,
+        password: u.password,
+        nombre: u.nombre,
+        rol: u.rol || "caja",
+        marca_id: u.marcaId ? Number(u.marcaId) : null,
+        estado: u.estado || "activo"
+      }));
+      const { error } = await db.from("usuarios").upsert(rows, { onConflict: "usuario" });
+      if (error) throw error;
+      return true;
+    } catch (e) {
+      console.warn("Supabase save usuarios:", e.message);
+      return false;
+    }
+  }
+  async function sbCargarUsuarios() {
+    try {
+      const db = await getSupabase();
+      const { data, error } = await db.from("usuarios").select("*");
+      if (error) throw error;
+      return (data || []).map((u) => ({
+        usuario: u.usuario,
+        password: u.password,
+        nombre: u.nombre,
+        rol: u.rol,
+        marcaId: u.marca_id ? Number(u.marca_id) : void 0,
+        estado: u.estado || "activo"
+      }));
+    } catch (e) {
+      console.warn("Supabase load usuarios:", e.message);
+      return null;
+    }
+  }
   async function sbCargarTodo() {
     try {
       const db = await getSupabase();
@@ -23374,7 +23411,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
         window.removeEventListener("pageshow", onPageShow);
       };
     }, []);
-    function login(usuario, password) {
+    async function login(usuario, password) {
       const listaActual = (() => {
         try {
           return JSON.parse(localStorage.getItem("th_usuarios") || "null") || USUARIOS;
@@ -23382,9 +23419,18 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
           return USUARIOS;
         }
       })();
-      const found = listaActual.find(
+      let found = listaActual.find(
         (u) => u.usuario.toLowerCase() === usuario.toLowerCase() && u.password === password
       );
+      if (!found) {
+        const sbUsers = await sbCargarUsuarios();
+        if (sbUsers && sbUsers.length > 0) {
+          localStorage.setItem("th_usuarios", JSON.stringify(sbUsers));
+          found = sbUsers.find(
+            (u) => u.usuario.toLowerCase() === usuario.toLowerCase() && u.password === password
+          );
+        }
+      }
       if (found) {
         if (found.estado === "inactivo") {
           return { ok: false, error: "Cuenta desactivada. Contact\xE1 al administrador." };
@@ -23420,20 +23466,18 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
     var showPass = _hN113[0];
     var setShowPass = _hN113[1];
     ;
-    function handleLogin() {
+    async function handleLogin() {
       if (!usuario || !password) {
         setError("Completa todos los campos");
         return;
       }
       setLoading(true);
       setError("");
-      setTimeout(() => {
-        const result = onLogin(usuario, password);
-        if (!result.ok) {
-          setError(result.error);
-          setLoading(false);
-        }
-      }, 600);
+      const result = await onLogin(usuario, password);
+      if (!result.ok) {
+        setError(result.error);
+        setLoading(false);
+      }
     }
     return /* @__PURE__ */ import_react.default.createElement("div", { style: {
       minHeight: "100vh",
@@ -27609,6 +27653,24 @@ Fecha: ${venta.fecha}`);
         setCargando(false);
       });
     }, []);
+    (0, import_react.useEffect)(() => {
+      sbCargarUsuarios().then((sbUsers) => {
+        if (sbUsers === null) return;
+        const localUsers = (() => {
+          try {
+            return JSON.parse(localStorage.getItem("th_usuarios") || "null") || USUARIOS;
+          } catch {
+            return USUARIOS;
+          }
+        })();
+        if (sbUsers.length === 0 && localUsers.length > 0) {
+          sbGuardarUsuarios(localUsers);
+        } else if (sbUsers.length > 0) {
+          localStorage.setItem("th_usuarios", JSON.stringify(sbUsers));
+        }
+      }).catch(() => {
+      });
+    }, []);
     const MK = (0, import_react.useMemo)(() => mkKey(mes, anio), [mes, anio]);
     const vMes = (0, import_react.useMemo)(() => ventas.filter((v) => v.mk === MK && !v.anulada), [ventas, MK]);
     const vMesAll = (0, import_react.useMemo)(() => ventas.filter((v) => v.mk === MK), [ventas, MK]);
@@ -30375,12 +30437,39 @@ Fecha: ${venta.fecha}`);
     function guardarUsuarios(u, accion, afectado, toastMsg) {
       setUsuarios(u);
       localStorage.setItem("th_usuarios", JSON.stringify(u));
+      sbGuardarUsuarios(u);
       if (accion && afectado) {
         agregarAudit(accion, afectado, user.nombre);
         setAuditLog(JSON.parse(localStorage.getItem(AUDIT_KEY) || "[]"));
       }
       if (toastMsg) addToast(toastMsg);
     }
+    const [supa_ok, setSupaOk] = (0, import_react.useState)(null);
+    (0, import_react.useEffect)(() => {
+      if (user.rol !== "admin") return;
+      sbCargarUsuarios().then((u) => {
+        if (u === null) {
+          setSupaOk(false);
+          return;
+        }
+        setSupaOk(true);
+        if (u.length === 0) {
+          const local = (() => {
+            try {
+              return JSON.parse(localStorage.getItem("th_usuarios") || "null") || USUARIOS;
+            } catch {
+              return USUARIOS;
+            }
+          })();
+          if (local.length > 0) sbGuardarUsuarios(local).then((ok) => {
+            if (ok) setSupaOk(true);
+          });
+        } else {
+          setUsuarios(u);
+          localStorage.setItem("th_usuarios", JSON.stringify(u));
+        }
+      });
+    }, []);
     const [modalAdd, setModalAdd] = (0, import_react.useState)(false);
     const [editando, setEditando] = (0, import_react.useState)(null);
     const [confirmAct, setConfirmAct] = (0, import_react.useState)(null);
@@ -30489,8 +30578,10 @@ Fecha: ${venta.fecha}`);
           `Usuario @${data.usuario} creado correctamente`
         );
       } else {
+        const update = { ...data, marcaId: data.marcaId ? Number(data.marcaId) : void 0 };
+        if (!update.password) delete update.password;
         guardarUsuarios(
-          usuarios.map((u) => u.usuario === data.usuario ? { ...u, ...data, marcaId: data.marcaId ? Number(data.marcaId) : void 0 } : u),
+          usuarios.map((u) => u.usuario === data.usuario ? { ...u, ...update } : u),
           "Edit\xF3 usuario",
           data.usuario,
           `Cambios de @${data.usuario} guardados`
@@ -30499,7 +30590,55 @@ Fecha: ${venta.fecha}`);
       setModalAdd(false);
       setEditando(null);
     }
-    return /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 22 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+    const SQL_USUARIOS = `create table if not exists usuarios (
+  usuario text primary key,
+  password text not null,
+  nombre text not null,
+  rol text not null default 'caja',
+  marca_id integer,
+  estado text not null default 'activo',
+  created_at timestamptz default now()
+);
+alter table usuarios enable row level security;
+create policy "allow all usuarios" on usuarios
+  for all using (true) with check (true);`;
+    return /* @__PURE__ */ import_react.default.createElement("div", null, isAdmin && supa_ok === false && /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      background: "#FFF8E1",
+      border: "1.5px solid #F9A825",
+      borderRadius: 14,
+      padding: "14px 16px",
+      marginBottom: 18,
+      fontFamily: FONT
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontWeight: 700, color: "#795548", fontSize: 13, marginBottom: 6 } }, "\u26A0\uFE0F Acci\xF3n \xFAnica requerida para habilitar login en todos los dispositivos"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: "#795548", marginBottom: 10, lineHeight: 1.5 } }, "Abr\xED ", /* @__PURE__ */ import_react.default.createElement("b", null, "supabase.com \u2192 Tu proyecto \u2192 SQL Editor"), " y ejecut\xE1 este SQL:"), /* @__PURE__ */ import_react.default.createElement("pre", { style: {
+      background: "#1e1e2e",
+      color: "#cdd6f4",
+      borderRadius: 10,
+      padding: "12px 14px",
+      fontSize: 11,
+      overflowX: "auto",
+      lineHeight: 1.6,
+      margin: "0 0 10px"
+    } }, SQL_USUARIOS), /* @__PURE__ */ import_react.default.createElement(
+      "button",
+      {
+        onClick: () => {
+          navigator.clipboard?.writeText(SQL_USUARIOS);
+          addToast("SQL copiado al portapapeles");
+        },
+        style: {
+          background: C.gold,
+          color: "#fff",
+          border: "none",
+          borderRadius: 8,
+          padding: "7px 16px",
+          fontSize: 12,
+          fontWeight: 600,
+          cursor: "pointer",
+          fontFamily: FONT
+        }
+      },
+      "\u{1F4CB} Copiar SQL"
+    ), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 11, color: "#9E9E9E", marginLeft: 10 } }, "Despu\xE9s recarg\xE1 la app \u2014 usuarios existentes se sincronizar\xE1n autom\xE1ticamente.")), /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 22 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
       fontSize: 24,
       fontWeight: 800,
       color: C.label,

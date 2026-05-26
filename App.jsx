@@ -112,6 +112,38 @@ async function sbCargarRetiros() {
   } catch(e) { console.warn("Supabase load retiros:", e.message); return []; }
 }
 
+// ── Usuarios en la nube ──────────────────────────────────
+async function sbGuardarUsuarios(lista) {
+  try {
+    const db = await getSupabase();
+    const rows = lista.map(u => ({
+      usuario: u.usuario,
+      password: u.password,
+      nombre: u.nombre,
+      rol: u.rol || "caja",
+      marca_id: u.marcaId ? Number(u.marcaId) : null,
+      estado: u.estado || "activo"
+    }));
+    const { error } = await db.from("usuarios").upsert(rows, { onConflict: "usuario" });
+    if (error) throw error;
+    return true;
+  } catch(e) { console.warn("Supabase save usuarios:", e.message); return false; }
+}
+
+async function sbCargarUsuarios() {
+  try {
+    const db = await getSupabase();
+    const { data, error } = await db.from("usuarios").select("*");
+    if (error) throw error;
+    return (data || []).map(u => ({
+      usuario: u.usuario, password: u.password,
+      nombre: u.nombre, rol: u.rol,
+      marcaId: u.marca_id ? Number(u.marca_id) : undefined,
+      estado: u.estado || "activo"
+    }));
+  } catch(e) { console.warn("Supabase load usuarios:", e.message); return null; }
+}
+
 async function sbCargarTodo() {
   try {
     const db = await getSupabase();
@@ -1933,15 +1965,28 @@ function useAuth() {
     return function(){ window.removeEventListener("pageshow", onPageShow); };
   }, []);
 
-  function login(usuario, password) {
+  async function login(usuario, password) {
+    // 1. Intentar con lista local (rápido, funciona offline)
     const listaActual = (() => {
       try { return JSON.parse(localStorage.getItem("th_usuarios")||"null") || USUARIOS; }
       catch { return USUARIOS; }
     })();
-    const found = listaActual.find(u =>
+    let found = listaActual.find(u =>
       u.usuario.toLowerCase() === usuario.toLowerCase() &&
       u.password === password
     );
+    if (!found) {
+      // 2. Fallback a Supabase — encuentra usuarios creados en otros dispositivos
+      const sbUsers = await sbCargarUsuarios();
+      if (sbUsers && sbUsers.length > 0) {
+        // Actualizar localStorage con lista de la nube
+        localStorage.setItem("th_usuarios", JSON.stringify(sbUsers));
+        found = sbUsers.find(u =>
+          u.usuario.toLowerCase() === usuario.toLowerCase() &&
+          u.password === password
+        );
+      }
+    }
     if (found) {
       if (found.estado === "inactivo") {
         return { ok: false, error: "Cuenta desactivada. Contactá al administrador." };
@@ -1967,17 +2012,15 @@ function LoginScreen({ onLogin }) {
   var _hN112 = useState(false); var loading = _hN112[0]; var setLoading = _hN112[1];;
   var _hN113 = useState(false); var showPass = _hN113[0]; var setShowPass = _hN113[1];;
 
-  function handleLogin() {
+  async function handleLogin() {
     if (!usuario || !password) { setError("Completa todos los campos"); return; }
     setLoading(true);
     setError("");
-    setTimeout(() => {
-      const result = onLogin(usuario, password);
-      if (!result.ok) {
-        setError(result.error);
-        setLoading(false);
-      }
-    }, 600);
+    const result = await onLogin(usuario, password);
+    if (!result.ok) {
+      setError(result.error);
+      setLoading(false);
+    }
   }
 
   return (
@@ -5868,6 +5911,24 @@ function App(){
     });
   },[]);
 
+  // Sincronizar usuarios con Supabase al inicio
+  useEffect(()=>{
+    sbCargarUsuarios().then(sbUsers=>{
+      if(sbUsers===null) return; // tabla no existe aún — ignorar
+      const localUsers = (()=>{
+        try{ return JSON.parse(localStorage.getItem("th_usuarios")||"null")||USUARIOS; }
+        catch{ return USUARIOS; }
+      })();
+      if(sbUsers.length===0 && localUsers.length>0){
+        // Supabase vacío pero hay usuarios locales → migrar a la nube
+        sbGuardarUsuarios(localUsers);
+      } else if(sbUsers.length>0){
+        // Supabase tiene usuarios → actualizar localStorage con datos de la nube
+        localStorage.setItem("th_usuarios", JSON.stringify(sbUsers));
+      }
+    }).catch(()=>{});
+  },[]);
+
   const MK      =useMemo(()=>mkKey(mes,anio),[mes,anio]);
   // vMes excluye anuladas → se usa en cálculos financieros y liquidaciones
   const vMes    =useMemo(()=>ventas.filter(v=>v.mk===MK&&!v.anulada),[ventas,MK]);
@@ -8408,12 +8469,32 @@ function ConfigTab({user, logout}){
   function guardarUsuarios(u, accion, afectado, toastMsg){
     setUsuarios(u);
     localStorage.setItem("th_usuarios", JSON.stringify(u));
+    sbGuardarUsuarios(u); // sincronizar a la nube para que funcione en todos los dispositivos
     if(accion&&afectado){
       agregarAudit(accion, afectado, user.nombre);
       setAuditLog(JSON.parse(localStorage.getItem(AUDIT_KEY)||"[]"));
     }
     if(toastMsg) addToast(toastMsg);
   }
+
+  // ── Verificar tabla Supabase de usuarios ──
+  const [supa_ok, setSupaOk] = useState(null); // null=verificando, true=ok, false=tabla falta
+  useEffect(()=>{
+    if(user.rol!=="admin") return;
+    sbCargarUsuarios().then(u=>{
+      if(u===null){ setSupaOk(false); return; }
+      setSupaOk(true);
+      // Si Supabase está vacío pero hay usuarios locales → migrar ahora
+      if(u.length===0){
+        const local=(()=>{try{return JSON.parse(localStorage.getItem("th_usuarios")||"null")||USUARIOS;}catch{return USUARIOS;}})();
+        if(local.length>0) sbGuardarUsuarios(local).then(ok=>{ if(ok) setSupaOk(true); });
+      } else {
+        // Actualizar lista local con la de la nube
+        setUsuarios(u);
+        localStorage.setItem("th_usuarios", JSON.stringify(u));
+      }
+    });
+  },[]);
 
   // ── Estado UI ──
   const [modalAdd,     setModalAdd]     = useState(false);
@@ -8502,9 +8583,11 @@ function ConfigTab({user, logout}){
         `Usuario @${data.usuario} creado correctamente`
       );
     } else {
+      // Si el campo password viene vacío, conservar la contraseña existente
+      const update = {...data, marcaId:data.marcaId?Number(data.marcaId):undefined};
+      if(!update.password) delete update.password;
       guardarUsuarios(
-        usuarios.map(u=>u.usuario===data.usuario
-          ?{...u,...data,marcaId:data.marcaId?Number(data.marcaId):undefined}:u),
+        usuarios.map(u=>u.usuario===data.usuario ? {...u,...update} : u),
         "Editó usuario", data.usuario,
         `Cambios de @${data.usuario} guardados`
       );
@@ -8512,8 +8595,46 @@ function ConfigTab({user, logout}){
     setModalAdd(false); setEditando(null);
   }
 
+  const SQL_USUARIOS = `create table if not exists usuarios (
+  usuario text primary key,
+  password text not null,
+  nombre text not null,
+  rol text not null default 'caja',
+  marca_id integer,
+  estado text not null default 'activo',
+  created_at timestamptz default now()
+);
+alter table usuarios enable row level security;
+create policy "allow all usuarios" on usuarios
+  for all using (true) with check (true);`;
+
   return (
     <div>
+      {/* ── Banner: tabla usuarios faltante en Supabase ── */}
+      {isAdmin && supa_ok===false && (
+        <div style={{background:"#FFF8E1",border:"1.5px solid #F9A825",borderRadius:14,
+          padding:"14px 16px",marginBottom:18,fontFamily:FONT}}>
+          <div style={{fontWeight:700,color:"#795548",fontSize:13,marginBottom:6}}>
+            ⚠️ Acción única requerida para habilitar login en todos los dispositivos
+          </div>
+          <div style={{fontSize:12,color:"#795548",marginBottom:10,lineHeight:1.5}}>
+            Abrí <b>supabase.com → Tu proyecto → SQL Editor</b> y ejecutá este SQL:
+          </div>
+          <pre style={{background:"#1e1e2e",color:"#cdd6f4",borderRadius:10,padding:"12px 14px",
+            fontSize:11,overflowX:"auto",lineHeight:1.6,margin:"0 0 10px"}}>
+            {SQL_USUARIOS}
+          </pre>
+          <button onClick={()=>{navigator.clipboard?.writeText(SQL_USUARIOS);addToast("SQL copiado al portapapeles");}}
+            style={{background:C.gold,color:"#fff",border:"none",borderRadius:8,
+              padding:"7px 16px",fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:FONT}}>
+            📋 Copiar SQL
+          </button>
+          <span style={{fontSize:11,color:"#9E9E9E",marginLeft:10}}>
+            Después recargá la app — usuarios existentes se sincronizarán automáticamente.
+          </span>
+        </div>
+      )}
+
       {/* ── Header ── */}
       <div style={{marginBottom:22}}>
         <div style={{fontSize:24,fontWeight:800,color:C.label,fontFamily:FONT_DISPLAY,
