@@ -668,7 +668,7 @@ function descargarArchivo(blob, nombre) {
 // ── Helpers de liquidación para planillas Excel ───────────────
 function leerCfgLiq(MK, marcaId) {
   const key = `th_liq_cfg_${MK}_${marcaId}`;
-  const def = { pctQR: 2, pctTarjeta: 2.5, pctComision: 10, alquiler: 0 };
+  const def = { pctTarjeta: 2.5, pctComision: 10, alquiler: 0 };
   try { return { ...def, ...JSON.parse(localStorage.getItem(key) || "{}") }; }
   catch { return def; }
 }
@@ -696,13 +696,12 @@ function calcLiqMarca(vMarca, marcaId, MK) {
     brutoTJ += m.tarjeta * pct;
   });
   const bruto    = brutoEf + brutoQR + brutoTJ;
-  const descQR   = brutoQR  * (Number(cfg.pctQR)       || 0) / 100;
   const descTJ   = brutoTJ  * (Number(cfg.pctTarjeta)   || 0) / 100;
-  const subBanco = bruto - descQR - descTJ;
+  const subBanco = bruto - descTJ;
   const comision = subBanco * (Number(cfg.pctComision)  || 0) / 100;
   const alquiler = Number(cfg.alquiler) || 0;
   const neto     = subBanco - comision - alquiler;
-  return { bruto, brutoEf, brutoQR, brutoTJ, descQR, descTJ, subBanco, comision, alquiler, neto, cfg };
+  return { bruto, brutoEf, brutoQR, brutoTJ, descTJ, subBanco, comision, alquiler, neto, cfg };
 }
 
 // ── FACTURACIÓN SIAT BOLIVIA — CUCU API ────────────────────────
@@ -806,7 +805,7 @@ async function generarExcelMensual(ventas, inventario, mes, anio, setGenerando, 
       [`TOSCANA HOUSE — REPORTE MENSUAL ${mesNom.toUpperCase()} ${anio}`],
       [`Generado: ${new Date().toLocaleString("es-BO")}`],
       [],
-      ["Marca","Ventas brutas (Bs)","Desc. QR","Desc. Tarjeta","Subtotal","Comisión %","Comisión (Bs)","Alquiler","Neto a pagar (Bs)","N° Ventas","Uds. vendidas","Estado"],
+      ["Marca","Ventas brutas (Bs)","Desc. Tarjeta","Subtotal","Comisión %","Comisión (Bs)","Alquiler","Neto a pagar (Bs)","N° Ventas","Uds. vendidas","Estado"],
     ];
 
     let totalBruto = 0, totalNeto = 0, totalVentas = 0;
@@ -820,7 +819,6 @@ async function generarExcelMensual(ventas, inventario, mes, anio, setGenerando, 
       resumenRows.push([
         m.nombre,
         +liq.bruto.toFixed(2),
-        +liq.descQR.toFixed(2),
         +liq.descTJ.toFixed(2),
         +liq.subBanco.toFixed(2),
         `${liq.cfg.pctComision}%`,
@@ -872,7 +870,6 @@ async function generarExcelMensual(ventas, inventario, mes, anio, setGenerando, 
       rows.push(
         [],
         ["","","","","","","","VENTAS BRUTAS",       +liqM.bruto.toFixed(2),"","",""],
-        ["","","","","","","",`− Desc. QR (${liqM.cfg.pctQR}%)`,      -liqM.descQR.toFixed(2),"","",""],
         ["","","","","","","",`− Desc. Tarjeta (${liqM.cfg.pctTarjeta}%)`, -liqM.descTJ.toFixed(2),"","",""],
         ["","","","","","","","SUBTOTAL BANCO",       +liqM.subBanco.toFixed(2),"","",""],
         ["","","","","","","",`− Comisión (${liqM.cfg.pctComision}%)`, -liqM.comision.toFixed(2),"","",""],
@@ -1032,7 +1029,6 @@ async function generarExcelMarca(marca, ventas, inventario, setGenerando) {
         rows.push(
           [],
           ["","","","","","","","Ventas brutas",        +liqP.bruto.toFixed(2),"","",""],
-          ["","","","","","","",`− Desc. QR (${liqP.cfg.pctQR}%)`,       -liqP.descQR.toFixed(2),"","",""],
           ["","","","","","","",`− Desc. Tarjeta (${liqP.cfg.pctTarjeta}%)`, -liqP.descTJ.toFixed(2),"","",""],
           ["","","","","","","","Subtotal banco",        +liqP.subBanco.toFixed(2),"","",""],
           ["","","","","","","",`− Comisión (${liqP.cfg.pctComision}%)`,  -liqP.comision.toFixed(2),"","",""],
@@ -1135,7 +1131,6 @@ function exportCSV(marca,ventas,mes,anio){
   const liq=calcLiqMarca(vm,marca.id,MK);
   rows.push([],
     ["Ventas brutas","","","","","","",+liq.bruto.toFixed(2),"",""],
-    [`Desc. QR (${liq.cfg.pctQR}%)`, "","","","","","",-liq.descQR.toFixed(2),"",""],
     [`Desc. Tarjeta (${liq.cfg.pctTarjeta}%)`, "","","","","","",-liq.descTJ.toFixed(2),"",""],
     ["Subtotal banco","","","","","","",+liq.subBanco.toFixed(2),"",""],
     [`Comisión (${liq.cfg.pctComision}%)`, "","","","","","",-liq.comision.toFixed(2),"",""],
@@ -1702,13 +1697,12 @@ function LiqModal({marcaId,ventas,mes,anio,MK,cierres,setCierres,onClose,syncCie
   if(!marcaId) return null;
   const marca=MARCAS.find(x=>x.id===marcaId);
   const cfgKey = `th_liq_cfg_${MK}_${marcaId}`;
-  const defCfg = {pctQR:2, pctTarjeta:2.5, pctComision:10, alquiler:0};
+  const defCfg = {pctTarjeta:2.5, pctComision:10, alquiler:0};
   const [cfg, setCfg] = useState(()=>{
     try{ return {...defCfg, ...JSON.parse(localStorage.getItem(cfgKey)||"{}")}; }
     catch{ return defCfg; }
   });
   const [showCfg, setShowCfg] = useState(false);
-  const pctQR = Number(cfg.pctQR)||0;
   const pctTarjeta = Number(cfg.pctTarjeta)||0;
   const pctComision = Number(cfg.pctComision)||0;
   const alquiler = Number(cfg.alquiler)||0;
@@ -1747,9 +1741,8 @@ function LiqModal({marcaId,ventas,mes,anio,MK,cierres,setCierres,onClose,syncCie
   });
 
   const bruto = brutoEfect + brutoQR + brutoTarjeta;
-  const descQR = brutoQR * pctQR/100;
   const descTarjeta = brutoTarjeta * pctTarjeta/100;
-  const subtotalBanco = bruto - descQR - descTarjeta;
+  const subtotalBanco = bruto - descTarjeta;
   const comision = subtotalBanco * pctComision/100;
   const neto = subtotalBanco - comision - alquiler;
 
@@ -1769,7 +1762,6 @@ function LiqModal({marcaId,ventas,mes,anio,MK,cierres,setCierres,onClose,syncCie
             border:`1px solid ${C.sep}`,borderTop:"none"}}>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:12}}>
               {[
-                {key:"pctQR",label:"Comisión banco QR (%)",placeholder:"2"},
                 {key:"pctTarjeta",label:"Comisión banco Tarjeta (%)",placeholder:"2.5"},
                 {key:"pctComision",label:"Comisión ventas (%)",placeholder:"10"},
                 {key:"alquiler",label:"Alquiler fijo (Bs)",placeholder:"0"},
@@ -1802,7 +1794,7 @@ function LiqModal({marcaId,ventas,mes,anio,MK,cierres,setCierres,onClose,syncCie
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
             {[
               {label:"Efectivo",val:brutoEfect,color:C.green},
-              {label:`QR (-${pctQR}%)`,val:brutoQR,color:C.blue},
+              {label:"QR",val:brutoQR,color:C.blue},
               {label:`Tarjeta (-${pctTarjeta}%)`,val:brutoTarjeta,color:C.amber},
             ].map(s=>(
               <div key={s.label} style={{textAlign:"center",padding:"8px 4px",
@@ -1817,7 +1809,6 @@ function LiqModal({marcaId,ventas,mes,anio,MK,cierres,setCierres,onClose,syncCie
         {/* Cálculo paso a paso */}
         {[
           ["Ventas brutas",$(Math.round(bruto)),C.label],
-          [`− Desc. banco QR (${pctQR}%)`,`-${$(Math.round(descQR))}`,C.red],
           [`− Desc. banco Tarjeta (${pctTarjeta}%)`,`-${$(Math.round(descTarjeta))}`,C.red],
           [`= Subtotal sin banco`,$(Math.round(subtotalBanco)),C.label2],
           [`− Comisión ventas (${pctComision}%)`,`-${$(Math.round(comision))}`,C.red],
@@ -5173,7 +5164,6 @@ function BrandPortal({user, ventas, inv, logout}){
                 {label:"Efectivo",                 value:liq.brutoEf,    sign:"",  color:C.label3,bold:false,sub:true},
                 {label:"QR",                       value:liq.brutoQR,    sign:"",  color:C.label3,bold:false,sub:true},
                 {label:"Tarjeta",                  value:liq.brutoTJ,    sign:"",  color:C.label3,bold:false,sub:true},
-                {label:`Desc. QR (${liq.cfg.pctQR}%)`,      value:-liq.descQR,   sign:"−",color:C.red,   bold:false},
                 {label:`Desc. Tarjeta (${liq.cfg.pctTarjeta}%)`,value:-liq.descTJ,sign:"−",color:C.red,   bold:false},
                 {label:"Subtotal banco",           value:liq.subBanco,   sign:"",  color:C.blue,  bold:true},
                 {label:`Comisión Toscana (${liq.cfg.pctComision}%)`,value:-liq.comision,sign:"−",color:C.red,bold:false},

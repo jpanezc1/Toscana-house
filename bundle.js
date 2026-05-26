@@ -22118,7 +22118,7 @@
   }
   function leerCfgLiq(MK, marcaId) {
     const key = `th_liq_cfg_${MK}_${marcaId}`;
-    const def = { pctQR: 2, pctTarjeta: 2.5, pctComision: 10, alquiler: 0 };
+    const def = { pctTarjeta: 2.5, pctComision: 10, alquiler: 0 };
     try {
       return { ...def, ...JSON.parse(localStorage.getItem(key) || "{}") };
     } catch {
@@ -22152,13 +22152,12 @@
       brutoTJ += m.tarjeta * pct;
     });
     const bruto = brutoEf + brutoQR + brutoTJ;
-    const descQR = brutoQR * (Number(cfg.pctQR) || 0) / 100;
     const descTJ = brutoTJ * (Number(cfg.pctTarjeta) || 0) / 100;
-    const subBanco = bruto - descQR - descTJ;
+    const subBanco = bruto - descTJ;
     const comision = subBanco * (Number(cfg.pctComision) || 0) / 100;
     const alquiler = Number(cfg.alquiler) || 0;
     const neto = subBanco - comision - alquiler;
-    return { bruto, brutoEf, brutoQR, brutoTJ, descQR, descTJ, subBanco, comision, alquiler, neto, cfg };
+    return { bruto, brutoEf, brutoQR, brutoTJ, descTJ, subBanco, comision, alquiler, neto, cfg };
   }
   var CUCU_CFG_KEY = "th_cucu_cfg";
   var CUCU_DEF = {
@@ -22278,7 +22277,7 @@
         [`TOSCANA HOUSE \u2014 REPORTE MENSUAL ${mesNom.toUpperCase()} ${anio}`],
         [`Generado: ${(/* @__PURE__ */ new Date()).toLocaleString("es-BO")}`],
         [],
-        ["Marca", "Ventas brutas (Bs)", "Desc. QR", "Desc. Tarjeta", "Subtotal", "Comisi\xF3n %", "Comisi\xF3n (Bs)", "Alquiler", "Neto a pagar (Bs)", "N\xB0 Ventas", "Uds. vendidas", "Estado"]
+        ["Marca", "Ventas brutas (Bs)", "Desc. Tarjeta", "Subtotal", "Comisi\xF3n %", "Comisi\xF3n (Bs)", "Alquiler", "Neto a pagar (Bs)", "N\xB0 Ventas", "Uds. vendidas", "Estado"]
       ];
       let totalBruto = 0, totalNeto = 0, totalVentas = 0;
       const ventasMes = ventas.filter((v) => v.mk === MK);
@@ -22292,7 +22291,6 @@
         resumenRows.push([
           m.nombre,
           +liq.bruto.toFixed(2),
-          +liq.descQR.toFixed(2),
           +liq.descTJ.toFixed(2),
           +liq.subBanco.toFixed(2),
           `${liq.cfg.pctComision}%`,
@@ -22344,7 +22342,6 @@
         rows.push(
           [],
           ["", "", "", "", "", "", "", "VENTAS BRUTAS", +liqM.bruto.toFixed(2), "", "", ""],
-          ["", "", "", "", "", "", "", `\u2212 Desc. QR (${liqM.cfg.pctQR}%)`, -liqM.descQR.toFixed(2), "", "", ""],
           ["", "", "", "", "", "", "", `\u2212 Desc. Tarjeta (${liqM.cfg.pctTarjeta}%)`, -liqM.descTJ.toFixed(2), "", "", ""],
           ["", "", "", "", "", "", "", "SUBTOTAL BANCO", +liqM.subBanco.toFixed(2), "", "", ""],
           ["", "", "", "", "", "", "", `\u2212 Comisi\xF3n (${liqM.cfg.pctComision}%)`, -liqM.comision.toFixed(2), "", "", ""],
@@ -22485,7 +22482,6 @@
           rows.push(
             [],
             ["", "", "", "", "", "", "", "Ventas brutas", +liqP.bruto.toFixed(2), "", "", ""],
-            ["", "", "", "", "", "", "", `\u2212 Desc. QR (${liqP.cfg.pctQR}%)`, -liqP.descQR.toFixed(2), "", "", ""],
             ["", "", "", "", "", "", "", `\u2212 Desc. Tarjeta (${liqP.cfg.pctTarjeta}%)`, -liqP.descTJ.toFixed(2), "", "", ""],
             ["", "", "", "", "", "", "", "Subtotal banco", +liqP.subBanco.toFixed(2), "", "", ""],
             ["", "", "", "", "", "", "", `\u2212 Comisi\xF3n (${liqP.cfg.pctComision}%)`, -liqP.comision.toFixed(2), "", "", ""],
@@ -22582,7 +22578,6 @@
     rows.push(
       [],
       ["Ventas brutas", "", "", "", "", "", "", +liq.bruto.toFixed(2), "", ""],
-      [`Desc. QR (${liq.cfg.pctQR}%)`, "", "", "", "", "", "", -liq.descQR.toFixed(2), "", ""],
       [`Desc. Tarjeta (${liq.cfg.pctTarjeta}%)`, "", "", "", "", "", "", -liq.descTJ.toFixed(2), "", ""],
       ["Subtotal banco", "", "", "", "", "", "", +liq.subBanco.toFixed(2), "", ""],
       [`Comisi\xF3n (${liq.cfg.pctComision}%)`, "", "", "", "", "", "", -liq.comision.toFixed(2), "", ""],
@@ -23166,7 +23161,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
     if (!marcaId) return null;
     const marca = MARCAS.find((x) => x.id === marcaId);
     const cfgKey = `th_liq_cfg_${MK}_${marcaId}`;
-    const defCfg = { pctQR: 2, pctTarjeta: 2.5, pctComision: 10, alquiler: 0 };
+    const defCfg = { pctTarjeta: 2.5, pctComision: 10, alquiler: 0 };
     const [cfg, setCfg] = (0, import_react.useState)(() => {
       try {
         return { ...defCfg, ...JSON.parse(localStorage.getItem(cfgKey) || "{}") };
@@ -23175,7 +23170,6 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       }
     });
     const [showCfg, setShowCfg] = (0, import_react.useState)(false);
-    const pctQR = Number(cfg.pctQR) || 0;
     const pctTarjeta = Number(cfg.pctTarjeta) || 0;
     const pctComision = Number(cfg.pctComision) || 0;
     const alquiler = Number(cfg.alquiler) || 0;
@@ -23215,9 +23209,8 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       brutoTarjeta += montos.tarjeta * pct;
     });
     const bruto = brutoEfect + brutoQR + brutoTarjeta;
-    const descQR = brutoQR * pctQR / 100;
     const descTarjeta = brutoTarjeta * pctTarjeta / 100;
-    const subtotalBanco = bruto - descQR - descTarjeta;
+    const subtotalBanco = bruto - descTarjeta;
     const comision = subtotalBanco * pctComision / 100;
     const neto = subtotalBanco - comision - alquiler;
     return /* @__PURE__ */ import_react.default.createElement(Sheet, { open: !!marcaId, onClose, title: `${marca?.emoji} ${marca?.nombre} \u2014 ${MESES[mes]}`, tall: true }, /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 16 } }, /* @__PURE__ */ import_react.default.createElement("button", { onClick: () => setShowCfg((s) => !s), style: {
@@ -23239,7 +23232,6 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       border: `1px solid ${C.sep}`,
       borderTop: "none"
     } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 } }, [
-      { key: "pctQR", label: "Comisi\xF3n banco QR (%)", placeholder: "2" },
       { key: "pctTarjeta", label: "Comisi\xF3n banco Tarjeta (%)", placeholder: "2.5" },
       { key: "pctComision", label: "Comisi\xF3n ventas (%)", placeholder: "10" },
       { key: "alquiler", label: "Alquiler fijo (Bs)", placeholder: "0" }
@@ -23275,7 +23267,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       fontFamily: FONT
     } }, "Desglose por m\xE9todo de pago"), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 } }, [
       { label: "Efectivo", val: brutoEfect, color: C.green },
-      { label: `QR (-${pctQR}%)`, val: brutoQR, color: C.blue },
+      { label: "QR", val: brutoQR, color: C.blue },
       { label: `Tarjeta (-${pctTarjeta}%)`, val: brutoTarjeta, color: C.amber }
     ].map((s) => /* @__PURE__ */ import_react.default.createElement("div", { key: s.label, style: {
       textAlign: "center",
@@ -23284,7 +23276,6 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       borderRadius: 10
     } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, fontWeight: 700, color: s.color, fontFamily: FONT } }, $(Math.round(s.val))), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: C.label3, fontFamily: FONT } }, s.label))))), [
       ["Ventas brutas", $(Math.round(bruto)), C.label],
-      [`\u2212 Desc. banco QR (${pctQR}%)`, `-${$(Math.round(descQR))}`, C.red],
       [`\u2212 Desc. banco Tarjeta (${pctTarjeta}%)`, `-${$(Math.round(descTarjeta))}`, C.red],
       [`= Subtotal sin banco`, $(Math.round(subtotalBanco)), C.label2],
       [`\u2212 Comisi\xF3n ventas (${pctComision}%)`, `-${$(Math.round(comision))}`, C.red],
@@ -26650,7 +26641,6 @@ Fecha: ${venta.fecha}`);
       { label: "Efectivo", value: liq.brutoEf, sign: "", color: C.label3, bold: false, sub: true },
       { label: "QR", value: liq.brutoQR, sign: "", color: C.label3, bold: false, sub: true },
       { label: "Tarjeta", value: liq.brutoTJ, sign: "", color: C.label3, bold: false, sub: true },
-      { label: `Desc. QR (${liq.cfg.pctQR}%)`, value: -liq.descQR, sign: "\u2212", color: C.red, bold: false },
       { label: `Desc. Tarjeta (${liq.cfg.pctTarjeta}%)`, value: -liq.descTJ, sign: "\u2212", color: C.red, bold: false },
       { label: "Subtotal banco", value: liq.subBanco, sign: "", color: C.blue, bold: true },
       { label: `Comisi\xF3n Toscana (${liq.cfg.pctComision}%)`, value: -liq.comision, sign: "\u2212", color: C.red, bold: false },
