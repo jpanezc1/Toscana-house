@@ -26874,45 +26874,39 @@ Fecha: ${venta.fecha}`);
           return;
         }
       }
-      setSaving(true);
-      setTimeout(() => {
-        const marca = {
-          id: nextId,
+      const marca = {
+        id: isNew ? nextId : editMarca.id,
+        nombre: f.nombre.trim(),
+        emoji: f.emoji,
+        color: f.color,
+        imagen: f.imagen || "",
+        email: (f.email || "").trim(),
+        telefono: (f.telefono || "").trim(),
+        pctComision: Number(f.pctComision) || 10,
+        alquiler: Number(f.alquiler) || 0,
+        estado: f.estado || "activa",
+        portal: !!f.portal,
+        liquidaciones: !!f.liquidaciones,
+        analytics: !!f.analytics,
+        excel: !!f.excel,
+        facturacion: !!f.facturacion,
+        dashboard: !!f.dashboard,
+        creadaEn: isNew ? (/* @__PURE__ */ new Date()).toISOString() : editMarca.creadaEn || ""
+      };
+      let nuevoUsuario = null;
+      if (crearUser && isNew) {
+        nuevoUsuario = {
+          usuario: uLogin.toLowerCase().trim(),
+          password: uPass,
           nombre: f.nombre.trim(),
-          emoji: f.emoji,
-          color: f.color,
-          imagen: f.imagen || "",
-          email: f.email.trim(),
-          telefono: f.telefono.trim(),
-          pctComision: Number(f.pctComision) || 10,
-          alquiler: Number(f.alquiler) || 0,
-          estado: f.estado,
-          // capacidades
-          portal: f.portal,
-          liquidaciones: f.liquidaciones,
-          analytics: f.analytics,
-          excel: f.excel,
-          facturacion: f.facturacion,
-          dashboard: f.dashboard,
-          creadaEn: isNew ? (/* @__PURE__ */ new Date()).toISOString() : editMarca.creadaEn,
-          ...isNew ? {} : { id: editMarca.id }
+          rol: "marca",
+          marcaId: marca.id,
+          estado: "activo"
         };
-        let nuevoUsuario = null;
-        if (crearUser && isNew) {
-          nuevoUsuario = {
-            usuario: uLogin.toLowerCase().trim(),
-            password: uPass,
-            nombre: f.nombre.trim(),
-            rol: "marca",
-            marcaId: nextId,
-            estado: "activo"
-          };
-        }
-        onGuardar(marca, isNew, nuevoUsuario);
-        setSaving(false);
-        setDone(true);
-        setTimeout(() => onClose(), 800);
-      }, 380);
+      }
+      onGuardar(marca, isNew, nuevoUsuario);
+      setDone(true);
+      setTimeout(() => onClose(), 600);
     }
     const ipt = (label, val, set, ph, type = "text", opts = {}) => /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 14 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
       fontSize: 11,
@@ -27417,8 +27411,8 @@ Fecha: ${venta.fecha}`);
       {
         onClick: () => setPagina((p) => p - 1),
         style: {
-          flex: 1,
-          padding: "13px",
+          flex: "0 0 auto",
+          padding: "13px 18px",
           borderRadius: 14,
           border: `1.5px solid ${C.sep}`,
           background: C.bg2,
@@ -27430,8 +27424,29 @@ Fecha: ${venta.fecha}`);
           WebkitTapHighlightColor: "transparent"
         }
       },
-      "\u2190 Anterior"
-    ), pagina < 2 ? /* @__PURE__ */ import_react.default.createElement(
+      "\u2190"
+    ), !isNew && /* @__PURE__ */ import_react.default.createElement(
+      "button",
+      {
+        onClick: guardar,
+        disabled: done,
+        style: {
+          flex: 1,
+          padding: "14px",
+          borderRadius: 14,
+          border: "none",
+          background: done ? C.green : C.gold,
+          cursor: done ? "default" : "pointer",
+          fontSize: 15,
+          fontWeight: 700,
+          color: "#fff",
+          fontFamily: FONT,
+          WebkitTapHighlightColor: "transparent",
+          transition: "background .25s"
+        }
+      },
+      done ? "\u2713 Guardado" : "Guardar cambios"
+    ), isNew && pagina < 2 && /* @__PURE__ */ import_react.default.createElement(
       "button",
       {
         onClick: () => setPagina((p) => p + 1),
@@ -27450,28 +27465,27 @@ Fecha: ${venta.fecha}`);
         }
       },
       "Siguiente \u2192"
-    ) : /* @__PURE__ */ import_react.default.createElement(
+    ), isNew && pagina === 2 && /* @__PURE__ */ import_react.default.createElement(
       "button",
       {
         onClick: guardar,
-        disabled: saving || done,
+        disabled: done,
         style: {
           flex: 1,
           padding: "14px",
           borderRadius: 14,
           border: "none",
           background: done ? C.green : C.gold,
-          cursor: saving || done ? "default" : "pointer",
+          cursor: done ? "default" : "pointer",
           fontSize: 15,
           fontWeight: 700,
           color: "#fff",
           fontFamily: FONT,
           WebkitTapHighlightColor: "transparent",
-          opacity: saving ? 0.8 : 1,
           transition: "background .25s"
         }
       },
-      done ? "\u2713 Guardado" : saving ? "Guardando..." : isNew ? "Crear marca" : "Guardar cambios"
+      done ? "\u2713 Guardado" : "Crear marca"
     )))));
   }
   function App() {

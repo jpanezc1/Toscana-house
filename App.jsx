@@ -5347,45 +5347,40 @@ function NuevaMarcaModal({editMarca, marcasActuales, onClose, onGuardar}){
       }
       if(!uPass||uPass.length<6){ setMsg("Contraseña mínimo 6 caracteres"); return; }
     }
-    setSaving(true);
-    setTimeout(()=>{
-      const marca = {
-        id: nextId,
-        nombre: f.nombre.trim(),
-        emoji:  f.emoji,
-        color:  f.color,
-        imagen: f.imagen||"",
-        email:  f.email.trim(),
-        telefono: f.telefono.trim(),
-        pctComision: Number(f.pctComision)||10,
-        alquiler:    Number(f.alquiler)||0,
-        estado: f.estado,
-        // capacidades
-        portal:        f.portal,
-        liquidaciones: f.liquidaciones,
-        analytics:     f.analytics,
-        excel:         f.excel,
-        facturacion:   f.facturacion,
-        dashboard:     f.dashboard,
-        creadaEn: isNew ? new Date().toISOString() : editMarca.creadaEn,
-        ...(isNew ? {} : {id: editMarca.id}),
+    const marca = {
+      id: isNew ? nextId : editMarca.id,
+      nombre: f.nombre.trim(),
+      emoji:  f.emoji,
+      color:  f.color,
+      imagen: f.imagen||"",
+      email:  (f.email||"").trim(),
+      telefono: (f.telefono||"").trim(),
+      pctComision: Number(f.pctComision)||10,
+      alquiler:    Number(f.alquiler)||0,
+      estado: f.estado||"activa",
+      portal:        !!f.portal,
+      liquidaciones: !!f.liquidaciones,
+      analytics:     !!f.analytics,
+      excel:         !!f.excel,
+      facturacion:   !!f.facturacion,
+      dashboard:     !!f.dashboard,
+      creadaEn: isNew ? new Date().toISOString() : (editMarca.creadaEn||""),
+    };
+    let nuevoUsuario = null;
+    if(crearUser&&isNew){
+      nuevoUsuario = {
+        usuario:  uLogin.toLowerCase().trim(),
+        password: uPass,
+        nombre:   f.nombre.trim(),
+        rol:      "marca",
+        marcaId:  marca.id,
+        estado:   "activo",
       };
-      // usuario brand opcional
-      let nuevoUsuario = null;
-      if(crearUser&&isNew){
-        nuevoUsuario = {
-          usuario:  uLogin.toLowerCase().trim(),
-          password: uPass,
-          nombre:   f.nombre.trim(),
-          rol:      "marca",
-          marcaId:  nextId,
-          estado:   "activo",
-        };
-      }
-      onGuardar(marca, isNew, nuevoUsuario);
-      setSaving(false); setDone(true);
-      setTimeout(()=>onClose(), 800);
-    }, 380);
+    }
+    // Guardar inmediatamente — sin timeout
+    onGuardar(marca, isNew, nuevoUsuario);
+    setDone(true);
+    setTimeout(()=>onClose(), 600);
   }
 
   const ipt=(label,val,set,ph,type="text",opts={})=>(
@@ -5729,27 +5724,41 @@ function NuevaMarcaModal({editMarca, marcasActuales, onClose, onGuardar}){
           <div style={{display:"flex",gap:10,marginTop:4}}>
             {pagina>0&&(
               <button onClick={()=>setPagina(p=>p-1)}
-                style={{flex:1,padding:"13px",borderRadius:14,border:`1.5px solid ${C.sep}`,
-                  background:C.bg2,cursor:"pointer",fontSize:14,fontWeight:600,
-                  color:C.label2,fontFamily:FONT,WebkitTapHighlightColor:"transparent"}}>
-                ← Anterior
+                style={{flex:"0 0 auto",padding:"13px 18px",borderRadius:14,
+                  border:`1.5px solid ${C.sep}`,background:C.bg2,cursor:"pointer",
+                  fontSize:14,fontWeight:600,color:C.label2,fontFamily:FONT,
+                  WebkitTapHighlightColor:"transparent"}}>
+                ←
               </button>
             )}
-            {pagina<2?(
+            {/* Al editar: botón Guardar siempre visible en cualquier página */}
+            {!isNew&&(
+              <button onClick={guardar} disabled={done}
+                style={{flex:1,padding:"14px",borderRadius:14,border:"none",
+                  background:done?C.green:C.gold,
+                  cursor:done?"default":"pointer",fontSize:15,fontWeight:700,
+                  color:"#fff",fontFamily:FONT,WebkitTapHighlightColor:"transparent",
+                  transition:"background .25s"}}>
+                {done?"✓ Guardado":"Guardar cambios"}
+              </button>
+            )}
+            {/* Al crear: Siguiente en páginas 0-1, Crear en página 2 */}
+            {isNew&&pagina<2&&(
               <button onClick={()=>setPagina(p=>p+1)}
                 style={{flex:1,padding:"13px",borderRadius:14,border:"none",
                   background:C.label,cursor:"pointer",fontSize:14,fontWeight:700,
                   color:C.bg0,fontFamily:FONT,WebkitTapHighlightColor:"transparent"}}>
                 Siguiente →
               </button>
-            ):(
-              <button onClick={guardar} disabled={saving||done}
+            )}
+            {isNew&&pagina===2&&(
+              <button onClick={guardar} disabled={done}
                 style={{flex:1,padding:"14px",borderRadius:14,border:"none",
                   background:done?C.green:C.gold,
-                  cursor:saving||done?"default":"pointer",fontSize:15,fontWeight:700,
+                  cursor:done?"default":"pointer",fontSize:15,fontWeight:700,
                   color:"#fff",fontFamily:FONT,WebkitTapHighlightColor:"transparent",
-                  opacity:saving?.8:1,transition:"background .25s"}}>
-                {done?"✓ Guardado":saving?"Guardando...":(isNew?"Crear marca":"Guardar cambios")}
+                  transition:"background .25s"}}>
+                {done?"✓ Guardado":"Crear marca"}
               </button>
             )}
           </div>
