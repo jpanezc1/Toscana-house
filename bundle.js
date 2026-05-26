@@ -28969,12 +28969,50 @@ Fecha: ${venta.fecha}`);
     const chars = "abcdefghjkmnpqrstuvwxyz23456789";
     return Array.from({ length: 10 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
   }
+  function useToast() {
+    const [toasts, setToasts] = (0, import_react.useState)([]);
+    function addToast(msg, type = "success") {
+      const id = Date.now() + Math.random();
+      setToasts((p) => [...p, { id, msg, type }]);
+      setTimeout(() => setToasts((p) => p.filter((t) => t.id !== id)), 3800);
+    }
+    return { toasts, addToast };
+  }
+  function ToastStack({ toasts }) {
+    if (!toasts.length) return null;
+    return /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      position: "fixed",
+      top: 16,
+      right: 16,
+      zIndex: 9999,
+      display: "flex",
+      flexDirection: "column",
+      gap: 8,
+      pointerEvents: "none",
+      width: "min(320px,calc(100vw - 32px))"
+    } }, toasts.map((t) => /* @__PURE__ */ import_react.default.createElement("div", { key: t.id, style: {
+      background: t.type === "error" ? "#D93025" : t.type === "warn" ? C.amber : "#1A7A45",
+      color: "#fff",
+      padding: "13px 18px",
+      borderRadius: 16,
+      fontSize: 14,
+      fontFamily: FONT,
+      fontWeight: 600,
+      lineHeight: 1.4,
+      boxShadow: "0 8px 32px rgba(0,0,0,0.22)",
+      display: "flex",
+      alignItems: "flex-start",
+      gap: 10,
+      animation: "slideInRight .22s cubic-bezier(.3,0,.2,1)"
+    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 18, lineHeight: 1, flexShrink: 0, marginTop: 1 } }, t.type === "error" ? "\u274C" : t.type === "warn" ? "\u26A0\uFE0F" : "\u2705"), /* @__PURE__ */ import_react.default.createElement("span", null, t.msg))), /* @__PURE__ */ import_react.default.createElement("style", null, `@keyframes slideInRight{from{opacity:0;transform:translateX(24px)}to{opacity:1;transform:none}}`));
+  }
   function PanelCambiarPass({ user, usuarios, onGuardar }) {
     const [passActual, setPassActual] = (0, import_react.useState)("");
     const [passNueva, setPassNueva] = (0, import_react.useState)("");
     const [passConfirm, setPassConfirm] = (0, import_react.useState)("");
     const [show, setShow] = (0, import_react.useState)(false);
     const [msg, setMsg] = (0, import_react.useState)(null);
+    const [saving, setSaving] = (0, import_react.useState)(false);
     function cambiar() {
       setMsg(null);
       const u = usuarios.find((x) => x.usuario === user.usuario);
@@ -28994,11 +29032,15 @@ Fecha: ${venta.fecha}`);
         setMsg({ ok: false, txt: "Las contrase\xF1as no coinciden" });
         return;
       }
-      onGuardar(usuarios.map((x) => x.usuario === user.usuario ? { ...x, password: passNueva } : x));
-      setMsg({ ok: true, txt: "\u2713 Contrase\xF1a actualizada correctamente" });
-      setPassActual("");
-      setPassNueva("");
-      setPassConfirm("");
+      setSaving(true);
+      setTimeout(() => {
+        onGuardar(usuarios.map((x) => x.usuario === user.usuario ? { ...x, password: passNueva } : x));
+        setSaving(false);
+        setMsg({ ok: true, txt: "\u2713 Contrase\xF1a actualizada correctamente" });
+        setPassActual("");
+        setPassNueva("");
+        setPassConfirm("");
+      }, 380);
     }
     const ipt = (label, val, set, placeholder) => /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 12 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
       fontSize: 11,
@@ -29062,19 +29104,29 @@ Fecha: ${venta.fecha}`);
       color: msg.ok ? C.green : C.red,
       fontSize: 13,
       fontFamily: FONT
-    } }, msg.txt), /* @__PURE__ */ import_react.default.createElement("button", { onClick: cambiar, style: {
-      width: "100%",
-      padding: "13px",
-      borderRadius: 12,
-      border: "none",
-      background: C.label,
-      cursor: "pointer",
-      fontSize: 14,
-      fontWeight: 700,
-      color: C.bg0,
-      fontFamily: FONT,
-      WebkitTapHighlightColor: "transparent"
-    } }, "Actualizar contrase\xF1a"));
+    } }, msg.txt), /* @__PURE__ */ import_react.default.createElement(
+      "button",
+      {
+        onClick: cambiar,
+        disabled: saving,
+        style: {
+          width: "100%",
+          padding: "13px",
+          borderRadius: 12,
+          border: "none",
+          background: C.label,
+          cursor: saving ? "default" : "pointer",
+          fontSize: 14,
+          fontWeight: 700,
+          color: C.bg0,
+          fontFamily: FONT,
+          WebkitTapHighlightColor: "transparent",
+          opacity: saving ? 0.75 : 1,
+          transition: "opacity .2s"
+        }
+      },
+      saving ? "Guardando..." : "Actualizar contrase\xF1a"
+    ));
   }
   function UserFormModal({ editUser, usuarios, onClose, onGuardar }) {
     const isNew = !editUser;
@@ -29083,6 +29135,8 @@ Fecha: ${venta.fecha}`);
     );
     const [msg, setMsg] = (0, import_react.useState)(null);
     const [showP, setShowP] = (0, import_react.useState)(false);
+    const [saving, setSaving] = (0, import_react.useState)(false);
+    const [done, setDone] = (0, import_react.useState)(false);
     function guardar() {
       setMsg(null);
       if (!f.nombre.trim()) {
@@ -29109,7 +29163,13 @@ Fecha: ${venta.fecha}`);
         setMsg("Ese nombre de usuario ya existe");
         return;
       }
-      onGuardar({ ...f, usuario: f.usuario.toLowerCase().trim() }, isNew);
+      setSaving(true);
+      setTimeout(() => {
+        onGuardar({ ...f, usuario: f.usuario.toLowerCase().trim() }, isNew);
+        setSaving(false);
+        setDone(true);
+        setTimeout(() => onClose(), 700);
+      }, 380);
     }
     const ipt = (label, val, set, placeholder, type = "text", opts = {}) => /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 14 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
       fontSize: 11,
@@ -29336,21 +29396,24 @@ Fecha: ${venta.fecha}`);
       "button",
       {
         onClick: guardar,
+        disabled: saving || done,
         style: {
           width: "100%",
           padding: "14px",
           borderRadius: 14,
           border: "none",
-          background: C.label,
-          cursor: "pointer",
+          background: done ? C.green : C.label,
+          cursor: saving || done ? "default" : "pointer",
           fontSize: 15,
           fontWeight: 700,
           color: C.bg0,
           fontFamily: FONT,
-          WebkitTapHighlightColor: "transparent"
+          WebkitTapHighlightColor: "transparent",
+          transition: "background .25s",
+          opacity: saving ? 0.75 : 1
         }
       },
-      isNew ? "Crear usuario" : "Guardar cambios"
+      done ? "\u2713 Guardado" : saving ? "Guardando..." : isNew ? "Crear usuario" : "Guardar cambios"
     ))));
   }
   function ConfigTab({ user, logout }) {
@@ -29369,13 +29432,15 @@ Fecha: ${venta.fecha}`);
         return [];
       }
     });
-    function guardarUsuarios(u, accion, afectado) {
+    const { toasts, addToast } = useToast();
+    function guardarUsuarios(u, accion, afectado, toastMsg) {
       setUsuarios(u);
       localStorage.setItem("th_usuarios", JSON.stringify(u));
       if (accion && afectado) {
         agregarAudit(accion, afectado, user.nombre);
         setAuditLog(JSON.parse(localStorage.getItem(AUDIT_KEY) || "[]"));
       }
+      if (toastMsg) addToast(toastMsg);
     }
     const [modalAdd, setModalAdd] = (0, import_react.useState)(false);
     const [editando, setEditando] = (0, import_react.useState)(null);
@@ -29448,7 +29513,8 @@ Fecha: ${venta.fecha}`);
       guardarUsuarios(
         usuarios.map((x) => x.usuario === u.usuario ? { ...x, password: temp } : x),
         `Reset contrase\xF1a \u2192 [oculto]`,
-        u.usuario
+        u.usuario,
+        `Contrase\xF1a de @${u.usuario} reseteada`
       );
       setTempPass({ usuario: u.usuario, nombre: u.nombre, password: temp });
       setConfirmAct(null);
@@ -29459,7 +29525,8 @@ Fecha: ${venta.fecha}`);
       guardarUsuarios(
         usuarios.map((x) => x.usuario === u.usuario ? { ...x, estado: ns } : x),
         `${ns === "inactivo" ? "Desactiv\xF3" : "Activ\xF3"} cuenta`,
-        u.usuario
+        u.usuario,
+        `Cuenta de @${u.usuario} ${ns === "inactivo" ? "desactivada" : "activada"}`
       );
       setConfirmAct(null);
       setMenuAbierto(null);
@@ -29468,7 +29535,8 @@ Fecha: ${venta.fecha}`);
       guardarUsuarios(
         usuarios.filter((x) => x.usuario !== u.usuario),
         "Elimin\xF3 usuario",
-        u.usuario
+        u.usuario,
+        `Usuario @${u.usuario} eliminado`
       );
       setConfirmAct(null);
       setMenuAbierto(null);
@@ -29478,13 +29546,15 @@ Fecha: ${venta.fecha}`);
         guardarUsuarios(
           [...usuarios, { ...data, estado: "activo", marcaId: data.marcaId ? Number(data.marcaId) : void 0 }],
           "Cre\xF3 usuario",
-          data.usuario
+          data.usuario,
+          `Usuario @${data.usuario} creado correctamente`
         );
       } else {
         guardarUsuarios(
           usuarios.map((u) => u.usuario === data.usuario ? { ...u, ...data, marcaId: data.marcaId ? Number(data.marcaId) : void 0 } : u),
           "Edit\xF3 usuario",
-          data.usuario
+          data.usuario,
+          `Cambios de @${data.usuario} guardados`
         );
       }
       setModalAdd(false);
@@ -29578,7 +29648,7 @@ Fecha: ${venta.fecha}`);
       {
         user,
         usuarios,
-        onGuardar: (u) => guardarUsuarios(u, "Cambi\xF3 su contrase\xF1a", user.usuario)
+        onGuardar: (u) => guardarUsuarios(u, "Cambi\xF3 su contrase\xF1a", user.usuario, "\u2713 Contrase\xF1a actualizada")
       }
     )), subTab === "equipo" && isAdmin && /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8, marginBottom: 20 } }, [
       { l: "Total", v: usuarios.length, i: "\u{1F465}" },
@@ -29859,7 +29929,7 @@ Esta acci\xF3n no se puede deshacer.`,
       {
         user,
         usuarios,
-        onGuardar: (u) => guardarUsuarios(u, "Cambi\xF3 su contrase\xF1a", user.usuario)
+        onGuardar: (u) => guardarUsuarios(u, "Cambi\xF3 su contrase\xF1a", user.usuario, "\u2713 Contrase\xF1a actualizada")
       }
     )), subTab === "sistema" && /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: {
       background: C.bg1,
@@ -30088,7 +30158,7 @@ Esta acci\xF3n no se puede deshacer.`,
         }
       },
       "Entendido \xB7 Cerrar"
-    ))));
+    ))), /* @__PURE__ */ import_react.default.createElement(ToastStack, { toasts }));
   }
   function DashboardVentas({ ventas, onVentaClick }) {
     const now = /* @__PURE__ */ new Date();

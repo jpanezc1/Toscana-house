@@ -7463,13 +7463,50 @@ function generarTempPassword(){
   return Array.from({length:10},()=>chars[Math.floor(Math.random()*chars.length)]).join("");
 }
 
+// ── Toast system ─────────────────────────────────────────────────────────────
+function useToast(){
+  const [toasts, setToasts] = useState([]);
+  function addToast(msg, type="success"){
+    const id = Date.now() + Math.random();
+    setToasts(p=>[...p,{id,msg,type}]);
+    setTimeout(()=>setToasts(p=>p.filter(t=>t.id!==id)), 3800);
+  }
+  return {toasts, addToast};
+}
+function ToastStack({toasts}){
+  if(!toasts.length) return null;
+  return (
+    <div style={{position:"fixed",top:16,right:16,zIndex:9999,
+      display:"flex",flexDirection:"column",gap:8,pointerEvents:"none",
+      width:"min(320px,calc(100vw - 32px))"}}>
+      {toasts.map(t=>(
+        <div key={t.id} style={{
+          background:t.type==="error"?"#D93025":t.type==="warn"?C.amber:"#1A7A45",
+          color:"#fff",padding:"13px 18px",borderRadius:16,
+          fontSize:14,fontFamily:FONT,fontWeight:600,lineHeight:1.4,
+          boxShadow:"0 8px 32px rgba(0,0,0,0.22)",
+          display:"flex",alignItems:"flex-start",gap:10,
+          animation:"slideInRight .22s cubic-bezier(.3,0,.2,1)",
+        }}>
+          <span style={{fontSize:18,lineHeight:1,flexShrink:0,marginTop:1}}>
+            {t.type==="error"?"❌":t.type==="warn"?"⚠️":"✅"}
+          </span>
+          <span>{t.msg}</span>
+        </div>
+      ))}
+      <style>{`@keyframes slideInRight{from{opacity:0;transform:translateX(24px)}to{opacity:1;transform:none}}`}</style>
+    </div>
+  );
+}
+
 // ── Panel cambio contraseña propia ────────────────────────────────────────────
 function PanelCambiarPass({user, usuarios, onGuardar}){
   const [passActual,  setPassActual]  = useState("");
   const [passNueva,   setPassNueva]   = useState("");
   const [passConfirm, setPassConfirm] = useState("");
-  const [show, setShow] = useState(false);
-  const [msg,  setMsg]  = useState(null);
+  const [show,   setShow]   = useState(false);
+  const [msg,    setMsg]    = useState(null);
+  const [saving, setSaving] = useState(false);
 
   function cambiar(){
     setMsg(null);
@@ -7478,9 +7515,13 @@ function PanelCambiarPass({user, usuarios, onGuardar}){
     if(u.password!==passActual){ setMsg({ok:false,txt:"Contraseña actual incorrecta"}); return; }
     if(passNueva.length<6){ setMsg({ok:false,txt:"Mínimo 6 caracteres"}); return; }
     if(passNueva!==passConfirm){ setMsg({ok:false,txt:"Las contraseñas no coinciden"}); return; }
-    onGuardar(usuarios.map(x=>x.usuario===user.usuario?{...x,password:passNueva}:x));
-    setMsg({ok:true,txt:"✓ Contraseña actualizada correctamente"});
-    setPassActual(""); setPassNueva(""); setPassConfirm("");
+    setSaving(true);
+    setTimeout(()=>{
+      onGuardar(usuarios.map(x=>x.usuario===user.usuario?{...x,password:passNueva}:x));
+      setSaving(false);
+      setMsg({ok:true,txt:"✓ Contraseña actualizada correctamente"});
+      setPassActual(""); setPassNueva(""); setPassConfirm("");
+    }, 380);
   }
 
   const ipt=(label,val,set,placeholder)=>(
@@ -7519,11 +7560,14 @@ function PanelCambiarPass({user, usuarios, onGuardar}){
           border:`1px solid ${msg.ok?C.green:C.red}40`,
           color:msg.ok?C.green:C.red,fontSize:13,fontFamily:FONT}}>{msg.txt}</div>
       )}
-      <button onClick={cambiar} style={{width:"100%",padding:"13px",borderRadius:12,
-        border:"none",background:C.label,cursor:"pointer",fontSize:14,
-        fontWeight:700,color:C.bg0,fontFamily:FONT,
-        WebkitTapHighlightColor:"transparent"}}>
-        Actualizar contraseña
+      <button onClick={cambiar} disabled={saving}
+        style={{width:"100%",padding:"13px",borderRadius:12,
+          border:"none",background:C.label,
+          cursor:saving?"default":"pointer",fontSize:14,
+          fontWeight:700,color:C.bg0,fontFamily:FONT,
+          WebkitTapHighlightColor:"transparent",
+          opacity:saving?.75:1,transition:"opacity .2s"}}>
+        {saving?"Guardando...":"Actualizar contraseña"}
       </button>
     </div>
   );
@@ -7536,8 +7580,10 @@ function UserFormModal({editUser, usuarios, onClose, onGuardar}){
     ? {...editUser, password:"", marcaId:String(editUser.marcaId||"")}
     : {usuario:"",password:"",nombre:"",rol:"caja",marcaId:"",estado:"activo"}
   );
-  const [msg, setMsg] = useState(null);
-  const [showP, setShowP] = useState(false);
+  const [msg,    setMsg]    = useState(null);
+  const [showP,  setShowP]  = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [done,   setDone]   = useState(false);
 
   function guardar(){
     setMsg(null);
@@ -7549,7 +7595,12 @@ function UserFormModal({editUser, usuarios, onClose, onGuardar}){
     if(isNew&&usuarios.find(u=>u.usuario===f.usuario.toLowerCase())){
       setMsg("Ese nombre de usuario ya existe"); return;
     }
-    onGuardar({...f,usuario:f.usuario.toLowerCase().trim()},isNew);
+    setSaving(true);
+    setTimeout(()=>{
+      onGuardar({...f,usuario:f.usuario.toLowerCase().trim()},isNew);
+      setSaving(false); setDone(true);
+      setTimeout(()=>onClose(), 700);
+    }, 380);
   }
 
   const ipt=(label,val,set,placeholder,type="text",opts={})=>(
@@ -7684,11 +7735,15 @@ function UserFormModal({editUser, usuarios, onClose, onGuardar}){
               background:`${C.red}12`,border:`1px solid ${C.red}30`,
               color:C.red,fontSize:13,fontFamily:FONT}}>{msg}</div>
           )}
-          <button onClick={guardar}
+          <button onClick={guardar} disabled={saving||done}
             style={{width:"100%",padding:"14px",borderRadius:14,border:"none",
-              background:C.label,cursor:"pointer",fontSize:15,fontWeight:700,
-              color:C.bg0,fontFamily:FONT,WebkitTapHighlightColor:"transparent"}}>
-            {isNew?"Crear usuario":"Guardar cambios"}
+              background:done?C.green:C.label,
+              cursor:saving||done?"default":"pointer",
+              fontSize:15,fontWeight:700,
+              color:C.bg0,fontFamily:FONT,
+              WebkitTapHighlightColor:"transparent",
+              transition:"background .25s",opacity:saving?.75:1}}>
+            {done?"✓ Guardado":saving?"Guardando...":(isNew?"Crear usuario":"Guardar cambios")}
           </button>
         </div>
       </div>
@@ -7707,14 +7762,16 @@ function ConfigTab({user, logout}){
     try{return JSON.parse(localStorage.getItem(AUDIT_KEY)||"[]");}
     catch{return [];}
   });
+  const {toasts, addToast} = useToast();
 
-  function guardarUsuarios(u, accion, afectado){
+  function guardarUsuarios(u, accion, afectado, toastMsg){
     setUsuarios(u);
     localStorage.setItem("th_usuarios", JSON.stringify(u));
     if(accion&&afectado){
       agregarAudit(accion, afectado, user.nombre);
       setAuditLog(JSON.parse(localStorage.getItem(AUDIT_KEY)||"[]"));
     }
+    if(toastMsg) addToast(toastMsg);
   }
 
   // ── Estado UI ──
@@ -7773,7 +7830,8 @@ function ConfigTab({user, logout}){
     const temp=generarTempPassword();
     guardarUsuarios(
       usuarios.map(x=>x.usuario===u.usuario?{...x,password:temp}:x),
-      `Reset contraseña → [oculto]`, u.usuario
+      `Reset contraseña → [oculto]`, u.usuario,
+      `Contraseña de @${u.usuario} reseteada`
     );
     setTempPass({usuario:u.usuario,nombre:u.nombre,password:temp});
     setConfirmAct(null); setMenuAbierto(null);
@@ -7782,14 +7840,16 @@ function ConfigTab({user, logout}){
     const ns=u.estado==="inactivo"?"activo":"inactivo";
     guardarUsuarios(
       usuarios.map(x=>x.usuario===u.usuario?{...x,estado:ns}:x),
-      `${ns==="inactivo"?"Desactivó":"Activó"} cuenta`, u.usuario
+      `${ns==="inactivo"?"Desactivó":"Activó"} cuenta`, u.usuario,
+      `Cuenta de @${u.usuario} ${ns==="inactivo"?"desactivada":"activada"}`
     );
     setConfirmAct(null); setMenuAbierto(null);
   }
   function handleEliminar(u){
     guardarUsuarios(
       usuarios.filter(x=>x.usuario!==u.usuario),
-      "Eliminó usuario", u.usuario
+      "Eliminó usuario", u.usuario,
+      `Usuario @${u.usuario} eliminado`
     );
     setConfirmAct(null); setMenuAbierto(null);
   }
@@ -7797,13 +7857,15 @@ function ConfigTab({user, logout}){
     if(isNew){
       guardarUsuarios(
         [...usuarios,{...data,estado:"activo",marcaId:data.marcaId?Number(data.marcaId):undefined}],
-        "Creó usuario", data.usuario
+        "Creó usuario", data.usuario,
+        `Usuario @${data.usuario} creado correctamente`
       );
     } else {
       guardarUsuarios(
         usuarios.map(u=>u.usuario===data.usuario
           ?{...u,...data,marcaId:data.marcaId?Number(data.marcaId):undefined}:u),
-        "Editó usuario", data.usuario
+        "Editó usuario", data.usuario,
+        `Cambios de @${data.usuario} guardados`
       );
     }
     setModalAdd(false); setEditando(null);
@@ -7876,7 +7938,7 @@ function ConfigTab({user, logout}){
             ))}
           </div>
           <PanelCambiarPass user={user} usuarios={usuarios}
-            onGuardar={u=>guardarUsuarios(u,"Cambió su contraseña",user.usuario)}/>
+            onGuardar={u=>guardarUsuarios(u,"Cambió su contraseña",user.usuario,"✓ Contraseña actualizada")}/>
         </div>
       )}
 
@@ -8092,7 +8154,7 @@ function ConfigTab({user, logout}){
             ))}
           </div>
           <PanelCambiarPass user={user} usuarios={usuarios}
-            onGuardar={u=>guardarUsuarios(u,"Cambió su contraseña",user.usuario)}/>
+            onGuardar={u=>guardarUsuarios(u,"Cambió su contraseña",user.usuario,"✓ Contraseña actualizada")}/>
         </div>
       )}
 
@@ -8264,6 +8326,9 @@ function ConfigTab({user, logout}){
           </div>
         </div>
       )}
+
+      {/* ── Toasts ── */}
+      <ToastStack toasts={toasts}/>
     </div>
   );
 }
