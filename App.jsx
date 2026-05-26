@@ -1889,14 +1889,22 @@ const USUARIOS = [
 ];
 
 function useAuth() {
-  // sessionStorage: la sesión muere al cerrar la pestaña o el navegador.
-  // Nunca se usa localStorage para th_user → no hay sesiones persistentes.
-  // Limpiar cualquier sesión vieja que haya quedado en localStorage.
-  try { localStorage.removeItem("th_user"); } catch{}
-  var _hN108 = useState(function(){ try{return JSON.parse(sessionStorage.getItem("th_user")||"null");}catch{return null;} }); var user = _hN108[0]; var setUser = _hN108[1];
+  // ── Sesión SOLO en memoria React ────────────────────────────────────────────
+  // Sin localStorage, sin sessionStorage → cualquier recarga/cierre = login nuevo.
+  // Limpiar restos de versiones anteriores que pudieran quedar guardados.
+  try { localStorage.removeItem("th_user"); sessionStorage.removeItem("th_user"); } catch{}
+
+  var _hN108 = useState(null); var user = _hN108[0]; var setUser = _hN108[1];
+
+  // Safari bfcache: al restaurar página desde caché de memoria, React conserva
+  // su estado. El evento pageshow con persisted=true lo detecta y fuerza logout.
+  useEffect(function(){
+    function onPageShow(e){ if(e.persisted) setUser(null); }
+    window.addEventListener("pageshow", onPageShow);
+    return function(){ window.removeEventListener("pageshow", onPageShow); };
+  }, []);
 
   function login(usuario, password) {
-    // Usuarios viven en localStorage (configuración), sesión en sessionStorage (temporal)
     const listaActual = (() => {
       try { return JSON.parse(localStorage.getItem("th_usuarios")||"null") || USUARIOS; }
       catch { return USUARIOS; }
@@ -1909,16 +1917,13 @@ function useAuth() {
       if (found.estado === "inactivo") {
         return { ok: false, error: "Cuenta desactivada. Contactá al administrador." };
       }
-      const session = { ...found, loginAt: Date.now() };
-      sessionStorage.setItem("th_user", JSON.stringify(session));
-      setUser(session);
+      setUser({ ...found, loginAt: Date.now() });
       return { ok: true };
     }
     return { ok: false, error: "Usuario o contraseña incorrectos" };
   }
 
   function logout() {
-    sessionStorage.removeItem("th_user");
     setUser(null);
   }
 

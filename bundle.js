@@ -23322,17 +23322,21 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
   function useAuth() {
     try {
       localStorage.removeItem("th_user");
+      sessionStorage.removeItem("th_user");
     } catch {
     }
-    var _hN108 = (0, import_react.useState)(function() {
-      try {
-        return JSON.parse(sessionStorage.getItem("th_user") || "null");
-      } catch {
-        return null;
-      }
-    });
+    var _hN108 = (0, import_react.useState)(null);
     var user = _hN108[0];
     var setUser = _hN108[1];
+    (0, import_react.useEffect)(function() {
+      function onPageShow(e) {
+        if (e.persisted) setUser(null);
+      }
+      window.addEventListener("pageshow", onPageShow);
+      return function() {
+        window.removeEventListener("pageshow", onPageShow);
+      };
+    }, []);
     function login(usuario, password) {
       const listaActual = (() => {
         try {
@@ -23348,15 +23352,12 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
         if (found.estado === "inactivo") {
           return { ok: false, error: "Cuenta desactivada. Contact\xE1 al administrador." };
         }
-        const session = { ...found, loginAt: Date.now() };
-        sessionStorage.setItem("th_user", JSON.stringify(session));
-        setUser(session);
+        setUser({ ...found, loginAt: Date.now() });
         return { ok: true };
       }
       return { ok: false, error: "Usuario o contrase\xF1a incorrectos" };
     }
     function logout() {
-      sessionStorage.removeItem("th_user");
       setUser(null);
     }
     return { user, login, logout };
