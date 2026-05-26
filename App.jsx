@@ -1170,6 +1170,40 @@ function sendWA(venta){
   window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`,"_blank");
 }
 
+function sendFacturaWA(fac, venta, telefono){
+  // Limpiar número: quitar +, espacios, guiones; agregar 591 si es número boliviano de 8 dígitos
+  let num = (telefono||"").replace(/[\s\-\+()]/g,"");
+  if(/^[67]\d{7}$/.test(num)) num = "591" + num;   // 8 dígitos Bolivia → +591
+  else if(/^0[67]\d{7}$/.test(num)) num = "591" + num.slice(1); // 09XXXXXXX → 591
+  const waBase = num ? `https://wa.me/${num}` : "https://wa.me/";
+
+  const detalle = (venta?.items||[]).map(it=>`  • ${it.nombre} ×${it.cantidad} = ${$(it.subtotal)}`).join("\n");
+  const nitLine = fac.nitComprador&&fac.nitComprador!==0
+    ? `🪪 *NIT:* ${fac.nitComprador}`
+    : `🪪 Sin NIT (Consumidor Final)`;
+
+  const lines = [
+    `🧾 *FACTURA ELECTRÓNICA — TOSCANA HOUSE*`,
+    `━━━━━━━━━━━━━━━━━━━━`,
+    ``,
+    `📋 *N° Factura:* ${fac.numero||"—"}`,
+    `🏢 *Emisor:* ${PROPIETARIA}`,
+    `📌 *NIT Emisor:* ${NIT_EMPRESA}`,
+    `👤 *Cliente:* ${fac.nombreComprador||"Sin Nombre"}`,
+    nitLine,
+    ``,
+    `🛍 *Detalle:*`,
+    detalle,
+    ``,
+    `💰 *TOTAL: ${$(venta?.total||0)}*`,
+  ];
+  if(fac.cuf) lines.push(``, `🔐 *CUF:* ${fac.cuf.slice(0,20)}…`);
+  if(fac.pdf) lines.push(``, `📄 Ver factura: ${fac.pdf}`);
+  lines.push(``, `📅 ${new Date().toLocaleDateString("es-BO")} · Toscana House`);
+
+  window.open(`${waBase}?text=${encodeURIComponent(lines.join("\n"))}`,"_blank");
+}
+
 // ── Número a letras (es-BO) ───────────────────────────────
 function numeroALetras(monto){
   const entero=Math.floor(monto), cts=Math.round((monto-entero)*100);
@@ -2384,20 +2418,21 @@ function RetirosTab({inv, retiros, onRetiro}){
 // FACTURA MODAL — SIAT Bolivia (CUCU API)
 // ══════════════════════════════════════════════════════════
 function FacturaModal({venta, open, onClose, onFacturada}){
-  const [nit,setNit]     = useState("0");
-  const [nombre,setNombre] = useState("Sin Nombre");
-  const [modo,setModo]   = useState("api");
-  const [estado,setEstado] = useState("idle");
+  const [nit,setNit]         = useState("0");
+  const [nombre,setNombre]   = useState("Sin Nombre");
+  const [telefono,setTelefono] = useState("");
+  const [modo,setModo]       = useState("api");
+  const [estado,setEstado]   = useState("idle");
   const [resultado,setResultado] = useState(null);
-  const [errMsg,setErrMsg] = useState("");
-  const [manNro,setManNro] = useState("");
-  const [manCuf,setManCuf] = useState("");
+  const [errMsg,setErrMsg]   = useState("");
+  const [manNro,setManNro]   = useState("");
+  const [manCuf,setManCuf]   = useState("");
 
   const cfg = leerCfgCUCU();
 
   useEffect(()=>{
     if(open){
-      setNit("0"); setNombre("Sin Nombre");
+      setNit("0"); setNombre("Sin Nombre"); setTelefono("");
       setModo(cfg.modoApi!==false?"api":"manual");
       setEstado("idle"); setResultado(null); setErrMsg("");
       setManNro(""); setManCuf("");
@@ -2410,15 +2445,16 @@ function FacturaModal({venta, open, onClose, onFacturada}){
     setEstado("enviando"); setErrMsg("");
     try{
       const r = await emitirFacturaCUCU(venta,nit,nombre);
-      guardarFacturaLocal(venta.id,r);
-      setResultado(r); setEstado("ok");
+      guardarFacturaLocal(venta.id,{...r, telefono:telefono.trim()});
+      setResultado({...r, telefono:telefono.trim()}); setEstado("ok");
       onFacturada&&onFacturada(r);
     }catch(e){ setErrMsg(e.message); setEstado("error"); }
   }
 
   function guardarManual(){
     if(!manNro&&!manCuf){ setErrMsg("Ingresá el número de factura o CUF."); return; }
-    const r={cuf:manCuf,numero:manNro,qrUrl:"",pdf:"",nitComprador:Number(nit)||0,nombreComprador:nombre.trim()};
+    const r={cuf:manCuf,numero:manNro,qrUrl:"",pdf:"",
+      nitComprador:Number(nit)||0,nombreComprador:nombre.trim(),telefono:telefono.trim()};
     guardarFacturaLocal(venta.id,r);
     setResultado(r); setEstado("ok");
     onFacturada&&onFacturada(r);
@@ -2436,8 +2472,9 @@ function FacturaModal({venta, open, onClose, onFacturada}){
       </div>
       <div style={{background:C.bg2,borderRadius:14,overflow:"hidden",marginBottom:16,border:`1px solid ${C.sep}`}}>
         {[["N° Factura",r.numero],["Cliente",r.nombreComprador],
-          ["NIT",r.nitComprador===0?"Sin NIT (CF)":r.nitComprador]
-        ].filter(([,v])=>v!==undefined&&v!=="").map(([k,v],i,a)=>(
+          ["NIT",r.nitComprador===0?"Sin NIT (CF)":r.nitComprador],
+          r.telefono?["Teléfono",r.telefono]:null,
+        ].filter(x=>x&&x[1]!==undefined&&x[1]!=="").map(([k,v],i,a)=>(
           <div key={k} style={{display:"flex",justifyContent:"space-between",
             padding:"12px 16px",borderBottom:i<a.length-1?`1px solid ${C.sep}`:""}}>
             <span style={{fontSize:13,color:C.label3,fontFamily:FONT}}>{k}</span>
@@ -2455,10 +2492,24 @@ function FacturaModal({venta, open, onClose, onFacturada}){
       {r.qrUrl&&<div style={{textAlign:"center",marginBottom:16}}>
         <img src={r.qrUrl} style={{width:140,height:140,borderRadius:8}} alt="QR Factura"/>
       </div>}
-      {r.pdf&&<a href={r.pdf} target="_blank" rel="noopener noreferrer" style={{display:"block",marginBottom:10,textDecoration:"none"}}>
-        <IOSBtn variant="fill" full icon="📄">Ver PDF Factura</IOSBtn>
-      </a>}
-      <IOSBtn onPress={onClose} variant="primary" full>Cerrar</IOSBtn>
+      {/* Botones de acción */}
+      <div style={{display:"flex",flexDirection:"column",gap:10}}>
+        <button onClick={()=>sendFacturaWA(r,venta,r.telefono)} style={{
+          width:"100%",padding:"14px",borderRadius:14,border:"none",cursor:"pointer",
+          background:"linear-gradient(135deg,#25D366,#128C7E)",
+          display:"flex",alignItems:"center",justifyContent:"center",gap:10,
+          WebkitTapHighlightColor:"transparent",
+        }}>
+          <span style={{fontSize:20}}>📲</span>
+          <span style={{fontSize:14,fontWeight:700,color:"#fff",fontFamily:FONT_UI}}>
+            {r.telefono ? `Enviar a ${r.telefono}` : "Enviar por WhatsApp"}
+          </span>
+        </button>
+        {r.pdf&&<a href={r.pdf} target="_blank" rel="noopener noreferrer" style={{textDecoration:"none"}}>
+          <IOSBtn variant="fill" full icon="📄">Ver PDF Factura</IOSBtn>
+        </a>}
+        <IOSBtn onPress={onClose} variant="primary" full>Cerrar</IOSBtn>
+      </div>
     </div>
   );
 
@@ -2483,12 +2534,25 @@ function FacturaModal({venta, open, onClose, onFacturada}){
           {factExist.qrUrl&&<div style={{textAlign:"center",marginBottom:16}}>
             <img src={factExist.qrUrl} style={{width:140,height:140,borderRadius:8}} alt="QR"/>
           </div>}
-          {factExist.pdf&&<a href={factExist.pdf} target="_blank" rel="noopener noreferrer" style={{display:"block",marginBottom:10,textDecoration:"none"}}>
-            <IOSBtn variant="fill" full icon="📄">Ver PDF Factura</IOSBtn>
-          </a>}
-          <IOSBtn onPress={()=>setEstado("form")} variant="fill" full style={{marginTop:8}}>
-            Emitir nueva factura
-          </IOSBtn>
+          <div style={{display:"flex",flexDirection:"column",gap:8,marginTop:4}}>
+            <button onClick={()=>sendFacturaWA(factExist,venta,factExist.telefono)} style={{
+              width:"100%",padding:"13px",borderRadius:14,border:"none",cursor:"pointer",
+              background:"linear-gradient(135deg,#25D366,#128C7E)",
+              display:"flex",alignItems:"center",justifyContent:"center",gap:10,
+              WebkitTapHighlightColor:"transparent",
+            }}>
+              <span style={{fontSize:20}}>📲</span>
+              <span style={{fontSize:14,fontWeight:700,color:"#fff",fontFamily:FONT_UI}}>
+                {factExist.telefono ? `Enviar a ${factExist.telefono}` : "Enviar por WhatsApp"}
+              </span>
+            </button>
+            {factExist.pdf&&<a href={factExist.pdf} target="_blank" rel="noopener noreferrer" style={{textDecoration:"none"}}>
+              <IOSBtn variant="fill" full icon="📄">Ver PDF Factura</IOSBtn>
+            </a>}
+            <IOSBtn onPress={()=>setEstado("form")} variant="fill" full>
+              Emitir nueva factura
+            </IOSBtn>
+          </div>
         </div>
       ) : estado==="ok"&&resultado?(
         <FacturaOK r={resultado}/>
@@ -2532,6 +2596,37 @@ function FacturaModal({venta, open, onClose, onFacturada}){
             value={nit} onChange={e=>setNit(e.target.value)} placeholder="0"/>
           <IOSInput label="Razón Social / Nombre"
             value={nombre} onChange={e=>setNombre(e.target.value)} placeholder="Sin Nombre"/>
+
+          {/* Teléfono WhatsApp */}
+          <div style={{marginBottom:16}}>
+            <div style={{fontSize:12,fontWeight:600,color:C.label3,fontFamily:FONT,
+              marginBottom:6,display:"flex",alignItems:"center",gap:6}}>
+              📲 Teléfono WhatsApp
+              <span style={{fontSize:11,fontWeight:400,color:C.label3}}>(opcional)</span>
+            </div>
+            <div style={{position:"relative"}}>
+              <span style={{
+                position:"absolute",left:12,top:"50%",transform:"translateY(-50%)",
+                fontSize:13,color:C.label3,fontFamily:FONT,pointerEvents:"none",
+                display:"flex",alignItems:"center",gap:4,
+              }}>🇧🇴 +591</span>
+              <input
+                type="tel" value={telefono}
+                onChange={e=>setTelefono(e.target.value)}
+                placeholder="70000000"
+                style={{
+                  width:"100%",padding:"11px 14px 11px 80px",borderRadius:12,
+                  border:`1.5px solid ${C.sep}`,background:C.bg3,
+                  fontSize:16,color:C.label,outline:"none",
+                  fontFamily:FONT,boxSizing:"border-box",
+                  WebkitAppearance:"none",
+                }}
+              />
+            </div>
+            <div style={{fontSize:11,color:C.label3,fontFamily:FONT,marginTop:4}}>
+              La factura se enviará por WhatsApp después de emitirse.
+            </div>
+          </div>
 
           {/* API CUCU */}
           {modo==="api"&&(
