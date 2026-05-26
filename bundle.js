@@ -21683,22 +21683,6 @@
       document.head.appendChild(s);
     });
   }
-  var _H5QRPromise = null;
-  function loadHtml5Qrcode() {
-    if (_H5QRPromise) return _H5QRPromise;
-    _H5QRPromise = new Promise((resolve, reject) => {
-      if (window.Html5Qrcode) {
-        resolve(window.Html5Qrcode);
-        return;
-      }
-      const s = document.createElement("script");
-      s.src = "https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js";
-      s.onload = () => resolve(window.Html5Qrcode);
-      s.onerror = () => reject(new Error("No se pudo cargar html5-qrcode"));
-      document.head.appendChild(s);
-    });
-    return _H5QRPromise;
-  }
   async function leerCodigoDeImagen(file) {
     try {
       const ZXing = await loadZXing();
@@ -24215,75 +24199,105 @@ Fecha: ${venta.fecha}`);
     } }, clock);
   }
   function CameraScanner({ onDetect, onClose }) {
-    const containerId = (0, import_react.useRef)("thqr_" + Math.random().toString(36).slice(2, 8)).current;
-    const scannerRef = (0, import_react.useRef)(null);
+    const videoRef = (0, import_react.useRef)(null);
+    const canvasRef = (0, import_react.useRef)(null);
+    const streamRef = (0, import_react.useRef)(null);
+    const timerRef = (0, import_react.useRef)(null);
     const firedRef = (0, import_react.useRef)(false);
+    const readerRef = (0, import_react.useRef)(null);
     const [status, setStatus] = (0, import_react.useState)("cargando");
     (0, import_react.useEffect)(() => {
       let mounted = true;
-      async function start() {
+      async function iniciar() {
         try {
-          const Html5Qrcode = await loadHtml5Qrcode();
+          const stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } },
+            audio: false
+          });
+          if (!mounted) {
+            stream.getTracks().forEach((t) => t.stop());
+            return;
+          }
+          streamRef.current = stream;
+          const video = videoRef.current;
+          video.srcObject = stream;
+          video.setAttribute("playsinline", "");
+          video.setAttribute("muted", "");
+          await video.play();
           if (!mounted) return;
-          const scanner = new Html5Qrcode(containerId, { verbose: false });
-          scannerRef.current = scanner;
-          const qrboxFn = (w, h) => {
-            const side = Math.floor(Math.min(w, h) * 0.72);
-            return { width: side, height: side };
-          };
-          await scanner.start(
-            { facingMode: "environment" },
-            { fps: 12, qrbox: qrboxFn, aspectRatio: window.innerHeight / window.innerWidth },
-            (text) => {
-              if (firedRef.current) return;
-              firedRef.current = true;
-              try {
-                navigator.vibrate && navigator.vibrate(180);
-              } catch (_) {
+          const ZXing = await loadZXing();
+          if (!mounted) return;
+          const hints = /* @__PURE__ */ new Map();
+          hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [
+            ZXing.BarcodeFormat.CODE_128,
+            ZXing.BarcodeFormat.CODE_39,
+            ZXing.BarcodeFormat.EAN_13,
+            ZXing.BarcodeFormat.EAN_8,
+            ZXing.BarcodeFormat.QR_CODE,
+            ZXing.BarcodeFormat.DATA_MATRIX,
+            ZXing.BarcodeFormat.ITF,
+            ZXing.BarcodeFormat.UPC_A,
+            ZXing.BarcodeFormat.UPC_E
+          ]);
+          hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
+          const reader = new ZXing.MultiFormatReader();
+          reader.setHints(hints);
+          readerRef.current = reader;
+          setStatus("activo");
+          timerRef.current = setInterval(() => {
+            if (!mounted || firedRef.current) return;
+            const vid = videoRef.current;
+            const cvs = canvasRef.current;
+            if (!vid || !cvs || vid.readyState < 2 || vid.videoWidth === 0) return;
+            cvs.width = vid.videoWidth;
+            cvs.height = vid.videoHeight;
+            cvs.getContext("2d").drawImage(vid, 0, 0);
+            try {
+              const lum = new ZXing.HTMLCanvasElementLuminanceSource(cvs);
+              const bitmap = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(lum));
+              const res = reader.decode(bitmap);
+              if (res && !firedRef.current) {
+                firedRef.current = true;
+                try {
+                  navigator.vibrate && navigator.vibrate(200);
+                } catch (_) {
+                }
+                try {
+                  const ac = new (window.AudioContext || window.webkitAudioContext)();
+                  const o = ac.createOscillator(), g = ac.createGain();
+                  o.connect(g);
+                  g.connect(ac.destination);
+                  o.frequency.value = 1046;
+                  g.gain.value = 0.25;
+                  o.start();
+                  o.stop(ac.currentTime + 0.12);
+                  setTimeout(() => ac.close(), 500);
+                } catch (_) {
+                }
+                detener();
+                onDetect(res.getText());
               }
-              try {
-                const ac = new (window.AudioContext || window.webkitAudioContext)();
-                const o = ac.createOscillator(), g = ac.createGain();
-                o.connect(g);
-                g.connect(ac.destination);
-                o.frequency.value = 1046;
-                g.gain.value = 0.25;
-                o.start();
-                o.stop(ac.currentTime + 0.1);
-                setTimeout(() => ac.close(), 400);
-              } catch (_) {
-              }
-              scanner.stop().catch(() => {
-              }).finally(() => {
-                if (mounted) onDetect(text);
-              });
-            },
-            () => {
+            } catch (_) {
             }
-            // per-frame errors — normal, ignore
-          );
-          if (mounted) setStatus("activo");
+          }, 250);
         } catch (err) {
-          console.warn("CameraScanner error:", err);
+          console.warn("CameraScanner:", err);
           if (mounted) setStatus("error");
         }
       }
-      start();
+      function detener() {
+        clearInterval(timerRef.current);
+        if (streamRef.current) streamRef.current.getTracks().forEach((t) => t.stop());
+      }
+      iniciar();
       return () => {
         mounted = false;
-        if (scannerRef.current) {
-          scannerRef.current.stop().catch(() => {
-          });
-          try {
-            scannerRef.current.clear();
-          } catch (_) {
-          }
-        }
+        detener();
       };
     }, []);
-    function handleClose() {
-      if (scannerRef.current) scannerRef.current.stop().catch(() => {
-      });
+    function cerrar() {
+      clearInterval(timerRef.current);
+      if (streamRef.current) streamRef.current.getTracks().forEach((t) => t.stop());
       onClose();
     }
     return /* @__PURE__ */ import_react.default.createElement("div", { style: {
@@ -24298,18 +24312,69 @@ Fecha: ${venta.fecha}`);
       display: "flex",
       alignItems: "center",
       justifyContent: "space-between",
-      padding: "calc(env(safe-area-inset-top,0px) + 12px) 16px 12px",
-      background: "rgba(0,0,0,0.85)"
-    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 15, fontWeight: 700, color: "#fff" } }, status === "cargando" ? "\u23F3 Abriendo c\xE1mara\u2026" : status === "activo" ? "\u{1F4F7} Apunta al c\xF3digo" : "\u26A0 Sin acceso a c\xE1mara"), /* @__PURE__ */ import_react.default.createElement("button", { onClick: handleClose, style: {
+      padding: "calc(env(safe-area-inset-top,0px) + 10px) 16px 10px",
+      background: "rgba(0,0,0,0.82)"
+    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 15, fontWeight: 700, color: "#fff" } }, status === "cargando" ? "\u23F3 Abriendo c\xE1mara\u2026" : status === "activo" ? "\u{1F4F7} Apunta al c\xF3digo de barras o QR" : "\u26A0 Sin acceso a c\xE1mara"), /* @__PURE__ */ import_react.default.createElement("button", { onClick: cerrar, style: {
       background: "rgba(255,255,255,0.15)",
-      border: "1px solid rgba(255,255,255,0.35)",
+      border: "1px solid rgba(255,255,255,0.3)",
       borderRadius: 9,
-      padding: "8px 16px",
+      padding: "7px 16px",
       color: "#fff",
       fontSize: 14,
       fontWeight: 700,
-      cursor: "pointer"
-    } }, "\u2715 Cerrar")), /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1, position: "relative", overflow: "hidden", minHeight: 0 } }, /* @__PURE__ */ import_react.default.createElement("div", { id: containerId, style: { width: "100%", height: "100%" } }), status === "cargando" && /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      cursor: "pointer",
+      WebkitTapHighlightColor: "transparent"
+    } }, "\u2715 Cerrar")), /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1, position: "relative", overflow: "hidden", minHeight: 0 } }, /* @__PURE__ */ import_react.default.createElement(
+      "video",
+      {
+        ref: videoRef,
+        playsInline: true,
+        muted: true,
+        autoPlay: true,
+        style: {
+          width: "100%",
+          height: "100%",
+          objectFit: "cover",
+          display: status === "activo" ? "block" : "none"
+        }
+      }
+    ), /* @__PURE__ */ import_react.default.createElement("canvas", { ref: canvasRef, style: { display: "none" } }), status === "activo" && /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      position: "absolute",
+      inset: 0,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      pointerEvents: "none"
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { position: "relative", width: 272, height: 272 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      position: "absolute",
+      inset: 0,
+      boxShadow: "0 0 0 2000px rgba(0,0,0,0.48)",
+      borderRadius: 4
+    } }), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      position: "absolute",
+      inset: 0,
+      border: "2px solid rgba(255,255,255,0.55)",
+      borderRadius: 6
+    } }), [[0, 0, "tl"], [0, "auto", "tr"], ["auto", 0, "bl"], ["auto", "auto", "br"]].map(([t, r, k]) => /* @__PURE__ */ import_react.default.createElement("div", { key: k, style: {
+      position: "absolute",
+      top: t,
+      right: r === 0 ? "auto" : r === "auto" ? "auto" : "unset",
+      left: r === 0 ? "auto" : r === "auto" ? "unset" : 0,
+      bottom: t === "auto" ? 0 : "auto",
+      width: 28,
+      height: 28,
+      borderTop: t === 0 ? "3px solid #2196F3" : "none",
+      borderBottom: t === "auto" ? "3px solid #2196F3" : "none",
+      borderLeft: r !== 0 ? "3px solid #2196F3" : "none",
+      borderRight: r === 0 ? "3px solid #2196F3" : "none"
+    } })), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      position: "absolute",
+      left: 8,
+      right: 8,
+      height: 2,
+      background: "linear-gradient(90deg,transparent,#2196F3,transparent)",
+      animation: "thScan 1.8s ease-in-out infinite"
+    } }))), status === "cargando" && /* @__PURE__ */ import_react.default.createElement("div", { style: {
       position: "absolute",
       inset: 0,
       display: "flex",
@@ -24327,23 +24392,30 @@ Fecha: ${venta.fecha}`);
       background: "#111",
       padding: 28,
       textAlign: "center"
-    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 52, marginBottom: 14 } }, "\u26A0\uFE0F"), /* @__PURE__ */ import_react.default.createElement("div", { style: { color: "#fff", fontSize: 16, marginBottom: 10, fontWeight: 700 } }, "No se pudo acceder a la c\xE1mara"), /* @__PURE__ */ import_react.default.createElement("div", { style: { color: "#aaa", fontSize: 13, lineHeight: 1.6 } }, "Ve a Ajustes \u2192 Safari/Chrome \u2192 C\xE1mara \u2192 Permitir"), /* @__PURE__ */ import_react.default.createElement("button", { onClick: handleClose, style: {
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 52, marginBottom: 14 } }, "\u26A0\uFE0F"), /* @__PURE__ */ import_react.default.createElement("div", { style: { color: "#fff", fontSize: 17, fontWeight: 700, marginBottom: 10 } }, "Sin acceso a la c\xE1mara"), /* @__PURE__ */ import_react.default.createElement("div", { style: { color: "#aaa", fontSize: 13, lineHeight: 1.7 } }, "Ve a Ajustes \u2192 Safari (o Chrome) \u2192 C\xE1mara \u2192 Permitir,", "\n", "luego recarga la p\xE1gina."), /* @__PURE__ */ import_react.default.createElement("button", { onClick: cerrar, style: {
       marginTop: 24,
       background: "rgba(255,255,255,0.15)",
       border: "1px solid rgba(255,255,255,0.3)",
       borderRadius: 10,
-      padding: "10px 24px",
+      padding: "10px 26px",
       color: "#fff",
       fontSize: 14,
       cursor: "pointer"
     } }, "Cerrar"))), status === "activo" && /* @__PURE__ */ import_react.default.createElement("div", { style: {
       flexShrink: 0,
-      padding: "12px 16px calc(env(safe-area-inset-bottom,0px) + 12px)",
-      background: "rgba(0,0,0,0.85)",
+      padding: "10px 16px calc(env(safe-area-inset-bottom,0px) + 10px)",
+      background: "rgba(0,0,0,0.82)",
       textAlign: "center",
-      color: "rgba(255,255,255,0.65)",
+      color: "rgba(255,255,255,0.6)",
       fontSize: 13
-    } }, "Centra el c\xF3digo en el recuadro \u2014 se detecta autom\xE1ticamente"));
+    } }, "Centra el c\xF3digo en el recuadro \u2014 se detecta solo"), /* @__PURE__ */ import_react.default.createElement("style", null, `
+        @keyframes thScan{
+          0%{top:8px;opacity:0}
+          15%{opacity:1}
+          85%{opacity:1}
+          100%{top:256px;opacity:0}
+        }
+      `));
   }
   function ImportarExcelModal({ inv, onImportar, onClose }) {
     const [archivo, setArchivo] = (0, import_react.useState)(null);

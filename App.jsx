@@ -206,20 +206,7 @@ function loadZXing() {
   });
 }
 
-// Load html5-qrcode for real-time scanning
-let _H5QRPromise = null;
-function loadHtml5Qrcode() {
-  if (_H5QRPromise) return _H5QRPromise;
-  _H5QRPromise = new Promise((resolve, reject) => {
-    if (window.Html5Qrcode) { resolve(window.Html5Qrcode); return; }
-    const s = document.createElement("script");
-    s.src = "https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js";
-    s.onload = () => resolve(window.Html5Qrcode);
-    s.onerror = () => reject(new Error("No se pudo cargar html5-qrcode"));
-    document.head.appendChild(s);
-  });
-  return _H5QRPromise;
-}
+// (html5-qrcode removed — scanner uses native getUserMedia + ZXing instead)
 
 // Lee código de barras/QR desde un archivo de imagen
 async function leerCodigoDeImagen(file) {
@@ -2776,155 +2763,229 @@ function ClockWidget(){
 // ══════════════════════════════════════════════════════════
 // HOME DASHBOARD — vista en tiempo real (KPIs, chart, feed)
 // ══════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════
+// CAMERA SCANNER — getUserMedia + ZXing (sin librerías extra)
+// Compatible: iPhone Safari 14.3+, Android Chrome, desktop
+// ══════════════════════════════════════════════════════════
 function CameraScanner({onDetect, onClose}){
-  // Stable unique ID for the container div (never changes between renders)
-  const containerId = useRef("thqr_" + Math.random().toString(36).slice(2,8)).current;
-  const scannerRef  = useRef(null);
-  const firedRef    = useRef(false); // prevent double-fire
-  const [status, setStatus] = useState("cargando");
+  const videoRef    = useRef(null);
+  const canvasRef   = useRef(null);
+  const streamRef   = useRef(null);
+  const timerRef    = useRef(null);
+  const firedRef    = useRef(false);
+  const readerRef   = useRef(null);
+  const [status, setStatus] = useState("cargando"); // cargando|activo|error
 
   useEffect(()=>{
     let mounted = true;
 
-    async function start(){
+    async function iniciar(){
       try{
-        const Html5Qrcode = await loadHtml5Qrcode();
+        // 1. Pedir acceso a la cámara trasera
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video:{ facingMode:"environment", width:{ideal:1280}, height:{ideal:720} },
+          audio:false,
+        });
+        if(!mounted){ stream.getTracks().forEach(t=>t.stop()); return; }
+        streamRef.current = stream;
+
+        // 2. Conectar al elemento <video> (playsInline es crítico en iOS)
+        const video = videoRef.current;
+        video.srcObject = stream;
+        video.setAttribute("playsinline","");
+        video.setAttribute("muted","");
+        await video.play();
         if(!mounted) return;
 
-        // Constructor: verbose:false only — NO formatsToSupport here (it breaks the lib)
-        const scanner = new Html5Qrcode(containerId, {verbose:false});
-        scannerRef.current = scanner;
+        // 3. Cargar ZXing y preparar el lector
+        const ZXing = await loadZXing();
+        if(!mounted) return;
+        const hints = new Map();
+        hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS,[
+          ZXing.BarcodeFormat.CODE_128, ZXing.BarcodeFormat.CODE_39,
+          ZXing.BarcodeFormat.EAN_13,   ZXing.BarcodeFormat.EAN_8,
+          ZXing.BarcodeFormat.QR_CODE,  ZXing.BarcodeFormat.DATA_MATRIX,
+          ZXing.BarcodeFormat.ITF,      ZXing.BarcodeFormat.UPC_A,
+          ZXing.BarcodeFormat.UPC_E,
+        ]);
+        hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
+        const reader = new ZXing.MultiFormatReader();
+        reader.setHints(hints);
+        readerRef.current = reader;
 
-        // Use qrbox as function so it adapts to any screen size
-        const qrboxFn = (w, h) => {
-          const side = Math.floor(Math.min(w, h) * 0.72);
-          return {width: side, height: side};
-        };
+        setStatus("activo");
 
-        await scanner.start(
-          {facingMode:"environment"},
-          {fps:12, qrbox:qrboxFn, aspectRatio:window.innerHeight/window.innerWidth},
-          (text) => {
-            if(firedRef.current) return; // ignore duplicate frames
-            firedRef.current = true;
-            // Haptic + beep
-            try{ navigator.vibrate && navigator.vibrate(180); }catch(_){}
-            try{
-              const ac = new (window.AudioContext||window.webkitAudioContext)();
-              const o=ac.createOscillator(), g=ac.createGain();
-              o.connect(g); g.connect(ac.destination);
-              o.frequency.value=1046; g.gain.value=0.25;
-              o.start(); o.stop(ac.currentTime+0.1);
-              setTimeout(()=>ac.close(),400);
-            }catch(_){}
-            // Stop scanner then notify parent
-            scanner.stop().catch(()=>{}).finally(()=>{ if(mounted) onDetect(text); });
-          },
-          ()=>{} // per-frame errors — normal, ignore
-        );
+        // 4. Loop de escaneo cada 250 ms
+        timerRef.current = setInterval(()=>{
+          if(!mounted || firedRef.current) return;
+          const vid = videoRef.current;
+          const cvs = canvasRef.current;
+          if(!vid || !cvs || vid.readyState < 2 || vid.videoWidth===0) return;
 
-        if(mounted) setStatus("activo");
+          cvs.width  = vid.videoWidth;
+          cvs.height = vid.videoHeight;
+          cvs.getContext("2d").drawImage(vid, 0, 0);
+
+          try{
+            const lum    = new ZXing.HTMLCanvasElementLuminanceSource(cvs);
+            const bitmap = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(lum));
+            const res    = reader.decode(bitmap);
+            if(res && !firedRef.current){
+              firedRef.current = true;
+              // Vibración + beep
+              try{ navigator.vibrate && navigator.vibrate(200); }catch(_){}
+              try{
+                const ac=new(window.AudioContext||window.webkitAudioContext)();
+                const o=ac.createOscillator(),g=ac.createGain();
+                o.connect(g);g.connect(ac.destination);
+                o.frequency.value=1046;g.gain.value=0.25;
+                o.start();o.stop(ac.currentTime+0.12);
+                setTimeout(()=>ac.close(),500);
+              }catch(_){}
+              detener();
+              onDetect(res.getText());
+            }
+          }catch(_){/* frame sin código — normal */}
+        }, 250);
+
       }catch(err){
-        console.warn("CameraScanner error:", err);
+        console.warn("CameraScanner:", err);
         if(mounted) setStatus("error");
       }
     }
 
-    start();
+    function detener(){
+      clearInterval(timerRef.current);
+      if(streamRef.current) streamRef.current.getTracks().forEach(t=>t.stop());
+    }
 
-    return ()=>{
-      mounted = false;
-      if(scannerRef.current){
-        scannerRef.current.stop().catch(()=>{});
-        // clear() removes the video element from DOM
-        try{ scannerRef.current.clear(); }catch(_){}
-      }
-    };
-  },[]); // eslint-disable-line
+    iniciar();
+    return ()=>{ mounted=false; detener(); };
+  },[]);
 
-  function handleClose(){
-    if(scannerRef.current) scannerRef.current.stop().catch(()=>{});
+  function cerrar(){
+    clearInterval(timerRef.current);
+    if(streamRef.current) streamRef.current.getTracks().forEach(t=>t.stop());
     onClose();
   }
 
   return (
-    <div style={{
-      position:"fixed", inset:0, zIndex:9500,
-      background:"#000", display:"flex", flexDirection:"column",
-    }}>
-      {/* ── top bar ── */}
-      <div style={{
-        flexShrink:0,
-        display:"flex", alignItems:"center", justifyContent:"space-between",
-        padding:"calc(env(safe-area-inset-top,0px) + 12px) 16px 12px",
-        background:"rgba(0,0,0,0.85)",
-      }}>
-        <div style={{fontSize:15,fontWeight:700,color:"#fff"}}>
-          {status==="cargando" ? "⏳ Abriendo cámara…"
-           : status==="activo" ? "📷 Apunta al código"
-           : "⚠ Sin acceso a cámara"}
-        </div>
-        <button onClick={handleClose} style={{
-          background:"rgba(255,255,255,0.15)",
-          border:"1px solid rgba(255,255,255,0.35)",
-          borderRadius:9, padding:"8px 16px",
-          color:"#fff", fontSize:14, fontWeight:700, cursor:"pointer",
-        }}>✕ Cerrar</button>
+    <div style={{position:"fixed",inset:0,zIndex:9500,background:"#000",
+      display:"flex",flexDirection:"column"}}>
+
+      {/* ── Barra superior ── */}
+      <div style={{flexShrink:0,display:"flex",alignItems:"center",
+        justifyContent:"space-between",
+        padding:"calc(env(safe-area-inset-top,0px) + 10px) 16px 10px",
+        background:"rgba(0,0,0,0.82)"}}>
+        <span style={{fontSize:15,fontWeight:700,color:"#fff"}}>
+          {status==="cargando"?"⏳ Abriendo cámara…"
+           :status==="activo" ?"📷 Apunta al código de barras o QR"
+           :"⚠ Sin acceso a cámara"}
+        </span>
+        <button onClick={cerrar} style={{
+          background:"rgba(255,255,255,0.15)",border:"1px solid rgba(255,255,255,0.3)",
+          borderRadius:9,padding:"7px 16px",color:"#fff",fontSize:14,
+          fontWeight:700,cursor:"pointer",WebkitTapHighlightColor:"transparent"}}>
+          ✕ Cerrar
+        </button>
       </div>
 
-      {/* ── camera feed — html5-qrcode mounts video here ── */}
-      <div style={{flex:1, position:"relative", overflow:"hidden", minHeight:0}}>
-        {/* This div must exist in the DOM before useEffect fires — it does, because
-            React renders before effects run. html5-qrcode will inject video into it. */}
-        <div id={containerId} style={{width:"100%", height:"100%"}}/>
+      {/* ── Área de cámara ── */}
+      <div style={{flex:1,position:"relative",overflow:"hidden",minHeight:0}}>
 
-        {/* Loading overlay */}
-        {status==="cargando" && (
-          <div style={{
-            position:"absolute", inset:0,
-            display:"flex", flexDirection:"column",
-            alignItems:"center", justifyContent:"center", background:"#000",
-          }}>
-            <div style={{fontSize:52, marginBottom:14}}>📷</div>
-            <div style={{color:"#fff", fontSize:16}}>Iniciando cámara…</div>
+        {/* Video nativo — playsInline es CLAVE en iOS */}
+        <video ref={videoRef} playsInline muted autoPlay
+          style={{width:"100%",height:"100%",objectFit:"cover",
+            display:status==="activo"?"block":"none"}}/>
+
+        {/* Canvas oculto para ZXing */}
+        <canvas ref={canvasRef} style={{display:"none"}}/>
+
+        {/* Visor con esquinas y línea de barrido */}
+        {status==="activo"&&(
+          <div style={{position:"absolute",inset:0,display:"flex",
+            alignItems:"center",justifyContent:"center",pointerEvents:"none"}}>
+            <div style={{position:"relative",width:272,height:272}}>
+              {/* Fondo oscuro alrededor */}
+              <div style={{position:"absolute",inset:0,
+                boxShadow:"0 0 0 2000px rgba(0,0,0,0.48)",borderRadius:4}}/>
+              {/* Marco */}
+              <div style={{position:"absolute",inset:0,
+                border:"2px solid rgba(255,255,255,0.55)",borderRadius:6}}/>
+              {/* Esquinas azules */}
+              {[[0,0,"tl"],[0,"auto","tr"],["auto",0,"bl"],["auto","auto","br"]].map(([t,r,k])=>(
+                <div key={k} style={{position:"absolute",
+                  top:t,right:r===0?"auto":r==="auto"?"auto":"unset",
+                  left:r===0?"auto":r==="auto"?"unset":0,
+                  bottom:t==="auto"?0:"auto",
+                  width:28,height:28,
+                  borderTop:   t===0    ?"3px solid #2196F3":"none",
+                  borderBottom:t==="auto"?"3px solid #2196F3":"none",
+                  borderLeft:  r!==0    ?"3px solid #2196F3":"none",
+                  borderRight: r===0    ?"3px solid #2196F3":"none",
+                }}/>
+              ))}
+              {/* Línea de barrido */}
+              <div style={{position:"absolute",left:8,right:8,height:2,
+                background:"linear-gradient(90deg,transparent,#2196F3,transparent)",
+                animation:"thScan 1.8s ease-in-out infinite"}}/>
+            </div>
           </div>
         )}
 
-        {/* Error overlay */}
-        {status==="error" && (
-          <div style={{
-            position:"absolute", inset:0,
-            display:"flex", flexDirection:"column",
-            alignItems:"center", justifyContent:"center",
-            background:"#111", padding:28, textAlign:"center",
-          }}>
-            <div style={{fontSize:52, marginBottom:14}}>⚠️</div>
-            <div style={{color:"#fff", fontSize:16, marginBottom:10, fontWeight:700}}>
-              No se pudo acceder a la cámara
+        {/* Overlay cargando */}
+        {status==="cargando"&&(
+          <div style={{position:"absolute",inset:0,display:"flex",
+            flexDirection:"column",alignItems:"center",justifyContent:"center",
+            background:"#000"}}>
+            <div style={{fontSize:52,marginBottom:14}}>📷</div>
+            <div style={{color:"#fff",fontSize:16}}>Iniciando cámara…</div>
+          </div>
+        )}
+
+        {/* Overlay error */}
+        {status==="error"&&(
+          <div style={{position:"absolute",inset:0,display:"flex",
+            flexDirection:"column",alignItems:"center",justifyContent:"center",
+            background:"#111",padding:28,textAlign:"center"}}>
+            <div style={{fontSize:52,marginBottom:14}}>⚠️</div>
+            <div style={{color:"#fff",fontSize:17,fontWeight:700,marginBottom:10}}>
+              Sin acceso a la cámara
             </div>
-            <div style={{color:"#aaa", fontSize:13, lineHeight:1.6}}>
-              Ve a Ajustes → Safari/Chrome → Cámara → Permitir
+            <div style={{color:"#aaa",fontSize:13,lineHeight:1.7}}>
+              Ve a Ajustes → Safari (o Chrome) → Cámara → Permitir,{"\n"}
+              luego recarga la página.
             </div>
-            <button onClick={handleClose} style={{
-              marginTop:24, background:"rgba(255,255,255,0.15)",
-              border:"1px solid rgba(255,255,255,0.3)", borderRadius:10,
-              padding:"10px 24px", color:"#fff", fontSize:14, cursor:"pointer",
-            }}>Cerrar</button>
+            <button onClick={cerrar} style={{marginTop:24,
+              background:"rgba(255,255,255,0.15)",border:"1px solid rgba(255,255,255,0.3)",
+              borderRadius:10,padding:"10px 26px",color:"#fff",
+              fontSize:14,cursor:"pointer"}}>
+              Cerrar
+            </button>
           </div>
         )}
       </div>
 
-      {/* ── bottom hint ── */}
-      {status==="activo" && (
-        <div style={{
-          flexShrink:0,
-          padding:"12px 16px calc(env(safe-area-inset-bottom,0px) + 12px)",
-          background:"rgba(0,0,0,0.85)",
-          textAlign:"center", color:"rgba(255,255,255,0.65)", fontSize:13,
-        }}>
-          Centra el código en el recuadro — se detecta automáticamente
+      {/* ── Pie ── */}
+      {status==="activo"&&(
+        <div style={{flexShrink:0,
+          padding:"10px 16px calc(env(safe-area-inset-bottom,0px) + 10px)",
+          background:"rgba(0,0,0,0.82)",textAlign:"center",
+          color:"rgba(255,255,255,0.6)",fontSize:13}}>
+          Centra el código en el recuadro — se detecta solo
         </div>
       )}
+
+      {/* Animación línea de barrido */}
+      <style>{`
+        @keyframes thScan{
+          0%{top:8px;opacity:0}
+          15%{opacity:1}
+          85%{opacity:1}
+          100%{top:256px;opacity:0}
+        }
+      `}</style>
     </div>
   );
 }
