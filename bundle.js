@@ -22224,7 +22224,12 @@
   }
   function leerCfgLiq(marcaId) {
     const key = `th_liq_cfg_${marcaId}`;
-    const def = { pctTarjeta: 2.5, pctComision: 10, alquiler: 0 };
+    const alqD = ALQUILERES[Number(marcaId)] || {};
+    const def = {
+      pctTarjeta: 2.5,
+      pctComision: Number(alqD.comision) || 0,
+      alquiler: Number(alqD.alquiler) || 0
+    };
     try {
       return { ...def, ...JSON.parse(localStorage.getItem(key) || "{}") };
     } catch {
@@ -23668,7 +23673,6 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
   function LiqModal({ marcaId, ventas, mes, anio, MK, cierres, setCierres, onClose, syncCierre, onCfgChange }) {
     if (!marcaId) return null;
     const marca = MARCAS.find((x) => x.id === marcaId);
-    const defCfg = { pctTarjeta: 2.5, pctComision: 10, alquiler: 0 };
     const [cfg, setCfg] = (0, import_react.useState)(() => leerCfgLiq(marcaId));
     const [showCfg, setShowCfg] = (0, import_react.useState)(false);
     const pctTarjeta = Number(cfg.pctTarjeta) || 0;
@@ -30445,19 +30449,27 @@ Fecha: ${venta.fecha}`);
       fontFamily: FONT,
       textAlign: "center",
       fontWeight: 600
-    } }, "\u2713 Cierre de ", MESES[mes], " confirmado"), /* @__PURE__ */ import_react.default.createElement("div", { style: { background: C.bg2, borderRadius: 16, overflow: "hidden", marginBottom: 16 } }, [["Ventas brutas", $(liq.bruto), C.label], ["Comisi\xF3n (10%)", `-${$(liq.comision)}`, C.red], ["Neto a liquidar", $(liq.neto), C.green]].map(([k, v, c], i, arr) => /* @__PURE__ */ import_react.default.createElement("div", { key: k, style: {
+    } }, "\u2713 Cierre de ", MESES[mes], " confirmado"), /* @__PURE__ */ import_react.default.createElement("div", { style: { background: C.bg2, borderRadius: 16, overflow: "hidden", marginBottom: 16 } }, [
+      ["Ventas brutas", $(liq.bruto), C.label, false],
+      liq.descTJ > 0 ? [`\u2212 Desc. banco Tarjeta (${liq.cfg?.pctTarjeta ?? 2.5}%)`, `-${$(liq.descTJ)}`, C.red, false] : null,
+      liq.descTJ > 0 ? [`= Subtotal sin banco`, $(liq.subBanco), C.label2, false] : null,
+      liq.cfg?.pctComision > 0 ? [`\u2212 Comisi\xF3n ventas (${liq.cfg?.pctComision ?? 0}%)`, `-${$(liq.comision)}`, C.red, false] : null,
+      liq.alquiler > 0 ? [`\u2212 Alquiler`, `-${$(liq.alquiler)}`, C.amber, false] : null,
+      ["Neto a liquidar", $(liq.neto), C.green, true]
+    ].filter(Boolean).map(([k, v, c, bold], i, arr) => /* @__PURE__ */ import_react.default.createElement("div", { key: k, style: {
       display: "flex",
       justifyContent: "space-between",
       alignItems: "center",
-      padding: "15px 16px",
-      borderBottom: i < arr.length - 1 ? `1px solid ${C.sep}` : ""
-    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 16, color: C.label2, fontFamily: FONT } }, k), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 16, fontWeight: 600, color: c, fontFamily: FONT } }, v))), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      padding: "13px 16px",
+      borderBottom: i < arr.length - 1 ? `1px solid ${C.sep}` : "",
+      background: bold ? `${C.green}08` : "transparent"
+    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 14, color: bold ? C.green : C.label2, fontFamily: FONT, fontWeight: bold ? 600 : 400 } }, k), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 15, fontWeight: bold ? 700 : 600, color: c, fontFamily: FONT } }, v))), /* @__PURE__ */ import_react.default.createElement("div", { style: {
       display: "flex",
       justifyContent: "space-between",
       alignItems: "center",
       padding: "18px 16px",
       background: `${C.gold}12`
-    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 17, fontWeight: 700, color: C.label, fontFamily: FONT } }, "TOTAL A PAGAR"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 24, fontWeight: 800, color: C.gold, fontFamily: FONT } }, $(liq.neto)))), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 10 } }, /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => exportCSV(MARCAS.find((m) => m.id === marcaId), ventas, mes, anio), variant: "fill", full: true, icon: "\u2B07" }, "Exportar CSV"), !cerrado ? /* @__PURE__ */ import_react.default.createElement(
+    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 16, fontWeight: 700, color: C.label, fontFamily: FONT } }, "TOTAL A PAGAR"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 24, fontWeight: 800, color: C.gold, fontFamily: FONT } }, $(liq.neto)))), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 10 } }, /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => exportCSV(MARCAS.find((m) => m.id === marcaId), ventas, mes, anio), variant: "fill", full: true, icon: "\u2B07" }, "Exportar CSV"), !cerrado ? /* @__PURE__ */ import_react.default.createElement(
       IOSBtn,
       {
         variant: "success",
