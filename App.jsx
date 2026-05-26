@@ -72,6 +72,13 @@ async function sbGuardarVenta(venta) {
   } catch(e) { console.warn("Supabase save venta:", e.message); }
 }
 
+async function sbAnularVenta(ventaId) {
+  try {
+    const db = await getSupabase();
+    await db.from("ventas").update({ anulada: true }).eq("id", ventaId);
+  } catch(e) { console.warn("Supabase anular venta:", e.message); }
+}
+
 async function sbGuardarCierre(key, data) {
   try {
     const db = await getSupabase();
@@ -764,6 +771,25 @@ async function emitirFacturaCUCU(venta, nitComprador, nombreComprador){
     nitComprador: Number(nitComprador)||0,
     nombreComprador: (nombreComprador||"Sin Nombre").trim(),
   };
+}
+
+async function anularFacturaCUCU(cuf) {
+  const cfg = leerCfgCUCU();
+  if(!cfg.apiKey) throw new Error("Sin API Key de CUCU — ir a Config → Facturación.");
+  // Try DELETE /{cuf} first, common CUCU pattern
+  const base = cfg.endpoint.replace(/\/invoices\/?$/, "");
+  const url  = `${base}/invoices/${encodeURIComponent(cuf)}`;
+  const r = await fetch(url, {
+    method: "DELETE",
+    headers: {"Authorization":`Bearer ${cfg.apiKey}`,"Content-Type":"application/json"},
+    signal: AbortSignal.timeout(10000),
+  });
+  if(!r.ok && r.status !== 404){
+    let msg="";
+    try{const j=await r.json();msg=j.message||j.error||JSON.stringify(j);}catch{msg=await r.text();}
+    throw new Error(`CUCU ${r.status}: ${msg.slice(0,200)}`);
+  }
+  return r.status===204?{}:(await r.json().catch(()=>({})));
 }
 
 // ── REPORTE MENSUAL COMPLETO (todas las marcas, una pestaña c/u) ──
@@ -1658,7 +1684,7 @@ function LiqModal({marcaId,ventas,mes,anio,MK,cierres,setCierres,onClose,syncCie
     try{ localStorage.setItem(cfgKey, JSON.stringify(newCfg)); }catch{}
   }
 
-  const vMes=ventas.filter(v=>v.mk===MK);
+  const vMes=ventas.filter(v=>v.mk===MK&&!v.anulada);
   const vMarca=vMes.filter(v=>v.items.some(i=>i.marcaId===marcaId));
   const cerrado=cierres[`${MK}-${marcaId}`]?.cerrado;
 
@@ -2557,12 +2583,28 @@ function FacturaModal({venta, open, onClose, onFacturada}){
 // ══════════════════════════════════════════════════════════
 // NOTA DE VENTA — Modal detalle
 // ══════════════════════════════════════════════════════════
-function NotaVentaModal({venta, onClose, numVenta}){
+function NotaVentaModal({venta, onClose, numVenta, onAnularVenta}){
   if(!venta) return null;
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [showFactura, setShowFactura] = useState(false);
+  const [menuOpen,       setMenuOpen]       = useState(false);
+  const [showFactura,    setShowFactura]     = useState(false);
+  const [confirmAnulV,   setConfirmAnulV]    = useState(false);
+  const [confirmAnulF,   setConfirmAnulF]    = useState(false);
+  const [anulandoFac,    setAnulandoFac]     = useState(false);
+  const [anulFacMsg,     setAnulFacMsg]      = useState(null);
   const num = numVenta || venta.id.replace(/\D/g,"").slice(-4).padStart(4,"0");
   const facturaGuardada = leerFacturaLocal(venta.id);
+
+  async function ejecutarAnularFactura(){
+    const fac = leerFacturaLocal(venta.id);
+    if(!fac?.cuf){ setAnulFacMsg({ok:false,txt:"No hay CUF registrado para esta factura."}); return; }
+    setAnulandoFac(true); setAnulFacMsg(null); setConfirmAnulF(false);
+    try{
+      await anularFacturaCUCU(fac.cuf);
+      guardarFacturaLocal(venta.id, {...fac, anulada:true, fechaAnulacion:new Date().toLocaleDateString("es-BO")});
+      setAnulFacMsg({ok:true, txt:"✓ Factura anulada en SIAT / CUCU"});
+    }catch(e){ setAnulFacMsg({ok:false, txt:e.message}); }
+    setAnulandoFac(false);
+  }
 
   const filaInfo = (lbl, val) => (
     <div style={{borderBottom:`1px solid ${C.sep}`,padding:"10px 0",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
@@ -2581,7 +2623,12 @@ function NotaVentaModal({venta, onClose, numVenta}){
         <Chip color={colorPago(venta.metodoPago)}>
           {iconPago(venta.metodoPago)} {labelPago(venta.metodoPago)}
         </Chip>
-        <Chip color={C.green}>✓ Pagado</Chip>
+        {venta.anulada
+          ? <Chip color={C.red}>⊘ ANULADA</Chip>
+          : <Chip color={C.green}>✓ Pagado</Chip>
+        }
+        {facturaGuardada&&!facturaGuardada.anulada&&<Chip color={C.blue}>🧾 Facturada</Chip>}
+        {facturaGuardada?.anulada&&<Chip color={C.amber}>🧾 Factura anulada</Chip>}
       </div>
 
       {/* Datos de la venta */}
@@ -2685,8 +2732,110 @@ function NotaVentaModal({venta, onClose, numVenta}){
         </button>
       </div>
 
+      {/* ── Anulaciones ── */}
+      {!venta.anulada&&(
+        <div style={{marginBottom:10}}>
+          {/* Anular Factura */}
+          {facturaGuardada&&!facturaGuardada.anulada&&(
+            <div style={{marginBottom:8}}>
+              {!confirmAnulF?(
+                <button onClick={()=>setConfirmAnulF(true)} style={{
+                  width:"100%",background:"none",border:`1.5px solid ${C.amber}`,
+                  borderRadius:14,padding:"12px 10px",
+                  display:"flex",alignItems:"center",justifyContent:"center",gap:8,
+                  cursor:"pointer",WebkitTapHighlightColor:"transparent",
+                }}>
+                  <span style={{fontSize:18}}>🧾</span>
+                  <span style={{fontSize:14,fontWeight:600,color:C.amber,fontFamily:FONT_UI}}>
+                    Anular Factura SIAT
+                  </span>
+                </button>
+              ):(
+                <div style={{background:`${C.amber}12`,border:`1.5px solid ${C.amber}40`,
+                  borderRadius:14,padding:14}}>
+                  <div style={{fontSize:13,color:C.amber,fontFamily:FONT,marginBottom:10,textAlign:"center"}}>
+                    ⚠ ¿Anular la factura N° {facturaGuardada.numero} en SIAT?<br/>
+                    <span style={{fontSize:12,color:C.label3}}>Esta acción no se puede deshacer.</span>
+                  </div>
+                  <div style={{display:"flex",gap:8}}>
+                    <button onClick={()=>setConfirmAnulF(false)} style={{
+                      flex:1,padding:"10px",borderRadius:11,border:`1px solid ${C.sep}`,
+                      background:C.bg2,cursor:"pointer",fontFamily:FONT,fontSize:13,color:C.label2,
+                      WebkitTapHighlightColor:"transparent",
+                    }}>Cancelar</button>
+                    <button onClick={ejecutarAnularFactura} disabled={anulandoFac} style={{
+                      flex:1,padding:"10px",borderRadius:11,border:"none",
+                      background:C.amber,cursor:"pointer",fontFamily:FONT,fontSize:13,
+                      fontWeight:700,color:"#fff",WebkitTapHighlightColor:"transparent",
+                    }}>{anulandoFac?"Anulando…":"Sí, anular"}</button>
+                  </div>
+                </div>
+              )}
+              {anulFacMsg&&<div style={{marginTop:8,padding:"10px 12px",borderRadius:10,
+                background:anulFacMsg.ok?`${C.green}12`:`${C.red}12`,
+                border:`1px solid ${anulFacMsg.ok?C.green:C.red}30`}}>
+                <div style={{fontSize:13,color:anulFacMsg.ok?C.green:C.red,fontFamily:FONT}}>
+                  {anulFacMsg.txt}
+                </div>
+              </div>}
+            </div>
+          )}
+
+          {/* Anular Venta */}
+          {!confirmAnulV?(
+            <button onClick={()=>setConfirmAnulV(true)} style={{
+              width:"100%",background:"none",border:`1.5px solid ${C.red}`,
+              borderRadius:14,padding:"12px 10px",marginBottom:4,
+              display:"flex",alignItems:"center",justifyContent:"center",gap:8,
+              cursor:"pointer",WebkitTapHighlightColor:"transparent",
+            }}>
+              <span style={{fontSize:18}}>⊘</span>
+              <span style={{fontSize:14,fontWeight:600,color:C.red,fontFamily:FONT_UI}}>
+                Anular Venta
+              </span>
+            </button>
+          ):(
+            <div style={{background:`${C.red}10`,border:`1.5px solid ${C.red}40`,
+              borderRadius:14,padding:14,marginBottom:4}}>
+              <div style={{fontSize:13,color:C.red,fontFamily:FONT,marginBottom:4,textAlign:"center",fontWeight:600}}>
+                ¿Anular la venta #{num}?
+              </div>
+              <div style={{fontSize:12,color:C.label3,fontFamily:FONT,marginBottom:10,textAlign:"center"}}>
+                Se devolverá el stock de {venta.items.length} producto{venta.items.length>1?"s":""}.
+                {facturaGuardada&&!facturaGuardada.anulada&&
+                  " La factura SIAT quedará activa — anulála primero si es necesario."}
+              </div>
+              <div style={{display:"flex",gap:8}}>
+                <button onClick={()=>setConfirmAnulV(false)} style={{
+                  flex:1,padding:"10px",borderRadius:11,border:`1px solid ${C.sep}`,
+                  background:C.bg2,cursor:"pointer",fontFamily:FONT,fontSize:13,color:C.label2,
+                  WebkitTapHighlightColor:"transparent",
+                }}>Cancelar</button>
+                <button onClick={()=>{onAnularVenta&&onAnularVenta(venta.id);setConfirmAnulV(false);}} style={{
+                  flex:1,padding:"10px",borderRadius:11,border:"none",
+                  background:C.red,cursor:"pointer",fontFamily:FONT,fontSize:13,
+                  fontWeight:700,color:"#fff",WebkitTapHighlightColor:"transparent",
+                }}>Sí, anular</button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Bloque ANULADA */}
+      {venta.anulada&&(
+        <div style={{background:`${C.red}10`,border:`1.5px solid ${C.red}30`,
+          borderRadius:14,padding:14,marginBottom:10,textAlign:"center"}}>
+          <div style={{fontSize:18,marginBottom:4}}>⊘</div>
+          <div style={{fontSize:15,fontWeight:700,color:C.red,fontFamily:FONT}}>Venta Anulada</div>
+          <div style={{fontSize:12,color:C.label3,fontFamily:FONT,marginTop:4}}>
+            Anulada el {venta.fechaAnulacion||"—"} · Stock restituido
+          </div>
+        </div>
+      )}
+
       {/* ── Facturar SIAT ── */}
-      <button
+      {!venta.anulada&&<button
         onClick={()=>setShowFactura(true)}
         style={{
           width:"100%",marginBottom:10,
@@ -2701,7 +2850,7 @@ function NotaVentaModal({venta, onClose, numVenta}){
         <span style={{fontSize:14,fontWeight:700,color:"#fff",fontFamily:FONT_UI}}>
           {facturaGuardada?`Factura N° ${facturaGuardada.numero||"emitida"}`:"Emitir Factura SIAT"}
         </span>
-      </button>
+      </button>}
 
       <button onClick={onClose} style={{
         width:"100%",background:C.bg2,border:`1px solid ${C.sep}`,
@@ -4097,7 +4246,10 @@ function App(){
   },[]);
 
   const MK      =useMemo(()=>mkKey(mes,anio),[mes,anio]);
-  const vMes    =useMemo(()=>ventas.filter(v=>v.mk===MK),[ventas,MK]);
+  // vMes excluye anuladas → se usa en cálculos financieros y liquidaciones
+  const vMes    =useMemo(()=>ventas.filter(v=>v.mk===MK&&!v.anulada),[ventas,MK]);
+  // vMesAll incluye anuladas → se usa en historial/display
+  const vMesAll =useMemo(()=>ventas.filter(v=>v.mk===MK),[ventas,MK]);
   const alqMes  =useMemo(()=>alq.filter(a=>a.mes===mes&&a.anio===anio),[alq,mes,anio]);
   const totalVtas=useMemo(()=>vMes.reduce((s,v)=>s+v.total,0),[vMes]);
 
@@ -4159,8 +4311,23 @@ function App(){
       sbActualizarStock(it.prodId, Math.max(0,(inv.find(i=>i.id===it.prodId)?.stock||0)-it.cantidad));
     });
     drive.syncVenta(vf);
-    sbGuardarVenta(vf); // guardar en nube
+    sbGuardarVenta(vf);
     return vf;
+  }
+
+  function handleAnularVenta(ventaId){
+    const v = ventas.find(x=>x.id===ventaId);
+    if(!v||v.anulada) return;
+    // Devolver stock
+    v.items.forEach(it=>{
+      const actual = inv.find(i=>i.id===it.prodId)?.stock||0;
+      setInv(p=>p.map(i=>i.id===it.prodId?{...i,stock:actual+it.cantidad}:i));
+      sbActualizarStock(it.prodId, actual+it.cantidad);
+    });
+    const vAnulada = {...v, anulada:true, fechaAnulacion:hoy()};
+    setVentas(p=>p.map(x=>x.id===ventaId?vAnulada:x));
+    setVentaDetalle(vAnulada);
+    sbAnularVenta(ventaId);
   }
 
   function toggleAlq(marcaId){
@@ -4362,7 +4529,7 @@ function App(){
 
         {/* VENTAS */}
         {tab==="ventas" && (
-          <VentasTab vMes={vMes} totalVtas={totalVtas} mes={mes} anio={anio}
+          <VentasTab vMes={vMesAll} totalVtas={totalVtas} mes={mes} anio={anio}
             onVentaClick={v=>setVentaDetalle(v)}/>
         )}
 
@@ -4567,6 +4734,7 @@ function App(){
         venta={ventaDetalle}
         numVenta={ventaDetalle?ventaDetalle.id.replace(/\D/g,"").slice(-4).padStart(4,"0"):null}
         onClose={()=>setVentaDetalle(null)}
+        onAnularVenta={handleAnularVenta}
       />
 
       {/* ══ SHEETS ══ */}
@@ -7048,18 +7216,28 @@ function VentasTab({vMes, totalVtas, mes, anio, onVentaClick}){
                 const totalMostrar=itemsMostrar.reduce((s,i)=>s+i.subtotal,0);
                 return (
                   <div key={v.id} onClick={()=>onVentaClick&&onVentaClick(v)}
-                    style={{background:C.bg2,borderRadius:16,padding:"14px 16px",marginBottom:10,
-                      cursor:"pointer",WebkitTapHighlightColor:"transparent"}}>
+                    style={{background:v.anulada?`${C.red}06`:C.bg2,borderRadius:16,
+                      padding:"14px 16px",marginBottom:10,cursor:"pointer",
+                      WebkitTapHighlightColor:"transparent",
+                      opacity:v.anulada?0.7:1,
+                      border:v.anulada?`1px solid ${C.red}30`:"none"}}>
                     <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
                       <div>
-                        <span style={{fontFamily:"monospace",fontSize:12,color:C.gold,fontWeight:700}}>{v.id}</span>
+                        <span style={{fontFamily:"monospace",fontSize:12,color:v.anulada?C.red:C.gold,fontWeight:700}}>
+                          {v.id}{v.anulada?" ⊘":""}</span>
                         <div style={{fontSize:12,color:C.label3,fontFamily:FONT,marginTop:2}}>
                           {v.fecha} {v.hora} · {v.vendedor||"Tienda"}
+                          {v.anulada&&<span style={{color:C.red,fontWeight:600}}> · ANULADA</span>}
                         </div>
                       </div>
                       <div style={{display:"flex",alignItems:"center",gap:8}}>
-                        <Chip color={colorPago(v.metodoPago)}>{iconPago(v.metodoPago)} {labelPago(v.metodoPago)}</Chip>
-                        <span style={{fontSize:18,fontWeight:800,color:C.gold,fontFamily:FONT}}>{$(totalMostrar)}</span>
+                        {v.anulada
+                          ? <Chip color={C.red}>⊘ Anulada</Chip>
+                          : <Chip color={colorPago(v.metodoPago)}>{iconPago(v.metodoPago)} {labelPago(v.metodoPago)}</Chip>
+                        }
+                        <span style={{fontSize:18,fontWeight:800,
+                          color:v.anulada?C.label3:C.gold,fontFamily:FONT,
+                          textDecoration:v.anulada?"line-through":"none"}}>{$(totalMostrar)}</span>
                       </div>
                     </div>
                     {/* Ítems agrupados por marca */}

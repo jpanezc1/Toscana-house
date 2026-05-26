@@ -21537,6 +21537,14 @@
       console.warn("Supabase save venta:", e.message);
     }
   }
+  async function sbAnularVenta(ventaId) {
+    try {
+      const db = await getSupabase();
+      await db.from("ventas").update({ anulada: true }).eq("id", ventaId);
+    } catch (e) {
+      console.warn("Supabase anular venta:", e.message);
+    }
+  }
   async function sbGuardarCierre(key, data) {
     try {
       const db = await getSupabase();
@@ -22236,6 +22244,28 @@
       nitComprador: Number(nitComprador) || 0,
       nombreComprador: (nombreComprador || "Sin Nombre").trim()
     };
+  }
+  async function anularFacturaCUCU(cuf) {
+    const cfg = leerCfgCUCU();
+    if (!cfg.apiKey) throw new Error("Sin API Key de CUCU \u2014 ir a Config \u2192 Facturaci\xF3n.");
+    const base = cfg.endpoint.replace(/\/invoices\/?$/, "");
+    const url = `${base}/invoices/${encodeURIComponent(cuf)}`;
+    const r = await fetch(url, {
+      method: "DELETE",
+      headers: { "Authorization": `Bearer ${cfg.apiKey}`, "Content-Type": "application/json" },
+      signal: AbortSignal.timeout(1e4)
+    });
+    if (!r.ok && r.status !== 404) {
+      let msg = "";
+      try {
+        const j = await r.json();
+        msg = j.message || j.error || JSON.stringify(j);
+      } catch {
+        msg = await r.text();
+      }
+      throw new Error(`CUCU ${r.status}: ${msg.slice(0, 200)}`);
+    }
+    return r.status === 204 ? {} : await r.json().catch(() => ({}));
   }
   async function generarExcelMensual(ventas, inventario, mes, anio, setGenerando, retiros) {
     setGenerando(true);
@@ -23129,7 +23159,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       } catch {
       }
     }
-    const vMes = ventas.filter((v) => v.mk === MK);
+    const vMes = ventas.filter((v) => v.mk === MK && !v.anulada);
     const vMarca = vMes.filter((v) => v.items.some((i) => i.marcaId === marcaId));
     const cerrado = cierres[`${MK}-${marcaId}`]?.cerrado;
     function getMontosMixtos(venta) {
@@ -24129,14 +24159,36 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.red, fontFamily: FONT } }, "\u26A0 ", errMsg)), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: guardarManual, variant: "primary", full: true, icon: "\u{1F4BE}" }, "Guardar Factura")))
     ));
   }
-  function NotaVentaModal({ venta, onClose, numVenta }) {
+  function NotaVentaModal({ venta, onClose, numVenta, onAnularVenta }) {
     if (!venta) return null;
     const [menuOpen, setMenuOpen] = (0, import_react.useState)(false);
     const [showFactura, setShowFactura] = (0, import_react.useState)(false);
+    const [confirmAnulV, setConfirmAnulV] = (0, import_react.useState)(false);
+    const [confirmAnulF, setConfirmAnulF] = (0, import_react.useState)(false);
+    const [anulandoFac, setAnulandoFac] = (0, import_react.useState)(false);
+    const [anulFacMsg, setAnulFacMsg] = (0, import_react.useState)(null);
     const num = numVenta || venta.id.replace(/\D/g, "").slice(-4).padStart(4, "0");
     const facturaGuardada = leerFacturaLocal(venta.id);
+    async function ejecutarAnularFactura() {
+      const fac = leerFacturaLocal(venta.id);
+      if (!fac?.cuf) {
+        setAnulFacMsg({ ok: false, txt: "No hay CUF registrado para esta factura." });
+        return;
+      }
+      setAnulandoFac(true);
+      setAnulFacMsg(null);
+      setConfirmAnulF(false);
+      try {
+        await anularFacturaCUCU(fac.cuf);
+        guardarFacturaLocal(venta.id, { ...fac, anulada: true, fechaAnulacion: (/* @__PURE__ */ new Date()).toLocaleDateString("es-BO") });
+        setAnulFacMsg({ ok: true, txt: "\u2713 Factura anulada en SIAT / CUCU" });
+      } catch (e) {
+        setAnulFacMsg({ ok: false, txt: e.message });
+      }
+      setAnulandoFac(false);
+    }
     const filaInfo = (lbl, val) => /* @__PURE__ */ import_react.default.createElement("div", { style: { borderBottom: `1px solid ${C.sep}`, padding: "10px 0", display: "flex", justifyContent: "space-between", alignItems: "center" } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, color: C.label3, fontFamily: FONT } }, lbl), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, fontWeight: 500, color: C.label, fontFamily: FONT } }, val));
-    return /* @__PURE__ */ import_react.default.createElement(Sheet, { open: !!venta, onClose, title: "Detalle de Nota de venta", tall: true }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 16, flexWrap: "wrap" } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontFamily: "monospace", fontSize: 14, fontWeight: 700, color: C.label } }, "# ", num), /* @__PURE__ */ import_react.default.createElement(Chip, { color: colorPago(venta.metodoPago) }, iconPago(venta.metodoPago), " ", labelPago(venta.metodoPago)), /* @__PURE__ */ import_react.default.createElement(Chip, { color: C.green }, "\u2713 Pagado")), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+    return /* @__PURE__ */ import_react.default.createElement(Sheet, { open: !!venta, onClose, title: "Detalle de Nota de venta", tall: true }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 16, flexWrap: "wrap" } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontFamily: "monospace", fontSize: 14, fontWeight: 700, color: C.label } }, "# ", num), /* @__PURE__ */ import_react.default.createElement(Chip, { color: colorPago(venta.metodoPago) }, iconPago(venta.metodoPago), " ", labelPago(venta.metodoPago)), venta.anulada ? /* @__PURE__ */ import_react.default.createElement(Chip, { color: C.red }, "\u2298 ANULADA") : /* @__PURE__ */ import_react.default.createElement(Chip, { color: C.green }, "\u2713 Pagado"), facturaGuardada && !facturaGuardada.anulada && /* @__PURE__ */ import_react.default.createElement(Chip, { color: C.blue }, "\u{1F9FE} Facturada"), facturaGuardada?.anulada && /* @__PURE__ */ import_react.default.createElement(Chip, { color: C.amber }, "\u{1F9FE} Factura anulada")), /* @__PURE__ */ import_react.default.createElement("div", { style: {
       background: C.bg2,
       borderRadius: 14,
       padding: "0 16px",
@@ -24261,7 +24313,105 @@ Fecha: ${venta.fecha}`);
       },
       /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 22 } }, "\u2B06"),
       /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, fontWeight: 700, color: "#fff", fontFamily: FONT_UI } }, "Compartir")
-    )), /* @__PURE__ */ import_react.default.createElement(
+    )), !venta.anulada && /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 10 } }, facturaGuardada && !facturaGuardada.anulada && /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 8 } }, !confirmAnulF ? /* @__PURE__ */ import_react.default.createElement("button", { onClick: () => setConfirmAnulF(true), style: {
+      width: "100%",
+      background: "none",
+      border: `1.5px solid ${C.amber}`,
+      borderRadius: 14,
+      padding: "12px 10px",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 8,
+      cursor: "pointer",
+      WebkitTapHighlightColor: "transparent"
+    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 18 } }, "\u{1F9FE}"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 14, fontWeight: 600, color: C.amber, fontFamily: FONT_UI } }, "Anular Factura SIAT")) : /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      background: `${C.amber}12`,
+      border: `1.5px solid ${C.amber}40`,
+      borderRadius: 14,
+      padding: 14
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.amber, fontFamily: FONT, marginBottom: 10, textAlign: "center" } }, "\u26A0 \xBFAnular la factura N\xB0 ", facturaGuardada.numero, " en SIAT?", /* @__PURE__ */ import_react.default.createElement("br", null), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 12, color: C.label3 } }, "Esta acci\xF3n no se puede deshacer.")), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 8 } }, /* @__PURE__ */ import_react.default.createElement("button", { onClick: () => setConfirmAnulF(false), style: {
+      flex: 1,
+      padding: "10px",
+      borderRadius: 11,
+      border: `1px solid ${C.sep}`,
+      background: C.bg2,
+      cursor: "pointer",
+      fontFamily: FONT,
+      fontSize: 13,
+      color: C.label2,
+      WebkitTapHighlightColor: "transparent"
+    } }, "Cancelar"), /* @__PURE__ */ import_react.default.createElement("button", { onClick: ejecutarAnularFactura, disabled: anulandoFac, style: {
+      flex: 1,
+      padding: "10px",
+      borderRadius: 11,
+      border: "none",
+      background: C.amber,
+      cursor: "pointer",
+      fontFamily: FONT,
+      fontSize: 13,
+      fontWeight: 700,
+      color: "#fff",
+      WebkitTapHighlightColor: "transparent"
+    } }, anulandoFac ? "Anulando\u2026" : "S\xED, anular"))), anulFacMsg && /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      marginTop: 8,
+      padding: "10px 12px",
+      borderRadius: 10,
+      background: anulFacMsg.ok ? `${C.green}12` : `${C.red}12`,
+      border: `1px solid ${anulFacMsg.ok ? C.green : C.red}30`
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: anulFacMsg.ok ? C.green : C.red, fontFamily: FONT } }, anulFacMsg.txt))), !confirmAnulV ? /* @__PURE__ */ import_react.default.createElement("button", { onClick: () => setConfirmAnulV(true), style: {
+      width: "100%",
+      background: "none",
+      border: `1.5px solid ${C.red}`,
+      borderRadius: 14,
+      padding: "12px 10px",
+      marginBottom: 4,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 8,
+      cursor: "pointer",
+      WebkitTapHighlightColor: "transparent"
+    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 18 } }, "\u2298"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 14, fontWeight: 600, color: C.red, fontFamily: FONT_UI } }, "Anular Venta")) : /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      background: `${C.red}10`,
+      border: `1.5px solid ${C.red}40`,
+      borderRadius: 14,
+      padding: 14,
+      marginBottom: 4
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.red, fontFamily: FONT, marginBottom: 4, textAlign: "center", fontWeight: 600 } }, "\xBFAnular la venta #", num, "?"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT, marginBottom: 10, textAlign: "center" } }, "Se devolver\xE1 el stock de ", venta.items.length, " producto", venta.items.length > 1 ? "s" : "", ".", facturaGuardada && !facturaGuardada.anulada && " La factura SIAT quedar\xE1 activa \u2014 anul\xE1la primero si es necesario."), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 8 } }, /* @__PURE__ */ import_react.default.createElement("button", { onClick: () => setConfirmAnulV(false), style: {
+      flex: 1,
+      padding: "10px",
+      borderRadius: 11,
+      border: `1px solid ${C.sep}`,
+      background: C.bg2,
+      cursor: "pointer",
+      fontFamily: FONT,
+      fontSize: 13,
+      color: C.label2,
+      WebkitTapHighlightColor: "transparent"
+    } }, "Cancelar"), /* @__PURE__ */ import_react.default.createElement("button", { onClick: () => {
+      onAnularVenta && onAnularVenta(venta.id);
+      setConfirmAnulV(false);
+    }, style: {
+      flex: 1,
+      padding: "10px",
+      borderRadius: 11,
+      border: "none",
+      background: C.red,
+      cursor: "pointer",
+      fontFamily: FONT,
+      fontSize: 13,
+      fontWeight: 700,
+      color: "#fff",
+      WebkitTapHighlightColor: "transparent"
+    } }, "S\xED, anular")))), venta.anulada && /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      background: `${C.red}10`,
+      border: `1.5px solid ${C.red}30`,
+      borderRadius: 14,
+      padding: 14,
+      marginBottom: 10,
+      textAlign: "center"
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 18, marginBottom: 4 } }, "\u2298"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 15, fontWeight: 700, color: C.red, fontFamily: FONT } }, "Venta Anulada"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT, marginTop: 4 } }, "Anulada el ", venta.fechaAnulacion || "\u2014", " \xB7 Stock restituido")), !venta.anulada && /* @__PURE__ */ import_react.default.createElement(
       "button",
       {
         onClick: () => setShowFactura(true),
@@ -25458,7 +25608,8 @@ Fecha: ${venta.fecha}`);
       });
     }, []);
     const MK = (0, import_react.useMemo)(() => mkKey(mes, anio), [mes, anio]);
-    const vMes = (0, import_react.useMemo)(() => ventas.filter((v) => v.mk === MK), [ventas, MK]);
+    const vMes = (0, import_react.useMemo)(() => ventas.filter((v) => v.mk === MK && !v.anulada), [ventas, MK]);
+    const vMesAll = (0, import_react.useMemo)(() => ventas.filter((v) => v.mk === MK), [ventas, MK]);
     const alqMes = (0, import_react.useMemo)(() => alq.filter((a) => a.mes === mes && a.anio === anio), [alq, mes, anio]);
     const totalVtas = (0, import_react.useMemo)(() => vMes.reduce((s, v) => s + v.total, 0), [vMes]);
     const invFil = (0, import_react.useMemo)(() => {
@@ -25536,6 +25687,19 @@ Fecha: ${venta.fecha}`);
       drive.syncVenta(vf);
       sbGuardarVenta(vf);
       return vf;
+    }
+    function handleAnularVenta(ventaId) {
+      const v = ventas.find((x) => x.id === ventaId);
+      if (!v || v.anulada) return;
+      v.items.forEach((it) => {
+        const actual = inv.find((i) => i.id === it.prodId)?.stock || 0;
+        setInv((p) => p.map((i) => i.id === it.prodId ? { ...i, stock: actual + it.cantidad } : i));
+        sbActualizarStock(it.prodId, actual + it.cantidad);
+      });
+      const vAnulada = { ...v, anulada: true, fechaAnulacion: hoy() };
+      setVentas((p) => p.map((x) => x.id === ventaId ? vAnulada : x));
+      setVentaDetalle(vAnulada);
+      sbAnularVenta(ventaId);
     }
     function toggleAlq(marcaId) {
       const e = alqMes.find((a) => a.marcaId === marcaId);
@@ -25756,7 +25920,7 @@ Fecha: ${venta.fecha}`);
     ), tab === "ventas" && /* @__PURE__ */ import_react.default.createElement(
       VentasTab,
       {
-        vMes,
+        vMes: vMesAll,
         totalVtas,
         mes,
         anio,
@@ -25961,7 +26125,8 @@ Fecha: ${venta.fecha}`);
       {
         venta: ventaDetalle,
         numVenta: ventaDetalle ? ventaDetalle.id.replace(/\D/g, "").slice(-4).padStart(4, "0") : null,
-        onClose: () => setVentaDetalle(null)
+        onClose: () => setVentaDetalle(null),
+        onAnularVenta: handleAnularVenta
       }
     ), /* @__PURE__ */ import_react.default.createElement(
       SheetRecibir,
@@ -28412,15 +28577,23 @@ Fecha: ${venta.fecha}`);
           key: v.id,
           onClick: () => onVentaClick && onVentaClick(v),
           style: {
-            background: C.bg2,
+            background: v.anulada ? `${C.red}06` : C.bg2,
             borderRadius: 16,
             padding: "14px 16px",
             marginBottom: 10,
             cursor: "pointer",
-            WebkitTapHighlightColor: "transparent"
+            WebkitTapHighlightColor: "transparent",
+            opacity: v.anulada ? 0.7 : 1,
+            border: v.anulada ? `1px solid ${C.red}30` : "none"
           }
         },
-        /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontFamily: "monospace", fontSize: 12, color: C.gold, fontWeight: 700 } }, v.id), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT, marginTop: 2 } }, v.fecha, " ", v.hora, " \xB7 ", v.vendedor || "Tienda")), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } }, /* @__PURE__ */ import_react.default.createElement(Chip, { color: colorPago(v.metodoPago) }, iconPago(v.metodoPago), " ", labelPago(v.metodoPago)), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 18, fontWeight: 800, color: C.gold, fontFamily: FONT } }, $(totalMostrar)))),
+        /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontFamily: "monospace", fontSize: 12, color: v.anulada ? C.red : C.gold, fontWeight: 700 } }, v.id, v.anulada ? " \u2298" : ""), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT, marginTop: 2 } }, v.fecha, " ", v.hora, " \xB7 ", v.vendedor || "Tienda", v.anulada && /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.red, fontWeight: 600 } }, " \xB7 ANULADA"))), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } }, v.anulada ? /* @__PURE__ */ import_react.default.createElement(Chip, { color: C.red }, "\u2298 Anulada") : /* @__PURE__ */ import_react.default.createElement(Chip, { color: colorPago(v.metodoPago) }, iconPago(v.metodoPago), " ", labelPago(v.metodoPago)), /* @__PURE__ */ import_react.default.createElement("span", { style: {
+          fontSize: 18,
+          fontWeight: 800,
+          color: v.anulada ? C.label3 : C.gold,
+          fontFamily: FONT,
+          textDecoration: v.anulada ? "line-through" : "none"
+        } }, $(totalMostrar)))),
         (() => {
           const byMarca = {};
           itemsMostrar.forEach((it) => {
