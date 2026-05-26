@@ -658,6 +658,46 @@ function descargarArchivo(blob, nombre) {
   URL.revokeObjectURL(url);
 }
 
+// ── Helpers de liquidación para planillas Excel ───────────────
+function leerCfgLiq(MK, marcaId) {
+  const key = `th_liq_cfg_${MK}_${marcaId}`;
+  const def = { pctQR: 2, pctTarjeta: 2.5, pctComision: 10, alquiler: 0 };
+  try { return { ...def, ...JSON.parse(localStorage.getItem(key) || "{}") }; }
+  catch { return def; }
+}
+function parseMixtoXls(metodoPago, total) {
+  if (metodoPago?.startsWith("mixto|")) {
+    const obj = { efectivo: 0, qr: 0, tarjeta: 0 };
+    metodoPago.split("|").slice(1).forEach(p => { const [k, v] = p.split(":"); obj[k] = parseFloat(v) || 0; });
+    const s = obj.efectivo + obj.qr + obj.tarjeta;
+    return s > 0 ? obj : { efectivo: total, qr: 0, tarjeta: 0 };
+  }
+  if (metodoPago === "qr")      return { efectivo: 0, qr: total, tarjeta: 0 };
+  if (metodoPago === "tarjeta") return { efectivo: 0, qr: 0, tarjeta: total };
+  return { efectivo: total, qr: 0, tarjeta: 0 };
+}
+function calcLiqMarca(vMarca, marcaId, MK) {
+  const cfg = leerCfgLiq(MK, marcaId);
+  let brutoEf = 0, brutoQR = 0, brutoTJ = 0;
+  vMarca.forEach(v => {
+    const sub   = v.items.filter(i => i.marcaId === marcaId).reduce((s, i) => s + i.subtotal, 0);
+    const vTot  = v.total || sub;
+    const pct   = vTot > 0 ? sub / vTot : 1;
+    const m     = parseMixtoXls(v.metodoPago, v.total);
+    brutoEf += m.efectivo * pct;
+    brutoQR += m.qr * pct;
+    brutoTJ += m.tarjeta * pct;
+  });
+  const bruto    = brutoEf + brutoQR + brutoTJ;
+  const descQR   = brutoQR  * (Number(cfg.pctQR)       || 0) / 100;
+  const descTJ   = brutoTJ  * (Number(cfg.pctTarjeta)   || 0) / 100;
+  const subBanco = bruto - descQR - descTJ;
+  const comision = subBanco * (Number(cfg.pctComision)  || 0) / 100;
+  const alquiler = Number(cfg.alquiler) || 0;
+  const neto     = subBanco - comision - alquiler;
+  return { bruto, brutoEf, brutoQR, brutoTJ, descQR, descTJ, subBanco, comision, alquiler, neto, cfg };
+}
+
 // ── REPORTE MENSUAL COMPLETO (todas las marcas, una pestaña c/u) ──
 async function generarExcelMensual(ventas, inventario, mes, anio, setGenerando, retiros) {
   setGenerando(true);
@@ -672,35 +712,40 @@ async function generarExcelMensual(ventas, inventario, mes, anio, setGenerando, 
       [`TOSCANA HOUSE — REPORTE MENSUAL ${mesNom.toUpperCase()} ${anio}`],
       [`Generado: ${new Date().toLocaleString("es-BO")}`],
       [],
-      ["Marca","Ventas brutas (Bs)","Comisión 10%","Neto a pagar (Bs)","N° Ventas","Unidades vendidas","Estado"],
+      ["Marca","Ventas brutas (Bs)","Desc. QR","Desc. Tarjeta","Subtotal","Comisión %","Comisión (Bs)","Alquiler","Neto a pagar (Bs)","N° Ventas","Uds. vendidas","Estado"],
     ];
 
     let totalBruto = 0, totalNeto = 0, totalVentas = 0;
     const ventasMes = ventas.filter(v => v.mk === MK);
 
     MARCAS.forEach(m => {
-      const vM   = ventasMes.filter(v => v.items.some(i => i.marcaId === m.id));
-      const bruto= vM.reduce((s,v) => s + v.items.filter(i=>i.marcaId===m.id).reduce((ss,i)=>ss+i.subtotal,0), 0);
-      const uds  = vM.reduce((s,v) => s + v.items.filter(i=>i.marcaId===m.id).reduce((ss,i)=>ss+i.cantidad,0), 0);
-      totalBruto += bruto; totalNeto += bruto * 0.9; totalVentas += vM.length;
+      const vM  = ventasMes.filter(v => v.items.some(i => i.marcaId === m.id));
+      const uds = vM.reduce((s,v) => s + v.items.filter(i=>i.marcaId===m.id).reduce((ss,i)=>ss+i.cantidad,0), 0);
+      const liq = calcLiqMarca(vM, m.id, MK);
+      totalBruto += liq.bruto; totalNeto += liq.neto; totalVentas += vM.length;
       resumenRows.push([
         m.nombre,
-        bruto,
-        +(bruto * 0.1).toFixed(2),
-        +(bruto * 0.9).toFixed(2),
+        +liq.bruto.toFixed(2),
+        +liq.descQR.toFixed(2),
+        +liq.descTJ.toFixed(2),
+        +liq.subBanco.toFixed(2),
+        `${liq.cfg.pctComision}%`,
+        +liq.comision.toFixed(2),
+        +liq.alquiler.toFixed(2),
+        +liq.neto.toFixed(2),
         vM.length,
         uds,
-        bruto > 0 ? "Con ventas" : "Sin ventas",
+        liq.bruto > 0 ? "Con ventas" : "Sin ventas",
       ]);
     });
 
     resumenRows.push(
       [],
-      ["TOTAL GENERAL", totalBruto, +(totalBruto*0.1).toFixed(2), +(totalNeto).toFixed(2), totalVentas, "", ""]
+      ["TOTAL GENERAL", +totalBruto.toFixed(2), "","","","","","", +totalNeto.toFixed(2), totalVentas, "", ""]
     );
 
     const wsResumen = XLSX.utils.aoa_to_sheet(resumenRows);
-    wsResumen["!cols"] = [{wch:22},{wch:20},{wch:16},{wch:20},{wch:12},{wch:18},{wch:14}];
+    wsResumen["!cols"] = [{wch:22},{wch:18},{wch:12},{wch:14},{wch:14},{wch:12},{wch:14},{wch:12},{wch:18},{wch:10},{wch:13},{wch:14}];
     XLSX.utils.book_append_sheet(wb, wsResumen, "📊 Resumen");
 
     // ── Una pestaña por cada marca ───────────────────────────
@@ -713,7 +758,6 @@ async function generarExcelMensual(ventas, inventario, mes, anio, setGenerando, 
         ["ID Venta","Fecha","Hora","Código","Producto","Categoría","Cantidad","Precio Unit. (Bs)","Subtotal (Bs)","Desc%","Método Pago","Vendedor"],
       ];
 
-      let brutoMarca = 0;
       if (vMarca.length === 0) {
         rows.push(["Sin ventas en este período"]);
       } else {
@@ -725,17 +769,21 @@ async function generarExcelMensual(ventas, inventario, mes, anio, setGenerando, 
               it.cantidad, it.precioUnit, it.subtotal,
               v.descPct||0, v.metodoPago, v.vendedor||"Tienda"
             ]);
-            brutoMarca += it.subtotal;
           });
         });
       }
 
-      // Totales
+      // Totales con config real de liquidación
+      const liqM = calcLiqMarca(vMarca, m.id, MK);
       rows.push(
         [],
-        ["","","","","","","","VENTAS BRUTAS",brutoMarca,"","",""],
-        ["","","","","","","","COMISIÓN 10%",+(brutoMarca*0.1).toFixed(2),"","",""],
-        ["","","","","","","","NETO A PAGAR",+(brutoMarca*0.9).toFixed(2),"","",""],
+        ["","","","","","","","VENTAS BRUTAS",       +liqM.bruto.toFixed(2),"","",""],
+        ["","","","","","","",`− Desc. QR (${liqM.cfg.pctQR}%)`,      -liqM.descQR.toFixed(2),"","",""],
+        ["","","","","","","",`− Desc. Tarjeta (${liqM.cfg.pctTarjeta}%)`, -liqM.descTJ.toFixed(2),"","",""],
+        ["","","","","","","","SUBTOTAL BANCO",       +liqM.subBanco.toFixed(2),"","",""],
+        ["","","","","","","",`− Comisión (${liqM.cfg.pctComision}%)`, -liqM.comision.toFixed(2),"","",""],
+        ["","","","","","","","− Alquiler",           -liqM.alquiler.toFixed(2),"","",""],
+        ["","","","","","","","NETO A PAGAR",          +liqM.neto.toFixed(2),"","",""],
       );
 
       const ws = XLSX.utils.aoa_to_sheet(rows);
@@ -881,14 +929,22 @@ async function generarExcelMarca(marca, ventas, inventario, setGenerando) {
           [],
           ["ID Venta","Fecha","Hora","Código","Producto","Categoría","Cantidad","Precio Unit.","Subtotal","Desc%","Pago","Vendedor"],
         ];
-        let bruto = 0;
         p.ventas.forEach(v => {
           v.items.filter(i => i.marcaId === marca.id).forEach(it => {
             rows.push([v.id, v.fecha, v.hora, it.codigo, it.nombre, it.categoria||"", it.cantidad, it.precioUnit, it.subtotal, v.descPct||0, v.metodoPago, v.vendedor||"Tienda"]);
-            bruto += it.subtotal;
           });
         });
-        rows.push([], ["","","","","","","","Bruto",bruto,"","",""], ["","","","","","","","Comisión 10%",+(bruto*.1).toFixed(2),"","",""], ["","","","","","","","Neto",+(bruto*.9).toFixed(2),"","",""]);
+        const liqP = calcLiqMarca(p.ventas, marca.id, p.mk);
+        rows.push(
+          [],
+          ["","","","","","","","Ventas brutas",        +liqP.bruto.toFixed(2),"","",""],
+          ["","","","","","","",`− Desc. QR (${liqP.cfg.pctQR}%)`,       -liqP.descQR.toFixed(2),"","",""],
+          ["","","","","","","",`− Desc. Tarjeta (${liqP.cfg.pctTarjeta}%)`, -liqP.descTJ.toFixed(2),"","",""],
+          ["","","","","","","","Subtotal banco",        +liqP.subBanco.toFixed(2),"","",""],
+          ["","","","","","","",`− Comisión (${liqP.cfg.pctComision}%)`,  -liqP.comision.toFixed(2),"","",""],
+          ["","","","","","","","− Alquiler",            -liqP.alquiler.toFixed(2),"","",""],
+          ["","","","","","","","Neto",                  +liqP.neto.toFixed(2),"","",""],
+        );
         const ws = XLSX.utils.aoa_to_sheet(rows);
         ws["!cols"] = [{wch:16},{wch:12},{wch:8},{wch:16},{wch:24},{wch:14},{wch:8},{wch:16},{wch:14},{wch:6},{wch:12},{wch:14}];
         XLSX.utils.book_append_sheet(wb, ws, `${mesNom} ${p.anio}`.slice(0,31));
@@ -979,14 +1035,18 @@ function exportCSV(marca,ventas,mes,anio){
   const MK=mkKey(mes,anio);
   const vm=ventas.filter(v=>v.mk===MK&&v.items.some(i=>i.marcaId===marca.id));
   const rows=[["ID","Fecha","Hora","Código","Producto","Cant.","Precio","Subtotal","Desc%","Pago"]];
-  let bruto=0;
   vm.forEach(v=>v.items.filter(i=>i.marcaId===marca.id).forEach(it=>{
     rows.push([v.id,v.fecha,v.hora,it.codigo,it.nombre,it.cantidad,it.precioUnit,it.subtotal,v.descPct||0,v.metodoPago]);
-    bruto+=it.subtotal;
   }));
-  rows.push([],["Bruto","","","","","","",bruto,"",""],
-               ["Comisión 10%","","","","","","",-bruto*.1,"",""],
-               ["Neto","","","","","","",bruto*.9,"",""]);
+  const liq=calcLiqMarca(vm,marca.id,MK);
+  rows.push([],
+    ["Ventas brutas","","","","","","",+liq.bruto.toFixed(2),"",""],
+    [`Desc. QR (${liq.cfg.pctQR}%)`, "","","","","","",-liq.descQR.toFixed(2),"",""],
+    [`Desc. Tarjeta (${liq.cfg.pctTarjeta}%)`, "","","","","","",-liq.descTJ.toFixed(2),"",""],
+    ["Subtotal banco","","","","","","",+liq.subBanco.toFixed(2),"",""],
+    [`Comisión (${liq.cfg.pctComision}%)`, "","","","","","",-liq.comision.toFixed(2),"",""],
+    ["Alquiler","","","","","","",-liq.alquiler.toFixed(2),"",""],
+    ["Neto","","","","","","",+liq.neto.toFixed(2),"",""]);
   const csv=rows.map(r=>r.map(c=>String(c).includes(",")?`"${c}"`:c).join(",")).join("\n");
   const blob=new Blob(["\uFEFF"+csv],{type:"text/csv;charset=utf-8;"});
   const url=URL.createObjectURL(blob);
