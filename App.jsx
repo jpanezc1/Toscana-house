@@ -2777,92 +2777,152 @@ function ClockWidget(){
 // HOME DASHBOARD — vista en tiempo real (KPIs, chart, feed)
 // ══════════════════════════════════════════════════════════
 function CameraScanner({onDetect, onClose}){
-  const idRef = useRef("th-qr-" + Date.now());
-  const scannerRef = useRef(null);
-  const [status, setStatus] = useState("cargando"); // cargando | activo | error
+  // Stable unique ID for the container div (never changes between renders)
+  const containerId = useRef("thqr_" + Math.random().toString(36).slice(2,8)).current;
+  const scannerRef  = useRef(null);
+  const firedRef    = useRef(false); // prevent double-fire
+  const [status, setStatus] = useState("cargando");
 
   useEffect(()=>{
-    let stopped = false;
-    loadHtml5Qrcode().then(Html5Qrcode => {
-      if(stopped) return;
-      const scanner = new Html5Qrcode(idRef.current, {verbose:false});
-      scannerRef.current = scanner;
-      const config = {
-        fps: 15,
-        qrbox: { width: 250, height: 250 },
-        aspectRatio: 1.0,
-        formatsToSupport: [0,1,2,3,4,5,6,7,8,9,10,11,12,13],
-      };
-      scanner.start(
-        { facingMode: "environment" },
-        config,
-        (decodedText) => {
-          try{ if(navigator.vibrate) navigator.vibrate(100); }catch(e){}
-          try{
-            const ctx = new (window.AudioContext||window.webkitAudioContext)();
-            const osc = ctx.createOscillator();
-            const gain = ctx.createGain();
-            osc.connect(gain); gain.connect(ctx.destination);
-            osc.frequency.value = 880; gain.gain.value = 0.3;
-            osc.start(); osc.stop(ctx.currentTime + 0.12);
-          }catch(e){}
-          scanner.stop().catch(()=>{});
-          onDetect(decodedText);
-        },
-        () => {}
-      ).then(()=>{ if(!stopped) setStatus("activo"); })
-       .catch(err=>{ if(!stopped){ setStatus("error"); console.warn("Scanner error:", err); }});
-    }).catch(()=>{ if(!stopped) setStatus("error"); });
+    let mounted = true;
+
+    async function start(){
+      try{
+        const Html5Qrcode = await loadHtml5Qrcode();
+        if(!mounted) return;
+
+        // Constructor: verbose:false only — NO formatsToSupport here (it breaks the lib)
+        const scanner = new Html5Qrcode(containerId, {verbose:false});
+        scannerRef.current = scanner;
+
+        // Use qrbox as function so it adapts to any screen size
+        const qrboxFn = (w, h) => {
+          const side = Math.floor(Math.min(w, h) * 0.72);
+          return {width: side, height: side};
+        };
+
+        await scanner.start(
+          {facingMode:"environment"},
+          {fps:12, qrbox:qrboxFn, aspectRatio:window.innerHeight/window.innerWidth},
+          (text) => {
+            if(firedRef.current) return; // ignore duplicate frames
+            firedRef.current = true;
+            // Haptic + beep
+            try{ navigator.vibrate && navigator.vibrate(180); }catch(_){}
+            try{
+              const ac = new (window.AudioContext||window.webkitAudioContext)();
+              const o=ac.createOscillator(), g=ac.createGain();
+              o.connect(g); g.connect(ac.destination);
+              o.frequency.value=1046; g.gain.value=0.25;
+              o.start(); o.stop(ac.currentTime+0.1);
+              setTimeout(()=>ac.close(),400);
+            }catch(_){}
+            // Stop scanner then notify parent
+            scanner.stop().catch(()=>{}).finally(()=>{ if(mounted) onDetect(text); });
+          },
+          ()=>{} // per-frame errors — normal, ignore
+        );
+
+        if(mounted) setStatus("activo");
+      }catch(err){
+        console.warn("CameraScanner error:", err);
+        if(mounted) setStatus("error");
+      }
+    }
+
+    start();
 
     return ()=>{
-      stopped = true;
+      mounted = false;
       if(scannerRef.current){
         scannerRef.current.stop().catch(()=>{});
+        // clear() removes the video element from DOM
+        try{ scannerRef.current.clear(); }catch(_){}
       }
     };
-  },[]);
+  },[]); // eslint-disable-line
+
+  function handleClose(){
+    if(scannerRef.current) scannerRef.current.stop().catch(()=>{});
+    onClose();
+  }
 
   return (
-    <div style={{position:"fixed",inset:0,zIndex:9500,background:"#000",
-      display:"flex",flexDirection:"column"}}>
-      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",
-        padding:"12px 16px",background:"rgba(0,0,0,0.7)",zIndex:2}}>
-        <div style={{fontSize:16,fontWeight:700,color:"#fff"}}>
-          {status==="cargando"?"⏳ Iniciando cámara…":status==="activo"?"📷 Apunta al código":"⚠ Error de cámara"}
+    <div style={{
+      position:"fixed", inset:0, zIndex:9500,
+      background:"#000", display:"flex", flexDirection:"column",
+    }}>
+      {/* ── top bar ── */}
+      <div style={{
+        flexShrink:0,
+        display:"flex", alignItems:"center", justifyContent:"space-between",
+        padding:"calc(env(safe-area-inset-top,0px) + 12px) 16px 12px",
+        background:"rgba(0,0,0,0.85)",
+      }}>
+        <div style={{fontSize:15,fontWeight:700,color:"#fff"}}>
+          {status==="cargando" ? "⏳ Abriendo cámara…"
+           : status==="activo" ? "📷 Apunta al código"
+           : "⚠ Sin acceso a cámara"}
         </div>
-        <button onClick={onClose} style={{
-          background:"rgba(255,255,255,0.2)",border:"1px solid rgba(255,255,255,0.3)",
-          borderRadius:8,padding:"8px 14px",color:"#fff",fontSize:14,
-          cursor:"pointer",fontWeight:600}}>
-          Cerrar
-        </button>
+        <button onClick={handleClose} style={{
+          background:"rgba(255,255,255,0.15)",
+          border:"1px solid rgba(255,255,255,0.35)",
+          borderRadius:9, padding:"8px 16px",
+          color:"#fff", fontSize:14, fontWeight:700, cursor:"pointer",
+        }}>✕ Cerrar</button>
       </div>
-      <div style={{flex:1,position:"relative",overflow:"hidden"}}>
-        <div id={idRef.current} style={{width:"100%",height:"100%"}}/>
-        {status==="cargando"&&(
-          <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",
-            justifyContent:"center",background:"rgba(0,0,0,0.6)"}}>
-            <div style={{color:"#fff",fontSize:16,textAlign:"center"}}>
-              <div style={{fontSize:32,marginBottom:12}}>📷</div>
-              Iniciando cámara…
-            </div>
+
+      {/* ── camera feed — html5-qrcode mounts video here ── */}
+      <div style={{flex:1, position:"relative", overflow:"hidden", minHeight:0}}>
+        {/* This div must exist in the DOM before useEffect fires — it does, because
+            React renders before effects run. html5-qrcode will inject video into it. */}
+        <div id={containerId} style={{width:"100%", height:"100%"}}/>
+
+        {/* Loading overlay */}
+        {status==="cargando" && (
+          <div style={{
+            position:"absolute", inset:0,
+            display:"flex", flexDirection:"column",
+            alignItems:"center", justifyContent:"center", background:"#000",
+          }}>
+            <div style={{fontSize:52, marginBottom:14}}>📷</div>
+            <div style={{color:"#fff", fontSize:16}}>Iniciando cámara…</div>
           </div>
         )}
-        {status==="error"&&(
-          <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",
-            justifyContent:"center",background:"rgba(0,0,0,0.8)"}}>
-            <div style={{color:"#fff",fontSize:15,textAlign:"center",padding:20}}>
-              <div style={{fontSize:40,marginBottom:12}}>⚠️</div>
-              <div style={{marginBottom:8}}>No se pudo acceder a la cámara.</div>
-              <div style={{fontSize:12,color:"#aaa"}}>Verifica los permisos de cámara en tu navegador.</div>
+
+        {/* Error overlay */}
+        {status==="error" && (
+          <div style={{
+            position:"absolute", inset:0,
+            display:"flex", flexDirection:"column",
+            alignItems:"center", justifyContent:"center",
+            background:"#111", padding:28, textAlign:"center",
+          }}>
+            <div style={{fontSize:52, marginBottom:14}}>⚠️</div>
+            <div style={{color:"#fff", fontSize:16, marginBottom:10, fontWeight:700}}>
+              No se pudo acceder a la cámara
             </div>
+            <div style={{color:"#aaa", fontSize:13, lineHeight:1.6}}>
+              Ve a Ajustes → Safari/Chrome → Cámara → Permitir
+            </div>
+            <button onClick={handleClose} style={{
+              marginTop:24, background:"rgba(255,255,255,0.15)",
+              border:"1px solid rgba(255,255,255,0.3)", borderRadius:10,
+              padding:"10px 24px", color:"#fff", fontSize:14, cursor:"pointer",
+            }}>Cerrar</button>
           </div>
         )}
       </div>
-      {status==="activo"&&(
-        <div style={{padding:"12px 16px",background:"rgba(0,0,0,0.7)",
-          textAlign:"center",color:"rgba(255,255,255,0.7)",fontSize:13}}>
-          Centra el código de barras o QR en el recuadro
+
+      {/* ── bottom hint ── */}
+      {status==="activo" && (
+        <div style={{
+          flexShrink:0,
+          padding:"12px 16px calc(env(safe-area-inset-bottom,0px) + 12px)",
+          background:"rgba(0,0,0,0.85)",
+          textAlign:"center", color:"rgba(255,255,255,0.65)", fontSize:13,
+        }}>
+          Centra el código en el recuadro — se detecta automáticamente
         </div>
       )}
     </div>

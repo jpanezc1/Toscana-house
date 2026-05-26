@@ -24215,66 +24215,77 @@ Fecha: ${venta.fecha}`);
     } }, clock);
   }
   function CameraScanner({ onDetect, onClose }) {
-    const idRef = (0, import_react.useRef)("th-qr-" + Date.now());
+    const containerId = (0, import_react.useRef)("thqr_" + Math.random().toString(36).slice(2, 8)).current;
     const scannerRef = (0, import_react.useRef)(null);
+    const firedRef = (0, import_react.useRef)(false);
     const [status, setStatus] = (0, import_react.useState)("cargando");
     (0, import_react.useEffect)(() => {
-      let stopped = false;
-      loadHtml5Qrcode().then((Html5Qrcode) => {
-        if (stopped) return;
-        const scanner = new Html5Qrcode(idRef.current, { verbose: false });
-        scannerRef.current = scanner;
-        const config = {
-          fps: 15,
-          qrbox: { width: 250, height: 250 },
-          aspectRatio: 1,
-          formatsToSupport: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]
-        };
-        scanner.start(
-          { facingMode: "environment" },
-          config,
-          (decodedText) => {
-            try {
-              if (navigator.vibrate) navigator.vibrate(100);
-            } catch (e) {
+      let mounted = true;
+      async function start() {
+        try {
+          const Html5Qrcode = await loadHtml5Qrcode();
+          if (!mounted) return;
+          const scanner = new Html5Qrcode(containerId, { verbose: false });
+          scannerRef.current = scanner;
+          const qrboxFn = (w, h) => {
+            const side = Math.floor(Math.min(w, h) * 0.72);
+            return { width: side, height: side };
+          };
+          await scanner.start(
+            { facingMode: "environment" },
+            { fps: 12, qrbox: qrboxFn, aspectRatio: window.innerHeight / window.innerWidth },
+            (text) => {
+              if (firedRef.current) return;
+              firedRef.current = true;
+              try {
+                navigator.vibrate && navigator.vibrate(180);
+              } catch (_) {
+              }
+              try {
+                const ac = new (window.AudioContext || window.webkitAudioContext)();
+                const o = ac.createOscillator(), g = ac.createGain();
+                o.connect(g);
+                g.connect(ac.destination);
+                o.frequency.value = 1046;
+                g.gain.value = 0.25;
+                o.start();
+                o.stop(ac.currentTime + 0.1);
+                setTimeout(() => ac.close(), 400);
+              } catch (_) {
+              }
+              scanner.stop().catch(() => {
+              }).finally(() => {
+                if (mounted) onDetect(text);
+              });
+            },
+            () => {
             }
-            try {
-              const ctx = new (window.AudioContext || window.webkitAudioContext)();
-              const osc = ctx.createOscillator();
-              const gain = ctx.createGain();
-              osc.connect(gain);
-              gain.connect(ctx.destination);
-              osc.frequency.value = 880;
-              gain.gain.value = 0.3;
-              osc.start();
-              osc.stop(ctx.currentTime + 0.12);
-            } catch (e) {
-            }
-            scanner.stop().catch(() => {
-            });
-            onDetect(decodedText);
-          },
-          () => {
-          }
-        ).then(() => {
-          if (!stopped) setStatus("activo");
-        }).catch((err) => {
-          if (!stopped) {
-            setStatus("error");
-            console.warn("Scanner error:", err);
-          }
-        });
-      }).catch(() => {
-        if (!stopped) setStatus("error");
-      });
+            // per-frame errors — normal, ignore
+          );
+          if (mounted) setStatus("activo");
+        } catch (err) {
+          console.warn("CameraScanner error:", err);
+          if (mounted) setStatus("error");
+        }
+      }
+      start();
       return () => {
-        stopped = true;
+        mounted = false;
         if (scannerRef.current) {
           scannerRef.current.stop().catch(() => {
           });
+          try {
+            scannerRef.current.clear();
+          } catch (_) {
+          }
         }
       };
     }, []);
+    function handleClose() {
+      if (scannerRef.current) scannerRef.current.stop().catch(() => {
+      });
+      onClose();
+    }
     return /* @__PURE__ */ import_react.default.createElement("div", { style: {
       position: "fixed",
       inset: 0,
@@ -24283,42 +24294,56 @@ Fecha: ${venta.fecha}`);
       display: "flex",
       flexDirection: "column"
     } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      flexShrink: 0,
       display: "flex",
       alignItems: "center",
       justifyContent: "space-between",
-      padding: "12px 16px",
-      background: "rgba(0,0,0,0.7)",
-      zIndex: 2
-    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 16, fontWeight: 700, color: "#fff" } }, status === "cargando" ? "\u23F3 Iniciando c\xE1mara\u2026" : status === "activo" ? "\u{1F4F7} Apunta al c\xF3digo" : "\u26A0 Error de c\xE1mara"), /* @__PURE__ */ import_react.default.createElement("button", { onClick: onClose, style: {
-      background: "rgba(255,255,255,0.2)",
-      border: "1px solid rgba(255,255,255,0.3)",
-      borderRadius: 8,
-      padding: "8px 14px",
+      padding: "calc(env(safe-area-inset-top,0px) + 12px) 16px 12px",
+      background: "rgba(0,0,0,0.85)"
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 15, fontWeight: 700, color: "#fff" } }, status === "cargando" ? "\u23F3 Abriendo c\xE1mara\u2026" : status === "activo" ? "\u{1F4F7} Apunta al c\xF3digo" : "\u26A0 Sin acceso a c\xE1mara"), /* @__PURE__ */ import_react.default.createElement("button", { onClick: handleClose, style: {
+      background: "rgba(255,255,255,0.15)",
+      border: "1px solid rgba(255,255,255,0.35)",
+      borderRadius: 9,
+      padding: "8px 16px",
       color: "#fff",
       fontSize: 14,
-      cursor: "pointer",
-      fontWeight: 600
-    } }, "Cerrar")), /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1, position: "relative", overflow: "hidden" } }, /* @__PURE__ */ import_react.default.createElement("div", { id: idRef.current, style: { width: "100%", height: "100%" } }), status === "cargando" && /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      fontWeight: 700,
+      cursor: "pointer"
+    } }, "\u2715 Cerrar")), /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1, position: "relative", overflow: "hidden", minHeight: 0 } }, /* @__PURE__ */ import_react.default.createElement("div", { id: containerId, style: { width: "100%", height: "100%" } }), status === "cargando" && /* @__PURE__ */ import_react.default.createElement("div", { style: {
       position: "absolute",
       inset: 0,
       display: "flex",
+      flexDirection: "column",
       alignItems: "center",
       justifyContent: "center",
-      background: "rgba(0,0,0,0.6)"
-    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { color: "#fff", fontSize: 16, textAlign: "center" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 32, marginBottom: 12 } }, "\u{1F4F7}"), "Iniciando c\xE1mara\u2026")), status === "error" && /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      background: "#000"
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 52, marginBottom: 14 } }, "\u{1F4F7}"), /* @__PURE__ */ import_react.default.createElement("div", { style: { color: "#fff", fontSize: 16 } }, "Iniciando c\xE1mara\u2026")), status === "error" && /* @__PURE__ */ import_react.default.createElement("div", { style: {
       position: "absolute",
       inset: 0,
       display: "flex",
+      flexDirection: "column",
       alignItems: "center",
       justifyContent: "center",
-      background: "rgba(0,0,0,0.8)"
-    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { color: "#fff", fontSize: 15, textAlign: "center", padding: 20 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 40, marginBottom: 12 } }, "\u26A0\uFE0F"), /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 8 } }, "No se pudo acceder a la c\xE1mara."), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: "#aaa" } }, "Verifica los permisos de c\xE1mara en tu navegador.")))), status === "activo" && /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      padding: "12px 16px",
-      background: "rgba(0,0,0,0.7)",
+      background: "#111",
+      padding: 28,
+      textAlign: "center"
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 52, marginBottom: 14 } }, "\u26A0\uFE0F"), /* @__PURE__ */ import_react.default.createElement("div", { style: { color: "#fff", fontSize: 16, marginBottom: 10, fontWeight: 700 } }, "No se pudo acceder a la c\xE1mara"), /* @__PURE__ */ import_react.default.createElement("div", { style: { color: "#aaa", fontSize: 13, lineHeight: 1.6 } }, "Ve a Ajustes \u2192 Safari/Chrome \u2192 C\xE1mara \u2192 Permitir"), /* @__PURE__ */ import_react.default.createElement("button", { onClick: handleClose, style: {
+      marginTop: 24,
+      background: "rgba(255,255,255,0.15)",
+      border: "1px solid rgba(255,255,255,0.3)",
+      borderRadius: 10,
+      padding: "10px 24px",
+      color: "#fff",
+      fontSize: 14,
+      cursor: "pointer"
+    } }, "Cerrar"))), status === "activo" && /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      flexShrink: 0,
+      padding: "12px 16px calc(env(safe-area-inset-bottom,0px) + 12px)",
+      background: "rgba(0,0,0,0.85)",
       textAlign: "center",
-      color: "rgba(255,255,255,0.7)",
+      color: "rgba(255,255,255,0.65)",
       fontSize: 13
-    } }, "Centra el c\xF3digo de barras o QR en el recuadro"));
+    } }, "Centra el c\xF3digo en el recuadro \u2014 se detecta autom\xE1ticamente"));
   }
   function ImportarExcelModal({ inv, onImportar, onClose }) {
     const [archivo, setArchivo] = (0, import_react.useState)(null);
