@@ -26919,6 +26919,10 @@ Fecha: ${venta.fecha}`);
     const udsHoy = (0, import_react.useMemo)(() => udsV(vHoy), [vHoy]);
     const tktProm = vMes.length > 0 ? brutoMes / vMes.length : 0;
     const liq = (0, import_react.useMemo)(() => calcLiqMarca(vMes, mid), [vMes, mid]);
+    const gcMarca = (0, import_react.useMemo)(() => vMes.reduce((s, v) => {
+      const a = v.gcAllocations?.find((x) => x.marcaId === mid);
+      return s + (a?.gcAmount || 0);
+    }, 0), [vMes, mid]);
     const diaActual = mes === now.getMonth() && anio === now.getFullYear() ? now.getDate() : new Date(anio, mes + 1, 0).getDate();
     const diasTotal = new Date(anio, mes + 1, 0).getDate();
     const proyeccion = diaActual > 0 ? brutoMes / diaActual * diasTotal : 0;
@@ -27555,55 +27559,48 @@ Fecha: ${venta.fecha}`);
       padding: 16,
       marginBottom: 16,
       border: `1px solid ${marca.color}30`
-    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, fontWeight: 700, color: C.label, fontFamily: FONT, marginBottom: 4 } }, marca.emoji, " Liquidaci\xF3n estimada \u2014 ", MESES[mes], " ", anio), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT } }, "Basado en la configuraci\xF3n de comisiones de Toscana House")), (() => {
-      const gcMarca = vMes.reduce((s, v) => {
-        const alloc = v.gcAllocations?.find((a) => a.marcaId === mid);
-        return s + (alloc?.gcAmount || 0);
-      }, 0);
-      const rows = [
-        { label: "Ventas brutas", value: liq.bruto, sign: "", color: C.label, bold: false },
-        { label: "Efectivo", value: liq.brutoEf, sign: "", color: C.label3, bold: false, sub: true },
-        { label: "QR", value: liq.brutoQR, sign: "", color: C.label3, bold: false, sub: true },
-        { label: "Tarjeta", value: liq.brutoTJ, sign: "", color: C.label3, bold: false, sub: true },
-        ...gcMarca > 0 ? [{ label: "Gift Cards", value: gcMarca, sign: "", color: "#7C3AED", bold: false, sub: true, gc: true }] : [],
-        { label: `Desc. Tarjeta (${liq.cfg.pctTarjeta}%)`, value: -liq.descTJ, sign: "\u2212", color: C.red, bold: false },
-        { label: "Subtotal banco", value: liq.subBanco, sign: "", color: C.blue, bold: true },
-        { label: `Comisi\xF3n Toscana (${liq.cfg.pctComision}%)`, value: -liq.comision, sign: "\u2212", color: C.red, bold: false },
-        { label: "Alquiler", value: -liq.alquiler, sign: "\u2212", color: C.red, bold: false }
-      ];
-      return /* @__PURE__ */ import_react.default.createElement("div", { style: {
-        background: C.bg1,
-        borderRadius: 18,
-        overflow: "hidden",
-        border: `1px solid ${C.sep}`,
-        marginBottom: 16,
-        boxShadow: "0 2px 8px rgba(0,0,0,0.04)"
-      } }, rows.map((row, i, arr) => /* @__PURE__ */ import_react.default.createElement("div", { key: row.label, style: {
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
-        padding: `${row.sub ? "8px" : "12px"} 16px ${row.sub ? "8px" : "12px"} ${row.sub ? "28px" : "16px"}`,
-        borderBottom: i < arr.length - 1 ? `1px solid ${C.sep}` : "",
-        background: row.bold ? `${C.blue}08` : void 0
-      } }, /* @__PURE__ */ import_react.default.createElement("span", { style: {
-        fontSize: row.sub ? 12 : 13,
-        color: row.color || C.label2,
-        fontFamily: FONT,
-        fontWeight: row.bold ? 700 : 400
-      } }, row.label), /* @__PURE__ */ import_react.default.createElement("span", { style: {
-        fontSize: row.sub ? 12 : 14,
-        fontWeight: row.bold ? 700 : 500,
-        color: row.color || C.label,
-        fontFamily: FONT
-      } }, row.sign, " ", $(Math.abs(row.value))))), /* @__PURE__ */ import_react.default.createElement("div", { style: {
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
-        padding: "16px",
-        background: `${C.green}12`,
-        borderTop: `2px solid ${C.green}30`
-      } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 15, fontWeight: 700, color: C.green, fontFamily: FONT } }, "\u{1F49A} Total Neto Estimado"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 22, fontWeight: 800, color: C.green, fontFamily: FONT_DISPLAY } }, $(liq.neto))));
-    })(), " ", /* @__PURE__ */ import_react.default.createElement("div", { style: { background: C.bg2, borderRadius: 14, padding: 12, border: `1px solid ${C.sep}` } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT, lineHeight: 1.6 } }, "\u2139\uFE0F Esta liquidaci\xF3n es una estimaci\xF3n autom\xE1tica. El monto final puede variar seg\xFAn revisi\xF3n de Toscana House. Contact\xE1 a la administraci\xF3n para confirmar.")))), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, fontWeight: 700, color: C.label, fontFamily: FONT, marginBottom: 4 } }, marca.emoji, " Liquidaci\xF3n estimada \u2014 ", MESES[mes], " ", anio), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT } }, "Basado en la configuraci\xF3n de comisiones de Toscana House")), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      background: C.bg1,
+      borderRadius: 18,
+      overflow: "hidden",
+      border: `1px solid ${C.sep}`,
+      marginBottom: 16,
+      boxShadow: "0 2px 8px rgba(0,0,0,0.04)"
+    } }, [
+      { label: "Ventas brutas", value: liq.bruto, sign: "", color: C.label, bold: false },
+      { label: "Efectivo", value: liq.brutoEf, sign: "", color: C.label3, bold: false, sub: true },
+      { label: "QR", value: liq.brutoQR, sign: "", color: C.label3, bold: false, sub: true },
+      { label: "Tarjeta", value: liq.brutoTJ, sign: "", color: C.label3, bold: false, sub: true },
+      ...gcMarca > 0 ? [{ label: "Gift Cards", value: gcMarca, sign: "", color: "#7C3AED", bold: false, sub: true }] : [],
+      { label: `Desc. Tarjeta (${liq.cfg.pctTarjeta}%)`, value: -liq.descTJ, sign: "\u2212", color: C.red, bold: false },
+      { label: "Subtotal banco", value: liq.subBanco, sign: "", color: C.blue, bold: true },
+      { label: `Comisi\xF3n Toscana (${liq.cfg.pctComision}%)`, value: -liq.comision, sign: "\u2212", color: C.red, bold: false },
+      { label: "Alquiler", value: -liq.alquiler, sign: "\u2212", color: C.red, bold: false }
+    ].map((row, i, arr) => /* @__PURE__ */ import_react.default.createElement("div", { key: row.label, style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      padding: `${row.sub ? "8px" : "12px"} 16px ${row.sub ? "8px" : "12px"} ${row.sub ? "28px" : "16px"}`,
+      borderBottom: i < arr.length - 1 ? `1px solid ${C.sep}` : "",
+      background: row.bold ? `${C.blue}08` : void 0
+    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: {
+      fontSize: row.sub ? 12 : 13,
+      color: row.color || C.label2,
+      fontFamily: FONT,
+      fontWeight: row.bold ? 700 : 400
+    } }, row.label), /* @__PURE__ */ import_react.default.createElement("span", { style: {
+      fontSize: row.sub ? 12 : 14,
+      fontWeight: row.bold ? 700 : 500,
+      color: row.color || C.label,
+      fontFamily: FONT
+    } }, row.sign, " ", $(Math.abs(row.value))))), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      padding: "16px",
+      background: `${C.green}12`,
+      borderTop: `2px solid ${C.green}30`
+    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 15, fontWeight: 700, color: C.green, fontFamily: FONT } }, "\u{1F49A} Total Neto Estimado"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 22, fontWeight: 800, color: C.green, fontFamily: FONT_DISPLAY } }, $(liq.neto)))), /* @__PURE__ */ import_react.default.createElement("div", { style: { background: C.bg2, borderRadius: 14, padding: 12, border: `1px solid ${C.sep}` } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT, lineHeight: 1.6 } }, "\u2139\uFE0F Esta liquidaci\xF3n es una estimaci\xF3n autom\xE1tica. El monto final puede variar seg\xFAn revisi\xF3n de Toscana House. Contact\xE1 a la administraci\xF3n para confirmar.")))), /* @__PURE__ */ import_react.default.createElement("div", { style: {
       position: "fixed",
       bottom: 0,
       left: 0,

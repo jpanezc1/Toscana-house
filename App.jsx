@@ -5410,6 +5410,12 @@ function BrandPortal({user, ventas, inv, logout}){
   // Liquidación con config real
   const liq = useMemo(()=>calcLiqMarca(vMes, mid),[vMes, mid]);
 
+  // GC usadas en ventas de esta marca este mes
+  const gcMarca = useMemo(()=>vMes.reduce((s,v)=>{
+    const a=v.gcAllocations?.find(x=>x.marcaId===mid);
+    return s+(a?.gcAmount||0);
+  },0),[vMes,mid]);
+
   // Proyección fin de mes
   const diaActual = (mes===now.getMonth()&&anio===now.getFullYear())?now.getDate():new Date(anio,mes+1,0).getDate();
   const diasTotal = new Date(anio,mes+1,0).getDate();
@@ -6000,27 +6006,19 @@ function BrandPortal({user, ventas, inv, logout}){
             </div>
 
             {/* Desglose */}
-            {(()=>{
-              // Calcular total GC usado para esta marca en el mes
-              const gcMarca = vMes.reduce((s,v)=>{
-                const alloc = v.gcAllocations?.find(a=>a.marcaId===mid);
-                return s+(alloc?.gcAmount||0);
-              },0);
-              const rows = [
-                {label:"Ventas brutas",            value:liq.bruto,      sign:"",  color:C.label, bold:false},
-                {label:"Efectivo",                 value:liq.brutoEf,    sign:"",  color:C.label3,bold:false,sub:true},
-                {label:"QR",                       value:liq.brutoQR,    sign:"",  color:C.label3,bold:false,sub:true},
-                {label:"Tarjeta",                  value:liq.brutoTJ,    sign:"",  color:C.label3,bold:false,sub:true},
-                ...(gcMarca>0?[{label:"Gift Cards",value:gcMarca,sign:"",color:"#7C3AED",bold:false,sub:true,gc:true}]:[]),
-                {label:`Desc. Tarjeta (${liq.cfg.pctTarjeta}%)`,value:-liq.descTJ,sign:"−",color:C.red,   bold:false},
-                {label:"Subtotal banco",           value:liq.subBanco,   sign:"",  color:C.blue,  bold:true},
-                {label:`Comisión Toscana (${liq.cfg.pctComision}%)`,value:-liq.comision,sign:"−",color:C.red,bold:false},
-                {label:"Alquiler",                 value:-liq.alquiler,  sign:"−",  color:C.red,  bold:false},
-              ];
-              return (
             <div style={{background:C.bg1,borderRadius:18,overflow:"hidden",
               border:`1px solid ${C.sep}`,marginBottom:16,boxShadow:"0 2px 8px rgba(0,0,0,0.04)"}}>
-              {rows.map((row,i,arr)=>(
+              {[
+                {label:"Ventas brutas",                                  value:liq.bruto,      sign:"",  color:C.label, bold:false},
+                {label:"Efectivo",                                        value:liq.brutoEf,    sign:"",  color:C.label3,bold:false,sub:true},
+                {label:"QR",                                              value:liq.brutoQR,    sign:"",  color:C.label3,bold:false,sub:true},
+                {label:"Tarjeta",                                         value:liq.brutoTJ,    sign:"",  color:C.label3,bold:false,sub:true},
+                ...(gcMarca>0?[{label:"Gift Cards",                       value:gcMarca,        sign:"",  color:"#7C3AED",bold:false,sub:true}]:[]),
+                {label:`Desc. Tarjeta (${liq.cfg.pctTarjeta}%)`,         value:-liq.descTJ,    sign:"−", color:C.red,   bold:false},
+                {label:"Subtotal banco",                                  value:liq.subBanco,   sign:"",  color:C.blue,  bold:true},
+                {label:`Comisión Toscana (${liq.cfg.pctComision}%)`,      value:-liq.comision,  sign:"−", color:C.red,   bold:false},
+                {label:"Alquiler",                                        value:-liq.alquiler,  sign:"−", color:C.red,   bold:false},
+              ].map((row,i,arr)=>(
                 <div key={row.label} style={{
                   display:"flex",justifyContent:"space-between",alignItems:"center",
                   padding:`${row.sub?"8px":"12px"} 16px ${row.sub?"8px":"12px"} ${row.sub?"28px":"16px"}`,
@@ -6046,8 +6044,6 @@ function BrandPortal({user, ventas, inv, logout}){
                 </span>
               </div>
             </div>
-              ); // end IIFE return
-            })()} {/* end IIFE */}
 
             <div style={{background:C.bg2,borderRadius:14,padding:12,border:`1px solid ${C.sep}`}}>
               <div style={{fontSize:11,color:C.label3,fontFamily:FONT,lineHeight:1.6}}>
