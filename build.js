@@ -1,7 +1,7 @@
 const esbuild = require("esbuild");
 const fs = require("fs");
 
-// Crear main.jsx
+// ── Crear main.jsx (entry point) ─────────────────────────────────────────────
 let app = fs.readFileSync("App.jsx", "utf8");
 app = app.replace(/^import .+\n/gm, "");
 const main = `import React, { useState, useMemo, useRef, useCallback, useEffect } from "react";
@@ -12,7 +12,7 @@ root.render(React.createElement(App));
 `;
 fs.writeFileSync("main.jsx", main);
 
-// Compilar
+// ── Compilar bundle ───────────────────────────────────────────────────────────
 esbuild.buildSync({
   entryPoints: ["main.jsx"],
   bundle: true,
@@ -21,6 +21,203 @@ esbuild.buildSync({
   jsx: "transform",
   platform: "browser",
   target: "es2020",
+  minify: false,
 });
 
-console.log("Build OK");
+// ── PWA Manifest ──────────────────────────────────────────────────────────────
+const manifest = {
+  name: "Toscana House",
+  short_name: "Toscana",
+  description: "Sistema de gestión Toscana House — Casa de Moda",
+  start_url: "/",
+  display: "standalone",
+  orientation: "portrait",
+  background_color: "#FAF9F7",
+  theme_color: "#FAF9F7",
+  icons: [
+    { src: "public/favicon.ico",  sizes: "64x64 32x32 24x24 16x16", type: "image/x-icon" },
+    { src: "public/logo192.png",  type: "image/png", sizes: "192x192" },
+    { src: "public/logo512.png",  type: "image/png", sizes: "512x512" }
+  ]
+};
+fs.writeFileSync("manifest.json", JSON.stringify(manifest, null, 2));
+
+// ── Cache-busting: timestamp en script tag ────────────────────────────────────
+const v = Date.now();
+
+const html = `<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+
+  <!-- Viewport — full safe-area coverage (notch, Dynamic Island, Android cutout) -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+
+  <!-- PWA / instalación en pantalla de inicio -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Toscana">
+  <meta name="application-name" content="Toscana House">
+
+  <!-- Tema de color (barra del navegador / UI del OS) -->
+  <meta name="theme-color" content="#FAF9F7">
+  <meta name="msapplication-TileColor" content="#FAF9F7">
+
+  <!-- SEO / descripción -->
+  <meta name="description" content="Toscana House — Sistema de gestión de marcas y ventas">
+  <meta name="robots" content="noindex, nofollow">
+
+  <!-- PWA manifest -->
+  <link rel="manifest" href="manifest.json">
+
+  <title>Toscana House</title>
+
+  <!-- Tipografías premium -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+  <style>
+    /* ═══════════════════════════════════════════════════════════════
+       TOSCANA HOUSE — Global CSS
+       Reset + PWA + iOS + Premium base
+       ═══════════════════════════════════════════════════════════════ */
+
+    /* ── Reset universal ──────────────────────────────────────────── */
+    *, *::before, *::after {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      /* Elimina el flash azul al tocar en iOS/Android */
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    /* ── HTML raíz ────────────────────────────────────────────────── */
+    html {
+      height: 100%;
+      /* Scroll suave en todo el documento */
+      scroll-behavior: smooth;
+      /* Previene efecto de rebote al hacer scroll más allá del límite */
+      overscroll-behavior: none;
+    }
+
+    /* ── Body ────────────────────────────────────────────────────── */
+    body {
+      width: 100%;
+      min-height: 100%;
+      /* Fallback para browsers que no soportan dvh */
+      min-height: -webkit-fill-available;
+
+      background: #FAF9F7;
+      color: #1A1714;
+
+      /* Previene scroll horizontal indeseado */
+      overflow-x: hidden;
+
+      /* Previene rebote en iOS (efecto de "overscroll") */
+      overscroll-behavior: none;
+
+      /* Suavizado de tipografía premium (como nativo en Mac/iOS) */
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      text-rendering: optimizeLegibility;
+    }
+
+    /* ── Root de React ───────────────────────────────────────────── */
+    #root {
+      min-height: 100vh;
+      min-height: -webkit-fill-available;
+      position: relative;
+    }
+
+    /* ── Inputs: prevenir zoom en iOS ────────────────────────────── */
+    /* iOS hace zoom cuando font-size < 16px. Este base se
+       puede sobrescribir con inline styles en componentes específicos. */
+    input,
+    textarea,
+    select {
+      font-size: 16px;
+      /* Elimina estilos nativos del OS (especialmente en iOS Safari) */
+      -webkit-appearance: none;
+      appearance: none;
+      /* Evita border-radius nativo en iOS */
+      border-radius: 0;
+    }
+
+    /* ── Ocultar UI nativa del color picker ──────────────────────── */
+    /* El app usa su propio color picker con botones de colores */
+    input[type="color"] {
+      opacity: 0;
+      position: absolute;
+      width: 0;
+      height: 0;
+      pointer-events: none;
+    }
+    input::-webkit-color-swatch-wrapper { display: none; }
+    input::-webkit-color-swatch         { display: none; }
+    input::-moz-color-swatch            { display: none; }
+
+    /* ── Imágenes responsive ─────────────────────────────────────── */
+    img {
+      display: block;
+      max-width: 100%;
+    }
+
+    /* ── Scrollbars responsivos ──────────────────────────────────── */
+    /* Scrollbars delgados en WebKit (Mac/iOS) */
+    ::-webkit-scrollbar {
+      width: 4px;
+      height: 4px;
+    }
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(120, 113, 108, 0.25);
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(120, 113, 108, 0.45);
+    }
+
+    /* ── Focus visible accesible ─────────────────────────────────── */
+    :focus           { outline: none; }
+    :focus-visible   {
+      outline: 2px solid rgba(154, 123, 79, 0.55);
+      outline-offset: 2px;
+      border-radius: 4px;
+    }
+
+    /* ── Contenedores con scroll suave en iOS ────────────────────── */
+    .scroll-touch {
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior-y: contain;
+    }
+
+    /* ── Centering helpers ───────────────────────────────────────── */
+    .page-center {
+      width: 100%;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* ── Safe area para notch/Dynamic Island ─────────────────────── */
+    /* Se usa en el app con env(safe-area-inset-*) directamente */
+    .safe-top    { padding-top:    env(safe-area-inset-top);    }
+    .safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
+    .safe-left   { padding-left:   env(safe-area-inset-left);   }
+    .safe-right  { padding-right:  env(safe-area-inset-right);  }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script src="bundle.js?v=${v}"></script>
+</body>
+</html>`;
+
+fs.writeFileSync("index.html", html);
+
+console.log("Build OK — v" + v);
