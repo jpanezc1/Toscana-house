@@ -21695,6 +21695,96 @@
       return null;
     }
   }
+  function useRealtimeSync(setVentas, setInv) {
+    (0, import_react.useEffect)(() => {
+      let channel = null;
+      let mounted = true;
+      getSupabase().then((db) => {
+        if (!mounted) return;
+        channel = db.channel("toscana-realtime-v3").on("postgres_changes", { event: "INSERT", schema: "public", table: "ventas" }, async (payload) => {
+          const v = payload.new;
+          try {
+            const { data: rawItems } = await db.from("venta_items").select("*").eq("venta_id", v.id);
+            const venta = {
+              id: v.id,
+              fecha: v.fecha,
+              hora: v.hora,
+              mk: v.mk,
+              mes: v.mes,
+              anio: v.anio,
+              total: v.total,
+              subtotal: v.subtotal,
+              descPct: v.desc_pct,
+              metodoPago: v.metodo_pago,
+              vendedor: v.vendedor,
+              etiquetaImg: v.etiqueta_img,
+              anulada: v.anulada || false,
+              items: (rawItems || []).map((i) => ({
+                prodId: i.prod_id,
+                codigo: i.codigo,
+                nombre: i.nombre,
+                marcaId: i.marca_id,
+                marcaNombre: i.marca_nombre,
+                cantidad: i.cantidad,
+                precioUnit: i.precio_unit,
+                subtotal: i.subtotal
+              }))
+            };
+            if (mounted) setVentas(
+              (prev) => prev.some((x) => x.id === venta.id) ? prev : [...prev, venta]
+            );
+          } catch (e) {
+            console.warn("[RT] venta insert:", e.message);
+          }
+        }).on("postgres_changes", { event: "UPDATE", schema: "public", table: "ventas" }, (payload) => {
+          const v = payload.new;
+          if (mounted) setVentas((prev) => prev.map((x) => x.id === v.id ? {
+            ...x,
+            anulada: v.anulada || false,
+            total: v.total,
+            subtotal: v.subtotal,
+            metodoPago: v.metodo_pago
+          } : x));
+        }).on("postgres_changes", { event: "INSERT", schema: "public", table: "inventario" }, (payload) => {
+          const p = payload.new;
+          const prod = {
+            id: p.id,
+            codigo: p.codigo,
+            marcaId: p.marca_id,
+            marcaNombre: p.marca_nombre,
+            nombre: p.nombre,
+            categoria: p.categoria,
+            precio: p.precio,
+            stock: p.stock,
+            stockInicial: p.stock_inicial,
+            fecha: p.fecha
+          };
+          if (mounted) setInv(
+            (prev) => prev.some((x) => x.id === prod.id) ? prev : [...prev, prod]
+          );
+        }).on("postgres_changes", { event: "UPDATE", schema: "public", table: "inventario" }, (payload) => {
+          const p = payload.new;
+          if (mounted) setInv((prev) => prev.map((i) => i.id === p.id ? {
+            ...i,
+            stock: p.stock,
+            nombre: p.nombre,
+            precio: p.precio,
+            categoria: p.categoria
+          } : i));
+        }).subscribe((status) => {
+          if (status === "SUBSCRIBED") console.log("[Toscana Realtime] \u2713 conectado");
+          if (status === "CHANNEL_ERROR") console.warn("[Toscana Realtime] error de canal \u2014 verifique Realtime en Supabase dashboard");
+        });
+      }).catch((e) => console.warn("[Toscana Realtime] init:", e.message));
+      return () => {
+        mounted = false;
+        if (channel) {
+          getSupabase().then((db) => db.removeChannel(channel)).catch(() => {
+          });
+        }
+      };
+    }, []);
+  }
   var _QRLoaded = false;
   var _QRLib = null;
   function loadQRCode() {
@@ -22257,16 +22347,18 @@
   }
   function parseMixtoXls(metodoPago, total) {
     if (metodoPago?.startsWith("mixto|")) {
-      const obj = { efectivo: 0, qr: 0, tarjeta: 0 };
+      const obj = { efectivo: 0, qr: 0, tarjeta: 0, giftcard: 0 };
       metodoPago.split("|").slice(1).forEach((p) => {
         const [k, v] = p.split(":");
         obj[k] = parseFloat(v) || 0;
       });
+      obj.efectivo += obj.giftcard;
       const s = obj.efectivo + obj.qr + obj.tarjeta;
-      return s > 0 ? obj : { efectivo: total, qr: 0, tarjeta: 0 };
+      return s > 0 ? { efectivo: obj.efectivo, qr: obj.qr, tarjeta: obj.tarjeta } : { efectivo: total, qr: 0, tarjeta: 0 };
     }
     if (metodoPago === "qr") return { efectivo: 0, qr: total, tarjeta: 0 };
     if (metodoPago === "tarjeta") return { efectivo: 0, qr: 0, tarjeta: total };
+    if (metodoPago === "giftcard") return { efectivo: total, qr: 0, tarjeta: 0 };
     return { efectivo: total, qr: 0, tarjeta: 0 };
   }
   function calcLiqMarca(vMarca, marcaId) {
@@ -23786,10 +23878,10 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       { label: `Tarjeta (-${pctTarjeta}%)`, val: brutoTarjeta, color: C.amber }
     ].map((s) => /* @__PURE__ */ import_react.default.createElement("div", { key: s.label, style: {
       textAlign: "center",
-      padding: "8px 4px",
+      padding: "9px 8px",
       background: `${s.color}10`,
-      borderRadius: 10
-    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, fontWeight: 700, color: s.color, fontFamily: FONT } }, $(Math.round(s.val))), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: C.label3, fontFamily: FONT } }, s.label))))), [
+      borderRadius: 12
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 14, fontWeight: 600, color: s.color, fontFamily: FONT, letterSpacing: "-0.01em" } }, $(Math.round(s.val))), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: C.label3, fontFamily: FONT, marginTop: 2, opacity: 0.7 } }, s.label))))), [
       ["Ventas brutas", $(Math.round(bruto)), C.label],
       [`\u2212 Desc. banco Tarjeta (${pctTarjeta}%)`, `-${$(Math.round(descTarjeta))}`, C.red],
       [`= Subtotal sin banco`, $(Math.round(subtotalBanco)), C.label2],
@@ -23799,15 +23891,30 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       display: "flex",
       justifyContent: "space-between",
       alignItems: "center",
-      padding: "12px 16px",
+      padding: "9px 16px",
       borderBottom: i < arr.length - 1 ? `1px solid ${C.sep}` : ""
-    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 14, color: C.label2, fontFamily: FONT } }, k), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 14, fontWeight: 600, color: c, fontFamily: FONT } }, v))), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, color: C.label2, fontFamily: FONT, lineHeight: "1.35" } }, k), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, fontWeight: 600, color: c, fontFamily: FONT } }, v))), /* @__PURE__ */ import_react.default.createElement("div", { style: {
       display: "flex",
       justifyContent: "space-between",
       alignItems: "center",
-      padding: "18px 16px",
+      padding: "14px 16px",
       background: `${C.gold}12`
-    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 17, fontWeight: 700, color: C.label, fontFamily: FONT } }, "TOTAL NETO"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 22, fontWeight: 800, color: C.gold, fontFamily: FONT } }, $(Math.round(neto))))), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: {
+      fontSize: 11,
+      fontWeight: 600,
+      color: C.label,
+      fontFamily: FONT,
+      textTransform: "uppercase",
+      letterSpacing: ".08em",
+      opacity: 0.6
+    } }, "Total Neto"), /* @__PURE__ */ import_react.default.createElement("span", { style: {
+      fontSize: 28,
+      fontWeight: 700,
+      color: C.gold,
+      fontFamily: FONT,
+      letterSpacing: "-0.03em",
+      lineHeight: 1
+    } }, $(Math.round(neto))))), /* @__PURE__ */ import_react.default.createElement("div", { style: {
       fontSize: 13,
       fontWeight: 600,
       color: C.label3,
@@ -23819,7 +23926,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
     } }, "Transacciones del per\xEDodo"), vMarca.length === 0 ? /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center", padding: "32px 0", color: C.label3, fontFamily: FONT, fontSize: 16 } }, "Sin ventas en ", MESES[mes]) : vMarca.map((v) => {
       const its = v.items.filter((i) => i.marcaId === marcaId);
       const sub = its.reduce((s, i) => s + i.subtotal, 0);
-      return /* @__PURE__ */ import_react.default.createElement("div", { key: v.id, style: { background: C.bg2, borderRadius: 14, padding: 14, marginBottom: 10 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", marginBottom: 6 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontFamily: "monospace", fontSize: 12, color: C.gold } }, v.id), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 16, fontWeight: 700, color: C.gold, fontFamily: FONT } }, $(sub))), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.label3, fontFamily: FONT, marginBottom: 6 } }, v.fecha, " ", v.hora, " \xB7 ", labelPago(v.metodoPago)), its.map((it, ii) => /* @__PURE__ */ import_react.default.createElement("div", { key: `${v.id}-${it.prodId}-${ii}`, style: { fontSize: 13, color: C.label2, fontFamily: FONT } }, "\xB7 ", it.nombre, " \xD7", it.cantidad, " = ", $(it.subtotal))));
+      return /* @__PURE__ */ import_react.default.createElement("div", { key: v.id, style: { background: C.bg2, borderRadius: 10, padding: "10px 14px", marginBottom: 5 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 3 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontFamily: "monospace", fontSize: 11, color: C.gold, fontWeight: 600 } }, v.id), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 15, fontWeight: 600, color: C.gold, fontFamily: FONT, letterSpacing: "-0.01em" } }, $(sub))), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT, marginBottom: 4, opacity: 0.65 } }, v.fecha, " ", v.hora, " \xB7 ", labelPago(v.metodoPago)), its.map((it, ii) => /* @__PURE__ */ import_react.default.createElement("div", { key: `${v.id}-${it.prodId}-${ii}`, style: { fontSize: 12, color: C.label2, fontFamily: FONT, lineHeight: "1.35" } }, "\xB7 ", it.nombre, " \xD7", it.cantidad, " = ", $(it.subtotal))));
     }), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 10, marginTop: 16 } }, /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => exportCSV(marca, ventas, mes, anio), variant: "fill", icon: "\u2B07" }, "Exportar CSV"), !cerrado ? /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => {
       setCierres((p) => ({ ...p, [`${MK}-${marcaId}`]: { cerrado: true, fecha: hoy(), mk: MK } }));
       sbGuardarCierre(`${MK}-${marcaId}`, { cerrado: true, fecha: hoy(), mk: MK, marca_id: marcaId });
@@ -24702,7 +24809,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
         marginTop: 8,
         paddingTop: 8,
         borderTop: `1px solid ${C.sep}`
-      } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 15, fontWeight: 700, color: C.label, fontFamily: FONT } }, "Total"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 17, fontWeight: 800, color: C.gold, fontFamily: FONT } }, $(venta?.total)))), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 8, marginBottom: 16 } }, [["api", "\u{1F310} API CUCU"], ["manual", "Manual"]].map(([m, l]) => /* @__PURE__ */ import_react.default.createElement("button", { key: m, onClick: () => {
+      } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 15, fontWeight: 700, color: C.label, fontFamily: FONT } }, "Total"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 17, fontWeight: 600, color: C.gold, fontFamily: FONT } }, $(venta?.total)))), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 8, marginBottom: 16 } }, [["api", "\u{1F310} API CUCU"], ["manual", "Manual"]].map(([m, l]) => /* @__PURE__ */ import_react.default.createElement("button", { key: m, onClick: () => {
         setModo(m);
         setErrMsg("");
       }, style: {
@@ -24889,7 +24996,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       padding: "12px 14px",
       background: `${C.gold}12`,
       borderTop: `2px solid ${C.sep}`
-    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 15, fontWeight: 700, color: C.label, fontFamily: FONT } }, "Total"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 18, fontWeight: 800, color: C.gold, fontFamily: FONT } }, $(venta.total)))), venta.gcId && venta.gcAllocations && /* @__PURE__ */ import_react.default.createElement("div", { style: {
+    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 15, fontWeight: 700, color: C.label, fontFamily: FONT } }, "Total"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 18, fontWeight: 600, color: C.gold, fontFamily: FONT } }, $(venta.total)))), venta.gcId && venta.gcAllocations && /* @__PURE__ */ import_react.default.createElement("div", { style: {
       background: "#7C3AED10",
       border: "1px solid #7C3AED25",
       borderRadius: 14,
@@ -25207,7 +25314,7 @@ Fecha: ${venta.fecha}`);
       alignItems: "center",
       border: `1px solid ${C.sep}`,
       marginBottom: 16
-    } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 28, fontWeight: 800, color: C.gold, fontFamily: FONT, lineHeight: 1 } }, cajas.length, " cajas"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.label3, fontFamily: FONT, marginTop: 4 } }, SUCURSAL_EMP)), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 24 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 22, fontWeight: 800, color: C.green, fontFamily: FONT } }, abiertas), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT } }, "Cajas abiertas")), /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 22, fontWeight: 800, color: C.amber, fontFamily: FONT } }, porAbrir), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT } }, "Cajas por abrir")))), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+    } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 28, fontWeight: 700, color: C.gold, fontFamily: FONT, lineHeight: 1 } }, cajas.length, " cajas"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.label3, fontFamily: FONT, marginTop: 4 } }, SUCURSAL_EMP)), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 24 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 22, fontWeight: 700, color: C.green, fontFamily: FONT } }, abiertas), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT } }, "Cajas abiertas")), /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 22, fontWeight: 700, color: C.amber, fontFamily: FONT } }, porAbrir), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT } }, "Cajas por abrir")))), /* @__PURE__ */ import_react.default.createElement("div", { style: {
       marginBottom: 8,
       fontSize: 13,
       fontWeight: 600,
@@ -25745,9 +25852,11 @@ Fecha: ${venta.fecha}`);
           return;
         }
         let hRow = 0;
-        for (let i = 0; i < Math.min(5, raw.length); i++) {
+        for (let i = 0; i < Math.min(10, raw.length); i++) {
           const r = raw[i].map((c) => norm(String(c)).toLowerCase());
-          if (r.some((c) => c.includes("marca") || c.includes("descripcion") || c.includes("precio") || c.includes("sku"))) {
+          if (r.some(
+            (c) => c.includes("descripcion") || c.includes("precio") || c.includes("sku") || c.includes("articulo") || c.includes("marca") || c.includes("item")
+          )) {
             hRow = i;
             break;
           }
@@ -25760,38 +25869,59 @@ Fecha: ${venta.fecha}`);
           }
           return -1;
         };
-        const cSKU = col("sku", "codigo", "cod", "code", "referencia", "ref");
-        const cMarca = col("marca", "brand", "tienda");
-        const cDesc = col("descripcion", "nombre", "producto", "desc", "item", "articulo");
-        const cPrecio = col("precio", "price", "valor", "importe", "costo", "pvp");
-        const cCat = col("categoria", "cat", "tipo", "clasificacion", "rubro");
-        const cTalla = col("talla", "size", "talle", "medida");
-        const cColor = col("color", "colour");
-        const cStock = col("stock", "cantidad", "qty", "existencia", "unidades", "piezas");
-        const cSubcat = col("subcat", "subcategoria", "subcategory");
+        const isIZi = headers.some((h) => h.includes("subgategoria") || h.includes("item/articulo") || h.includes("item/art"));
+        let cSKU, cMarca, cDesc, cPrecio, cCat, cTalla, cColor, cStock, cSubcat;
+        if (isIZi) {
+          cSKU = col("codigo", "articulo", "item");
+          cMarca = headers.findIndex((h) => h.includes("categoria") && !h.includes("sub") && !h.includes("gategoria"));
+          if (cMarca === -1) cMarca = headers.findIndex((h) => h.includes("2.") || h.includes("categoria"));
+          cCat = col("subgategoria", "subcategoria", "subcat");
+          cDesc = col("descripcion");
+          cPrecio = col("precio de venta", "precio venta", "precio");
+          cTalla = -1;
+          cColor = -1;
+          cStock = col("cantidad actual", "cantidad", "stock", "existencia");
+          cSubcat = -1;
+        } else {
+          cSKU = col("sku", "codigo", "cod", "code", "referencia", "ref");
+          cMarca = col("marca", "brand", "tienda");
+          cDesc = col("descripcion", "nombre", "producto", "desc", "item", "articulo");
+          cPrecio = col("precio", "price", "valor", "importe", "costo", "pvp");
+          cCat = col("categoria", "cat", "tipo", "clasificacion", "rubro");
+          cTalla = col("talla", "size", "talle", "medida");
+          cColor = col("color", "colour");
+          cStock = col("stock", "cantidad", "qty", "existencia", "unidades", "piezas");
+          cSubcat = col("subcat", "subcategoria", "subcategory");
+        }
         const usadosSet = /* @__PURE__ */ new Set();
         const filas = [];
         for (let i = hRow + 1; i < raw.length; i++) {
           const row = raw[i];
           if (row.every((c) => String(c).trim() === "")) continue;
           const marcaNom = cMarca >= 0 ? String(row[cMarca]).trim() : "";
-          const desc = cDesc >= 0 ? String(row[cDesc]).trim() : "";
+          const descRaw = cDesc >= 0 ? String(row[cDesc]).trim() : "";
+          if (descRaw.toUpperCase().includes("NO INGRESAR") || descRaw.toUpperCase() === "ATENCI\xD3N") continue;
+          const desc = descRaw;
           const precioRaw = cPrecio >= 0 ? String(row[cPrecio]).replace(/[^\d.,]/g, "").replace(",", ".") : "";
           const precio = parseFloat(precioRaw) || 0;
-          const cat = cCat >= 0 ? String(row[cCat]).trim() : "General";
+          const cat = cCat >= 0 ? String(row[cCat]).trim().replace(/\s+/g, " ") : "General";
           const talla = cTalla >= 0 ? String(row[cTalla]).trim() : "";
           const color = cColor >= 0 ? String(row[cColor]).trim() : "";
-          const stock = cStock >= 0 ? Math.max(1, parseInt(String(row[cStock])) || 1) : 1;
+          const stockRaw = cStock >= 0 ? String(row[cStock]).replace(/[^\d]/g, "") : "1";
+          const stock = Math.max(1, parseInt(stockRaw) || 1);
           const subcat = cSubcat >= 0 ? String(row[cSubcat]).trim() : "";
-          const marcaEnc = MARCAS.find((m) => norm(m.nombre).toLowerCase() === norm(marcaNom).toLowerCase()) || MARCAS.find((m) => norm(marcaNom).toLowerCase().startsWith(norm(m.nombre).toLowerCase().slice(0, 4)));
-          let skuRaw = cSKU >= 0 ? String(row[cSKU]).trim().toUpperCase() : "";
+          const marcaNomNorm = norm(marcaNom).toLowerCase();
+          const marcaEnc = MARCAS.find((m) => norm(m.nombre).toLowerCase() === marcaNomNorm) || MARCAS.find((m) => marcaNomNorm.length >= 3 && marcaNomNorm.startsWith(norm(m.nombre).toLowerCase().slice(0, 4))) || MARCAS.find((m) => norm(m.nombre).toLowerCase().startsWith(marcaNomNorm.slice(0, 4)));
+          const skuRaw = cSKU >= 0 ? String(row[cSKU]).trim().toUpperCase() : "";
           const autoSKU = !skuRaw;
-          const sku = skuRaw || genCodImport(marcaEnc?.nombre || marcaNom, desc, talla || "TU", usadosSet);
+          const tallaParaCod = isIZi ? (cat || "").replace(/[^A-Za-z]/g, "").slice(0, 3).toUpperCase() || "TU" : talla || "TU";
+          const sku = skuRaw || genCodImport(marcaEnc?.nombre || marcaNom, desc, tallaParaCod, usadosSet);
           if (skuRaw) usadosSet.add(sku);
           const fila = {
             _row: i + 1,
             sku,
             autoSKU,
+            isIZi,
             marcaNom,
             marcaId: marcaEnc?.id || null,
             marcaNombre: marcaEnc?.nombre || marcaNom,
@@ -25809,9 +25939,7 @@ Fecha: ${venta.fecha}`);
           if (precio <= 0) fila._errs.push("Precio inv\xE1lido");
           if (!marcaEnc) fila._errs.push(`Marca "${marcaNom || "\u2014"}" no encontrada`);
           const existe = inv.find((p) => p.codigo.toUpperCase() === sku);
-          if (existe) {
-            fila._dup = true;
-          }
+          if (existe) fila._dup = true;
           filas.push(fila);
         }
         setPreview(filas);
@@ -25994,7 +26122,7 @@ Fecha: ${venta.fecha}`);
       padding: "10px 8px",
       textAlign: "center",
       border: `1px solid ${s.c}25`
-    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 20, fontWeight: 800, color: s.c, fontFamily: FONT_UI } }, s.v), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: C.label3, fontFamily: FONT_UI, textTransform: "uppercase", letterSpacing: 0.5 } }, s.l)))), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 6, marginBottom: 12, flexWrap: "wrap" } }, [
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 20, fontWeight: 700, color: s.c, fontFamily: FONT_UI } }, s.v), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: C.label3, fontFamily: FONT_UI, textTransform: "uppercase", letterSpacing: 0.5 } }, s.l)))), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 6, marginBottom: 12, flexWrap: "wrap" } }, [
       { id: "todas", l: `Todas (${preview.length})` },
       { id: "validas", l: `V\xE1lidas (${nValidas})` },
       { id: "errores", l: `Errores (${nErrores})` },
@@ -26146,7 +26274,7 @@ Fecha: ${venta.fecha}`);
       padding: "14px 10px",
       textAlign: "center",
       border: `1px solid ${s.c}25`
-    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 28, fontWeight: 800, color: s.c, fontFamily: FONT_UI } }, s.v), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT_UI, textTransform: "uppercase", letterSpacing: 0.5, marginTop: 2 } }, s.l)))), /* @__PURE__ */ import_react.default.createElement("button", { onClick: onClose, style: {
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 28, fontWeight: 700, color: s.c, fontFamily: FONT_UI } }, s.v), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT_UI, textTransform: "uppercase", letterSpacing: 0.5, marginTop: 2 } }, s.l)))), /* @__PURE__ */ import_react.default.createElement("button", { onClick: onClose, style: {
       width: "100%",
       background: C.label,
       border: "none",
@@ -26363,7 +26491,7 @@ Fecha: ${venta.fecha}`);
       borderRadius: 10,
       padding: "10px 12px",
       border: `1px solid ${p.color}20`
-    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: p.color, fontFamily: FONT_UI, fontWeight: 600, marginBottom: 4 } }, p.icon, " ", p.label), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 16, fontWeight: 800, color: p.color, fontFamily: FONT_UI } }, "Bs ", new Intl.NumberFormat("es-BO", { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(p.val)))))), topMarcas.length > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: cardStyle }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, fontWeight: 700, color: C.label2, fontFamily: FONT_UI } }, "Top marcas \u2014 ", MESES[mes]), /* @__PURE__ */ import_react.default.createElement("button", { onClick: () => onGoTab("marcas"), style: {
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: p.color, fontFamily: FONT_UI, fontWeight: 600, marginBottom: 4 } }, p.icon, " ", p.label), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 16, fontWeight: 600, color: p.color, fontFamily: FONT_UI } }, "Bs ", new Intl.NumberFormat("es-BO", { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(p.val)))))), topMarcas.length > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: cardStyle }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, fontWeight: 700, color: C.label2, fontFamily: FONT_UI } }, "Top marcas \u2014 ", MESES[mes]), /* @__PURE__ */ import_react.default.createElement("button", { onClick: () => onGoTab("marcas"), style: {
       fontSize: 12,
       color: C.gold,
       fontFamily: FONT_UI,
@@ -26391,8 +26519,8 @@ Fecha: ${venta.fecha}`);
       display: "flex",
       justifyContent: "space-between",
       alignItems: "center",
-      padding: "9px 0",
-      borderBottom: i < ultVentas.length - 1 ? "1px solid #F1F5F9" : ""
+      padding: "7px 0",
+      borderBottom: i < ultVentas.length - 1 ? `1px solid ${C.sep}` : ""
     } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
       fontSize: 13,
       fontWeight: 600,
@@ -26400,8 +26528,16 @@ Fecha: ${venta.fecha}`);
       fontFamily: FONT_UI,
       overflow: "hidden",
       textOverflow: "ellipsis",
-      whiteSpace: "nowrap"
-    } }, iconPago(v.metodoPago), " ", v.items?.map((it) => it.nombre).join(", ") || "Venta"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT_UI } }, v.fecha, " \xB7 ", labelPago(v.metodoPago))), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 14, fontWeight: 800, color: "#2E7D32", fontFamily: FONT_UI, marginLeft: 12 } }, "Bs ", new Intl.NumberFormat("es-BO", { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(v.total))))), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "grid", gridTemplateColumns: isDesktop ? "1fr 1fr 1fr 1fr" : "1fr 1fr", gap: isDesktop ? 8 : 10, marginBottom: 8 } }, [
+      whiteSpace: "nowrap",
+      lineHeight: "1.3"
+    } }, iconPago(v.metodoPago), " ", v.items?.map((it) => it.nombre).join(", ") || "Venta"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: C.label3, fontFamily: FONT_UI, marginTop: 1, opacity: 0.65 } }, v.fecha, " \xB7 ", labelPago(v.metodoPago))), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      fontSize: 14,
+      fontWeight: 600,
+      color: "#2E7D32",
+      fontFamily: FONT_UI,
+      marginLeft: 12,
+      letterSpacing: "-0.01em"
+    } }, "Bs ", new Intl.NumberFormat("es-BO", { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(v.total))))), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "grid", gridTemplateColumns: isDesktop ? "1fr 1fr 1fr 1fr" : "1fr 1fr", gap: isDesktop ? 8 : 10, marginBottom: 8 } }, [
       { icon: "\u2295", label: "Nueva venta", tab: "pos", color: C.gold },
       { icon: "\u25EB", label: "Inventario", tab: "inventario", color: C.indigo },
       { icon: "\u25C8", label: "Ver ventas", tab: "ventas", color: "#00695C" },
@@ -26581,7 +26717,7 @@ Fecha: ${venta.fecha}`);
       padding: "12px 14px",
       background: `${marca.color}10`,
       borderTop: `2px solid ${marca.color}30`
-    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 14, fontWeight: 700, color: C.label, fontFamily: FONT } }, "Subtotal ", marca.nombre), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 20, fontWeight: 800, color: marca.color, fontFamily: FONT_DISPLAY } }, $(sub)))), fac && /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, null, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 14, fontWeight: 700, color: C.label, fontFamily: FONT } }, "Subtotal ", marca.nombre), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 20, fontWeight: 700, color: marca.color, fontFamily: FONT_DISPLAY } }, $(sub)))), fac && /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, null, /* @__PURE__ */ import_react.default.createElement("div", { style: {
       fontSize: 11,
       fontWeight: 700,
       color: C.label3,
@@ -26684,7 +26820,7 @@ Fecha: ${venta.fecha}`);
       marginBottom: 4
     } }, "\u{1F9FE} Factura Electr\xF3nica Bolivia"), /* @__PURE__ */ import_react.default.createElement("div", { style: {
       fontSize: 18,
-      fontWeight: 800,
+      fontWeight: 700,
       color: "#1A237E",
       fontFamily: FONT_DISPLAY
     } }, "N\xB0 ", fac.numero || "\u2014")), fac.anulada && /* @__PURE__ */ import_react.default.createElement("span", { style: {
@@ -26783,6 +26919,10 @@ Fecha: ${venta.fecha}`);
     const udsHoy = (0, import_react.useMemo)(() => udsV(vHoy), [vHoy]);
     const tktProm = vMes.length > 0 ? brutoMes / vMes.length : 0;
     const liq = (0, import_react.useMemo)(() => calcLiqMarca(vMes, mid), [vMes, mid]);
+    const gcMarca = (0, import_react.useMemo)(() => vMes.reduce((s, v) => {
+      const a = v.gcAllocations?.find((x) => x.marcaId === mid);
+      return s + (a?.gcAmount || 0);
+    }, 0), [vMes, mid]);
     const diaActual = mes === now.getMonth() && anio === now.getFullYear() ? now.getDate() : new Date(anio, mes + 1, 0).getDate();
     const diasTotal = new Date(anio, mes + 1, 0).getDate();
     const proyeccion = diaActual > 0 ? brutoMes / diaActual * diasTotal : 0;
@@ -27078,7 +27218,7 @@ Fecha: ${venta.fecha}`);
       { label: "En stock", value: stockOk, color: C.green, bg: C.greenBg },
       { label: "Bajo stock", value: stockBaj, color: C.amber, bg: C.amberBg },
       { label: "Agotados", value: agotados, color: C.red, bg: C.redBg }
-    ].map((s) => /* @__PURE__ */ import_react.default.createElement("div", { key: s.label, style: { background: s.bg, borderRadius: 12, padding: "12px 10px", textAlign: "center" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 22, fontWeight: 800, color: s.color, fontFamily: FONT } }, s.value), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+    ].map((s) => /* @__PURE__ */ import_react.default.createElement("div", { key: s.label, style: { background: s.bg, borderRadius: 12, padding: "12px 10px", textAlign: "center" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 22, fontWeight: 700, color: s.color, fontFamily: FONT } }, s.value), /* @__PURE__ */ import_react.default.createElement("div", { style: {
       fontSize: 10,
       color: s.color,
       fontFamily: FONT,
@@ -27163,34 +27303,35 @@ Fecha: ${venta.fecha}`);
           onClick: () => setVentaSeleccionada(v),
           style: {
             background: C.bg1,
-            borderRadius: 16,
-            padding: "14px 16px",
-            marginBottom: 10,
+            borderRadius: 12,
+            padding: "10px 14px",
+            marginBottom: 6,
             border: `1px solid ${C.sep}`,
-            boxShadow: "0 1px 6px rgba(0,0,0,0.04)",
+            boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
             cursor: "pointer",
             WebkitTapHighlightColor: "transparent",
-            transition: "box-shadow .15s",
-            borderLeft: `4px solid ${v.anulada ? C.red : marca.color}`
+            transition: "all .15s",
+            borderLeft: `3px solid ${v.anulada ? C.red : marca.color}`
           }
         },
         /* @__PURE__ */ import_react.default.createElement("div", { style: {
           display: "flex",
           justifyContent: "space-between",
-          alignItems: "flex-start",
-          marginBottom: 8
+          alignItems: "center",
+          marginBottom: 4
         } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: {
           fontSize: 11,
           fontFamily: "monospace",
-          color: C.label3,
+          color: C.gold,
           fontWeight: 600
-        } }, v.id), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT, marginTop: 1 } }, v.fecha, " ", v.hora, " \xB7 ", v.vendedor || "Tienda")), /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "right" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
-          fontSize: 17,
-          fontWeight: 800,
+        } }, v.id), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT, marginTop: 1, opacity: 0.65 } }, v.fecha, " ", v.hora, " \xB7 ", v.vendedor || "Tienda")), /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "right" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+          fontSize: 16,
+          fontWeight: 600,
           color: v.anulada ? C.red : marca.color,
           fontFamily: FONT_DISPLAY,
-          lineHeight: 1
-        } }, $(csub)), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: C.label3, fontFamily: FONT, marginTop: 2 } }, iconPago(v.metodoPago), " ", labelPago(v.metodoPago)))),
+          lineHeight: 1,
+          letterSpacing: "-0.02em"
+        } }, $(csub)), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: C.label3, fontFamily: FONT, marginTop: 2, opacity: 0.65 } }, iconPago(v.metodoPago), " ", labelPago(v.metodoPago)))),
         /* @__PURE__ */ import_react.default.createElement("div", { style: {
           fontSize: 12,
           color: C.label2,
@@ -27198,7 +27339,8 @@ Fecha: ${venta.fecha}`);
           overflow: "hidden",
           textOverflow: "ellipsis",
           whiteSpace: "nowrap",
-          marginBottom: 8
+          marginBottom: 5,
+          lineHeight: "1.35"
         } }, citems.map((i) => `${i.nombre} \xD7${i.cantidad}`).join(" \xB7 ")),
         /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" } }, v.anulada && /* @__PURE__ */ import_react.default.createElement("span", { style: {
           fontSize: 10,
@@ -27389,21 +27531,22 @@ Fecha: ${venta.fecha}`);
         marginBottom: 8
       } }, g.label, " (", g.prods.length, ")"), g.prods.map((p) => /* @__PURE__ */ import_react.default.createElement("div", { key: p.id, style: {
         background: C.bg1,
-        borderRadius: 14,
-        padding: "12px 14px",
-        marginBottom: 6,
+        borderRadius: 10,
+        padding: "9px 12px",
+        marginBottom: 5,
         border: `1px solid ${C.sep}`,
-        borderLeft: `4px solid ${g.color}`,
-        boxShadow: "0 1px 4px rgba(0,0,0,0.04)"
-      } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "flex-start" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+        borderLeft: `3px solid ${g.color}`,
+        boxShadow: "0 1px 3px rgba(0,0,0,0.03)"
+      } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
         fontSize: 13,
         fontWeight: 600,
         color: C.label,
         fontFamily: FONT,
         overflow: "hidden",
         textOverflow: "ellipsis",
-        whiteSpace: "nowrap"
-      } }, p.nombre), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT, marginTop: 2 } }, p.codigo, " \xB7 ", p.categoria || "General", p.fecha && /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.label3 } }, " \xB7 ", p.fecha))), /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "right", flexShrink: 0, marginLeft: 10 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 14, fontWeight: 700, color: C.gold, fontFamily: FONT } }, $(p.precio)), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: g.color, fontFamily: FONT, marginTop: 2 } }, p.stock, " / ", p.stockInicial || p.stock, " uds"))), /* @__PURE__ */ import_react.default.createElement("div", { style: { marginTop: 8, height: 4, background: `${g.color}20`, borderRadius: 2 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+        whiteSpace: "nowrap",
+        lineHeight: "1.3"
+      } }, p.nombre), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: C.label3, fontFamily: FONT, marginTop: 1, opacity: 0.65 } }, p.codigo, " \xB7 ", p.categoria || "General", p.fecha && /* @__PURE__ */ import_react.default.createElement("span", null, " \xB7 ", p.fecha))), /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "right", flexShrink: 0, marginLeft: 10 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 14, fontWeight: 600, color: C.gold, fontFamily: FONT, letterSpacing: "-0.01em" } }, $(p.precio)), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, fontWeight: 600, color: g.color, fontFamily: FONT, marginTop: 1 } }, p.stock, " / ", p.stockInicial || p.stock, " uds"))), /* @__PURE__ */ import_react.default.createElement("div", { style: { marginTop: 7, height: 3, background: `${g.color}20`, borderRadius: 2 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
         height: "100%",
         background: g.color,
         borderRadius: 2,
@@ -27428,6 +27571,7 @@ Fecha: ${venta.fecha}`);
       { label: "Efectivo", value: liq.brutoEf, sign: "", color: C.label3, bold: false, sub: true },
       { label: "QR", value: liq.brutoQR, sign: "", color: C.label3, bold: false, sub: true },
       { label: "Tarjeta", value: liq.brutoTJ, sign: "", color: C.label3, bold: false, sub: true },
+      ...gcMarca > 0 ? [{ label: "Gift Cards", value: gcMarca, sign: "", color: "#7C3AED", bold: false, sub: true }] : [],
       { label: `Desc. Tarjeta (${liq.cfg.pctTarjeta}%)`, value: -liq.descTJ, sign: "\u2212", color: C.red, bold: false },
       { label: "Subtotal banco", value: liq.subBanco, sign: "", color: C.blue, bold: true },
       { label: `Comisi\xF3n Toscana (${liq.cfg.pctComision}%)`, value: -liq.comision, sign: "\u2212", color: C.red, bold: false },
@@ -27456,7 +27600,7 @@ Fecha: ${venta.fecha}`);
       padding: "16px",
       background: `${C.green}12`,
       borderTop: `2px solid ${C.green}30`
-    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 15, fontWeight: 700, color: C.green, fontFamily: FONT } }, "\u{1F49A} Total Neto Estimado"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 22, fontWeight: 800, color: C.green, fontFamily: FONT_DISPLAY } }, $(liq.neto)))), /* @__PURE__ */ import_react.default.createElement("div", { style: { background: C.bg2, borderRadius: 14, padding: 12, border: `1px solid ${C.sep}` } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT, lineHeight: 1.6 } }, "\u2139\uFE0F Esta liquidaci\xF3n es una estimaci\xF3n autom\xE1tica. El monto final puede variar seg\xFAn revisi\xF3n de Toscana House. Contact\xE1 a la administraci\xF3n para confirmar.")))), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 15, fontWeight: 700, color: C.green, fontFamily: FONT } }, "\u{1F49A} Total Neto Estimado"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 22, fontWeight: 700, color: C.green, fontFamily: FONT_DISPLAY } }, $(liq.neto)))), /* @__PURE__ */ import_react.default.createElement("div", { style: { background: C.bg2, borderRadius: 14, padding: 12, border: `1px solid ${C.sep}` } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT, lineHeight: 1.6 } }, "\u2139\uFE0F Esta liquidaci\xF3n es una estimaci\xF3n autom\xE1tica. El monto final puede variar seg\xFAn revisi\xF3n de Toscana House. Contact\xE1 a la administraci\xF3n para confirmar.")))), /* @__PURE__ */ import_react.default.createElement("div", { style: {
       position: "fixed",
       bottom: 0,
       left: 0,
@@ -28041,7 +28185,7 @@ Fecha: ${venta.fecha}`);
       marginBottom: 3
     } }, isNew ? "Nueva marca" : "Editar marca"), /* @__PURE__ */ import_react.default.createElement("div", { style: {
       fontSize: 20,
-      fontWeight: 800,
+      fontWeight: 600,
       color: C.label,
       fontFamily: FONT_DISPLAY,
       display: "flex",
@@ -29026,7 +29170,71 @@ Fecha: ${venta.fecha}`);
       transition: "width .3s",
       width: `${pct}%`,
       background: pct > 50 ? C.green : pct > 20 ? C.amber : C.red
-    } }))), /* @__PURE__ */ import_react.default.createElement("div", { style: { background: C.bg2, borderRadius: 14, border: `1px solid ${C.sep}`, padding: "14px 16px", marginBottom: 20 } }, [
+    } }))), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 20,
+      marginBottom: 20,
+      background: C.bg2,
+      borderRadius: 14,
+      border: `1px solid ${C.sep}`,
+      padding: "16px"
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      flexShrink: 0,
+      background: "#fff",
+      borderRadius: 10,
+      padding: 8,
+      boxShadow: "0 2px 8px rgba(0,0,0,0.08)"
+    } }, /* @__PURE__ */ import_react.default.createElement(BarcodeDisplay, { codigo: gc.codigo })), /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      fontSize: 11,
+      fontWeight: 700,
+      color: C.label3,
+      textTransform: "uppercase",
+      letterSpacing: 0.6,
+      marginBottom: 6,
+      fontFamily: FONT_UI
+    } }, "C\xF3digo QR"), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      fontSize: 13,
+      fontFamily: "monospace",
+      fontWeight: 700,
+      color: C.gold,
+      marginBottom: 8,
+      wordBreak: "break-all"
+    } }, gc.codigo), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT_UI, lineHeight: 1.5 } }, "Mostr\xE1 este QR en caja para usar la Gift Card"), /* @__PURE__ */ import_react.default.createElement("button", { onClick: () => {
+      const w = window.open("", "_blank", "width=400,height=480");
+      w.document.write(`<!DOCTYPE html><html><head><title>Gift Card ${gc.codigo}</title>
+              <style>body{font-family:sans-serif;text-align:center;padding:30px;background:#fff}
+              h2{font-size:18px;margin-bottom:4px}p{color:#888;font-size:12px;margin:4px 0}
+              .cod{font-size:13px;font-weight:700;color:#9A7B4F;margin:12px 0;letter-spacing:1px}
+              .saldo{font-size:28px;font-weight:700;color:#1A1714;margin:8px 0}
+              #qr{margin:16px auto;display:inline-block}
+              </style></head><body>
+              <h2>\u{1F381} Gift Card</h2>
+              <div class="cod">${gc.codigo}</div>
+              <div class="saldo">Bs ${gc.saldo}</div>
+              <p>Saldo disponible</p>
+              <div id="qr"></div>
+              <p style="margin-top:16px;font-size:11px;color:#bbb">Toscana House</p>
+              <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><\/script>
+              <script>new QRCode(document.getElementById('qr'),{text:'${gc.codigo}',width:160,height:160,colorDark:'#1A2E1A'});<\/script>
+              </body></html>`);
+      w.document.close();
+      setTimeout(() => w.print(), 800);
+    }, style: {
+      marginTop: 8,
+      padding: "7px 14px",
+      borderRadius: 10,
+      border: "none",
+      background: C.gold,
+      color: "#fff",
+      fontSize: 12,
+      fontWeight: 700,
+      fontFamily: FONT_UI,
+      cursor: "pointer",
+      display: "inline-flex",
+      alignItems: "center",
+      gap: 6
+    } }, "\u{1F5A8} Imprimir QR"))), /* @__PURE__ */ import_react.default.createElement("div", { style: { background: C.bg2, borderRadius: 14, border: `1px solid ${C.sep}`, padding: "14px 16px", marginBottom: 20 } }, [
       ["Fecha de emisi\xF3n", gc.emision],
       ["Vencimiento", gc.vencimiento || "Sin vencimiento"],
       ["\xDAltimo uso", gc.ultimoUso || "No utilizada"],
@@ -29423,6 +29631,7 @@ Fecha: ${venta.fecha}`);
         sbGuardarUsuarios(nueva);
       }
     }
+    useRealtimeSync(setVentas, setInv);
     (0, import_react.useEffect)(() => {
       sbCargarRetiros().then((data) => {
         if (data.length > 0) setRetiros(data);
@@ -29591,7 +29800,7 @@ Fecha: ${venta.fecha}`);
       });
       return Object.values(map).sort((a, b) => b.mk.localeCompare(a.mk));
     }, [ventas]);
-    const TABS = [
+    const TABS_ALL = [
       { id: "inicio", icon: "\u229E", label: "Inicio" },
       { id: "pos", icon: "\u2295", label: "Caja" },
       { id: "ventas", icon: "\u25C8", label: "Ventas" },
@@ -29601,6 +29810,7 @@ Fecha: ${venta.fecha}`);
       { id: "giftcards", icon: "\u{1F381}", label: "Gift" },
       { id: "config", icon: "\u2699", label: "Config" }
     ];
+    const TABS = user?.rol === "caja" ? TABS_ALL.filter((t) => ["inicio", "pos", "ventas"].includes(t.id)) : TABS_ALL;
     const showingDetail = tab === "marcas" && marcaDetalle;
     if (!user) return /* @__PURE__ */ import_react.default.createElement(LoginScreen, { onLogin: login });
     if (user.rol === "marca") return /* @__PURE__ */ import_react.default.createElement(BrandPortal, { user, ventas, inv, logout });
@@ -30806,7 +31016,7 @@ Fecha: ${venta.fecha}`);
     } }, "Venta realizada"), /* @__PURE__ */ import_react.default.createElement("div", { style: {
       fontSize: 28,
       fontWeight: 600,
-      color: C.label,
+      color: C.gold,
       fontFamily: FONT_DISPLAY,
       marginTop: 4
     } }, $(ultima.total))), /* @__PURE__ */ import_react.default.createElement("div", { style: {
@@ -30854,7 +31064,7 @@ Fecha: ${venta.fecha}`);
       padding: "20px",
       marginBottom: 20,
       textAlign: "center"
-    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.label3, fontFamily: FONT, marginBottom: 6 } }, "Total a cobrar"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 40, fontWeight: 800, color: C.gold, fontFamily: FONT, lineHeight: 1 } }, $(total)), descPct > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.label3, fontFamily: FONT, marginTop: 6 } }, "Subtotal ", $(subtotal), " \xB7 -(", descPct, "%)")), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.label3, fontFamily: FONT, marginBottom: 6 } }, "Total a cobrar"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 40, fontWeight: 700, color: C.gold, fontFamily: FONT, lineHeight: 1 } }, $(total)), descPct > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.label3, fontFamily: FONT, marginTop: 6 } }, "Subtotal ", $(subtotal), " \xB7 -(", descPct, "%)")), /* @__PURE__ */ import_react.default.createElement("div", { style: {
       fontSize: 13,
       fontWeight: 600,
       color: C.label3,
@@ -31457,7 +31667,7 @@ Fecha: ${venta.fecha}`);
       padding: isDesktop ? "10px 8px" : "12px 10px",
       border: `1px solid ${C.sep}`,
       textAlign: "center"
-    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 20, marginBottom: 4 } }, s.icon), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 18, fontWeight: 800, color: s.color, fontFamily: FONT } }, s.value), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: C.label3, fontFamily: FONT, textTransform: "uppercase", letterSpacing: 0.5 } }, s.label)))), productos.length === 0 ? /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center", padding: "48px 20px", color: C.label3 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 40, marginBottom: 10, opacity: 0.5 } }, "\u{1F4E6}"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 16, fontWeight: 600, color: C.label2, fontFamily: FONT } }, "Sin productos para ", marca?.nombre), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.label3, fontFamily: FONT, marginTop: 6 } }, 'Usa "Recibir" para agregar \xEDtems')) : /* @__PURE__ */ import_react.default.createElement("div", { style: {
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 20, marginBottom: 4 } }, s.icon), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 18, fontWeight: 700, color: s.color, fontFamily: FONT } }, s.value), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: C.label3, fontFamily: FONT, textTransform: "uppercase", letterSpacing: 0.5 } }, s.label)))), productos.length === 0 ? /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center", padding: "48px 20px", color: C.label3 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 40, marginBottom: 10, opacity: 0.5 } }, "\u{1F4E6}"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 16, fontWeight: 600, color: C.label2, fontFamily: FONT } }, "Sin productos para ", marca?.nombre), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.label3, fontFamily: FONT, marginTop: 6 } }, 'Usa "Recibir" para agregar \xEDtems')) : /* @__PURE__ */ import_react.default.createElement("div", { style: {
       display: isDesktop ? "grid" : "flex",
       gridTemplateColumns: isDesktop ? "1fr 1fr" : void 0,
       flexDirection: isDesktop ? void 0 : "column",
@@ -31489,29 +31699,30 @@ Fecha: ${venta.fecha}`);
       const borderColor = prod.stock === 0 ? "#F4A8A8" : prod.stock < 3 ? "#F4D4A8" : "#A8D4A8";
       return /* @__PURE__ */ import_react.default.createElement("div", { key: prod.id, style: {
         background: bgColor,
-        border: `1.5px solid ${borderColor}`,
-        borderRadius: isDesktop ? 12 : 16,
-        padding: isDesktop ? "10px 12px" : "14px 16px"
+        border: `1px solid ${borderColor}`,
+        borderRadius: isDesktop ? 10 : 12,
+        padding: isDesktop ? "8px 12px" : "10px 14px"
       } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
         display: "flex",
         justifyContent: "space-between",
-        alignItems: "flex-start",
-        marginBottom: isDesktop ? 6 : 10
+        alignItems: "center",
+        marginBottom: isDesktop ? 4 : 6
       } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
-        fontSize: isDesktop ? 13 : 15,
-        fontWeight: 700,
+        fontSize: isDesktop ? 13 : 14,
+        fontWeight: 600,
         color: C.label,
         fontFamily: FONT,
-        marginBottom: isDesktop ? 3 : 4
-      } }, prod.nombre), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" } }, /* @__PURE__ */ import_react.default.createElement("span", { style: {
+        marginBottom: isDesktop ? 2 : 3,
+        lineHeight: "1.3"
+      } }, prod.nombre), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" } }, /* @__PURE__ */ import_react.default.createElement("span", { style: {
         fontFamily: "monospace",
-        fontSize: 11,
+        fontSize: 10,
         color: C.gold,
         background: C.gold + "18",
-        padding: "2px 7px",
-        borderRadius: 5,
-        fontWeight: 700
-      } }, prod.codigo), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 12, color: C.label3, fontFamily: FONT } }, prod.categoria))), /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "right", flexShrink: 0 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: isDesktop ? 14 : 16, fontWeight: 800, color: C.gold, fontFamily: FONT } }, $(prod.precio)), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+        padding: "1px 6px",
+        borderRadius: 4,
+        fontWeight: 600
+      } }, prod.codigo), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 10, color: C.label3, fontFamily: FONT, opacity: 0.7 } }, prod.categoria))), /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "right", flexShrink: 0 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: isDesktop ? 13 : 15, fontWeight: 600, color: C.gold, fontFamily: FONT, letterSpacing: "-0.01em" } }, $(prod.precio)), /* @__PURE__ */ import_react.default.createElement("div", { style: {
         fontSize: 12,
         fontFamily: FONT,
         fontWeight: 600,
@@ -31640,17 +31851,17 @@ Fecha: ${venta.fecha}`);
       },
       /* @__PURE__ */ import_react.default.createElement("option", { value: "" }, "Todo"),
       historial.map((h) => /* @__PURE__ */ import_react.default.createElement("option", { key: h.mk, value: h.mk }, MESES[h.mes], " ", h.anio))
-    )), histFil.length === 0 ? /* @__PURE__ */ import_react.default.createElement(EmptyState, { icon: "\u{1F4CB}", title: "Sin ventas registradas", sub: `No hay ventas para ${marca?.nombre}` }) : histFil.map((periodo) => /* @__PURE__ */ import_react.default.createElement("div", { key: periodo.mk, style: { background: C.bg2, borderRadius: 16, overflow: "hidden", marginBottom: isDesktop ? 8 : 14 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      padding: isDesktop ? "10px 14px" : "14px 16px",
+    )), histFil.length === 0 ? /* @__PURE__ */ import_react.default.createElement(EmptyState, { icon: "\u{1F4CB}", title: "Sin ventas registradas", sub: `No hay ventas para ${marca?.nombre}` }) : histFil.map((periodo) => /* @__PURE__ */ import_react.default.createElement("div", { key: periodo.mk, style: { background: C.bg2, borderRadius: 14, overflow: "hidden", marginBottom: isDesktop ? 6 : 10 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      padding: isDesktop ? "9px 14px" : "12px 14px",
       borderBottom: `1px solid ${C.sep}`,
       display: "flex",
       justifyContent: "space-between",
       alignItems: "center",
       background: `${marca?.color}10`
-    } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: isDesktop ? 14 : 17, fontWeight: 600, color: C.label, fontFamily: FONT } }, MESES[periodo.mes], " ", periodo.anio), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: isDesktop ? 12 : 13, color: C.label3, fontFamily: FONT } }, periodo.ventas.length, " transacciones")), /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "right" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: isDesktop ? 18 : 22, fontWeight: 800, color: marca?.color, fontFamily: FONT } }, $(periodo.bruto)), cierres[`${periodo.mk}-${marcaId}`]?.cerrado && /* @__PURE__ */ import_react.default.createElement(Chip, { color: C.green, small: true }, "\u2713 Cerrado"))), periodo.ventas.map((v, i) => /* @__PURE__ */ import_react.default.createElement("div", { key: v.id, style: {
-      padding: isDesktop ? "9px 14px" : "13px 16px",
+    } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: isDesktop ? 13 : 15, fontWeight: 600, color: C.label, fontFamily: FONT } }, MESES[periodo.mes], " ", periodo.anio), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: isDesktop ? 11 : 12, color: C.label3, fontFamily: FONT, opacity: 0.65 } }, periodo.ventas.length, " transacciones")), /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "right" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: isDesktop ? 17 : 20, fontWeight: 600, color: marca?.color, fontFamily: FONT, letterSpacing: "-0.02em" } }, $(periodo.bruto)), cierres[`${periodo.mk}-${marcaId}`]?.cerrado && /* @__PURE__ */ import_react.default.createElement(Chip, { color: C.green, small: true }, "\u2713 Cerrado"))), periodo.ventas.map((v, i) => /* @__PURE__ */ import_react.default.createElement("div", { key: v.id, style: {
+      padding: isDesktop ? "8px 14px" : "10px 14px",
       borderBottom: i < periodo.ventas.length - 1 ? `1px solid ${C.sep}` : ""
-    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", marginBottom: isDesktop ? 4 : 6 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontFamily: "monospace", fontSize: 12, color: C.gold } }, v.id), /* @__PURE__ */ import_react.default.createElement(Chip, { color: colorPago(v.metodoPago), small: true }, iconPago(v.metodoPago), " ", labelPago(v.metodoPago))), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: isDesktop ? 14 : 16, fontWeight: 700, color: C.gold, fontFamily: FONT } }, $(v.subMarca))), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT, marginBottom: isDesktop ? 3 : 6 } }, v.fecha, " ", v.hora), v.itsMarca.map((it, ii) => /* @__PURE__ */ import_react.default.createElement("div", { key: `${v.id}-${it.prodId}-${ii}`, style: { fontSize: 13, color: C.label2, fontFamily: FONT } }, "\xB7 ", it.nombre, " ", /* @__PURE__ */ import_react.default.createElement("span", { style: { fontFamily: "monospace", fontSize: 11, color: C.label3 } }, it.codigo), " ", "\xD7", it.cantidad))))))), sub === "productos" && /* @__PURE__ */ import_react.default.createElement("div", { style: {
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: isDesktop ? 2 : 4 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 7 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontFamily: "monospace", fontSize: 11, color: C.gold, fontWeight: 600 } }, v.id), /* @__PURE__ */ import_react.default.createElement(Chip, { color: colorPago(v.metodoPago), small: true }, iconPago(v.metodoPago), " ", labelPago(v.metodoPago))), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: isDesktop ? 14 : 15, fontWeight: 600, color: C.gold, fontFamily: FONT, letterSpacing: "-0.01em" } }, $(v.subMarca))), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT, marginBottom: isDesktop ? 2 : 4, opacity: 0.65 } }, v.fecha, " ", v.hora), v.itsMarca.map((it, ii) => /* @__PURE__ */ import_react.default.createElement("div", { key: `${v.id}-${it.prodId}-${ii}`, style: { fontSize: 12, color: C.label2, fontFamily: FONT, lineHeight: "1.3" } }, "\xB7 ", it.nombre, " ", /* @__PURE__ */ import_react.default.createElement("span", { style: { fontFamily: "monospace", fontSize: 10, color: C.label3, opacity: 0.7 } }, it.codigo), " ", "\xD7", it.cantidad))))))), sub === "productos" && /* @__PURE__ */ import_react.default.createElement("div", { style: {
       display: isDesktop ? "grid" : "flex",
       gridTemplateColumns: isDesktop ? "1fr 1fr 1fr" : void 0,
       flexDirection: isDesktop ? void 0 : "column",
@@ -31723,7 +31934,7 @@ Fecha: ${venta.fecha}`);
       alignItems: "center",
       padding: "18px 16px",
       background: `${C.gold}12`
-    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 16, fontWeight: 700, color: C.label, fontFamily: FONT } }, "TOTAL A PAGAR"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 24, fontWeight: 800, color: C.gold, fontFamily: FONT } }, $(liq.neto)))), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 10 } }, /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => exportCSV(MARCAS.find((m) => m.id === marcaId), ventas, mes, anio), variant: "fill", full: true, icon: "\u2B07" }, "Exportar CSV"), !cerrado ? /* @__PURE__ */ import_react.default.createElement(
+    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 16, fontWeight: 700, color: C.label, fontFamily: FONT } }, "TOTAL A PAGAR"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 24, fontWeight: 700, color: C.gold, fontFamily: FONT } }, $(liq.neto)))), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 10 } }, /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => exportCSV(MARCAS.find((m) => m.id === marcaId), ventas, mes, anio), variant: "fill", full: true, icon: "\u2B07" }, "Exportar CSV"), !cerrado ? /* @__PURE__ */ import_react.default.createElement(
       IOSBtn,
       {
         variant: "success",
@@ -31753,28 +31964,28 @@ Fecha: ${venta.fecha}`);
       const gcAlloc = v.gcAllocations?.find((a) => a.marcaId === marcaId);
       return /* @__PURE__ */ import_react.default.createElement("div", { key: v.id, style: {
         background: C.bg2,
-        borderRadius: 14,
-        padding: 14,
-        marginBottom: 10,
+        borderRadius: 10,
+        padding: "10px 14px",
+        marginBottom: 5,
         border: v.gcId ? `1px solid #7C3AED20` : `1px solid ${C.sep}`
-      } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", marginBottom: 6 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontFamily: "monospace", fontSize: 12, color: C.gold } }, v.id), v.gcId && /* @__PURE__ */ import_react.default.createElement("span", { style: {
-        fontSize: 10,
+      } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 3 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontFamily: "monospace", fontSize: 11, color: C.gold, fontWeight: 600 } }, v.id), v.gcId && /* @__PURE__ */ import_react.default.createElement("span", { style: {
+        fontSize: 9,
         background: "#7C3AED15",
         color: "#7C3AED",
         fontWeight: 700,
-        padding: "2px 6px",
-        borderRadius: 8,
+        padding: "2px 5px",
+        borderRadius: 6,
         fontFamily: FONT_UI
-      } }, "\u{1F381} GC")), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 16, fontWeight: 700, color: C.gold, fontFamily: FONT } }, $(sub2))), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.label3, fontFamily: FONT, marginBottom: 4 } }, v.fecha, " ", v.hora, " \xB7 ", labelPago(v.metodoPago)), gcAlloc && /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      } }, "\u{1F381} GC")), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 15, fontWeight: 600, color: C.gold, fontFamily: FONT, letterSpacing: "-0.01em" } }, $(sub2))), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT, marginBottom: gcAlloc ? 3 : 0, opacity: 0.65 } }, v.fecha, " ", v.hora, " \xB7 ", labelPago(v.metodoPago)), gcAlloc && /* @__PURE__ */ import_react.default.createElement("div", { style: {
         display: "flex",
-        gap: 12,
+        gap: 10,
         fontSize: 11,
         fontFamily: FONT_UI,
-        marginBottom: 6,
-        padding: "6px 10px",
+        marginBottom: 3,
+        padding: "4px 8px",
         background: "#7C3AED08",
-        borderRadius: 8
-      } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { color: "#7C3AED", fontWeight: 600 } }, "\u{1F381} GC: ", $(gcAlloc.gcAmount)), gcAlloc.extraAmount > 0.01 && /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.amber, fontWeight: 600 } }, "+ ", $(gcAlloc.extraAmount), " extra")), its.map((it, ii) => /* @__PURE__ */ import_react.default.createElement("div", { key: `liq-${v.id}-${it.prodId}-${ii}`, style: { fontSize: 13, color: C.label2, fontFamily: FONT } }, "\xB7 ", it.nombre, " \xD7", it.cantidad, " = ", $(it.subtotal))));
+        borderRadius: 6
+      } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { color: "#7C3AED", fontWeight: 600 } }, "\u{1F381} GC: ", $(gcAlloc.gcAmount)), gcAlloc.extraAmount > 0.01 && /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.amber, fontWeight: 600 } }, "+ ", $(gcAlloc.extraAmount), " extra")), its.map((it, ii) => /* @__PURE__ */ import_react.default.createElement("div", { key: `liq-${v.id}-${it.prodId}-${ii}`, style: { fontSize: 12, color: C.label2, fontFamily: FONT, lineHeight: "1.3" } }, "\xB7 ", it.nombre, " \xD7", it.cantidad, " = ", $(it.subtotal))));
     }))));
   }
   function HistorialTab({ ventas, inv, cierres, onVentaClick }) {
@@ -31886,7 +32097,7 @@ Fecha: ${venta.fecha}`);
       display: "flex",
       justifyContent: "space-between",
       alignItems: "center"
-    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 14, fontWeight: 700, color: C.label, fontFamily: FONT } }, MESES[mesSel], " ", anioSel), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 14, fontWeight: 800, color: totalPer > 0 ? C.gold : C.label3, fontFamily: FONT } }, totalPer > 0 ? $(totalPer) : "Sin ventas"))), /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 16 } }, /* @__PURE__ */ import_react.default.createElement(
+    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 14, fontWeight: 700, color: C.label, fontFamily: FONT } }, MESES[mesSel], " ", anioSel), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 14, fontWeight: 700, color: totalPer > 0 ? C.gold : C.label3, fontFamily: FONT } }, totalPer > 0 ? $(totalPer) : "Sin ventas"))), /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 16 } }, /* @__PURE__ */ import_react.default.createElement(
       SegControl,
       {
         options: [
@@ -31943,7 +32154,7 @@ Fecha: ${venta.fecha}`);
         borderBottom: i < porMarcaPer.length - 1 ? `1px solid ${C.sep}` : "",
         padding: "14px 16px",
         borderLeft: `4px solid ${x.marca.color}`
-      } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10 } }, /* @__PURE__ */ import_react.default.createElement(MarcaIcon, { marca: x.marca, size: 22, radius: 6 }), /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 15, fontWeight: 600, color: C.label, fontFamily: FONT, letterSpacing: "0.02em" } }, x.marca.nombre), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT } }, x.txs, " venta", x.txs !== 1 ? "s" : ""))), /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "right" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 18, fontWeight: 800, color: x.marca.color, fontFamily: FONT } }, $(x.total)), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.green, fontFamily: FONT } }, "Neto: ", $(x.total * 0.9)))), /* @__PURE__ */ import_react.default.createElement("div", { style: { background: "rgba(0,0,0,0.06)", borderRadius: 4, height: 5, marginBottom: 10 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { width: `${x.total / maxT * 100}%`, background: x.marca.color, height: 5, borderRadius: 4 } })), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6 } }, [["\u{1F4B5}", x.ef, "#4A9B6F"], ["\u{1F4F1}", x.qr, "#5B8DB8"], ["\u{1F4B3}", x.tj, "#C8922A"]].map(([icon, val, color]) => /* @__PURE__ */ import_react.default.createElement("div", { key: icon, style: {
+      } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10 } }, /* @__PURE__ */ import_react.default.createElement(MarcaIcon, { marca: x.marca, size: 22, radius: 6 }), /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 15, fontWeight: 600, color: C.label, fontFamily: FONT, letterSpacing: "0.02em" } }, x.marca.nombre), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT } }, x.txs, " venta", x.txs !== 1 ? "s" : ""))), /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "right" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 18, fontWeight: 600, color: x.marca.color, fontFamily: FONT } }, $(x.total)), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.green, fontFamily: FONT } }, "Neto: ", $(x.total * 0.9)))), /* @__PURE__ */ import_react.default.createElement("div", { style: { background: "rgba(0,0,0,0.06)", borderRadius: 4, height: 5, marginBottom: 10 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { width: `${x.total / maxT * 100}%`, background: x.marca.color, height: 5, borderRadius: 4 } })), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6 } }, [["\u{1F4B5}", x.ef, "#4A9B6F"], ["\u{1F4F1}", x.qr, "#5B8DB8"], ["\u{1F4B3}", x.tj, "#C8922A"]].map(([icon, val, color]) => /* @__PURE__ */ import_react.default.createElement("div", { key: icon, style: {
         padding: "7px",
         background: `${color}10`,
         borderRadius: 8,
@@ -31965,7 +32176,7 @@ Fecha: ${venta.fecha}`);
             WebkitTapHighlightColor: "transparent"
           }
         },
-        /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", marginBottom: 6 } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontFamily: "monospace", fontSize: 12, color: C.gold } }, v.id), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT } }, v.fecha, " ", v.hora)), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } }, /* @__PURE__ */ import_react.default.createElement(Chip, { color: colorPago(v.metodoPago) }, iconPago(v.metodoPago), " ", labelPago(v.metodoPago)), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 17, fontWeight: 800, color: C.gold, fontFamily: FONT } }, $(v.total)))),
+        /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", marginBottom: 6 } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontFamily: "monospace", fontSize: 12, color: C.gold } }, v.id), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT } }, v.fecha, " ", v.hora)), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } }, /* @__PURE__ */ import_react.default.createElement(Chip, { color: colorPago(v.metodoPago) }, iconPago(v.metodoPago), " ", labelPago(v.metodoPago)), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 17, fontWeight: 600, color: C.gold, fontFamily: FONT } }, $(v.total)))),
         v.items.map((it, ii) => {
           const m = MARCAS.find((x) => x.id === it.marcaId);
           return /* @__PURE__ */ import_react.default.createElement("div", { key: ii, style: {
@@ -32389,7 +32600,7 @@ Fecha: ${venta.fecha}`);
       textTransform: "uppercase",
       letterSpacing: 0.6,
       marginBottom: 3
-    } }, isNew ? "Nuevo usuario" : "Editar usuario"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 19, fontWeight: 800, color: C.label, fontFamily: FONT_DISPLAY } }, isNew ? "Crear cuenta" : "Modificar cuenta")), /* @__PURE__ */ import_react.default.createElement("button", { onClick: onClose, style: {
+    } }, isNew ? "Nuevo usuario" : "Editar usuario"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 19, fontWeight: 600, color: C.label, fontFamily: FONT_DISPLAY } }, isNew ? "Crear cuenta" : "Modificar cuenta")), /* @__PURE__ */ import_react.default.createElement("button", { onClick: onClose, style: {
       width: 32,
       height: 32,
       borderRadius: "50%",
@@ -32799,7 +33010,7 @@ create policy "allow all usuarios" on usuarios
       "\u{1F4CB} Copiar SQL"
     ), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 11, color: "#9E9E9E", marginLeft: 10 } }, "Despu\xE9s recarg\xE1 la app \u2014 usuarios existentes se sincronizar\xE1n autom\xE1ticamente.")), /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 22 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
       fontSize: 24,
-      fontWeight: 800,
+      fontWeight: 600,
       color: C.label,
       fontFamily: FONT_DISPLAY,
       letterSpacing: 0.3,
@@ -32868,7 +33079,7 @@ create policy "allow all usuarios" on usuarios
       flexShrink: 0
     } }, user.rol === "admin" ? "\u{1F451}" : user.rol === "marca" ? "\u{1F3F7}" : "\u{1F6D2}"), /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: {
       fontSize: 20,
-      fontWeight: 800,
+      fontWeight: 600,
       color: C.label,
       fontFamily: FONT_DISPLAY,
       lineHeight: 1.2
@@ -32901,8 +33112,8 @@ create policy "allow all usuarios" on usuarios
       boxShadow: "0 1px 6px rgba(0,0,0,0.04)"
     } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 18, marginBottom: 2 } }, s.i), /* @__PURE__ */ import_react.default.createElement("div", { style: {
       fontSize: 22,
-      fontWeight: 800,
-      color: C.label,
+      fontWeight: 700,
+      color: C.gold,
       fontFamily: FONT_DISPLAY,
       lineHeight: 1
     } }, s.v), /* @__PURE__ */ import_react.default.createElement("div", { style: {
@@ -33196,7 +33407,7 @@ Esta acci\xF3n no se puede deshacer.`,
       boxShadow: "0 28px 70px rgba(0,0,0,0.25)"
     } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 44, textAlign: "center", marginBottom: 14 } }, confirmAct.type === "delete" ? "\u{1F5D1}\uFE0F" : confirmAct.type === "reset" ? "\u{1F511}" : "\u26A0\uFE0F"), /* @__PURE__ */ import_react.default.createElement("div", { style: {
       fontSize: 17,
-      fontWeight: 800,
+      fontWeight: 600,
       color: C.label,
       fontFamily: FONT,
       textAlign: "center",
@@ -33270,7 +33481,7 @@ Esta acci\xF3n no se puede deshacer.`,
       boxShadow: "0 28px 70px rgba(0,0,0,0.25)"
     } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 44, textAlign: "center", marginBottom: 12 } }, "\u{1F511}"), /* @__PURE__ */ import_react.default.createElement("div", { style: {
       fontSize: 18,
-      fontWeight: 800,
+      fontWeight: 600,
       color: C.label,
       fontFamily: FONT,
       textAlign: "center",
@@ -33448,7 +33659,7 @@ Esta acci\xF3n no se puede deshacer.`,
       marginBottom: 6,
       textTransform: "uppercase",
       letterSpacing: 0.8
-    } }, "Total facturado \xB7 ", fmtDate(fechaIni), " \u2013 ", fmtDate(fechaFin)), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 32, fontWeight: 800, color: "#fff", fontFamily: FONT, lineHeight: 1 } }, $(totalFil)), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: "rgba(255,255,255,0.75)", fontFamily: FONT, marginTop: 6 } }, ventasFiltradas.length, " venta", ventasFiltradas.length !== 1 ? "s" : "", " en el per\xEDodo")), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 12 } }, [
+    } }, "Total facturado \xB7 ", fmtDate(fechaIni), " \u2013 ", fmtDate(fechaFin)), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 32, fontWeight: 700, color: "#fff", fontFamily: FONT, lineHeight: 1 } }, $(totalFil)), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: "rgba(255,255,255,0.75)", fontFamily: FONT, marginTop: 6 } }, ventasFiltradas.length, " venta", ventasFiltradas.length !== 1 ? "s" : "", " en el per\xEDodo")), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 12 } }, [
       { icon: "\u{1F4B5}", label: "Efectivo", val: efectivoFil, color: C.green },
       { icon: "\u{1F4F1}", label: "QR", val: qrFil, color: C.blue },
       { icon: "\u{1F4B3}", label: "Tarjeta", val: tarjetaFil, color: C.amber },
@@ -33459,7 +33670,7 @@ Esta acci\xF3n no se puede deshacer.`,
       padding: "14px 16px",
       border: `1px solid ${C.sep}`,
       boxShadow: "0 1px 3px rgba(0,0,0,0.05)"
-    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 6 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 18 } }, s.icon), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 12, color: C.label3, fontFamily: FONT } }, s.label)), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 16, fontWeight: 800, color: s.color, fontFamily: FONT } }, $(s.val)), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT, marginTop: 2 } }, Math.round(totalFil > 0 ? s.val / totalFil * 100 : 0), "% del total")))), porMarcaFil.length > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: {
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 6 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 18 } }, s.icon), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 12, color: C.label3, fontFamily: FONT } }, s.label)), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 16, fontWeight: 600, color: s.color, fontFamily: FONT } }, $(s.val)), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT, marginTop: 2 } }, Math.round(totalFil > 0 ? s.val / totalFil * 100 : 0), "% del total")))), porMarcaFil.length > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: {
       background: C.bg1,
       borderRadius: 14,
       padding: 16,
@@ -33502,7 +33713,7 @@ Esta acci\xF3n no se puede deshacer.`,
         borderRadius: 12,
         padding: "12px 16px",
         border: `1px solid ${C.sep}`
-      } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT_UI, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5 } }, "Items vendidos"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 20, fontWeight: 800, color: C.gold, fontFamily: FONT_UI } }, totalUds, " unidades")), /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "right" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT_UI, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5 } }, "Revenue"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 20, fontWeight: 800, color: C.green, fontFamily: FONT_UI } }, $(totalFil)))), items.length === 0 ? /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center", padding: "30px 0", color: C.label3, fontFamily: FONT_UI, fontSize: 13 } }, "Sin items en el per\xEDodo") : /* @__PURE__ */ import_react.default.createElement("div", { style: { background: C.bg1, borderRadius: 14, overflow: "hidden", border: `1px solid ${C.sep}` } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT_UI, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5 } }, "Items vendidos"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 20, fontWeight: 700, color: C.gold, fontFamily: FONT_UI } }, totalUds, " unidades")), /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "right" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT_UI, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5 } }, "Revenue"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 20, fontWeight: 700, color: C.green, fontFamily: FONT_UI } }, $(totalFil)))), items.length === 0 ? /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center", padding: "30px 0", color: C.label3, fontFamily: FONT_UI, fontSize: 13 } }, "Sin items en el per\xEDodo") : /* @__PURE__ */ import_react.default.createElement("div", { style: { background: C.bg1, borderRadius: 14, overflow: "hidden", border: `1px solid ${C.sep}` } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
         display: "grid",
         gridTemplateColumns: "1fr 60px 70px",
         gap: 0,
@@ -33551,7 +33762,7 @@ Esta acci\xF3n no se puede deshacer.`,
           WebkitTapHighlightColor: "transparent"
         }
       },
-      /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", marginBottom: 6 } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontFamily: "monospace", fontSize: 11, color: C.label3 } }, v.id), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT } }, v.fecha, " ", v.hora, " \xB7 ", v.vendedor || "Tienda")), /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "right" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 15, fontWeight: 800, color: C.blue, fontFamily: FONT } }, $(v.total)), /* @__PURE__ */ import_react.default.createElement(Chip, { color: colorPago(v.metodoPago), small: true }, iconPago(v.metodoPago), " ", labelPago(v.metodoPago)))),
+      /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", marginBottom: 6 } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontFamily: "monospace", fontSize: 11, color: C.label3 } }, v.id), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT } }, v.fecha, " ", v.hora, " \xB7 ", v.vendedor || "Tienda")), /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "right" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 15, fontWeight: 600, color: C.gold, fontFamily: FONT } }, $(v.total)), /* @__PURE__ */ import_react.default.createElement(Chip, { color: colorPago(v.metodoPago), small: true }, iconPago(v.metodoPago), " ", labelPago(v.metodoPago)))),
       /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 4 } }, v.items.map((it, i) => /* @__PURE__ */ import_react.default.createElement("span", { key: i, style: { fontSize: 11, color: C.label3, fontFamily: FONT } }, it.nombre, " \xD7", it.cantidad, i < v.items.length - 1 ? " \xB7" : "")))
     ))), vistaD === "busqueda" && /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { position: "relative", marginBottom: 14 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: {
       position: "absolute",
@@ -33601,7 +33812,7 @@ Esta acci\xF3n no se puede deshacer.`,
             WebkitTapHighlightColor: "transparent"
           }
         },
-        /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", marginBottom: 8 } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontFamily: "monospace", fontSize: 11, color: C.label3 } }, v.id), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT } }, v.fecha, " \xB7 ", v.vendedor || "Tienda")), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 15, fontWeight: 800, color: C.blue, fontFamily: FONT } }, $(v.total))),
+        /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", marginBottom: 8 } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontFamily: "monospace", fontSize: 11, color: C.label3 } }, v.id), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT } }, v.fecha, " \xB7 ", v.vendedor || "Tienda")), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 15, fontWeight: 600, color: C.gold, fontFamily: FONT } }, $(v.total))),
         /* @__PURE__ */ import_react.default.createElement("div", { style: { borderTop: `1px solid ${C.sep}`, paddingTop: 8 } }, itsMatch.map((it, i) => /* @__PURE__ */ import_react.default.createElement("div", { key: i, style: {
           display: "flex",
           justifyContent: "space-between",
@@ -33658,7 +33869,7 @@ Esta acci\xF3n no se puede deshacer.`,
       display: "flex",
       justifyContent: "space-between",
       alignItems: "center"
-    } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.7, marginBottom: 3 } }, "Total ", MESES[mes]), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: isDesktop ? 22 : 28, fontWeight: 800, color: C.gold, fontFamily: FONT, lineHeight: 1 } }, $(totalVtas)), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT, marginTop: 3 } }, vMes.length, " transacciones \xB7 ", porMarca.length, " marcas activas")), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: isDesktop ? 28 : 36, opacity: 0.4 } }, "\u{1F4B0}")), [
+    } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.7, marginBottom: 3 } }, "Total ", MESES[mes]), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: isDesktop ? 22 : 28, fontWeight: 700, color: C.gold, fontFamily: FONT, lineHeight: 1 } }, $(totalVtas)), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT, marginTop: 3 } }, vMes.length, " transacciones \xB7 ", porMarca.length, " marcas activas")), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: isDesktop ? 28 : 36, opacity: 0.4 } }, "\u{1F4B0}")), [
       { icon: "\u{1F4B5}", label: "Efectivo", value: totalEfectivo, color: "#4A9B6F" },
       { icon: "\u{1F4F1}", label: "QR", value: totalQR, color: "#5B8DB8" },
       { icon: "\u{1F4B3}", label: "Tarjeta", value: totalTarjeta, color: "#C8922A" },
@@ -33687,12 +33898,12 @@ Esta acci\xF3n no se puede deshacer.`,
         key: x.marca.id,
         style: {
           background: C.bg2,
-          borderRadius: i === 0 ? "16px 16px 4px 4px" : i === porMarca.length - 1 ? "4px 4px 16px 16px" : "4px",
+          borderRadius: i === 0 ? "14px 14px 4px 4px" : i === porMarca.length - 1 ? "4px 4px 14px 14px" : "4px",
           borderBottom: i < porMarca.length - 1 ? `1px solid ${C.sep}` : "",
-          padding: isDesktop ? "10px 14px" : "14px 16px",
+          padding: isDesktop ? "9px 14px" : "12px 14px",
           cursor: "pointer",
           WebkitTapHighlightColor: "transparent",
-          borderLeft: `4px solid ${x.marca.color}`,
+          borderLeft: `3px solid ${x.marca.color}`,
           transition: isDesktop ? "background .12s" : void 0
         },
         onMouseEnter: isDesktop ? (e) => {
@@ -33706,40 +33917,39 @@ Esta acci\xF3n no se puede deshacer.`,
           setVistaActiva("historial");
         }
       },
-      /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: isDesktop ? 6 : 10 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: isDesktop ? 8 : 10 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
-        width: isDesktop ? 30 : 36,
-        height: isDesktop ? 30 : 36,
-        borderRadius: 10,
+      /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: isDesktop ? 5 : 8 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: isDesktop ? 8 : 10 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+        width: isDesktop ? 28 : 32,
+        height: isDesktop ? 28 : 32,
+        borderRadius: 9,
         background: `${x.marca.color}22`,
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        fontSize: 18,
         flexShrink: 0
-      } }, /* @__PURE__ */ import_react.default.createElement(MarcaIcon, { marca: x.marca, size: isDesktop ? 17 : 20, radius: 6 })), /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: isDesktop ? 13 : 15, fontWeight: 600, color: C.label, fontFamily: FONT, letterSpacing: "0.02em" } }, x.marca.nombre), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT } }, x.txs, " venta", x.txs !== 1 ? "s" : ""))), /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "right" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: isDesktop ? 15 : 18, fontWeight: 800, color: x.marca.color, fontFamily: FONT } }, $(x.total)), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT } }, Math.round(x.total / totalVtas * 100), "% del total"))),
-      /* @__PURE__ */ import_react.default.createElement("div", { style: { background: "rgba(0,0,0,0.06)", borderRadius: 6, height: isDesktop ? 4 : 6, marginBottom: isDesktop ? 6 : 10, overflow: "hidden" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      } }, /* @__PURE__ */ import_react.default.createElement(MarcaIcon, { marca: x.marca, size: isDesktop ? 16 : 18, radius: 5 })), /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: isDesktop ? 13 : 14, fontWeight: 600, color: C.label, fontFamily: FONT } }, x.marca.nombre), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: C.label3, fontFamily: FONT, opacity: 0.65 } }, x.txs, " venta", x.txs !== 1 ? "s" : ""))), /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "right" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: isDesktop ? 15 : 17, fontWeight: 600, color: x.marca.color, fontFamily: FONT, letterSpacing: "-0.01em" } }, $(x.total)), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: C.label3, fontFamily: FONT, opacity: 0.65 } }, Math.round(x.total / totalVtas * 100), "% del total"))),
+      /* @__PURE__ */ import_react.default.createElement("div", { style: { background: "rgba(0,0,0,0.05)", borderRadius: 4, height: isDesktop ? 3 : 4, marginBottom: isDesktop ? 5 : 8, overflow: "hidden" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
         width: `${x.total / maxVenta * 100}%`,
         background: x.marca.color,
         height: "100%",
-        borderRadius: 6,
+        borderRadius: 4,
         transition: "width .5s"
       } })),
-      /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: isDesktop ? 6 : 8 } }, [
+      /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: isDesktop ? 5 : 7 } }, [
         { icon: "\u{1F4B5}", label: "Efectivo", value: x.efectivo, color: "#4A9B6F" },
         { icon: "\u{1F4F1}", label: "QR", value: x.qr, color: "#5B8DB8" },
         { icon: "\u{1F4B3}", label: "Tarjeta", value: x.tarjeta, color: "#C8922A" }
       ].map((p) => /* @__PURE__ */ import_react.default.createElement("div", { key: p.label, style: {
-        padding: isDesktop ? "6px 8px" : "8px 10px",
-        borderRadius: 10,
+        padding: "6px 8px",
+        borderRadius: 9,
         background: p.value > 0 ? `${p.color}12` : "rgba(0,0,0,0.03)",
         border: `1px solid ${p.value > 0 ? p.color + "25" : C.sep}`,
-        opacity: p.value > 0 ? 1 : 0.5
-      } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: isDesktop ? 12 : 14, marginBottom: isDesktop ? 1 : 3 } }, p.icon), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT, marginBottom: 2 } }, p.label), /* @__PURE__ */ import_react.default.createElement("div", { style: {
-        fontSize: isDesktop ? 12 : 13,
-        fontWeight: 700,
+        opacity: p.value > 0 ? 1 : 0.45
+      } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, marginBottom: 1 } }, p.icon), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: C.label3, fontFamily: FONT, marginBottom: 1, opacity: 0.7 } }, p.label), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+        fontSize: isDesktop ? 11 : 12,
+        fontWeight: 600,
         color: p.value > 0 ? p.color : C.label3,
         fontFamily: FONT
-      } }, p.value > 0 ? $(p.value) : "\u2014"), p.value > 0 && x.total > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: C.label3, fontFamily: FONT } }, Math.round(p.value / x.total * 100), "%")))),
+      } }, p.value > 0 ? $(p.value) : "\u2014"), p.value > 0 && x.total > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 9, color: C.label3, fontFamily: FONT, opacity: 0.7 } }, Math.round(p.value / x.total * 100), "%")))),
       !isDesktop && /* @__PURE__ */ import_react.default.createElement("div", { style: {
         marginTop: 10,
         fontSize: 11,
@@ -33793,9 +34003,9 @@ Esta acci\xF3n no se puede deshacer.`,
           onClick: () => onVentaClick && onVentaClick(v),
           style: {
             background: v.anulada ? `${C.red}06` : C.bg2,
-            borderRadius: 14,
-            padding: isDesktop ? "10px 14px" : "14px 16px",
-            marginBottom: isDesktop ? 6 : 10,
+            borderRadius: isDesktop ? 10 : 12,
+            padding: isDesktop ? "9px 14px" : "11px 14px",
+            marginBottom: isDesktop ? 5 : 7,
             cursor: "pointer",
             WebkitTapHighlightColor: "transparent",
             opacity: v.anulada ? 0.7 : 1,
@@ -33809,11 +34019,12 @@ Esta acci\xF3n no se puede deshacer.`,
             e.currentTarget.style.background = v.anulada ? `${C.red}06` : C.bg2;
           } : void 0
         },
-        /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: isDesktop ? 5 : 8 } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontFamily: "monospace", fontSize: 12, color: v.anulada ? C.red : C.gold, fontWeight: 700 } }, v.id, v.anulada ? " \u2298" : ""), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT, marginTop: 2 } }, v.fecha, " ", v.hora, " \xB7 ", v.vendedor || "Tienda", v.anulada && /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.red, fontWeight: 600 } }, " \xB7 ANULADA"))), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } }, v.anulada ? /* @__PURE__ */ import_react.default.createElement(Chip, { color: C.red }, "\u2298 Anulada") : /* @__PURE__ */ import_react.default.createElement(Chip, { color: colorPago(v.metodoPago) }, iconPago(v.metodoPago), " ", labelPago(v.metodoPago)), /* @__PURE__ */ import_react.default.createElement("span", { style: {
-          fontSize: isDesktop ? 15 : 18,
-          fontWeight: 800,
+        /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: isDesktop ? 3 : 5 } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontFamily: "monospace", fontSize: 11, color: v.anulada ? C.red : C.gold, fontWeight: 600 } }, v.id, v.anulada ? " \u2298" : ""), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT, marginTop: 1, opacity: 0.65 } }, v.fecha, " ", v.hora, " \xB7 ", v.vendedor || "Tienda", v.anulada && /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.red, fontWeight: 600 } }, " \xB7 ANULADA"))), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } }, v.anulada ? /* @__PURE__ */ import_react.default.createElement(Chip, { color: C.red }, "\u2298 Anulada") : /* @__PURE__ */ import_react.default.createElement(Chip, { color: colorPago(v.metodoPago) }, iconPago(v.metodoPago), " ", labelPago(v.metodoPago)), /* @__PURE__ */ import_react.default.createElement("span", { style: {
+          fontSize: isDesktop ? 15 : 17,
+          fontWeight: 600,
           color: v.anulada ? C.label3 : C.gold,
           fontFamily: FONT,
+          letterSpacing: "-0.01em",
           textDecoration: v.anulada ? "line-through" : "none"
         } }, $(totalMostrar)))),
         (() => {
@@ -33824,12 +34035,12 @@ Esta acci\xF3n no se puede deshacer.`,
             byMarca[it.marcaId].sub += it.subtotal;
           });
           return Object.values(byMarca).map((g) => /* @__PURE__ */ import_react.default.createElement("div", { key: g.marca?.id, style: {
-            marginBottom: isDesktop ? 5 : 8,
-            padding: isDesktop ? "5px 8px" : "8px 10px",
+            marginBottom: isDesktop ? 4 : 6,
+            padding: isDesktop ? "5px 8px" : "6px 10px",
             background: `${g.marca?.color}10`,
-            borderRadius: 10,
+            borderRadius: 8,
             borderLeft: `3px solid ${g.marca?.color}`
-          } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6 } }, /* @__PURE__ */ import_react.default.createElement(MarcaIcon, { marca: g.marca, size: 16, radius: 4 }), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, fontWeight: 600, color: g.marca?.color, fontFamily: FONT, letterSpacing: "0.02em" } }, g.marca?.nombre)), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, fontWeight: 700, color: g.marca?.color, fontFamily: FONT } }, $(g.sub))), g.items.map((it, ii) => /* @__PURE__ */ import_react.default.createElement("div", { key: ii, style: { fontSize: 12, color: C.label2, fontFamily: FONT } }, "\xB7 ", it.nombre, " \xD7", it.cantidad, " = ", $(it.subtotal)))));
+          } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 3 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6 } }, /* @__PURE__ */ import_react.default.createElement(MarcaIcon, { marca: g.marca, size: 14, radius: 4 }), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 12, fontWeight: 600, color: g.marca?.color, fontFamily: FONT } }, g.marca?.nombre)), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, fontWeight: 600, color: g.marca?.color, fontFamily: FONT, letterSpacing: "-0.01em" } }, $(g.sub))), g.items.map((it, ii) => /* @__PURE__ */ import_react.default.createElement("div", { key: ii, style: { fontSize: 11, color: C.label2, fontFamily: FONT, lineHeight: "1.3" } }, "\xB7 ", it.nombre, " \xD7", it.cantidad, " = ", $(it.subtotal)))));
         })(),
         !isDesktop && /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => sendWA(v), variant: "fill", small: true, full: true, icon: "\u{1F4F2}" }, "Enviar por WhatsApp"),
         v.etiquetaImg && /* @__PURE__ */ import_react.default.createElement(
