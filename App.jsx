@@ -670,20 +670,32 @@ const PAGOS = [
   {id:"tarjeta",  label:"Tarjeta",  icon:"💳", desc:2.5, color:"#C8922A"},
 ];
 
-// ── Helpers pago mixto ────────────────────────────────────
+// ── Helpers pago ──────────────────────────────────────────
 function labelPago(mp){
   if(!mp) return "—";
-  if(mp.startsWith("mixto|")) return "Mixto";
+  if(mp==="giftcard") return "Gift Card";
+  if(mp.startsWith("mixto|")){
+    if(mp.includes("giftcard")) return "Gift Card + Otro";
+    return "Mixto";
+  }
   return PAGOS.find(p=>p.id===mp)?.label||mp;
 }
 function colorPago(mp){
   if(!mp) return "#4A9B6F";
-  if(mp.startsWith("mixto|")) return "#6C5CE7";
+  if(mp==="giftcard") return "#7C3AED";
+  if(mp.startsWith("mixto|")){
+    if(mp.includes("giftcard")) return "#7C3AED";
+    return "#6C5CE7";
+  }
   return PAGOS.find(p=>p.id===mp)?.color||"#4A9B6F";
 }
 function iconPago(mp){
   if(!mp) return "";
-  if(mp.startsWith("mixto|")) return "🔀";
+  if(mp==="giftcard") return "🎁";
+  if(mp.startsWith("mixto|")){
+    if(mp.includes("giftcard")) return "🎁";
+    return "🔀";
+  }
   return PAGOS.find(p=>p.id===mp)?.icon||"";
 }
 
@@ -3259,6 +3271,42 @@ function NotaVentaModal({venta, onClose, numVenta, onAnularVenta}){
           <span style={{fontSize:18,fontWeight:800,color:C.gold,fontFamily:FONT}}>{$(venta.total)}</span>
         </div>
       </div>
+
+      {/* Gift Card allocation — si la venta usó GC */}
+      {venta.gcId&&venta.gcAllocations&&(
+        <div style={{background:"#7C3AED10",border:"1px solid #7C3AED25",borderRadius:14,
+          padding:"14px 16px",marginBottom:16}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+            <div style={{fontSize:12,fontWeight:700,color:"#7C3AED",fontFamily:FONT_UI,
+              textTransform:"uppercase",letterSpacing:.6}}>🎁 Gift Card utilizada</div>
+            <div style={{fontSize:14,fontWeight:700,color:"#7C3AED",fontFamily:FONT_UI}}>{$(venta.gcUsado)}</div>
+          </div>
+          <div style={{fontSize:11,color:C.label3,fontFamily:FONT_UI,marginBottom:10}}>
+            Código: <span style={{fontFamily:"monospace",color:C.label,fontWeight:600}}>{venta.gcId}</span>
+          </div>
+          {venta.gcAllocations.length>1&&(
+            <div style={{display:"flex",flexDirection:"column",gap:4}}>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",padding:"4px 0",
+                borderBottom:`1px solid #7C3AED20`}}>
+                {["Marca","GC","Pago extra"].map(h=>(
+                  <div key={h} style={{fontSize:9,fontWeight:700,color:"#7C3AED",textTransform:"uppercase",
+                    letterSpacing:.6,fontFamily:FONT_UI,textAlign:h!=="Marca"?"right":"left"}}>{h}</div>
+                ))}
+              </div>
+              {venta.gcAllocations.map((a,i)=>(
+                <div key={i} style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",
+                  padding:"5px 0",borderBottom:i<venta.gcAllocations.length-1?`1px solid #7C3AED15`:""}}>
+                  <div style={{fontSize:11,color:C.label,fontFamily:FONT_UI,fontWeight:600}}>{a.marcaNombre}</div>
+                  <div style={{fontSize:11,color:"#7C3AED",fontFamily:FONT_UI,textAlign:"right",fontWeight:600}}>{$(a.gcAmount)}</div>
+                  <div style={{fontSize:11,color:a.extraAmount>0.01?C.amber:C.label3,fontFamily:FONT_UI,textAlign:"right"}}>
+                    {a.extraAmount>0.01?$(a.extraAmount):"—"}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Acciones — 2×2 grid */}
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
@@ -8351,6 +8399,13 @@ function POS({inv,onVenta,onVerNota}){
   var _hN143 = useState(false); var showPago = _hN143[0]; var setShowPago = _hN143[1];
   var _hNm1 = useState(false); var pagoMixto = _hNm1[0]; var setPagoMixto = _hNm1[1];
   var _hNm2 = useState({efectivo:"", qr:"", tarjeta:""}); var montosMixtos = _hNm2[0]; var setMontosMixtos = _hNm2[1];
+  // Gift Card payment state
+  const [pagoGC,       setPagoGC]       = useState(false);
+  const [gcCodigo,     setGcCodigo]     = useState("");
+  const [gcEncontrado, setGcEncontrado] = useState(null);
+  const [gcBusqMsg,    setGcBusqMsg]    = useState(null);
+  const [gcMontoUsar,  setGcMontoUsar]  = useState("");
+  const [metodoCompl,  setMetodoCompl]  = useState("efectivo");
   var _hN144 = useState(null); var scanStatus = _hN144[0]; var setScanStatus = _hN144[1];; // null | "leyendo" | "ok" | "notfound"
   var _hN145 = useState(""); var scanMsg = _hN145[0]; var setScanMsg = _hN145[1];;
   const [showScanner, setShowScanner] = useState(false);
@@ -8430,23 +8485,92 @@ function POS({inv,onVenta,onVerNota}){
     setTimeout(()=>setScanStatus(null),4000);
   }
 
+  // ── GC helpers ──────────────────────────────────────────────────
+  function buscarGCenPOS(){
+    const lista=cargarGC();
+    const gc=lista.find(g=>g.codigo.toLowerCase()===gcCodigo.trim().toLowerCase());
+    if(!gc)                              { setGcBusqMsg("❌ Gift Card no encontrada"); setGcEncontrado(null); return; }
+    const est=gcEstado(gc);
+    if(est==="agotada")                  { setGcBusqMsg("⚠️ Gift Card agotada (saldo cero)"); setGcEncontrado(null); return; }
+    if(est==="vencida")                  { setGcBusqMsg("⚠️ Gift Card vencida"); setGcEncontrado(null); return; }
+    setGcEncontrado(gc);
+    setGcMontoUsar(String(Math.min(gc.saldo, total).toFixed(2)));
+    setGcBusqMsg(null);
+  }
+
+  // GC allocation: distribute GC amount proportionally across brands
+  function calcGCAllocations(items, totalVenta, gcUsado){
+    const brands={};
+    items.forEach(it=>{
+      if(!brands[it.marcaId]) brands[it.marcaId]={marcaId:it.marcaId,marcaNombre:it.marcaNombre,subtotal:0};
+      brands[it.marcaId].subtotal+=it.subtotal;
+    });
+    const extra=+(totalVenta-gcUsado).toFixed(2);
+    return Object.values(brands).map(b=>({
+      marcaId:    b.marcaId,
+      marcaNombre:b.marcaNombre,
+      subtotal:   +b.subtotal.toFixed(2),
+      gcAmount:   +(b.subtotal/totalVenta*gcUsado).toFixed(2),
+      extraAmount:+(b.subtotal/totalVenta*extra).toFixed(2),
+    }));
+  }
+
   function cobrar(){
-    if(!carrito.length)return;
+    if(!carrito.length) return;
+    const factor=1-descPct/100;
+    const items=carrito.map(it=>({
+      prodId:it.prodId,codigo:it.codigo,nombre:it.nombre,
+      marcaId:it.marcaId,marcaNombre:it.marcaNombre,
+      cantidad:it.cantidad,precioUnit:it.precio,subtotal:+(it.precio*it.cantidad*factor).toFixed(2),
+    }));
+
+    // ── Gift Card flow ───────────────────────────────────────
+    if(pagoGC){
+      if(!gcEncontrado){ alert("Busca y verifica la Gift Card primero"); return; }
+      const gcUsado=+(Math.min(gcEncontrado.saldo, total, parseFloat(gcMontoUsar)||total)).toFixed(2);
+      const extraMonto=+(total-gcUsado).toFixed(2);
+      if(extraMonto>0.01&&!metodoCompl){ alert("Selecciona método de pago complementario"); return; }
+
+      const gcAllocations=calcGCAllocations(items, total, gcUsado);
+      const metodoPagoFinal=extraMonto<=0.01
+        ? "giftcard"
+        : `mixto|giftcard:${gcUsado}|${metodoCompl}:${extraMonto}`;
+
+      // Deducir saldo GC
+      const gcLista=cargarGC();
+      guardarGC(gcLista.map(g=>g.codigo!==gcEncontrado.codigo?g:{
+        ...g,
+        saldo:+(g.saldo-gcUsado).toFixed(2),
+        ultimoUso:hoy(),
+        usos:[...(g.usos||[]),{
+          fecha:hoy(), monto:gcUsado,
+          nota:`Venta POS — ${items.length} prod.`
+        }],
+      }));
+
+      const vf=onVenta({items,total,subtotal,descPct,
+        metodoPago:metodoPagoFinal,
+        vendedor:vendedor||"Tienda",clienteNombre:cliente,etiquetaImg:etiqueta,
+        gcId:gcEncontrado.codigo, gcUsado, gcAllocations,
+      });
+      setUltima(vf);setShowOk(true);setShowPago(false);
+      setCarrito([]);setDescExtra(0);setBusq("");setEtiqueta(null);setCliente("");
+      setPagoGC(false);setGcCodigo("");setGcEncontrado(null);setGcBusqMsg(null);setGcMontoUsar("");
+      return;
+    }
+
+    // ── Mixto flow ───────────────────────────────────────────
     if(pagoMixto){
       const suma=(parseFloat(montosMixtos.efectivo)||0)+(parseFloat(montosMixtos.qr)||0)+(parseFloat(montosMixtos.tarjeta)||0);
       if(Math.abs(suma-total)>0.01){alert(`Los montos (${$(suma)}) no cuadran con el total (${$(total)})`);return;}
     }
-    const factor=1-descPct/100;
-    const items=carrito.map(it=>({prodId:it.prodId,codigo:it.codigo,nombre:it.nombre,
-      marcaId:it.marcaId,marcaNombre:it.marcaNombre,
-      cantidad:it.cantidad,precioUnit:it.precio,subtotal:it.precio*it.cantidad*factor}));
-    var metodoPagoFinal = pago;
+    var metodoPagoFinal=pago;
     if(pagoMixto){
-      var partes = [];
+      var partes=[];
       if(parseFloat(montosMixtos.efectivo)>0) partes.push("efectivo:"+montosMixtos.efectivo);
-      if(parseFloat(montosMixtos.qr)>0) partes.push("qr:"+montosMixtos.qr);
-      if(parseFloat(montosMixtos.tarjeta)>0) partes.push("tarjeta:"+montosMixtos.tarjeta);
-      metodoPagoFinal = partes.length > 0 ? "mixto|" + partes.join("|") : pago;
+      if(parseFloat(montosMixtos.qr)>0)       partes.push("qr:"+montosMixtos.qr);
+      if(parseFloat(montosMixtos.tarjeta)>0)  partes.push("tarjeta:"+montosMixtos.tarjeta);
+      metodoPagoFinal=partes.length>0?"mixto|"+partes.join("|"):pago;
     }
     const vf=onVenta({items,total,subtotal,descPct,metodoPago:metodoPagoFinal,vendedor:vendedor||"Tienda",clienteNombre:cliente,etiquetaImg:etiqueta});
     setUltima(vf);setShowOk(true);setShowPago(false);
@@ -8694,24 +8818,28 @@ function POS({inv,onVenta,onVerNota}){
         <div style={{fontSize:13,fontWeight:600,color:C.label3,textTransform:"uppercase",
           letterSpacing:.6,marginBottom:10}}>Método de Pago</div>
 
-        {/* Toggle pago simple / mixto */}
-        <div style={{display:"flex",gap:8,marginBottom:16}}>
-          <button onClick={function(){setPagoMixto(false);}} style={{
-            flex:1,padding:"10px",borderRadius:12,cursor:"pointer",fontFamily:FONT,
-            border:"2px solid "+(!pagoMixto?C.green:C.sep),
-            background:!pagoMixto?C.green+"18":C.bg2,
-            color:!pagoMixto?C.green:C.label2,fontWeight:!pagoMixto?700:400,fontSize:13,
-          }}>Pago simple</button>
-          <button onClick={function(){setPagoMixto(true);}} style={{
-            flex:1,padding:"10px",borderRadius:12,cursor:"pointer",fontFamily:FONT,
-            border:"2px solid "+(pagoMixto?C.blue:C.sep),
-            background:pagoMixto?C.blue+"18":C.bg2,
-            color:pagoMixto?C.blue:C.label2,fontWeight:pagoMixto?700:400,fontSize:13,
-          }}>Pago mixto</button>
+        {/* Toggle: Pago simple / Mixto / Gift Card */}
+        <div style={{display:"flex",gap:6,marginBottom:16}}>
+          {[
+            {id:"simple",  label:"Simple",    color:C.green, active:!pagoMixto&&!pagoGC},
+            {id:"mixto",   label:"Mixto",     color:C.blue,  active:pagoMixto&&!pagoGC},
+            {id:"giftcard",label:"🎁 Gift Card",color:"#7C3AED",active:pagoGC},
+          ].map(t=>(
+            <button key={t.id} onClick={()=>{
+              setPagoMixto(t.id==="mixto"); setPagoGC(t.id==="giftcard");
+              if(t.id==="giftcard"){ setGcCodigo(""); setGcEncontrado(null); setGcBusqMsg(null); }
+            }} style={{
+              flex:1,padding:"10px 6px",borderRadius:12,cursor:"pointer",fontFamily:FONT_UI,
+              border:`2px solid ${t.active?t.color:C.sep}`,
+              background:t.active?`${t.color}18`:C.bg2,
+              color:t.active?t.color:C.label2,fontWeight:t.active?700:400,fontSize:12,
+              WebkitTapHighlightColor:"transparent",
+            }}>{t.label}</button>
+          ))}
         </div>
 
-        {/* Pago simple */}
-        {!pagoMixto&&(
+        {/* ── Pago simple ── */}
+        {!pagoMixto&&!pagoGC&&(
           <div>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:20}}>
               {PAGOS.map(p=>(
@@ -8739,10 +8867,10 @@ function POS({inv,onVenta,onVerNota}){
           </div>
         )}
 
-        {/* Pago mixto */}
-        {pagoMixto&&(
+        {/* ── Pago mixto ── */}
+        {pagoMixto&&!pagoGC&&(
           <div style={{marginBottom:16}}>
-            <div style={{background:C.bg2,borderRadius:14,padding:16,border:"1px solid "+C.sep,marginBottom:10}}>
+            <div style={{background:C.bg2,borderRadius:14,padding:16,border:`1px solid ${C.sep}`,marginBottom:10}}>
               <div style={{fontSize:12,color:C.label3,fontFamily:FONT,marginBottom:12,textAlign:"center"}}>
                 Total a cobrar: <strong style={{color:C.gold}}>{$(total)}</strong> — distribuye entre los métodos
               </div>
@@ -8757,57 +8885,183 @@ function POS({inv,onVenta,onVerNota}){
                     <div style={{position:"relative"}}>
                       <span style={{position:"absolute",left:12,top:"50%",transform:"translateY(-50%)",
                         fontSize:14,color:C.label3,fontFamily:FONT}}>Bs</span>
-                      <input
-                        type="number" min="0" step="0.01"
-                        value={val}
-                        placeholder="0.00"
+                      <input type="number" min="0" step="0.01" value={val} placeholder="0.00"
                         onChange={function(e){
-                          var v = e.target.value;
-                          setMontosMixtos(function(prev){
-                            var next = Object.assign({}, prev);
-                            next[p.id] = v;
-                            return next;
-                          });
+                          var v=e.target.value;
+                          setMontosMixtos(function(prev){ var next=Object.assign({},prev); next[p.id]=v; return next; });
                         }}
                         style={{width:"100%",padding:"11px 14px 11px 36px",borderRadius:12,
-                          border:"1.5px solid "+C.sep,background:C.bg3,
-                          fontSize:16,color:C.label,outline:"none",
-                          fontFamily:FONT,boxSizing:"border-box"}}
-                      />
+                          border:`1.5px solid ${C.sep}`,background:C.bg0,
+                          fontSize:16,color:C.label,outline:"none",fontFamily:FONT,boxSizing:"border-box"}}/>
                     </div>
                   </div>
                 );
               })}
               {(function(){
-                var suma = (parseFloat(montosMixtos.efectivo)||0) +
-                           (parseFloat(montosMixtos.qr)||0) +
-                           (parseFloat(montosMixtos.tarjeta)||0);
-                var diff = total - suma;
-                return (
+                var suma=(parseFloat(montosMixtos.efectivo)||0)+(parseFloat(montosMixtos.qr)||0)+(parseFloat(montosMixtos.tarjeta)||0);
+                var diff=total-suma;
+                return(
                   <div style={{padding:"10px 12px",borderRadius:10,
-                    background:Math.abs(diff)<0.01?C.green+"15":C.red+"15",
-                    border:"1px solid "+(Math.abs(diff)<0.01?C.green:C.red)+"30"}}>
+                    background:Math.abs(diff)<0.01?`${C.green}15`:`${C.red}15`,
+                    border:`1px solid ${Math.abs(diff)<0.01?C.green:C.red}30`}}>
                     <div style={{display:"flex",justifyContent:"space-between",fontFamily:FONT}}>
                       <span style={{fontSize:13,color:C.label3}}>Total ingresado:</span>
                       <span style={{fontSize:13,fontWeight:700,color:C.label}}>{$(suma)}</span>
                     </div>
-                    {Math.abs(diff)>0.01&&(
-                      <div style={{display:"flex",justifyContent:"space-between",marginTop:4,fontFamily:FONT}}>
-                        <span style={{fontSize:13,color:C.red}}>Diferencia:</span>
-                        <span style={{fontSize:13,fontWeight:700,color:C.red}}>{$(Math.abs(diff))}</span>
-                      </div>
-                    )}
-                    {Math.abs(diff)<0.01&&(
-                      <div style={{fontSize:13,color:C.green,textAlign:"center",marginTop:4,fontFamily:FONT}}>
-                        ✓ Montos cuadrados
-                      </div>
-                    )}
+                    {Math.abs(diff)>0.01&&<div style={{display:"flex",justifyContent:"space-between",marginTop:4,fontFamily:FONT}}>
+                      <span style={{fontSize:13,color:C.red}}>Diferencia:</span>
+                      <span style={{fontSize:13,fontWeight:700,color:C.red}}>{$(Math.abs(diff))}</span>
+                    </div>}
+                    {Math.abs(diff)<0.01&&<div style={{fontSize:13,color:C.green,textAlign:"center",marginTop:4,fontFamily:FONT}}>✓ Montos cuadrados</div>}
                   </div>
                 );
               })()}
             </div>
           </div>
         )}
+
+        {/* ── Gift Card ── */}
+        {pagoGC&&(()=>{
+          const gcUsado     = +(Math.min(gcEncontrado?.saldo||0, total, parseFloat(gcMontoUsar)||0)).toFixed(2);
+          const extraMonto  = gcEncontrado ? +(total-gcUsado).toFixed(2) : 0;
+          const cubreTotal  = extraMonto <= 0.01;
+          return(
+            <div style={{marginBottom:16}}>
+              {/* Buscar GC */}
+              <div style={{marginBottom:12}}>
+                <div style={{fontSize:11,fontWeight:700,color:C.label3,textTransform:"uppercase",letterSpacing:.7,marginBottom:6,fontFamily:FONT_UI}}>Código de Gift Card</div>
+                <div style={{display:"flex",gap:8}}>
+                  <input type="text" value={gcCodigo}
+                    onChange={e=>{setGcCodigo(e.target.value);setGcEncontrado(null);setGcBusqMsg(null);}}
+                    placeholder="GC-YYYYMMDD-XXXX"
+                    onKeyDown={e=>e.key==="Enter"&&buscarGCenPOS()}
+                    style={{flex:1,padding:"12px 14px",borderRadius:12,border:`1.5px solid ${C.sep}`,
+                      background:C.bg0,fontSize:14,color:C.label,fontFamily:FONT_UI,outline:"none",
+                      WebkitAppearance:"none",appearance:"none"}}
+                    onFocus={e=>e.target.style.borderColor="#7C3AED"}
+                    onBlur={e=>e.target.style.borderColor=C.sep}/>
+                  <button onClick={buscarGCenPOS}
+                    style={{padding:"12px 16px",borderRadius:12,border:"none",
+                      background:"#7C3AED",color:"#fff",fontSize:13,fontWeight:700,
+                      fontFamily:FONT_UI,cursor:"pointer",flexShrink:0}}>Buscar</button>
+                </div>
+                {gcBusqMsg&&<div style={{fontSize:12,color:C.red,fontFamily:FONT_UI,marginTop:6,fontWeight:500}}>{gcBusqMsg}</div>}
+              </div>
+
+              {/* GC encontrada */}
+              {gcEncontrado&&(
+                <div>
+                  <div style={{background:"#7C3AED18",border:"1px solid #7C3AED30",borderRadius:14,
+                    padding:"14px 16px",marginBottom:12}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+                      <div>
+                        <div style={{fontSize:11,fontWeight:700,color:"#7C3AED",fontFamily:FONT_UI,textTransform:"uppercase",letterSpacing:.6,marginBottom:2}}>🎁 Gift Card activa</div>
+                        <div style={{fontSize:12,color:C.label,fontFamily:FONT_UI}}>{gcEncontrado.codigo}</div>
+                      </div>
+                      <div style={{textAlign:"right"}}>
+                        <div style={{fontSize:20,fontWeight:700,color:"#7C3AED",fontFamily:FONT_DISPLAY}}>{$(gcEncontrado.saldo)}</div>
+                        <div style={{fontSize:10,color:C.label3,fontFamily:FONT_UI}}>saldo disponible</div>
+                      </div>
+                    </div>
+
+                    {/* Monto a usar */}
+                    <div style={{marginBottom:8}}>
+                      <div style={{fontSize:10,fontWeight:700,color:C.label3,textTransform:"uppercase",letterSpacing:.6,marginBottom:4,fontFamily:FONT_UI}}>Monto a usar de Gift Card</div>
+                      <div style={{position:"relative"}}>
+                        <span style={{position:"absolute",left:10,top:"50%",transform:"translateY(-50%)",fontSize:13,color:C.label3,fontFamily:FONT_UI}}>Bs</span>
+                        <input type="number" min="0.01" step="0.01" max={Math.min(gcEncontrado.saldo,total)}
+                          value={gcMontoUsar}
+                          onChange={e=>setGcMontoUsar(e.target.value)}
+                          style={{width:"100%",padding:"10px 12px 10px 30px",borderRadius:10,
+                            border:"1.5px solid #7C3AED50",background:C.bg0,
+                            fontSize:15,color:C.label,fontFamily:FONT_UI,outline:"none",
+                            WebkitAppearance:"none",appearance:"none",boxSizing:"border-box"}}/>
+                      </div>
+                    </div>
+
+                    {/* Resumen */}
+                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
+                      {[
+                        {l:"Total venta",   v:$(total),       c:C.label},
+                        {l:"Gift Card",     v:`−${$(gcUsado)}`,c:"#7C3AED"},
+                        {l:"Pago extra",    v:$(extraMonto),  c:extraMonto>0.01?C.amber:C.green},
+                      ].map(k=>(
+                        <div key={k.l} style={{background:C.bg0,borderRadius:8,padding:"8px",textAlign:"center"}}>
+                          <div style={{fontSize:9,color:C.label3,textTransform:"uppercase",letterSpacing:.5,fontFamily:FONT_UI,marginBottom:2}}>{k.l}</div>
+                          <div style={{fontSize:12,fontWeight:700,color:k.c,fontFamily:FONT_UI}}>{k.v}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Pago complementario si hay resto */}
+                  {extraMonto>0.01&&(
+                    <div style={{marginBottom:12}}>
+                      <div style={{fontSize:11,fontWeight:700,color:C.label3,textTransform:"uppercase",letterSpacing:.7,marginBottom:8,fontFamily:FONT_UI}}>Pago complementario ({$(extraMonto)})</div>
+                      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
+                        {PAGOS.map(p=>(
+                          <button key={p.id} onClick={()=>setMetodoCompl(p.id)}
+                            style={{padding:"10px 6px",borderRadius:12,
+                              border:`2px solid ${metodoCompl===p.id?p.color:C.sep}`,
+                              background:metodoCompl===p.id?`${p.color}18`:C.bg2,
+                              cursor:"pointer",fontFamily:FONT_UI,
+                              display:"flex",flexDirection:"column",alignItems:"center",gap:4,
+                              WebkitTapHighlightColor:"transparent"}}>
+                            <span style={{fontSize:20}}>{p.icon}</span>
+                            <span style={{fontSize:11,fontWeight:metodoCompl===p.id?700:400,
+                              color:metodoCompl===p.id?p.color:C.label3}}>{p.label}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Distribución por marca */}
+                  {(()=>{
+                    const factor=1-descPct/100;
+                    const items=carrito.map(it=>({
+                      marcaId:it.marcaId,marcaNombre:it.marcaNombre,
+                      subtotal:it.precio*it.cantidad*factor,
+                    }));
+                    const brands={};
+                    items.forEach(it=>{ if(!brands[it.marcaId])brands[it.marcaId]={marcaNombre:it.marcaNombre,subtotal:0}; brands[it.marcaId].subtotal+=it.subtotal; });
+                    const allocs=Object.values(brands).map(b=>({
+                      ...b,
+                      gcAmt: +(b.subtotal/total*gcUsado).toFixed(2),
+                      xtra:  +(b.subtotal/total*extraMonto).toFixed(2),
+                    }));
+                    return allocs.length>1?(
+                      <div style={{background:C.bg2,borderRadius:12,overflow:"hidden",border:`1px solid ${C.sep}`}}>
+                        <div style={{padding:"8px 12px",background:C.bg2,borderBottom:`1px solid ${C.sep}`}}>
+                          <div style={{fontSize:10,fontWeight:700,color:C.label3,textTransform:"uppercase",letterSpacing:.7,fontFamily:FONT_UI}}>Distribución por marca</div>
+                        </div>
+                        {allocs.map((a,i)=>(
+                          <div key={i} style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",
+                            padding:"8px 12px",borderBottom:i<allocs.length-1?`1px solid ${C.sep}`:"",
+                            alignItems:"center"}}>
+                            <div style={{fontSize:12,color:C.label,fontFamily:FONT_UI,fontWeight:600}}>{a.marcaNombre}</div>
+                            <div style={{fontSize:11,color:C.label3,fontFamily:FONT_UI,textAlign:"right"}}>{$(a.subtotal)}</div>
+                            <div style={{fontSize:11,color:"#7C3AED",fontFamily:FONT_UI,fontWeight:600,textAlign:"right"}}>🎁{$(a.gcAmt)}</div>
+                            <div style={{fontSize:11,color:extraMonto>0.01?C.amber:C.label3,fontFamily:FONT_UI,textAlign:"right"}}>{extraMonto>0.01?$(a.xtra):"—"}</div>
+                          </div>
+                        ))}
+                      </div>
+                    ):null;
+                  })()}
+
+                  {cubreTotal&&(
+                    <div style={{padding:"10px 14px",background:`${C.green}12`,borderRadius:10,
+                      border:`1px solid ${C.green}30`,textAlign:"center",marginTop:8}}>
+                      <div style={{fontSize:13,color:C.green,fontWeight:700,fontFamily:FONT_UI}}>
+                        ✓ Gift Card cubre el total completo
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
         {/* Descuento adicional */}
         <IOSInput label="Descuento adicional (%)" type="number" min="0" max="100"
@@ -8840,8 +9094,13 @@ function POS({inv,onVenta,onVerNota}){
           </div>
         )}
 
-        <IOSBtn onPress={cobrar} full variant="primary" style={{fontSize:18,padding:"17px"}} icon="💳">
-          Cobrar {$(total)}
+        <IOSBtn onPress={cobrar} full variant="primary"
+          disabled={pagoGC&&(!gcEncontrado)}
+          style={{fontSize:18,padding:"17px"}}
+          icon={pagoGC?"🎁":"💳"}>
+          {pagoGC
+            ? (gcEncontrado ? `Confirmar — ${$(total)}` : "Busca la Gift Card")
+            : `Cobrar ${$(total)}`}
         </IOSBtn>
       </Sheet>
     </div>
@@ -9371,6 +9630,23 @@ function MarcaDetalle({marcaId,inv,ventas,vMes,mes,anio,MK,cierres,setCierres,ge
             </div>
           )}
           <div style={{background:C.bg2,borderRadius:16,overflow:"hidden",marginBottom:16}}>
+            {(()=>{
+              // Compute GC totals for this brand this month
+              const gcTotal = liq.vMarca.reduce((s,v)=>{
+                const a=v.gcAllocations?.find(x=>x.marcaId===marcaId);
+                return s+(a?.gcAmount||0);
+              },0);
+              const gcVentas = liq.vMarca.filter(v=>v.gcAllocations?.some(x=>x.marcaId===marcaId&&x.gcAmount>0)).length;
+              return gcTotal>0?[
+                <div key="gc-summary" style={{display:"flex",justifyContent:"space-between",alignItems:"center",
+                  padding:"10px 16px",background:"#7C3AED08",borderBottom:`1px solid ${C.sep}`}}>
+                  <span style={{fontSize:13,color:"#7C3AED",fontFamily:FONT}}>
+                    🎁 Gift Card ({gcVentas} venta{gcVentas!==1?"s":""})
+                  </span>
+                  <span style={{fontSize:13,fontWeight:600,color:"#7C3AED",fontFamily:FONT}}>{$(gcTotal)}</span>
+                </div>
+              ]:[];
+            })()}
             {[
               ["Ventas brutas", $(liq.bruto), C.label, false],
               liq.descTJ > 0
@@ -9425,15 +9701,29 @@ function MarcaDetalle({marcaId,inv,ventas,vMes,mes,anio,MK,cierres,setCierres,ge
               {liq.vMarca.map(v=>{
                 const its=v.items.filter(i=>i.marcaId===marcaId);
                 const sub2=its.reduce((s,i)=>s+i.subtotal,0);
+                // GC allocation for this brand in this venta
+                const gcAlloc=v.gcAllocations?.find(a=>a.marcaId===marcaId);
                 return (
-                  <div key={v.id} style={{background:C.bg2,borderRadius:14,padding:14,marginBottom:10}}>
+                  <div key={v.id} style={{background:C.bg2,borderRadius:14,padding:14,marginBottom:10,
+                    border:v.gcId?`1px solid #7C3AED20`:`1px solid ${C.sep}`}}>
                     <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
-                      <span style={{fontFamily:"monospace",fontSize:12,color:C.gold}}>{v.id}</span>
+                      <div style={{display:"flex",alignItems:"center",gap:6}}>
+                        <span style={{fontFamily:"monospace",fontSize:12,color:C.gold}}>{v.id}</span>
+                        {v.gcId&&<span style={{fontSize:10,background:"#7C3AED15",color:"#7C3AED",
+                          fontWeight:700,padding:"2px 6px",borderRadius:8,fontFamily:FONT_UI}}>🎁 GC</span>}
+                      </div>
                       <span style={{fontSize:16,fontWeight:700,color:C.gold,fontFamily:FONT}}>{$(sub2)}</span>
                     </div>
                     <div style={{fontSize:13,color:C.label3,fontFamily:FONT,marginBottom:4}}>
                       {v.fecha} {v.hora} · {labelPago(v.metodoPago)}
                     </div>
+                    {gcAlloc&&(
+                      <div style={{display:"flex",gap:12,fontSize:11,fontFamily:FONT_UI,marginBottom:6,
+                        padding:"6px 10px",background:"#7C3AED08",borderRadius:8}}>
+                        <span style={{color:"#7C3AED",fontWeight:600}}>🎁 GC: {$(gcAlloc.gcAmount)}</span>
+                        {gcAlloc.extraAmount>0.01&&<span style={{color:C.amber,fontWeight:600}}>+ {$(gcAlloc.extraAmount)} extra</span>}
+                      </div>
+                    )}
                     {its.map((it,ii)=>(
                       <div key={`liq-${v.id}-${it.prodId}-${ii}`} style={{fontSize:13,color:C.label2,fontFamily:FONT}}>
                         · {it.nombre} ×{it.cantidad} = {$(it.subtotal)}
