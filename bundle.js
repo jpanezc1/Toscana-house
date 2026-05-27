@@ -25665,13 +25665,30 @@ Fecha: ${venta.fecha}`);
       `));
   }
   function ImportarExcelModal({ inv, onImportar, onClose }) {
-    const [archivo, setArchivo] = (0, import_react.useState)(null);
+    const isDesktop = useIsDesktop();
     const [preview, setPreview] = (0, import_react.useState)([]);
-    const [errores, setErrores] = (0, import_react.useState)([]);
     const [estado, setEstado] = (0, import_react.useState)("idle");
     const [stats, setStats] = (0, import_react.useState)(null);
+    const [isDragging, setIsDragging] = (0, import_react.useState)(false);
+    const [filtro, setFiltro] = (0, import_react.useState)("todas");
     const fileRef = (0, import_react.useRef)(null);
-    async function parsearExcel(file) {
+    function norm(s) {
+      return String(s || "").trim().normalize("NFD").replace(/[̀-ͯ]/g, "");
+    }
+    function genCodImport(marcaNombre, desc, talla, usadosSet) {
+      const prefix = norm(marcaNombre || "TOS").replace(/[^A-Za-z]/gi, "").toUpperCase().slice(0, 3) || "TOS";
+      const words = norm(desc || "ITEM").split(/\s+/).filter((w) => w.length > 0);
+      const inics = words.map((w) => w.replace(/[^A-Za-z]/gi, "")[0] || "").filter(Boolean).join("").toUpperCase().slice(0, 3) || "ITM";
+      const tallaUp = norm(talla || "TU").replace(/[^A-Z0-9]/gi, "").toUpperCase().slice(0, 3) || "TU";
+      const base = `${prefix}-${inics}-${tallaUp}`;
+      const invNums = new Set(inv.map((p) => p.codigo.toUpperCase()));
+      let n = 1;
+      while (invNums.has(`${base}-${String(n).padStart(3, "0")}`) || usadosSet.has(`${base}-${String(n).padStart(3, "0")}`)) n++;
+      const cod = `${base}-${String(n).padStart(3, "0")}`;
+      usadosSet.add(cod);
+      return cod;
+    }
+    async function parsearArchivo(file) {
       setEstado("leyendo");
       try {
         const XLSX = await loadXLSX();
@@ -25681,78 +25698,92 @@ Fecha: ${venta.fecha}`);
         const raw = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
         if (raw.length < 2) {
           setEstado("idle");
-          alert("El archivo est\xE1 vac\xEDo");
+          alert("El archivo est\xE1 vac\xEDo o no tiene datos");
           return;
         }
-        let headerRow = -1;
+        let hRow = 0;
         for (let i = 0; i < Math.min(5, raw.length); i++) {
-          const row = raw[i].map((c) => String(c).toLowerCase());
-          if (row.some((c) => c.includes("sku") || c.includes("c\xF3digo") || c.includes("codigo"))) {
-            headerRow = i;
+          const r = raw[i].map((c) => norm(String(c)).toLowerCase());
+          if (r.some((c) => c.includes("marca") || c.includes("descripcion") || c.includes("precio") || c.includes("sku"))) {
+            hRow = i;
             break;
           }
         }
-        if (headerRow === -1) headerRow = 0;
-        const headers = raw[headerRow].map((h) => String(h).toLowerCase().trim());
-        const findCol = (...names) => {
+        const headers = raw[hRow].map((h) => norm(String(h)).toLowerCase().trim());
+        const col = (...names) => {
           for (const n of names) {
-            const idx = headers.findIndex((h) => h.includes(n));
-            if (idx >= 0) return idx;
+            const i = headers.findIndex((h) => h.includes(n));
+            if (i >= 0) return i;
           }
           return -1;
         };
-        const colSKU = findCol("sku", "c\xF3digo", "codigo", "cod");
-        const colMarca = findCol("marca", "brand");
-        const colDesc = findCol("descripci\xF3n", "descripcion", "nombre", "producto", "desc");
-        const colPrecio = findCol("precio", "price", "valor");
-        const colCat = findCol("categor\xEDa", "categoria", "cat", "tipo");
-        const colTalla = findCol("talla", "size", "talle");
-        const colColor = findCol("color");
-        const colStock = findCol("stock", "cantidad", "qty", "existencia");
+        const cSKU = col("sku", "codigo", "cod", "code", "referencia", "ref");
+        const cMarca = col("marca", "brand", "tienda");
+        const cDesc = col("descripcion", "nombre", "producto", "desc", "item", "articulo");
+        const cPrecio = col("precio", "price", "valor", "importe", "costo", "pvp");
+        const cCat = col("categoria", "cat", "tipo", "clasificacion", "rubro");
+        const cTalla = col("talla", "size", "talle", "medida");
+        const cColor = col("color", "colour");
+        const cStock = col("stock", "cantidad", "qty", "existencia", "unidades", "piezas");
+        const cSubcat = col("subcat", "subcategoria", "subcategory");
+        const usadosSet = /* @__PURE__ */ new Set();
         const filas = [];
-        const errs = [];
-        for (let i = headerRow + 1; i < raw.length; i++) {
+        for (let i = hRow + 1; i < raw.length; i++) {
           const row = raw[i];
-          if (row.every((c) => !c)) continue;
-          const sku = colSKU >= 0 ? String(row[colSKU]).trim().toUpperCase() : "";
-          const marcaNom = colMarca >= 0 ? String(row[colMarca]).trim() : "";
-          const desc = colDesc >= 0 ? String(row[colDesc]).trim() : "";
-          const precio = colPrecio >= 0 ? parseFloat(String(row[colPrecio]).replace(/[^\d.]/g, "")) : 0;
-          const cat = colCat >= 0 ? String(row[colCat]).trim() : "";
-          const talla = colTalla >= 0 ? String(row[colTalla]).trim() : "";
-          const color = colColor >= 0 ? String(row[colColor]).trim() : "";
-          const stock = colStock >= 0 ? parseInt(String(row[colStock])) || 1 : 1;
-          const fila = { _row: i + 1, sku, marcaNom, desc, precio, cat, talla, color, stock, _errs: [] };
-          if (!sku) fila._errs.push("SKU vac\xEDo");
-          if (!desc) fila._errs.push("Descripci\xF3n vac\xEDa");
-          if (!precio || isNaN(precio)) fila._errs.push("Precio inv\xE1lido");
+          if (row.every((c) => String(c).trim() === "")) continue;
+          const marcaNom = cMarca >= 0 ? String(row[cMarca]).trim() : "";
+          const desc = cDesc >= 0 ? String(row[cDesc]).trim() : "";
+          const precioRaw = cPrecio >= 0 ? String(row[cPrecio]).replace(/[^\d.,]/g, "").replace(",", ".") : "";
+          const precio = parseFloat(precioRaw) || 0;
+          const cat = cCat >= 0 ? String(row[cCat]).trim() : "General";
+          const talla = cTalla >= 0 ? String(row[cTalla]).trim() : "";
+          const color = cColor >= 0 ? String(row[cColor]).trim() : "";
+          const stock = cStock >= 0 ? Math.max(1, parseInt(String(row[cStock])) || 1) : 1;
+          const subcat = cSubcat >= 0 ? String(row[cSubcat]).trim() : "";
+          const marcaEnc = MARCAS.find((m) => norm(m.nombre).toLowerCase() === norm(marcaNom).toLowerCase()) || MARCAS.find((m) => norm(marcaNom).toLowerCase().startsWith(norm(m.nombre).toLowerCase().slice(0, 4)));
+          let skuRaw = cSKU >= 0 ? String(row[cSKU]).trim().toUpperCase() : "";
+          const autoSKU = !skuRaw;
+          const sku = skuRaw || genCodImport(marcaEnc?.nombre || marcaNom, desc, talla || "TU", usadosSet);
+          if (skuRaw) usadosSet.add(sku);
+          const fila = {
+            _row: i + 1,
+            sku,
+            autoSKU,
+            marcaNom,
+            marcaId: marcaEnc?.id || null,
+            marcaNombre: marcaEnc?.nombre || marcaNom,
+            desc,
+            precio,
+            cat,
+            talla,
+            color,
+            stock,
+            subcat,
+            _errs: [],
+            _dup: false
+          };
+          if (!desc) fila._errs.push("Sin descripci\xF3n");
+          if (precio <= 0) fila._errs.push("Precio inv\xE1lido");
+          if (!marcaEnc) fila._errs.push(`Marca "${marcaNom || "\u2014"}" no encontrada`);
           const existe = inv.find((p) => p.codigo.toUpperCase() === sku);
-          if (existe) fila._dup = true;
-          const marcaEnc = MARCAS.find((m) => m.nombre.toLowerCase() === marcaNom.toLowerCase());
-          fila.marcaId = marcaEnc?.id || null;
-          fila.marcaNombre = marcaEnc?.nombre || marcaNom;
-          if (!marcaEnc) fila._errs.push(`Marca "${marcaNom}" no encontrada`);
-          if (fila._errs.length > 0) errs.push({ row: i + 1, errs: fila._errs });
+          if (existe) {
+            fila._dup = true;
+          }
           filas.push(fila);
         }
         setPreview(filas);
-        setErrores(errs);
+        setFiltro("todas");
         setEstado("preview");
       } catch (e) {
         setEstado("idle");
-        alert("Error leyendo Excel: " + e.message);
+        alert("Error leyendo archivo: " + e.message);
       }
     }
-    async function importar(soloValidas) {
+    async function importar() {
       setEstado("importando");
-      const filas = soloValidas ? preview.filter((f) => f._errs.length === 0) : preview;
-      let ok = 0, skip = 0, upd = 0;
-      for (const f of filas) {
-        if (f._errs.length > 0 && soloValidas) continue;
-        if (!f.sku || !f.desc || !f.marcaId) {
-          skip++;
-          continue;
-        }
+      const importables = preview.filter((f) => f.desc && f.marcaId && f.precio > 0);
+      let ok = 0, upd = 0, skip = 0;
+      for (const f of importables) {
         if (f._dup) {
           upd++;
           onImportar({ tipo: "update", codigo: f.sku, stock: f.stock });
@@ -25763,34 +25794,108 @@ Fecha: ${venta.fecha}`);
             nombre: f.desc,
             marcaId: f.marcaId,
             marcaNombre: f.marcaNombre,
-            categoria: [f.cat, f.talla, f.color].filter(Boolean).join(" / ") || "General",
+            categoria: f.cat || "General",
+            descripcion: [f.talla && `Talla: ${f.talla}`, f.color && `Color: ${f.color}`].filter(Boolean).join(" \xB7 ") || "",
+            subcat: f.subcat || f.talla || "",
             precio: f.precio,
             stock: f.stock,
             stockInicial: f.stock,
-            fecha: (/* @__PURE__ */ new Date()).toISOString().slice(0, 10)
+            fecha: hoy()
           } });
         }
       }
-      setStats({ ok, upd, skip });
+      skip = preview.length - importables.length;
+      setStats({ ok, upd, skip, total: preview.length });
       setEstado("done");
     }
-    return /* @__PURE__ */ import_react.default.createElement(Sheet, { open: true, title: "Importar Excel \u2014 Inventario", onClose, tall: true }, estado === "idle" && /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center", marginBottom: 20 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 48, marginBottom: 10 } }, "\u{1F4E5}"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 16, fontWeight: 700, color: C.label, fontFamily: FONT, marginBottom: 6 } }, "Importaci\xF3n masiva desde Excel"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.label3, fontFamily: FONT } }, "Sube un archivo .xlsx con los productos a importar")), /* @__PURE__ */ import_react.default.createElement("div", { style: { background: C.bg2, borderRadius: 14, padding: 16, marginBottom: 16, border: `1px solid ${C.sep}` } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, fontWeight: 700, color: C.label, fontFamily: FONT, marginBottom: 8 } }, "Columnas esperadas (en cualquier orden):"), [
-      ["SKU / C\xF3digo", "C\xF3digo \xFAnico del producto (obligatorio)"],
-      ["Marca", "Nombre exacto de la marca (obligatorio)"],
-      ["Descripci\xF3n / Nombre", "Nombre del producto (obligatorio)"],
-      ["Precio", "Precio en Bs (obligatorio)"],
-      ["Stock / Cantidad", "Unidades (opcional, default 1)"],
-      ["Categor\xEDa", "Tipo de prenda (opcional)"],
-      ["Talla / Color", "Caracter\xEDsticas (opcional)"]
-    ].map(([col, desc]) => /* @__PURE__ */ import_react.default.createElement("div", { key: col, style: { display: "flex", gap: 8, marginBottom: 4 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: {
-      fontSize: 12,
-      fontFamily: "monospace",
-      background: C.fill2,
-      padding: "1px 6px",
-      borderRadius: 4,
-      color: C.gold,
-      fontWeight: 700
-    } }, col), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 12, color: C.label3, fontFamily: FONT } }, desc)))), /* @__PURE__ */ import_react.default.createElement(
+    async function exportarPreview() {
+      const XLSX = await loadXLSX();
+      const rows = [
+        ["C\xF3digo", "Auto?", "Marca", "Descripci\xF3n", "Talla", "Precio (Bs)", "Stock", "Estado"],
+        ...preview.map((f) => [
+          f.sku,
+          f.autoSKU ? "Auto-generado" : "Manual",
+          f.marcaNombre,
+          f.desc,
+          f.talla || "\u2014",
+          f.precio,
+          f.stock,
+          f._errs.length > 0 ? "\u26A0 " + f._errs.join("; ") : f._dup ? "Actualiza stock" : "\u2713 V\xE1lido"
+        ])
+      ];
+      const ws = XLSX.utils.aoa_to_sheet(rows);
+      ws["!cols"] = [22, 14, 14, 32, 8, 12, 8, 32].map((w) => ({ wch: w }));
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Preview importaci\xF3n");
+      const buf = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+      const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+      descargarArchivo(blob, `ToscanaHouse_ImportPreview_${hoy()}.xlsx`);
+    }
+    function onDragOver(e) {
+      e.preventDefault();
+      setIsDragging(true);
+    }
+    function onDragLeave(e) {
+      e.preventDefault();
+      setIsDragging(false);
+    }
+    function onDrop(e) {
+      e.preventDefault();
+      setIsDragging(false);
+      const f = e.dataTransfer.files?.[0];
+      if (f) {
+        parsearArchivo(f);
+      }
+    }
+    const previstaFiltrada = (0, import_react.useMemo)(() => {
+      if (filtro === "validas") return preview.filter((f) => f._errs.length === 0 && !f._dup);
+      if (filtro === "errores") return preview.filter((f) => f._errs.length > 0);
+      if (filtro === "dups") return preview.filter((f) => f._dup);
+      return preview;
+    }, [preview, filtro]);
+    const nValidas = preview.filter((f) => f._errs.length === 0).length;
+    const nErrores = preview.filter((f) => f._errs.length > 0).length;
+    const nDups = preview.filter((f) => f._dup).length;
+    const nAuto = preview.filter((f) => f.autoSKU).length;
+    return /* @__PURE__ */ import_react.default.createElement(Sheet, { open: true, title: "Importar Excel \u2014 Inventario", onClose, tall: true }, /* @__PURE__ */ import_react.default.createElement("div", { style: { padding: "0 4px 20px" } }, estado === "idle" && /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement(
+      "div",
+      {
+        onDragOver,
+        onDragLeave,
+        onDrop,
+        onClick: () => fileRef.current?.click(),
+        style: {
+          border: `2px dashed ${isDragging ? C.gold : "#D8CEC2"}`,
+          borderRadius: 28,
+          background: isDragging ? `${C.gold}08` : "rgba(255,255,255,0.7)",
+          padding: "40px 24px",
+          textAlign: "center",
+          cursor: "pointer",
+          marginBottom: 20,
+          transition: "all .2s"
+        }
+      },
+      /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 48, marginBottom: 12 } }, isDragging ? "\u{1F4C2}" : "\u{1F4E5}"),
+      /* @__PURE__ */ import_react.default.createElement("div", { style: {
+        fontSize: 17,
+        fontWeight: 700,
+        color: C.label,
+        fontFamily: FONT_DISPLAY,
+        letterSpacing: "0.01em",
+        marginBottom: 6
+      } }, isDragging ? "Suelta el archivo aqu\xED" : "Importar desde Excel"),
+      /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.label3, fontFamily: FONT_UI, marginBottom: 16 } }, "Arrastra un archivo o haz clic para seleccionar"),
+      /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap" } }, [".xlsx", ".xls", ".csv"].map((ext) => /* @__PURE__ */ import_react.default.createElement("span", { key: ext, style: {
+        fontSize: 11,
+        fontWeight: 700,
+        color: C.gold,
+        background: `${C.gold}15`,
+        padding: "4px 10px",
+        borderRadius: 12,
+        border: `1px solid ${C.gold}30`,
+        fontFamily: FONT_UI
+      } }, ext)))
+    ), /* @__PURE__ */ import_react.default.createElement(
       "input",
       {
         ref: fileRef,
@@ -25798,143 +25903,218 @@ Fecha: ${venta.fecha}`);
         accept: ".xlsx,.xls,.csv",
         onChange: (e) => {
           const f = e.target.files?.[0];
-          if (f) {
-            setArchivo(f);
-            parsearExcel(f);
-          }
+          if (f) parsearArchivo(f);
         },
         style: { display: "none" }
       }
-    ), /* @__PURE__ */ import_react.default.createElement(
-      "button",
-      {
-        onClick: () => fileRef.current?.click(),
-        style: {
-          width: "100%",
-          background: `linear-gradient(135deg,${C.gold},${C.goldD})`,
-          border: "none",
-          borderRadius: 14,
-          padding: 16,
-          fontSize: 16,
-          fontWeight: 700,
-          color: "#fff",
-          cursor: "pointer",
-          fontFamily: FONT
-        }
-      },
-      "\u{1F4C2} Seleccionar archivo Excel"
-    )), estado === "leyendo" && /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center", padding: 40 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 32, marginBottom: 12 } }, "\u23F3"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 15, color: C.label, fontFamily: FONT } }, "Leyendo archivo\u2026")), estado === "preview" && /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 16 } }, [
-      { v: preview.length, l: "Total filas", c: C.label },
-      { v: preview.filter((f) => f._errs.length === 0).length, l: "V\xE1lidas", c: C.green },
-      { v: errores.length, l: "Con errores", c: C.red }
+    ), /* @__PURE__ */ import_react.default.createElement("div", { style: { background: C.bg2, borderRadius: 16, padding: "16px 18px", border: `1px solid ${C.sep}` } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      fontSize: 12,
+      fontWeight: 700,
+      color: C.label,
+      fontFamily: FONT_UI,
+      textTransform: "uppercase",
+      letterSpacing: 0.7,
+      marginBottom: 12
+    } }, "Columnas del Excel (en cualquier orden)"), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 8 } }, [
+      ["Marca *", "Nombre de la marca", true],
+      ["Descripci\xF3n *", "Nombre del producto", true],
+      ["Precio *", "Precio en Bs", true],
+      ["Talla", "XS / S / M / L / XL / TU \u2014 para el c\xF3digo", false],
+      ["Stock", "Unidades (default: 1)", false],
+      ["Categor\xEDa", "Tipo de prenda", false],
+      ["Color", "Color del art\xEDculo", false],
+      ["SKU / C\xF3digo", "Si no existe, se auto-genera \u{1F916}", false]
+    ].map(([col, info, req]) => /* @__PURE__ */ import_react.default.createElement("div", { key: col, style: { display: "flex", alignItems: "center", gap: 10 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: {
+      fontSize: 11,
+      fontFamily: "monospace",
+      background: req ? `${C.gold}18` : C.bg0,
+      padding: "2px 8px",
+      borderRadius: 6,
+      color: req ? C.gold : C.label3,
+      fontWeight: 700,
+      border: `1px solid ${req ? C.gold + "40" : C.sep}`,
+      flexShrink: 0
+    } }, col), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 12, color: C.label3, fontFamily: FONT_UI } }, info)))), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      marginTop: 14,
+      padding: "10px 14px",
+      background: `${C.gold}10`,
+      borderRadius: 12,
+      border: `1px solid ${C.gold}25`
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, fontWeight: 700, color: C.gold, fontFamily: FONT_UI, marginBottom: 4 } }, "\u{1F916} Auto-generaci\xF3n de c\xF3digos"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT_UI, lineHeight: 1.5 } }, "Si tu Excel ", /* @__PURE__ */ import_react.default.createElement("strong", null, "no tiene columna C\xF3digo"), ", Toscana genera autom\xE1ticamente:", /* @__PURE__ */ import_react.default.createElement("br", null), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontFamily: "monospace", color: C.label, fontWeight: 600 } }, "RAM-VLB-S-001"), " ", " = ", /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.label3 } }, "Marca \xB7 Iniciales \xB7 Talla \xB7 N\xFAmero"))))), estado === "leyendo" && /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center", padding: "50px 20px" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 40, marginBottom: 16 } }, "\u23F3"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 16, fontWeight: 600, color: C.label, fontFamily: FONT_UI, marginBottom: 6 } }, "Analizando archivo\u2026"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.label3, fontFamily: FONT_UI } }, "Detectando columnas y generando c\xF3digos")), estado === "preview" && /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 8, marginBottom: 16 } }, [
+      { v: preview.length, l: "Total", c: C.label },
+      { v: nValidas, l: "V\xE1lidas", c: C.green },
+      { v: nErrores, l: "Errores", c: C.red },
+      { v: nAuto, l: "Auto-c\xF3d", c: C.gold }
     ].map((s) => /* @__PURE__ */ import_react.default.createElement("div", { key: s.l, style: {
       background: C.bg2,
       borderRadius: 12,
-      padding: "12px 10px",
+      padding: "10px 8px",
       textAlign: "center",
       border: `1px solid ${s.c}25`
-    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 24, fontWeight: 800, color: s.c, fontFamily: FONT } }, s.v), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT } }, s.l)))), errores.length > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      background: `${C.red}08`,
-      borderRadius: 12,
-      padding: 12,
-      marginBottom: 12,
-      border: `1px solid ${C.red}30`,
-      maxHeight: 120,
-      overflowY: "auto"
-    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, fontWeight: 700, color: C.red, fontFamily: FONT, marginBottom: 4 } }, "\u26A0 Filas con errores:"), errores.slice(0, 10).map((e) => /* @__PURE__ */ import_react.default.createElement("div", { key: e.row, style: { fontSize: 11, color: C.red, fontFamily: FONT } }, "Fila ", e.row, ": ", e.errs.join(", "))), errores.length > 10 && /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.red, fontFamily: FONT } }, "...y ", errores.length - 10, " m\xE1s")), /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      maxHeight: 280,
-      overflowY: "auto",
-      borderRadius: 12,
-      border: `1px solid ${C.sep}`,
-      marginBottom: 16
-    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      display: "grid",
-      gridTemplateColumns: "1fr 1fr 1fr auto",
-      background: C.sep,
-      padding: "8px 12px",
-      position: "sticky",
-      top: 0
-    } }, ["SKU", "Marca", "Descripci\xF3n", "Precio"].map((h) => /* @__PURE__ */ import_react.default.createElement("span", { key: h, style: {
-      fontSize: 11,
-      fontWeight: 700,
-      color: C.label2,
-      fontFamily: FONT,
-      textTransform: "uppercase",
-      letterSpacing: 0.5
-    } }, h))), preview.map((f, i) => /* @__PURE__ */ import_react.default.createElement("div", { key: i, style: {
-      display: "grid",
-      gridTemplateColumns: "1fr 1fr 1fr auto",
-      padding: "8px 12px",
-      borderBottom: `1px solid ${C.sep}`,
-      background: f._errs.length > 0 ? `${C.red}06` : f._dup ? `${C.amber}06` : "transparent"
-    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 12, fontFamily: "monospace", color: C.gold } }, f.sku), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 12, color: C.label, fontFamily: FONT } }, f.marcaNombre || "\u2014"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 12, color: C.label, fontFamily: FONT } }, f.desc.slice(0, 25), f.desc.length > 25 ? "\u2026" : ""), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 12, color: C.green, fontFamily: FONT, fontWeight: 600 } }, "Bs ", f.precio)))), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 8 } }, preview.filter((f) => f._errs.length === 0).length > 0 && /* @__PURE__ */ import_react.default.createElement(
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 20, fontWeight: 800, color: s.c, fontFamily: FONT_UI } }, s.v), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: C.label3, fontFamily: FONT_UI, textTransform: "uppercase", letterSpacing: 0.5 } }, s.l)))), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 6, marginBottom: 12, flexWrap: "wrap" } }, [
+      { id: "todas", l: `Todas (${preview.length})` },
+      { id: "validas", l: `V\xE1lidas (${nValidas})` },
+      { id: "errores", l: `Errores (${nErrores})` },
+      { id: "dups", l: `Duplicadas (${nDups})` }
+    ].map((ft) => /* @__PURE__ */ import_react.default.createElement(
       "button",
       {
-        onClick: () => importar(true),
+        key: ft.id,
+        onClick: () => setFiltro(ft.id),
         style: {
-          background: `linear-gradient(135deg,${C.green},#2E7D32)`,
+          padding: "5px 12px",
+          borderRadius: 20,
+          fontSize: 11,
+          fontWeight: 600,
+          fontFamily: FONT_UI,
+          cursor: "pointer",
+          transition: "all .12s",
+          border: `1px solid ${filtro === ft.id ? C.label : C.sep}`,
+          background: filtro === ft.id ? C.label : C.bg0,
+          color: filtro === ft.id ? C.bg0 : C.label3
+        }
+      },
+      ft.l
+    ))), /* @__PURE__ */ import_react.default.createElement("div", { style: { maxHeight: 300, overflowY: "auto", borderRadius: 14, border: `1px solid ${C.sep}`, marginBottom: 16 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      display: "grid",
+      gridTemplateColumns: "2fr 1fr 1.5fr 1fr 1fr",
+      padding: "9px 12px",
+      background: C.bg2,
+      position: "sticky",
+      top: 0,
+      borderBottom: `1px solid ${C.sep}`
+    } }, ["C\xF3digo", "Marca", "Descripci\xF3n", "Precio", "Estado"].map((h) => /* @__PURE__ */ import_react.default.createElement("div", { key: h, style: {
+      fontSize: 10,
+      fontWeight: 700,
+      color: C.label3,
+      textTransform: "uppercase",
+      letterSpacing: 0.6,
+      fontFamily: FONT_UI
+    } }, h))), previstaFiltrada.map((f, i) => {
+      const hasErr = f._errs.length > 0;
+      const rowBg = hasErr ? `${C.red}07` : f._dup ? `${C.amber}07` : "transparent";
+      const estadoChip = hasErr ? { txt: f._errs[0], color: C.red } : f._dup ? { txt: "Actualiza stock", color: C.amber } : { txt: "\u2713 V\xE1lido", color: C.green };
+      return /* @__PURE__ */ import_react.default.createElement("div", { key: i, style: {
+        display: "grid",
+        gridTemplateColumns: "2fr 1fr 1.5fr 1fr 1fr",
+        padding: "9px 12px",
+        borderBottom: `1px solid ${C.sep}`,
+        background: rowBg,
+        alignItems: "center"
+      } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, fontFamily: "monospace", color: C.gold, fontWeight: 700, lineHeight: 1.2 } }, f.sku), f.autoSKU && /* @__PURE__ */ import_react.default.createElement("div", { style: {
+        fontSize: 9,
+        color: C.gold,
+        fontFamily: FONT_UI,
+        fontWeight: 700,
+        textTransform: "uppercase",
+        letterSpacing: 0.4,
+        opacity: 0.7,
+        marginTop: 1
+      } }, "\u{1F916} auto")), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: f.marcaId ? C.label : C.red, fontFamily: FONT_UI, fontWeight: f.marcaId ? 400 : 600 } }, f.marcaNombre.slice(0, 12) || "\u2014"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label, fontFamily: FONT_UI } }, f.desc.slice(0, 22), f.desc.length > 22 ? "\u2026" : "", f.talla && /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 9, color: C.label3, marginLeft: 4 } }, f.talla)), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, fontWeight: 600, color: f.precio > 0 ? C.label : C.red, fontFamily: FONT_UI } }, f.precio > 0 ? `Bs ${f.precio}` : "\u2014"), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+        fontSize: 9,
+        fontWeight: 700,
+        color: estadoChip.color,
+        fontFamily: FONT_UI,
+        textTransform: "uppercase",
+        letterSpacing: 0.3,
+        lineHeight: 1.3
+      } }, estadoChip.txt.slice(0, 20)));
+    }), previstaFiltrada.length === 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: { padding: "24px", textAlign: "center", color: C.label3, fontSize: 13, fontFamily: FONT_UI } }, "Sin filas en este filtro")), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 8 } }, nValidas > 0 && /* @__PURE__ */ import_react.default.createElement(
+      "button",
+      {
+        onClick: importar,
+        style: {
+          background: C.label,
           border: "none",
           borderRadius: 14,
-          padding: 14,
+          padding: "14px",
           fontSize: 15,
           fontWeight: 700,
-          color: "#fff",
+          color: C.bg0,
           cursor: "pointer",
-          fontFamily: FONT
+          fontFamily: FONT_UI,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 8
         }
       },
       "\u2713 Importar ",
-      preview.filter((f) => f._errs.length === 0).length,
-      " filas v\xE1lidas"
-    ), errores.length > 0 && preview.filter((f) => f._errs.length === 0).length < preview.length && /* @__PURE__ */ import_react.default.createElement(
+      nValidas,
+      " producto",
+      nValidas !== 1 ? "s" : "",
+      " v\xE1lido",
+      nValidas !== 1 ? "s" : "",
+      nDups > 0 && /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 12, opacity: 0.8 } }, "(+", nDups, " actualiza stock)")
+    ), /* @__PURE__ */ import_react.default.createElement(
       "button",
       {
-        onClick: () => importar(false),
+        onClick: exportarPreview,
         style: {
-          background: `${C.amber}20`,
-          border: `1px solid ${C.amber}40`,
+          background: `${C.gold}15`,
+          border: `1px solid ${C.gold}35`,
           borderRadius: 14,
-          padding: 14,
-          fontSize: 14,
+          padding: "12px",
+          fontSize: 13,
           fontWeight: 600,
-          color: C.amber,
+          color: C.gold,
           cursor: "pointer",
-          fontFamily: FONT
+          fontFamily: FONT_UI,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 6
         }
       },
-      "Importar todo (incluyendo filas con errores)"
+      "\u{1F4CA} Descargar preview con c\xF3digos generados"
     ), /* @__PURE__ */ import_react.default.createElement(
       "button",
       {
         onClick: () => {
           setEstado("idle");
           setPreview([]);
-          setErrores([]);
         },
         style: {
           background: "none",
           border: `1px solid ${C.sep}`,
           borderRadius: 14,
-          padding: 12,
-          fontSize: 14,
+          padding: "11px",
+          fontSize: 13,
           color: C.label3,
           cursor: "pointer",
-          fontFamily: FONT
+          fontFamily: FONT_UI
         }
       },
-      "Cancelar"
-    ))), estado === "importando" && /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center", padding: 40 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 32, marginBottom: 12 } }, "\u2699\uFE0F"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 15, color: C.label, fontFamily: FONT } }, "Importando productos\u2026")), estado === "done" && stats && /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center", padding: 20 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 48, marginBottom: 12 } }, "\u2705"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 18, fontWeight: 700, color: C.green, fontFamily: FONT, marginBottom: 16 } }, "Importaci\xF3n completada"), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 20 } }, [{ v: stats.ok, l: "Creados", c: C.green }, { v: stats.upd, l: "Actualizados", c: C.blue }, { v: stats.skip, l: "Omitidos", c: C.label3 }].map((s) => /* @__PURE__ */ import_react.default.createElement("div", { key: s.l, style: { background: C.bg2, borderRadius: 12, padding: "12px 10px", textAlign: "center" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 24, fontWeight: 800, color: s.c, fontFamily: FONT } }, s.v), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT } }, s.l)))), /* @__PURE__ */ import_react.default.createElement("button", { onClick: onClose, style: {
-      background: `linear-gradient(135deg,${C.gold},${C.goldD})`,
+      "\u2190 Cargar otro archivo"
+    ))), estado === "importando" && /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center", padding: "50px 20px" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 40, marginBottom: 16 } }, "\u2699\uFE0F"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 16, fontWeight: 600, color: C.label, fontFamily: FONT_UI, marginBottom: 6 } }, "Importando productos\u2026"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.label3, fontFamily: FONT_UI } }, "Guardando en inventario")), estado === "done" && stats && /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center", padding: "20px 0" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 48, marginBottom: 16 } }, "\u2705"), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      fontSize: 20,
+      fontWeight: 700,
+      color: C.green,
+      fontFamily: FONT_DISPLAY,
+      letterSpacing: "0.01em",
+      marginBottom: 6
+    } }, "Importaci\xF3n completada"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.label3, fontFamily: FONT_UI, marginBottom: 20 } }, stats.total, " filas procesadas"), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 24 } }, [
+      { v: stats.ok, l: "Creados", c: C.green },
+      { v: stats.upd, l: "Actualizados", c: C.blue },
+      { v: stats.skip, l: "Omitidos", c: C.label3 }
+    ].map((s) => /* @__PURE__ */ import_react.default.createElement("div", { key: s.l, style: {
+      background: C.bg2,
+      borderRadius: 14,
+      padding: "14px 10px",
+      textAlign: "center",
+      border: `1px solid ${s.c}25`
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 28, fontWeight: 800, color: s.c, fontFamily: FONT_UI } }, s.v), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT_UI, textTransform: "uppercase", letterSpacing: 0.5, marginTop: 2 } }, s.l)))), /* @__PURE__ */ import_react.default.createElement("button", { onClick: onClose, style: {
+      width: "100%",
+      background: C.label,
       border: "none",
       borderRadius: 14,
-      padding: 14,
+      padding: "14px",
       fontSize: 15,
       fontWeight: 700,
-      color: "#fff",
+      color: C.bg0,
       cursor: "pointer",
-      fontFamily: FONT,
-      width: "100%"
-    } }, "Cerrar")));
+      fontFamily: FONT_UI
+    } }, "Listo \u2014 Ver inventario"))));
   }
   function HomeDashboard({ ventas, inv, vMes, mes, anio, onGoTab }) {
     const isDesktop = useIsDesktop();

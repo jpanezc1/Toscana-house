@@ -4150,289 +4150,457 @@ function CameraScanner({onDetect, onClose}){
 }
 
 // ══════════════════════════════════════════════════════════
-// ImportarExcelModal — Importación masiva de inventario
-// ══════════════════════════════════════════════════════════
+// ImportarExcelModal — Importación masiva con auto-generación de códigos
+// ══════════════════════════════════════════════════════════════════════
 function ImportarExcelModal({inv, onImportar, onClose}){
-  const [archivo, setArchivo] = useState(null);
-  const [preview, setPreview] = useState([]);
-  const [errores, setErrores] = useState([]);
-  const [estado, setEstado] = useState("idle"); // idle|leyendo|preview|importando|done
-  const [stats, setStats] = useState(null);
+  const isDesktop = useIsDesktop();
+  const [preview,    setPreview]    = useState([]);
+  const [estado,     setEstado]     = useState("idle"); // idle|leyendo|preview|importando|done
+  const [stats,      setStats]      = useState(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [filtro,     setFiltro]     = useState("todas"); // todas|validas|errores|dups
   const fileRef = useRef(null);
 
-  async function parsearExcel(file){
+  // ── Normalizar texto: quitar acentos, trim, uppercase ─────────────
+  function norm(s){ return String(s||"").trim().normalize("NFD").replace(/[̀-ͯ]/g,""); }
+
+  // ── Auto-generar código [MARCA3]-[INICIALES3]-[TALLA]-[NUM] ───────
+  function genCodImport(marcaNombre, desc, talla, usadosSet){
+    const prefix  = norm(marcaNombre||"TOS").replace(/[^A-Za-z]/gi,"").toUpperCase().slice(0,3)||"TOS";
+    const words   = norm(desc||"ITEM").split(/\s+/).filter(w=>w.length>0);
+    const inics   = words.map(w=>w.replace(/[^A-Za-z]/gi,"")[0]||"").filter(Boolean).join("").toUpperCase().slice(0,3)||"ITM";
+    const tallaUp = norm(talla||"TU").replace(/[^A-Z0-9]/gi,"").toUpperCase().slice(0,3)||"TU";
+    const base    = `${prefix}-${inics}-${tallaUp}`;
+    // buscar siguiente número libre (inventory actual + lote actual)
+    const invNums = new Set(inv.map(p=>p.codigo.toUpperCase()));
+    let n=1;
+    while(invNums.has(`${base}-${String(n).padStart(3,"0")}`) || usadosSet.has(`${base}-${String(n).padStart(3,"0")}`)) n++;
+    const cod=`${base}-${String(n).padStart(3,"0")}`;
+    usadosSet.add(cod);
+    return cod;
+  }
+
+  // ── Parsear archivo ───────────────────────────────────────────────
+  async function parsearArchivo(file){
     setEstado("leyendo");
     try{
       const XLSX = await loadXLSX();
-      const buf = await file.arrayBuffer();
-      const wb = XLSX.read(buf, {type:"array"});
-      const ws = wb.Sheets[wb.SheetNames[0]];
-      const raw = XLSX.utils.sheet_to_json(ws, {header:1, defval:""});
+      const buf  = await file.arrayBuffer();
+      const wb   = XLSX.read(buf,{type:"array"});
+      const ws   = wb.Sheets[wb.SheetNames[0]];
+      const raw  = XLSX.utils.sheet_to_json(ws,{header:1,defval:""});
 
-      if(raw.length < 2){ setEstado("idle"); alert("El archivo está vacío"); return; }
+      if(raw.length<2){ setEstado("idle"); alert("El archivo está vacío o no tiene datos"); return; }
 
-      let headerRow = -1;
+      // Auto-detectar fila de encabezado (primeras 5 filas)
+      let hRow=0;
       for(let i=0;i<Math.min(5,raw.length);i++){
-        const row = raw[i].map(c=>String(c).toLowerCase());
-        if(row.some(c=>c.includes("sku")||c.includes("código")||c.includes("codigo"))){
-          headerRow = i; break;
+        const r=raw[i].map(c=>norm(String(c)).toLowerCase());
+        if(r.some(c=>c.includes("marca")||c.includes("descripcion")||c.includes("precio")||c.includes("sku"))){
+          hRow=i; break;
         }
       }
-      if(headerRow === -1) headerRow = 0;
 
-      const headers = raw[headerRow].map(h=>String(h).toLowerCase().trim());
-      const findCol = (...names) => {
-        for(const n of names){
-          const idx = headers.findIndex(h=>h.includes(n));
-          if(idx>=0) return idx;
-        }
+      const headers = raw[hRow].map(h=>norm(String(h)).toLowerCase().trim());
+      const col     = (...names)=>{
+        for(const n of names){ const i=headers.findIndex(h=>h.includes(n)); if(i>=0)return i; }
         return -1;
       };
 
-      const colSKU = findCol("sku","código","codigo","cod");
-      const colMarca = findCol("marca","brand");
-      const colDesc = findCol("descripción","descripcion","nombre","producto","desc");
-      const colPrecio = findCol("precio","price","valor");
-      const colCat = findCol("categoría","categoria","cat","tipo");
-      const colTalla = findCol("talla","size","talle");
-      const colColor = findCol("color");
-      const colStock = findCol("stock","cantidad","qty","existencia");
+      const cSKU    = col("sku","codigo","cod","code","referencia","ref");
+      const cMarca  = col("marca","brand","tienda");
+      const cDesc   = col("descripcion","nombre","producto","desc","item","articulo");
+      const cPrecio = col("precio","price","valor","importe","costo","pvp");
+      const cCat    = col("categoria","cat","tipo","clasificacion","rubro");
+      const cTalla  = col("talla","size","talle","medida");
+      const cColor  = col("color","colour");
+      const cStock  = col("stock","cantidad","qty","existencia","unidades","piezas");
+      const cSubcat = col("subcat","subcategoria","subcategory");
 
-      const filas = [];
-      const errs = [];
+      const usadosSet = new Set();
+      const filas     = [];
 
-      for(let i=headerRow+1;i<raw.length;i++){
-        const row = raw[i];
-        if(row.every(c=>!c)) continue;
+      for(let i=hRow+1; i<raw.length; i++){
+        const row=raw[i];
+        if(row.every(c=>String(c).trim()==="")) continue; // fila vacía
 
-        const sku = colSKU>=0 ? String(row[colSKU]).trim().toUpperCase() : "";
-        const marcaNom = colMarca>=0 ? String(row[colMarca]).trim() : "";
-        const desc = colDesc>=0 ? String(row[colDesc]).trim() : "";
-        const precio = colPrecio>=0 ? parseFloat(String(row[colPrecio]).replace(/[^\d.]/g,"")) : 0;
-        const cat = colCat>=0 ? String(row[colCat]).trim() : "";
-        const talla = colTalla>=0 ? String(row[colTalla]).trim() : "";
-        const color = colColor>=0 ? String(row[colColor]).trim() : "";
-        const stock = colStock>=0 ? parseInt(String(row[colStock])) || 1 : 1;
+        const marcaNom = cMarca>=0  ? String(row[cMarca]).trim()  : "";
+        const desc     = cDesc>=0   ? String(row[cDesc]).trim()   : "";
+        const precioRaw= cPrecio>=0 ? String(row[cPrecio]).replace(/[^\d.,]/g,"").replace(",",".") : "";
+        const precio   = parseFloat(precioRaw)||0;
+        const cat      = cCat>=0    ? String(row[cCat]).trim()    : "General";
+        const talla    = cTalla>=0  ? String(row[cTalla]).trim()  : "";
+        const color    = cColor>=0  ? String(row[cColor]).trim()  : "";
+        const stock    = cStock>=0  ? Math.max(1,parseInt(String(row[cStock]))||1) : 1;
+        const subcat   = cSubcat>=0 ? String(row[cSubcat]).trim() : "";
 
-        const fila = {_row:i+1, sku, marcaNom, desc, precio, cat, talla, color, stock, _errs:[]};
+        // Buscar marca
+        const marcaEnc = MARCAS.find(m=>norm(m.nombre).toLowerCase()===norm(marcaNom).toLowerCase())
+          || MARCAS.find(m=>norm(marcaNom).toLowerCase().startsWith(norm(m.nombre).toLowerCase().slice(0,4)));
 
-        if(!sku) fila._errs.push("SKU vacío");
-        if(!desc) fila._errs.push("Descripción vacía");
-        if(!precio || isNaN(precio)) fila._errs.push("Precio inválido");
+        // SKU: usar del Excel si existe, si no auto-generar
+        let skuRaw  = cSKU>=0 ? String(row[cSKU]).trim().toUpperCase() : "";
+        const autoSKU = !skuRaw;
+        const sku   = skuRaw || genCodImport(marcaEnc?.nombre||marcaNom, desc, talla||"TU", usadosSet);
+        if(skuRaw) usadosSet.add(sku);
 
-        const existe = inv.find(p=>p.codigo.toUpperCase()===sku);
-        if(existe) fila._dup = true;
+        const fila = {
+          _row:i+1, sku, autoSKU,
+          marcaNom, marcaId:marcaEnc?.id||null, marcaNombre:marcaEnc?.nombre||marcaNom,
+          desc, precio, cat, talla, color, stock, subcat,
+          _errs:[], _dup:false,
+        };
 
-        const marcaEnc = MARCAS.find(m=>m.nombre.toLowerCase()===marcaNom.toLowerCase());
-        fila.marcaId = marcaEnc?.id || null;
-        fila.marcaNombre = marcaEnc?.nombre || marcaNom;
-        if(!marcaEnc) fila._errs.push(`Marca "${marcaNom}" no encontrada`);
+        // Validaciones
+        if(!desc)               fila._errs.push("Sin descripción");
+        if(precio<=0)           fila._errs.push("Precio inválido");
+        if(!marcaEnc)           fila._errs.push(`Marca "${marcaNom||"—"}" no encontrada`);
 
-        if(fila._errs.length > 0) errs.push({row:i+1, errs:fila._errs});
+        // Duplicado en inventario existente
+        const existe=inv.find(p=>p.codigo.toUpperCase()===sku);
+        if(existe){ fila._dup=true; }
+
         filas.push(fila);
       }
 
       setPreview(filas);
-      setErrores(errs);
+      setFiltro("todas");
       setEstado("preview");
     }catch(e){
       setEstado("idle");
-      alert("Error leyendo Excel: " + e.message);
+      alert("Error leyendo archivo: "+e.message);
     }
   }
 
-  async function importar(soloValidas){
+  // ── Importar ───────────────────────────────────────────────────────
+  async function importar(){
     setEstado("importando");
-    const filas = soloValidas ? preview.filter(f=>f._errs.length===0) : preview;
-    let ok=0, skip=0, upd=0;
+    const importables = preview.filter(f=>f.desc&&f.marcaId&&f.precio>0);
+    let ok=0, upd=0, skip=0;
 
-    for(const f of filas){
-      if(f._errs.length>0 && soloValidas) continue;
-      if(!f.sku || !f.desc || !f.marcaId) { skip++; continue; }
-
+    for(const f of importables){
       if(f._dup){
         upd++;
         onImportar({tipo:"update", codigo:f.sku, stock:f.stock});
       } else {
         ok++;
         onImportar({tipo:"create", producto:{
-          codigo: f.sku,
-          nombre: f.desc,
-          marcaId: f.marcaId,
+          codigo:      f.sku,
+          nombre:      f.desc,
+          marcaId:     f.marcaId,
           marcaNombre: f.marcaNombre,
-          categoria: [f.cat, f.talla, f.color].filter(Boolean).join(" / ") || "General",
-          precio: f.precio,
-          stock: f.stock,
-          stockInicial: f.stock,
-          fecha: new Date().toISOString().slice(0,10),
+          categoria:   f.cat||"General",
+          descripcion: [f.talla&&`Talla: ${f.talla}`, f.color&&`Color: ${f.color}`].filter(Boolean).join(" · ")||"",
+          subcat:      f.subcat||f.talla||"",
+          precio:      f.precio,
+          stock:       f.stock,
+          stockInicial:f.stock,
+          fecha:       hoy(),
         }});
       }
     }
-
-    setStats({ok, upd, skip});
+    skip = preview.length - importables.length;
+    setStats({ok, upd, skip, total:preview.length});
     setEstado("done");
   }
 
+  // ── Exportar preview como Excel ───────────────────────────────────
+  async function exportarPreview(){
+    const XLSX = await loadXLSX();
+    const rows = [
+      ["Código","Auto?","Marca","Descripción","Talla","Precio (Bs)","Stock","Estado"],
+      ...preview.map(f=>[
+        f.sku, f.autoSKU?"Auto-generado":"Manual",
+        f.marcaNombre, f.desc, f.talla||"—", f.precio, f.stock,
+        f._errs.length>0?"⚠ "+f._errs.join("; "):f._dup?"Actualiza stock":"✓ Válido",
+      ]),
+    ];
+    const ws=XLSX.utils.aoa_to_sheet(rows);
+    ws["!cols"]=[22,14,14,32,8,12,8,32].map(w=>({wch:w}));
+    const wb=XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb,ws,"Preview importación");
+    const buf=XLSX.write(wb,{bookType:"xlsx",type:"array"});
+    const blob=new Blob([buf],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
+    descargarArchivo(blob,`ToscanaHouse_ImportPreview_${hoy()}.xlsx`);
+  }
+
+  // ── Drag & drop ───────────────────────────────────────────────────
+  function onDragOver(e)  { e.preventDefault(); setIsDragging(true);  }
+  function onDragLeave(e) { e.preventDefault(); setIsDragging(false); }
+  function onDrop(e)      { e.preventDefault(); setIsDragging(false); const f=e.dataTransfer.files?.[0]; if(f){parsearArchivo(f);} }
+
+  // ── Preview filtrado ───────────────────────────────────────────────
+  const previstaFiltrada = useMemo(()=>{
+    if(filtro==="validas")  return preview.filter(f=>f._errs.length===0&&!f._dup);
+    if(filtro==="errores")  return preview.filter(f=>f._errs.length>0);
+    if(filtro==="dups")     return preview.filter(f=>f._dup);
+    return preview;
+  },[preview,filtro]);
+
+  const nValidas = preview.filter(f=>f._errs.length===0).length;
+  const nErrores = preview.filter(f=>f._errs.length>0).length;
+  const nDups    = preview.filter(f=>f._dup).length;
+  const nAuto    = preview.filter(f=>f.autoSKU).length;
+
   return (
     <Sheet open title="Importar Excel — Inventario" onClose={onClose} tall>
+      <div style={{padding:"0 4px 20px"}}>
+
+      {/* ── IDLE: Drop zone ── */}
       {estado==="idle"&&(
         <div>
-          <div style={{textAlign:"center",marginBottom:20}}>
-            <div style={{fontSize:48,marginBottom:10}}>📥</div>
-            <div style={{fontSize:16,fontWeight:700,color:C.label,fontFamily:FONT,marginBottom:6}}>
-              Importación masiva desde Excel
+          {/* Drop zone */}
+          <div
+            onDragOver={onDragOver} onDragLeave={onDragLeave} onDrop={onDrop}
+            onClick={()=>fileRef.current?.click()}
+            style={{
+              border:`2px dashed ${isDragging?C.gold:"#D8CEC2"}`,
+              borderRadius:28, background:isDragging?`${C.gold}08`:"rgba(255,255,255,0.7)",
+              padding:"40px 24px", textAlign:"center", cursor:"pointer",
+              marginBottom:20, transition:"all .2s",
+            }}>
+            <div style={{fontSize:48,marginBottom:12}}>{isDragging?"📂":"📥"}</div>
+            <div style={{fontSize:17,fontWeight:700,color:C.label,fontFamily:FONT_DISPLAY,
+              letterSpacing:"0.01em",marginBottom:6}}>
+              {isDragging?"Suelta el archivo aquí":"Importar desde Excel"}
             </div>
-            <div style={{fontSize:13,color:C.label3,fontFamily:FONT}}>
-              Sube un archivo .xlsx con los productos a importar
+            <div style={{fontSize:13,color:C.label3,fontFamily:FONT_UI,marginBottom:16}}>
+              Arrastra un archivo o haz clic para seleccionar
+            </div>
+            <div style={{display:"flex",gap:8,justifyContent:"center",flexWrap:"wrap"}}>
+              {[".xlsx",".xls",".csv"].map(ext=>(
+                <span key={ext} style={{fontSize:11,fontWeight:700,color:C.gold,
+                  background:`${C.gold}15`,padding:"4px 10px",borderRadius:12,
+                  border:`1px solid ${C.gold}30`,fontFamily:FONT_UI}}>{ext}</span>
+              ))}
             </div>
           </div>
-
-          <div style={{background:C.bg2,borderRadius:14,padding:16,marginBottom:16,border:`1px solid ${C.sep}`}}>
-            <div style={{fontSize:13,fontWeight:700,color:C.label,fontFamily:FONT,marginBottom:8}}>
-              Columnas esperadas (en cualquier orden):
-            </div>
-            {[["SKU / Código","Código único del producto (obligatorio)"],
-              ["Marca","Nombre exacto de la marca (obligatorio)"],
-              ["Descripción / Nombre","Nombre del producto (obligatorio)"],
-              ["Precio","Precio en Bs (obligatorio)"],
-              ["Stock / Cantidad","Unidades (opcional, default 1)"],
-              ["Categoría","Tipo de prenda (opcional)"],
-              ["Talla / Color","Características (opcional)"],
-            ].map(([col,desc])=>(
-              <div key={col} style={{display:"flex",gap:8,marginBottom:4}}>
-                <span style={{fontSize:12,fontFamily:"monospace",background:C.fill2,
-                  padding:"1px 6px",borderRadius:4,color:C.gold,fontWeight:700}}>{col}</span>
-                <span style={{fontSize:12,color:C.label3,fontFamily:FONT}}>{desc}</span>
-              </div>
-            ))}
-          </div>
-
           <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv"
-            onChange={e=>{const f=e.target.files?.[0];if(f){setArchivo(f);parsearExcel(f);}}}
+            onChange={e=>{const f=e.target.files?.[0];if(f)parsearArchivo(f);}}
             style={{display:"none"}}/>
-          <button onClick={()=>fileRef.current?.click()}
-            style={{width:"100%",background:`linear-gradient(135deg,${C.gold},${C.goldD})`,
-              border:"none",borderRadius:14,padding:16,fontSize:16,fontWeight:700,
-              color:"#fff",cursor:"pointer",fontFamily:FONT}}>
-            📂 Seleccionar archivo Excel
-          </button>
-        </div>
-      )}
 
-      {estado==="leyendo"&&(
-        <div style={{textAlign:"center",padding:40}}>
-          <div style={{fontSize:32,marginBottom:12}}>⏳</div>
-          <div style={{fontSize:15,color:C.label,fontFamily:FONT}}>Leyendo archivo…</div>
-        </div>
-      )}
-
-      {estado==="preview"&&(
-        <div>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:16}}>
-            {[
-              {v:preview.length,l:"Total filas",c:C.label},
-              {v:preview.filter(f=>f._errs.length===0).length,l:"Válidas",c:C.green},
-              {v:errores.length,l:"Con errores",c:C.red},
-            ].map(s=>(
-              <div key={s.l} style={{background:C.bg2,borderRadius:12,padding:"12px 10px",
-                textAlign:"center",border:`1px solid ${s.c}25`}}>
-                <div style={{fontSize:24,fontWeight:800,color:s.c,fontFamily:FONT}}>{s.v}</div>
-                <div style={{fontSize:11,color:C.label3,fontFamily:FONT}}>{s.l}</div>
-              </div>
-            ))}
-          </div>
-
-          {errores.length>0&&(
-            <div style={{background:`${C.red}08`,borderRadius:12,padding:12,marginBottom:12,
-              border:`1px solid ${C.red}30`,maxHeight:120,overflowY:"auto"}}>
-              <div style={{fontSize:12,fontWeight:700,color:C.red,fontFamily:FONT,marginBottom:4}}>
-                ⚠ Filas con errores:
-              </div>
-              {errores.slice(0,10).map(e=>(
-                <div key={e.row} style={{fontSize:11,color:C.red,fontFamily:FONT}}>
-                  Fila {e.row}: {e.errs.join(", ")}
+          {/* Info columnas */}
+          <div style={{background:C.bg2,borderRadius:16,padding:"16px 18px",border:`1px solid ${C.sep}`}}>
+            <div style={{fontSize:12,fontWeight:700,color:C.label,fontFamily:FONT_UI,
+              textTransform:"uppercase",letterSpacing:.7,marginBottom:12}}>
+              Columnas del Excel (en cualquier orden)
+            </div>
+            <div style={{display:"flex",flexDirection:"column",gap:8}}>
+              {[
+                ["Marca *","Nombre de la marca",true],
+                ["Descripción *","Nombre del producto",true],
+                ["Precio *","Precio en Bs",true],
+                ["Talla","XS / S / M / L / XL / TU — para el código",false],
+                ["Stock","Unidades (default: 1)",false],
+                ["Categoría","Tipo de prenda",false],
+                ["Color","Color del artículo",false],
+                ["SKU / Código","Si no existe, se auto-genera 🤖",false],
+              ].map(([col,info,req])=>(
+                <div key={col} style={{display:"flex",alignItems:"center",gap:10}}>
+                  <span style={{fontSize:11,fontFamily:"monospace",background:req?`${C.gold}18`:C.bg0,
+                    padding:"2px 8px",borderRadius:6,color:req?C.gold:C.label3,
+                    fontWeight:700,border:`1px solid ${req?C.gold+"40":C.sep}`,flexShrink:0}}>
+                    {col}
+                  </span>
+                  <span style={{fontSize:12,color:C.label3,fontFamily:FONT_UI}}>{info}</span>
                 </div>
               ))}
-              {errores.length>10&&<div style={{fontSize:11,color:C.red,fontFamily:FONT}}>...y {errores.length-10} más</div>}
             </div>
-          )}
+            <div style={{marginTop:14,padding:"10px 14px",background:`${C.gold}10`,borderRadius:12,
+              border:`1px solid ${C.gold}25`}}>
+              <div style={{fontSize:12,fontWeight:700,color:C.gold,fontFamily:FONT_UI,marginBottom:4}}>
+                🤖 Auto-generación de códigos
+              </div>
+              <div style={{fontSize:12,color:C.label3,fontFamily:FONT_UI,lineHeight:1.5}}>
+                Si tu Excel <strong>no tiene columna Código</strong>, Toscana genera automáticamente:<br/>
+                <span style={{fontFamily:"monospace",color:C.label,fontWeight:600}}>RAM-VLB-S-001</span>
+                {" "} = <span style={{color:C.label3}}>Marca · Iniciales · Talla · Número</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
-          <div style={{maxHeight:280,overflowY:"auto",borderRadius:12,
-            border:`1px solid ${C.sep}`,marginBottom:16}}>
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr auto",
-              background:C.sep,padding:"8px 12px",position:"sticky",top:0}}>
-              {["SKU","Marca","Descripción","Precio"].map(h=>(
-                <span key={h} style={{fontSize:11,fontWeight:700,color:C.label2,fontFamily:FONT,
-                  textTransform:"uppercase",letterSpacing:.5}}>{h}</span>
-              ))}
-            </div>
-            {preview.map((f,i)=>(
-              <div key={i} style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr auto",
-                padding:"8px 12px",borderBottom:`1px solid ${C.sep}`,
-                background:f._errs.length>0?`${C.red}06`:f._dup?`${C.amber}06`:"transparent"}}>
-                <span style={{fontSize:12,fontFamily:"monospace",color:C.gold}}>{f.sku}</span>
-                <span style={{fontSize:12,color:C.label,fontFamily:FONT}}>{f.marcaNombre||"—"}</span>
-                <span style={{fontSize:12,color:C.label,fontFamily:FONT}}>{f.desc.slice(0,25)}{f.desc.length>25?"…":""}</span>
-                <span style={{fontSize:12,color:C.green,fontFamily:FONT,fontWeight:600}}>Bs {f.precio}</span>
+      {/* ── LEYENDO ── */}
+      {estado==="leyendo"&&(
+        <div style={{textAlign:"center",padding:"50px 20px"}}>
+          <div style={{fontSize:40,marginBottom:16}}>⏳</div>
+          <div style={{fontSize:16,fontWeight:600,color:C.label,fontFamily:FONT_UI,marginBottom:6}}>
+            Analizando archivo…
+          </div>
+          <div style={{fontSize:13,color:C.label3,fontFamily:FONT_UI}}>
+            Detectando columnas y generando códigos
+          </div>
+        </div>
+      )}
+
+      {/* ── PREVIEW ── */}
+      {estado==="preview"&&(
+        <div>
+          {/* Stats KPIs */}
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:8,marginBottom:16}}>
+            {[
+              {v:preview.length, l:"Total",    c:C.label},
+              {v:nValidas,       l:"Válidas",  c:C.green},
+              {v:nErrores,       l:"Errores",  c:C.red},
+              {v:nAuto,          l:"Auto-cód", c:C.gold},
+            ].map(s=>(
+              <div key={s.l} style={{background:C.bg2,borderRadius:12,padding:"10px 8px",
+                textAlign:"center",border:`1px solid ${s.c}25`}}>
+                <div style={{fontSize:20,fontWeight:800,color:s.c,fontFamily:FONT_UI}}>{s.v}</div>
+                <div style={{fontSize:10,color:C.label3,fontFamily:FONT_UI,textTransform:"uppercase",letterSpacing:.5}}>{s.l}</div>
               </div>
             ))}
           </div>
 
+          {/* Filtros */}
+          <div style={{display:"flex",gap:6,marginBottom:12,flexWrap:"wrap"}}>
+            {[
+              {id:"todas",  l:`Todas (${preview.length})`},
+              {id:"validas",l:`Válidas (${nValidas})`},
+              {id:"errores",l:`Errores (${nErrores})`},
+              {id:"dups",   l:`Duplicadas (${nDups})`},
+            ].map(ft=>(
+              <button key={ft.id} onClick={()=>setFiltro(ft.id)}
+                style={{padding:"5px 12px",borderRadius:20,fontSize:11,fontWeight:600,fontFamily:FONT_UI,
+                  cursor:"pointer",transition:"all .12s",border:`1px solid ${filtro===ft.id?C.label:C.sep}`,
+                  background:filtro===ft.id?C.label:C.bg0, color:filtro===ft.id?C.bg0:C.label3}}>
+                {ft.l}
+              </button>
+            ))}
+          </div>
+
+          {/* Tabla preview */}
+          <div style={{maxHeight:300,overflowY:"auto",borderRadius:14,border:`1px solid ${C.sep}`,marginBottom:16}}>
+            {/* Header */}
+            <div style={{display:"grid",gridTemplateColumns:"2fr 1fr 1.5fr 1fr 1fr",
+              padding:"9px 12px",background:C.bg2,position:"sticky",top:0,
+              borderBottom:`1px solid ${C.sep}`}}>
+              {["Código","Marca","Descripción","Precio","Estado"].map(h=>(
+                <div key={h} style={{fontSize:10,fontWeight:700,color:C.label3,
+                  textTransform:"uppercase",letterSpacing:.6,fontFamily:FONT_UI}}>{h}</div>
+              ))}
+            </div>
+            {/* Filas */}
+            {previstaFiltrada.map((f,i)=>{
+              const hasErr = f._errs.length>0;
+              const rowBg  = hasErr?`${C.red}07`:f._dup?`${C.amber}07`:"transparent";
+              const estadoChip = hasErr
+                ? {txt:f._errs[0], color:C.red}
+                : f._dup
+                ? {txt:"Actualiza stock", color:C.amber}
+                : {txt:"✓ Válido", color:C.green};
+              return(
+                <div key={i} style={{display:"grid",gridTemplateColumns:"2fr 1fr 1.5fr 1fr 1fr",
+                  padding:"9px 12px",borderBottom:`1px solid ${C.sep}`,background:rowBg,
+                  alignItems:"center"}}>
+                  <div>
+                    <div style={{fontSize:11,fontFamily:"monospace",color:C.gold,fontWeight:700,lineHeight:1.2}}>
+                      {f.sku}
+                    </div>
+                    {f.autoSKU&&(
+                      <div style={{fontSize:9,color:C.gold,fontFamily:FONT_UI,fontWeight:700,
+                        textTransform:"uppercase",letterSpacing:.4,opacity:.7,marginTop:1}}>
+                        🤖 auto
+                      </div>
+                    )}
+                  </div>
+                  <div style={{fontSize:11,color:f.marcaId?C.label:C.red,fontFamily:FONT_UI,fontWeight:f.marcaId?400:600}}>
+                    {f.marcaNombre.slice(0,12)||"—"}
+                  </div>
+                  <div style={{fontSize:11,color:C.label,fontFamily:FONT_UI}}>
+                    {f.desc.slice(0,22)}{f.desc.length>22?"…":""}
+                    {f.talla&&<span style={{fontSize:9,color:C.label3,marginLeft:4}}>{f.talla}</span>}
+                  </div>
+                  <div style={{fontSize:11,fontWeight:600,color:f.precio>0?C.label:C.red,fontFamily:FONT_UI}}>
+                    {f.precio>0?`Bs ${f.precio}`:"—"}
+                  </div>
+                  <div style={{fontSize:9,fontWeight:700,color:estadoChip.color,fontFamily:FONT_UI,
+                    textTransform:"uppercase",letterSpacing:.3,lineHeight:1.3}}>
+                    {estadoChip.txt.slice(0,20)}
+                  </div>
+                </div>
+              );
+            })}
+            {previstaFiltrada.length===0&&(
+              <div style={{padding:"24px",textAlign:"center",color:C.label3,fontSize:13,fontFamily:FONT_UI}}>
+                Sin filas en este filtro
+              </div>
+            )}
+          </div>
+
+          {/* Botones acción */}
           <div style={{display:"flex",flexDirection:"column",gap:8}}>
-            {preview.filter(f=>f._errs.length===0).length>0&&(
-              <button onClick={()=>importar(true)}
-                style={{background:`linear-gradient(135deg,${C.green},#2E7D32)`,
-                  border:"none",borderRadius:14,padding:14,fontSize:15,fontWeight:700,
-                  color:"#fff",cursor:"pointer",fontFamily:FONT}}>
-                ✓ Importar {preview.filter(f=>f._errs.length===0).length} filas válidas
+            {nValidas>0&&(
+              <button onClick={importar}
+                style={{background:C.label,border:"none",borderRadius:14,padding:"14px",
+                  fontSize:15,fontWeight:700,color:C.bg0,cursor:"pointer",fontFamily:FONT_UI,
+                  display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+                ✓ Importar {nValidas} producto{nValidas!==1?"s":""} válido{nValidas!==1?"s":""}
+                {nDups>0&&<span style={{fontSize:12,opacity:.8}}>(+{nDups} actualiza stock)</span>}
               </button>
             )}
-            {errores.length>0&&preview.filter(f=>f._errs.length===0).length<preview.length&&(
-              <button onClick={()=>importar(false)}
-                style={{background:`${C.amber}20`,border:`1px solid ${C.amber}40`,
-                  borderRadius:14,padding:14,fontSize:14,fontWeight:600,
-                  color:C.amber,cursor:"pointer",fontFamily:FONT}}>
-                Importar todo (incluyendo filas con errores)
-              </button>
-            )}
-            <button onClick={()=>{setEstado("idle");setPreview([]);setErrores([]);}}
+            <button onClick={exportarPreview}
+              style={{background:`${C.gold}15`,border:`1px solid ${C.gold}35`,borderRadius:14,
+                padding:"12px",fontSize:13,fontWeight:600,color:C.gold,cursor:"pointer",fontFamily:FONT_UI,
+                display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
+              📊 Descargar preview con códigos generados
+            </button>
+            <button onClick={()=>{setEstado("idle");setPreview([]);}}
               style={{background:"none",border:`1px solid ${C.sep}`,borderRadius:14,
-                padding:12,fontSize:14,color:C.label3,cursor:"pointer",fontFamily:FONT}}>
-              Cancelar
+                padding:"11px",fontSize:13,color:C.label3,cursor:"pointer",fontFamily:FONT_UI}}>
+              ← Cargar otro archivo
             </button>
           </div>
         </div>
       )}
 
+      {/* ── IMPORTANDO ── */}
       {estado==="importando"&&(
-        <div style={{textAlign:"center",padding:40}}>
-          <div style={{fontSize:32,marginBottom:12}}>⚙️</div>
-          <div style={{fontSize:15,color:C.label,fontFamily:FONT}}>Importando productos…</div>
+        <div style={{textAlign:"center",padding:"50px 20px"}}>
+          <div style={{fontSize:40,marginBottom:16}}>⚙️</div>
+          <div style={{fontSize:16,fontWeight:600,color:C.label,fontFamily:FONT_UI,marginBottom:6}}>
+            Importando productos…
+          </div>
+          <div style={{fontSize:13,color:C.label3,fontFamily:FONT_UI}}>
+            Guardando en inventario
+          </div>
         </div>
       )}
 
+      {/* ── DONE ── */}
       {estado==="done"&&stats&&(
-        <div style={{textAlign:"center",padding:20}}>
-          <div style={{fontSize:48,marginBottom:12}}>✅</div>
-          <div style={{fontSize:18,fontWeight:700,color:C.green,fontFamily:FONT,marginBottom:16}}>
+        <div style={{textAlign:"center",padding:"20px 0"}}>
+          <div style={{fontSize:48,marginBottom:16}}>✅</div>
+          <div style={{fontSize:20,fontWeight:700,color:C.green,fontFamily:FONT_DISPLAY,
+            letterSpacing:"0.01em",marginBottom:6}}>
             Importación completada
           </div>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:20}}>
-            {[{v:stats.ok,l:"Creados",c:C.green},{v:stats.upd,l:"Actualizados",c:C.blue},{v:stats.skip,l:"Omitidos",c:C.label3}].map(s=>(
-              <div key={s.l} style={{background:C.bg2,borderRadius:12,padding:"12px 10px",textAlign:"center"}}>
-                <div style={{fontSize:24,fontWeight:800,color:s.c,fontFamily:FONT}}>{s.v}</div>
-                <div style={{fontSize:11,color:C.label3,fontFamily:FONT}}>{s.l}</div>
+          <div style={{fontSize:13,color:C.label3,fontFamily:FONT_UI,marginBottom:20}}>
+            {stats.total} filas procesadas
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:24}}>
+            {[
+              {v:stats.ok,  l:"Creados",      c:C.green},
+              {v:stats.upd, l:"Actualizados", c:C.blue},
+              {v:stats.skip,l:"Omitidos",     c:C.label3},
+            ].map(s=>(
+              <div key={s.l} style={{background:C.bg2,borderRadius:14,padding:"14px 10px",
+                textAlign:"center",border:`1px solid ${s.c}25`}}>
+                <div style={{fontSize:28,fontWeight:800,color:s.c,fontFamily:FONT_UI}}>{s.v}</div>
+                <div style={{fontSize:11,color:C.label3,fontFamily:FONT_UI,textTransform:"uppercase",letterSpacing:.5,marginTop:2}}>{s.l}</div>
               </div>
             ))}
           </div>
-          <button onClick={onClose} style={{
-            background:`linear-gradient(135deg,${C.gold},${C.goldD})`,
-            border:"none",borderRadius:14,padding:14,fontSize:15,fontWeight:700,
-            color:"#fff",cursor:"pointer",fontFamily:FONT,width:"100%"}}>
-            Cerrar
+          <button onClick={onClose} style={{width:"100%",background:C.label,border:"none",
+            borderRadius:14,padding:"14px",fontSize:15,fontWeight:700,
+            color:C.bg0,cursor:"pointer",fontFamily:FONT_UI}}>
+            Listo — Ver inventario
           </button>
         </div>
       )}
+
+      </div>
     </Sheet>
   );
 }
