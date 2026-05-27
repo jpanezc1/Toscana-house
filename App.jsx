@@ -670,20 +670,32 @@ const PAGOS = [
   {id:"tarjeta",  label:"Tarjeta",  icon:"💳", desc:2.5, color:"#C8922A"},
 ];
 
-// ── Helpers pago mixto ────────────────────────────────────
+// ── Helpers pago ──────────────────────────────────────────
 function labelPago(mp){
   if(!mp) return "—";
-  if(mp.startsWith("mixto|")) return "Mixto";
+  if(mp==="giftcard") return "Gift Card";
+  if(mp.startsWith("mixto|")){
+    if(mp.includes("giftcard")) return "Gift Card + Otro";
+    return "Mixto";
+  }
   return PAGOS.find(p=>p.id===mp)?.label||mp;
 }
 function colorPago(mp){
   if(!mp) return "#4A9B6F";
-  if(mp.startsWith("mixto|")) return "#6C5CE7";
+  if(mp==="giftcard") return "#7C3AED";
+  if(mp.startsWith("mixto|")){
+    if(mp.includes("giftcard")) return "#7C3AED";
+    return "#6C5CE7";
+  }
   return PAGOS.find(p=>p.id===mp)?.color||"#4A9B6F";
 }
 function iconPago(mp){
   if(!mp) return "";
-  if(mp.startsWith("mixto|")) return "🔀";
+  if(mp==="giftcard") return "🎁";
+  if(mp.startsWith("mixto|")){
+    if(mp.includes("giftcard")) return "🎁";
+    return "🔀";
+  }
   return PAGOS.find(p=>p.id===mp)?.icon||"";
 }
 
@@ -742,8 +754,14 @@ function descargarArchivo(blob, nombre) {
 
 // ── Helpers de liquidación para planillas Excel ───────────────
 function leerCfgLiq(marcaId) {
-  const key = `th_liq_cfg_${marcaId}`;
-  const def = { pctTarjeta: 2.5, pctComision: 10, alquiler: 0 };
+  const key   = `th_liq_cfg_${marcaId}`;
+  const alqD  = ALQUILERES[Number(marcaId)] || {};
+  // Defaults: usa ALQUILERES como base real, no genérico 10%
+  const def   = {
+    pctTarjeta: 2.5,
+    pctComision: Number(alqD.comision) || 0,
+    alquiler:    Number(alqD.alquiler)  || 0,
+  };
   try { return { ...def, ...JSON.parse(localStorage.getItem(key) || "{}") }; }
   catch { return def; }
 }
@@ -2128,7 +2146,6 @@ function PctMarcasPanel({ onCfgChange }) {
 function LiqModal({marcaId,ventas,mes,anio,MK,cierres,setCierres,onClose,syncCierre,onCfgChange}){
   if(!marcaId) return null;
   const marca=MARCAS.find(x=>x.id===marcaId);
-  const defCfg = {pctTarjeta:2.5, pctComision:10, alquiler:0};
   const [cfg, setCfg] = useState(()=>leerCfgLiq(marcaId));
   const [showCfg, setShowCfg] = useState(false);
   const pctTarjeta = Number(cfg.pctTarjeta)||0;
@@ -3255,6 +3272,42 @@ function NotaVentaModal({venta, onClose, numVenta, onAnularVenta}){
         </div>
       </div>
 
+      {/* Gift Card allocation — si la venta usó GC */}
+      {venta.gcId&&venta.gcAllocations&&(
+        <div style={{background:"#7C3AED10",border:"1px solid #7C3AED25",borderRadius:14,
+          padding:"14px 16px",marginBottom:16}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+            <div style={{fontSize:12,fontWeight:700,color:"#7C3AED",fontFamily:FONT_UI,
+              textTransform:"uppercase",letterSpacing:.6}}>🎁 Gift Card utilizada</div>
+            <div style={{fontSize:14,fontWeight:700,color:"#7C3AED",fontFamily:FONT_UI}}>{$(venta.gcUsado)}</div>
+          </div>
+          <div style={{fontSize:11,color:C.label3,fontFamily:FONT_UI,marginBottom:10}}>
+            Código: <span style={{fontFamily:"monospace",color:C.label,fontWeight:600}}>{venta.gcId}</span>
+          </div>
+          {venta.gcAllocations.length>1&&(
+            <div style={{display:"flex",flexDirection:"column",gap:4}}>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",padding:"4px 0",
+                borderBottom:`1px solid #7C3AED20`}}>
+                {["Marca","GC","Pago extra"].map(h=>(
+                  <div key={h} style={{fontSize:9,fontWeight:700,color:"#7C3AED",textTransform:"uppercase",
+                    letterSpacing:.6,fontFamily:FONT_UI,textAlign:h!=="Marca"?"right":"left"}}>{h}</div>
+                ))}
+              </div>
+              {venta.gcAllocations.map((a,i)=>(
+                <div key={i} style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",
+                  padding:"5px 0",borderBottom:i<venta.gcAllocations.length-1?`1px solid #7C3AED15`:""}}>
+                  <div style={{fontSize:11,color:C.label,fontFamily:FONT_UI,fontWeight:600}}>{a.marcaNombre}</div>
+                  <div style={{fontSize:11,color:"#7C3AED",fontFamily:FONT_UI,textAlign:"right",fontWeight:600}}>{$(a.gcAmount)}</div>
+                  <div style={{fontSize:11,color:a.extraAmount>0.01?C.amber:C.label3,fontFamily:FONT_UI,textAlign:"right"}}>
+                    {a.extraAmount>0.01?$(a.extraAmount):"—"}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Acciones — 2×2 grid */}
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
         <button
@@ -4145,289 +4198,457 @@ function CameraScanner({onDetect, onClose}){
 }
 
 // ══════════════════════════════════════════════════════════
-// ImportarExcelModal — Importación masiva de inventario
-// ══════════════════════════════════════════════════════════
+// ImportarExcelModal — Importación masiva con auto-generación de códigos
+// ══════════════════════════════════════════════════════════════════════
 function ImportarExcelModal({inv, onImportar, onClose}){
-  const [archivo, setArchivo] = useState(null);
-  const [preview, setPreview] = useState([]);
-  const [errores, setErrores] = useState([]);
-  const [estado, setEstado] = useState("idle"); // idle|leyendo|preview|importando|done
-  const [stats, setStats] = useState(null);
+  const isDesktop = useIsDesktop();
+  const [preview,    setPreview]    = useState([]);
+  const [estado,     setEstado]     = useState("idle"); // idle|leyendo|preview|importando|done
+  const [stats,      setStats]      = useState(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [filtro,     setFiltro]     = useState("todas"); // todas|validas|errores|dups
   const fileRef = useRef(null);
 
-  async function parsearExcel(file){
+  // ── Normalizar texto: quitar acentos, trim, uppercase ─────────────
+  function norm(s){ return String(s||"").trim().normalize("NFD").replace(/[̀-ͯ]/g,""); }
+
+  // ── Auto-generar código [MARCA3]-[INICIALES3]-[TALLA]-[NUM] ───────
+  function genCodImport(marcaNombre, desc, talla, usadosSet){
+    const prefix  = norm(marcaNombre||"TOS").replace(/[^A-Za-z]/gi,"").toUpperCase().slice(0,3)||"TOS";
+    const words   = norm(desc||"ITEM").split(/\s+/).filter(w=>w.length>0);
+    const inics   = words.map(w=>w.replace(/[^A-Za-z]/gi,"")[0]||"").filter(Boolean).join("").toUpperCase().slice(0,3)||"ITM";
+    const tallaUp = norm(talla||"TU").replace(/[^A-Z0-9]/gi,"").toUpperCase().slice(0,3)||"TU";
+    const base    = `${prefix}-${inics}-${tallaUp}`;
+    // buscar siguiente número libre (inventory actual + lote actual)
+    const invNums = new Set(inv.map(p=>p.codigo.toUpperCase()));
+    let n=1;
+    while(invNums.has(`${base}-${String(n).padStart(3,"0")}`) || usadosSet.has(`${base}-${String(n).padStart(3,"0")}`)) n++;
+    const cod=`${base}-${String(n).padStart(3,"0")}`;
+    usadosSet.add(cod);
+    return cod;
+  }
+
+  // ── Parsear archivo ───────────────────────────────────────────────
+  async function parsearArchivo(file){
     setEstado("leyendo");
     try{
       const XLSX = await loadXLSX();
-      const buf = await file.arrayBuffer();
-      const wb = XLSX.read(buf, {type:"array"});
-      const ws = wb.Sheets[wb.SheetNames[0]];
-      const raw = XLSX.utils.sheet_to_json(ws, {header:1, defval:""});
+      const buf  = await file.arrayBuffer();
+      const wb   = XLSX.read(buf,{type:"array"});
+      const ws   = wb.Sheets[wb.SheetNames[0]];
+      const raw  = XLSX.utils.sheet_to_json(ws,{header:1,defval:""});
 
-      if(raw.length < 2){ setEstado("idle"); alert("El archivo está vacío"); return; }
+      if(raw.length<2){ setEstado("idle"); alert("El archivo está vacío o no tiene datos"); return; }
 
-      let headerRow = -1;
+      // Auto-detectar fila de encabezado (primeras 5 filas)
+      let hRow=0;
       for(let i=0;i<Math.min(5,raw.length);i++){
-        const row = raw[i].map(c=>String(c).toLowerCase());
-        if(row.some(c=>c.includes("sku")||c.includes("código")||c.includes("codigo"))){
-          headerRow = i; break;
+        const r=raw[i].map(c=>norm(String(c)).toLowerCase());
+        if(r.some(c=>c.includes("marca")||c.includes("descripcion")||c.includes("precio")||c.includes("sku"))){
+          hRow=i; break;
         }
       }
-      if(headerRow === -1) headerRow = 0;
 
-      const headers = raw[headerRow].map(h=>String(h).toLowerCase().trim());
-      const findCol = (...names) => {
-        for(const n of names){
-          const idx = headers.findIndex(h=>h.includes(n));
-          if(idx>=0) return idx;
-        }
+      const headers = raw[hRow].map(h=>norm(String(h)).toLowerCase().trim());
+      const col     = (...names)=>{
+        for(const n of names){ const i=headers.findIndex(h=>h.includes(n)); if(i>=0)return i; }
         return -1;
       };
 
-      const colSKU = findCol("sku","código","codigo","cod");
-      const colMarca = findCol("marca","brand");
-      const colDesc = findCol("descripción","descripcion","nombre","producto","desc");
-      const colPrecio = findCol("precio","price","valor");
-      const colCat = findCol("categoría","categoria","cat","tipo");
-      const colTalla = findCol("talla","size","talle");
-      const colColor = findCol("color");
-      const colStock = findCol("stock","cantidad","qty","existencia");
+      const cSKU    = col("sku","codigo","cod","code","referencia","ref");
+      const cMarca  = col("marca","brand","tienda");
+      const cDesc   = col("descripcion","nombre","producto","desc","item","articulo");
+      const cPrecio = col("precio","price","valor","importe","costo","pvp");
+      const cCat    = col("categoria","cat","tipo","clasificacion","rubro");
+      const cTalla  = col("talla","size","talle","medida");
+      const cColor  = col("color","colour");
+      const cStock  = col("stock","cantidad","qty","existencia","unidades","piezas");
+      const cSubcat = col("subcat","subcategoria","subcategory");
 
-      const filas = [];
-      const errs = [];
+      const usadosSet = new Set();
+      const filas     = [];
 
-      for(let i=headerRow+1;i<raw.length;i++){
-        const row = raw[i];
-        if(row.every(c=>!c)) continue;
+      for(let i=hRow+1; i<raw.length; i++){
+        const row=raw[i];
+        if(row.every(c=>String(c).trim()==="")) continue; // fila vacía
 
-        const sku = colSKU>=0 ? String(row[colSKU]).trim().toUpperCase() : "";
-        const marcaNom = colMarca>=0 ? String(row[colMarca]).trim() : "";
-        const desc = colDesc>=0 ? String(row[colDesc]).trim() : "";
-        const precio = colPrecio>=0 ? parseFloat(String(row[colPrecio]).replace(/[^\d.]/g,"")) : 0;
-        const cat = colCat>=0 ? String(row[colCat]).trim() : "";
-        const talla = colTalla>=0 ? String(row[colTalla]).trim() : "";
-        const color = colColor>=0 ? String(row[colColor]).trim() : "";
-        const stock = colStock>=0 ? parseInt(String(row[colStock])) || 1 : 1;
+        const marcaNom = cMarca>=0  ? String(row[cMarca]).trim()  : "";
+        const desc     = cDesc>=0   ? String(row[cDesc]).trim()   : "";
+        const precioRaw= cPrecio>=0 ? String(row[cPrecio]).replace(/[^\d.,]/g,"").replace(",",".") : "";
+        const precio   = parseFloat(precioRaw)||0;
+        const cat      = cCat>=0    ? String(row[cCat]).trim()    : "General";
+        const talla    = cTalla>=0  ? String(row[cTalla]).trim()  : "";
+        const color    = cColor>=0  ? String(row[cColor]).trim()  : "";
+        const stock    = cStock>=0  ? Math.max(1,parseInt(String(row[cStock]))||1) : 1;
+        const subcat   = cSubcat>=0 ? String(row[cSubcat]).trim() : "";
 
-        const fila = {_row:i+1, sku, marcaNom, desc, precio, cat, talla, color, stock, _errs:[]};
+        // Buscar marca
+        const marcaEnc = MARCAS.find(m=>norm(m.nombre).toLowerCase()===norm(marcaNom).toLowerCase())
+          || MARCAS.find(m=>norm(marcaNom).toLowerCase().startsWith(norm(m.nombre).toLowerCase().slice(0,4)));
 
-        if(!sku) fila._errs.push("SKU vacío");
-        if(!desc) fila._errs.push("Descripción vacía");
-        if(!precio || isNaN(precio)) fila._errs.push("Precio inválido");
+        // SKU: usar del Excel si existe, si no auto-generar
+        let skuRaw  = cSKU>=0 ? String(row[cSKU]).trim().toUpperCase() : "";
+        const autoSKU = !skuRaw;
+        const sku   = skuRaw || genCodImport(marcaEnc?.nombre||marcaNom, desc, talla||"TU", usadosSet);
+        if(skuRaw) usadosSet.add(sku);
 
-        const existe = inv.find(p=>p.codigo.toUpperCase()===sku);
-        if(existe) fila._dup = true;
+        const fila = {
+          _row:i+1, sku, autoSKU,
+          marcaNom, marcaId:marcaEnc?.id||null, marcaNombre:marcaEnc?.nombre||marcaNom,
+          desc, precio, cat, talla, color, stock, subcat,
+          _errs:[], _dup:false,
+        };
 
-        const marcaEnc = MARCAS.find(m=>m.nombre.toLowerCase()===marcaNom.toLowerCase());
-        fila.marcaId = marcaEnc?.id || null;
-        fila.marcaNombre = marcaEnc?.nombre || marcaNom;
-        if(!marcaEnc) fila._errs.push(`Marca "${marcaNom}" no encontrada`);
+        // Validaciones
+        if(!desc)               fila._errs.push("Sin descripción");
+        if(precio<=0)           fila._errs.push("Precio inválido");
+        if(!marcaEnc)           fila._errs.push(`Marca "${marcaNom||"—"}" no encontrada`);
 
-        if(fila._errs.length > 0) errs.push({row:i+1, errs:fila._errs});
+        // Duplicado en inventario existente
+        const existe=inv.find(p=>p.codigo.toUpperCase()===sku);
+        if(existe){ fila._dup=true; }
+
         filas.push(fila);
       }
 
       setPreview(filas);
-      setErrores(errs);
+      setFiltro("todas");
       setEstado("preview");
     }catch(e){
       setEstado("idle");
-      alert("Error leyendo Excel: " + e.message);
+      alert("Error leyendo archivo: "+e.message);
     }
   }
 
-  async function importar(soloValidas){
+  // ── Importar ───────────────────────────────────────────────────────
+  async function importar(){
     setEstado("importando");
-    const filas = soloValidas ? preview.filter(f=>f._errs.length===0) : preview;
-    let ok=0, skip=0, upd=0;
+    const importables = preview.filter(f=>f.desc&&f.marcaId&&f.precio>0);
+    let ok=0, upd=0, skip=0;
 
-    for(const f of filas){
-      if(f._errs.length>0 && soloValidas) continue;
-      if(!f.sku || !f.desc || !f.marcaId) { skip++; continue; }
-
+    for(const f of importables){
       if(f._dup){
         upd++;
         onImportar({tipo:"update", codigo:f.sku, stock:f.stock});
       } else {
         ok++;
         onImportar({tipo:"create", producto:{
-          codigo: f.sku,
-          nombre: f.desc,
-          marcaId: f.marcaId,
+          codigo:      f.sku,
+          nombre:      f.desc,
+          marcaId:     f.marcaId,
           marcaNombre: f.marcaNombre,
-          categoria: [f.cat, f.talla, f.color].filter(Boolean).join(" / ") || "General",
-          precio: f.precio,
-          stock: f.stock,
-          stockInicial: f.stock,
-          fecha: new Date().toISOString().slice(0,10),
+          categoria:   f.cat||"General",
+          descripcion: [f.talla&&`Talla: ${f.talla}`, f.color&&`Color: ${f.color}`].filter(Boolean).join(" · ")||"",
+          subcat:      f.subcat||f.talla||"",
+          precio:      f.precio,
+          stock:       f.stock,
+          stockInicial:f.stock,
+          fecha:       hoy(),
         }});
       }
     }
-
-    setStats({ok, upd, skip});
+    skip = preview.length - importables.length;
+    setStats({ok, upd, skip, total:preview.length});
     setEstado("done");
   }
 
+  // ── Exportar preview como Excel ───────────────────────────────────
+  async function exportarPreview(){
+    const XLSX = await loadXLSX();
+    const rows = [
+      ["Código","Auto?","Marca","Descripción","Talla","Precio (Bs)","Stock","Estado"],
+      ...preview.map(f=>[
+        f.sku, f.autoSKU?"Auto-generado":"Manual",
+        f.marcaNombre, f.desc, f.talla||"—", f.precio, f.stock,
+        f._errs.length>0?"⚠ "+f._errs.join("; "):f._dup?"Actualiza stock":"✓ Válido",
+      ]),
+    ];
+    const ws=XLSX.utils.aoa_to_sheet(rows);
+    ws["!cols"]=[22,14,14,32,8,12,8,32].map(w=>({wch:w}));
+    const wb=XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb,ws,"Preview importación");
+    const buf=XLSX.write(wb,{bookType:"xlsx",type:"array"});
+    const blob=new Blob([buf],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
+    descargarArchivo(blob,`ToscanaHouse_ImportPreview_${hoy()}.xlsx`);
+  }
+
+  // ── Drag & drop ───────────────────────────────────────────────────
+  function onDragOver(e)  { e.preventDefault(); setIsDragging(true);  }
+  function onDragLeave(e) { e.preventDefault(); setIsDragging(false); }
+  function onDrop(e)      { e.preventDefault(); setIsDragging(false); const f=e.dataTransfer.files?.[0]; if(f){parsearArchivo(f);} }
+
+  // ── Preview filtrado ───────────────────────────────────────────────
+  const previstaFiltrada = useMemo(()=>{
+    if(filtro==="validas")  return preview.filter(f=>f._errs.length===0&&!f._dup);
+    if(filtro==="errores")  return preview.filter(f=>f._errs.length>0);
+    if(filtro==="dups")     return preview.filter(f=>f._dup);
+    return preview;
+  },[preview,filtro]);
+
+  const nValidas = preview.filter(f=>f._errs.length===0).length;
+  const nErrores = preview.filter(f=>f._errs.length>0).length;
+  const nDups    = preview.filter(f=>f._dup).length;
+  const nAuto    = preview.filter(f=>f.autoSKU).length;
+
   return (
     <Sheet open title="Importar Excel — Inventario" onClose={onClose} tall>
+      <div style={{padding:"0 4px 20px"}}>
+
+      {/* ── IDLE: Drop zone ── */}
       {estado==="idle"&&(
         <div>
-          <div style={{textAlign:"center",marginBottom:20}}>
-            <div style={{fontSize:48,marginBottom:10}}>📥</div>
-            <div style={{fontSize:16,fontWeight:700,color:C.label,fontFamily:FONT,marginBottom:6}}>
-              Importación masiva desde Excel
+          {/* Drop zone */}
+          <div
+            onDragOver={onDragOver} onDragLeave={onDragLeave} onDrop={onDrop}
+            onClick={()=>fileRef.current?.click()}
+            style={{
+              border:`2px dashed ${isDragging?C.gold:"#D8CEC2"}`,
+              borderRadius:28, background:isDragging?`${C.gold}08`:"rgba(255,255,255,0.7)",
+              padding:"40px 24px", textAlign:"center", cursor:"pointer",
+              marginBottom:20, transition:"all .2s",
+            }}>
+            <div style={{fontSize:48,marginBottom:12}}>{isDragging?"📂":"📥"}</div>
+            <div style={{fontSize:17,fontWeight:700,color:C.label,fontFamily:FONT_DISPLAY,
+              letterSpacing:"0.01em",marginBottom:6}}>
+              {isDragging?"Suelta el archivo aquí":"Importar desde Excel"}
             </div>
-            <div style={{fontSize:13,color:C.label3,fontFamily:FONT}}>
-              Sube un archivo .xlsx con los productos a importar
+            <div style={{fontSize:13,color:C.label3,fontFamily:FONT_UI,marginBottom:16}}>
+              Arrastra un archivo o haz clic para seleccionar
+            </div>
+            <div style={{display:"flex",gap:8,justifyContent:"center",flexWrap:"wrap"}}>
+              {[".xlsx",".xls",".csv"].map(ext=>(
+                <span key={ext} style={{fontSize:11,fontWeight:700,color:C.gold,
+                  background:`${C.gold}15`,padding:"4px 10px",borderRadius:12,
+                  border:`1px solid ${C.gold}30`,fontFamily:FONT_UI}}>{ext}</span>
+              ))}
             </div>
           </div>
-
-          <div style={{background:C.bg2,borderRadius:14,padding:16,marginBottom:16,border:`1px solid ${C.sep}`}}>
-            <div style={{fontSize:13,fontWeight:700,color:C.label,fontFamily:FONT,marginBottom:8}}>
-              Columnas esperadas (en cualquier orden):
-            </div>
-            {[["SKU / Código","Código único del producto (obligatorio)"],
-              ["Marca","Nombre exacto de la marca (obligatorio)"],
-              ["Descripción / Nombre","Nombre del producto (obligatorio)"],
-              ["Precio","Precio en Bs (obligatorio)"],
-              ["Stock / Cantidad","Unidades (opcional, default 1)"],
-              ["Categoría","Tipo de prenda (opcional)"],
-              ["Talla / Color","Características (opcional)"],
-            ].map(([col,desc])=>(
-              <div key={col} style={{display:"flex",gap:8,marginBottom:4}}>
-                <span style={{fontSize:12,fontFamily:"monospace",background:C.fill2,
-                  padding:"1px 6px",borderRadius:4,color:C.gold,fontWeight:700}}>{col}</span>
-                <span style={{fontSize:12,color:C.label3,fontFamily:FONT}}>{desc}</span>
-              </div>
-            ))}
-          </div>
-
           <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv"
-            onChange={e=>{const f=e.target.files?.[0];if(f){setArchivo(f);parsearExcel(f);}}}
+            onChange={e=>{const f=e.target.files?.[0];if(f)parsearArchivo(f);}}
             style={{display:"none"}}/>
-          <button onClick={()=>fileRef.current?.click()}
-            style={{width:"100%",background:`linear-gradient(135deg,${C.gold},${C.goldD})`,
-              border:"none",borderRadius:14,padding:16,fontSize:16,fontWeight:700,
-              color:"#fff",cursor:"pointer",fontFamily:FONT}}>
-            📂 Seleccionar archivo Excel
-          </button>
-        </div>
-      )}
 
-      {estado==="leyendo"&&(
-        <div style={{textAlign:"center",padding:40}}>
-          <div style={{fontSize:32,marginBottom:12}}>⏳</div>
-          <div style={{fontSize:15,color:C.label,fontFamily:FONT}}>Leyendo archivo…</div>
-        </div>
-      )}
-
-      {estado==="preview"&&(
-        <div>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:16}}>
-            {[
-              {v:preview.length,l:"Total filas",c:C.label},
-              {v:preview.filter(f=>f._errs.length===0).length,l:"Válidas",c:C.green},
-              {v:errores.length,l:"Con errores",c:C.red},
-            ].map(s=>(
-              <div key={s.l} style={{background:C.bg2,borderRadius:12,padding:"12px 10px",
-                textAlign:"center",border:`1px solid ${s.c}25`}}>
-                <div style={{fontSize:24,fontWeight:800,color:s.c,fontFamily:FONT}}>{s.v}</div>
-                <div style={{fontSize:11,color:C.label3,fontFamily:FONT}}>{s.l}</div>
-              </div>
-            ))}
-          </div>
-
-          {errores.length>0&&(
-            <div style={{background:`${C.red}08`,borderRadius:12,padding:12,marginBottom:12,
-              border:`1px solid ${C.red}30`,maxHeight:120,overflowY:"auto"}}>
-              <div style={{fontSize:12,fontWeight:700,color:C.red,fontFamily:FONT,marginBottom:4}}>
-                ⚠ Filas con errores:
-              </div>
-              {errores.slice(0,10).map(e=>(
-                <div key={e.row} style={{fontSize:11,color:C.red,fontFamily:FONT}}>
-                  Fila {e.row}: {e.errs.join(", ")}
+          {/* Info columnas */}
+          <div style={{background:C.bg2,borderRadius:16,padding:"16px 18px",border:`1px solid ${C.sep}`}}>
+            <div style={{fontSize:12,fontWeight:700,color:C.label,fontFamily:FONT_UI,
+              textTransform:"uppercase",letterSpacing:.7,marginBottom:12}}>
+              Columnas del Excel (en cualquier orden)
+            </div>
+            <div style={{display:"flex",flexDirection:"column",gap:8}}>
+              {[
+                ["Marca *","Nombre de la marca",true],
+                ["Descripción *","Nombre del producto",true],
+                ["Precio *","Precio en Bs",true],
+                ["Talla","XS / S / M / L / XL / TU — para el código",false],
+                ["Stock","Unidades (default: 1)",false],
+                ["Categoría","Tipo de prenda",false],
+                ["Color","Color del artículo",false],
+                ["SKU / Código","Si no existe, se auto-genera 🤖",false],
+              ].map(([col,info,req])=>(
+                <div key={col} style={{display:"flex",alignItems:"center",gap:10}}>
+                  <span style={{fontSize:11,fontFamily:"monospace",background:req?`${C.gold}18`:C.bg0,
+                    padding:"2px 8px",borderRadius:6,color:req?C.gold:C.label3,
+                    fontWeight:700,border:`1px solid ${req?C.gold+"40":C.sep}`,flexShrink:0}}>
+                    {col}
+                  </span>
+                  <span style={{fontSize:12,color:C.label3,fontFamily:FONT_UI}}>{info}</span>
                 </div>
               ))}
-              {errores.length>10&&<div style={{fontSize:11,color:C.red,fontFamily:FONT}}>...y {errores.length-10} más</div>}
             </div>
-          )}
+            <div style={{marginTop:14,padding:"10px 14px",background:`${C.gold}10`,borderRadius:12,
+              border:`1px solid ${C.gold}25`}}>
+              <div style={{fontSize:12,fontWeight:700,color:C.gold,fontFamily:FONT_UI,marginBottom:4}}>
+                🤖 Auto-generación de códigos
+              </div>
+              <div style={{fontSize:12,color:C.label3,fontFamily:FONT_UI,lineHeight:1.5}}>
+                Si tu Excel <strong>no tiene columna Código</strong>, Toscana genera automáticamente:<br/>
+                <span style={{fontFamily:"monospace",color:C.label,fontWeight:600}}>RAM-VLB-S-001</span>
+                {" "} = <span style={{color:C.label3}}>Marca · Iniciales · Talla · Número</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
-          <div style={{maxHeight:280,overflowY:"auto",borderRadius:12,
-            border:`1px solid ${C.sep}`,marginBottom:16}}>
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr auto",
-              background:C.sep,padding:"8px 12px",position:"sticky",top:0}}>
-              {["SKU","Marca","Descripción","Precio"].map(h=>(
-                <span key={h} style={{fontSize:11,fontWeight:700,color:C.label2,fontFamily:FONT,
-                  textTransform:"uppercase",letterSpacing:.5}}>{h}</span>
-              ))}
-            </div>
-            {preview.map((f,i)=>(
-              <div key={i} style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr auto",
-                padding:"8px 12px",borderBottom:`1px solid ${C.sep}`,
-                background:f._errs.length>0?`${C.red}06`:f._dup?`${C.amber}06`:"transparent"}}>
-                <span style={{fontSize:12,fontFamily:"monospace",color:C.gold}}>{f.sku}</span>
-                <span style={{fontSize:12,color:C.label,fontFamily:FONT}}>{f.marcaNombre||"—"}</span>
-                <span style={{fontSize:12,color:C.label,fontFamily:FONT}}>{f.desc.slice(0,25)}{f.desc.length>25?"…":""}</span>
-                <span style={{fontSize:12,color:C.green,fontFamily:FONT,fontWeight:600}}>Bs {f.precio}</span>
+      {/* ── LEYENDO ── */}
+      {estado==="leyendo"&&(
+        <div style={{textAlign:"center",padding:"50px 20px"}}>
+          <div style={{fontSize:40,marginBottom:16}}>⏳</div>
+          <div style={{fontSize:16,fontWeight:600,color:C.label,fontFamily:FONT_UI,marginBottom:6}}>
+            Analizando archivo…
+          </div>
+          <div style={{fontSize:13,color:C.label3,fontFamily:FONT_UI}}>
+            Detectando columnas y generando códigos
+          </div>
+        </div>
+      )}
+
+      {/* ── PREVIEW ── */}
+      {estado==="preview"&&(
+        <div>
+          {/* Stats KPIs */}
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:8,marginBottom:16}}>
+            {[
+              {v:preview.length, l:"Total",    c:C.label},
+              {v:nValidas,       l:"Válidas",  c:C.green},
+              {v:nErrores,       l:"Errores",  c:C.red},
+              {v:nAuto,          l:"Auto-cód", c:C.gold},
+            ].map(s=>(
+              <div key={s.l} style={{background:C.bg2,borderRadius:12,padding:"10px 8px",
+                textAlign:"center",border:`1px solid ${s.c}25`}}>
+                <div style={{fontSize:20,fontWeight:800,color:s.c,fontFamily:FONT_UI}}>{s.v}</div>
+                <div style={{fontSize:10,color:C.label3,fontFamily:FONT_UI,textTransform:"uppercase",letterSpacing:.5}}>{s.l}</div>
               </div>
             ))}
           </div>
 
+          {/* Filtros */}
+          <div style={{display:"flex",gap:6,marginBottom:12,flexWrap:"wrap"}}>
+            {[
+              {id:"todas",  l:`Todas (${preview.length})`},
+              {id:"validas",l:`Válidas (${nValidas})`},
+              {id:"errores",l:`Errores (${nErrores})`},
+              {id:"dups",   l:`Duplicadas (${nDups})`},
+            ].map(ft=>(
+              <button key={ft.id} onClick={()=>setFiltro(ft.id)}
+                style={{padding:"5px 12px",borderRadius:20,fontSize:11,fontWeight:600,fontFamily:FONT_UI,
+                  cursor:"pointer",transition:"all .12s",border:`1px solid ${filtro===ft.id?C.label:C.sep}`,
+                  background:filtro===ft.id?C.label:C.bg0, color:filtro===ft.id?C.bg0:C.label3}}>
+                {ft.l}
+              </button>
+            ))}
+          </div>
+
+          {/* Tabla preview */}
+          <div style={{maxHeight:300,overflowY:"auto",borderRadius:14,border:`1px solid ${C.sep}`,marginBottom:16}}>
+            {/* Header */}
+            <div style={{display:"grid",gridTemplateColumns:"2fr 1fr 1.5fr 1fr 1fr",
+              padding:"9px 12px",background:C.bg2,position:"sticky",top:0,
+              borderBottom:`1px solid ${C.sep}`}}>
+              {["Código","Marca","Descripción","Precio","Estado"].map(h=>(
+                <div key={h} style={{fontSize:10,fontWeight:700,color:C.label3,
+                  textTransform:"uppercase",letterSpacing:.6,fontFamily:FONT_UI}}>{h}</div>
+              ))}
+            </div>
+            {/* Filas */}
+            {previstaFiltrada.map((f,i)=>{
+              const hasErr = f._errs.length>0;
+              const rowBg  = hasErr?`${C.red}07`:f._dup?`${C.amber}07`:"transparent";
+              const estadoChip = hasErr
+                ? {txt:f._errs[0], color:C.red}
+                : f._dup
+                ? {txt:"Actualiza stock", color:C.amber}
+                : {txt:"✓ Válido", color:C.green};
+              return(
+                <div key={i} style={{display:"grid",gridTemplateColumns:"2fr 1fr 1.5fr 1fr 1fr",
+                  padding:"9px 12px",borderBottom:`1px solid ${C.sep}`,background:rowBg,
+                  alignItems:"center"}}>
+                  <div>
+                    <div style={{fontSize:11,fontFamily:"monospace",color:C.gold,fontWeight:700,lineHeight:1.2}}>
+                      {f.sku}
+                    </div>
+                    {f.autoSKU&&(
+                      <div style={{fontSize:9,color:C.gold,fontFamily:FONT_UI,fontWeight:700,
+                        textTransform:"uppercase",letterSpacing:.4,opacity:.7,marginTop:1}}>
+                        🤖 auto
+                      </div>
+                    )}
+                  </div>
+                  <div style={{fontSize:11,color:f.marcaId?C.label:C.red,fontFamily:FONT_UI,fontWeight:f.marcaId?400:600}}>
+                    {f.marcaNombre.slice(0,12)||"—"}
+                  </div>
+                  <div style={{fontSize:11,color:C.label,fontFamily:FONT_UI}}>
+                    {f.desc.slice(0,22)}{f.desc.length>22?"…":""}
+                    {f.talla&&<span style={{fontSize:9,color:C.label3,marginLeft:4}}>{f.talla}</span>}
+                  </div>
+                  <div style={{fontSize:11,fontWeight:600,color:f.precio>0?C.label:C.red,fontFamily:FONT_UI}}>
+                    {f.precio>0?`Bs ${f.precio}`:"—"}
+                  </div>
+                  <div style={{fontSize:9,fontWeight:700,color:estadoChip.color,fontFamily:FONT_UI,
+                    textTransform:"uppercase",letterSpacing:.3,lineHeight:1.3}}>
+                    {estadoChip.txt.slice(0,20)}
+                  </div>
+                </div>
+              );
+            })}
+            {previstaFiltrada.length===0&&(
+              <div style={{padding:"24px",textAlign:"center",color:C.label3,fontSize:13,fontFamily:FONT_UI}}>
+                Sin filas en este filtro
+              </div>
+            )}
+          </div>
+
+          {/* Botones acción */}
           <div style={{display:"flex",flexDirection:"column",gap:8}}>
-            {preview.filter(f=>f._errs.length===0).length>0&&(
-              <button onClick={()=>importar(true)}
-                style={{background:`linear-gradient(135deg,${C.green},#2E7D32)`,
-                  border:"none",borderRadius:14,padding:14,fontSize:15,fontWeight:700,
-                  color:"#fff",cursor:"pointer",fontFamily:FONT}}>
-                ✓ Importar {preview.filter(f=>f._errs.length===0).length} filas válidas
+            {nValidas>0&&(
+              <button onClick={importar}
+                style={{background:C.label,border:"none",borderRadius:14,padding:"14px",
+                  fontSize:15,fontWeight:700,color:C.bg0,cursor:"pointer",fontFamily:FONT_UI,
+                  display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+                ✓ Importar {nValidas} producto{nValidas!==1?"s":""} válido{nValidas!==1?"s":""}
+                {nDups>0&&<span style={{fontSize:12,opacity:.8}}>(+{nDups} actualiza stock)</span>}
               </button>
             )}
-            {errores.length>0&&preview.filter(f=>f._errs.length===0).length<preview.length&&(
-              <button onClick={()=>importar(false)}
-                style={{background:`${C.amber}20`,border:`1px solid ${C.amber}40`,
-                  borderRadius:14,padding:14,fontSize:14,fontWeight:600,
-                  color:C.amber,cursor:"pointer",fontFamily:FONT}}>
-                Importar todo (incluyendo filas con errores)
-              </button>
-            )}
-            <button onClick={()=>{setEstado("idle");setPreview([]);setErrores([]);}}
+            <button onClick={exportarPreview}
+              style={{background:`${C.gold}15`,border:`1px solid ${C.gold}35`,borderRadius:14,
+                padding:"12px",fontSize:13,fontWeight:600,color:C.gold,cursor:"pointer",fontFamily:FONT_UI,
+                display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
+              📊 Descargar preview con códigos generados
+            </button>
+            <button onClick={()=>{setEstado("idle");setPreview([]);}}
               style={{background:"none",border:`1px solid ${C.sep}`,borderRadius:14,
-                padding:12,fontSize:14,color:C.label3,cursor:"pointer",fontFamily:FONT}}>
-              Cancelar
+                padding:"11px",fontSize:13,color:C.label3,cursor:"pointer",fontFamily:FONT_UI}}>
+              ← Cargar otro archivo
             </button>
           </div>
         </div>
       )}
 
+      {/* ── IMPORTANDO ── */}
       {estado==="importando"&&(
-        <div style={{textAlign:"center",padding:40}}>
-          <div style={{fontSize:32,marginBottom:12}}>⚙️</div>
-          <div style={{fontSize:15,color:C.label,fontFamily:FONT}}>Importando productos…</div>
+        <div style={{textAlign:"center",padding:"50px 20px"}}>
+          <div style={{fontSize:40,marginBottom:16}}>⚙️</div>
+          <div style={{fontSize:16,fontWeight:600,color:C.label,fontFamily:FONT_UI,marginBottom:6}}>
+            Importando productos…
+          </div>
+          <div style={{fontSize:13,color:C.label3,fontFamily:FONT_UI}}>
+            Guardando en inventario
+          </div>
         </div>
       )}
 
+      {/* ── DONE ── */}
       {estado==="done"&&stats&&(
-        <div style={{textAlign:"center",padding:20}}>
-          <div style={{fontSize:48,marginBottom:12}}>✅</div>
-          <div style={{fontSize:18,fontWeight:700,color:C.green,fontFamily:FONT,marginBottom:16}}>
+        <div style={{textAlign:"center",padding:"20px 0"}}>
+          <div style={{fontSize:48,marginBottom:16}}>✅</div>
+          <div style={{fontSize:20,fontWeight:700,color:C.green,fontFamily:FONT_DISPLAY,
+            letterSpacing:"0.01em",marginBottom:6}}>
             Importación completada
           </div>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:20}}>
-            {[{v:stats.ok,l:"Creados",c:C.green},{v:stats.upd,l:"Actualizados",c:C.blue},{v:stats.skip,l:"Omitidos",c:C.label3}].map(s=>(
-              <div key={s.l} style={{background:C.bg2,borderRadius:12,padding:"12px 10px",textAlign:"center"}}>
-                <div style={{fontSize:24,fontWeight:800,color:s.c,fontFamily:FONT}}>{s.v}</div>
-                <div style={{fontSize:11,color:C.label3,fontFamily:FONT}}>{s.l}</div>
+          <div style={{fontSize:13,color:C.label3,fontFamily:FONT_UI,marginBottom:20}}>
+            {stats.total} filas procesadas
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:24}}>
+            {[
+              {v:stats.ok,  l:"Creados",      c:C.green},
+              {v:stats.upd, l:"Actualizados", c:C.blue},
+              {v:stats.skip,l:"Omitidos",     c:C.label3},
+            ].map(s=>(
+              <div key={s.l} style={{background:C.bg2,borderRadius:14,padding:"14px 10px",
+                textAlign:"center",border:`1px solid ${s.c}25`}}>
+                <div style={{fontSize:28,fontWeight:800,color:s.c,fontFamily:FONT_UI}}>{s.v}</div>
+                <div style={{fontSize:11,color:C.label3,fontFamily:FONT_UI,textTransform:"uppercase",letterSpacing:.5,marginTop:2}}>{s.l}</div>
               </div>
             ))}
           </div>
-          <button onClick={onClose} style={{
-            background:`linear-gradient(135deg,${C.gold},${C.goldD})`,
-            border:"none",borderRadius:14,padding:14,fontSize:15,fontWeight:700,
-            color:"#fff",cursor:"pointer",fontFamily:FONT,width:"100%"}}>
-            Cerrar
+          <button onClick={onClose} style={{width:"100%",background:C.label,border:"none",
+            borderRadius:14,padding:"14px",fontSize:15,fontWeight:700,
+            color:C.bg0,cursor:"pointer",fontFamily:FONT_UI}}>
+            Listo — Ver inventario
           </button>
         </div>
       )}
+
+      </div>
     </Sheet>
   );
 }
@@ -6558,6 +6779,713 @@ function NuevaMarcaModal({editMarca, marcasActuales, onClose, onGuardar}){
   );
 }
 
+// ══════════════════════════════════════════════════════════════════
+// GIFT CARDS MODULE
+// ══════════════════════════════════════════════════════════════════
+
+const GC_KEY = "th_gc_v1";
+
+function genGCId() {
+  const d    = new Date();
+  const fecha = d.toISOString().slice(0,10).replace(/-/g,"");
+  const rand  = Math.random().toString(36).slice(2,6).toUpperCase();
+  return `GC-${fecha}-${rand}`;
+}
+function cargarGC() {
+  try { return JSON.parse(localStorage.getItem(GC_KEY)||"[]"); }
+  catch { return []; }
+}
+function guardarGC(lista) {
+  try { localStorage.setItem(GC_KEY, JSON.stringify(lista)); } catch {}
+}
+function gcEstado(gc) {
+  if ((gc.saldo||0) <= 0) return "agotada";
+  if (gc.vencimiento && gc.vencimiento < hoy()) return "vencida";
+  return "vigente";
+}
+function getDateRange(tipo) {
+  const d      = new Date();
+  const hoyStr = hoy();
+  const pad    = n => String(n).padStart(2,"0");
+  const fmt    = x => `${x.getFullYear()}-${pad(x.getMonth()+1)}-${pad(x.getDate())}`;
+  switch(tipo) {
+    case "hoy":    return { ini: hoyStr,         fin: hoyStr };
+    case "ayer":   { const a=new Date(d); a.setDate(a.getDate()-1); const s=fmt(a); return{ini:s,fin:s}; }
+    case "7d":     { const a=new Date(d); a.setDate(a.getDate()-6); return{ini:fmt(a),fin:hoyStr}; }
+    case "30d":    { const a=new Date(d); a.setDate(a.getDate()-29);return{ini:fmt(a),fin:hoyStr}; }
+    case "mes":    return { ini:`${d.getFullYear()}-${pad(d.getMonth()+1)}-01`, fin:hoyStr };
+    case "mesant": {
+      const pm  = new Date(d.getFullYear(), d.getMonth()-1, 1);
+      const ult = new Date(d.getFullYear(), d.getMonth(), 0);
+      return { ini: fmt(pm), fin: fmt(ult) };
+    }
+    default: return { ini:"", fin:"" };
+  }
+}
+
+async function exportarExcelGC(gcFiltradas, fechaIni, fechaFin) {
+  const XLSX = await loadXLSX();
+  const wb   = XLSX.utils.book_new();
+  const titulo = (fechaIni && fechaFin)
+    ? `Gift Cards — ${fechaIni} al ${fechaFin}`
+    : "Gift Cards — Todas";
+
+  const rows = [
+    [titulo],
+    [`Generado: ${new Date().toLocaleString("es-BO")}`],
+    [],
+    ["Código","Emisión","Vencimiento","Monto (Bs)","Saldo (Bs)","Consumido (Bs)","Estado","Último uso","Nota"],
+    ...gcFiltradas.map(gc=>[
+      gc.codigo,
+      gc.emision,
+      gc.vencimiento||"—",
+      +(gc.monto||0).toFixed(2),
+      +(gc.saldo||0).toFixed(2),
+      +((gc.monto||0)-(gc.saldo||0)).toFixed(2),
+      gcEstado(gc),
+      gc.ultimoUso||"—",
+      gc.nota||"",
+    ]),
+    [],
+    ["TOTALES","","",
+      +gcFiltradas.reduce((s,g)=>s+(g.monto||0),0).toFixed(2),
+      +gcFiltradas.reduce((s,g)=>s+(g.saldo||0),0).toFixed(2),
+      +gcFiltradas.reduce((s,g)=>s+((g.monto||0)-(g.saldo||0)),0).toFixed(2),
+    ],
+  ];
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  ws["!cols"] = [22,12,12,14,14,14,10,12,28].map(w=>({wch:w}));
+  XLSX.utils.book_append_sheet(wb, ws, "Gift Cards");
+
+  const usoRows = [
+    ["DETALLE DE USOS"],
+    [`Generado: ${new Date().toLocaleString("es-BO")}`],
+    [],
+    ["Código GC","Fecha uso","Monto usado (Bs)","Nota"],
+  ];
+  gcFiltradas.forEach(gc=>{
+    (gc.usos||[]).forEach(u=>{
+      usoRows.push([gc.codigo, u.fecha, +(u.monto||0).toFixed(2), u.nota||""]);
+    });
+  });
+  const wsUsos = XLSX.utils.aoa_to_sheet(usoRows);
+  wsUsos["!cols"] = [22,12,16,32].map(w=>({wch:w}));
+  XLSX.utils.book_append_sheet(wb, wsUsos, "Usos detallados");
+
+  const buf  = XLSX.write(wb, { bookType:"xlsx", type:"array" });
+  const blob = new Blob([buf],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
+  const sfx  = (fechaIni||"todo").replace(/-/g,"") + "_" + (fechaFin||"todo").replace(/-/g,"");
+  descargarArchivo(blob, `ToscanaHouse_GiftCards_${sfx}.xlsx`);
+}
+
+// ── SheetCrearGC ─────────────────────────────────────────────────
+function SheetCrearGC({ onClose, onCreada }) {
+  const isDesktop = useIsDesktop();
+  const [monto,       setMonto]       = useState("");
+  const [vencimiento, setVencimiento] = useState("");
+  const [nota,        setNota]        = useState("");
+  const [done,        setDone]        = useState(false);
+  const [nuevaGC,     setNuevaGC]     = useState(null);
+
+  function crear() {
+    const m = parseFloat(monto);
+    if (!m || m <= 0) return;
+    const id = genGCId();
+    const gc = {
+      id, codigo: id,
+      monto: m, saldo: m,
+      emision: hoy(),
+      vencimiento: vencimiento || null,
+      nota: nota.trim(),
+      usos: [], ultimoUso: null,
+    };
+    const lista = [...cargarGC(), gc];
+    guardarGC(lista);
+    setNuevaGC(gc);
+    setDone(true);
+    onCreada && onCreada(lista);
+  }
+
+  const overlay  = { position:"fixed",inset:0,zIndex:9999,background:"rgba(0,0,0,0.45)",backdropFilter:"blur(6px)",
+    display:"flex", alignItems: isDesktop?"center":"flex-end", justifyContent: isDesktop?"center":"stretch" };
+  const card     = { width:"100%", maxWidth: isDesktop?480:"100%", margin: isDesktop?"auto":"0",
+    background:"rgba(255,255,255,0.97)", backdropFilter:"blur(32px) saturate(180%)",
+    borderRadius: isDesktop?28:"28px 28px 0 0", boxShadow:"0 -2px 40px rgba(0,0,0,0.12)",
+    padding:"28px 24px 40px", maxHeight:"90vh", overflowY:"auto" };
+  const lbl      = { display:"block",fontSize:10,fontWeight:700,color:C.label3,
+    textTransform:"uppercase",letterSpacing:.8,marginBottom:6,fontFamily:FONT_UI };
+  const inp      = { width:"100%",padding:"13px 14px",borderRadius:12,border:`1.5px solid ${C.sep}`,
+    background:C.bg0,fontSize:15,color:C.label,fontFamily:FONT_UI,outline:"none",
+    WebkitAppearance:"none",appearance:"none" };
+  const onFocus  = e => e.target.style.borderColor = C.gold;
+  const onBlur   = e => e.target.style.borderColor = C.sep;
+
+  return (
+    <div style={overlay} onClick={e=>e.target===e.currentTarget&&onClose()}>
+      <div style={card}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:24}}>
+          <div>
+            <div style={{fontSize:20,fontWeight:700,color:C.label,fontFamily:FONT_DISPLAY,letterSpacing:"0.01em"}}>Nueva Gift Card</div>
+            <div style={{fontSize:13,color:C.label3,fontFamily:FONT_UI,marginTop:2}}>Crear tarjeta de regalo</div>
+          </div>
+          <button onClick={onClose} style={{background:"none",border:"none",fontSize:22,cursor:"pointer",color:C.label3,padding:"4px 8px",lineHeight:1}}>✕</button>
+        </div>
+
+        {done && nuevaGC ? (
+          <div>
+            <div style={{background:`${C.green}10`,border:`1px solid ${C.green}30`,borderRadius:16,padding:"20px",textAlign:"center",marginBottom:20}}>
+              <div style={{fontSize:32,marginBottom:8}}>🎁</div>
+              <div style={{fontSize:14,fontWeight:700,color:C.green,fontFamily:FONT_UI,marginBottom:4}}>Gift Card creada</div>
+              <div style={{fontSize:22,fontWeight:700,color:C.label,fontFamily:FONT_DISPLAY,marginBottom:4}}>{$(nuevaGC.monto)}</div>
+              <div style={{fontSize:12,color:C.label3,fontFamily:FONT_UI,fontWeight:600,letterSpacing:.5,textTransform:"uppercase",marginTop:4}}>{nuevaGC.codigo}</div>
+              {nuevaGC.vencimiento&&<div style={{fontSize:12,color:C.amber,fontFamily:FONT_UI,marginTop:6}}>Vence: {nuevaGC.vencimiento}</div>}
+            </div>
+            <button onClick={onClose} style={{width:"100%",padding:"14px",borderRadius:14,border:"none",background:C.label,color:C.bg0,fontSize:15,fontWeight:700,fontFamily:FONT_UI,cursor:"pointer"}}>Listo</button>
+          </div>
+        ) : (
+          <div style={{display:"flex",flexDirection:"column",gap:16}}>
+            <div>
+              <label style={lbl}>Monto (Bs) *</label>
+              <input type="number" min="1" step="0.01" value={monto} onChange={e=>setMonto(e.target.value)} placeholder="0.00" style={inp} onFocus={onFocus} onBlur={onBlur}/>
+            </div>
+            <div>
+              <label style={lbl}>Vencimiento (opcional)</label>
+              <input type="date" value={vencimiento} onChange={e=>setVencimiento(e.target.value)} style={inp} onFocus={onFocus} onBlur={onBlur}/>
+            </div>
+            <div>
+              <label style={lbl}>Nota (opcional)</label>
+              <input type="text" value={nota} onChange={e=>setNota(e.target.value)} placeholder="Ej: Regalo cumpleaños…" style={inp} onFocus={onFocus} onBlur={onBlur}/>
+            </div>
+            <button onClick={crear} disabled={!monto||parseFloat(monto)<=0}
+              style={{marginTop:4,padding:"14px",borderRadius:14,border:"none",
+                background:(!monto||parseFloat(monto)<=0)?C.bg2:C.label,
+                color:(!monto||parseFloat(monto)<=0)?C.label3:C.bg0,
+                fontSize:15,fontWeight:700,fontFamily:FONT_UI,
+                cursor:(!monto||parseFloat(monto)<=0)?"not-allowed":"pointer",transition:"all .15s"}}>
+              🎁 Crear Gift Card
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── SheetUsarGC ──────────────────────────────────────────────────
+function SheetUsarGC({ onClose, onUsada }) {
+  const isDesktop  = useIsDesktop();
+  const [codigo,   setCodigo]   = useState("");
+  const [monto,    setMonto]    = useState("");
+  const [nota,     setNota]     = useState("");
+  const [gcFound,  setGcFound]  = useState(null);
+  const [busqMsg,  setBusqMsg]  = useState(null);
+  const [done,     setDone]     = useState(false);
+  const [errorMsg, setErrorMsg] = useState(null);
+
+  function buscar() {
+    const lista = cargarGC();
+    const gc    = lista.find(g=>g.codigo.toLowerCase()===codigo.trim().toLowerCase());
+    if (!gc)                  { setBusqMsg("❌ Gift Card no encontrada"); setGcFound(null); return; }
+    const est = gcEstado(gc);
+    if (est==="agotada")      { setBusqMsg("⚠️ Gift Card ya agotada");   setGcFound(null); return; }
+    if (est==="vencida")      { setBusqMsg("⚠️ Gift Card vencida");      setGcFound(null); return; }
+    setGcFound(gc); setBusqMsg(null); setErrorMsg(null);
+  }
+
+  function canjear() {
+    const m = parseFloat(monto);
+    if (!m||m<=0)            { setErrorMsg("Ingresa un monto válido"); return; }
+    if (!gcFound)             return;
+    if (m>gcFound.saldo)     { setErrorMsg(`Saldo insuficiente. Disponible: ${$(gcFound.saldo)}`); return; }
+    const lista   = cargarGC();
+    const updated = lista.map(g => g.codigo!==gcFound.codigo ? g : {
+      ...g,
+      saldo:    +(g.saldo-m).toFixed(2),
+      ultimoUso: hoy(),
+      usos:     [...(g.usos||[]),{fecha:hoy(),monto:m,nota:nota.trim()}],
+    });
+    guardarGC(updated);
+    setDone(true);
+    onUsada && onUsada(updated);
+  }
+
+  const overlay = { position:"fixed",inset:0,zIndex:9999,background:"rgba(0,0,0,0.45)",backdropFilter:"blur(6px)",
+    display:"flex", alignItems: isDesktop?"center":"flex-end", justifyContent: isDesktop?"center":"stretch" };
+  const card    = { width:"100%", maxWidth: isDesktop?480:"100%", margin: isDesktop?"auto":"0",
+    background:"rgba(255,255,255,0.97)", backdropFilter:"blur(32px) saturate(180%)",
+    borderRadius: isDesktop?28:"28px 28px 0 0", boxShadow:"0 -2px 40px rgba(0,0,0,0.12)",
+    padding:"28px 24px 40px", maxHeight:"90vh", overflowY:"auto" };
+  const lbl     = { display:"block",fontSize:10,fontWeight:700,color:C.label3,
+    textTransform:"uppercase",letterSpacing:.8,marginBottom:6,fontFamily:FONT_UI };
+  const inp     = { width:"100%",padding:"13px 14px",borderRadius:12,border:`1.5px solid ${C.sep}`,
+    background:C.bg0,fontSize:15,color:C.label,fontFamily:FONT_UI,outline:"none",
+    WebkitAppearance:"none",appearance:"none" };
+  const onFocus = e => e.target.style.borderColor = C.gold;
+  const onBlur  = e => e.target.style.borderColor = C.sep;
+
+  return (
+    <div style={overlay} onClick={e=>e.target===e.currentTarget&&onClose()}>
+      <div style={card}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:24}}>
+          <div>
+            <div style={{fontSize:20,fontWeight:700,color:C.label,fontFamily:FONT_DISPLAY,letterSpacing:"0.01em"}}>Canjear Gift Card</div>
+            <div style={{fontSize:13,color:C.label3,fontFamily:FONT_UI,marginTop:2}}>Aplicar saldo de tarjeta de regalo</div>
+          </div>
+          <button onClick={onClose} style={{background:"none",border:"none",fontSize:22,cursor:"pointer",color:C.label3,padding:"4px 8px",lineHeight:1}}>✕</button>
+        </div>
+
+        {done ? (
+          <div>
+            <div style={{background:`${C.green}10`,border:`1px solid ${C.green}30`,borderRadius:16,padding:"20px",textAlign:"center",marginBottom:20}}>
+              <div style={{fontSize:32,marginBottom:8}}>✅</div>
+              <div style={{fontSize:14,fontWeight:700,color:C.green,fontFamily:FONT_UI,marginBottom:4}}>Canje exitoso</div>
+              <div style={{fontSize:22,fontWeight:700,color:C.label,fontFamily:FONT_DISPLAY}}>{$(parseFloat(monto))} canjeados</div>
+              <div style={{fontSize:13,color:C.label3,fontFamily:FONT_UI,marginTop:8}}>
+                Saldo restante: {$(Math.max(0,(gcFound?.saldo||0)-parseFloat(monto||0)))}
+              </div>
+            </div>
+            <button onClick={onClose} style={{width:"100%",padding:"14px",borderRadius:14,border:"none",background:C.label,color:C.bg0,fontSize:15,fontWeight:700,fontFamily:FONT_UI,cursor:"pointer"}}>Listo</button>
+          </div>
+        ) : (
+          <div style={{display:"flex",flexDirection:"column",gap:16}}>
+            <div>
+              <label style={lbl}>Código de Gift Card *</label>
+              <div style={{display:"flex",gap:8}}>
+                <input type="text" value={codigo}
+                  onChange={e=>{setCodigo(e.target.value);setGcFound(null);setBusqMsg(null);}}
+                  placeholder="GC-YYYYMMDD-XXXX"
+                  style={{...inp,flex:1}} onFocus={onFocus} onBlur={onBlur}
+                  onKeyDown={e=>e.key==="Enter"&&buscar()}/>
+                <button onClick={buscar}
+                  style={{padding:"13px 16px",borderRadius:12,border:"none",background:C.label,color:C.bg0,
+                    fontSize:13,fontWeight:700,fontFamily:FONT_UI,cursor:"pointer",flexShrink:0}}>
+                  Buscar
+                </button>
+              </div>
+              {busqMsg&&<div style={{fontSize:12,color:C.red,fontFamily:FONT_UI,marginTop:6,fontWeight:500}}>{busqMsg}</div>}
+            </div>
+
+            {gcFound&&(
+              <div style={{background:`${C.gold}10`,border:`1px solid ${C.gold}30`,borderRadius:14,padding:"14px 16px"}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                  <div>
+                    <div style={{fontSize:11,fontWeight:700,color:C.gold,fontFamily:FONT_UI,textTransform:"uppercase",letterSpacing:.6,marginBottom:2}}>Gift Card encontrada</div>
+                    <div style={{fontSize:13,color:C.label,fontFamily:FONT_UI}}>{gcFound.codigo}</div>
+                  </div>
+                  <div style={{textAlign:"right"}}>
+                    <div style={{fontSize:18,fontWeight:700,color:C.gold,fontFamily:FONT_DISPLAY}}>{$(gcFound.saldo)}</div>
+                    <div style={{fontSize:11,color:C.label3,fontFamily:FONT_UI}}>saldo disponible</div>
+                  </div>
+                </div>
+                {gcFound.vencimiento&&<div style={{fontSize:11,color:C.amber,fontFamily:FONT_UI,marginTop:6,fontWeight:500}}>Vence: {gcFound.vencimiento}</div>}
+              </div>
+            )}
+
+            {gcFound&&(
+              <>
+                <div>
+                  <label style={lbl}>Monto a canjear (Bs) *</label>
+                  <input type="number" min="0.01" step="0.01" max={gcFound.saldo} value={monto}
+                    onChange={e=>{setMonto(e.target.value);setErrorMsg(null);}}
+                    placeholder={`Máx. ${gcFound.saldo}`} style={inp} onFocus={onFocus} onBlur={onBlur}/>
+                </div>
+                <div>
+                  <label style={lbl}>Nota (opcional)</label>
+                  <input type="text" value={nota} onChange={e=>setNota(e.target.value)}
+                    placeholder="Ej: Venta N°123…" style={inp} onFocus={onFocus} onBlur={onBlur}/>
+                </div>
+                {errorMsg&&<div style={{fontSize:12,color:C.red,fontFamily:FONT_UI,fontWeight:500}}>⚠️ {errorMsg}</div>}
+                <button onClick={canjear} disabled={!monto||parseFloat(monto)<=0}
+                  style={{padding:"14px",borderRadius:14,border:"none",
+                    background:(!monto||parseFloat(monto)<=0)?C.bg2:C.green,
+                    color:(!monto||parseFloat(monto)<=0)?C.label3:"#fff",
+                    fontSize:15,fontWeight:700,fontFamily:FONT_UI,
+                    cursor:(!monto||parseFloat(monto)<=0)?"not-allowed":"pointer",transition:"all .15s"}}>
+                  💳 Canjear {monto?$(parseFloat(monto)):""}
+                </button>
+              </>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── SheetDetalleGC ───────────────────────────────────────────────
+function SheetDetalleGC({ gc: gcProp, onClose }) {
+  const isDesktop = useIsDesktop();
+  const [gc, setGc] = useState(gcProp);
+  useEffect(()=>{
+    const found = cargarGC().find(g=>g.codigo===gcProp.codigo);
+    if (found) setGc(found);
+  },[gcProp.codigo]);
+
+  const estado = gcEstado(gc);
+  const ec     = {vigente:C.green,agotada:C.label3,vencida:C.red}[estado]||C.label3;
+  const consumido = (gc.monto||0)-(gc.saldo||0);
+  const pct = gc.monto>0?(gc.saldo/gc.monto)*100:0;
+
+  const overlay = { position:"fixed",inset:0,zIndex:9999,background:"rgba(0,0,0,0.45)",backdropFilter:"blur(6px)",
+    display:"flex", alignItems: isDesktop?"center":"flex-end", justifyContent: isDesktop?"center":"stretch" };
+  const card    = { width:"100%", maxWidth: isDesktop?520:"100%", margin: isDesktop?"auto":"0",
+    background:"rgba(255,255,255,0.97)", backdropFilter:"blur(32px) saturate(180%)",
+    borderRadius: isDesktop?28:"28px 28px 0 0", boxShadow:"0 -2px 40px rgba(0,0,0,0.12)",
+    padding:"28px 24px 40px", maxHeight:"90vh", overflowY:"auto" };
+
+  return (
+    <div style={overlay} onClick={e=>e.target===e.currentTarget&&onClose()}>
+      <div style={card}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:20}}>
+          <div>
+            <div style={{fontSize:20,fontWeight:700,color:C.label,fontFamily:FONT_DISPLAY,letterSpacing:"0.01em"}}>Detalle Gift Card</div>
+            <div style={{fontSize:12,color:C.label3,fontFamily:FONT_UI,marginTop:2,fontWeight:600,letterSpacing:.4,textTransform:"uppercase"}}>{gc.codigo}</div>
+          </div>
+          <button onClick={onClose} style={{background:"none",border:"none",fontSize:22,cursor:"pointer",color:C.label3,padding:"4px 8px",lineHeight:1}}>✕</button>
+        </div>
+
+        {/* KPIs */}
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:20}}>
+          {[
+            {label:"Valor original",val:$(gc.monto),  color:C.label},
+            {label:"Saldo actual",  val:$(gc.saldo),   color:gc.saldo>0?C.green:C.label3},
+            {label:"Consumido",     val:$(consumido),  color:consumido>0?C.amber:C.label3},
+          ].map(k=>(
+            <div key={k.label} style={{background:C.bg2,borderRadius:12,padding:"12px 10px",textAlign:"center",border:`1px solid ${C.sep}`}}>
+              <div style={{fontSize:9,fontWeight:700,color:C.label3,textTransform:"uppercase",letterSpacing:.6,marginBottom:4,fontFamily:FONT_UI}}>{k.label}</div>
+              <div style={{fontSize:15,fontWeight:700,color:k.color,fontFamily:FONT_UI}}>{k.val}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* Barra saldo */}
+        <div style={{marginBottom:20}}>
+          <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
+            <div style={{fontSize:11,fontWeight:600,color:C.label3,fontFamily:FONT_UI,textTransform:"uppercase",letterSpacing:.6}}>Saldo restante</div>
+            <div style={{fontSize:11,fontWeight:700,color:ec,fontFamily:FONT_UI,textTransform:"uppercase",letterSpacing:.4}}>{estado}</div>
+          </div>
+          <div style={{height:8,background:C.sep,borderRadius:4,overflow:"hidden"}}>
+            <div style={{height:"100%",borderRadius:4,transition:"width .3s",
+              width:`${pct}%`, background:pct>50?C.green:pct>20?C.amber:C.red}}/>
+          </div>
+        </div>
+
+        {/* Metadata */}
+        <div style={{background:C.bg2,borderRadius:14,border:`1px solid ${C.sep}`,padding:"14px 16px",marginBottom:20}}>
+          {[
+            ["Fecha de emisión", gc.emision],
+            ["Vencimiento",      gc.vencimiento||"Sin vencimiento"],
+            ["Último uso",       gc.ultimoUso||"No utilizada"],
+            ["N° de usos",       (gc.usos||[]).length],
+            gc.nota?["Nota",gc.nota]:null,
+          ].filter(Boolean).map(([k,v],i,arr)=>(
+            <div key={k} style={{display:"flex",justifyContent:"space-between",alignItems:"center",
+              padding:"8px 0",borderBottom:i<arr.length-1?`1px solid ${C.sep}`:""}}>
+              <span style={{fontSize:13,color:C.label3,fontFamily:FONT_UI}}>{k}</span>
+              <span style={{fontSize:13,fontWeight:600,color:C.label,fontFamily:FONT_UI}}>{v}</span>
+            </div>
+          ))}
+        </div>
+
+        {/* Historial de usos */}
+        {(gc.usos||[]).length>0 ? (
+          <div>
+            <div style={{fontSize:11,fontWeight:700,color:C.label3,textTransform:"uppercase",letterSpacing:.8,marginBottom:10,fontFamily:FONT_UI}}>Historial de usos</div>
+            <div style={{display:"flex",flexDirection:"column",gap:8}}>
+              {[...(gc.usos||[])].reverse().map((u,i)=>(
+                <div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",
+                  background:C.bg0,borderRadius:10,padding:"10px 14px",border:`1px solid ${C.sep}`}}>
+                  <div>
+                    <div style={{fontSize:13,fontWeight:600,color:C.label,fontFamily:FONT_UI}}>{u.fecha}</div>
+                    {u.nota&&<div style={{fontSize:12,color:C.label3,fontFamily:FONT_UI,marginTop:2}}>{u.nota}</div>}
+                  </div>
+                  <div style={{fontSize:15,fontWeight:700,color:C.red,fontFamily:FONT_UI}}>−{$(u.monto)}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div style={{textAlign:"center",padding:"20px 0",color:C.label3,fontSize:13,fontFamily:FONT_UI}}>
+            Aún no tiene usos registrados
+          </div>
+        )}
+
+        <button onClick={onClose} style={{marginTop:20,width:"100%",padding:"14px",borderRadius:14,border:"none",background:C.bg2,color:C.label,fontSize:15,fontWeight:700,fontFamily:FONT_UI,cursor:"pointer"}}>Cerrar</button>
+      </div>
+    </div>
+  );
+}
+
+// ── GiftCardsTab ─────────────────────────────────────────────────
+function GiftCardsTab() {
+  const isDesktop = useIsDesktop();
+  const [giftCards,   setGiftCards]  = useState(()=>cargarGC());
+  const [fechaIni,    setFechaIni]   = useState("");
+  const [fechaFin,    setFechaFin]   = useState("");
+  const [campo,       setCampo]      = useState("emision");
+  const [rangoActivo, setRangoActivo]= useState("todo");
+  const [estadoFil,   setEstadoFil]  = useState("todas");
+  const [busq,        setBusq]       = useState("");
+  const [shCrear,     setShCrear]    = useState(false);
+  const [shUsar,      setShUsar]     = useState(false);
+  const [gcDetalle,   setGcDetalle]  = useState(null);
+  const [exportando,  setExportando] = useState(false);
+
+  function reload(lista){ setGiftCards(lista||cargarGC()); }
+
+  function aplicarRango(tipo){
+    setRangoActivo(tipo);
+    if(tipo==="todo"){ setFechaIni(""); setFechaFin(""); return; }
+    const r=getDateRange(tipo); setFechaIni(r.ini); setFechaFin(r.fin);
+  }
+
+  const gcFiltradas = useMemo(()=>{
+    let lista = [...giftCards];
+    if(fechaIni||fechaFin){
+      lista = lista.filter(gc=>{
+        const f = campo==="ultimoUso"?gc.ultimoUso : campo==="vencimiento"?gc.vencimiento : gc.emision;
+        if(!f) return false;
+        if(fechaIni&&f<fechaIni) return false;
+        if(fechaFin&&f>fechaFin) return false;
+        return true;
+      });
+    }
+    if(estadoFil!=="todas") lista=lista.filter(gc=>gcEstado(gc)===estadoFil);
+    if(busq.trim()){
+      const q=busq.trim().toLowerCase();
+      lista=lista.filter(gc=>gc.codigo.toLowerCase().includes(q)||(gc.nota||"").toLowerCase().includes(q));
+    }
+    return lista;
+  },[giftCards,fechaIni,fechaFin,campo,estadoFil,busq]);
+
+  const kpis = useMemo(()=>{
+    const emitido    = gcFiltradas.reduce((s,g)=>s+(g.monto||0),0);
+    const disponible = gcFiltradas.reduce((s,g)=>s+(g.saldo||0),0);
+    return {
+      total:       gcFiltradas.length,
+      vigentes:    gcFiltradas.filter(g=>gcEstado(g)==="vigente").length,
+      agotadas:    gcFiltradas.filter(g=>gcEstado(g)==="agotada").length,
+      vencidas:    gcFiltradas.filter(g=>gcEstado(g)==="vencida").length,
+      emitido, disponible, consumido: emitido-disponible,
+    };
+  },[gcFiltradas]);
+
+  const EC = {vigente:C.green,agotada:C.label3,vencida:C.red};
+
+  const rangosBtns = [{id:"hoy",l:"Hoy"},{id:"ayer",l:"Ayer"},{id:"7d",l:"7 días"},{id:"30d",l:"30 días"},{id:"mes",l:"Este mes"},{id:"mesant",l:"Mes ant."},{id:"todo",l:"Todo"}];
+  const campoOpts  = [{id:"emision",l:"Emisión"},{id:"ultimoUso",l:"Último uso"},{id:"vencimiento",l:"Vencimiento"}];
+  const estOpts    = [{id:"todas",l:"Todas"},{id:"vigente",l:"Vigentes"},{id:"agotada",l:"Agotadas"},{id:"vencida",l:"Vencidas"}];
+
+  async function handleExportar(){
+    setExportando(true);
+    try{ await exportarExcelGC(gcFiltradas,fechaIni,fechaFin); }
+    catch(e){ alert("Error al exportar: "+e.message); }
+    finally{ setExportando(false); }
+  }
+
+  const chipBtn = (active,color)=>({
+    padding:"6px 12px",borderRadius:20,fontSize:12,fontWeight:600,fontFamily:FONT_UI,
+    cursor:"pointer",transition:"all .12s",border:`1px solid ${active?color:C.sep}`,
+    background:active?`${color}18`:C.bg0, color:active?color:C.label3,
+  });
+
+  return (
+    <div style={{paddingBottom:16}}>
+      {/* Encabezado */}
+      <div style={{marginBottom:20}}>
+        <div style={{fontSize:22,fontWeight:700,color:C.label,fontFamily:FONT_DISPLAY,letterSpacing:"0.01em",marginBottom:2}}>Gift Cards</div>
+        <div style={{fontSize:13,color:C.label3,fontFamily:FONT_UI}}>{gcFiltradas.length} tarjeta{gcFiltradas.length!==1?"s":""}  · {kpis.vigentes} vigente{kpis.vigentes!==1?"s":""}</div>
+      </div>
+
+      {/* Acciones */}
+      <div style={{display:"flex",gap:8,marginBottom:16}}>
+        <button onClick={()=>setShCrear(true)}
+          style={{flex:1,padding:"12px",borderRadius:14,border:"none",background:C.label,color:C.bg0,
+            fontSize:14,fontWeight:700,fontFamily:FONT_UI,cursor:"pointer",
+            display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
+          🎁 Nueva GC
+        </button>
+        <button onClick={()=>setShUsar(true)}
+          style={{flex:1,padding:"12px",borderRadius:14,
+            border:`1px solid ${C.green}30`,background:`${C.green}18`,color:C.green,
+            fontSize:14,fontWeight:700,fontFamily:FONT_UI,cursor:"pointer",
+            display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
+          💳 Canjear
+        </button>
+        <button onClick={handleExportar} disabled={exportando||gcFiltradas.length===0}
+          style={{padding:"12px 14px",borderRadius:14,border:`1px solid ${C.sep}`,
+            background:C.bg2,color:(exportando||gcFiltradas.length===0)?C.label3:C.label,
+            fontSize:13,fontWeight:600,fontFamily:FONT_UI,
+            cursor:(exportando||gcFiltradas.length===0)?"not-allowed":"pointer",
+            display:"flex",alignItems:"center",gap:5}}>
+          {exportando?"⏳":"📊"}
+        </button>
+      </div>
+
+      {/* Filtro campo */}
+      <div style={{marginBottom:12}}>
+        <div style={{fontSize:10,fontWeight:700,color:C.label3,textTransform:"uppercase",letterSpacing:.8,marginBottom:8,fontFamily:FONT_UI}}>Filtrar por fecha de</div>
+        <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+          {campoOpts.map(c=>(
+            <button key={c.id} onClick={()=>setCampo(c.id)} style={chipBtn(campo===c.id,C.gold)}>{c.l}</button>
+          ))}
+        </div>
+      </div>
+
+      {/* Quick ranges */}
+      <div style={{marginBottom:12}}>
+        <div style={{fontSize:10,fontWeight:700,color:C.label3,textTransform:"uppercase",letterSpacing:.8,marginBottom:8,fontFamily:FONT_UI}}>Rango rápido</div>
+        <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+          {rangosBtns.map(r=>(
+            <button key={r.id} onClick={()=>aplicarRango(r.id)}
+              style={{padding:"6px 12px",borderRadius:20,fontSize:12,fontWeight:600,fontFamily:FONT_UI,cursor:"pointer",transition:"all .12s",
+                border:`1px solid ${rangoActivo===r.id?C.label:C.sep}`,
+                background:rangoActivo===r.id?C.label:C.bg0,
+                color:rangoActivo===r.id?C.bg0:C.label3}}>
+              {r.l}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Date inputs */}
+      <div style={{display:"flex",gap:10,marginBottom:12}}>
+        {[["Desde",fechaIni,v=>{setFechaIni(v);setRangoActivo("");}],["Hasta",fechaFin,v=>{setFechaFin(v);setRangoActivo("");}]].map(([lbl,val,onChange])=>(
+          <div key={lbl} style={{flex:1}}>
+            <div style={{fontSize:10,fontWeight:700,color:C.label3,textTransform:"uppercase",letterSpacing:.6,marginBottom:6,fontFamily:FONT_UI}}>{lbl}</div>
+            <input type="date" value={val} onChange={e=>onChange(e.target.value)}
+              style={{width:"100%",padding:"10px 12px",borderRadius:10,border:`1.5px solid ${C.sep}`,
+                background:C.bg0,fontSize:14,color:C.label,fontFamily:FONT_UI,outline:"none",
+                WebkitAppearance:"none",appearance:"none"}}
+              onFocus={e=>e.target.style.borderColor=C.gold}
+              onBlur={e=>e.target.style.borderColor=C.sep}/>
+          </div>
+        ))}
+      </div>
+
+      {/* Estado + Búsqueda */}
+      <div style={{display:"flex",gap:8,marginBottom:16,flexWrap:"wrap"}}>
+        <div style={{flex:1,minWidth:180}}>
+          <div style={{fontSize:10,fontWeight:700,color:C.label3,textTransform:"uppercase",letterSpacing:.6,marginBottom:6,fontFamily:FONT_UI}}>Estado</div>
+          <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
+            {estOpts.map(e=>(
+              <button key={e.id} onClick={()=>setEstadoFil(e.id)} style={chipBtn(estadoFil===e.id,EC[e.id]||C.label)}>{e.l}</button>
+            ))}
+          </div>
+        </div>
+        <div style={{flex:1,minWidth:180}}>
+          <div style={{fontSize:10,fontWeight:700,color:C.label3,textTransform:"uppercase",letterSpacing:.6,marginBottom:6,fontFamily:FONT_UI}}>Buscar</div>
+          <input type="text" value={busq} onChange={e=>setBusq(e.target.value)}
+            placeholder="Código o nota…"
+            style={{width:"100%",padding:"9px 12px",borderRadius:10,border:`1.5px solid ${C.sep}`,
+              background:C.bg0,fontSize:14,color:C.label,fontFamily:FONT_UI,outline:"none",
+              WebkitAppearance:"none",appearance:"none"}}
+            onFocus={e=>e.target.style.borderColor=C.gold}
+            onBlur={e=>e.target.style.borderColor=C.sep}/>
+        </div>
+      </div>
+
+      {/* KPIs */}
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:16}}>
+        {[
+          {label:"Total",      val:kpis.total,      color:C.label, fmt:"n"},
+          {label:"Vigentes",   val:kpis.vigentes,   color:C.green, fmt:"n"},
+          {label:"Agotadas",   val:kpis.agotadas,   color:C.label3,fmt:"n"},
+          {label:"Vencidas",   val:kpis.vencidas,   color:C.red,   fmt:"n"},
+          {label:"Emitido",    val:kpis.emitido,    color:C.blue,  fmt:"bs"},
+          {label:"Disponible", val:kpis.disponible, color:C.green, fmt:"bs"},
+        ].map(k=>(
+          <div key={k.label} style={{background:C.bg2,borderRadius:14,padding:"12px 10px",
+            border:`1px solid ${k.color}20`,textAlign:"center"}}>
+            <div style={{fontSize:9,fontWeight:700,color:k.color,textTransform:"uppercase",
+              letterSpacing:.6,marginBottom:4,fontFamily:FONT_UI,opacity:.8}}>{k.label}</div>
+            <div style={{fontSize:k.fmt==="bs"?13:20,fontWeight:700,color:k.color,fontFamily:FONT_UI}}>
+              {k.fmt==="bs"?$(k.val):k.val}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Lista */}
+      {gcFiltradas.length===0 ? (
+        <div style={{textAlign:"center",padding:"40px 20px",color:C.label3,fontFamily:FONT_UI}}>
+          <div style={{fontSize:40,marginBottom:12}}>🎁</div>
+          <div style={{fontSize:15,fontWeight:600,marginBottom:6}}>Sin resultados</div>
+          <div style={{fontSize:13}}>Ajusta los filtros o crea una nueva Gift Card</div>
+        </div>
+      ) : isDesktop ? (
+        <div style={{background:C.bg1,borderRadius:16,border:`1px solid ${C.sep}`,overflow:"hidden"}}>
+          <div style={{display:"grid",gridTemplateColumns:"2fr 1fr 1fr 1fr 1fr 1fr 70px",
+            padding:"10px 16px",background:C.bg2,borderBottom:`1px solid ${C.sep}`}}>
+            {["Código","Emisión","Vence","Monto","Saldo","Estado",""].map(h=>(
+              <div key={h} style={{fontSize:10,fontWeight:700,color:C.label3,textTransform:"uppercase",letterSpacing:.7,fontFamily:FONT_UI}}>{h}</div>
+            ))}
+          </div>
+          {gcFiltradas.map((gc,i)=>{
+            const est=gcEstado(gc); const ec=EC[est]||C.label3;
+            return(
+              <div key={gc.id} onClick={()=>setGcDetalle(gc)}
+                style={{display:"grid",gridTemplateColumns:"2fr 1fr 1fr 1fr 1fr 1fr 70px",
+                  padding:"12px 16px",cursor:"pointer",
+                  borderBottom:i<gcFiltradas.length-1?`1px solid ${C.sep}`:"",transition:"background .1s"}}
+                onMouseEnter={e=>e.currentTarget.style.background=C.bg2}
+                onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+                <div style={{fontSize:13,fontWeight:600,color:C.label,fontFamily:FONT_UI,fontVariantNumeric:"tabular-nums"}}>{gc.codigo}</div>
+                <div style={{fontSize:13,color:C.label3,fontFamily:FONT_UI}}>{gc.emision}</div>
+                <div style={{fontSize:13,color:gc.vencimiento?C.amber:C.label3,fontFamily:FONT_UI}}>{gc.vencimiento||"—"}</div>
+                <div style={{fontSize:13,fontWeight:600,color:C.label,fontFamily:FONT_UI}}>{$(gc.monto)}</div>
+                <div style={{fontSize:13,fontWeight:700,color:gc.saldo>0?C.green:C.label3,fontFamily:FONT_UI}}>{$(gc.saldo)}</div>
+                <div style={{fontSize:11,fontWeight:700,color:ec,textTransform:"uppercase",letterSpacing:.4,fontFamily:FONT_UI,paddingTop:2}}>{est}</div>
+                <div>
+                  <button onClick={e=>{e.stopPropagation();setGcDetalle(gc);}}
+                    style={{padding:"5px 10px",borderRadius:8,border:`1px solid ${C.sep}`,background:"none",color:C.label3,fontSize:11,fontFamily:FONT_UI,cursor:"pointer",fontWeight:600}}>
+                    Ver
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <div style={{display:"flex",flexDirection:"column",gap:10}}>
+          {gcFiltradas.map(gc=>{
+            const est=gcEstado(gc); const ec=EC[est]||C.label3;
+            const consumido=(gc.monto||0)-(gc.saldo||0);
+            return(
+              <div key={gc.id} onClick={()=>setGcDetalle(gc)}
+                style={{background:C.bg2,borderRadius:16,padding:"16px",
+                  border:`1px solid ${C.sep}`,cursor:"pointer",WebkitTapHighlightColor:"transparent"}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:12}}>
+                  <div>
+                    <div style={{fontSize:12,fontWeight:700,color:C.label,fontFamily:FONT_UI,fontVariantNumeric:"tabular-nums",letterSpacing:.3}}>{gc.codigo}</div>
+                    <div style={{fontSize:11,color:C.label3,fontFamily:FONT_UI,marginTop:2}}>Emitida: {gc.emision}</div>
+                  </div>
+                  <div style={{fontSize:11,fontWeight:700,color:ec,textTransform:"uppercase",letterSpacing:.4,fontFamily:FONT_UI,background:`${ec}15`,padding:"3px 8px",borderRadius:12,border:`1px solid ${ec}30`}}>{est}</div>
+                </div>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
+                  {[{l:"Monto",v:$(gc.monto),c:C.label},{l:"Saldo",v:$(gc.saldo),c:gc.saldo>0?C.green:C.label3},{l:"Consumido",v:$(consumido),c:consumido>0?C.amber:C.label3}].map(k=>(
+                    <div key={k.l} style={{textAlign:"center"}}>
+                      <div style={{fontSize:9,fontWeight:700,color:C.label3,textTransform:"uppercase",letterSpacing:.5,marginBottom:2,fontFamily:FONT_UI}}>{k.l}</div>
+                      <div style={{fontSize:13,fontWeight:700,color:k.c,fontFamily:FONT_UI}}>{k.v}</div>
+                    </div>
+                  ))}
+                </div>
+                {gc.vencimiento&&<div style={{fontSize:11,color:C.amber,fontFamily:FONT_UI,marginTop:8,fontWeight:500}}>⏱ Vence: {gc.vencimiento}</div>}
+                {gc.nota&&<div style={{fontSize:11,color:C.label3,fontFamily:FONT_UI,marginTop:6,fontStyle:"italic"}}>"{gc.nota}"</div>}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Sheets */}
+      {shCrear&&<SheetCrearGC onClose={()=>setShCrear(false)} onCreada={lista=>reload(lista)}/>}
+      {shUsar &&<SheetUsarGC  onClose={()=>setShUsar(false)}  onUsada={lista=>reload(lista)}/>}
+      {gcDetalle&&<SheetDetalleGC gc={gcDetalle} onClose={()=>setGcDetalle(null)}/>}
+    </div>
+  );
+}
+
 function App(){
   const { user, login, logout } = useAuth();
   const isDesktop = useIsDesktop();
@@ -6786,6 +7714,7 @@ function App(){
     {id:"inventario",    icon:"◫", label:"Inventario"},
     {id:"marcas",        icon:"◆", label:"Marcas"},
     {id:"liquidaciones", icon:"◎", label:"Liquidar"},
+    {id:"giftcards",     icon:"🎁", label:"Gift"},
     {id:"config",        icon:"⚙", label:"Config"},
   ];
 
@@ -7248,6 +8177,9 @@ function App(){
           </div>
         )}
 
+        {/* GIFT CARDS */}
+        {tab==="giftcards" && <GiftCardsTab/>}
+
         {/* CAJAS */}
         {tab==="cajas" && <CajasTab/>}
 
@@ -7467,6 +8399,13 @@ function POS({inv,onVenta,onVerNota}){
   var _hN143 = useState(false); var showPago = _hN143[0]; var setShowPago = _hN143[1];
   var _hNm1 = useState(false); var pagoMixto = _hNm1[0]; var setPagoMixto = _hNm1[1];
   var _hNm2 = useState({efectivo:"", qr:"", tarjeta:""}); var montosMixtos = _hNm2[0]; var setMontosMixtos = _hNm2[1];
+  // Gift Card payment state
+  const [pagoGC,       setPagoGC]       = useState(false);
+  const [gcCodigo,     setGcCodigo]     = useState("");
+  const [gcEncontrado, setGcEncontrado] = useState(null);
+  const [gcBusqMsg,    setGcBusqMsg]    = useState(null);
+  const [gcMontoUsar,  setGcMontoUsar]  = useState("");
+  const [metodoCompl,  setMetodoCompl]  = useState("efectivo");
   var _hN144 = useState(null); var scanStatus = _hN144[0]; var setScanStatus = _hN144[1];; // null | "leyendo" | "ok" | "notfound"
   var _hN145 = useState(""); var scanMsg = _hN145[0]; var setScanMsg = _hN145[1];;
   const [showScanner, setShowScanner] = useState(false);
@@ -7546,23 +8485,92 @@ function POS({inv,onVenta,onVerNota}){
     setTimeout(()=>setScanStatus(null),4000);
   }
 
+  // ── GC helpers ──────────────────────────────────────────────────
+  function buscarGCenPOS(){
+    const lista=cargarGC();
+    const gc=lista.find(g=>g.codigo.toLowerCase()===gcCodigo.trim().toLowerCase());
+    if(!gc)                              { setGcBusqMsg("❌ Gift Card no encontrada"); setGcEncontrado(null); return; }
+    const est=gcEstado(gc);
+    if(est==="agotada")                  { setGcBusqMsg("⚠️ Gift Card agotada (saldo cero)"); setGcEncontrado(null); return; }
+    if(est==="vencida")                  { setGcBusqMsg("⚠️ Gift Card vencida"); setGcEncontrado(null); return; }
+    setGcEncontrado(gc);
+    setGcMontoUsar(String(Math.min(gc.saldo, total).toFixed(2)));
+    setGcBusqMsg(null);
+  }
+
+  // GC allocation: distribute GC amount proportionally across brands
+  function calcGCAllocations(items, totalVenta, gcUsado){
+    const brands={};
+    items.forEach(it=>{
+      if(!brands[it.marcaId]) brands[it.marcaId]={marcaId:it.marcaId,marcaNombre:it.marcaNombre,subtotal:0};
+      brands[it.marcaId].subtotal+=it.subtotal;
+    });
+    const extra=+(totalVenta-gcUsado).toFixed(2);
+    return Object.values(brands).map(b=>({
+      marcaId:    b.marcaId,
+      marcaNombre:b.marcaNombre,
+      subtotal:   +b.subtotal.toFixed(2),
+      gcAmount:   +(b.subtotal/totalVenta*gcUsado).toFixed(2),
+      extraAmount:+(b.subtotal/totalVenta*extra).toFixed(2),
+    }));
+  }
+
   function cobrar(){
-    if(!carrito.length)return;
+    if(!carrito.length) return;
+    const factor=1-descPct/100;
+    const items=carrito.map(it=>({
+      prodId:it.prodId,codigo:it.codigo,nombre:it.nombre,
+      marcaId:it.marcaId,marcaNombre:it.marcaNombre,
+      cantidad:it.cantidad,precioUnit:it.precio,subtotal:+(it.precio*it.cantidad*factor).toFixed(2),
+    }));
+
+    // ── Gift Card flow ───────────────────────────────────────
+    if(pagoGC){
+      if(!gcEncontrado){ alert("Busca y verifica la Gift Card primero"); return; }
+      const gcUsado=+(Math.min(gcEncontrado.saldo, total, parseFloat(gcMontoUsar)||total)).toFixed(2);
+      const extraMonto=+(total-gcUsado).toFixed(2);
+      if(extraMonto>0.01&&!metodoCompl){ alert("Selecciona método de pago complementario"); return; }
+
+      const gcAllocations=calcGCAllocations(items, total, gcUsado);
+      const metodoPagoFinal=extraMonto<=0.01
+        ? "giftcard"
+        : `mixto|giftcard:${gcUsado}|${metodoCompl}:${extraMonto}`;
+
+      // Deducir saldo GC
+      const gcLista=cargarGC();
+      guardarGC(gcLista.map(g=>g.codigo!==gcEncontrado.codigo?g:{
+        ...g,
+        saldo:+(g.saldo-gcUsado).toFixed(2),
+        ultimoUso:hoy(),
+        usos:[...(g.usos||[]),{
+          fecha:hoy(), monto:gcUsado,
+          nota:`Venta POS — ${items.length} prod.`
+        }],
+      }));
+
+      const vf=onVenta({items,total,subtotal,descPct,
+        metodoPago:metodoPagoFinal,
+        vendedor:vendedor||"Tienda",clienteNombre:cliente,etiquetaImg:etiqueta,
+        gcId:gcEncontrado.codigo, gcUsado, gcAllocations,
+      });
+      setUltima(vf);setShowOk(true);setShowPago(false);
+      setCarrito([]);setDescExtra(0);setBusq("");setEtiqueta(null);setCliente("");
+      setPagoGC(false);setGcCodigo("");setGcEncontrado(null);setGcBusqMsg(null);setGcMontoUsar("");
+      return;
+    }
+
+    // ── Mixto flow ───────────────────────────────────────────
     if(pagoMixto){
       const suma=(parseFloat(montosMixtos.efectivo)||0)+(parseFloat(montosMixtos.qr)||0)+(parseFloat(montosMixtos.tarjeta)||0);
       if(Math.abs(suma-total)>0.01){alert(`Los montos (${$(suma)}) no cuadran con el total (${$(total)})`);return;}
     }
-    const factor=1-descPct/100;
-    const items=carrito.map(it=>({prodId:it.prodId,codigo:it.codigo,nombre:it.nombre,
-      marcaId:it.marcaId,marcaNombre:it.marcaNombre,
-      cantidad:it.cantidad,precioUnit:it.precio,subtotal:it.precio*it.cantidad*factor}));
-    var metodoPagoFinal = pago;
+    var metodoPagoFinal=pago;
     if(pagoMixto){
-      var partes = [];
+      var partes=[];
       if(parseFloat(montosMixtos.efectivo)>0) partes.push("efectivo:"+montosMixtos.efectivo);
-      if(parseFloat(montosMixtos.qr)>0) partes.push("qr:"+montosMixtos.qr);
-      if(parseFloat(montosMixtos.tarjeta)>0) partes.push("tarjeta:"+montosMixtos.tarjeta);
-      metodoPagoFinal = partes.length > 0 ? "mixto|" + partes.join("|") : pago;
+      if(parseFloat(montosMixtos.qr)>0)       partes.push("qr:"+montosMixtos.qr);
+      if(parseFloat(montosMixtos.tarjeta)>0)  partes.push("tarjeta:"+montosMixtos.tarjeta);
+      metodoPagoFinal=partes.length>0?"mixto|"+partes.join("|"):pago;
     }
     const vf=onVenta({items,total,subtotal,descPct,metodoPago:metodoPagoFinal,vendedor:vendedor||"Tienda",clienteNombre:cliente,etiquetaImg:etiqueta});
     setUltima(vf);setShowOk(true);setShowPago(false);
@@ -7810,24 +8818,28 @@ function POS({inv,onVenta,onVerNota}){
         <div style={{fontSize:13,fontWeight:600,color:C.label3,textTransform:"uppercase",
           letterSpacing:.6,marginBottom:10}}>Método de Pago</div>
 
-        {/* Toggle pago simple / mixto */}
-        <div style={{display:"flex",gap:8,marginBottom:16}}>
-          <button onClick={function(){setPagoMixto(false);}} style={{
-            flex:1,padding:"10px",borderRadius:12,cursor:"pointer",fontFamily:FONT,
-            border:"2px solid "+(!pagoMixto?C.green:C.sep),
-            background:!pagoMixto?C.green+"18":C.bg2,
-            color:!pagoMixto?C.green:C.label2,fontWeight:!pagoMixto?700:400,fontSize:13,
-          }}>Pago simple</button>
-          <button onClick={function(){setPagoMixto(true);}} style={{
-            flex:1,padding:"10px",borderRadius:12,cursor:"pointer",fontFamily:FONT,
-            border:"2px solid "+(pagoMixto?C.blue:C.sep),
-            background:pagoMixto?C.blue+"18":C.bg2,
-            color:pagoMixto?C.blue:C.label2,fontWeight:pagoMixto?700:400,fontSize:13,
-          }}>Pago mixto</button>
+        {/* Toggle: Pago simple / Mixto / Gift Card */}
+        <div style={{display:"flex",gap:6,marginBottom:16}}>
+          {[
+            {id:"simple",  label:"Simple",    color:C.green, active:!pagoMixto&&!pagoGC},
+            {id:"mixto",   label:"Mixto",     color:C.blue,  active:pagoMixto&&!pagoGC},
+            {id:"giftcard",label:"🎁 Gift Card",color:"#7C3AED",active:pagoGC},
+          ].map(t=>(
+            <button key={t.id} onClick={()=>{
+              setPagoMixto(t.id==="mixto"); setPagoGC(t.id==="giftcard");
+              if(t.id==="giftcard"){ setGcCodigo(""); setGcEncontrado(null); setGcBusqMsg(null); }
+            }} style={{
+              flex:1,padding:"10px 6px",borderRadius:12,cursor:"pointer",fontFamily:FONT_UI,
+              border:`2px solid ${t.active?t.color:C.sep}`,
+              background:t.active?`${t.color}18`:C.bg2,
+              color:t.active?t.color:C.label2,fontWeight:t.active?700:400,fontSize:12,
+              WebkitTapHighlightColor:"transparent",
+            }}>{t.label}</button>
+          ))}
         </div>
 
-        {/* Pago simple */}
-        {!pagoMixto&&(
+        {/* ── Pago simple ── */}
+        {!pagoMixto&&!pagoGC&&(
           <div>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:20}}>
               {PAGOS.map(p=>(
@@ -7855,10 +8867,10 @@ function POS({inv,onVenta,onVerNota}){
           </div>
         )}
 
-        {/* Pago mixto */}
-        {pagoMixto&&(
+        {/* ── Pago mixto ── */}
+        {pagoMixto&&!pagoGC&&(
           <div style={{marginBottom:16}}>
-            <div style={{background:C.bg2,borderRadius:14,padding:16,border:"1px solid "+C.sep,marginBottom:10}}>
+            <div style={{background:C.bg2,borderRadius:14,padding:16,border:`1px solid ${C.sep}`,marginBottom:10}}>
               <div style={{fontSize:12,color:C.label3,fontFamily:FONT,marginBottom:12,textAlign:"center"}}>
                 Total a cobrar: <strong style={{color:C.gold}}>{$(total)}</strong> — distribuye entre los métodos
               </div>
@@ -7873,57 +8885,183 @@ function POS({inv,onVenta,onVerNota}){
                     <div style={{position:"relative"}}>
                       <span style={{position:"absolute",left:12,top:"50%",transform:"translateY(-50%)",
                         fontSize:14,color:C.label3,fontFamily:FONT}}>Bs</span>
-                      <input
-                        type="number" min="0" step="0.01"
-                        value={val}
-                        placeholder="0.00"
+                      <input type="number" min="0" step="0.01" value={val} placeholder="0.00"
                         onChange={function(e){
-                          var v = e.target.value;
-                          setMontosMixtos(function(prev){
-                            var next = Object.assign({}, prev);
-                            next[p.id] = v;
-                            return next;
-                          });
+                          var v=e.target.value;
+                          setMontosMixtos(function(prev){ var next=Object.assign({},prev); next[p.id]=v; return next; });
                         }}
                         style={{width:"100%",padding:"11px 14px 11px 36px",borderRadius:12,
-                          border:"1.5px solid "+C.sep,background:C.bg3,
-                          fontSize:16,color:C.label,outline:"none",
-                          fontFamily:FONT,boxSizing:"border-box"}}
-                      />
+                          border:`1.5px solid ${C.sep}`,background:C.bg0,
+                          fontSize:16,color:C.label,outline:"none",fontFamily:FONT,boxSizing:"border-box"}}/>
                     </div>
                   </div>
                 );
               })}
               {(function(){
-                var suma = (parseFloat(montosMixtos.efectivo)||0) +
-                           (parseFloat(montosMixtos.qr)||0) +
-                           (parseFloat(montosMixtos.tarjeta)||0);
-                var diff = total - suma;
-                return (
+                var suma=(parseFloat(montosMixtos.efectivo)||0)+(parseFloat(montosMixtos.qr)||0)+(parseFloat(montosMixtos.tarjeta)||0);
+                var diff=total-suma;
+                return(
                   <div style={{padding:"10px 12px",borderRadius:10,
-                    background:Math.abs(diff)<0.01?C.green+"15":C.red+"15",
-                    border:"1px solid "+(Math.abs(diff)<0.01?C.green:C.red)+"30"}}>
+                    background:Math.abs(diff)<0.01?`${C.green}15`:`${C.red}15`,
+                    border:`1px solid ${Math.abs(diff)<0.01?C.green:C.red}30`}}>
                     <div style={{display:"flex",justifyContent:"space-between",fontFamily:FONT}}>
                       <span style={{fontSize:13,color:C.label3}}>Total ingresado:</span>
                       <span style={{fontSize:13,fontWeight:700,color:C.label}}>{$(suma)}</span>
                     </div>
-                    {Math.abs(diff)>0.01&&(
-                      <div style={{display:"flex",justifyContent:"space-between",marginTop:4,fontFamily:FONT}}>
-                        <span style={{fontSize:13,color:C.red}}>Diferencia:</span>
-                        <span style={{fontSize:13,fontWeight:700,color:C.red}}>{$(Math.abs(diff))}</span>
-                      </div>
-                    )}
-                    {Math.abs(diff)<0.01&&(
-                      <div style={{fontSize:13,color:C.green,textAlign:"center",marginTop:4,fontFamily:FONT}}>
-                        ✓ Montos cuadrados
-                      </div>
-                    )}
+                    {Math.abs(diff)>0.01&&<div style={{display:"flex",justifyContent:"space-between",marginTop:4,fontFamily:FONT}}>
+                      <span style={{fontSize:13,color:C.red}}>Diferencia:</span>
+                      <span style={{fontSize:13,fontWeight:700,color:C.red}}>{$(Math.abs(diff))}</span>
+                    </div>}
+                    {Math.abs(diff)<0.01&&<div style={{fontSize:13,color:C.green,textAlign:"center",marginTop:4,fontFamily:FONT}}>✓ Montos cuadrados</div>}
                   </div>
                 );
               })()}
             </div>
           </div>
         )}
+
+        {/* ── Gift Card ── */}
+        {pagoGC&&(()=>{
+          const gcUsado     = +(Math.min(gcEncontrado?.saldo||0, total, parseFloat(gcMontoUsar)||0)).toFixed(2);
+          const extraMonto  = gcEncontrado ? +(total-gcUsado).toFixed(2) : 0;
+          const cubreTotal  = extraMonto <= 0.01;
+          return(
+            <div style={{marginBottom:16}}>
+              {/* Buscar GC */}
+              <div style={{marginBottom:12}}>
+                <div style={{fontSize:11,fontWeight:700,color:C.label3,textTransform:"uppercase",letterSpacing:.7,marginBottom:6,fontFamily:FONT_UI}}>Código de Gift Card</div>
+                <div style={{display:"flex",gap:8}}>
+                  <input type="text" value={gcCodigo}
+                    onChange={e=>{setGcCodigo(e.target.value);setGcEncontrado(null);setGcBusqMsg(null);}}
+                    placeholder="GC-YYYYMMDD-XXXX"
+                    onKeyDown={e=>e.key==="Enter"&&buscarGCenPOS()}
+                    style={{flex:1,padding:"12px 14px",borderRadius:12,border:`1.5px solid ${C.sep}`,
+                      background:C.bg0,fontSize:14,color:C.label,fontFamily:FONT_UI,outline:"none",
+                      WebkitAppearance:"none",appearance:"none"}}
+                    onFocus={e=>e.target.style.borderColor="#7C3AED"}
+                    onBlur={e=>e.target.style.borderColor=C.sep}/>
+                  <button onClick={buscarGCenPOS}
+                    style={{padding:"12px 16px",borderRadius:12,border:"none",
+                      background:"#7C3AED",color:"#fff",fontSize:13,fontWeight:700,
+                      fontFamily:FONT_UI,cursor:"pointer",flexShrink:0}}>Buscar</button>
+                </div>
+                {gcBusqMsg&&<div style={{fontSize:12,color:C.red,fontFamily:FONT_UI,marginTop:6,fontWeight:500}}>{gcBusqMsg}</div>}
+              </div>
+
+              {/* GC encontrada */}
+              {gcEncontrado&&(
+                <div>
+                  <div style={{background:"#7C3AED18",border:"1px solid #7C3AED30",borderRadius:14,
+                    padding:"14px 16px",marginBottom:12}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+                      <div>
+                        <div style={{fontSize:11,fontWeight:700,color:"#7C3AED",fontFamily:FONT_UI,textTransform:"uppercase",letterSpacing:.6,marginBottom:2}}>🎁 Gift Card activa</div>
+                        <div style={{fontSize:12,color:C.label,fontFamily:FONT_UI}}>{gcEncontrado.codigo}</div>
+                      </div>
+                      <div style={{textAlign:"right"}}>
+                        <div style={{fontSize:20,fontWeight:700,color:"#7C3AED",fontFamily:FONT_DISPLAY}}>{$(gcEncontrado.saldo)}</div>
+                        <div style={{fontSize:10,color:C.label3,fontFamily:FONT_UI}}>saldo disponible</div>
+                      </div>
+                    </div>
+
+                    {/* Monto a usar */}
+                    <div style={{marginBottom:8}}>
+                      <div style={{fontSize:10,fontWeight:700,color:C.label3,textTransform:"uppercase",letterSpacing:.6,marginBottom:4,fontFamily:FONT_UI}}>Monto a usar de Gift Card</div>
+                      <div style={{position:"relative"}}>
+                        <span style={{position:"absolute",left:10,top:"50%",transform:"translateY(-50%)",fontSize:13,color:C.label3,fontFamily:FONT_UI}}>Bs</span>
+                        <input type="number" min="0.01" step="0.01" max={Math.min(gcEncontrado.saldo,total)}
+                          value={gcMontoUsar}
+                          onChange={e=>setGcMontoUsar(e.target.value)}
+                          style={{width:"100%",padding:"10px 12px 10px 30px",borderRadius:10,
+                            border:"1.5px solid #7C3AED50",background:C.bg0,
+                            fontSize:15,color:C.label,fontFamily:FONT_UI,outline:"none",
+                            WebkitAppearance:"none",appearance:"none",boxSizing:"border-box"}}/>
+                      </div>
+                    </div>
+
+                    {/* Resumen */}
+                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
+                      {[
+                        {l:"Total venta",   v:$(total),       c:C.label},
+                        {l:"Gift Card",     v:`−${$(gcUsado)}`,c:"#7C3AED"},
+                        {l:"Pago extra",    v:$(extraMonto),  c:extraMonto>0.01?C.amber:C.green},
+                      ].map(k=>(
+                        <div key={k.l} style={{background:C.bg0,borderRadius:8,padding:"8px",textAlign:"center"}}>
+                          <div style={{fontSize:9,color:C.label3,textTransform:"uppercase",letterSpacing:.5,fontFamily:FONT_UI,marginBottom:2}}>{k.l}</div>
+                          <div style={{fontSize:12,fontWeight:700,color:k.c,fontFamily:FONT_UI}}>{k.v}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Pago complementario si hay resto */}
+                  {extraMonto>0.01&&(
+                    <div style={{marginBottom:12}}>
+                      <div style={{fontSize:11,fontWeight:700,color:C.label3,textTransform:"uppercase",letterSpacing:.7,marginBottom:8,fontFamily:FONT_UI}}>Pago complementario ({$(extraMonto)})</div>
+                      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
+                        {PAGOS.map(p=>(
+                          <button key={p.id} onClick={()=>setMetodoCompl(p.id)}
+                            style={{padding:"10px 6px",borderRadius:12,
+                              border:`2px solid ${metodoCompl===p.id?p.color:C.sep}`,
+                              background:metodoCompl===p.id?`${p.color}18`:C.bg2,
+                              cursor:"pointer",fontFamily:FONT_UI,
+                              display:"flex",flexDirection:"column",alignItems:"center",gap:4,
+                              WebkitTapHighlightColor:"transparent"}}>
+                            <span style={{fontSize:20}}>{p.icon}</span>
+                            <span style={{fontSize:11,fontWeight:metodoCompl===p.id?700:400,
+                              color:metodoCompl===p.id?p.color:C.label3}}>{p.label}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Distribución por marca */}
+                  {(()=>{
+                    const factor=1-descPct/100;
+                    const items=carrito.map(it=>({
+                      marcaId:it.marcaId,marcaNombre:it.marcaNombre,
+                      subtotal:it.precio*it.cantidad*factor,
+                    }));
+                    const brands={};
+                    items.forEach(it=>{ if(!brands[it.marcaId])brands[it.marcaId]={marcaNombre:it.marcaNombre,subtotal:0}; brands[it.marcaId].subtotal+=it.subtotal; });
+                    const allocs=Object.values(brands).map(b=>({
+                      ...b,
+                      gcAmt: +(b.subtotal/total*gcUsado).toFixed(2),
+                      xtra:  +(b.subtotal/total*extraMonto).toFixed(2),
+                    }));
+                    return allocs.length>1?(
+                      <div style={{background:C.bg2,borderRadius:12,overflow:"hidden",border:`1px solid ${C.sep}`}}>
+                        <div style={{padding:"8px 12px",background:C.bg2,borderBottom:`1px solid ${C.sep}`}}>
+                          <div style={{fontSize:10,fontWeight:700,color:C.label3,textTransform:"uppercase",letterSpacing:.7,fontFamily:FONT_UI}}>Distribución por marca</div>
+                        </div>
+                        {allocs.map((a,i)=>(
+                          <div key={i} style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",
+                            padding:"8px 12px",borderBottom:i<allocs.length-1?`1px solid ${C.sep}`:"",
+                            alignItems:"center"}}>
+                            <div style={{fontSize:12,color:C.label,fontFamily:FONT_UI,fontWeight:600}}>{a.marcaNombre}</div>
+                            <div style={{fontSize:11,color:C.label3,fontFamily:FONT_UI,textAlign:"right"}}>{$(a.subtotal)}</div>
+                            <div style={{fontSize:11,color:"#7C3AED",fontFamily:FONT_UI,fontWeight:600,textAlign:"right"}}>🎁{$(a.gcAmt)}</div>
+                            <div style={{fontSize:11,color:extraMonto>0.01?C.amber:C.label3,fontFamily:FONT_UI,textAlign:"right"}}>{extraMonto>0.01?$(a.xtra):"—"}</div>
+                          </div>
+                        ))}
+                      </div>
+                    ):null;
+                  })()}
+
+                  {cubreTotal&&(
+                    <div style={{padding:"10px 14px",background:`${C.green}12`,borderRadius:10,
+                      border:`1px solid ${C.green}30`,textAlign:"center",marginTop:8}}>
+                      <div style={{fontSize:13,color:C.green,fontWeight:700,fontFamily:FONT_UI}}>
+                        ✓ Gift Card cubre el total completo
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
         {/* Descuento adicional */}
         <IOSInput label="Descuento adicional (%)" type="number" min="0" max="100"
@@ -7956,8 +9094,13 @@ function POS({inv,onVenta,onVerNota}){
           </div>
         )}
 
-        <IOSBtn onPress={cobrar} full variant="primary" style={{fontSize:18,padding:"17px"}} icon="💳">
-          Cobrar {$(total)}
+        <IOSBtn onPress={cobrar} full variant="primary"
+          disabled={pagoGC&&(!gcEncontrado)}
+          style={{fontSize:18,padding:"17px"}}
+          icon={pagoGC?"🎁":"💳"}>
+          {pagoGC
+            ? (gcEncontrado ? `Confirmar — ${$(total)}` : "Busca la Gift Card")
+            : `Cobrar ${$(total)}`}
         </IOSBtn>
       </Sheet>
     </div>
@@ -8487,16 +9630,49 @@ function MarcaDetalle({marcaId,inv,ventas,vMes,mes,anio,MK,cierres,setCierres,ge
             </div>
           )}
           <div style={{background:C.bg2,borderRadius:16,overflow:"hidden",marginBottom:16}}>
-            {[["Ventas brutas",$(liq.bruto),C.label],["Comisión (10%)",`-${$(liq.comision)}`,C.red],["Neto a liquidar",$(liq.neto),C.green]].map(([k,v,c],i,arr)=>(
+            {(()=>{
+              // Compute GC totals for this brand this month
+              const gcTotal = liq.vMarca.reduce((s,v)=>{
+                const a=v.gcAllocations?.find(x=>x.marcaId===marcaId);
+                return s+(a?.gcAmount||0);
+              },0);
+              const gcVentas = liq.vMarca.filter(v=>v.gcAllocations?.some(x=>x.marcaId===marcaId&&x.gcAmount>0)).length;
+              return gcTotal>0?[
+                <div key="gc-summary" style={{display:"flex",justifyContent:"space-between",alignItems:"center",
+                  padding:"10px 16px",background:"#7C3AED08",borderBottom:`1px solid ${C.sep}`}}>
+                  <span style={{fontSize:13,color:"#7C3AED",fontFamily:FONT}}>
+                    🎁 Gift Card ({gcVentas} venta{gcVentas!==1?"s":""})
+                  </span>
+                  <span style={{fontSize:13,fontWeight:600,color:"#7C3AED",fontFamily:FONT}}>{$(gcTotal)}</span>
+                </div>
+              ]:[];
+            })()}
+            {[
+              ["Ventas brutas", $(liq.bruto), C.label, false],
+              liq.descTJ > 0
+                ? [`− Desc. banco Tarjeta (${liq.cfg?.pctTarjeta ?? 2.5}%)`, `-${$(liq.descTJ)}`, C.red, false]
+                : null,
+              liq.descTJ > 0
+                ? [`= Subtotal sin banco`, $(liq.subBanco), C.label2, false]
+                : null,
+              (liq.cfg?.pctComision > 0)
+                ? [`− Comisión ventas (${liq.cfg?.pctComision ?? 0}%)`, `-${$(liq.comision)}`, C.red, false]
+                : null,
+              (liq.alquiler > 0)
+                ? [`− Alquiler`, `-${$(liq.alquiler)}`, C.amber, false]
+                : null,
+              ["Neto a liquidar", $(liq.neto), C.green, true],
+            ].filter(Boolean).map(([k,v,c,bold],i,arr)=>(
               <div key={k} style={{display:"flex",justifyContent:"space-between",alignItems:"center",
-                padding:"15px 16px",borderBottom:i<arr.length-1?`1px solid ${C.sep}`:""}}>
-                <span style={{fontSize:16,color:C.label2,fontFamily:FONT}}>{k}</span>
-                <span style={{fontSize:16,fontWeight:600,color:c,fontFamily:FONT}}>{v}</span>
+                padding:"13px 16px",borderBottom:i<arr.length-1?`1px solid ${C.sep}`:"",
+                background: bold ? `${C.green}08` : "transparent"}}>
+                <span style={{fontSize:14,color:bold?C.green:C.label2,fontFamily:FONT,fontWeight:bold?600:400}}>{k}</span>
+                <span style={{fontSize:15,fontWeight:bold?700:600,color:c,fontFamily:FONT}}>{v}</span>
               </div>
             ))}
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",
               padding:"18px 16px",background:`${C.gold}12`}}>
-              <span style={{fontSize:17,fontWeight:700,color:C.label,fontFamily:FONT}}>TOTAL A PAGAR</span>
+              <span style={{fontSize:16,fontWeight:700,color:C.label,fontFamily:FONT}}>TOTAL A PAGAR</span>
               <span style={{fontSize:24,fontWeight:800,color:C.gold,fontFamily:FONT}}>{$(liq.neto)}</span>
             </div>
           </div>
@@ -8525,15 +9701,29 @@ function MarcaDetalle({marcaId,inv,ventas,vMes,mes,anio,MK,cierres,setCierres,ge
               {liq.vMarca.map(v=>{
                 const its=v.items.filter(i=>i.marcaId===marcaId);
                 const sub2=its.reduce((s,i)=>s+i.subtotal,0);
+                // GC allocation for this brand in this venta
+                const gcAlloc=v.gcAllocations?.find(a=>a.marcaId===marcaId);
                 return (
-                  <div key={v.id} style={{background:C.bg2,borderRadius:14,padding:14,marginBottom:10}}>
+                  <div key={v.id} style={{background:C.bg2,borderRadius:14,padding:14,marginBottom:10,
+                    border:v.gcId?`1px solid #7C3AED20`:`1px solid ${C.sep}`}}>
                     <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
-                      <span style={{fontFamily:"monospace",fontSize:12,color:C.gold}}>{v.id}</span>
+                      <div style={{display:"flex",alignItems:"center",gap:6}}>
+                        <span style={{fontFamily:"monospace",fontSize:12,color:C.gold}}>{v.id}</span>
+                        {v.gcId&&<span style={{fontSize:10,background:"#7C3AED15",color:"#7C3AED",
+                          fontWeight:700,padding:"2px 6px",borderRadius:8,fontFamily:FONT_UI}}>🎁 GC</span>}
+                      </div>
                       <span style={{fontSize:16,fontWeight:700,color:C.gold,fontFamily:FONT}}>{$(sub2)}</span>
                     </div>
                     <div style={{fontSize:13,color:C.label3,fontFamily:FONT,marginBottom:4}}>
                       {v.fecha} {v.hora} · {labelPago(v.metodoPago)}
                     </div>
+                    {gcAlloc&&(
+                      <div style={{display:"flex",gap:12,fontSize:11,fontFamily:FONT_UI,marginBottom:6,
+                        padding:"6px 10px",background:"#7C3AED08",borderRadius:8}}>
+                        <span style={{color:"#7C3AED",fontWeight:600}}>🎁 GC: {$(gcAlloc.gcAmount)}</span>
+                        {gcAlloc.extraAmount>0.01&&<span style={{color:C.amber,fontWeight:600}}>+ {$(gcAlloc.extraAmount)} extra</span>}
+                      </div>
+                    )}
                     {its.map((it,ii)=>(
                       <div key={`liq-${v.id}-${it.prodId}-${ii}`} style={{fontSize:13,color:C.label2,fontFamily:FONT}}>
                         · {it.nombre} ×{it.cantidad} = {$(it.subtotal)}
