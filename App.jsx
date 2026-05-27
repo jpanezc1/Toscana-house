@@ -850,13 +850,16 @@ function guardarCfgLiq(marcaId, cfg) {
 }
 function parseMixtoXls(metodoPago, total) {
   if (metodoPago?.startsWith("mixto|")) {
-    const obj = { efectivo: 0, qr: 0, tarjeta: 0 };
+    const obj = { efectivo: 0, qr: 0, tarjeta: 0, giftcard: 0 };
     metodoPago.split("|").slice(1).forEach(p => { const [k, v] = p.split(":"); obj[k] = parseFloat(v) || 0; });
+    // Gift Card tratada como efectivo en liquidación (ya se cobró cuando se vendió la GC)
+    obj.efectivo += obj.giftcard;
     const s = obj.efectivo + obj.qr + obj.tarjeta;
-    return s > 0 ? obj : { efectivo: total, qr: 0, tarjeta: 0 };
+    return s > 0 ? { efectivo: obj.efectivo, qr: obj.qr, tarjeta: obj.tarjeta } : { efectivo: total, qr: 0, tarjeta: 0 };
   }
-  if (metodoPago === "qr")      return { efectivo: 0, qr: total, tarjeta: 0 };
-  if (metodoPago === "tarjeta") return { efectivo: 0, qr: 0, tarjeta: total };
+  if (metodoPago === "qr")       return { efectivo: 0, qr: total, tarjeta: 0 };
+  if (metodoPago === "tarjeta")  return { efectivo: 0, qr: 0, tarjeta: total };
+  if (metodoPago === "giftcard") return { efectivo: total, qr: 0, tarjeta: 0 };
   return { efectivo: total, qr: 0, tarjeta: 0 };
 }
 function calcLiqMarca(vMarca, marcaId) {
@@ -5997,18 +6000,27 @@ function BrandPortal({user, ventas, inv, logout}){
             </div>
 
             {/* Desglose */}
-            <div style={{background:C.bg1,borderRadius:18,overflow:"hidden",
-              border:`1px solid ${C.sep}`,marginBottom:16,boxShadow:"0 2px 8px rgba(0,0,0,0.04)"}}>
-              {[
+            {(()=>{
+              // Calcular total GC usado para esta marca en el mes
+              const gcMarca = vMes.reduce((s,v)=>{
+                const alloc = v.gcAllocations?.find(a=>a.marcaId===mid);
+                return s+(alloc?.gcAmount||0);
+              },0);
+              const rows = [
                 {label:"Ventas brutas",            value:liq.bruto,      sign:"",  color:C.label, bold:false},
                 {label:"Efectivo",                 value:liq.brutoEf,    sign:"",  color:C.label3,bold:false,sub:true},
                 {label:"QR",                       value:liq.brutoQR,    sign:"",  color:C.label3,bold:false,sub:true},
                 {label:"Tarjeta",                  value:liq.brutoTJ,    sign:"",  color:C.label3,bold:false,sub:true},
+                ...(gcMarca>0?[{label:"Gift Cards",value:gcMarca,sign:"",color:"#7C3AED",bold:false,sub:true,gc:true}]:[]),
                 {label:`Desc. Tarjeta (${liq.cfg.pctTarjeta}%)`,value:-liq.descTJ,sign:"−",color:C.red,   bold:false},
                 {label:"Subtotal banco",           value:liq.subBanco,   sign:"",  color:C.blue,  bold:true},
                 {label:`Comisión Toscana (${liq.cfg.pctComision}%)`,value:-liq.comision,sign:"−",color:C.red,bold:false},
                 {label:"Alquiler",                 value:-liq.alquiler,  sign:"−",  color:C.red,  bold:false},
-              ].map((row,i,arr)=>(
+              ];
+              return (
+            <div style={{background:C.bg1,borderRadius:18,overflow:"hidden",
+              border:`1px solid ${C.sep}`,marginBottom:16,boxShadow:"0 2px 8px rgba(0,0,0,0.04)"}}>
+              {rows.map((row,i,arr)=>(
                 <div key={row.label} style={{
                   display:"flex",justifyContent:"space-between",alignItems:"center",
                   padding:`${row.sub?"8px":"12px"} 16px ${row.sub?"8px":"12px"} ${row.sub?"28px":"16px"}`,
@@ -6034,6 +6046,8 @@ function BrandPortal({user, ventas, inv, logout}){
                 </span>
               </div>
             </div>
+              ); // end IIFE return
+            })()} {/* end IIFE */}
 
             <div style={{background:C.bg2,borderRadius:14,padding:12,border:`1px solid ${C.sep}`}}>
               <div style={{fontSize:11,color:C.label3,fontFamily:FONT,lineHeight:1.6}}>
@@ -7295,6 +7309,49 @@ function SheetDetalleGC({ gc: gcProp, onClose }) {
           </div>
         </div>
 
+        {/* QR code — para imprimir o escanear en caja */}
+        <div style={{display:"flex",alignItems:"center",gap:20,marginBottom:20,
+          background:C.bg2,borderRadius:14,border:`1px solid ${C.sep}`,padding:"16px"}}>
+          <div style={{flexShrink:0,background:"#fff",borderRadius:10,padding:8,
+            boxShadow:"0 2px 8px rgba(0,0,0,0.08)"}}>
+            <BarcodeDisplay codigo={gc.codigo}/>
+          </div>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontSize:11,fontWeight:700,color:C.label3,textTransform:"uppercase",
+              letterSpacing:.6,marginBottom:6,fontFamily:FONT_UI}}>Código QR</div>
+            <div style={{fontSize:13,fontFamily:"monospace",fontWeight:700,color:C.gold,
+              marginBottom:8,wordBreak:"break-all"}}>{gc.codigo}</div>
+            <div style={{fontSize:11,color:C.label3,fontFamily:FONT_UI,lineHeight:1.5}}>
+              Mostrá este QR en caja para usar la Gift Card
+            </div>
+            <button onClick={()=>{
+              const w=window.open("","_blank","width=400,height=480");
+              w.document.write(`<!DOCTYPE html><html><head><title>Gift Card ${gc.codigo}</title>
+              <style>body{font-family:sans-serif;text-align:center;padding:30px;background:#fff}
+              h2{font-size:18px;margin-bottom:4px}p{color:#888;font-size:12px;margin:4px 0}
+              .cod{font-size:13px;font-weight:700;color:#9A7B4F;margin:12px 0;letter-spacing:1px}
+              .saldo{font-size:28px;font-weight:700;color:#1A1714;margin:8px 0}
+              #qr{margin:16px auto;display:inline-block}
+              </style></head><body>
+              <h2>🎁 Gift Card</h2>
+              <div class="cod">${gc.codigo}</div>
+              <div class="saldo">Bs ${gc.saldo}</div>
+              <p>Saldo disponible</p>
+              <div id="qr"></div>
+              <p style="margin-top:16px;font-size:11px;color:#bbb">Toscana House</p>
+              <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><\/script>
+              <script>new QRCode(document.getElementById('qr'),{text:'${gc.codigo}',width:160,height:160,colorDark:'#1A2E1A'});<\/script>
+              </body></html>`);
+              w.document.close();
+              setTimeout(()=>w.print(),800);
+            }} style={{marginTop:8,padding:"7px 14px",borderRadius:10,border:"none",
+              background:C.gold,color:"#fff",fontSize:12,fontWeight:700,fontFamily:FONT_UI,
+              cursor:"pointer",display:"inline-flex",alignItems:"center",gap:6}}>
+              🖨 Imprimir QR
+            </button>
+          </div>
+        </div>
+
         {/* Metadata */}
         <div style={{background:C.bg2,borderRadius:14,border:`1px solid ${C.sep}`,padding:"14px 16px",marginBottom:20}}>
           {[
@@ -7835,7 +7892,7 @@ function App(){
     return Object.values(map).sort((a,b)=>b.mk.localeCompare(a.mk));
   },[ventas]);
 
-  const TABS=[
+  const TABS_ALL=[
     {id:"inicio",        icon:"⊞", label:"Inicio"},
     {id:"pos",           icon:"⊕", label:"Caja"},
     {id:"ventas",        icon:"◈", label:"Ventas"},
@@ -7845,6 +7902,10 @@ function App(){
     {id:"giftcards",     icon:"🎁", label:"Gift"},
     {id:"config",        icon:"⚙", label:"Config"},
   ];
+  // Caja: solo inicio + POS + ventas (no acceso a admin, marcas, config)
+  const TABS = user.rol==="caja"
+    ? TABS_ALL.filter(t=>["inicio","pos","ventas"].includes(t.id))
+    : TABS_ALL;
 
   // Pantallas con vista de detalle (back button)
   const showingDetail = tab==="marcas" && marcaDetalle;
