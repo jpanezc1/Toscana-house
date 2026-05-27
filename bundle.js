@@ -29810,7 +29810,7 @@ Fecha: ${venta.fecha}`);
       { id: "giftcards", icon: "\u{1F381}", label: "Gift" },
       { id: "config", icon: "\u2699", label: "Config" }
     ];
-    const TABS = user.rol === "caja" ? TABS_ALL.filter((t) => ["inicio", "pos", "ventas"].includes(t.id)) : TABS_ALL;
+    const TABS = user?.rol === "caja" ? TABS_ALL.filter((t) => ["inicio", "pos", "ventas"].includes(t.id)) : TABS_ALL;
     const showingDetail = tab === "marcas" && marcaDetalle;
     if (!user) return /* @__PURE__ */ import_react.default.createElement(LoginScreen, { onLogin: login });
     if (user.rol === "marca") return /* @__PURE__ */ import_react.default.createElement(BrandPortal, { user, ventas, inv, logout });

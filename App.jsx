@@ -7899,7 +7899,7 @@ function App(){
     {id:"config",        icon:"⚙", label:"Config"},
   ];
   // Caja: solo inicio + POS + ventas (no acceso a admin, marcas, config)
-  const TABS = user.rol==="caja"
+  const TABS = user?.rol==="caja"
     ? TABS_ALL.filter(t=>["inicio","pos","ventas"].includes(t.id))
     : TABS_ALL;
 
