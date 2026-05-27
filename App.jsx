@@ -193,6 +193,85 @@ async function sbCargarTodo() {
   }
 }
 
+// ── Realtime sync — escucha cambios en Supabase y actualiza estado local ────
+// Activa canales en: ventas (INSERT/UPDATE) + inventario (INSERT/UPDATE)
+// Deduplicación: si la fila ya existe (optimistic update local), no se agrega.
+function useRealtimeSync(setVentas, setInv) {
+  useEffect(() => {
+    let channel = null;
+    let mounted = true;
+
+    getSupabase().then(db => {
+      if (!mounted) return;
+      channel = db.channel("toscana-realtime-v3")
+        // ── Venta nueva ────────────────────────────────────────────────────
+        .on("postgres_changes", { event: "INSERT", schema: "public", table: "ventas" }, async payload => {
+          const v = payload.new;
+          try {
+            const { data: rawItems } = await db.from("venta_items").select("*").eq("venta_id", v.id);
+            const venta = {
+              id: v.id, fecha: v.fecha, hora: v.hora, mk: v.mk,
+              mes: v.mes, anio: v.anio, total: v.total, subtotal: v.subtotal,
+              descPct: v.desc_pct, metodoPago: v.metodo_pago,
+              vendedor: v.vendedor, etiquetaImg: v.etiqueta_img,
+              anulada: v.anulada || false,
+              items: (rawItems || []).map(i => ({
+                prodId: i.prod_id, codigo: i.codigo, nombre: i.nombre,
+                marcaId: i.marca_id, marcaNombre: i.marca_nombre,
+                cantidad: i.cantidad, precioUnit: i.precio_unit, subtotal: i.subtotal
+              }))
+            };
+            if (mounted) setVentas(prev =>
+              prev.some(x => x.id === venta.id) ? prev : [...prev, venta]
+            );
+          } catch(e) { console.warn("[RT] venta insert:", e.message); }
+        })
+        // ── Venta actualizada (anulada, etc.) ───────────────────────────
+        .on("postgres_changes", { event: "UPDATE", schema: "public", table: "ventas" }, payload => {
+          const v = payload.new;
+          if (mounted) setVentas(prev => prev.map(x => x.id === v.id ? {
+            ...x,
+            anulada: v.anulada || false,
+            total: v.total,
+            subtotal: v.subtotal,
+            metodoPago: v.metodo_pago,
+          } : x));
+        })
+        // ── Producto nuevo en inventario ────────────────────────────────
+        .on("postgres_changes", { event: "INSERT", schema: "public", table: "inventario" }, payload => {
+          const p = payload.new;
+          const prod = {
+            id: p.id, codigo: p.codigo, marcaId: p.marca_id,
+            marcaNombre: p.marca_nombre, nombre: p.nombre,
+            categoria: p.categoria, precio: p.precio,
+            stock: p.stock, stockInicial: p.stock_inicial, fecha: p.fecha
+          };
+          if (mounted) setInv(prev =>
+            prev.some(x => x.id === prod.id) ? prev : [...prev, prod]
+          );
+        })
+        // ── Stock / precio actualizado ───────────────────────────────────
+        .on("postgres_changes", { event: "UPDATE", schema: "public", table: "inventario" }, payload => {
+          const p = payload.new;
+          if (mounted) setInv(prev => prev.map(i => i.id === p.id ? {
+            ...i, stock: p.stock, nombre: p.nombre, precio: p.precio, categoria: p.categoria
+          } : i));
+        })
+        .subscribe(status => {
+          if (status === "SUBSCRIBED") console.log("[Toscana Realtime] ✓ conectado");
+          if (status === "CHANNEL_ERROR") console.warn("[Toscana Realtime] error de canal — verifique Realtime en Supabase dashboard");
+        });
+    }).catch(e => console.warn("[Toscana Realtime] init:", e.message));
+
+    return () => {
+      mounted = false;
+      if (channel) {
+        getSupabase().then(db => db.removeChannel(channel)).catch(() => {});
+      }
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+}
+
 // Hook de estado de conexión Supabase
 function useSupabaseStatus() {
   var _hN100 = useState("connecting"); var status = _hN100[0]; var setStatus = _hN100[1];; // connecting | ok | error
@@ -2243,10 +2322,10 @@ function LiqModal({marcaId,ventas,mes,anio,MK,cierres,setCierres,onClose,syncCie
               {label:"QR",val:brutoQR,color:C.blue},
               {label:`Tarjeta (-${pctTarjeta}%)`,val:brutoTarjeta,color:C.amber},
             ].map(s=>(
-              <div key={s.label} style={{textAlign:"center",padding:"8px 4px",
-                background:`${s.color}10`,borderRadius:10}}>
-                <div style={{fontSize:13,fontWeight:700,color:s.color,fontFamily:FONT}}>{$(Math.round(s.val))}</div>
-                <div style={{fontSize:10,color:C.label3,fontFamily:FONT}}>{s.label}</div>
+              <div key={s.label} style={{textAlign:"center",padding:"9px 8px",
+                background:`${s.color}10`,borderRadius:12}}>
+                <div style={{fontSize:14,fontWeight:600,color:s.color,fontFamily:FONT,letterSpacing:"-0.01em"}}>{$(Math.round(s.val))}</div>
+                <div style={{fontSize:10,color:C.label3,fontFamily:FONT,marginTop:2,opacity:.7}}>{s.label}</div>
               </div>
             ))}
           </div>
@@ -2261,15 +2340,17 @@ function LiqModal({marcaId,ventas,mes,anio,MK,cierres,setCierres,onClose,syncCie
           alquiler>0?[`− Alquiler`,`-${$(alquiler)}`,C.amber]:null,
         ].filter(Boolean).map(([k,v,c],i,arr)=>(
           <div key={k} style={{display:"flex",justifyContent:"space-between",alignItems:"center",
-            padding:"12px 16px",borderBottom:i<arr.length-1?`1px solid ${C.sep}`:""}}>
-            <span style={{fontSize:14,color:C.label2,fontFamily:FONT}}>{k}</span>
-            <span style={{fontSize:14,fontWeight:600,color:c,fontFamily:FONT}}>{v}</span>
+            padding:"9px 16px",borderBottom:i<arr.length-1?`1px solid ${C.sep}`:""}}>
+            <span style={{fontSize:13,color:C.label2,fontFamily:FONT,lineHeight:"1.35"}}>{k}</span>
+            <span style={{fontSize:13,fontWeight:600,color:c,fontFamily:FONT}}>{v}</span>
           </div>
         ))}
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",
-          padding:"18px 16px",background:`${C.gold}12`}}>
-          <span style={{fontSize:17,fontWeight:700,color:C.label,fontFamily:FONT}}>TOTAL NETO</span>
-          <span style={{fontSize:22,fontWeight:800,color:C.gold,fontFamily:FONT}}>{$(Math.round(neto))}</span>
+          padding:"14px 16px",background:`${C.gold}12`}}>
+          <span style={{fontSize:11,fontWeight:600,color:C.label,fontFamily:FONT,
+            textTransform:"uppercase",letterSpacing:".08em",opacity:.6}}>Total Neto</span>
+          <span style={{fontSize:28,fontWeight:700,color:C.gold,fontFamily:FONT,
+            letterSpacing:"-0.03em",lineHeight:1}}>{$(Math.round(neto))}</span>
         </div>
       </div>
 
@@ -2284,16 +2365,16 @@ function LiqModal({marcaId,ventas,mes,anio,MK,cierres,setCierres,onClose,syncCie
             const its=v.items.filter(i=>i.marcaId===marcaId);
             const sub=its.reduce((s,i)=>s+i.subtotal,0);
             return (
-              <div key={v.id} style={{background:C.bg2,borderRadius:14,padding:14,marginBottom:10}}>
-                <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
-                  <span style={{fontFamily:"monospace",fontSize:12,color:C.gold}}>{v.id}</span>
-                  <span style={{fontSize:16,fontWeight:700,color:C.gold,fontFamily:FONT}}>{$(sub)}</span>
+              <div key={v.id} style={{background:C.bg2,borderRadius:10,padding:"10px 14px",marginBottom:5}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:3}}>
+                  <span style={{fontFamily:"monospace",fontSize:11,color:C.gold,fontWeight:600}}>{v.id}</span>
+                  <span style={{fontSize:15,fontWeight:600,color:C.gold,fontFamily:FONT,letterSpacing:"-0.01em"}}>{$(sub)}</span>
                 </div>
-                <div style={{fontSize:13,color:C.label3,fontFamily:FONT,marginBottom:6}}>
+                <div style={{fontSize:11,color:C.label3,fontFamily:FONT,marginBottom:4,opacity:.65}}>
                   {v.fecha} {v.hora} · {labelPago(v.metodoPago)}
                 </div>
                 {its.map((it,ii)=>(
-                  <div key={`${v.id}-${it.prodId}-${ii}`} style={{fontSize:13,color:C.label2,fontFamily:FONT}}>
+                  <div key={`${v.id}-${it.prodId}-${ii}`} style={{fontSize:12,color:C.label2,fontFamily:FONT,lineHeight:"1.35"}}>
                     · {it.nombre} ×{it.cantidad} = {$(it.subtotal)}
                   </div>
                 ))}
@@ -4240,13 +4321,14 @@ function ImportarExcelModal({inv, onImportar, onClose}){
 
       if(raw.length<2){ setEstado("idle"); alert("El archivo está vacío o no tiene datos"); return; }
 
-      // Auto-detectar fila de encabezado (primeras 5 filas)
+      // ── Auto-detectar fila de encabezado (hasta 10 filas de preámbulo) ──
       let hRow=0;
-      for(let i=0;i<Math.min(5,raw.length);i++){
+      for(let i=0;i<Math.min(10,raw.length);i++){
         const r=raw[i].map(c=>norm(String(c)).toLowerCase());
-        if(r.some(c=>c.includes("marca")||c.includes("descripcion")||c.includes("precio")||c.includes("sku"))){
-          hRow=i; break;
-        }
+        if(r.some(c=>
+          c.includes("descripcion")||c.includes("precio")||c.includes("sku")||
+          c.includes("articulo")||c.includes("marca")||c.includes("item")
+        )){ hRow=i; break; }
       }
 
       const headers = raw[hRow].map(h=>norm(String(h)).toLowerCase().trim());
@@ -4255,15 +4337,42 @@ function ImportarExcelModal({inv, onImportar, onClose}){
         return -1;
       };
 
-      const cSKU    = col("sku","codigo","cod","code","referencia","ref");
-      const cMarca  = col("marca","brand","tienda");
-      const cDesc   = col("descripcion","nombre","producto","desc","item","articulo");
-      const cPrecio = col("precio","price","valor","importe","costo","pvp");
-      const cCat    = col("categoria","cat","tipo","clasificacion","rubro");
-      const cTalla  = col("talla","size","talle","medida");
-      const cColor  = col("color","colour");
-      const cStock  = col("stock","cantidad","qty","existencia","unidades","piezas");
-      const cSubcat = col("subcat","subcategoria","subcategory");
+      // ── Detectar formato iZi ──────────────────────────────────────────
+      // iZi tiene "SUBGATEGORÍA" (typo con G) y "ÍTEM/ARTÍCULO" en el header
+      const isIZi = headers.some(h=>h.includes("subgategoria")||h.includes("item/articulo")||h.includes("item/art"));
+
+      let cSKU, cMarca, cDesc, cPrecio, cCat, cTalla, cColor, cStock, cSubcat;
+
+      if(isIZi){
+        // ── Mapeo iZi ─────────────────────────────────────────────────
+        // Col A: "1. Código del ÍTEM/ARTÍCULO" → SKU (siempre vacío → auto)
+        // Col B: "2. CATEGORÍA"               → MARCA (brand)
+        // Col D: "4. SUBGATEGORÍA"            → CATEGORÍA (tipo de prenda)
+        // Col E: "5. DESCRIPCIÓN"             → DESCRIPCIÓN
+        // Col H: "CANTIDAD ACTUAL"            → STOCK
+        // Col I: "PRECIO DE VENTA (Bs.)"      → PRECIO
+        cSKU   = col("codigo","articulo","item");
+        cMarca = headers.findIndex(h=>h.includes("categoria")&&!h.includes("sub")&&!h.includes("gategoria"));
+        if(cMarca===-1) cMarca = headers.findIndex(h=>h.includes("2.")||h.includes("categoria"));
+        cCat   = col("subgategoria","subcategoria","subcat");
+        cDesc  = col("descripcion");
+        cPrecio= col("precio de venta","precio venta","precio");
+        cTalla = -1;  // iZi no tiene columna talla
+        cColor = -1;
+        cStock = col("cantidad actual","cantidad","stock","existencia");
+        cSubcat= -1;
+      } else {
+        // ── Mapeo estándar ────────────────────────────────────────────
+        cSKU   = col("sku","codigo","cod","code","referencia","ref");
+        cMarca = col("marca","brand","tienda");
+        cDesc  = col("descripcion","nombre","producto","desc","item","articulo");
+        cPrecio= col("precio","price","valor","importe","costo","pvp");
+        cCat   = col("categoria","cat","tipo","clasificacion","rubro");
+        cTalla = col("talla","size","talle","medida");
+        cColor = col("color","colour");
+        cStock = col("stock","cantidad","qty","existencia","unidades","piezas");
+        cSubcat= col("subcat","subcategoria","subcategory");
+      }
 
       const usadosSet = new Set();
       const filas     = [];
@@ -4273,40 +4382,55 @@ function ImportarExcelModal({inv, onImportar, onClose}){
         if(row.every(c=>String(c).trim()==="")) continue; // fila vacía
 
         const marcaNom = cMarca>=0  ? String(row[cMarca]).trim()  : "";
-        const desc     = cDesc>=0   ? String(row[cDesc]).trim()   : "";
+        const descRaw  = cDesc>=0   ? String(row[cDesc]).trim()   : "";
+        // iZi: la descripción a veces incluye "NO INGRESAR" en col F/G — ignorar esas filas
+        if(descRaw.toUpperCase().includes("NO INGRESAR")||descRaw.toUpperCase()==="ATENCIÓN") continue;
+        const desc     = descRaw;
+
         const precioRaw= cPrecio>=0 ? String(row[cPrecio]).replace(/[^\d.,]/g,"").replace(",",".") : "";
         const precio   = parseFloat(precioRaw)||0;
-        const cat      = cCat>=0    ? String(row[cCat]).trim()    : "General";
-        const talla    = cTalla>=0  ? String(row[cTalla]).trim()  : "";
-        const color    = cColor>=0  ? String(row[cColor]).trim()  : "";
-        const stock    = cStock>=0  ? Math.max(1,parseInt(String(row[cStock]))||1) : 1;
+
+        // iZi: subcategoría = tipo de prenda (CHOMPA, GABARDINA, etc.)
+        // En formato estándar: categoría normal
+        const cat      = cCat>=0    ? String(row[cCat]).trim().replace(/\s+/g," ")   : "General";
+        const talla    = cTalla>=0  ? String(row[cTalla]).trim() : "";
+        const color    = cColor>=0  ? String(row[cColor]).trim() : "";
+
+        // Stock: parsear "1." "2." "1" "2" → número
+        const stockRaw = cStock>=0 ? String(row[cStock]).replace(/[^\d]/g,"") : "1";
+        const stock    = Math.max(1, parseInt(stockRaw)||1);
+
         const subcat   = cSubcat>=0 ? String(row[cSubcat]).trim() : "";
 
-        // Buscar marca
-        const marcaEnc = MARCAS.find(m=>norm(m.nombre).toLowerCase()===norm(marcaNom).toLowerCase())
-          || MARCAS.find(m=>norm(marcaNom).toLowerCase().startsWith(norm(m.nombre).toLowerCase().slice(0,4)));
+        // Buscar marca — fuzzy: exact → starts-with-4-chars
+        const marcaNomNorm = norm(marcaNom).toLowerCase();
+        const marcaEnc = MARCAS.find(m=>norm(m.nombre).toLowerCase()===marcaNomNorm)
+          || MARCAS.find(m=>marcaNomNorm.length>=3&&marcaNomNorm.startsWith(norm(m.nombre).toLowerCase().slice(0,4)))
+          || MARCAS.find(m=>norm(m.nombre).toLowerCase().startsWith(marcaNomNorm.slice(0,4)));
 
         // SKU: usar del Excel si existe, si no auto-generar
-        let skuRaw  = cSKU>=0 ? String(row[cSKU]).trim().toUpperCase() : "";
+        // iZi: para el código usamos subcategoría como "talla" para mayor descriptividad
+        const skuRaw  = cSKU>=0 ? String(row[cSKU]).trim().toUpperCase() : "";
         const autoSKU = !skuRaw;
-        const sku   = skuRaw || genCodImport(marcaEnc?.nombre||marcaNom, desc, talla||"TU", usadosSet);
+        const tallaParaCod = isIZi
+          ? (cat||"").replace(/[^A-Za-z]/g,"").slice(0,3).toUpperCase()||"TU"
+          : (talla||"TU");
+        const sku = skuRaw || genCodImport(marcaEnc?.nombre||marcaNom, desc, tallaParaCod, usadosSet);
         if(skuRaw) usadosSet.add(sku);
 
         const fila = {
-          _row:i+1, sku, autoSKU,
+          _row: i+1, sku, autoSKU, isIZi,
           marcaNom, marcaId:marcaEnc?.id||null, marcaNombre:marcaEnc?.nombre||marcaNom,
           desc, precio, cat, talla, color, stock, subcat,
           _errs:[], _dup:false,
         };
 
-        // Validaciones
         if(!desc)               fila._errs.push("Sin descripción");
         if(precio<=0)           fila._errs.push("Precio inválido");
         if(!marcaEnc)           fila._errs.push(`Marca "${marcaNom||"—"}" no encontrada`);
 
-        // Duplicado en inventario existente
         const existe=inv.find(p=>p.codigo.toUpperCase()===sku);
-        if(existe){ fila._dup=true; }
+        if(existe) fila._dup=true;
 
         filas.push(fila);
       }
@@ -4941,19 +5065,20 @@ function HomeDashboard({ventas, inv, vMes, mes, anio, onGoTab}){
           {ultVentas.map((v, i) => (
             <div key={v.id || i} style={{
               display:"flex", justifyContent:"space-between", alignItems:"center",
-              padding:"9px 0",
-              borderBottom: i < ultVentas.length - 1 ? "1px solid #F1F5F9" : "",
+              padding:"7px 0",
+              borderBottom: i < ultVentas.length - 1 ? `1px solid ${C.sep}` : "",
             }}>
               <div style={{flex:1, minWidth:0}}>
                 <div style={{fontSize:13, fontWeight:600, color:C.label, fontFamily:FONT_UI,
-                  overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>
+                  overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", lineHeight:"1.3"}}>
                   {iconPago(v.metodoPago)} {v.items?.map(it => it.nombre).join(", ") || "Venta"}
                 </div>
-                <div style={{fontSize:11, color:C.label3, fontFamily:FONT_UI}}>
+                <div style={{fontSize:10, color:C.label3, fontFamily:FONT_UI, marginTop:1, opacity:.65}}>
                   {v.fecha} · {labelPago(v.metodoPago)}
                 </div>
               </div>
-              <div style={{fontSize:14, fontWeight:800, color:"#2E7D32", fontFamily:FONT_UI, marginLeft:12}}>
+              <div style={{fontSize:14, fontWeight:600, color:"#2E7D32", fontFamily:FONT_UI, marginLeft:12,
+                letterSpacing:"-0.01em"}}>
                 Bs {new Intl.NumberFormat("es-BO",{minimumFractionDigits:0,maximumFractionDigits:0}).format(v.total)}
               </div>
             </div>
@@ -5671,26 +5796,26 @@ function BrandPortal({user, ventas, inv, logout}){
                   return (
                     <div key={v.id}
                       onClick={()=>setVentaSeleccionada(v)}
-                      style={{background:C.bg1,borderRadius:16,padding:"14px 16px",
-                        marginBottom:10,border:`1px solid ${C.sep}`,
-                        boxShadow:"0 1px 6px rgba(0,0,0,0.04)",
+                      style={{background:C.bg1,borderRadius:12,padding:"10px 14px",
+                        marginBottom:6,border:`1px solid ${C.sep}`,
+                        boxShadow:"0 1px 4px rgba(0,0,0,0.04)",
                         cursor:"pointer",WebkitTapHighlightColor:"transparent",
-                        transition:"box-shadow .15s",
-                        borderLeft:`4px solid ${v.anulada?C.red:marca.color}`}}>
+                        transition:"all .15s",
+                        borderLeft:`3px solid ${v.anulada?C.red:marca.color}`}}>
                       {/* Fila 1 — ID + total */}
                       <div style={{display:"flex",justifyContent:"space-between",
-                        alignItems:"flex-start",marginBottom:8}}>
+                        alignItems:"center",marginBottom:4}}>
                         <div>
                           <div style={{fontSize:11,fontFamily:"monospace",
-                            color:C.label3,fontWeight:600}}>{v.id}</div>
-                          <div style={{fontSize:12,color:C.label3,fontFamily:FONT,marginTop:1}}>
+                            color:C.gold,fontWeight:600}}>{v.id}</div>
+                          <div style={{fontSize:11,color:C.label3,fontFamily:FONT,marginTop:1,opacity:.65}}>
                             {v.fecha} {v.hora} · {v.vendedor||"Tienda"}
                           </div>
                         </div>
                         <div style={{textAlign:"right"}}>
-                          <div style={{fontSize:17,fontWeight:800,color:v.anulada?C.red:marca.color,
-                            fontFamily:FONT_DISPLAY,lineHeight:1}}>{$(csub)}</div>
-                          <div style={{fontSize:10,color:C.label3,fontFamily:FONT,marginTop:2}}>
+                          <div style={{fontSize:16,fontWeight:600,color:v.anulada?C.red:marca.color,
+                            fontFamily:FONT_DISPLAY,lineHeight:1,letterSpacing:"-0.02em"}}>{$(csub)}</div>
+                          <div style={{fontSize:10,color:C.label3,fontFamily:FONT,marginTop:2,opacity:.65}}>
                             {iconPago(v.metodoPago)} {labelPago(v.metodoPago)}
                           </div>
                         </div>
@@ -5698,7 +5823,7 @@ function BrandPortal({user, ventas, inv, logout}){
                       {/* Fila 2 — productos resumidos */}
                       <div style={{fontSize:12,color:C.label2,fontFamily:FONT,
                         overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",
-                        marginBottom:8}}>
+                        marginBottom:5,lineHeight:"1.35"}}>
                         {citems.map(i=>`${i.nombre} ×${i.cantidad}`).join(" · ")}
                       </div>
                       {/* Fila 3 — badges */}
@@ -5820,31 +5945,31 @@ function BrandPortal({user, ventas, inv, logout}){
                         {g.label} ({g.prods.length})
                       </div>
                       {g.prods.map(p=>(
-                        <div key={p.id} style={{background:C.bg1,borderRadius:14,
-                          padding:"12px 14px",marginBottom:6,border:`1px solid ${C.sep}`,
-                          borderLeft:`4px solid ${g.color}`,
-                          boxShadow:"0 1px 4px rgba(0,0,0,0.04)"}}>
-                          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+                        <div key={p.id} style={{background:C.bg1,borderRadius:10,
+                          padding:"9px 12px",marginBottom:5,border:`1px solid ${C.sep}`,
+                          borderLeft:`3px solid ${g.color}`,
+                          boxShadow:"0 1px 3px rgba(0,0,0,0.03)"}}>
+                          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                             <div style={{flex:1,minWidth:0}}>
                               <div style={{fontSize:13,fontWeight:600,color:C.label,fontFamily:FONT,
-                                overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                                overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",lineHeight:"1.3"}}>
                                 {p.nombre}
                               </div>
-                              <div style={{fontSize:11,color:C.label3,fontFamily:FONT,marginTop:2}}>
+                              <div style={{fontSize:10,color:C.label3,fontFamily:FONT,marginTop:1,opacity:.65}}>
                                 {p.codigo} · {p.categoria||"General"}
-                                {p.fecha&&<span style={{color:C.label3}}> · {p.fecha}</span>}
+                                {p.fecha&&<span> · {p.fecha}</span>}
                               </div>
                             </div>
                             <div style={{textAlign:"right",flexShrink:0,marginLeft:10}}>
-                              <div style={{fontSize:14,fontWeight:700,color:C.gold,fontFamily:FONT}}>
+                              <div style={{fontSize:14,fontWeight:600,color:C.gold,fontFamily:FONT,letterSpacing:"-0.01em"}}>
                                 {$(p.precio)}
                               </div>
-                              <div style={{fontSize:11,fontWeight:700,color:g.color,fontFamily:FONT,marginTop:2}}>
+                              <div style={{fontSize:10,fontWeight:600,color:g.color,fontFamily:FONT,marginTop:1}}>
                                 {p.stock} / {p.stockInicial||p.stock} uds
                               </div>
                             </div>
                           </div>
-                          <div style={{marginTop:8,height:4,background:`${g.color}20`,borderRadius:2}}>
+                          <div style={{marginTop:7,height:3,background:`${g.color}20`,borderRadius:2}}>
                             <div style={{height:"100%",background:g.color,borderRadius:2,
                               width:`${(p.stockInicial||p.stock)>0?Math.round((p.stock/(p.stockInicial||p.stock))*100):0}%`,
                               transition:"width .3s"}}/>
@@ -7544,6 +7669,9 @@ function App(){
       sbGuardarUsuarios(nueva); // ← también a la nube
     }
   }
+
+  // ── Realtime sync — cualquier cambio en Supabase (otro dispositivo) actualiza aquí ──
+  useRealtimeSync(setVentas, setInv);
 
   // Cargar retiros desde Supabase al inicio
   useEffect(()=>{
@@ -9385,27 +9513,27 @@ function InventarioPorMarca({inv, ventas, onRecibir, onBaja, onImportarExcel}){
               return (
                 <div key={prod.id} style={{
                   background:bgColor,
-                  border:`1.5px solid ${borderColor}`,
-                  borderRadius: isDesktop ? 12 : 16,
-                  padding: isDesktop ? "10px 12px" : "14px 16px",
+                  border:`1px solid ${borderColor}`,
+                  borderRadius: isDesktop ? 10 : 12,
+                  padding: isDesktop ? "8px 12px" : "10px 14px",
                 }}>
                   {/* Header producto */}
                   <div style={{display:"flex",justifyContent:"space-between",
-                    alignItems:"flex-start",marginBottom: isDesktop ? 6 : 10}}>
+                    alignItems:"center",marginBottom: isDesktop ? 4 : 6}}>
                     <div style={{flex:1,minWidth:0}}>
-                      <div style={{fontSize: isDesktop ? 13 : 15, fontWeight:700, color:C.label,
-                        fontFamily:FONT,marginBottom: isDesktop ? 3 : 4}}>{prod.nombre}</div>
-                      <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
-                        <span style={{fontFamily:"monospace",fontSize:11,color:C.gold,
-                          background:C.gold+"18",padding:"2px 7px",borderRadius:5,
-                          fontWeight:700}}>{prod.codigo}</span>
-                        <span style={{fontSize:12,color:C.label3,fontFamily:FONT}}>
+                      <div style={{fontSize: isDesktop ? 13 : 14, fontWeight:600, color:C.label,
+                        fontFamily:FONT,marginBottom: isDesktop ? 2 : 3,lineHeight:"1.3"}}>{prod.nombre}</div>
+                      <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+                        <span style={{fontFamily:"monospace",fontSize:10,color:C.gold,
+                          background:C.gold+"18",padding:"1px 6px",borderRadius:4,
+                          fontWeight:600}}>{prod.codigo}</span>
+                        <span style={{fontSize:10,color:C.label3,fontFamily:FONT,opacity:.7}}>
                           {prod.categoria}
                         </span>
                       </div>
                     </div>
                     <div style={{textAlign:"right",flexShrink:0}}>
-                      <div style={{fontSize: isDesktop ? 14 : 16, fontWeight:800, color:C.gold, fontFamily:FONT}}>
+                      <div style={{fontSize: isDesktop ? 13 : 15, fontWeight:600, color:C.gold, fontFamily:FONT, letterSpacing:"-0.01em"}}>
                         {$(prod.precio)}
                       </div>
                       <div style={{fontSize:12,fontFamily:FONT,fontWeight:600,
@@ -9524,21 +9652,21 @@ function MarcaDetalle({marcaId,inv,ventas,vMes,mes,anio,MK,cierres,setCierres,ge
           {histFil.length===0
             ? <EmptyState icon="📋" title="Sin ventas registradas" sub={`No hay ventas para ${marca?.nombre}`}/>
             : histFil.map(periodo=>(
-                <div key={periodo.mk} style={{background:C.bg2,borderRadius:16,overflow:"hidden",marginBottom: isDesktop ? 8 : 14}}>
+                <div key={periodo.mk} style={{background:C.bg2,borderRadius:14,overflow:"hidden",marginBottom: isDesktop ? 6 : 10}}>
                   {/* Header período */}
-                  <div style={{padding: isDesktop ? "10px 14px" : "14px 16px", borderBottom:`1px solid ${C.sep}`,
+                  <div style={{padding: isDesktop ? "9px 14px" : "12px 14px", borderBottom:`1px solid ${C.sep}`,
                     display:"flex",justifyContent:"space-between",alignItems:"center",
                     background:`${marca?.color}10`}}>
                     <div>
-                      <div style={{fontSize: isDesktop ? 14 : 17, fontWeight:600,color:C.label,fontFamily:FONT}}>
+                      <div style={{fontSize: isDesktop ? 13 : 15, fontWeight:600,color:C.label,fontFamily:FONT}}>
                         {MESES[periodo.mes]} {periodo.anio}
                       </div>
-                      <div style={{fontSize: isDesktop ? 12 : 13, color:C.label3,fontFamily:FONT}}>
+                      <div style={{fontSize: isDesktop ? 11 : 12, color:C.label3,fontFamily:FONT,opacity:.65}}>
                         {periodo.ventas.length} transacciones
                       </div>
                     </div>
                     <div style={{textAlign:"right"}}>
-                      <div style={{fontSize: isDesktop ? 18 : 22, fontWeight:800,color:marca?.color,fontFamily:FONT}}>
+                      <div style={{fontSize: isDesktop ? 17 : 20, fontWeight:600,color:marca?.color,fontFamily:FONT,letterSpacing:"-0.02em"}}>
                         {$(periodo.bruto)}
                       </div>
                       {cierres[`${periodo.mk}-${marcaId}`]?.cerrado&&<Chip color={C.green} small>✓ Cerrado</Chip>}
@@ -9546,24 +9674,24 @@ function MarcaDetalle({marcaId,inv,ventas,vMes,mes,anio,MK,cierres,setCierres,ge
                   </div>
                   {/* Ventas del período */}
                   {periodo.ventas.map((v,i)=>(
-                    <div key={v.id} style={{padding: isDesktop ? "9px 14px" : "13px 16px",
+                    <div key={v.id} style={{padding: isDesktop ? "8px 14px" : "10px 14px",
                       borderBottom:i<periodo.ventas.length-1?`1px solid ${C.sep}`:""}}>
-                      <div style={{display:"flex",justifyContent:"space-between",marginBottom: isDesktop ? 4 : 6}}>
-                        <div style={{display:"flex",alignItems:"center",gap:8}}>
-                          <span style={{fontFamily:"monospace",fontSize:12,color:C.gold}}>{v.id}</span>
+                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom: isDesktop ? 2 : 4}}>
+                        <div style={{display:"flex",alignItems:"center",gap:7}}>
+                          <span style={{fontFamily:"monospace",fontSize:11,color:C.gold,fontWeight:600}}>{v.id}</span>
                           <Chip color={colorPago(v.metodoPago)} small>
                             {iconPago(v.metodoPago)} {labelPago(v.metodoPago)}
                           </Chip>
                         </div>
-                        <span style={{fontSize: isDesktop ? 14 : 16, fontWeight:700,color:C.gold,fontFamily:FONT}}>{$(v.subMarca)}</span>
+                        <span style={{fontSize: isDesktop ? 14 : 15, fontWeight:600,color:C.gold,fontFamily:FONT,letterSpacing:"-0.01em"}}>{$(v.subMarca)}</span>
                       </div>
-                      <div style={{fontSize:12,color:C.label3,fontFamily:FONT,marginBottom: isDesktop ? 3 : 6}}>
+                      <div style={{fontSize:11,color:C.label3,fontFamily:FONT,marginBottom: isDesktop ? 2 : 4,opacity:.65}}>
                         {v.fecha} {v.hora}
                       </div>
                       {v.itsMarca.map((it,ii)=>(
-                        <div key={`${v.id}-${it.prodId}-${ii}`} style={{fontSize:13,color:C.label2,fontFamily:FONT}}>
+                        <div key={`${v.id}-${it.prodId}-${ii}`} style={{fontSize:12,color:C.label2,fontFamily:FONT,lineHeight:"1.3"}}>
                           · {it.nombre}{" "}
-                          <span style={{fontFamily:"monospace",fontSize:11,color:C.label3}}>{it.codigo}</span>
+                          <span style={{fontFamily:"monospace",fontSize:10,color:C.label3,opacity:.7}}>{it.codigo}</span>
                           {" "}×{it.cantidad}
                         </div>
                       ))}
@@ -9704,28 +9832,28 @@ function MarcaDetalle({marcaId,inv,ventas,vMes,mes,anio,MK,cierres,setCierres,ge
                 // GC allocation for this brand in this venta
                 const gcAlloc=v.gcAllocations?.find(a=>a.marcaId===marcaId);
                 return (
-                  <div key={v.id} style={{background:C.bg2,borderRadius:14,padding:14,marginBottom:10,
+                  <div key={v.id} style={{background:C.bg2,borderRadius:10,padding:"10px 14px",marginBottom:5,
                     border:v.gcId?`1px solid #7C3AED20`:`1px solid ${C.sep}`}}>
-                    <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:3}}>
                       <div style={{display:"flex",alignItems:"center",gap:6}}>
-                        <span style={{fontFamily:"monospace",fontSize:12,color:C.gold}}>{v.id}</span>
-                        {v.gcId&&<span style={{fontSize:10,background:"#7C3AED15",color:"#7C3AED",
-                          fontWeight:700,padding:"2px 6px",borderRadius:8,fontFamily:FONT_UI}}>🎁 GC</span>}
+                        <span style={{fontFamily:"monospace",fontSize:11,color:C.gold,fontWeight:600}}>{v.id}</span>
+                        {v.gcId&&<span style={{fontSize:9,background:"#7C3AED15",color:"#7C3AED",
+                          fontWeight:700,padding:"2px 5px",borderRadius:6,fontFamily:FONT_UI}}>🎁 GC</span>}
                       </div>
-                      <span style={{fontSize:16,fontWeight:700,color:C.gold,fontFamily:FONT}}>{$(sub2)}</span>
+                      <span style={{fontSize:15,fontWeight:600,color:C.gold,fontFamily:FONT,letterSpacing:"-0.01em"}}>{$(sub2)}</span>
                     </div>
-                    <div style={{fontSize:13,color:C.label3,fontFamily:FONT,marginBottom:4}}>
+                    <div style={{fontSize:11,color:C.label3,fontFamily:FONT,marginBottom:gcAlloc?3:0,opacity:.65}}>
                       {v.fecha} {v.hora} · {labelPago(v.metodoPago)}
                     </div>
                     {gcAlloc&&(
-                      <div style={{display:"flex",gap:12,fontSize:11,fontFamily:FONT_UI,marginBottom:6,
-                        padding:"6px 10px",background:"#7C3AED08",borderRadius:8}}>
+                      <div style={{display:"flex",gap:10,fontSize:11,fontFamily:FONT_UI,marginBottom:3,
+                        padding:"4px 8px",background:"#7C3AED08",borderRadius:6}}>
                         <span style={{color:"#7C3AED",fontWeight:600}}>🎁 GC: {$(gcAlloc.gcAmount)}</span>
                         {gcAlloc.extraAmount>0.01&&<span style={{color:C.amber,fontWeight:600}}>+ {$(gcAlloc.extraAmount)} extra</span>}
                       </div>
                     )}
                     {its.map((it,ii)=>(
-                      <div key={`liq-${v.id}-${it.prodId}-${ii}`} style={{fontSize:13,color:C.label2,fontFamily:FONT}}>
+                      <div key={`liq-${v.id}-${it.prodId}-${ii}`} style={{fontSize:12,color:C.label2,fontFamily:FONT,lineHeight:"1.3"}}>
                         · {it.nombre} ×{it.cantidad} = {$(it.subtotal)}
                       </div>
                     ))}
@@ -11487,65 +11615,65 @@ function VentasTab({vMes, totalVtas, mes, anio, onVentaClick}){
             : porMarca.map((x,i)=>(
                 <div key={x.marca.id} style={{
                   background:C.bg2,
-                  borderRadius:i===0?"16px 16px 4px 4px":i===porMarca.length-1?"4px 4px 16px 16px":"4px",
+                  borderRadius:i===0?"14px 14px 4px 4px":i===porMarca.length-1?"4px 4px 14px 14px":"4px",
                   borderBottom:i<porMarca.length-1?`1px solid ${C.sep}`:"",
-                  padding: isDesktop ? "10px 14px" : "14px 16px",
+                  padding: isDesktop ? "9px 14px" : "12px 14px",
                   cursor:"pointer",
                   WebkitTapHighlightColor:"transparent",
-                  borderLeft:`4px solid ${x.marca.color}`,
+                  borderLeft:`3px solid ${x.marca.color}`,
                   transition: isDesktop ? "background .12s" : undefined,
                 }}
                 onMouseEnter={isDesktop ? e=>{ e.currentTarget.style.background=`${x.marca.color}0A`; } : undefined}
                 onMouseLeave={isDesktop ? e=>{ e.currentTarget.style.background=C.bg2; } : undefined}
                 onClick={()=>{setMarcaFiltro(marcaFiltro===x.marca.id?null:x.marca.id);setVistaActiva("historial");}}>
                   {/* Cabecera marca */}
-                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom: isDesktop ? 6 : 10}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom: isDesktop ? 5 : 8}}>
                     <div style={{display:"flex",alignItems:"center",gap: isDesktop ? 8 : 10}}>
-                      <div style={{width: isDesktop ? 30 : 36, height: isDesktop ? 30 : 36, borderRadius:10,
+                      <div style={{width: isDesktop ? 28 : 32, height: isDesktop ? 28 : 32, borderRadius:9,
                         background:`${x.marca.color}22`,display:"flex",
-                        alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>
-                        <MarcaIcon marca={x.marca} size={isDesktop ? 17 : 20} radius={6}/>
+                        alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                        <MarcaIcon marca={x.marca} size={isDesktop ? 16 : 18} radius={5}/>
                       </div>
                       <div>
-                        <div style={{fontSize: isDesktop ? 13 : 15, fontWeight:600, color:C.label, fontFamily:FONT, letterSpacing:"0.02em"}}>{x.marca.nombre}</div>
-                        <div style={{fontSize:12,color:C.label3,fontFamily:FONT}}>{x.txs} venta{x.txs!==1?"s":""}</div>
+                        <div style={{fontSize: isDesktop ? 13 : 14, fontWeight:600, color:C.label, fontFamily:FONT}}>{x.marca.nombre}</div>
+                        <div style={{fontSize:10,color:C.label3,fontFamily:FONT,opacity:.65}}>{x.txs} venta{x.txs!==1?"s":""}</div>
                       </div>
                     </div>
                     <div style={{textAlign:"right"}}>
-                      <div style={{fontSize: isDesktop ? 15 : 18, fontWeight:800, color:x.marca.color, fontFamily:FONT}}>{$(x.total)}</div>
-                      <div style={{fontSize:11,color:C.label3,fontFamily:FONT}}>
+                      <div style={{fontSize: isDesktop ? 15 : 17, fontWeight:600, color:x.marca.color, fontFamily:FONT,letterSpacing:"-0.01em"}}>{$(x.total)}</div>
+                      <div style={{fontSize:10,color:C.label3,fontFamily:FONT,opacity:.65}}>
                         {Math.round((x.total/totalVtas)*100)}% del total
                       </div>
                     </div>
                   </div>
 
                   {/* Barra total */}
-                  <div style={{background:"rgba(0,0,0,0.06)",borderRadius:6,height: isDesktop ? 4 : 6, marginBottom: isDesktop ? 6 : 10, overflow:"hidden"}}>
+                  <div style={{background:"rgba(0,0,0,0.05)",borderRadius:4,height: isDesktop ? 3 : 4, marginBottom: isDesktop ? 5 : 8, overflow:"hidden"}}>
                     <div style={{width:`${(x.total/maxVenta)*100}%`,background:x.marca.color,
-                      height:"100%",borderRadius:6,transition:"width .5s"}}/>
+                      height:"100%",borderRadius:4,transition:"width .5s"}}/>
                   </div>
 
                   {/* Desglose métodos de pago */}
-                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap: isDesktop ? 6 : 8}}>
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap: isDesktop ? 5 : 7}}>
                     {[
                       {icon:"💵",label:"Efectivo",value:x.efectivo,color:"#4A9B6F"},
                       {icon:"📱",label:"QR",value:x.qr,color:"#5B8DB8"},
                       {icon:"💳",label:"Tarjeta",value:x.tarjeta,color:"#C8922A"},
                     ].map(p=>(
                       <div key={p.label} style={{
-                        padding: isDesktop ? "6px 8px" : "8px 10px", borderRadius:10,
+                        padding: "6px 8px", borderRadius:9,
                         background:p.value>0?`${p.color}12`:"rgba(0,0,0,0.03)",
                         border:`1px solid ${p.value>0?p.color+"25":C.sep}`,
-                        opacity:p.value>0?1:.5,
+                        opacity:p.value>0?1:.45,
                       }}>
-                        <div style={{fontSize: isDesktop ? 12 : 14, marginBottom: isDesktop ? 1 : 3}}>{p.icon}</div>
-                        <div style={{fontSize:11,color:C.label3,fontFamily:FONT,marginBottom:2}}>{p.label}</div>
-                        <div style={{fontSize: isDesktop ? 12 : 13, fontWeight:700,
+                        <div style={{fontSize:11, marginBottom:1}}>{p.icon}</div>
+                        <div style={{fontSize:10,color:C.label3,fontFamily:FONT,marginBottom:1,opacity:.7}}>{p.label}</div>
+                        <div style={{fontSize: isDesktop ? 11 : 12, fontWeight:600,
                           color:p.value>0?p.color:C.label3,fontFamily:FONT}}>
                           {p.value>0?$(p.value):"—"}
                         </div>
                         {p.value>0&&x.total>0&&(
-                          <div style={{fontSize:10,color:C.label3,fontFamily:FONT}}>
+                          <div style={{fontSize:9,color:C.label3,fontFamily:FONT,opacity:.7}}>
                             {Math.round((p.value/x.total)*100)}%
                           </div>
                         )}
@@ -11603,8 +11731,8 @@ function VentasTab({vMes, totalVtas, mes, anio, onVentaClick}){
                 const totalMostrar=itemsMostrar.reduce((s,i)=>s+i.subtotal,0);
                 return (
                   <div key={v.id} onClick={()=>onVentaClick&&onVentaClick(v)}
-                    style={{background:v.anulada?`${C.red}06`:C.bg2,borderRadius:14,
-                      padding: isDesktop ? "10px 14px" : "14px 16px", marginBottom: isDesktop ? 6 : 10, cursor:"pointer",
+                    style={{background:v.anulada?`${C.red}06`:C.bg2,borderRadius:isDesktop?10:12,
+                      padding: isDesktop ? "9px 14px" : "11px 14px", marginBottom: isDesktop ? 5 : 7, cursor:"pointer",
                       WebkitTapHighlightColor:"transparent",
                       opacity:v.anulada?0.7:1,
                       border:v.anulada?`1px solid ${C.red}30`:"none",
@@ -11612,11 +11740,11 @@ function VentasTab({vMes, totalVtas, mes, anio, onVentaClick}){
                     }}
                     onMouseEnter={isDesktop ? e=>{ e.currentTarget.style.background=v.anulada?`${C.red}06`:`${C.sep}`; } : undefined}
                     onMouseLeave={isDesktop ? e=>{ e.currentTarget.style.background=v.anulada?`${C.red}06`:C.bg2; } : undefined}>
-                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom: isDesktop ? 5 : 8}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom: isDesktop ? 3 : 5}}>
                       <div>
-                        <span style={{fontFamily:"monospace",fontSize:12,color:v.anulada?C.red:C.gold,fontWeight:700}}>
+                        <span style={{fontFamily:"monospace",fontSize:11,color:v.anulada?C.red:C.gold,fontWeight:600}}>
                           {v.id}{v.anulada?" ⊘":""}</span>
-                        <div style={{fontSize:12,color:C.label3,fontFamily:FONT,marginTop:2}}>
+                        <div style={{fontSize:11,color:C.label3,fontFamily:FONT,marginTop:1,opacity:.65}}>
                           {v.fecha} {v.hora} · {v.vendedor||"Tienda"}
                           {v.anulada&&<span style={{color:C.red,fontWeight:600}}> · ANULADA</span>}
                         </div>
@@ -11626,8 +11754,8 @@ function VentasTab({vMes, totalVtas, mes, anio, onVentaClick}){
                           ? <Chip color={C.red}>⊘ Anulada</Chip>
                           : <Chip color={colorPago(v.metodoPago)}>{iconPago(v.metodoPago)} {labelPago(v.metodoPago)}</Chip>
                         }
-                        <span style={{fontSize: isDesktop ? 15 : 18, fontWeight:800,
-                          color:v.anulada?C.label3:C.gold,fontFamily:FONT,
+                        <span style={{fontSize: isDesktop ? 15 : 17, fontWeight:600,
+                          color:v.anulada?C.label3:C.gold,fontFamily:FONT,letterSpacing:"-0.01em",
                           textDecoration:v.anulada?"line-through":"none"}}>{$(totalMostrar)}</span>
                       </div>
                     </div>
@@ -11640,18 +11768,18 @@ function VentasTab({vMes, totalVtas, mes, anio, onVentaClick}){
                         byMarca[it.marcaId].sub+=it.subtotal;
                       });
                       return Object.values(byMarca).map(g=>(
-                        <div key={g.marca?.id} style={{marginBottom: isDesktop ? 5 : 8, padding: isDesktop ? "5px 8px" : "8px 10px",
-                          background:`${g.marca?.color}10`,borderRadius:10,
+                        <div key={g.marca?.id} style={{marginBottom: isDesktop ? 4 : 6, padding: isDesktop ? "5px 8px" : "6px 10px",
+                          background:`${g.marca?.color}10`,borderRadius:8,
                           borderLeft:`3px solid ${g.marca?.color}`}}>
-                          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
+                          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:3}}>
                             <div style={{display:"flex",alignItems:"center",gap:6}}>
-                              <MarcaIcon marca={g.marca} size={16} radius={4}/>
-                              <span style={{fontSize:13,fontWeight:600,color:g.marca?.color,fontFamily:FONT,letterSpacing:"0.02em"}}>{g.marca?.nombre}</span>
+                              <MarcaIcon marca={g.marca} size={14} radius={4}/>
+                              <span style={{fontSize:12,fontWeight:600,color:g.marca?.color,fontFamily:FONT}}>{g.marca?.nombre}</span>
                             </div>
-                            <span style={{fontSize:13,fontWeight:700,color:g.marca?.color,fontFamily:FONT}}>{$(g.sub)}</span>
+                            <span style={{fontSize:13,fontWeight:600,color:g.marca?.color,fontFamily:FONT,letterSpacing:"-0.01em"}}>{$(g.sub)}</span>
                           </div>
                           {g.items.map((it,ii)=>(
-                            <div key={ii} style={{fontSize:12,color:C.label2,fontFamily:FONT}}>
+                            <div key={ii} style={{fontSize:11,color:C.label2,fontFamily:FONT,lineHeight:"1.3"}}>
                               · {it.nombre} ×{it.cantidad} = {$(it.subtotal)}
                             </div>
                           ))}
