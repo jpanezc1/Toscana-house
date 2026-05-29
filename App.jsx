@@ -2327,7 +2327,7 @@ function LiqModal({marcaId,ventas,mes,anio,MK,cierres,setCierres,onClose,syncCie
             ].map(s=>(
               <div key={s.label} style={{textAlign:"center",padding:"9px 8px",
                 background:`${s.color}10`,borderRadius:12}}>
-                <div style={{fontSize:14,fontWeight:600,color:s.color,fontFamily:FONT,letterSpacing:"-0.01em"}}>{$(Math.round(s.val))}</div>
+                <div style={{fontSize:14,fontWeight:700,color:C.label,fontFamily:FONT,letterSpacing:"-0.01em"}}>{$(Math.round(s.val))}</div>
                 <div style={{fontSize:10,color:C.label3,fontFamily:FONT,marginTop:2,opacity:.7}}>{s.label}</div>
               </div>
             ))}
@@ -2352,7 +2352,7 @@ function LiqModal({marcaId,ventas,mes,anio,MK,cierres,setCierres,onClose,syncCie
           padding:"14px 16px",background:`${C.gold}12`}}>
           <span style={{fontSize:11,fontWeight:600,color:C.label,fontFamily:FONT,
             textTransform:"uppercase",letterSpacing:".08em",opacity:.6}}>Total Neto</span>
-          <span style={{fontSize:28,fontWeight:700,color:C.gold,fontFamily:FONT,
+          <span style={{fontSize:28,fontWeight:700,color:C.label,fontFamily:FONT,
             letterSpacing:"-0.03em",lineHeight:1}}>{$(Math.round(neto))}</span>
         </div>
       </div>
@@ -2371,7 +2371,7 @@ function LiqModal({marcaId,ventas,mes,anio,MK,cierres,setCierres,onClose,syncCie
               <div key={v.id} style={{background:C.bg2,borderRadius:10,padding:"10px 14px",marginBottom:5}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:3}}>
                   <span style={{fontFamily:"monospace",fontSize:11,color:C.gold,fontWeight:600}}>{v.id}</span>
-                  <span style={{fontSize:15,fontWeight:600,color:C.gold,fontFamily:FONT,letterSpacing:"-0.01em"}}>{$(sub)}</span>
+                  <span style={{fontSize:15,fontWeight:700,color:C.label,fontFamily:FONT,letterSpacing:"-0.01em"}}>{$(sub)}</span>
                 </div>
                 <div style={{fontSize:11,color:C.label3,fontFamily:FONT,marginBottom:4,opacity:.65}}>
                   {v.fecha} {v.hora} · {labelPago(v.metodoPago)}
@@ -3142,7 +3142,7 @@ function FacturaModal({venta, open, onClose, onFacturada}){
             {venta?.items?.slice(0,3).map((it,i)=>(
               <div key={i} style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
                 <span style={{fontSize:13,color:C.label2,fontFamily:FONT}}>{it.nombre} ×{it.cantidad}</span>
-                <span style={{fontSize:13,fontWeight:600,color:C.gold,fontFamily:FONT}}>{$(it.subtotal)}</span>
+                <span style={{fontSize:13,fontWeight:700,color:C.label,fontFamily:FONT}}>{$(it.subtotal)}</span>
               </div>
             ))}
             {(venta?.items?.length||0)>3&&<div style={{fontSize:12,color:C.label3,fontFamily:FONT}}>
@@ -3150,7 +3150,7 @@ function FacturaModal({venta, open, onClose, onFacturada}){
             <div style={{display:"flex",justifyContent:"space-between",marginTop:8,
               paddingTop:8,borderTop:`1px solid ${C.sep}`}}>
               <span style={{fontSize:15,fontWeight:700,color:C.label,fontFamily:FONT}}>Total</span>
-              <span style={{fontSize:17,fontWeight:600,color:C.gold,fontFamily:FONT}}>{$(venta?.total)}</span>
+              <span style={{fontSize:17,fontWeight:700,color:C.label,fontFamily:FONT}}>{$(venta?.total)}</span>
             </div>
           </div>
 
@@ -3352,7 +3352,7 @@ function NotaVentaModal({venta, onClose, numVenta, onAnularVenta}){
         <div style={{display:"flex",justifyContent:"space-between",padding:"12px 14px",
           background:`${C.gold}12`,borderTop:`2px solid ${C.sep}`}}>
           <span style={{fontSize:15,fontWeight:700,color:C.label,fontFamily:FONT}}>Total</span>
-          <span style={{fontSize:18,fontWeight:600,color:C.gold,fontFamily:FONT}}>{$(venta.total)}</span>
+          <span style={{fontSize:18,fontWeight:700,color:C.label,fontFamily:FONT}}>{$(venta.total)}</span>
         </div>
       </div>
 
@@ -5037,7 +5037,7 @@ function HomeDashboard({ventas, inv, vMes, mes, anio, onGoTab}){
                   <MarcaIcon marca={m.marca} size={18} radius={6}/>
                   <span style={{fontSize:13, fontWeight:600, color:C.label, fontFamily:FONT_UI, letterSpacing:"0.02em"}}>{m.marca.nombre}</span>
                 </div>
-                <span style={{fontSize:12, fontWeight:700, color:m.marca.color, fontFamily:FONT_UI}}>
+                <span style={{fontSize:13, fontWeight:700, color:C.label, fontFamily:FONT_UI}}>
                   Bs {new Intl.NumberFormat("es-BO",{minimumFractionDigits:0,maximumFractionDigits:0}).format(m.total)}
                 </span>
               </div>
@@ -5080,7 +5080,7 @@ function HomeDashboard({ventas, inv, vMes, mes, anio, onGoTab}){
                   {v.fecha} · {labelPago(v.metodoPago)}
                 </div>
               </div>
-              <div style={{fontSize:14, fontWeight:600, color:"#2E7D32", fontFamily:FONT_UI, marginLeft:12,
+              <div style={{fontSize:14, fontWeight:700, color:C.label, fontFamily:FONT_UI, marginLeft:12,
                 letterSpacing:"-0.01em"}}>
                 Bs {new Intl.NumberFormat("es-BO",{minimumFractionDigits:0,maximumFractionDigits:0}).format(v.total)}
               </div>
@@ -5235,7 +5235,7 @@ function BrandVentaModal({venta, marca, onClose}){
                 <div style={{textAlign:"right",fontSize:13,color:C.label2,fontFamily:FONT,
                   fontWeight:500}}>×{it.cantidad}</div>
                 <div style={{textAlign:"right",fontSize:13,fontWeight:700,
-                  color:marca.color,fontFamily:FONT}}>{$(it.subtotal)}</div>
+                  color:C.label,fontFamily:FONT}}>{$(it.subtotal)}</div>
               </div>
             ))}
             {/* Total */}
@@ -5671,7 +5671,7 @@ function BrandPortal({user, ventas, inv, logout}){
                 </div>
                 <div style={{textAlign:"right"}}>
                   <div style={{fontSize:11,color:C.label3,fontFamily:FONT}}>Proyección cierre</div>
-                  <div style={{fontSize:15,fontWeight:700,color:C.gold,fontFamily:FONT}}>{$(proyeccion)}</div>
+                  <div style={{fontSize:15,fontWeight:700,color:C.label,fontFamily:FONT}}>{$(proyeccion)}</div>
                 </div>
               </div>
             </div>
@@ -5698,7 +5698,7 @@ function BrandPortal({user, ventas, inv, logout}){
                       <div style={{fontSize:11,color:C.label3,fontFamily:FONT}}>{p.codigo}</div>
                     </div>
                     <div style={{textAlign:"right",flexShrink:0}}>
-                      <div style={{fontSize:13,fontWeight:700,color:C.gold,fontFamily:FONT}}>{$(p.total)}</div>
+                      <div style={{fontSize:13,fontWeight:700,color:C.label,fontFamily:FONT}}>{$(p.total)}</div>
                       <div style={{fontSize:11,color:C.label3,fontFamily:FONT}}>{p.uds} uds</div>
                     </div>
                   </div>
@@ -5811,48 +5811,45 @@ function BrandPortal({user, ventas, inv, logout}){
                         cursor:"pointer",WebkitTapHighlightColor:"transparent",
                         transition:"all .15s",
                         borderLeft:`3px solid ${v.anulada?C.red:marca.color}`}}>
-                      {/* Fila 1 — ID + total */}
+                      {/* Fila 1 — precio + metadata en línea */}
                       <div style={{display:"flex",justifyContent:"space-between",
-                        alignItems:"center",marginBottom:4}}>
-                        <div>
-                          <div style={{fontSize:11,fontFamily:"monospace",
-                            color:C.gold,fontWeight:600}}>{v.id}</div>
-                          <div style={{fontSize:11,color:C.label3,fontFamily:FONT,marginTop:1,opacity:.65}}>
-                            {v.fecha} {v.hora} · {v.vendedor||"Tienda"}
+                        alignItems:"flex-start",marginBottom:3}}>
+                        <div style={{flex:1,minWidth:0}}>
+                          <div style={{fontSize:12,color:C.label2,fontFamily:FONT,
+                            overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",
+                            lineHeight:"1.35",marginBottom:2}}>
+                            {citems.map(i=>`${i.nombre} ×${i.cantidad}`).join(" · ")}
+                          </div>
+                          <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+                            <span style={{fontSize:10,color:C.label3,fontFamily:FONT,opacity:.7}}>
+                              {v.fecha} {v.hora}
+                            </span>
+                            <span style={{fontSize:10,color:C.label3,fontFamily:FONT,opacity:.7}}>·</span>
+                            <span style={{fontSize:10,color:C.label3,fontFamily:FONT,opacity:.7}}>
+                              {v.vendedor||"Tienda"}
+                            </span>
+                            <span style={{fontSize:10,color:C.label3,fontFamily:FONT,opacity:.7}}>·</span>
+                            <span style={{fontSize:10,color:C.label3,fontFamily:FONT,opacity:.7}}>
+                              {iconPago(v.metodoPago)} {labelPago(v.metodoPago)}
+                            </span>
+                            {v.anulada&&(
+                              <span style={{fontSize:9,background:C.redBg,color:C.red,
+                                padding:"1px 6px",borderRadius:20,fontFamily:FONT,fontWeight:700,
+                                textTransform:"uppercase",letterSpacing:.4}}>ANULADA</span>
+                            )}
+                            {hasFac&&(
+                              <span style={{fontSize:9,background:"#F3F4FC",color:"#1A237E",
+                                padding:"1px 6px",borderRadius:20,fontFamily:FONT,fontWeight:600}}>🧾 Factura</span>
+                            )}
                           </div>
                         </div>
-                        <div style={{textAlign:"right"}}>
-                          <div style={{fontSize:16,fontWeight:600,color:v.anulada?C.red:marca.color,
-                            fontFamily:FONT_DISPLAY,lineHeight:1,letterSpacing:"-0.02em"}}>{$(csub)}</div>
-                          <div style={{fontSize:10,color:C.label3,fontFamily:FONT,marginTop:2,opacity:.65}}>
-                            {iconPago(v.metodoPago)} {labelPago(v.metodoPago)}
-                          </div>
+                        <div style={{textAlign:"right",flexShrink:0,marginLeft:12}}>
+                          <div style={{fontSize:15,fontWeight:700,color:v.anulada?C.label3:C.label,
+                            fontFamily:FONT,letterSpacing:"-0.02em",
+                            textDecoration:v.anulada?"line-through":"none"}}>{$(csub)}</div>
+                          <div style={{fontSize:10,fontFamily:"monospace",color:C.label3,
+                            opacity:.55,marginTop:1}}>{v.id.slice(-6)}</div>
                         </div>
-                      </div>
-                      {/* Fila 2 — productos resumidos */}
-                      <div style={{fontSize:12,color:C.label2,fontFamily:FONT,
-                        overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",
-                        marginBottom:5,lineHeight:"1.35"}}>
-                        {citems.map(i=>`${i.nombre} ×${i.cantidad}`).join(" · ")}
-                      </div>
-                      {/* Fila 3 — badges */}
-                      <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
-                        {v.anulada&&(
-                          <span style={{fontSize:10,background:C.redBg,color:C.red,
-                            padding:"2px 8px",borderRadius:20,fontFamily:FONT,fontWeight:700}}>
-                            ANULADA
-                          </span>
-                        )}
-                        {hasFac&&(
-                          <span style={{fontSize:10,background:"#F3F4FC",color:"#1A237E",
-                            padding:"2px 8px",borderRadius:20,fontFamily:FONT,fontWeight:600}}>
-                            🧾 Facturada
-                          </span>
-                        )}
-                        <span style={{fontSize:10,color:C.label3,fontFamily:FONT,
-                          marginLeft:"auto"}}>
-                          Ver detalle →
-                        </span>
                       </div>
                     </div>
                   );
@@ -5968,7 +5965,7 @@ function BrandPortal({user, ventas, inv, logout}){
                               </div>
                             </div>
                             <div style={{textAlign:"right",flexShrink:0,marginLeft:10}}>
-                              <div style={{fontSize:14,fontWeight:600,color:C.gold,fontFamily:FONT,letterSpacing:"-0.01em"}}>
+                              <div style={{fontSize:14,fontWeight:700,color:C.label,fontFamily:FONT,letterSpacing:"-0.01em"}}>
                                 {$(p.precio)}
                               </div>
                               <div style={{fontSize:10,fontWeight:600,color:g.color,fontFamily:FONT,marginTop:1}}>
@@ -7205,7 +7202,7 @@ function SheetUsarGC({ onClose, onUsada }) {
                     <div style={{fontSize:13,color:C.label,fontFamily:FONT_UI}}>{gcFound.codigo}</div>
                   </div>
                   <div style={{textAlign:"right"}}>
-                    <div style={{fontSize:18,fontWeight:700,color:C.gold,fontFamily:FONT_DISPLAY}}>{$(gcFound.saldo)}</div>
+                    <div style={{fontSize:18,fontWeight:700,color:C.label,fontFamily:FONT_DISPLAY}}>{$(gcFound.saldo)}</div>
                     <div style={{fontSize:11,color:C.label3,fontFamily:FONT_UI}}>saldo disponible</div>
                   </div>
                 </div>
@@ -7280,8 +7277,8 @@ function SheetDetalleGC({ gc: gcProp, onClose }) {
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:20}}>
           {[
             {label:"Valor original",val:$(gc.monto),  color:C.label},
-            {label:"Saldo actual",  val:$(gc.saldo),   color:gc.saldo>0?C.green:C.label3},
-            {label:"Consumido",     val:$(consumido),  color:consumido>0?C.amber:C.label3},
+            {label:"Saldo actual",  val:$(gc.saldo),   color:gc.saldo>0?C.label:C.label3},
+            {label:"Consumido",     val:$(consumido),  color:consumido>0?C.label:C.label3},
           ].map(k=>(
             <div key={k.label} style={{background:C.bg2,borderRadius:12,padding:"12px 10px",textAlign:"center",border:`1px solid ${C.sep}`}}>
               <div style={{fontSize:9,fontWeight:700,color:C.label3,textTransform:"uppercase",letterSpacing:.6,marginBottom:4,fontFamily:FONT_UI}}>{k.label}</div>
@@ -7609,7 +7606,7 @@ function GiftCardsTab() {
                 <div style={{fontSize:13,color:C.label3,fontFamily:FONT_UI}}>{gc.emision}</div>
                 <div style={{fontSize:13,color:gc.vencimiento?C.amber:C.label3,fontFamily:FONT_UI}}>{gc.vencimiento||"—"}</div>
                 <div style={{fontSize:13,fontWeight:600,color:C.label,fontFamily:FONT_UI}}>{$(gc.monto)}</div>
-                <div style={{fontSize:13,fontWeight:700,color:gc.saldo>0?C.green:C.label3,fontFamily:FONT_UI}}>{$(gc.saldo)}</div>
+                <div style={{fontSize:13,fontWeight:700,color:gc.saldo>0?C.label:C.label3,fontFamily:FONT_UI}}>{$(gc.saldo)}</div>
                 <div style={{fontSize:11,fontWeight:700,color:ec,textTransform:"uppercase",letterSpacing:.4,fontFamily:FONT_UI,paddingTop:2}}>{est}</div>
                 <div>
                   <button onClick={e=>{e.stopPropagation();setGcDetalle(gc);}}
@@ -8132,7 +8129,7 @@ function App(){
                           background:prods>0?C.green:C.label4,flexShrink:0,
                         }}/>
                         {prods} producto{prods!==1?"s":""}
-                        {total>0&&<span style={{color:C.gold,fontWeight:500}}> · {$(total)}</span>}
+                        {total>0&&<span style={{color:C.label,fontWeight:700}}> · {$(total)}</span>}
                       </div>
                     </div>
 
@@ -8198,7 +8195,7 @@ function App(){
                       border:`1px solid ${s.color}25`,textAlign:"center"}}>
                       <div style={{fontSize:10,fontWeight:700,color:s.color,fontFamily:FONT_UI,
                         textTransform:"uppercase",letterSpacing:.6,marginBottom:4,opacity:.8}}>{s.label}</div>
-                      <div style={{fontSize:16,fontWeight:700,color:s.color,fontFamily:FONT_UI}}>{s.value}</div>
+                      <div style={{fontSize:16,fontWeight:700,color:C.label,fontFamily:FONT_UI}}>{s.value}</div>
                     </div>
                   ))}
                 </div>
@@ -8224,7 +8221,7 @@ function App(){
                         </div>
                       </div>
                       <div style={{textAlign:"right"}}>
-                        <div style={{fontSize:15,fontWeight:700,color:p.color,fontFamily:FONT_UI}}>{$(p.val)}</div>
+                        <div style={{fontSize:15,fontWeight:700,color:C.label,fontFamily:FONT_UI}}>{$(p.val)}</div>
                         {p.val>0&&<div style={{fontSize:10,color:C.green,fontFamily:FONT_UI,fontWeight:600}}>✓ Registrado</div>}
                       </div>
                     </div>
@@ -8819,7 +8816,7 @@ function POS({inv,onVenta,onVerNota}){
                   </div>
                 </div>
                 <div style={{textAlign:"right"}}>
-                  <div style={{fontSize:16,fontWeight:700,color:C.gold,fontFamily:FONT}}>{$(p.precio)}</div>
+                  <div style={{fontSize:16,fontWeight:700,color:C.label,fontFamily:FONT}}>{$(p.precio)}</div>
                   <div style={{fontSize:11,color:C.label3,fontFamily:FONT}}>{idx===0?"↵ agregar":""}</div>
                 </div>
               </div>
@@ -8835,7 +8832,7 @@ function POS({inv,onVenta,onVerNota}){
             display:"flex",justifyContent:"space-between",alignItems:"center"}}>
             <span style={{fontSize:13,fontWeight:600,color:C.label2,fontFamily:FONT,
               textTransform:"uppercase",letterSpacing:.6}}>Carrito · {carrito.length} ítem{carrito.length!==1?"s":""}</span>
-            <span style={{fontSize:16,fontWeight:700,color:C.gold,fontFamily:FONT}}>{$(subtotal)}</span>
+            <span style={{fontSize:16,fontWeight:700,color:C.label,fontFamily:FONT}}>{$(subtotal)}</span>
           </div>
           {carrito.map((it,i)=>(
             <div key={it.prodId} style={{
@@ -8868,7 +8865,7 @@ function POS({inv,onVenta,onVerNota}){
                 }}>+</button>
               </div>
               <div style={{minWidth:70,textAlign:"right"}}>
-                <div style={{fontSize:15,fontWeight:600,color:C.gold,fontFamily:FONT}}>{$(it.precio*it.cantidad)}</div>
+                <div style={{fontSize:15,fontWeight:700,color:C.label,fontFamily:FONT}}>{$(it.precio*it.cantidad)}</div>
               </div>
               <button onClick={()=>quitar(it.prodId)} style={{
                 background:"none",border:"none",cursor:"pointer",
@@ -8953,7 +8950,7 @@ function POS({inv,onVenta,onVerNota}){
             }}>✓</div>
             <div style={{fontSize:22,fontWeight:500,color:C.green,
               fontFamily:FONT_DISPLAY,letterSpacing:.5}}>Venta realizada</div>
-            <div style={{fontSize:28,fontWeight:600,color:C.gold,
+            <div style={{fontSize:28,fontWeight:700,color:C.label,
               fontFamily:FONT_DISPLAY,marginTop:4}}>{$(ultima.total)}</div>
           </div>
           <div style={{display:"flex",justifyContent:"space-between",
@@ -9001,7 +8998,7 @@ function POS({inv,onVenta,onVerNota}){
         <div style={{background:`${C.gold}12`,border:`1px solid ${C.gold}30`,
           borderRadius:16,padding:"20px",marginBottom:20,textAlign:"center"}}>
           <div style={{fontSize:13,color:C.label3,fontFamily:FONT,marginBottom:6}}>Total a cobrar</div>
-          <div style={{fontSize:40,fontWeight:700,color:C.gold,fontFamily:FONT,lineHeight:1}}>{$(total)}</div>
+          <div style={{fontSize:40,fontWeight:700,color:C.label,fontFamily:FONT,lineHeight:1}}>{$(total)}</div>
           {descPct>0&&<div style={{fontSize:13,color:C.label3,fontFamily:FONT,marginTop:6}}>
             Subtotal {$(subtotal)} · -({descPct}%)
           </div>}
@@ -9065,7 +9062,7 @@ function POS({inv,onVenta,onVerNota}){
           <div style={{marginBottom:16}}>
             <div style={{background:C.bg2,borderRadius:14,padding:16,border:`1px solid ${C.sep}`,marginBottom:10}}>
               <div style={{fontSize:12,color:C.label3,fontFamily:FONT,marginBottom:12,textAlign:"center"}}>
-                Total a cobrar: <strong style={{color:C.gold}}>{$(total)}</strong> — distribuye entre los métodos
+                Total a cobrar: <strong style={{color:C.label}}>{$(total)}</strong> — distribuye entre los métodos
               </div>
               {PAGOS.map(function(p){
                 var val = montosMixtos[p.id] || "";
@@ -9216,9 +9213,9 @@ function POS({inv,onVenta,onVerNota}){
                         padding:"8px 12px",borderBottom:i<gcAllocsDisplay.length-1?`1px solid ${C.sep}`:"",
                         alignItems:"center"}}>
                         <div style={{fontSize:12,color:C.label,fontFamily:FONT_UI,fontWeight:600}}>{a.marcaNombre}</div>
-                        <div style={{fontSize:11,color:C.label3,fontFamily:FONT_UI,textAlign:"right"}}>{$(a.subtotal)}</div>
+                        <div style={{fontSize:11,color:C.label,fontWeight:600,fontFamily:FONT_UI,textAlign:"right"}}>{$(a.subtotal)}</div>
                         <div style={{fontSize:11,color:"#7C3AED",fontFamily:FONT_UI,fontWeight:600,textAlign:"right"}}>🎁{$(a.gcAmt)}</div>
-                        <div style={{fontSize:11,color:extraMontoUI>0.01?C.amber:C.label3,fontFamily:FONT_UI,textAlign:"right"}}>{extraMontoUI>0.01?$(a.xtra):"—"}</div>
+                        <div style={{fontSize:11,color:extraMontoUI>0.01?C.label:C.label3,fontFamily:FONT_UI,fontWeight:600,textAlign:"right"}}>{extraMontoUI>0.01?$(a.xtra):"—"}</div>
                       </div>
                     ))}
                   </div>
@@ -9715,7 +9712,7 @@ function MarcaDetalle({marcaId,inv,ventas,vMes,mes,anio,MK,cierres,setCierres,ge
                       </div>
                     </div>
                     <div style={{textAlign:"right"}}>
-                      <div style={{fontSize: isDesktop ? 17 : 20, fontWeight:600,color:marca?.color,fontFamily:FONT,letterSpacing:"-0.02em"}}>
+                      <div style={{fontSize: isDesktop ? 17 : 20, fontWeight:700,color:C.label,fontFamily:FONT,letterSpacing:"-0.02em"}}>
                         {$(periodo.bruto)}
                       </div>
                       {cierres[`${periodo.mk}-${marcaId}`]?.cerrado&&<Chip color={C.green} small>✓ Cerrado</Chip>}
@@ -9732,7 +9729,7 @@ function MarcaDetalle({marcaId,inv,ventas,vMes,mes,anio,MK,cierres,setCierres,ge
                             {iconPago(v.metodoPago)} {labelPago(v.metodoPago)}
                           </Chip>
                         </div>
-                        <span style={{fontSize: isDesktop ? 14 : 15, fontWeight:600,color:C.gold,fontFamily:FONT,letterSpacing:"-0.01em"}}>{$(v.subMarca)}</span>
+                        <span style={{fontSize: isDesktop ? 14 : 15, fontWeight:700,color:C.label,fontFamily:FONT,letterSpacing:"-0.01em"}}>{$(v.subMarca)}</span>
                       </div>
                       <div style={{fontSize:11,color:C.label3,fontFamily:FONT,marginBottom: isDesktop ? 2 : 4,opacity:.65}}>
                         {v.fecha} {v.hora}
@@ -9781,7 +9778,7 @@ function MarcaDetalle({marcaId,inv,ventas,vMes,mes,anio,MK,cierres,setCierres,ge
                           background:`${C.gold}18`,padding:"1px 7px",borderRadius:5}}>{p.codigo}</span>
                       </div>
                       <div style={{textAlign:"right"}}>
-                        <div style={{fontSize: isDesktop ? 14 : 16, fontWeight:700,color:C.gold,fontFamily:FONT}}>{$(p.precio)}</div>
+                        <div style={{fontSize: isDesktop ? 14 : 16, fontWeight:700,color:C.label,fontFamily:FONT}}>{$(p.precio)}</div>
                         <div style={{fontSize: isDesktop ? 12 : 13, fontFamily:FONT,marginTop:2,
                           color:p.stock===0?C.red:p.stock<3?C.amber:C.green}}>
                           {p.stock===0?"Agotado":p.stock<3?`${p.stock} (bajo)`:`${p.stock} disp.`}
@@ -9842,7 +9839,7 @@ function MarcaDetalle({marcaId,inv,ventas,vMes,mes,anio,MK,cierres,setCierres,ge
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",
               padding:"18px 16px",background:`${C.gold}12`}}>
               <span style={{fontSize:16,fontWeight:700,color:C.label,fontFamily:FONT}}>TOTAL A PAGAR</span>
-              <span style={{fontSize:24,fontWeight:700,color:C.gold,fontFamily:FONT}}>{$(liq.neto)}</span>
+              <span style={{fontSize:24,fontWeight:700,color:C.label,fontFamily:FONT}}>{$(liq.neto)}</span>
             </div>
           </div>
 
@@ -9881,7 +9878,7 @@ function MarcaDetalle({marcaId,inv,ventas,vMes,mes,anio,MK,cierres,setCierres,ge
                         {v.gcId&&<span style={{fontSize:9,background:"#7C3AED15",color:"#7C3AED",
                           fontWeight:700,padding:"2px 5px",borderRadius:6,fontFamily:FONT_UI}}>🎁 GC</span>}
                       </div>
-                      <span style={{fontSize:15,fontWeight:600,color:C.gold,fontFamily:FONT,letterSpacing:"-0.01em"}}>{$(sub2)}</span>
+                      <span style={{fontSize:15,fontWeight:700,color:C.label,fontFamily:FONT,letterSpacing:"-0.01em"}}>{$(sub2)}</span>
                     </div>
                     <div style={{fontSize:11,color:C.label3,fontFamily:FONT,marginBottom:gcAlloc?3:0,opacity:.65}}>
                       {v.fecha} {v.hora} · {labelPago(v.metodoPago)}
@@ -10102,8 +10099,8 @@ function HistorialTab({ventas, inv, cierres, onVentaClick}){
                         </div>
                       </div>
                       <div style={{textAlign:"right"}}>
-                        <div style={{fontSize:18,fontWeight:600,color:x.marca.color,fontFamily:FONT}}>{$(x.total)}</div>
-                        <div style={{fontSize:11,color:C.green,fontFamily:FONT}}>Neto: {$(x.total*.9)}</div>
+                        <div style={{fontSize:18,fontWeight:700,color:C.label,fontFamily:FONT}}>{$(x.total)}</div>
+                        <div style={{fontSize:11,color:C.label3,fontFamily:FONT}}>Neto: {$(x.total*.9)}</div>
                       </div>
                     </div>
                     <div style={{background:"rgba(0,0,0,0.06)",borderRadius:4,height:5,marginBottom:10}}>
@@ -10133,28 +10130,32 @@ function HistorialTab({ventas, inv, cierres, onVentaClick}){
             : [...ventasPer].reverse().map(v=>{
                 return (
                   <div key={v.id} onClick={()=>onVentaClick&&onVentaClick(v)}
-                    style={{background:C.bg2,borderRadius:14,padding:"14px 16px",marginBottom:10,
-                      cursor:"pointer",WebkitTapHighlightColor:"transparent"}}>
-                    <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
-                      <div>
-                        <span style={{fontFamily:"monospace",fontSize:12,color:C.gold}}>{v.id}</span>
-                        <div style={{fontSize:12,color:C.label3,fontFamily:FONT}}>{v.fecha} {v.hora}</div>
+                    style={{background:C.bg2,borderRadius:14,padding:"12px 14px",marginBottom:8,
+                      cursor:"pointer",WebkitTapHighlightColor:"transparent",
+                      borderLeft:`3px solid ${colorPago(v.metodoPago)||C.sep}`}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:5}}>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:3,flexWrap:"wrap"}}>
+                          <Chip color={colorPago(v.metodoPago)} small>{iconPago(v.metodoPago)} {labelPago(v.metodoPago)}</Chip>
+                          <span style={{fontSize:10,color:C.label3,fontFamily:FONT,opacity:.7}}>{v.fecha} {v.hora}</span>
+                        </div>
+                        {v.items.map((it,ii)=>{
+                          const m=MARCAS.find(x=>x.id===it.marcaId);
+                          return (
+                            <div key={ii} style={{fontSize:12,color:C.label2,fontFamily:FONT,
+                              display:"flex",alignItems:"center",gap:5,marginBottom:2}}>
+                              <div style={{width:5,height:5,borderRadius:"50%",background:m?.color,flexShrink:0}}/>
+                              <span style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",flex:1}}>{it.nombre} ×{it.cantidad}</span>
+                              <span style={{fontWeight:600,color:C.label,flexShrink:0}}>{$(it.subtotal)}</span>
+                            </div>
+                          );
+                        })}
                       </div>
-                      <div style={{display:"flex",alignItems:"center",gap:8}}>
-                        <Chip color={colorPago(v.metodoPago)}>{iconPago(v.metodoPago)} {labelPago(v.metodoPago)}</Chip>
-                        <span style={{fontSize:17,fontWeight:600,color:C.gold,fontFamily:FONT}}>{$(v.total)}</span>
+                      <div style={{textAlign:"right",flexShrink:0,marginLeft:12}}>
+                        <span style={{fontSize:17,fontWeight:700,color:C.label,fontFamily:FONT,
+                          letterSpacing:"-0.02em"}}>{$(v.total)}</span>
                       </div>
                     </div>
-                    {v.items.map((it,ii)=>{
-                      const m=MARCAS.find(x=>x.id===it.marcaId);
-                      return (
-                        <div key={ii} style={{fontSize:13,color:C.label2,fontFamily:FONT,
-                          display:"flex",alignItems:"center",gap:6,marginBottom:3}}>
-                          <div style={{width:6,height:6,borderRadius:"50%",background:m?.color,flexShrink:0}}/>
-                          {it.nombre} ×{it.cantidad} = {$(it.subtotal)}
-                        </div>
-                      );
-                    })}
                   </div>
                 );
               })
@@ -11363,7 +11364,7 @@ function DashboardVentas({ventas, onVentaClick}){
                   <span style={{fontSize:18}}>{s.icon}</span>
                   <span style={{fontSize:12,color:C.label3,fontFamily:FONT}}>{s.label}</span>
                 </div>
-                <div style={{fontSize:16,fontWeight:600,color:s.color,fontFamily:FONT}}>{$(s.val)}</div>
+                <div style={{fontSize:16,fontWeight:700,color:C.label,fontFamily:FONT}}>{$(s.val)}</div>
                 <div style={{fontSize:11,color:C.label3,fontFamily:FONT,marginTop:2}}>
                   {Math.round(totalFil>0?(s.val/totalFil)*100:0)}% del total
                 </div>
@@ -11428,7 +11429,7 @@ function DashboardVentas({ventas, onVentaClick}){
             </div>
             <div style={{textAlign:"right"}}>
               <div style={{fontSize:12,color:C.label3,fontFamily:FONT_UI,fontWeight:600,textTransform:"uppercase",letterSpacing:.5}}>Revenue</div>
-              <div style={{fontSize:20,fontWeight:700,color:C.green,fontFamily:FONT_UI}}>{$(totalFil)}</div>
+              <div style={{fontSize:20,fontWeight:700,color:C.label,fontFamily:FONT_UI}}>{$(totalFil)}</div>
             </div>
           </div>
           {itemsView.length===0
@@ -11460,7 +11461,7 @@ function DashboardVentas({ventas, onVentaClick}){
                         </div>
                       </div>
                       <div style={{textAlign:"center",fontSize:15,fontWeight:700,color:C.blue,fontFamily:FONT_UI}}>{it.cant}</div>
-                      <div style={{textAlign:"right",fontSize:14,fontWeight:700,color:C.green,fontFamily:FONT_UI}}>{$(it.total)}</div>
+                      <div style={{textAlign:"right",fontSize:14,fontWeight:700,color:C.label,fontFamily:FONT_UI}}>{$(it.total)}</div>
                     </div>
                   );
                 })}
@@ -11483,26 +11484,34 @@ function DashboardVentas({ventas, onVentaClick}){
               </div>
             : [...ventasFiltradas].reverse().map(v=>(
                 <div key={v.id} onClick={()=>onVentaClick&&onVentaClick(v)}
-                  style={{background:C.bg1,borderRadius:12,padding:"14px 16px",marginBottom:8,
+                  style={{background:C.bg1,borderRadius:12,padding:"11px 14px",marginBottom:7,
                     border:`1px solid ${C.sep}`,cursor:"pointer",
-                    boxShadow:"0 1px 3px rgba(0,0,0,0.05)",
-                    WebkitTapHighlightColor:"transparent"}}>
-                  <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
-                    <div>
-                      <span style={{fontFamily:"monospace",fontSize:11,color:C.label3}}>{v.id}</span>
-                      <div style={{fontSize:12,color:C.label3,fontFamily:FONT}}>{v.fecha} {v.hora} · {v.vendedor||"Tienda"}</div>
+                    boxShadow:"0 1px 3px rgba(0,0,0,0.04)",
+                    WebkitTapHighlightColor:"transparent",
+                    borderLeft:`3px solid ${colorPago(v.metodoPago)||C.sep}`}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8}}>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:4,flexWrap:"wrap"}}>
+                        <Chip color={colorPago(v.metodoPago)} small>{iconPago(v.metodoPago)} {labelPago(v.metodoPago)}</Chip>
+                        <span style={{fontSize:10,color:C.label3,fontFamily:FONT,opacity:.7}}>
+                          {v.fecha} · {v.vendedor||"Tienda"}
+                        </span>
+                      </div>
+                      <div style={{display:"flex",flexWrap:"wrap",gap:3}}>
+                        {v.items.map((it,i)=>(
+                          <span key={i} style={{fontSize:11,color:C.label2,fontFamily:FONT}}>
+                            {it.nombre} ×{it.cantidad}{i<v.items.length-1?" ·":""}
+                          </span>
+                        ))}
+                      </div>
                     </div>
-                    <div style={{textAlign:"right"}}>
-                      <div style={{fontSize:15,fontWeight:600,color:C.gold,fontFamily:FONT}}>{$(v.total)}</div>
-                      <Chip color={colorPago(v.metodoPago)} small>{iconPago(v.metodoPago)} {labelPago(v.metodoPago)}</Chip>
+                    <div style={{textAlign:"right",flexShrink:0}}>
+                      <div style={{fontSize:15,fontWeight:700,color:C.label,fontFamily:FONT,
+                        letterSpacing:"-0.02em"}}>{$(v.total)}</div>
+                      <div style={{fontSize:10,color:C.label3,fontFamily:FONT,marginTop:2,opacity:.6}}>
+                        {v.items.length} ítem{v.items.length!==1?"s":""}
+                      </div>
                     </div>
-                  </div>
-                  <div style={{display:"flex",flexWrap:"wrap",gap:4}}>
-                    {v.items.map((it,i)=>(
-                      <span key={i} style={{fontSize:11,color:C.label3,fontFamily:FONT}}>
-                        {it.nombre} ×{it.cantidad}{i<v.items.length-1?" ·":""}
-                      </span>
-                    ))}
                   </div>
                 </div>
               ))
@@ -11551,12 +11560,12 @@ function DashboardVentas({ventas, onVentaClick}){
                   border:`1px solid ${C.sep}`,cursor:"pointer",
                   boxShadow:"0 1px 3px rgba(0,0,0,0.05)",
                   WebkitTapHighlightColor:"transparent"}}>
-                <div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
                   <div>
                     <span style={{fontFamily:"monospace",fontSize:11,color:C.label3}}>{v.id}</span>
                     <div style={{fontSize:12,color:C.label3,fontFamily:FONT}}>{v.fecha} · {v.vendedor||"Tienda"}</div>
                   </div>
-                  <div style={{fontSize:15,fontWeight:600,color:C.gold,fontFamily:FONT}}>{$(v.total)}</div>
+                  <div style={{fontSize:15,fontWeight:700,color:C.label,fontFamily:FONT}}>{$(v.total)}</div>
                 </div>
                 <div style={{borderTop:`1px solid ${C.sep}`,paddingTop:8}}>
                   {itsMatch.map((it,i)=>(
@@ -11625,7 +11634,7 @@ function VentasTab({vMes, totalVtas, mes, anio, onVentaClick}){
           border:`1px solid ${C.sep}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
           <div>
             <div style={{fontSize:11,color:C.label3,fontWeight:700,textTransform:"uppercase",letterSpacing:.7,marginBottom:3}}>Total {MESES[mes]}</div>
-            <div style={{fontSize: isDesktop ? 22 : 28,fontWeight:700,color:C.gold,fontFamily:FONT,lineHeight:1}}>{$(totalVtas)}</div>
+            <div style={{fontSize: isDesktop ? 22 : 28,fontWeight:700,color:C.label,fontFamily:FONT,lineHeight:1}}>{$(totalVtas)}</div>
             <div style={{fontSize:12,color:C.label3,fontFamily:FONT,marginTop:3}}>{vMes.length} transacciones · {porMarca.length} marcas activas</div>
           </div>
           <div style={{fontSize: isDesktop ? 28 : 36,opacity:.4}}>💰</div>
@@ -11682,7 +11691,7 @@ function VentasTab({vMes, totalVtas, mes, anio, onVentaClick}){
                       </div>
                     </div>
                     <div style={{textAlign:"right"}}>
-                      <div style={{fontSize: isDesktop ? 15 : 17, fontWeight:600, color:x.marca.color, fontFamily:FONT,letterSpacing:"-0.01em"}}>{$(x.total)}</div>
+                      <div style={{fontSize: isDesktop ? 15 : 17, fontWeight:700, color:C.label, fontFamily:FONT,letterSpacing:"-0.01em"}}>{$(x.total)}</div>
                       <div style={{fontSize:10,color:C.label3,fontFamily:FONT,opacity:.65}}>
                         {Math.round((x.total/totalVtas)*100)}% del total
                       </div>
@@ -11710,8 +11719,8 @@ function VentasTab({vMes, totalVtas, mes, anio, onVentaClick}){
                       }}>
                         <div style={{fontSize:11, marginBottom:1}}>{p.icon}</div>
                         <div style={{fontSize:10,color:C.label3,fontFamily:FONT,marginBottom:1,opacity:.7}}>{p.label}</div>
-                        <div style={{fontSize: isDesktop ? 11 : 12, fontWeight:600,
-                          color:p.value>0?p.color:C.label3,fontFamily:FONT}}>
+                        <div style={{fontSize: isDesktop ? 11 : 12, fontWeight:700,
+                          color:p.value>0?C.label:C.label3,fontFamily:FONT}}>
                           {p.value>0?$(p.value):"—"}
                         </div>
                         {p.value>0&&x.total>0&&(
@@ -11782,24 +11791,22 @@ function VentasTab({vMes, totalVtas, mes, anio, onVentaClick}){
                     }}
                     onMouseEnter={isDesktop ? e=>{ e.currentTarget.style.background=v.anulada?`${C.red}06`:`${C.sep}`; } : undefined}
                     onMouseLeave={isDesktop ? e=>{ e.currentTarget.style.background=v.anulada?`${C.red}06`:C.bg2; } : undefined}>
-                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom: isDesktop ? 3 : 5}}>
-                      <div>
-                        <span style={{fontFamily:"monospace",fontSize:11,color:v.anulada?C.red:C.gold,fontWeight:600}}>
-                          {v.id}{v.anulada?" ⊘":""}</span>
-                        <div style={{fontSize:11,color:C.label3,fontFamily:FONT,marginTop:1,opacity:.65}}>
-                          {v.fecha} {v.hora} · {v.vendedor||"Tienda"}
-                          {v.anulada&&<span style={{color:C.red,fontWeight:600}}> · ANULADA</span>}
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",
+                      gap:8, marginBottom: isDesktop ? 4 : 6}}>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:2,flexWrap:"wrap"}}>
+                          {v.anulada
+                            ? <Chip color={C.red}>⊘ Anulada</Chip>
+                            : <Chip color={colorPago(v.metodoPago)} small>{iconPago(v.metodoPago)} {labelPago(v.metodoPago)}</Chip>
+                          }
+                          <span style={{fontSize:10,color:C.label3,fontFamily:FONT,opacity:.65}}>
+                            {v.fecha} {v.hora} · {v.vendedor||"Tienda"}
+                          </span>
                         </div>
                       </div>
-                      <div style={{display:"flex",alignItems:"center",gap:8}}>
-                        {v.anulada
-                          ? <Chip color={C.red}>⊘ Anulada</Chip>
-                          : <Chip color={colorPago(v.metodoPago)}>{iconPago(v.metodoPago)} {labelPago(v.metodoPago)}</Chip>
-                        }
-                        <span style={{fontSize: isDesktop ? 15 : 17, fontWeight:600,
-                          color:v.anulada?C.label3:C.gold,fontFamily:FONT,letterSpacing:"-0.01em",
-                          textDecoration:v.anulada?"line-through":"none"}}>{$(totalMostrar)}</span>
-                      </div>
+                      <span style={{fontSize: isDesktop ? 15 : 16, fontWeight:700,
+                        color:v.anulada?C.label3:C.label,fontFamily:FONT,letterSpacing:"-0.02em",
+                        flexShrink:0,textDecoration:v.anulada?"line-through":"none"}}>{$(totalMostrar)}</span>
                     </div>
                     {/* Ítems agrupados por marca */}
                     {Object.values(
@@ -11818,7 +11825,7 @@ function VentasTab({vMes, totalVtas, mes, anio, onVentaClick}){
                             <MarcaIcon marca={g.marca} size={14} radius={4}/>
                             <span style={{fontSize:12,fontWeight:600,color:g.marca?.color,fontFamily:FONT}}>{g.marca?.nombre}</span>
                           </div>
-                          <span style={{fontSize:13,fontWeight:600,color:g.marca?.color,fontFamily:FONT,letterSpacing:"-0.01em"}}>{$(g.sub)}</span>
+                          <span style={{fontSize:13,fontWeight:700,color:C.label,fontFamily:FONT,letterSpacing:"-0.01em"}}>{$(g.sub)}</span>
                         </div>
                         {g.items.map((it,ii)=>(
                           <div key={ii} style={{fontSize:11,color:C.label2,fontFamily:FONT,lineHeight:"1.3"}}>
