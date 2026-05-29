@@ -68,6 +68,11 @@ const html = `<!DOCTYPE html>
   <meta name="description" content="Toscana House — Sistema de gestión de marcas y ventas">
   <meta name="robots" content="noindex, nofollow">
 
+  <!-- Cache control — siempre cargar versión más nueva -->
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+
   <!-- PWA manifest -->
   <link rel="manifest" href="manifest.json">
 
