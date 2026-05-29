@@ -27515,45 +27515,42 @@ Fecha: ${venta.fecha}`);
       xlsxCarg ? "\u23F3" : "\u{1F4CA}",
       " ",
       xlsxCarg ? "Generando\u2026" : "Excel"
-    ))), invMarca.length === 0 ? /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center", padding: "48px 0", color: C.label3 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 40, marginBottom: 8 } }, "\u{1F4E6}"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontFamily: FONT } }, "Sin productos registrados")) : invFiltrado.length === 0 ? /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center", padding: "48px 0", color: C.label3 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 32, marginBottom: 8 } }, "\u{1F50D}"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontFamily: FONT } }, "Sin resultados con los filtros aplicados")) : (() => {
-      const grupos = [
-        { label: "\u{1F534} Agotados", prods: invFiltrado.filter((i) => i.stock === 0), color: C.red },
-        { label: "\u{1F7E1} Bajo stock", prods: invFiltrado.filter((i) => i.stock > 0 && i.stock <= 2), color: C.amber },
-        { label: "\u{1F7E2} En stock", prods: invFiltrado.filter((i) => i.stock > 2), color: C.green }
-      ].filter((g) => g.prods.length > 0);
-      return grupos.map((g) => /* @__PURE__ */ import_react.default.createElement("div", { key: g.label, style: { marginBottom: 16 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
-        fontSize: 11,
-        fontWeight: 700,
-        color: g.color,
-        fontFamily: FONT,
-        textTransform: "uppercase",
-        letterSpacing: 0.5,
-        marginBottom: 8
-      } }, g.label, " (", g.prods.length, ")"), g.prods.map((p) => /* @__PURE__ */ import_react.default.createElement("div", { key: p.id, style: {
-        background: C.bg1,
-        borderRadius: 10,
-        padding: "9px 12px",
-        marginBottom: 5,
-        border: `1px solid ${C.sep}`,
-        borderLeft: `3px solid ${g.color}`,
-        boxShadow: "0 1px 3px rgba(0,0,0,0.03)"
-      } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
-        fontSize: 13,
-        fontWeight: 600,
-        color: C.label,
-        fontFamily: FONT,
-        overflow: "hidden",
-        textOverflow: "ellipsis",
-        whiteSpace: "nowrap",
-        lineHeight: "1.3"
-      } }, p.nombre), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: C.label3, fontFamily: FONT, marginTop: 1, opacity: 0.65 } }, p.codigo, " \xB7 ", p.categoria || "General", p.fecha && /* @__PURE__ */ import_react.default.createElement("span", null, " \xB7 ", p.fecha))), /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "right", flexShrink: 0, marginLeft: 10 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 14, fontWeight: 600, color: C.gold, fontFamily: FONT, letterSpacing: "-0.01em" } }, $(p.precio)), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, fontWeight: 600, color: g.color, fontFamily: FONT, marginTop: 1 } }, p.stock, " / ", p.stockInicial || p.stock, " uds"))), /* @__PURE__ */ import_react.default.createElement("div", { style: { marginTop: 7, height: 3, background: `${g.color}20`, borderRadius: 2 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
-        height: "100%",
-        background: g.color,
-        borderRadius: 2,
-        width: `${(p.stockInicial || p.stock) > 0 ? Math.round(p.stock / (p.stockInicial || p.stock) * 100) : 0}%`,
-        transition: "width .3s"
-      } }))))));
-    })()), tab === "liquidacion" && /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+    ))), invMarca.length === 0 ? /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center", padding: "48px 0", color: C.label3 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 40, marginBottom: 8 } }, "\u{1F4E6}"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontFamily: FONT } }, "Sin productos registrados")) : invFiltrado.length === 0 ? /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center", padding: "48px 0", color: C.label3 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 32, marginBottom: 8 } }, "\u{1F50D}"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontFamily: FONT } }, "Sin resultados con los filtros aplicados")) : [
+      { label: "\u{1F534} Agotados", prods: invFiltrado.filter((i) => i.stock === 0), color: C.red },
+      { label: "\u{1F7E1} Bajo stock", prods: invFiltrado.filter((i) => i.stock > 0 && i.stock <= 2), color: C.amber },
+      { label: "\u{1F7E2} En stock", prods: invFiltrado.filter((i) => i.stock > 2), color: C.green }
+    ].filter((g) => g.prods.length > 0).map((g) => /* @__PURE__ */ import_react.default.createElement("div", { key: g.label, style: { marginBottom: 16 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      fontSize: 11,
+      fontWeight: 700,
+      color: g.color,
+      fontFamily: FONT,
+      textTransform: "uppercase",
+      letterSpacing: 0.5,
+      marginBottom: 8
+    } }, g.label, " (", g.prods.length, ")"), g.prods.map((p) => /* @__PURE__ */ import_react.default.createElement("div", { key: p.id, style: {
+      background: C.bg1,
+      borderRadius: 10,
+      padding: "9px 12px",
+      marginBottom: 5,
+      border: `1px solid ${C.sep}`,
+      borderLeft: `3px solid ${g.color}`,
+      boxShadow: "0 1px 3px rgba(0,0,0,0.03)"
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      fontSize: 13,
+      fontWeight: 600,
+      color: C.label,
+      fontFamily: FONT,
+      overflow: "hidden",
+      textOverflow: "ellipsis",
+      whiteSpace: "nowrap",
+      lineHeight: "1.3"
+    } }, p.nombre), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: C.label3, fontFamily: FONT, marginTop: 1, opacity: 0.65 } }, p.codigo, " \xB7 ", p.categoria || "General", p.fecha && /* @__PURE__ */ import_react.default.createElement("span", null, " \xB7 ", p.fecha))), /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "right", flexShrink: 0, marginLeft: 10 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 14, fontWeight: 600, color: C.gold, fontFamily: FONT, letterSpacing: "-0.01em" } }, $(p.precio)), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, fontWeight: 600, color: g.color, fontFamily: FONT, marginTop: 1 } }, p.stock, " / ", p.stockInicial || p.stock, " uds"))), /* @__PURE__ */ import_react.default.createElement("div", { style: { marginTop: 7, height: 3, background: `${g.color}20`, borderRadius: 2 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      height: "100%",
+      background: g.color,
+      borderRadius: 2,
+      width: `${(p.stockInicial || p.stock) > 0 ? Math.round(p.stock / (p.stockInicial || p.stock) * 100) : 0}%`,
+      transition: "width .3s"
+    } }))))))), tab === "liquidacion" && /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: {
       background: `${marca.color}15`,
       borderRadius: 18,
       padding: 16,
@@ -29814,6 +29811,13 @@ Fecha: ${venta.fecha}`);
     const showingDetail = tab === "marcas" && marcaDetalle;
     if (!user) return /* @__PURE__ */ import_react.default.createElement(LoginScreen, { onLogin: login });
     if (user.rol === "marca") return /* @__PURE__ */ import_react.default.createElement(BrandPortal, { user, ventas, inv, logout });
+    const liqEf = vMes.filter((v) => v.metodoPago === "efectivo").reduce((s, v) => s + v.total, 0);
+    const liqQr = vMes.filter((v) => v.metodoPago === "qr").reduce((s, v) => s + v.total, 0);
+    const liqTj = vMes.filter((v) => v.metodoPago === "tarjeta").reduce((s, v) => s + v.total, 0);
+    const liqConFact = vMes.filter((v) => v.conFactura);
+    const liqCerradas = MARCAS.filter((m) => cierres[`${MK}-${m.id}`]?.cerrado).length;
+    const liqConVentas = MARCAS.filter((m) => getLiq(m.id).bruto > 0).length;
+    const liqPct = liqConVentas > 0 ? Math.round(liqCerradas / liqConVentas * 100) : 0;
     return /* @__PURE__ */ import_react.default.createElement("div", { style: {
       minHeight: "100vh",
       background: C.bg0,
@@ -30123,88 +30127,77 @@ Fecha: ${venta.fecha}`);
       letterSpacing: 0.8,
       marginBottom: 12,
       fontFamily: FONT_UI
-    } }, MESES[mes], " ", anio), (() => {
-      const ef = vMes.filter((v) => v.metodoPago === "efectivo").reduce((s, v) => s + v.total, 0);
-      const qr = vMes.filter((v) => v.metodoPago === "qr").reduce((s, v) => s + v.total, 0);
-      const tj = vMes.filter((v) => v.metodoPago === "tarjeta").reduce((s, v) => s + v.total, 0);
-      const conFact = vMes.filter((v) => v.conFactura);
-      return /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 8, marginBottom: 12 } }, [
-        { label: "Total mes", value: $(vMes.reduce((s, v) => s + v.total, 0)), color: C.label, bg: C.bg2 },
-        { label: "Efectivo", value: $(ef), color: C.green, bg: `${C.green}10` },
-        { label: "QR", value: $(qr), color: C.blue, bg: `${C.blue}10` },
-        { label: "Tarjeta", value: $(tj), color: C.amber, bg: `${C.amber}10` }
-      ].map((s) => /* @__PURE__ */ import_react.default.createElement("div", { key: s.label, style: {
-        background: s.bg,
-        borderRadius: 14,
-        padding: "12px 10px",
-        border: `1px solid ${s.color}25`,
-        textAlign: "center"
-      } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
-        fontSize: 10,
-        fontWeight: 700,
-        color: s.color,
-        fontFamily: FONT_UI,
-        textTransform: "uppercase",
-        letterSpacing: 0.6,
-        marginBottom: 4,
-        opacity: 0.8
-      } }, s.label), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 16, fontWeight: 700, color: s.color, fontFamily: FONT_UI } }, s.value)))), /* @__PURE__ */ import_react.default.createElement("div", { style: {
-        background: C.bg2,
-        borderRadius: 14,
-        border: `1px solid ${C.sep}`,
-        padding: "14px 16px",
-        marginBottom: 12
-      } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
-        fontSize: 12,
-        fontWeight: 700,
-        color: C.label3,
-        textTransform: "uppercase",
-        letterSpacing: 0.8,
-        marginBottom: 12,
-        fontFamily: FONT_UI
-      } }, "Conciliaci\xF3n de pagos"), [
-        { label: "Efectivo", val: ef, n: vMes.filter((v) => v.metodoPago === "efectivo").length, color: C.green, icon: "\u{1F4B5}" },
-        { label: "QR", val: qr, n: vMes.filter((v) => v.metodoPago === "qr").length, color: C.blue, icon: "\u{1F4F1}" },
-        { label: "Tarjeta (+2.5%)", val: tj, n: vMes.filter((v) => v.metodoPago === "tarjeta").length, color: C.amber, icon: "\u{1F4B3}" }
-      ].map((p, i, arr) => /* @__PURE__ */ import_react.default.createElement("div", { key: p.label, style: {
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
-        padding: "10px 0",
-        borderBottom: i < arr.length - 1 ? `1px solid ${C.sep}` : ""
-      } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 18 } }, p.icon), /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 14, fontWeight: 600, color: C.label, fontFamily: FONT_UI } }, p.label), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT_UI } }, p.n, " transacciones"))), /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "right" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 15, fontWeight: 700, color: p.color, fontFamily: FONT_UI } }, $(p.val)), p.val > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: C.green, fontFamily: FONT_UI, fontWeight: 600 } }, "\u2713 Registrado"))))), conFact.length > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: {
-        background: `${C.blue}08`,
-        borderRadius: 14,
-        border: `1px solid ${C.blue}25`,
-        padding: "12px 16px",
-        marginBottom: 12,
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center"
-      } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, fontWeight: 700, color: C.blue, fontFamily: FONT_UI } }, "\u{1F9FE} Ventas con factura"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT_UI, marginTop: 2 } }, conFact.length, " venta", conFact.length > 1 ? "s" : "", " este mes")), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 15, fontWeight: 700, color: C.blue, fontFamily: FONT_UI } }, $(conFact.reduce((s, v) => s + v.total, 0)))), (() => {
-        const cerradas = MARCAS.filter((m) => cierres[`${MK}-${m.id}`]?.cerrado).length;
-        const conVentas = MARCAS.filter((m) => getLiq(m.id).bruto > 0).length;
-        const pct = conVentas > 0 ? Math.round(cerradas / conVentas * 100) : 0;
-        return /* @__PURE__ */ import_react.default.createElement("div", { style: {
-          background: C.bg2,
-          borderRadius: 14,
-          border: `1px solid ${C.sep}`,
-          padding: "12px 16px",
-          marginBottom: 12
-        } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, fontWeight: 700, color: C.label, fontFamily: FONT_UI } }, "Progreso de cierres"), /* @__PURE__ */ import_react.default.createElement("div", { style: {
-          fontSize: 13,
-          fontWeight: 700,
-          color: pct === 100 ? C.green : C.amber,
-          fontFamily: FONT_UI
-        } }, cerradas, "/", conVentas, " marcas")), /* @__PURE__ */ import_react.default.createElement("div", { style: { height: 8, background: C.sep, borderRadius: 4, overflow: "hidden" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
-          height: "100%",
-          width: `${pct}%`,
-          background: pct === 100 ? C.green : C.amber,
-          borderRadius: 4,
-          transition: "width .3s"
-        } })), pct === 100 && /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.green, fontFamily: FONT_UI, marginTop: 6, textAlign: "center", fontWeight: 600 } }, "\u2713 Todas las marcas con ventas est\xE1n cerradas"));
-      })());
-    })(), /* @__PURE__ */ import_react.default.createElement(PctMarcasPanel, { onCfgChange: bumpCfgLiq }), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" } }, /* @__PURE__ */ import_react.default.createElement(
+    } }, MESES[mes], " ", anio), /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 8, marginBottom: 12 } }, [
+      { label: "Total mes", value: $(vMes.reduce((s, v) => s + v.total, 0)), color: C.label, bg: C.bg2 },
+      { label: "Efectivo", value: $(liqEf), color: C.green, bg: `${C.green}10` },
+      { label: "QR", value: $(liqQr), color: C.blue, bg: `${C.blue}10` },
+      { label: "Tarjeta", value: $(liqTj), color: C.amber, bg: `${C.amber}10` }
+    ].map((s) => /* @__PURE__ */ import_react.default.createElement("div", { key: s.label, style: {
+      background: s.bg,
+      borderRadius: 14,
+      padding: "12px 10px",
+      border: `1px solid ${s.color}25`,
+      textAlign: "center"
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      fontSize: 10,
+      fontWeight: 700,
+      color: s.color,
+      fontFamily: FONT_UI,
+      textTransform: "uppercase",
+      letterSpacing: 0.6,
+      marginBottom: 4,
+      opacity: 0.8
+    } }, s.label), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 16, fontWeight: 700, color: s.color, fontFamily: FONT_UI } }, s.value)))), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      background: C.bg2,
+      borderRadius: 14,
+      border: `1px solid ${C.sep}`,
+      padding: "14px 16px",
+      marginBottom: 12
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      fontSize: 12,
+      fontWeight: 700,
+      color: C.label3,
+      textTransform: "uppercase",
+      letterSpacing: 0.8,
+      marginBottom: 12,
+      fontFamily: FONT_UI
+    } }, "Conciliaci\xF3n de pagos"), [
+      { label: "Efectivo", val: liqEf, n: vMes.filter((v) => v.metodoPago === "efectivo").length, color: C.green, icon: "\u{1F4B5}" },
+      { label: "QR", val: liqQr, n: vMes.filter((v) => v.metodoPago === "qr").length, color: C.blue, icon: "\u{1F4F1}" },
+      { label: "Tarjeta (+2.5%)", val: liqTj, n: vMes.filter((v) => v.metodoPago === "tarjeta").length, color: C.amber, icon: "\u{1F4B3}" }
+    ].map((p, i, arr) => /* @__PURE__ */ import_react.default.createElement("div", { key: p.label, style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      padding: "10px 0",
+      borderBottom: i < arr.length - 1 ? `1px solid ${C.sep}` : ""
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 18 } }, p.icon), /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 14, fontWeight: 600, color: C.label, fontFamily: FONT_UI } }, p.label), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT_UI } }, p.n, " transacciones"))), /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "right" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 15, fontWeight: 700, color: p.color, fontFamily: FONT_UI } }, $(p.val)), p.val > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: C.green, fontFamily: FONT_UI, fontWeight: 600 } }, "\u2713 Registrado"))))), liqConFact.length > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      background: `${C.blue}08`,
+      borderRadius: 14,
+      border: `1px solid ${C.blue}25`,
+      padding: "12px 16px",
+      marginBottom: 12,
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center"
+    } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, fontWeight: 700, color: C.blue, fontFamily: FONT_UI } }, "\u{1F9FE} Ventas con factura"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT_UI, marginTop: 2 } }, liqConFact.length, " venta", liqConFact.length > 1 ? "s" : "", " este mes")), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 15, fontWeight: 700, color: C.blue, fontFamily: FONT_UI } }, $(liqConFact.reduce((s, v) => s + v.total, 0)))), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      background: C.bg2,
+      borderRadius: 14,
+      border: `1px solid ${C.sep}`,
+      padding: "12px 16px",
+      marginBottom: 12
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, fontWeight: 700, color: C.label, fontFamily: FONT_UI } }, "Progreso de cierres"), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      fontSize: 13,
+      fontWeight: 700,
+      color: liqPct === 100 ? C.green : C.amber,
+      fontFamily: FONT_UI
+    } }, liqCerradas, "/", liqConVentas, " marcas")), /* @__PURE__ */ import_react.default.createElement("div", { style: { height: 8, background: C.sep, borderRadius: 4, overflow: "hidden" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      height: "100%",
+      width: `${liqPct}%`,
+      background: liqPct === 100 ? C.green : C.amber,
+      borderRadius: 4,
+      transition: "width .3s"
+    } })), liqPct === 100 && /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.green, fontFamily: FONT_UI, marginTop: 6, textAlign: "center", fontWeight: 600 } }, "\u2713 Todas las marcas con ventas est\xE1n cerradas"))), /* @__PURE__ */ import_react.default.createElement(PctMarcasPanel, { onCfgChange: bumpCfgLiq }), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" } }, /* @__PURE__ */ import_react.default.createElement(
       "button",
       {
         onClick: () => generarPlanillaAlquileres(ventas, mes, anio),
@@ -30790,6 +30783,20 @@ Fecha: ${venta.fecha}`);
       setPagoMixto(false);
       setMontosMixtos({ efectivo: "", qr: "", tarjeta: "" });
     }
+    const gcUsadoUI = +Math.min(gcEncontrado?.saldo || 0, total, parseFloat(gcMontoUsar) || 0).toFixed(2);
+    const extraMontoUI = gcEncontrado ? +(total - gcUsadoUI).toFixed(2) : 0;
+    const cubreTotalUI = extraMontoUI <= 0.01;
+    const _gcBrands = {};
+    carrito.forEach((it) => {
+      const s = it.precio * it.cantidad * (1 - descPct / 100);
+      if (!_gcBrands[it.marcaId]) _gcBrands[it.marcaId] = { marcaNombre: it.marcaNombre, subtotal: 0 };
+      _gcBrands[it.marcaId].subtotal += s;
+    });
+    const gcAllocsDisplay = Object.values(_gcBrands).map((b) => ({
+      ...b,
+      gcAmt: total > 0 ? +(b.subtotal / total * gcUsadoUI).toFixed(2) : 0,
+      xtra: total > 0 ? +(b.subtotal / total * extraMontoUI).toFixed(2) : 0
+    }));
     return /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { position: "relative", marginBottom: 14 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", fontSize: 16, color: C.label3 } }, "\u{1F50D}"), /* @__PURE__ */ import_react.default.createElement(
       "input",
       {
@@ -31170,148 +31177,125 @@ Fecha: ${venta.fecha}`);
         background: Math.abs(diff) < 0.01 ? `${C.green}15` : `${C.red}15`,
         border: `1px solid ${Math.abs(diff) < 0.01 ? C.green : C.red}30`
       } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", fontFamily: FONT } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, color: C.label3 } }, "Total ingresado:"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, fontWeight: 700, color: C.label } }, $(suma))), Math.abs(diff) > 0.01 && /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", marginTop: 4, fontFamily: FONT } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, color: C.red } }, "Diferencia:"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, fontWeight: 700, color: C.red } }, $(Math.abs(diff)))), Math.abs(diff) < 0.01 && /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.green, textAlign: "center", marginTop: 4, fontFamily: FONT } }, "\u2713 Montos cuadrados"));
-    })())), pagoGC && (() => {
-      const gcUsado = +Math.min(gcEncontrado?.saldo || 0, total, parseFloat(gcMontoUsar) || 0).toFixed(2);
-      const extraMonto = gcEncontrado ? +(total - gcUsado).toFixed(2) : 0;
-      const cubreTotal = extraMonto <= 0.01;
-      return /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 16 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 12 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: C.label3, textTransform: "uppercase", letterSpacing: 0.7, marginBottom: 6, fontFamily: FONT_UI } }, "C\xF3digo de Gift Card"), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 8 } }, /* @__PURE__ */ import_react.default.createElement(
-        "input",
-        {
-          type: "text",
-          value: gcCodigo,
-          onChange: (e) => {
-            setGcCodigo(e.target.value);
-            setGcEncontrado(null);
-            setGcBusqMsg(null);
-          },
-          placeholder: "GC-YYYYMMDD-XXXX",
-          onKeyDown: (e) => e.key === "Enter" && buscarGCenPOS(),
-          style: {
-            flex: 1,
-            padding: "12px 14px",
-            borderRadius: 12,
-            border: `1.5px solid ${C.sep}`,
-            background: C.bg0,
-            fontSize: 14,
-            color: C.label,
-            fontFamily: FONT_UI,
-            outline: "none",
-            WebkitAppearance: "none",
-            appearance: "none"
-          },
-          onFocus: (e) => e.target.style.borderColor = "#7C3AED",
-          onBlur: (e) => e.target.style.borderColor = C.sep
-        }
-      ), /* @__PURE__ */ import_react.default.createElement(
-        "button",
-        {
-          onClick: buscarGCenPOS,
-          style: {
-            padding: "12px 16px",
-            borderRadius: 12,
-            border: "none",
-            background: "#7C3AED",
-            color: "#fff",
-            fontSize: 13,
-            fontWeight: 700,
-            fontFamily: FONT_UI,
-            cursor: "pointer",
-            flexShrink: 0
-          }
+    })())), pagoGC && /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 16 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 12 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: C.label3, textTransform: "uppercase", letterSpacing: 0.7, marginBottom: 6, fontFamily: FONT_UI } }, "C\xF3digo de Gift Card"), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 8 } }, /* @__PURE__ */ import_react.default.createElement(
+      "input",
+      {
+        type: "text",
+        value: gcCodigo,
+        onChange: (e) => {
+          setGcCodigo(e.target.value);
+          setGcEncontrado(null);
+          setGcBusqMsg(null);
         },
-        "Buscar"
-      )), gcBusqMsg && /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.red, fontFamily: FONT_UI, marginTop: 6, fontWeight: 500 } }, gcBusqMsg)), gcEncontrado && /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: {
-        background: "#7C3AED18",
-        border: "1px solid #7C3AED30",
-        borderRadius: 14,
-        padding: "14px 16px",
-        marginBottom: 12
-      } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: "#7C3AED", fontFamily: FONT_UI, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 2 } }, "\u{1F381} Gift Card activa"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label, fontFamily: FONT_UI } }, gcEncontrado.codigo)), /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "right" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 20, fontWeight: 700, color: "#7C3AED", fontFamily: FONT_DISPLAY } }, $(gcEncontrado.saldo)), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: C.label3, fontFamily: FONT_UI } }, "saldo disponible"))), /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 8 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, fontWeight: 700, color: C.label3, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 4, fontFamily: FONT_UI } }, "Monto a usar de Gift Card"), /* @__PURE__ */ import_react.default.createElement("div", { style: { position: "relative" } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", fontSize: 13, color: C.label3, fontFamily: FONT_UI } }, "Bs"), /* @__PURE__ */ import_react.default.createElement(
-        "input",
-        {
-          type: "number",
-          min: "0.01",
-          step: "0.01",
-          max: Math.min(gcEncontrado.saldo, total),
-          value: gcMontoUsar,
-          onChange: (e) => setGcMontoUsar(e.target.value),
-          style: {
-            width: "100%",
-            padding: "10px 12px 10px 30px",
-            borderRadius: 10,
-            border: "1.5px solid #7C3AED50",
-            background: C.bg0,
-            fontSize: 15,
-            color: C.label,
-            fontFamily: FONT_UI,
-            outline: "none",
-            WebkitAppearance: "none",
-            appearance: "none",
-            boxSizing: "border-box"
-          }
-        }
-      ))), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 } }, [
-        { l: "Total venta", v: $(total), c: C.label },
-        { l: "Gift Card", v: `\u2212${$(gcUsado)}`, c: "#7C3AED" },
-        { l: "Pago extra", v: $(extraMonto), c: extraMonto > 0.01 ? C.amber : C.green }
-      ].map((k) => /* @__PURE__ */ import_react.default.createElement("div", { key: k.l, style: { background: C.bg0, borderRadius: 8, padding: "8px", textAlign: "center" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 9, color: C.label3, textTransform: "uppercase", letterSpacing: 0.5, fontFamily: FONT_UI, marginBottom: 2 } }, k.l), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, fontWeight: 700, color: k.c, fontFamily: FONT_UI } }, k.v))))), extraMonto > 0.01 && /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 12 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: C.label3, textTransform: "uppercase", letterSpacing: 0.7, marginBottom: 8, fontFamily: FONT_UI } }, "Pago complementario (", $(extraMonto), ")"), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 } }, PAGOS.map((p) => /* @__PURE__ */ import_react.default.createElement(
-        "button",
-        {
-          key: p.id,
-          onClick: () => setMetodoCompl(p.id),
-          style: {
-            padding: "10px 6px",
-            borderRadius: 12,
-            border: `2px solid ${metodoCompl === p.id ? p.color : C.sep}`,
-            background: metodoCompl === p.id ? `${p.color}18` : C.bg2,
-            cursor: "pointer",
-            fontFamily: FONT_UI,
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            gap: 4,
-            WebkitTapHighlightColor: "transparent"
-          }
+        placeholder: "GC-YYYYMMDD-XXXX",
+        onKeyDown: (e) => e.key === "Enter" && buscarGCenPOS(),
+        style: {
+          flex: 1,
+          padding: "12px 14px",
+          borderRadius: 12,
+          border: `1.5px solid ${C.sep}`,
+          background: C.bg0,
+          fontSize: 14,
+          color: C.label,
+          fontFamily: FONT_UI,
+          outline: "none",
+          WebkitAppearance: "none",
+          appearance: "none"
         },
-        /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 20 } }, p.icon),
-        /* @__PURE__ */ import_react.default.createElement("span", { style: {
-          fontSize: 11,
-          fontWeight: metodoCompl === p.id ? 700 : 400,
-          color: metodoCompl === p.id ? p.color : C.label3
-        } }, p.label)
-      )))), (() => {
-        const factor = 1 - descPct / 100;
-        const items = carrito.map((it) => ({
-          marcaId: it.marcaId,
-          marcaNombre: it.marcaNombre,
-          subtotal: it.precio * it.cantidad * factor
-        }));
-        const brands = {};
-        items.forEach((it) => {
-          if (!brands[it.marcaId]) brands[it.marcaId] = { marcaNombre: it.marcaNombre, subtotal: 0 };
-          brands[it.marcaId].subtotal += it.subtotal;
-        });
-        const allocs = Object.values(brands).map((b) => ({
-          ...b,
-          gcAmt: +(b.subtotal / total * gcUsado).toFixed(2),
-          xtra: +(b.subtotal / total * extraMonto).toFixed(2)
-        }));
-        return allocs.length > 1 ? /* @__PURE__ */ import_react.default.createElement("div", { style: { background: C.bg2, borderRadius: 12, overflow: "hidden", border: `1px solid ${C.sep}` } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { padding: "8px 12px", background: C.bg2, borderBottom: `1px solid ${C.sep}` } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, fontWeight: 700, color: C.label3, textTransform: "uppercase", letterSpacing: 0.7, fontFamily: FONT_UI } }, "Distribuci\xF3n por marca")), allocs.map((a, i) => /* @__PURE__ */ import_react.default.createElement("div", { key: i, style: {
-          display: "grid",
-          gridTemplateColumns: "1fr 1fr 1fr 1fr",
-          padding: "8px 12px",
-          borderBottom: i < allocs.length - 1 ? `1px solid ${C.sep}` : "",
-          alignItems: "center"
-        } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label, fontFamily: FONT_UI, fontWeight: 600 } }, a.marcaNombre), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT_UI, textAlign: "right" } }, $(a.subtotal)), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: "#7C3AED", fontFamily: FONT_UI, fontWeight: 600, textAlign: "right" } }, "\u{1F381}", $(a.gcAmt)), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: extraMonto > 0.01 ? C.amber : C.label3, fontFamily: FONT_UI, textAlign: "right" } }, extraMonto > 0.01 ? $(a.xtra) : "\u2014")))) : null;
-      })(), cubreTotal && /* @__PURE__ */ import_react.default.createElement("div", { style: {
-        padding: "10px 14px",
-        background: `${C.green}12`,
-        borderRadius: 10,
-        border: `1px solid ${C.green}30`,
-        textAlign: "center",
-        marginTop: 8
-      } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.green, fontWeight: 700, fontFamily: FONT_UI } }, "\u2713 Gift Card cubre el total completo"))));
-    })(), /* @__PURE__ */ import_react.default.createElement(
+        onFocus: (e) => e.target.style.borderColor = "#7C3AED",
+        onBlur: (e) => e.target.style.borderColor = C.sep
+      }
+    ), /* @__PURE__ */ import_react.default.createElement(
+      "button",
+      {
+        onClick: buscarGCenPOS,
+        style: {
+          padding: "12px 16px",
+          borderRadius: 12,
+          border: "none",
+          background: "#7C3AED",
+          color: "#fff",
+          fontSize: 13,
+          fontWeight: 700,
+          fontFamily: FONT_UI,
+          cursor: "pointer",
+          flexShrink: 0
+        }
+      },
+      "Buscar"
+    )), gcBusqMsg && /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.red, fontFamily: FONT_UI, marginTop: 6, fontWeight: 500 } }, gcBusqMsg)), gcEncontrado && /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      background: "#7C3AED18",
+      border: "1px solid #7C3AED30",
+      borderRadius: 14,
+      padding: "14px 16px",
+      marginBottom: 12
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: "#7C3AED", fontFamily: FONT_UI, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 2 } }, "\u{1F381} Gift Card activa"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label, fontFamily: FONT_UI } }, gcEncontrado.codigo)), /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "right" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 20, fontWeight: 700, color: "#7C3AED", fontFamily: FONT_DISPLAY } }, $(gcEncontrado.saldo)), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: C.label3, fontFamily: FONT_UI } }, "saldo disponible"))), /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 8 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, fontWeight: 700, color: C.label3, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 4, fontFamily: FONT_UI } }, "Monto a usar de Gift Card"), /* @__PURE__ */ import_react.default.createElement("div", { style: { position: "relative" } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", fontSize: 13, color: C.label3, fontFamily: FONT_UI } }, "Bs"), /* @__PURE__ */ import_react.default.createElement(
+      "input",
+      {
+        type: "number",
+        min: "0.01",
+        step: "0.01",
+        max: Math.min(gcEncontrado.saldo, total),
+        value: gcMontoUsar,
+        onChange: (e) => setGcMontoUsar(e.target.value),
+        style: {
+          width: "100%",
+          padding: "10px 12px 10px 30px",
+          borderRadius: 10,
+          border: "1.5px solid #7C3AED50",
+          background: C.bg0,
+          fontSize: 15,
+          color: C.label,
+          fontFamily: FONT_UI,
+          outline: "none",
+          WebkitAppearance: "none",
+          appearance: "none",
+          boxSizing: "border-box"
+        }
+      }
+    ))), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 } }, [
+      { l: "Total venta", v: $(total), c: C.label },
+      { l: "Gift Card", v: `\u2212${$(gcUsadoUI)}`, c: "#7C3AED" },
+      { l: "Pago extra", v: $(extraMontoUI), c: extraMontoUI > 0.01 ? C.amber : C.green }
+    ].map((k) => /* @__PURE__ */ import_react.default.createElement("div", { key: k.l, style: { background: C.bg0, borderRadius: 8, padding: "8px", textAlign: "center" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 9, color: C.label3, textTransform: "uppercase", letterSpacing: 0.5, fontFamily: FONT_UI, marginBottom: 2 } }, k.l), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, fontWeight: 700, color: k.c, fontFamily: FONT_UI } }, k.v))))), extraMontoUI > 0.01 && /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 12 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: C.label3, textTransform: "uppercase", letterSpacing: 0.7, marginBottom: 8, fontFamily: FONT_UI } }, "Pago complementario (", $(extraMontoUI), ")"), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 } }, PAGOS.map((p) => /* @__PURE__ */ import_react.default.createElement(
+      "button",
+      {
+        key: p.id,
+        onClick: () => setMetodoCompl(p.id),
+        style: {
+          padding: "10px 6px",
+          borderRadius: 12,
+          border: `2px solid ${metodoCompl === p.id ? p.color : C.sep}`,
+          background: metodoCompl === p.id ? `${p.color}18` : C.bg2,
+          cursor: "pointer",
+          fontFamily: FONT_UI,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          gap: 4,
+          WebkitTapHighlightColor: "transparent"
+        }
+      },
+      /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 20 } }, p.icon),
+      /* @__PURE__ */ import_react.default.createElement("span", { style: {
+        fontSize: 11,
+        fontWeight: metodoCompl === p.id ? 700 : 400,
+        color: metodoCompl === p.id ? p.color : C.label3
+      } }, p.label)
+    )))), gcAllocsDisplay.length > 1 && /* @__PURE__ */ import_react.default.createElement("div", { style: { background: C.bg2, borderRadius: 12, overflow: "hidden", border: `1px solid ${C.sep}` } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { padding: "8px 12px", background: C.bg2, borderBottom: `1px solid ${C.sep}` } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, fontWeight: 700, color: C.label3, textTransform: "uppercase", letterSpacing: 0.7, fontFamily: FONT_UI } }, "Distribuci\xF3n por marca")), gcAllocsDisplay.map((a, i) => /* @__PURE__ */ import_react.default.createElement("div", { key: i, style: {
+      display: "grid",
+      gridTemplateColumns: "1fr 1fr 1fr 1fr",
+      padding: "8px 12px",
+      borderBottom: i < gcAllocsDisplay.length - 1 ? `1px solid ${C.sep}` : "",
+      alignItems: "center"
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label, fontFamily: FONT_UI, fontWeight: 600 } }, a.marcaNombre), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT_UI, textAlign: "right" } }, $(a.subtotal)), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: "#7C3AED", fontFamily: FONT_UI, fontWeight: 600, textAlign: "right" } }, "\u{1F381}", $(a.gcAmt)), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: extraMontoUI > 0.01 ? C.amber : C.label3, fontFamily: FONT_UI, textAlign: "right" } }, extraMontoUI > 0.01 ? $(a.xtra) : "\u2014")))), cubreTotalUI && /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      padding: "10px 14px",
+      background: `${C.green}12`,
+      borderRadius: 10,
+      border: `1px solid ${C.green}30`,
+      textAlign: "center",
+      marginTop: 8
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.green, fontWeight: 700, fontFamily: FONT_UI } }, "\u2713 Gift Card cubre el total completo")))), /* @__PURE__ */ import_react.default.createElement(
       IOSInput,
       {
         label: "Descuento adicional (%)",
@@ -31794,6 +31778,11 @@ Fecha: ${venta.fecha}`);
     const prods = inv.filter((i) => i.marcaId === marcaId);
     const histFil = filtroMk ? historial.filter((h) => h.mk === filtroMk) : historial;
     const totalHist = historial.reduce((s, h) => s + h.bruto, 0);
+    const gcTotal = liq.vMarca.reduce((s, v) => {
+      const a = v.gcAllocations?.find((x) => x.marcaId === marcaId);
+      return s + (a?.gcAmount || 0);
+    }, 0);
+    const gcVentas = liq.vMarca.filter((v) => v.gcAllocations?.some((x) => x.marcaId === marcaId && x.gcAmount > 0)).length;
     return /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "grid", gridTemplateColumns: isDesktop ? "1fr 1fr 1fr 1fr" : "1fr 1fr", gap: isDesktop ? 8 : 10, marginBottom: isDesktop ? 14 : 20 } }, /* @__PURE__ */ import_react.default.createElement(
       StatCard,
       {
@@ -31898,23 +31887,14 @@ Fecha: ${venta.fecha}`);
       fontFamily: FONT,
       textAlign: "center",
       fontWeight: 600
-    } }, "\u2713 Cierre de ", MESES[mes], " confirmado"), /* @__PURE__ */ import_react.default.createElement("div", { style: { background: C.bg2, borderRadius: 16, overflow: "hidden", marginBottom: 16 } }, (() => {
-      const gcTotal = liq.vMarca.reduce((s, v) => {
-        const a = v.gcAllocations?.find((x) => x.marcaId === marcaId);
-        return s + (a?.gcAmount || 0);
-      }, 0);
-      const gcVentas = liq.vMarca.filter((v) => v.gcAllocations?.some((x) => x.marcaId === marcaId && x.gcAmount > 0)).length;
-      return gcTotal > 0 ? [
-        /* @__PURE__ */ import_react.default.createElement("div", { key: "gc-summary", style: {
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          padding: "10px 16px",
-          background: "#7C3AED08",
-          borderBottom: `1px solid ${C.sep}`
-        } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, color: "#7C3AED", fontFamily: FONT } }, "\u{1F381} Gift Card (", gcVentas, " venta", gcVentas !== 1 ? "s" : "", ")"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, fontWeight: 600, color: "#7C3AED", fontFamily: FONT } }, $(gcTotal)))
-      ] : [];
-    })(), [
+    } }, "\u2713 Cierre de ", MESES[mes], " confirmado"), /* @__PURE__ */ import_react.default.createElement("div", { style: { background: C.bg2, borderRadius: 16, overflow: "hidden", marginBottom: 16 } }, gcTotal > 0 && /* @__PURE__ */ import_react.default.createElement("div", { key: "gc-summary", style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      padding: "10px 16px",
+      background: "#7C3AED08",
+      borderBottom: `1px solid ${C.sep}`
+    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, color: "#7C3AED", fontFamily: FONT } }, "\u{1F381} Gift Card (", gcVentas, " venta", gcVentas !== 1 ? "s" : "", ")"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, fontWeight: 600, color: "#7C3AED", fontFamily: FONT } }, $(gcTotal))), [
       ["Ventas brutas", $(liq.bruto), C.label, false],
       liq.descTJ > 0 ? [`\u2212 Desc. banco Tarjeta (${liq.cfg?.pctTarjeta ?? 2.5}%)`, `-${$(liq.descTJ)}`, C.red, false] : null,
       liq.descTJ > 0 ? [`= Subtotal sin banco`, $(liq.subBanco), C.label2, false] : null,
@@ -33571,6 +33551,25 @@ Esta acci\xF3n no se puede deshacer.`,
       return Object.values(map).sort((a, b) => b.total - a.total);
     }, [ventasFiltradas]);
     const fmtDate = (d) => d ? d.split("-").reverse().join("/") : "";
+    const itemsView = (0, import_react.useMemo)(() => {
+      const map = {};
+      ventasFiltradas.forEach((v) => v.items.forEach((it) => {
+        const k = it.prodId || it.codigo;
+        if (!map[k]) map[k] = {
+          codigo: it.codigo,
+          nombre: it.nombre,
+          marcaNombre: it.marcaNombre,
+          marcaId: it.marcaId,
+          precioUnit: it.precioUnit,
+          cant: 0,
+          total: 0
+        };
+        map[k].cant += it.cantidad;
+        map[k].total += it.subtotal;
+      }));
+      return Object.values(map).sort((a, b) => b.total - a.total);
+    }, [ventasFiltradas]);
+    const totalUdsView = (0, import_react.useMemo)(() => itemsView.reduce((s, i) => s + i.cant, 0), [itemsView]);
     return /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: {
       background: C.bg1,
       borderRadius: 14,
@@ -33686,67 +33685,48 @@ Esta acci\xF3n no se puede deshacer.`,
         background: marca?.color || C.blue,
         transition: "width .5s"
       } })));
-    })), porMarcaFil.length === 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center", padding: "30px 0", color: C.label3, fontFamily: FONT, fontSize: 13 } }, "Sin ventas en el per\xEDodo seleccionado")), vistaD === "items" && (() => {
-      const itemsMap = {};
-      ventasFiltradas.forEach((v) => v.items.forEach((it) => {
-        const k = it.prodId || it.codigo;
-        if (!itemsMap[k]) itemsMap[k] = {
-          codigo: it.codigo,
-          nombre: it.nombre,
-          marcaNombre: it.marcaNombre,
-          marcaId: it.marcaId,
-          precioUnit: it.precioUnit,
-          cant: 0,
-          total: 0
-        };
-        itemsMap[k].cant += it.cantidad;
-        itemsMap[k].total += it.subtotal;
-      }));
-      const items = Object.values(itemsMap).sort((a, b) => b.total - a.total);
-      const totalUds = items.reduce((s, i) => s + i.cant, 0);
-      return /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: {
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
-        marginBottom: 12,
-        background: C.bg1,
-        borderRadius: 12,
-        padding: "12px 16px",
-        border: `1px solid ${C.sep}`
-      } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT_UI, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5 } }, "Items vendidos"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 20, fontWeight: 700, color: C.gold, fontFamily: FONT_UI } }, totalUds, " unidades")), /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "right" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT_UI, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5 } }, "Revenue"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 20, fontWeight: 700, color: C.green, fontFamily: FONT_UI } }, $(totalFil)))), items.length === 0 ? /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center", padding: "30px 0", color: C.label3, fontFamily: FONT_UI, fontSize: 13 } }, "Sin items en el per\xEDodo") : /* @__PURE__ */ import_react.default.createElement("div", { style: { background: C.bg1, borderRadius: 14, overflow: "hidden", border: `1px solid ${C.sep}` } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+    })), porMarcaFil.length === 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center", padding: "30px 0", color: C.label3, fontFamily: FONT, fontSize: 13 } }, "Sin ventas en el per\xEDodo seleccionado")), vistaD === "items" && /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 12,
+      background: C.bg1,
+      borderRadius: 12,
+      padding: "12px 16px",
+      border: `1px solid ${C.sep}`
+    } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT_UI, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5 } }, "Items vendidos"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 20, fontWeight: 700, color: C.gold, fontFamily: FONT_UI } }, totalUdsView, " unidades")), /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "right" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT_UI, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5 } }, "Revenue"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 20, fontWeight: 700, color: C.green, fontFamily: FONT_UI } }, $(totalFil)))), itemsView.length === 0 ? /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center", padding: "30px 0", color: C.label3, fontFamily: FONT_UI, fontSize: 13 } }, "Sin items en el per\xEDodo") : /* @__PURE__ */ import_react.default.createElement("div", { style: { background: C.bg1, borderRadius: 14, overflow: "hidden", border: `1px solid ${C.sep}` } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      display: "grid",
+      gridTemplateColumns: "1fr 60px 70px",
+      gap: 0,
+      background: C.bg3,
+      padding: "8px 14px",
+      borderBottom: `1px solid ${C.sep}`
+    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 11, fontWeight: 700, color: C.label3, fontFamily: FONT_UI, textTransform: "uppercase", letterSpacing: 0.5 } }, "\xCDtem"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 11, fontWeight: 700, color: C.label3, fontFamily: FONT_UI, textTransform: "uppercase", letterSpacing: 0.5, textAlign: "center" } }, "Cant."), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 11, fontWeight: 700, color: C.label3, fontFamily: FONT_UI, textTransform: "uppercase", letterSpacing: 0.5, textAlign: "right" } }, "Total")), itemsView.map((it, i) => {
+      const marca = MARCAS.find((m) => m.id === it.marcaId);
+      return /* @__PURE__ */ import_react.default.createElement("div", { key: it.codigo, style: {
         display: "grid",
         gridTemplateColumns: "1fr 60px 70px",
         gap: 0,
-        background: C.bg3,
-        padding: "8px 14px",
-        borderBottom: `1px solid ${C.sep}`
-      } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 11, fontWeight: 700, color: C.label3, fontFamily: FONT_UI, textTransform: "uppercase", letterSpacing: 0.5 } }, "\xCDtem"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 11, fontWeight: 700, color: C.label3, fontFamily: FONT_UI, textTransform: "uppercase", letterSpacing: 0.5, textAlign: "center" } }, "Cant."), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 11, fontWeight: 700, color: C.label3, fontFamily: FONT_UI, textTransform: "uppercase", letterSpacing: 0.5, textAlign: "right" } }, "Total")), items.map((it, i) => {
-        const marca = MARCAS.find((m) => m.id === it.marcaId);
-        return /* @__PURE__ */ import_react.default.createElement("div", { key: it.codigo, style: {
-          display: "grid",
-          gridTemplateColumns: "1fr 60px 70px",
-          gap: 0,
-          padding: "10px 14px",
-          borderBottom: i < items.length - 1 ? `1px solid ${C.sep}` : "",
-          alignItems: "center"
-        } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: {
-          fontSize: 13,
-          fontWeight: 600,
-          color: C.label,
-          fontFamily: FONT_UI,
-          overflow: "hidden",
-          textOverflow: "ellipsis",
-          whiteSpace: "nowrap"
-        } }, it.nombre), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6, marginTop: 2 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: {
-          fontSize: 10,
-          fontFamily: "monospace",
-          color: C.gold,
-          background: `${C.gold}15`,
-          padding: "1px 5px",
-          borderRadius: 4
-        } }, it.codigo), marca && /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 10, color: marca.color, fontFamily: FONT_UI, display: "inline-flex", alignItems: "center", gap: 3 } }, /* @__PURE__ */ import_react.default.createElement(MarcaIcon, { marca, size: 12, radius: 3 }), it.marcaNombre))), /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center", fontSize: 15, fontWeight: 700, color: C.blue, fontFamily: FONT_UI } }, it.cant), /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "right", fontSize: 14, fontWeight: 700, color: C.green, fontFamily: FONT_UI } }, $(it.total)));
-      })));
-    })(), vistaD === "lista" && /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, color: C.label3, fontFamily: FONT } }, ventasFiltradas.length, " venta", ventasFiltradas.length !== 1 ? "s" : "", " \xB7 ", $(totalFil))), ventasFiltradas.length === 0 ? /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center", padding: "30px 0", color: C.label3, fontFamily: FONT, fontSize: 13 } }, "Sin ventas en el per\xEDodo") : [...ventasFiltradas].reverse().map((v) => /* @__PURE__ */ import_react.default.createElement(
+        padding: "10px 14px",
+        borderBottom: i < itemsView.length - 1 ? `1px solid ${C.sep}` : "",
+        alignItems: "center"
+      } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+        fontSize: 13,
+        fontWeight: 600,
+        color: C.label,
+        fontFamily: FONT_UI,
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+        whiteSpace: "nowrap"
+      } }, it.nombre), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6, marginTop: 2 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: {
+        fontSize: 10,
+        fontFamily: "monospace",
+        color: C.gold,
+        background: `${C.gold}15`,
+        padding: "1px 5px",
+        borderRadius: 4
+      } }, it.codigo), marca && /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 10, color: marca.color, fontFamily: FONT_UI, display: "inline-flex", alignItems: "center", gap: 3 } }, /* @__PURE__ */ import_react.default.createElement(MarcaIcon, { marca, size: 12, radius: 3 }), it.marcaNombre))), /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center", fontSize: 15, fontWeight: 700, color: C.blue, fontFamily: FONT_UI } }, it.cant), /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "right", fontSize: 14, fontWeight: 700, color: C.green, fontFamily: FONT_UI } }, $(it.total)));
+    }))), vistaD === "lista" && /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, color: C.label3, fontFamily: FONT } }, ventasFiltradas.length, " venta", ventasFiltradas.length !== 1 ? "s" : "", " \xB7 ", $(totalFil))), ventasFiltradas.length === 0 ? /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center", padding: "30px 0", color: C.label3, fontFamily: FONT, fontSize: 13 } }, "Sin ventas en el per\xEDodo") : [...ventasFiltradas].reverse().map((v) => /* @__PURE__ */ import_react.default.createElement(
       "div",
       {
         key: v.id,
@@ -34027,21 +34007,20 @@ Esta acci\xF3n no se puede deshacer.`,
           letterSpacing: "-0.01em",
           textDecoration: v.anulada ? "line-through" : "none"
         } }, $(totalMostrar)))),
-        (() => {
-          const byMarca = {};
-          itemsMostrar.forEach((it) => {
-            if (!byMarca[it.marcaId]) byMarca[it.marcaId] = { marca: MARCAS.find((m) => m.id === it.marcaId), items: [], sub: 0 };
-            byMarca[it.marcaId].items.push(it);
-            byMarca[it.marcaId].sub += it.subtotal;
-          });
-          return Object.values(byMarca).map((g) => /* @__PURE__ */ import_react.default.createElement("div", { key: g.marca?.id, style: {
-            marginBottom: isDesktop ? 4 : 6,
-            padding: isDesktop ? "5px 8px" : "6px 10px",
-            background: `${g.marca?.color}10`,
-            borderRadius: 8,
-            borderLeft: `3px solid ${g.marca?.color}`
-          } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 3 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6 } }, /* @__PURE__ */ import_react.default.createElement(MarcaIcon, { marca: g.marca, size: 14, radius: 4 }), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 12, fontWeight: 600, color: g.marca?.color, fontFamily: FONT } }, g.marca?.nombre)), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, fontWeight: 600, color: g.marca?.color, fontFamily: FONT, letterSpacing: "-0.01em" } }, $(g.sub))), g.items.map((it, ii) => /* @__PURE__ */ import_react.default.createElement("div", { key: ii, style: { fontSize: 11, color: C.label2, fontFamily: FONT, lineHeight: "1.3" } }, "\xB7 ", it.nombre, " \xD7", it.cantidad, " = ", $(it.subtotal)))));
-        })(),
+        Object.values(
+          itemsMostrar.reduce((acc, it) => {
+            if (!acc[it.marcaId]) acc[it.marcaId] = { marca: MARCAS.find((m) => m.id === it.marcaId), items: [], sub: 0 };
+            acc[it.marcaId].items.push(it);
+            acc[it.marcaId].sub += it.subtotal;
+            return acc;
+          }, {})
+        ).map((g) => /* @__PURE__ */ import_react.default.createElement("div", { key: g.marca?.id, style: {
+          marginBottom: isDesktop ? 4 : 6,
+          padding: isDesktop ? "5px 8px" : "6px 10px",
+          background: `${g.marca?.color}10`,
+          borderRadius: 8,
+          borderLeft: `3px solid ${g.marca?.color}`
+        } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 3 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6 } }, /* @__PURE__ */ import_react.default.createElement(MarcaIcon, { marca: g.marca, size: 14, radius: 4 }), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 12, fontWeight: 600, color: g.marca?.color, fontFamily: FONT } }, g.marca?.nombre)), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, fontWeight: 600, color: g.marca?.color, fontFamily: FONT, letterSpacing: "-0.01em" } }, $(g.sub))), g.items.map((it, ii) => /* @__PURE__ */ import_react.default.createElement("div", { key: ii, style: { fontSize: 11, color: C.label2, fontFamily: FONT, lineHeight: "1.3" } }, "\xB7 ", it.nombre, " \xD7", it.cantidad, " = ", $(it.subtotal))))),
         !isDesktop && /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => sendWA(v), variant: "fill", small: true, full: true, icon: "\u{1F4F2}" }, "Enviar por WhatsApp"),
         v.etiquetaImg && /* @__PURE__ */ import_react.default.createElement(
           "img",
