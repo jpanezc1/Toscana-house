@@ -27128,7 +27128,7 @@ Fecha: ${venta.fecha}`);
       color: C.label2,
       fontFamily: FONT,
       WebkitTapHighlightColor: "transparent"
-    } }, "Salir")))), /* @__PURE__ */ import_react.default.createElement("div", { style: { padding: "16px 16px 0" } }, tab === "dashboard" && /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+    } }, "Salir")))), /* @__PURE__ */ import_react.default.createElement("div", { style: { padding: "16px 16px 0", maxWidth: 780, margin: "0 auto" } }, tab === "dashboard" && /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: {
       fontSize: 12,
       fontWeight: 700,
       color: C.label3,
@@ -29962,8 +29962,8 @@ Fecha: ${venta.fecha}`);
       }
     ), /* @__PURE__ */ import_react.default.createElement("div", { style: {
       padding: isDesktop ? "16px 24px 0" : "16px 16px 0",
-      maxWidth: isDesktop ? 1100 : void 0,
-      margin: isDesktop ? "0 auto" : void 0
+      maxWidth: 780,
+      margin: "0 auto"
     } }, tab === "inicio" && /* @__PURE__ */ import_react.default.createElement(
       HomeDashboard,
       {

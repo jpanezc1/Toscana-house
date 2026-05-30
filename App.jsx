@@ -5631,7 +5631,7 @@ function BrandPortal({user, ventas, inv, logout}){
       </div>
 
       {/* ── Content ── */}
-      <div style={{padding:"16px 16px 0"}}>
+      <div style={{padding:"16px 16px 0", maxWidth:780, margin:"0 auto"}}>
 
         {/* ══ DASHBOARD ══ */}
         {tab==="dashboard"&&(
@@ -8017,8 +8017,8 @@ function App(){
       {/* ── CONTENT ── */}
       <div style={{
         padding: isDesktop ? "16px 24px 0" : "16px 16px 0",
-        maxWidth: isDesktop ? 1100 : undefined,
-        margin: isDesktop ? "0 auto" : undefined,
+        maxWidth: 780,
+        margin: "0 auto",
       }}>
 
         {/* INICIO — dashboard */}
