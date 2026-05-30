@@ -5805,50 +5805,50 @@ function BrandPortal({user, ventas, inv, logout}){
                   return (
                     <div key={v.id}
                       onClick={()=>setVentaSeleccionada(v)}
-                      style={{background:C.bg1,borderRadius:12,padding:"10px 14px",
-                        marginBottom:6,border:`1px solid ${C.sep}`,
-                        boxShadow:"0 1px 4px rgba(0,0,0,0.04)",
+                      style={{background:C.bg1,borderRadius:10,padding:"6px 11px",
+                        marginBottom:3,border:`1px solid ${C.sep}`,
+                        boxShadow:"0 1px 3px rgba(0,0,0,0.03)",
                         cursor:"pointer",WebkitTapHighlightColor:"transparent",
                         transition:"all .15s",
                         borderLeft:`3px solid ${v.anulada?C.red:marca.color}`}}>
-                      {/* Fila 1 — precio + metadata en línea */}
+                      {/* Fila única — precio + metadata compactos */}
                       <div style={{display:"flex",justifyContent:"space-between",
-                        alignItems:"flex-start",marginBottom:3}}>
+                        alignItems:"center",gap:10}}>
                         <div style={{flex:1,minWidth:0}}>
-                          <div style={{fontSize:12,color:C.label2,fontFamily:FONT,
+                          <div style={{fontSize:11,color:C.label,fontFamily:FONT,fontWeight:600,
                             overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",
-                            lineHeight:"1.35",marginBottom:2}}>
+                            lineHeight:"1.3",marginBottom:1}}>
                             {citems.map(i=>`${i.nombre} ×${i.cantidad}`).join(" · ")}
                           </div>
-                          <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
-                            <span style={{fontSize:10,color:C.label3,fontFamily:FONT,opacity:.7}}>
+                          <div style={{display:"flex",alignItems:"center",gap:4,flexWrap:"wrap"}}>
+                            <span style={{fontSize:9,color:C.label3,fontFamily:FONT,opacity:.75}}>
                               {v.fecha} {v.hora}
                             </span>
-                            <span style={{fontSize:10,color:C.label3,fontFamily:FONT,opacity:.7}}>·</span>
-                            <span style={{fontSize:10,color:C.label3,fontFamily:FONT,opacity:.7}}>
+                            <span style={{fontSize:9,color:C.label3,opacity:.4}}>·</span>
+                            <span style={{fontSize:9,color:C.label3,fontFamily:FONT,opacity:.75}}>
                               {v.vendedor||"Tienda"}
                             </span>
-                            <span style={{fontSize:10,color:C.label3,fontFamily:FONT,opacity:.7}}>·</span>
-                            <span style={{fontSize:10,color:C.label3,fontFamily:FONT,opacity:.7}}>
+                            <span style={{fontSize:9,color:C.label3,opacity:.4}}>·</span>
+                            <span style={{fontSize:9,color:C.label3,fontFamily:FONT,opacity:.75}}>
                               {iconPago(v.metodoPago)} {labelPago(v.metodoPago)}
                             </span>
                             {v.anulada&&(
-                              <span style={{fontSize:9,background:C.redBg,color:C.red,
-                                padding:"1px 6px",borderRadius:20,fontFamily:FONT,fontWeight:700,
+                              <span style={{fontSize:8,background:C.redBg,color:C.red,
+                                padding:"1px 5px",borderRadius:20,fontFamily:FONT,fontWeight:700,
                                 textTransform:"uppercase",letterSpacing:.4}}>ANULADA</span>
                             )}
                             {hasFac&&(
-                              <span style={{fontSize:9,background:"#F3F4FC",color:"#1A237E",
-                                padding:"1px 6px",borderRadius:20,fontFamily:FONT,fontWeight:600}}>🧾 Factura</span>
+                              <span style={{fontSize:8,background:"#F3F4FC",color:"#1A237E",
+                                padding:"1px 5px",borderRadius:20,fontFamily:FONT,fontWeight:600}}>🧾</span>
                             )}
                           </div>
                         </div>
-                        <div style={{textAlign:"right",flexShrink:0,marginLeft:12}}>
-                          <div style={{fontSize:15,fontWeight:700,color:v.anulada?C.label3:C.label,
+                        <div style={{textAlign:"right",flexShrink:0}}>
+                          <div style={{fontSize:14,fontWeight:700,color:v.anulada?C.label3:C.label,
                             fontFamily:FONT,letterSpacing:"-0.02em",
                             textDecoration:v.anulada?"line-through":"none"}}>{$(csub)}</div>
-                          <div style={{fontSize:10,fontFamily:"monospace",color:C.label3,
-                            opacity:.55,marginTop:1}}>{v.id.slice(-6)}</div>
+                          <div style={{fontSize:9,fontFamily:"monospace",color:C.label3,
+                            opacity:.5,marginTop:1}}>{v.id.slice(-6)}</div>
                         </div>
                       </div>
                     </div>
@@ -10130,29 +10130,29 @@ function HistorialTab({ventas, inv, cierres, onVentaClick}){
             : [...ventasPer].reverse().map(v=>{
                 return (
                   <div key={v.id} onClick={()=>onVentaClick&&onVentaClick(v)}
-                    style={{background:C.bg2,borderRadius:14,padding:"12px 14px",marginBottom:8,
+                    style={{background:C.bg2,borderRadius:10,padding:"7px 12px",marginBottom:4,
                       cursor:"pointer",WebkitTapHighlightColor:"transparent",
                       borderLeft:`3px solid ${colorPago(v.metodoPago)||C.sep}`}}>
-                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:5}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10}}>
                       <div style={{flex:1,minWidth:0}}>
-                        <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:3,flexWrap:"wrap"}}>
+                        <div style={{display:"flex",alignItems:"center",gap:5,marginBottom:2,flexWrap:"wrap"}}>
                           <Chip color={colorPago(v.metodoPago)} small>{iconPago(v.metodoPago)} {labelPago(v.metodoPago)}</Chip>
-                          <span style={{fontSize:10,color:C.label3,fontFamily:FONT,opacity:.7}}>{v.fecha} {v.hora}</span>
+                          <span style={{fontSize:9,color:C.label3,fontFamily:FONT,opacity:.7}}>{v.fecha} {v.hora}</span>
                         </div>
                         {v.items.map((it,ii)=>{
                           const m=MARCAS.find(x=>x.id===it.marcaId);
                           return (
-                            <div key={ii} style={{fontSize:12,color:C.label2,fontFamily:FONT,
-                              display:"flex",alignItems:"center",gap:5,marginBottom:2}}>
-                              <div style={{width:5,height:5,borderRadius:"50%",background:m?.color,flexShrink:0}}/>
+                            <div key={ii} style={{fontSize:11,color:C.label2,fontFamily:FONT,
+                              display:"flex",alignItems:"center",gap:4,marginBottom:1,lineHeight:"1.25"}}>
+                              <div style={{width:4,height:4,borderRadius:"50%",background:m?.color,flexShrink:0}}/>
                               <span style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",flex:1}}>{it.nombre} ×{it.cantidad}</span>
-                              <span style={{fontWeight:600,color:C.label,flexShrink:0}}>{$(it.subtotal)}</span>
+                              <span style={{fontWeight:600,color:C.label,flexShrink:0,fontSize:11}}>{$(it.subtotal)}</span>
                             </div>
                           );
                         })}
                       </div>
-                      <div style={{textAlign:"right",flexShrink:0,marginLeft:12}}>
-                        <span style={{fontSize:17,fontWeight:700,color:C.label,fontFamily:FONT,
+                      <div style={{textAlign:"right",flexShrink:0}}>
+                        <span style={{fontSize:15,fontWeight:700,color:C.label,fontFamily:FONT,
                           letterSpacing:"-0.02em"}}>{$(v.total)}</span>
                       </div>
                     </div>
@@ -11484,31 +11484,28 @@ function DashboardVentas({ventas, onVentaClick}){
               </div>
             : [...ventasFiltradas].reverse().map(v=>(
                 <div key={v.id} onClick={()=>onVentaClick&&onVentaClick(v)}
-                  style={{background:C.bg1,borderRadius:12,padding:"11px 14px",marginBottom:7,
+                  style={{background:C.bg1,borderRadius:10,padding:"7px 12px",marginBottom:4,
                     border:`1px solid ${C.sep}`,cursor:"pointer",
-                    boxShadow:"0 1px 3px rgba(0,0,0,0.04)",
+                    boxShadow:"0 1px 3px rgba(0,0,0,0.03)",
                     WebkitTapHighlightColor:"transparent",
                     borderLeft:`3px solid ${colorPago(v.metodoPago)||C.sep}`}}>
-                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10}}>
                     <div style={{flex:1,minWidth:0}}>
-                      <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:4,flexWrap:"wrap"}}>
+                      <div style={{display:"flex",alignItems:"center",gap:5,marginBottom:2,flexWrap:"wrap"}}>
                         <Chip color={colorPago(v.metodoPago)} small>{iconPago(v.metodoPago)} {labelPago(v.metodoPago)}</Chip>
-                        <span style={{fontSize:10,color:C.label3,fontFamily:FONT,opacity:.7}}>
+                        <span style={{fontSize:9,color:C.label3,fontFamily:FONT,opacity:.7}}>
                           {v.fecha} · {v.vendedor||"Tienda"}
                         </span>
                       </div>
-                      <div style={{display:"flex",flexWrap:"wrap",gap:3}}>
-                        {v.items.map((it,i)=>(
-                          <span key={i} style={{fontSize:11,color:C.label2,fontFamily:FONT}}>
-                            {it.nombre} ×{it.cantidad}{i<v.items.length-1?" ·":""}
-                          </span>
-                        ))}
+                      <div style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",
+                        fontSize:11,color:C.label,fontFamily:FONT,fontWeight:500}}>
+                        {v.items.map((it,i)=>`${it.nombre} ×${it.cantidad}`).join(" · ")}
                       </div>
                     </div>
                     <div style={{textAlign:"right",flexShrink:0}}>
-                      <div style={{fontSize:15,fontWeight:700,color:C.label,fontFamily:FONT,
+                      <div style={{fontSize:14,fontWeight:700,color:C.label,fontFamily:FONT,
                         letterSpacing:"-0.02em"}}>{$(v.total)}</div>
-                      <div style={{fontSize:10,color:C.label3,fontFamily:FONT,marginTop:2,opacity:.6}}>
+                      <div style={{fontSize:9,color:C.label3,fontFamily:FONT,marginTop:1,opacity:.6}}>
                         {v.items.length} ítem{v.items.length!==1?"s":""}
                       </div>
                     </div>
@@ -11556,29 +11553,29 @@ function DashboardVentas({ventas, onVentaClick}){
             });
             return (
               <div key={v.id} onClick={()=>onVentaClick&&onVentaClick(v)}
-                style={{background:C.bg1,borderRadius:12,padding:"14px 16px",marginBottom:8,
+                style={{background:C.bg1,borderRadius:10,padding:"8px 12px",marginBottom:4,
                   border:`1px solid ${C.sep}`,cursor:"pointer",
-                  boxShadow:"0 1px 3px rgba(0,0,0,0.05)",
+                  boxShadow:"0 1px 3px rgba(0,0,0,0.03)",
                   WebkitTapHighlightColor:"transparent"}}>
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:5}}>
                   <div>
-                    <span style={{fontFamily:"monospace",fontSize:11,color:C.label3}}>{v.id}</span>
-                    <div style={{fontSize:12,color:C.label3,fontFamily:FONT}}>{v.fecha} · {v.vendedor||"Tienda"}</div>
+                    <span style={{fontFamily:"monospace",fontSize:10,color:C.label3}}>{v.id}</span>
+                    <div style={{fontSize:11,color:C.label3,fontFamily:FONT}}>{v.fecha} · {v.vendedor||"Tienda"}</div>
                   </div>
-                  <div style={{fontSize:15,fontWeight:700,color:C.label,fontFamily:FONT}}>{$(v.total)}</div>
+                  <div style={{fontSize:14,fontWeight:700,color:C.label,fontFamily:FONT}}>{$(v.total)}</div>
                 </div>
-                <div style={{borderTop:`1px solid ${C.sep}`,paddingTop:8}}>
+                <div style={{borderTop:`1px solid ${C.sep}`,paddingTop:5}}>
                   {itsMatch.map((it,i)=>(
                     <div key={i} style={{display:"flex",justifyContent:"space-between",
-                      fontSize:13,color:C.label,fontFamily:FONT,marginBottom:4}}>
+                      fontSize:12,color:C.label,fontFamily:FONT,marginBottom:2}}>
                       <div>
-                        <span style={{fontFamily:"monospace",fontSize:11,
-                          background:C.accent,color:C.blue,padding:"1px 6px",borderRadius:4,marginRight:6}}>
+                        <span style={{fontFamily:"monospace",fontSize:10,
+                          background:C.accent,color:C.blue,padding:"1px 5px",borderRadius:4,marginRight:5}}>
                           {it.codigo}
                         </span>
                         {it.nombre} ×{it.cantidad}
                       </div>
-                      <span style={{fontWeight:600,color:C.label2}}>{$(it.subtotal)}</span>
+                      <span style={{fontWeight:600,color:C.label,fontSize:12}}>{$(it.subtotal)}</span>
                     </div>
                   ))}
                 </div>
@@ -11782,8 +11779,8 @@ function VentasTab({vMes, totalVtas, mes, anio, onVentaClick}){
                 const totalMostrar=itemsMostrar.reduce((s,i)=>s+i.subtotal,0);
                 return (
                   <div key={v.id} onClick={()=>onVentaClick&&onVentaClick(v)}
-                    style={{background:v.anulada?`${C.red}06`:C.bg2,borderRadius:isDesktop?10:12,
-                      padding: isDesktop ? "9px 14px" : "11px 14px", marginBottom: isDesktop ? 5 : 7, cursor:"pointer",
+                    style={{background:v.anulada?`${C.red}06`:C.bg2,borderRadius:isDesktop?8:10,
+                      padding: isDesktop ? "7px 12px" : "8px 12px", marginBottom: isDesktop ? 3 : 4, cursor:"pointer",
                       WebkitTapHighlightColor:"transparent",
                       opacity:v.anulada?0.7:1,
                       border:v.anulada?`1px solid ${C.red}30`:"none",
@@ -11791,20 +11788,20 @@ function VentasTab({vMes, totalVtas, mes, anio, onVentaClick}){
                     }}
                     onMouseEnter={isDesktop ? e=>{ e.currentTarget.style.background=v.anulada?`${C.red}06`:`${C.sep}`; } : undefined}
                     onMouseLeave={isDesktop ? e=>{ e.currentTarget.style.background=v.anulada?`${C.red}06`:C.bg2; } : undefined}>
-                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",
-                      gap:8, marginBottom: isDesktop ? 4 : 6}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",
+                      gap:10, marginBottom: isDesktop ? 3 : 4}}>
                       <div style={{flex:1,minWidth:0}}>
-                        <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:2,flexWrap:"wrap"}}>
+                        <div style={{display:"flex",alignItems:"center",gap:5,marginBottom:1,flexWrap:"wrap"}}>
                           {v.anulada
                             ? <Chip color={C.red}>⊘ Anulada</Chip>
                             : <Chip color={colorPago(v.metodoPago)} small>{iconPago(v.metodoPago)} {labelPago(v.metodoPago)}</Chip>
                           }
-                          <span style={{fontSize:10,color:C.label3,fontFamily:FONT,opacity:.65}}>
+                          <span style={{fontSize:9,color:C.label3,fontFamily:FONT,opacity:.65}}>
                             {v.fecha} {v.hora} · {v.vendedor||"Tienda"}
                           </span>
                         </div>
                       </div>
-                      <span style={{fontSize: isDesktop ? 15 : 16, fontWeight:700,
+                      <span style={{fontSize: isDesktop ? 14 : 15, fontWeight:700,
                         color:v.anulada?C.label3:C.label,fontFamily:FONT,letterSpacing:"-0.02em",
                         flexShrink:0,textDecoration:v.anulada?"line-through":"none"}}>{$(totalMostrar)}</span>
                     </div>
@@ -11817,18 +11814,18 @@ function VentasTab({vMes, totalVtas, mes, anio, onVentaClick}){
                         return acc;
                       },{})
                     ).map(g=>(
-                      <div key={g.marca?.id} style={{marginBottom: isDesktop ? 4 : 6, padding: isDesktop ? "5px 8px" : "6px 10px",
-                        background:`${g.marca?.color}10`,borderRadius:8,
+                      <div key={g.marca?.id} style={{marginBottom: isDesktop ? 3 : 3, padding: isDesktop ? "4px 8px" : "4px 8px",
+                        background:`${g.marca?.color}10`,borderRadius:6,
                         borderLeft:`3px solid ${g.marca?.color}`}}>
-                        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:3}}>
-                          <div style={{display:"flex",alignItems:"center",gap:6}}>
-                            <MarcaIcon marca={g.marca} size={14} radius={4}/>
-                            <span style={{fontSize:12,fontWeight:600,color:g.marca?.color,fontFamily:FONT}}>{g.marca?.nombre}</span>
+                        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:1}}>
+                          <div style={{display:"flex",alignItems:"center",gap:5}}>
+                            <MarcaIcon marca={g.marca} size={12} radius={3}/>
+                            <span style={{fontSize:11,fontWeight:600,color:g.marca?.color,fontFamily:FONT}}>{g.marca?.nombre}</span>
                           </div>
-                          <span style={{fontSize:13,fontWeight:700,color:C.label,fontFamily:FONT,letterSpacing:"-0.01em"}}>{$(g.sub)}</span>
+                          <span style={{fontSize:12,fontWeight:700,color:C.label,fontFamily:FONT,letterSpacing:"-0.01em"}}>{$(g.sub)}</span>
                         </div>
                         {g.items.map((it,ii)=>(
-                          <div key={ii} style={{fontSize:11,color:C.label2,fontFamily:FONT,lineHeight:"1.3"}}>
+                          <div key={ii} style={{fontSize:10,color:C.label2,fontFamily:FONT,lineHeight:"1.2"}}>
                             · {it.nombre} ×{it.cantidad} = {$(it.subtotal)}
                           </div>
                         ))}
