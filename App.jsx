@@ -806,6 +806,35 @@ function sumPagos(ventas){
   },{efectivo:0,qr:0,tarjeta:0,giftcard:0});
 }
 
+// ── PagoDisplay: muestra el pago con desglose real para pagos mixtos ─────────
+// Para pagos simples → un Chip. Para mixto → un Chip por método con su monto.
+// prop inline=true → texto compacto "💵 Bs 80 · 📱 Bs 70" (para cards pequeñas)
+const _PAGO_ICON  = {efectivo:"💵",qr:"📱",tarjeta:"💳",giftcard:"🎁"};
+const _PAGO_COL   = {efectivo:C.green,qr:C.blue,tarjeta:C.amber,giftcard:"#7C3AED"};
+const _PAGO_LBL   = {efectivo:"Efectivo",qr:"QR",tarjeta:"Tarjeta",giftcard:"GC"};
+function PagoDisplay({mp, total, small, inline}){
+  if(!mp) return null;
+  if(mp.startsWith("mixto|")){
+    const partes = mp.split("|").slice(1)
+      .map(p=>{const[k,v]=p.split(":");return{k,amt:parseFloat(v)||0};})
+      .filter(x=>x.amt>0);
+    if(inline){
+      return <>{partes.map((x,i)=>(
+        <React.Fragment key={x.k}>
+          {i>0&&<span style={{opacity:.4}}> · </span>}
+          <span>{_PAGO_ICON[x.k]||"💱"} {$(x.amt)}</span>
+        </React.Fragment>
+      ))}</>;
+    }
+    return <>{partes.map(x=>(
+      <Chip key={x.k} color={_PAGO_COL[x.k]||C.label3} small={small}>
+        {_PAGO_ICON[x.k]||"💱"} {_PAGO_LBL[x.k]||x.k}: {$(x.amt)}
+      </Chip>
+    ))}</>;
+  }
+  return <Chip color={colorPago(mp)} small={small}>{iconPago(mp)} {labelPago(mp)}</Chip>;
+}
+
 // ── MarcaIcon: muestra imagen de logo o emoji como fallback ──────────────────
 // Usar en cualquier lugar del UI donde aparezca el ícono de una marca.
 function MarcaIcon({marca, size=20, radius=8, style={}}){
@@ -3319,9 +3348,7 @@ function NotaVentaModal({venta, onClose, numVenta, onAnularVenta}){
         <span style={{fontFamily:"monospace",fontSize:14,fontWeight:700,color:C.label}}>
           # {num}
         </span>
-        <Chip color={colorPago(venta.metodoPago)}>
-          {iconPago(venta.metodoPago)} {labelPago(venta.metodoPago)}
-        </Chip>
+        <PagoDisplay mp={venta.metodoPago} total={venta.total}/>
         {venta.anulada
           ? <Chip color={C.red}>⊘ ANULADA</Chip>
           : <Chip color={C.green}>✓ Pagado</Chip>
@@ -5221,7 +5248,7 @@ function BrandVentaModal({venta, marca, onClose}){
             boxShadow:"0 1px 6px rgba(0,0,0,0.04)"}}>
             <FilaInfo lbl="Fecha" val={`${venta.fecha} ${venta.hora}`}/>
             <FilaInfo lbl="Vendedor" val={venta.vendedor||"Tienda"}/>
-            <FilaInfo lbl="Método de pago" val={`${iconPago(venta.metodoPago)} ${labelPago(venta.metodoPago)}`}/>
+            <FilaInfo lbl="Método de pago" val={<PagoDisplay mp={venta.metodoPago} total={venta.total} small/>}/>
             <FilaInfo lbl="Estado" val={venta.anulada?"❌ Anulada":"✅ Completada"}/>
             {venta.descPct>0&&<FilaInfo lbl="Descuento" val={`${venta.descPct}%`}/>}
           </div>
@@ -5852,7 +5879,9 @@ function BrandPortal({user, ventas, inv, logout}){
                             </span>
                             <span style={{fontSize:9,color:C.label3,opacity:.4}}>·</span>
                             <span style={{fontSize:9,color:C.label3,fontFamily:FONT,opacity:.75}}>
-                              {iconPago(v.metodoPago)} {labelPago(v.metodoPago)}
+                              {v.metodoPago?.startsWith("mixto|")
+                                ? <PagoDisplay mp={v.metodoPago} total={csub} inline/>
+                                : `${iconPago(v.metodoPago)} ${labelPago(v.metodoPago)}`}
                             </span>
                             {v.anulada&&(
                               <span style={{fontSize:8,background:C.redBg,color:C.red,
@@ -9748,9 +9777,7 @@ function MarcaDetalle({marcaId,inv,ventas,vMes,mes,anio,MK,cierres,setCierres,ge
                       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom: isDesktop ? 2 : 4}}>
                         <div style={{display:"flex",alignItems:"center",gap:7}}>
                           <span style={{fontFamily:"monospace",fontSize:11,color:C.gold,fontWeight:600}}>{v.id}</span>
-                          <Chip color={colorPago(v.metodoPago)} small>
-                            {iconPago(v.metodoPago)} {labelPago(v.metodoPago)}
-                          </Chip>
+                          <PagoDisplay mp={v.metodoPago} total={v.total} small/>
                         </div>
                         <span style={{fontSize: isDesktop ? 14 : 15, fontWeight:700,color:C.label,fontFamily:FONT,letterSpacing:"-0.01em"}}>{$(v.subMarca)}</span>
                       </div>
@@ -9904,7 +9931,7 @@ function MarcaDetalle({marcaId,inv,ventas,vMes,mes,anio,MK,cierres,setCierres,ge
                       <span style={{fontSize:15,fontWeight:700,color:C.label,fontFamily:FONT,letterSpacing:"-0.01em"}}>{$(sub2)}</span>
                     </div>
                     <div style={{fontSize:11,color:C.label3,fontFamily:FONT,marginBottom:gcAlloc?3:0,opacity:.65}}>
-                      {v.fecha} {v.hora} · {labelPago(v.metodoPago)}
+                      {v.fecha} {v.hora} · {v.metodoPago?.startsWith("mixto|")?<PagoDisplay mp={v.metodoPago} total={sub2} inline/>:labelPago(v.metodoPago)}
                     </div>
                     {gcAlloc&&(
                       <div style={{display:"flex",gap:10,fontSize:11,fontFamily:FONT_UI,marginBottom:3,
@@ -10165,7 +10192,7 @@ function HistorialTab({ventas, inv, cierres, onVentaClick}){
                     <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10}}>
                       <div style={{flex:1,minWidth:0}}>
                         <div style={{display:"flex",alignItems:"center",gap:5,marginBottom:2,flexWrap:"wrap"}}>
-                          <Chip color={colorPago(v.metodoPago)} small>{iconPago(v.metodoPago)} {labelPago(v.metodoPago)}</Chip>
+                          <PagoDisplay mp={v.metodoPago} total={v.total} small/>
                           <span style={{fontSize:9,color:C.label3,fontFamily:FONT,opacity:.7}}>{v.fecha} {v.hora}</span>
                         </div>
                         {v.items.map((it,ii)=>{
@@ -11520,7 +11547,7 @@ function DashboardVentas({ventas, onVentaClick}){
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10}}>
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{display:"flex",alignItems:"center",gap:5,marginBottom:2,flexWrap:"wrap"}}>
-                        <Chip color={colorPago(v.metodoPago)} small>{iconPago(v.metodoPago)} {labelPago(v.metodoPago)}</Chip>
+                        <PagoDisplay mp={v.metodoPago} total={v.total} small/>
                         <span style={{fontSize:9,color:C.label3,fontFamily:FONT,opacity:.7}}>
                           {v.fecha} · {v.vendedor||"Tienda"}
                         </span>
@@ -11825,7 +11852,7 @@ function VentasTab({vMes, totalVtas, mes, anio, onVentaClick}){
                         <div style={{display:"flex",alignItems:"center",gap:5,marginBottom:1,flexWrap:"wrap"}}>
                           {v.anulada
                             ? <Chip color={C.red}>⊘ Anulada</Chip>
-                            : <Chip color={colorPago(v.metodoPago)} small>{iconPago(v.metodoPago)} {labelPago(v.metodoPago)}</Chip>
+                            : <PagoDisplay mp={v.metodoPago} total={totalMostrar} small/>
                           }
                           <span style={{fontSize:9,color:C.label3,fontFamily:FONT,opacity:.65}}>
                             {v.fecha} {v.hora} · {v.vendedor||"Tienda"}
