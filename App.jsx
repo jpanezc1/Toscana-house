@@ -778,6 +778,34 @@ function iconPago(mp){
   return PAGOS.find(p=>p.id===mp)?.icon||"";
 }
 
+// ── parsePago: desglosa cualquier metodoPago a montos reales por método ───────
+// Mixto NO es método de pago — es una herramienta que distribuye el total
+// entre efectivo / qr / tarjeta / giftcard. Esta función siempre devuelve
+// los montos reales, sin importar si la venta fue mixta o no.
+function parsePago(metodoPago, total){
+  const res={efectivo:0,qr:0,tarjeta:0,giftcard:0};
+  if(!metodoPago) return res;
+  if(metodoPago.startsWith("mixto|")){
+    metodoPago.split("|").slice(1).forEach(p=>{
+      const [k,v]=p.split(":");
+      if(k in res) res[k]=parseFloat(v)||0;
+    });
+    return res;
+  }
+  if(metodoPago in res) res[metodoPago]=total;
+  else res.efectivo=total; // fallback
+  return res;
+}
+// Suma parsePago sobre un array de ventas → {efectivo, qr, tarjeta, giftcard}
+function sumPagos(ventas){
+  return ventas.reduce((acc,v)=>{
+    const p=parsePago(v.metodoPago,v.total);
+    acc.efectivo+=p.efectivo; acc.qr+=p.qr;
+    acc.tarjeta+=p.tarjeta;  acc.giftcard+=p.giftcard;
+    return acc;
+  },{efectivo:0,qr:0,tarjeta:0,giftcard:0});
+}
+
 // ── MarcaIcon: muestra imagen de logo o emoji como fallback ──────────────────
 // Usar en cualquier lugar del UI donde aparezca el ícono de una marca.
 function MarcaIcon({marca, size=20, radius=8, style={}}){
@@ -4804,13 +4832,8 @@ function HomeDashboard({ventas, inv, vMes, mes, anio, onGoTab}){
   }, [ventas]);
   const maxDay = Math.max(...last7.map(d => d.total), 1);
 
-  // ── Métodos de pago hoy ─────────────────────────────────
-  const pagoHoy = {
-    efectivo: vHoy.filter(v => v.metodoPago === "efectivo").reduce((s,v) => s+v.total, 0),
-    qr:       vHoy.filter(v => v.metodoPago === "qr").reduce((s,v) => s+v.total, 0),
-    tarjeta:  vHoy.filter(v => v.metodoPago === "tarjeta").reduce((s,v) => s+v.total, 0),
-    mixto:    vHoy.filter(v => v.metodoPago?.startsWith("mixto|")).reduce((s,v) => s+v.total, 0),
-  };
+  // ── Métodos de pago hoy — mixto distribuido a sus métodos reales ───────────
+  const pagoHoy = sumPagos(vHoy);
 
   // ── Top 5 marcas del mes ────────────────────────────────
   const topMarcas = useMemo(() => {
@@ -5000,7 +5023,6 @@ function HomeDashboard({ventas, inv, vMes, mes, anio, onGoTab}){
               {label:"Efectivo", val:pagoHoy.efectivo, icon:"💵", color:"#2E7D32"},
               {label:"QR",       val:pagoHoy.qr,       icon:"📱", color:"#1565C0"},
               {label:"Tarjeta",  val:pagoHoy.tarjeta,  icon:"💳", color:"#E65100"},
-              {label:"Mixto",    val:pagoHoy.mixto,    icon:"🔀", color:"#6C5CE7"},
             ].filter(p => p.val > 0).map(p => (
               <div key={p.label} style={{
                 background:`${p.color}08`, borderRadius:10, padding:"10px 12px",
@@ -7907,10 +7929,11 @@ function App(){
   // Portal de marca (lectura)
   if (user.rol === "marca") return <BrandPortal user={user} ventas={ventas} inv={inv} logout={logout}/>;
 
-  // ── Liquidaciones: métricas pre-calculadas (evita IIFEs en JSX) ──────────
-  const liqEf       = vMes.filter(v=>v.metodoPago==="efectivo").reduce((s,v)=>s+v.total,0);
-  const liqQr       = vMes.filter(v=>v.metodoPago==="qr").reduce((s,v)=>s+v.total,0);
-  const liqTj       = vMes.filter(v=>v.metodoPago==="tarjeta").reduce((s,v)=>s+v.total,0);
+  // ── Liquidaciones: métricas pre-calculadas — mixto distribuido ─────────────
+  const _liqPagos   = sumPagos(vMes);
+  const liqEf       = _liqPagos.efectivo;
+  const liqQr       = _liqPagos.qr;
+  const liqTj       = _liqPagos.tarjeta;
   const liqConFact  = vMes.filter(v=>v.conFactura);
   const liqCerradas  = MARCAS.filter(m=>cierres[`${MK}-${m.id}`]?.cerrado).length;
   const liqConVentas = MARCAS.filter(m=>getLiq(m.id).bruto>0).length;
@@ -9933,18 +9956,24 @@ function HistorialTab({ventas, inv, cierres, onVentaClick}){
 
   // Stats del período
   const totalPer    = ventasPer.reduce((s,v)=>s+v.total,0);
-  const efectivoPer = ventasPer.filter(v=>v.metodoPago==="efectivo").reduce((s,v)=>s+v.total,0);
-  const qrPer       = ventasPer.filter(v=>v.metodoPago==="qr").reduce((s,v)=>s+v.total,0);
-  const tarjetaPer  = ventasPer.filter(v=>v.metodoPago==="tarjeta").reduce((s,v)=>s+v.total,0);
+  const _pagPer     = sumPagos(ventasPer);
+  const efectivoPer = _pagPer.efectivo;
+  const qrPer       = _pagPer.qr;
+  const tarjetaPer  = _pagPer.tarjeta;
 
   // Ventas por marca del período
   const porMarcaPer = useMemo(()=>
     MARCAS.map(m=>{
-      const total = ventasPer.reduce((s,v)=>s+v.items.filter(i=>i.marcaId===m.id).reduce((ss,i)=>ss+i.subtotal,0),0);
-      const ef    = ventasPer.filter(v=>v.metodoPago==="efectivo").reduce((s,v)=>s+v.items.filter(i=>i.marcaId===m.id).reduce((ss,i)=>ss+i.subtotal,0),0);
-      const qr    = ventasPer.filter(v=>v.metodoPago==="qr").reduce((s,v)=>s+v.items.filter(i=>i.marcaId===m.id).reduce((ss,i)=>ss+i.subtotal,0),0);
-      const tj    = ventasPer.filter(v=>v.metodoPago==="tarjeta").reduce((s,v)=>s+v.items.filter(i=>i.marcaId===m.id).reduce((ss,i)=>ss+i.subtotal,0),0);
-      const txs   = ventasPer.filter(v=>v.items.some(i=>i.marcaId===m.id)).length;
+      let total=0,ef=0,qr=0,tj=0;
+      ventasPer.forEach(v=>{
+        const brandSub=v.items.filter(i=>i.marcaId===m.id).reduce((s,i)=>s+i.subtotal,0);
+        if(brandSub===0) return;
+        total+=brandSub;
+        const p=parsePago(v.metodoPago,v.total);
+        const pct=v.total>0?brandSub/v.total:0;
+        ef+=p.efectivo*pct; qr+=p.qr*pct; tj+=p.tarjeta*pct;
+      });
+      const txs=ventasPer.filter(v=>v.items.some(i=>i.marcaId===m.id)).length;
       return {marca:m, total, ef, qr, tj, txs};
     }).filter(x=>x.total>0).sort((a,b)=>b.total-a.total)
   ,[ventasPer]);
@@ -11261,10 +11290,10 @@ function DashboardVentas({ventas, onVentaClick}){
   },[ventas,codBusq]);
 
   const totalFil = ventasFiltradas.reduce((s,v)=>s+v.total,0);
-  const efectivoFil = ventasFiltradas.filter(v=>v.metodoPago==="efectivo").reduce((s,v)=>s+v.total,0);
-  const qrFil = ventasFiltradas.filter(v=>v.metodoPago==="qr").reduce((s,v)=>s+v.total,0);
-  const tarjetaFil = ventasFiltradas.filter(v=>v.metodoPago==="tarjeta").reduce((s,v)=>s+v.total,0);
-  const mixtoFil = ventasFiltradas.filter(v=>v.metodoPago?.startsWith("mixto|")).reduce((s,v)=>s+v.total,0);
+  const _pagFil  = sumPagos(ventasFiltradas);
+  const efectivoFil = _pagFil.efectivo;
+  const qrFil       = _pagFil.qr;
+  const tarjetaFil  = _pagFil.tarjeta;
 
   const porMarcaFil = useMemo(()=>{
     const map={};
@@ -11356,7 +11385,6 @@ function DashboardVentas({ventas, onVentaClick}){
               {icon:"💵",label:"Efectivo",val:efectivoFil,color:C.green},
               {icon:"📱",label:"QR",val:qrFil,color:C.blue},
               {icon:"💳",label:"Tarjeta",val:tarjetaFil,color:C.amber},
-              ...(mixtoFil>0?[{icon:"🔀",label:"Mixto",val:mixtoFil,color:"#6A1B9A"}]:[]),
             ].map(s=>(
               <div key={s.label} style={{background:C.bg1,borderRadius:12,padding:"14px 16px",
                 border:`1px solid ${C.sep}`,boxShadow:"0 1px 3px rgba(0,0,0,0.05)"}}>
@@ -11596,25 +11624,29 @@ function VentasTab({vMes, totalVtas, mes, anio, onVentaClick}){
   var _hN166 = useState("marcas"); var vistaActiva = _hN166[0]; var setVistaActiva = _hN166[1];; // "marcas" | "historial"
   var _hN167 = useState(null); var marcaFiltro = _hN167[0]; var setMarcaFiltro = _hN167[1];; // id marca o null = todas
 
-  // Calcular ventas por marca con desglose de método de pago
+  // Calcular ventas por marca con desglose de método de pago — mixto distribuido
   const porMarca = useMemo(()=>{
     return MARCAS.map(m=>{
-      const efectivo = vMes.filter(v=>v.metodoPago==="efectivo")
-        .reduce((s,v)=>s+v.items.filter(i=>i.marcaId===m.id).reduce((ss,i)=>ss+i.subtotal,0),0);
-      const qr = vMes.filter(v=>v.metodoPago==="qr")
-        .reduce((s,v)=>s+v.items.filter(i=>i.marcaId===m.id).reduce((ss,i)=>ss+i.subtotal,0),0);
-      const tarjeta = vMes.filter(v=>v.metodoPago==="tarjeta")
-        .reduce((s,v)=>s+v.items.filter(i=>i.marcaId===m.id).reduce((ss,i)=>ss+i.subtotal,0),0);
-      const total = efectivo+qr+tarjeta;
-      const txs = vMes.filter(v=>v.items.some(i=>i.marcaId===m.id)).length;
+      let efectivo=0, qr=0, tarjeta=0, total=0;
+      vMes.forEach(v=>{
+        const brandSub=v.items.filter(i=>i.marcaId===m.id).reduce((s,i)=>s+i.subtotal,0);
+        if(brandSub===0) return;
+        total+=brandSub;
+        const p=parsePago(v.metodoPago,v.total);
+        const pct=v.total>0?brandSub/v.total:0; // proporción de esta marca en la venta
+        efectivo+=p.efectivo*pct;
+        qr      +=p.qr*pct;
+        tarjeta +=p.tarjeta*pct;
+      });
+      const txs=vMes.filter(v=>v.items.some(i=>i.marcaId===m.id)).length;
       return {marca:m, total, efectivo, qr, tarjeta, txs};
     }).filter(x=>x.total>0).sort((a,b)=>b.total-a.total);
   },[vMes]);
 
-  const totalEfectivo = vMes.filter(v=>v.metodoPago==="efectivo").reduce((s,v)=>s+v.total,0);
-  const totalQR       = vMes.filter(v=>v.metodoPago==="qr").reduce((s,v)=>s+v.total,0);
-  const totalTarjeta  = vMes.filter(v=>v.metodoPago==="tarjeta").reduce((s,v)=>s+v.total,0);
-  const totalMixto    = vMes.filter(v=>v.metodoPago?.startsWith("mixto|")).reduce((s,v)=>s+v.total,0);
+  const _pagMes   = sumPagos(vMes);
+  const totalEfectivo = _pagMes.efectivo;
+  const totalQR       = _pagMes.qr;
+  const totalTarjeta  = _pagMes.tarjeta;
   const maxVenta      = Math.max(...porMarca.map(x=>x.total), 1);
 
   // Ventas filtradas por marca para el historial
@@ -11640,7 +11672,6 @@ function VentasTab({vMes, totalVtas, mes, anio, onVentaClick}){
           {icon:"💵",label:"Efectivo",value:totalEfectivo,color:"#4A9B6F"},
           {icon:"📱",label:"QR",value:totalQR,color:"#5B8DB8"},
           {icon:"💳",label:"Tarjeta",value:totalTarjeta,color:"#C8922A"},
-          ...(totalMixto>0?[{icon:"🔀",label:"Mixto",value:totalMixto,color:"#6C5CE7"}]:[]),
         ].map(s=>(
           <StatCard key={s.label} icon={s.icon} label={s.label} value={$(s.value)}
             sub={`${Math.round(totalVtas>0?(s.value/totalVtas)*100:0)}% del total`} color={s.color} compact={isDesktop}/>

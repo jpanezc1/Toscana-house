@@ -22262,6 +22262,30 @@
     }
     return PAGOS.find((p) => p.id === mp)?.icon || "";
   }
+  function parsePago(metodoPago, total) {
+    const res = { efectivo: 0, qr: 0, tarjeta: 0, giftcard: 0 };
+    if (!metodoPago) return res;
+    if (metodoPago.startsWith("mixto|")) {
+      metodoPago.split("|").slice(1).forEach((p) => {
+        const [k, v] = p.split(":");
+        if (k in res) res[k] = parseFloat(v) || 0;
+      });
+      return res;
+    }
+    if (metodoPago in res) res[metodoPago] = total;
+    else res.efectivo = total;
+    return res;
+  }
+  function sumPagos(ventas) {
+    return ventas.reduce((acc, v) => {
+      const p = parsePago(v.metodoPago, v.total);
+      acc.efectivo += p.efectivo;
+      acc.qr += p.qr;
+      acc.tarjeta += p.tarjeta;
+      acc.giftcard += p.giftcard;
+      return acc;
+    }, { efectivo: 0, qr: 0, tarjeta: 0, giftcard: 0 });
+  }
   function MarcaIcon({ marca, size = 20, radius = 8, style = {} }) {
     if (!marca) return null;
     if (marca.imagen) {
@@ -26307,12 +26331,7 @@ Fecha: ${venta.fecha}`);
       return days;
     }, [ventas]);
     const maxDay = Math.max(...last7.map((d) => d.total), 1);
-    const pagoHoy = {
-      efectivo: vHoy.filter((v) => v.metodoPago === "efectivo").reduce((s, v) => s + v.total, 0),
-      qr: vHoy.filter((v) => v.metodoPago === "qr").reduce((s, v) => s + v.total, 0),
-      tarjeta: vHoy.filter((v) => v.metodoPago === "tarjeta").reduce((s, v) => s + v.total, 0),
-      mixto: vHoy.filter((v) => v.metodoPago?.startsWith("mixto|")).reduce((s, v) => s + v.total, 0)
-    };
+    const pagoHoy = sumPagos(vHoy);
     const topMarcas = (0, import_react.useMemo)(() => {
       const map = {};
       vMes.forEach((v) => v.items.forEach((it) => {
@@ -26484,8 +26503,7 @@ Fecha: ${venta.fecha}`);
     })), totalHoy > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT_UI, textAlign: "center", marginTop: 8 } }, "Hoy: Bs ", new Intl.NumberFormat("es-BO", { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(totalHoy))), totalHoy > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: cardStyle }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, fontWeight: 700, color: C.label2, fontFamily: FONT_UI, marginBottom: 10 } }, "M\xE9todos de pago \u2014 hoy"), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 } }, [
       { label: "Efectivo", val: pagoHoy.efectivo, icon: "\u{1F4B5}", color: "#2E7D32" },
       { label: "QR", val: pagoHoy.qr, icon: "\u{1F4F1}", color: "#1565C0" },
-      { label: "Tarjeta", val: pagoHoy.tarjeta, icon: "\u{1F4B3}", color: "#E65100" },
-      { label: "Mixto", val: pagoHoy.mixto, icon: "\u{1F500}", color: "#6C5CE7" }
+      { label: "Tarjeta", val: pagoHoy.tarjeta, icon: "\u{1F4B3}", color: "#E65100" }
     ].filter((p) => p.val > 0).map((p) => /* @__PURE__ */ import_react.default.createElement("div", { key: p.label, style: {
       background: `${p.color}08`,
       borderRadius: 10,
@@ -29808,9 +29826,10 @@ Fecha: ${venta.fecha}`);
     const showingDetail = tab === "marcas" && marcaDetalle;
     if (!user) return /* @__PURE__ */ import_react.default.createElement(LoginScreen, { onLogin: login });
     if (user.rol === "marca") return /* @__PURE__ */ import_react.default.createElement(BrandPortal, { user, ventas, inv, logout });
-    const liqEf = vMes.filter((v) => v.metodoPago === "efectivo").reduce((s, v) => s + v.total, 0);
-    const liqQr = vMes.filter((v) => v.metodoPago === "qr").reduce((s, v) => s + v.total, 0);
-    const liqTj = vMes.filter((v) => v.metodoPago === "tarjeta").reduce((s, v) => s + v.total, 0);
+    const _liqPagos = sumPagos(vMes);
+    const liqEf = _liqPagos.efectivo;
+    const liqQr = _liqPagos.qr;
+    const liqTj = _liqPagos.tarjeta;
     const liqConFact = vMes.filter((v) => v.conFactura);
     const liqCerradas = MARCAS.filter((m) => cierres[`${MK}-${m.id}`]?.cerrado).length;
     const liqConVentas = MARCAS.filter((m) => getLiq(m.id).bruto > 0).length;
@@ -31990,15 +32009,23 @@ Fecha: ${venta.fecha}`);
       });
     }, [ventas]);
     const totalPer = ventasPer.reduce((s, v) => s + v.total, 0);
-    const efectivoPer = ventasPer.filter((v) => v.metodoPago === "efectivo").reduce((s, v) => s + v.total, 0);
-    const qrPer = ventasPer.filter((v) => v.metodoPago === "qr").reduce((s, v) => s + v.total, 0);
-    const tarjetaPer = ventasPer.filter((v) => v.metodoPago === "tarjeta").reduce((s, v) => s + v.total, 0);
+    const _pagPer = sumPagos(ventasPer);
+    const efectivoPer = _pagPer.efectivo;
+    const qrPer = _pagPer.qr;
+    const tarjetaPer = _pagPer.tarjeta;
     const porMarcaPer = (0, import_react.useMemo)(
       () => MARCAS.map((m) => {
-        const total = ventasPer.reduce((s, v) => s + v.items.filter((i) => i.marcaId === m.id).reduce((ss, i) => ss + i.subtotal, 0), 0);
-        const ef = ventasPer.filter((v) => v.metodoPago === "efectivo").reduce((s, v) => s + v.items.filter((i) => i.marcaId === m.id).reduce((ss, i) => ss + i.subtotal, 0), 0);
-        const qr = ventasPer.filter((v) => v.metodoPago === "qr").reduce((s, v) => s + v.items.filter((i) => i.marcaId === m.id).reduce((ss, i) => ss + i.subtotal, 0), 0);
-        const tj = ventasPer.filter((v) => v.metodoPago === "tarjeta").reduce((s, v) => s + v.items.filter((i) => i.marcaId === m.id).reduce((ss, i) => ss + i.subtotal, 0), 0);
+        let total = 0, ef = 0, qr = 0, tj = 0;
+        ventasPer.forEach((v) => {
+          const brandSub = v.items.filter((i) => i.marcaId === m.id).reduce((s, i) => s + i.subtotal, 0);
+          if (brandSub === 0) return;
+          total += brandSub;
+          const p = parsePago(v.metodoPago, v.total);
+          const pct = v.total > 0 ? brandSub / v.total : 0;
+          ef += p.efectivo * pct;
+          qr += p.qr * pct;
+          tj += p.tarjeta * pct;
+        });
         const txs = ventasPer.filter((v) => v.items.some((i) => i.marcaId === m.id)).length;
         return { marca: m, total, ef, qr, tj, txs };
       }).filter((x) => x.total > 0).sort((a, b) => b.total - a.total),
@@ -33541,10 +33568,10 @@ Esta acci\xF3n no se puede deshacer.`,
       );
     }, [ventas, codBusq]);
     const totalFil = ventasFiltradas.reduce((s, v) => s + v.total, 0);
-    const efectivoFil = ventasFiltradas.filter((v) => v.metodoPago === "efectivo").reduce((s, v) => s + v.total, 0);
-    const qrFil = ventasFiltradas.filter((v) => v.metodoPago === "qr").reduce((s, v) => s + v.total, 0);
-    const tarjetaFil = ventasFiltradas.filter((v) => v.metodoPago === "tarjeta").reduce((s, v) => s + v.total, 0);
-    const mixtoFil = ventasFiltradas.filter((v) => v.metodoPago?.startsWith("mixto|")).reduce((s, v) => s + v.total, 0);
+    const _pagFil = sumPagos(ventasFiltradas);
+    const efectivoFil = _pagFil.efectivo;
+    const qrFil = _pagFil.qr;
+    const tarjetaFil = _pagFil.tarjeta;
     const porMarcaFil = (0, import_react.useMemo)(() => {
       const map = {};
       ventasFiltradas.forEach((v) => v.items.forEach((it) => {
@@ -33665,8 +33692,7 @@ Esta acci\xF3n no se puede deshacer.`,
     } }, "Total facturado \xB7 ", fmtDate(fechaIni), " \u2013 ", fmtDate(fechaFin)), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 32, fontWeight: 700, color: "#fff", fontFamily: FONT, lineHeight: 1 } }, $(totalFil)), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: "rgba(255,255,255,0.75)", fontFamily: FONT, marginTop: 6 } }, ventasFiltradas.length, " venta", ventasFiltradas.length !== 1 ? "s" : "", " en el per\xEDodo")), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 12 } }, [
       { icon: "\u{1F4B5}", label: "Efectivo", val: efectivoFil, color: C.green },
       { icon: "\u{1F4F1}", label: "QR", val: qrFil, color: C.blue },
-      { icon: "\u{1F4B3}", label: "Tarjeta", val: tarjetaFil, color: C.amber },
-      ...mixtoFil > 0 ? [{ icon: "\u{1F500}", label: "Mixto", val: mixtoFil, color: "#6A1B9A" }] : []
+      { icon: "\u{1F4B3}", label: "Tarjeta", val: tarjetaFil, color: C.amber }
     ].map((s) => /* @__PURE__ */ import_react.default.createElement("div", { key: s.label, style: {
       background: C.bg1,
       borderRadius: 12,
@@ -33842,18 +33868,25 @@ Esta acci\xF3n no se puede deshacer.`,
     ;
     const porMarca = (0, import_react.useMemo)(() => {
       return MARCAS.map((m) => {
-        const efectivo = vMes.filter((v) => v.metodoPago === "efectivo").reduce((s, v) => s + v.items.filter((i) => i.marcaId === m.id).reduce((ss, i) => ss + i.subtotal, 0), 0);
-        const qr = vMes.filter((v) => v.metodoPago === "qr").reduce((s, v) => s + v.items.filter((i) => i.marcaId === m.id).reduce((ss, i) => ss + i.subtotal, 0), 0);
-        const tarjeta = vMes.filter((v) => v.metodoPago === "tarjeta").reduce((s, v) => s + v.items.filter((i) => i.marcaId === m.id).reduce((ss, i) => ss + i.subtotal, 0), 0);
-        const total = efectivo + qr + tarjeta;
+        let efectivo = 0, qr = 0, tarjeta = 0, total = 0;
+        vMes.forEach((v) => {
+          const brandSub = v.items.filter((i) => i.marcaId === m.id).reduce((s, i) => s + i.subtotal, 0);
+          if (brandSub === 0) return;
+          total += brandSub;
+          const p = parsePago(v.metodoPago, v.total);
+          const pct = v.total > 0 ? brandSub / v.total : 0;
+          efectivo += p.efectivo * pct;
+          qr += p.qr * pct;
+          tarjeta += p.tarjeta * pct;
+        });
         const txs = vMes.filter((v) => v.items.some((i) => i.marcaId === m.id)).length;
         return { marca: m, total, efectivo, qr, tarjeta, txs };
       }).filter((x) => x.total > 0).sort((a, b) => b.total - a.total);
     }, [vMes]);
-    const totalEfectivo = vMes.filter((v) => v.metodoPago === "efectivo").reduce((s, v) => s + v.total, 0);
-    const totalQR = vMes.filter((v) => v.metodoPago === "qr").reduce((s, v) => s + v.total, 0);
-    const totalTarjeta = vMes.filter((v) => v.metodoPago === "tarjeta").reduce((s, v) => s + v.total, 0);
-    const totalMixto = vMes.filter((v) => v.metodoPago?.startsWith("mixto|")).reduce((s, v) => s + v.total, 0);
+    const _pagMes = sumPagos(vMes);
+    const totalEfectivo = _pagMes.efectivo;
+    const totalQR = _pagMes.qr;
+    const totalTarjeta = _pagMes.tarjeta;
     const maxVenta = Math.max(...porMarca.map((x) => x.total), 1);
     const ventasFiltradas = (0, import_react.useMemo)(() => {
       if (!marcaFiltro) return [...vMes].reverse();
@@ -33870,8 +33903,7 @@ Esta acci\xF3n no se puede deshacer.`,
     } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.7, marginBottom: 3 } }, "Total ", MESES[mes]), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: isDesktop ? 22 : 28, fontWeight: 700, color: C.label, fontFamily: FONT, lineHeight: 1 } }, $(totalVtas)), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT, marginTop: 3 } }, vMes.length, " transacciones \xB7 ", porMarca.length, " marcas activas")), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: isDesktop ? 28 : 36, opacity: 0.4 } }, "\u{1F4B0}")), [
       { icon: "\u{1F4B5}", label: "Efectivo", value: totalEfectivo, color: "#4A9B6F" },
       { icon: "\u{1F4F1}", label: "QR", value: totalQR, color: "#5B8DB8" },
-      { icon: "\u{1F4B3}", label: "Tarjeta", value: totalTarjeta, color: "#C8922A" },
-      ...totalMixto > 0 ? [{ icon: "\u{1F500}", label: "Mixto", value: totalMixto, color: "#6C5CE7" }] : []
+      { icon: "\u{1F4B3}", label: "Tarjeta", value: totalTarjeta, color: "#C8922A" }
     ].map((s) => /* @__PURE__ */ import_react.default.createElement(
       StatCard,
       {
