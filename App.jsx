@@ -4637,13 +4637,17 @@ function ImportarExcelModal({inv, onImportar, onClose}){
       if(raw.length<2){ setEstado("idle"); alert("El archivo está vacío o no tiene datos"); return; }
 
       // ── Auto-detectar fila de encabezado (hasta 10 filas de preámbulo) ──
+      // Requiere ≥2 celdas distintas con keywords (evita falso positivo con celdas
+      // de texto libre que contengan palabras como "precio" o "marca" en el cuerpo)
       let hRow=0;
       for(let i=0;i<Math.min(10,raw.length);i++){
         const r=raw[i].map(c=>norm(String(c)).toLowerCase());
-        if(r.some(c=>
+        const kwCount=r.filter(c=>
           c.includes("descripcion")||c.includes("precio")||c.includes("sku")||
-          c.includes("articulo")||c.includes("marca")||c.includes("item")
-        )){ hRow=i; break; }
+          c.includes("articulo")||c.includes("marca")||c.includes("item")||
+          c.includes("stock")||c.includes("cantidad")||c.includes("codigo")
+        ).length;
+        if(kwCount>=2){ hRow=i; break; }
       }
 
       const headers = raw[hRow].map(h=>norm(String(h)).toLowerCase().trim());
@@ -4698,6 +4702,9 @@ function ImportarExcelModal({inv, onImportar, onClose}){
 
         const marcaNom = cMarca>=0  ? String(row[cMarca]).trim()  : "";
         const descRaw  = cDesc>=0   ? String(row[cDesc]).trim()   : "";
+        // Saltar filas de ejemplo/placeholder de la propia plantilla
+        if(norm(marcaNom).toUpperCase().includes("NOMBRE DE TU MARCA")) continue;
+        if(norm(marcaNom).toUpperCase().startsWith("★")) continue;
         // iZi: la descripción a veces incluye "NO INGRESAR" en col F/G — ignorar esas filas
         if(descRaw.toUpperCase().includes("NO INGRESAR")||descRaw.toUpperCase()==="ATENCIÓN") continue;
         const desc     = descRaw;
@@ -4717,11 +4724,15 @@ function ImportarExcelModal({inv, onImportar, onClose}){
 
         const subcat   = cSubcat>=0 ? String(row[cSubcat]).trim() : "";
 
-        // Buscar marca — fuzzy: exact → starts-with-4-chars
+        // Buscar marca — fuzzy: exact → contains → starts-with-4-chars
+        // marcaNomNorm debe tener ≥3 chars para activar fuzzy (evita que "" match todo)
         const marcaNomNorm = norm(marcaNom).toLowerCase();
-        const marcaEnc = MARCAS.find(m=>norm(m.nombre).toLowerCase()===marcaNomNorm)
+        const marcaEnc = (marcaNomNorm.length<2) ? null : (
+          MARCAS.find(m=>norm(m.nombre).toLowerCase()===marcaNomNorm)
           || MARCAS.find(m=>marcaNomNorm.length>=3&&marcaNomNorm.startsWith(norm(m.nombre).toLowerCase().slice(0,4)))
-          || MARCAS.find(m=>norm(m.nombre).toLowerCase().startsWith(marcaNomNorm.slice(0,4)));
+          || MARCAS.find(m=>marcaNomNorm.length>=3&&norm(m.nombre).toLowerCase().startsWith(marcaNomNorm.slice(0,4)))
+          || MARCAS.find(m=>marcaNomNorm.length>=4&&norm(m.nombre).toLowerCase().includes(marcaNomNorm.slice(0,5)))
+        );
 
         // SKU: usar del Excel si existe, si no auto-generar
         // iZi: para el código usamos subcategoría como "talla" para mayor descriptividad

@@ -26134,9 +26134,10 @@ Fecha: ${venta.fecha}`);
         let hRow = 0;
         for (let i = 0; i < Math.min(10, raw.length); i++) {
           const r = raw[i].map((c) => norm(String(c)).toLowerCase());
-          if (r.some(
-            (c) => c.includes("descripcion") || c.includes("precio") || c.includes("sku") || c.includes("articulo") || c.includes("marca") || c.includes("item")
-          )) {
+          const kwCount = r.filter(
+            (c) => c.includes("descripcion") || c.includes("precio") || c.includes("sku") || c.includes("articulo") || c.includes("marca") || c.includes("item") || c.includes("stock") || c.includes("cantidad") || c.includes("codigo")
+          ).length;
+          if (kwCount >= 2) {
             hRow = i;
             break;
           }
@@ -26180,6 +26181,8 @@ Fecha: ${venta.fecha}`);
           if (row.every((c) => String(c).trim() === "")) continue;
           const marcaNom = cMarca >= 0 ? String(row[cMarca]).trim() : "";
           const descRaw = cDesc >= 0 ? String(row[cDesc]).trim() : "";
+          if (norm(marcaNom).toUpperCase().includes("NOMBRE DE TU MARCA")) continue;
+          if (norm(marcaNom).toUpperCase().startsWith("\u2605")) continue;
           if (descRaw.toUpperCase().includes("NO INGRESAR") || descRaw.toUpperCase() === "ATENCI\xD3N") continue;
           const desc = descRaw;
           const precioRaw = cPrecio >= 0 ? String(row[cPrecio]).replace(/[^\d.,]/g, "").replace(",", ".") : "";
@@ -26191,7 +26194,7 @@ Fecha: ${venta.fecha}`);
           const stock = Math.max(1, parseInt(stockRaw) || 1);
           const subcat = cSubcat >= 0 ? String(row[cSubcat]).trim() : "";
           const marcaNomNorm = norm(marcaNom).toLowerCase();
-          const marcaEnc = MARCAS.find((m) => norm(m.nombre).toLowerCase() === marcaNomNorm) || MARCAS.find((m) => marcaNomNorm.length >= 3 && marcaNomNorm.startsWith(norm(m.nombre).toLowerCase().slice(0, 4))) || MARCAS.find((m) => norm(m.nombre).toLowerCase().startsWith(marcaNomNorm.slice(0, 4)));
+          const marcaEnc = marcaNomNorm.length < 2 ? null : MARCAS.find((m) => norm(m.nombre).toLowerCase() === marcaNomNorm) || MARCAS.find((m) => marcaNomNorm.length >= 3 && marcaNomNorm.startsWith(norm(m.nombre).toLowerCase().slice(0, 4))) || MARCAS.find((m) => marcaNomNorm.length >= 3 && norm(m.nombre).toLowerCase().startsWith(marcaNomNorm.slice(0, 4))) || MARCAS.find((m) => marcaNomNorm.length >= 4 && norm(m.nombre).toLowerCase().includes(marcaNomNorm.slice(0, 5)));
           const skuRaw = cSKU >= 0 ? String(row[cSKU]).trim().toUpperCase() : "";
           const autoSKU = !skuRaw;
           const tallaParaCod = isIZi ? (cat || "").replace(/[^A-Za-z]/g, "").slice(0, 3).toUpperCase() || "TU" : talla || "TU";
