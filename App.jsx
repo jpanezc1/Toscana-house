@@ -4554,6 +4554,102 @@ function ImportarExcelModal({inv, onImportar, onClose}){
     descargarArchivo(blob,`ToscanaHouse_ImportPreview_${hoy()}.xlsx`);
   }
 
+  // ── Generar plantilla Excel para marcas ───────────────────────────
+  async function generarPlantilla(){
+    try{
+      const XLSX = await loadXLSX();
+      const wb   = XLSX.utils.book_new();
+
+      // ── Hoja 1: Plantilla de datos ──────────────────────────────
+      const H = ["Marca *","Descripción / Nombre del producto *","Precio (Bs) *","Stock (unidades)","Talla","Categoría","Color","SKU / Código (dejar vacío = auto)"];
+      const ejemplos = [
+        ["NOMBRE DE TU MARCA","Bralette microfibra esponja removible",100,3,"S/M","Lencería","Negro",""],
+        ["NOMBRE DE TU MARCA","Kit 3 piezas tangón alto especial",150,2,"S/M","Lencería","Nude",""],
+        ["NOMBRE DE TU MARCA","Vestido lino manga larga",280,1,"M","Vestidos","Blanco",""],
+      ];
+      const rows = [
+        ["TOSCANA HOUSE — Plantilla de Inventario","","","","","","",""],
+        [`Versión: ${hoy()} | Completa las columnas marcadas con * y envía este archivo a Toscana House`,"","","","","","",""],
+        ["","","","","","","",""],
+        H,
+        ...ejemplos,
+      ];
+      const ws1 = XLSX.utils.aoa_to_sheet(rows);
+
+      // Anchos de columna
+      ws1["!cols"] = [
+        {wch:22},{wch:42},{wch:14},{wch:14},{wch:10},{wch:16},{wch:14},{wch:28},
+      ];
+      // Merge título y subtítulo
+      ws1["!merges"] = [
+        {s:{r:0,c:0},e:{r:0,c:7}},
+        {s:{r:1,c:0},e:{r:1,c:7}},
+      ];
+
+      // Negrita en fila de encabezado (fila índice 3)
+      H.forEach((_,ci)=>{
+        const addr = XLSX.utils.encode_cell({r:3,c:ci});
+        if(ws1[addr]) ws1[addr].s = {font:{bold:true}};
+      });
+
+      XLSX.utils.book_append_sheet(wb, ws1, "📋 Inventario");
+
+      // ── Hoja 2: Marcas registradas ─────────────────────────────
+      const marcasRows = [
+        ["MARCAS REGISTRADAS EN TOSCANA HOUSE",""],
+        ["Usa el nombre exacto tal como aparece en la columna 'Nombre de Marca'",""],
+        [""],
+        ["#","Nombre de Marca"],
+        ...MARCAS.filter(m=>m.estado!=="inactiva").map((m,i)=>[i+1, m.nombre]),
+      ];
+      const ws2 = XLSX.utils.aoa_to_sheet(marcasRows);
+      ws2["!cols"] = [{wch:6},{wch:28}];
+      ws2["!merges"] = [{s:{r:0,c:0},e:{r:0,c:1}},{s:{r:1,c:0},e:{r:1,c:1}}];
+      XLSX.utils.book_append_sheet(wb, ws2, "🏷️ Marcas");
+
+      // ── Hoja 3: Instrucciones ───────────────────────────────────
+      const instrRows = [
+        ["INSTRUCCIONES — Plantilla de Inventario Toscana House"],
+        [""],
+        ["COLUMNAS OBLIGATORIAS (marcadas con *)"],
+        ["Marca *","Nombre de tu marca tal como aparece en la hoja '🏷️ Marcas'"],
+        ["Descripción *","Nombre completo del producto. Incluye material, tipo, etc."],
+        ["Precio (Bs) *","Precio de venta en bolivianos. Solo número (ej: 100). Sin símbolo."],
+        [""],
+        ["COLUMNAS OPCIONALES"],
+        ["Stock","Cantidad de unidades disponibles. Si se omite, se asume 1."],
+        ["Talla","Talla del artículo: XS / S / M / L / XL / TU / Única / número"],
+        ["Categoría","Tipo de prenda: Lencería, Vestidos, Camisas, Pantalones, etc."],
+        ["Color","Color principal del artículo"],
+        ["SKU / Código","Código propio del producto. Si lo dejas vacío, Toscana lo genera automáticamente con el formato: MARCA-INICIALES-TALLA-001"],
+        [""],
+        ["PASOS PARA COMPLETAR LA PLANTILLA"],
+        ["1.","Ve a la hoja '📋 Inventario' y llena una fila por producto"],
+        ["2.","Verifica que el nombre de tu marca coincida exactamente con la hoja '🏷️ Marcas'"],
+        ["3.","Guarda el archivo como .xlsx"],
+        ["4.","Envía el archivo a Toscana House"],
+        [""],
+        ["IMPORTANTE"],
+        ["•","No modifiques ni elimines la fila de encabezados (fila 4 de la hoja Inventario)"],
+        ["•","Puedes eliminar las 3 filas de ejemplo (filas 5, 6 y 7)"],
+        ["•","No combines celdas en la zona de datos"],
+        ["•","No agregues columnas adicionales"],
+        ["•","Si un producto tiene varias tallas, pon una fila por talla"],
+      ];
+      const ws3 = XLSX.utils.aoa_to_sheet(instrRows);
+      ws3["!cols"] = [{wch:28},{wch:60}];
+      ws3["!merges"] = [{s:{r:0,c:0},e:{r:0,c:1}}];
+      XLSX.utils.book_append_sheet(wb, ws3, "📖 Instrucciones");
+
+      // ── Descargar ───────────────────────────────────────────────
+      const buf  = XLSX.write(wb,{bookType:"xlsx",type:"array"});
+      const blob = new Blob([buf],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
+      descargarArchivo(blob, `ToscanaHouse_Plantilla_Inventario_${hoy()}.xlsx`);
+    }catch(e){
+      alert("Error generando plantilla: "+e.message);
+    }
+  }
+
   // ── Drag & drop ───────────────────────────────────────────────────
   function onDragOver(e)  { e.preventDefault(); setIsDragging(true);  }
   function onDragLeave(e) { e.preventDefault(); setIsDragging(false); }
@@ -4579,6 +4675,30 @@ function ImportarExcelModal({inv, onImportar, onClose}){
       {/* ── IDLE: Drop zone ── */}
       {estado==="idle"&&(
         <div>
+
+          {/* ── Plantilla para marcas ── */}
+          <div style={{background:`${C.gold}10`,border:`1.5px solid ${C.gold}35`,
+            borderRadius:18,padding:"16px 18px",marginBottom:16,
+            display:"flex",alignItems:"center",gap:14}}>
+            <div style={{fontSize:32,flexShrink:0}}>📋</div>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontSize:13,fontWeight:700,color:C.label,fontFamily:FONT,
+                marginBottom:3,letterSpacing:"0.01em"}}>
+                Plantilla oficial para marcas
+              </div>
+              <div style={{fontSize:11,color:C.label3,fontFamily:FONT_UI,lineHeight:1.45}}>
+                Descarga el Excel modelo, compártelo con la marca para que llene su inventario y te lo devuelva listo para importar.
+              </div>
+            </div>
+            <button onClick={generarPlantilla}
+              style={{flexShrink:0,background:C.gold,border:"none",borderRadius:12,
+                padding:"10px 16px",fontSize:12,fontWeight:700,color:"#fff",
+                cursor:"pointer",fontFamily:FONT_UI,whiteSpace:"nowrap",
+                WebkitTapHighlightColor:"transparent"}}>
+              ↓ Descargar plantilla
+            </button>
+          </div>
+
           {/* Drop zone */}
           <div
             onDragOver={onDragOver} onDragLeave={onDragLeave} onDrop={onDrop}
@@ -4592,10 +4712,10 @@ function ImportarExcelModal({inv, onImportar, onClose}){
             <div style={{fontSize:48,marginBottom:12}}>{isDragging?"📂":"📥"}</div>
             <div style={{fontSize:17,fontWeight:700,color:C.label,fontFamily:FONT_DISPLAY,
               letterSpacing:"0.01em",marginBottom:6}}>
-              {isDragging?"Suelta el archivo aquí":"Importar desde Excel"}
+              {isDragging?"Suelta el archivo aquí":"Importar inventario rellenado"}
             </div>
             <div style={{fontSize:13,color:C.label3,fontFamily:FONT_UI,marginBottom:16}}>
-              Arrastra un archivo o haz clic para seleccionar
+              Arrastra el Excel completado por la marca o haz clic para seleccionar
             </div>
             <div style={{display:"flex",gap:8,justifyContent:"center",flexWrap:"wrap"}}>
               {[".xlsx",".xls",".csv"].map(ext=>(
@@ -4609,42 +4729,34 @@ function ImportarExcelModal({inv, onImportar, onClose}){
             onChange={e=>{const f=e.target.files?.[0];if(f)parsearArchivo(f);}}
             style={{display:"none"}}/>
 
-          {/* Info columnas */}
+          {/* Info análisis */}
           <div style={{background:C.bg2,borderRadius:16,padding:"16px 18px",border:`1px solid ${C.sep}`}}>
             <div style={{fontSize:12,fontWeight:700,color:C.label,fontFamily:FONT_UI,
               textTransform:"uppercase",letterSpacing:.7,marginBottom:12}}>
-              Columnas del Excel (en cualquier orden)
+              Qué analiza el sistema al importar
             </div>
             <div style={{display:"flex",flexDirection:"column",gap:8}}>
               {[
-                ["Marca *","Nombre de la marca",true],
-                ["Descripción *","Nombre del producto",true],
-                ["Precio *","Precio en Bs",true],
-                ["Talla","XS / S / M / L / XL / TU — para el código",false],
-                ["Stock","Unidades (default: 1)",false],
-                ["Categoría","Tipo de prenda",false],
-                ["Color","Color del artículo",false],
-                ["SKU / Código","Si no existe, se auto-genera 🤖",false],
-              ].map(([col,info,req])=>(
-                <div key={col} style={{display:"flex",alignItems:"center",gap:10}}>
-                  <span style={{fontSize:11,fontFamily:"monospace",background:req?`${C.gold}18`:C.bg0,
-                    padding:"2px 8px",borderRadius:6,color:req?C.gold:C.label3,
-                    fontWeight:700,border:`1px solid ${req?C.gold+"40":C.sep}`,flexShrink:0}}>
-                    {col}
-                  </span>
-                  <span style={{fontSize:12,color:C.label3,fontFamily:FONT_UI}}>{info}</span>
+                ["🔍 Detecta columnas","Auto-detecta Marca, Descripción, Precio, Talla, Stock, SKU — en cualquier orden y con nombres similares",C.label],
+                ["🏷️ Auto-código","Si no hay SKU, genera: MARCA-INICIALES-TALLA-001 garantizando que sea único",C.gold],
+                ["✅ Verifica precio","Detecta precio inválido o 0 y lo marca como error antes de importar",C.green],
+                ["🔎 Verifica marca","Coteja el nombre con las marcas registradas (fuzzy matching)",C.blue],
+                ["⚠️ Duplicados","Si el código ya existe, propone actualizar el stock en lugar de duplicar",C.amber],
+                ["📊 Preview completo","Muestra cada fila con su código, estado y errores antes de confirmar",C.label3],
+              ].map(([lbl,info,c])=>(
+                <div key={lbl} style={{display:"flex",gap:10,alignItems:"flex-start"}}>
+                  <span style={{fontSize:11,fontFamily:FONT_UI,color:c,fontWeight:700,
+                    flexShrink:0,minWidth:130}}>{lbl}</span>
+                  <span style={{fontSize:11,color:C.label3,fontFamily:FONT_UI,lineHeight:1.4}}>{info}</span>
                 </div>
               ))}
             </div>
             <div style={{marginTop:14,padding:"10px 14px",background:`${C.gold}10`,borderRadius:12,
               border:`1px solid ${C.gold}25`}}>
-              <div style={{fontSize:12,fontWeight:700,color:C.gold,fontFamily:FONT_UI,marginBottom:4}}>
-                🤖 Auto-generación de códigos
-              </div>
-              <div style={{fontSize:12,color:C.label3,fontFamily:FONT_UI,lineHeight:1.5}}>
-                Si tu Excel <strong>no tiene columna Código</strong>, Toscana genera automáticamente:<br/>
-                <span style={{fontFamily:"monospace",color:C.label,fontWeight:600}}>RAM-VLB-S-001</span>
-                {" "} = <span style={{color:C.label3}}>Marca · Iniciales · Talla · Número</span>
+              <div style={{fontSize:11,color:C.label3,fontFamily:FONT_UI,lineHeight:1.5}}>
+                💡 Formato de código auto-generado:{" "}
+                <span style={{fontFamily:"monospace",color:C.label,fontWeight:700}}>RAM-VLB-S-001</span>
+                {" "}<span style={{color:C.label3}}>= Marca · Iniciales prod. · Talla · Número secuencial</span>
               </div>
             </div>
           </div>
@@ -9688,8 +9800,34 @@ function InventarioPorMarca({inv, ventas, onRecibir, onBaja, onImportarExcel}){
         <IOSBtn onPress={onBaja} variant="fill" full icon="🗑">Dar de Baja</IOSBtn>
         <IOSBtn onPress={onRecibir} full icon="+">Recibir</IOSBtn>
       </div>
-      <div style={{marginBottom:20}}>
+      <div style={{display:"flex",gap:8,marginBottom:20}}>
         <IOSBtn onPress={onImportarExcel} variant="fill" full icon="📥">Importar Excel</IOSBtn>
+        <IOSBtn onPress={async()=>{
+          try{
+            const XLSX=await loadXLSX();
+            const wb=XLSX.utils.book_new();
+            const H=["Marca *","Descripción / Nombre del producto *","Precio (Bs) *","Stock (unidades)","Talla","Categoría","Color","SKU / Código (dejar vacío = auto)"];
+            const ws1=XLSX.utils.aoa_to_sheet([
+              ["TOSCANA HOUSE — Plantilla de Inventario","","","","","","",""],
+              [`Versión: ${hoy()} | Completa las columnas con * y envía este archivo`,"","","","","","",""],
+              ["","","","","","","",""],
+              H,
+              ["NOMBRE DE TU MARCA","Bralette microfibra esponja removible",100,3,"S/M","Lencería","Negro",""],
+              ["NOMBRE DE TU MARCA","Kit 3 piezas tangón alto especial",150,2,"S/M","Lencería","Nude",""],
+            ]);
+            ws1["!cols"]=[{wch:22},{wch:42},{wch:14},{wch:14},{wch:10},{wch:16},{wch:14},{wch:28}];
+            ws1["!merges"]=[{s:{r:0,c:0},e:{r:0,c:7}},{s:{r:1,c:0},e:{r:1,c:7}}];
+            XLSX.utils.book_append_sheet(wb,ws1,"📋 Inventario");
+            const ws2=XLSX.utils.aoa_to_sheet([
+              ["MARCAS REGISTRADAS",""],["Usa el nombre exacto de esta lista",""],[""],
+              ["#","Marca"],...MARCAS.filter(m=>m.estado!=="inactiva").map((m,i)=>[i+1,m.nombre]),
+            ]);
+            ws2["!cols"]=[{wch:6},{wch:28}];
+            XLSX.utils.book_append_sheet(wb,ws2,"🏷️ Marcas");
+            const buf=XLSX.write(wb,{bookType:"xlsx",type:"array"});
+            descargarArchivo(new Blob([buf],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}),`ToscanaHouse_Plantilla_${hoy()}.xlsx`);
+          }catch(e){alert("Error: "+e.message);}
+        }} full icon="📋">Plantilla</IOSBtn>
       </div>
     </div>
   );

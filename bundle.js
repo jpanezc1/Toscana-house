@@ -26043,6 +26043,93 @@ Fecha: ${venta.fecha}`);
       const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
       descargarArchivo(blob, `ToscanaHouse_ImportPreview_${hoy()}.xlsx`);
     }
+    async function generarPlantilla() {
+      try {
+        const XLSX = await loadXLSX();
+        const wb = XLSX.utils.book_new();
+        const H = ["Marca *", "Descripci\xF3n / Nombre del producto *", "Precio (Bs) *", "Stock (unidades)", "Talla", "Categor\xEDa", "Color", "SKU / C\xF3digo (dejar vac\xEDo = auto)"];
+        const ejemplos = [
+          ["NOMBRE DE TU MARCA", "Bralette microfibra esponja removible", 100, 3, "S/M", "Lencer\xEDa", "Negro", ""],
+          ["NOMBRE DE TU MARCA", "Kit 3 piezas tang\xF3n alto especial", 150, 2, "S/M", "Lencer\xEDa", "Nude", ""],
+          ["NOMBRE DE TU MARCA", "Vestido lino manga larga", 280, 1, "M", "Vestidos", "Blanco", ""]
+        ];
+        const rows = [
+          ["TOSCANA HOUSE \u2014 Plantilla de Inventario", "", "", "", "", "", "", ""],
+          [`Versi\xF3n: ${hoy()} | Completa las columnas marcadas con * y env\xEDa este archivo a Toscana House`, "", "", "", "", "", "", ""],
+          ["", "", "", "", "", "", "", ""],
+          H,
+          ...ejemplos
+        ];
+        const ws1 = XLSX.utils.aoa_to_sheet(rows);
+        ws1["!cols"] = [
+          { wch: 22 },
+          { wch: 42 },
+          { wch: 14 },
+          { wch: 14 },
+          { wch: 10 },
+          { wch: 16 },
+          { wch: 14 },
+          { wch: 28 }
+        ];
+        ws1["!merges"] = [
+          { s: { r: 0, c: 0 }, e: { r: 0, c: 7 } },
+          { s: { r: 1, c: 0 }, e: { r: 1, c: 7 } }
+        ];
+        H.forEach((_, ci) => {
+          const addr = XLSX.utils.encode_cell({ r: 3, c: ci });
+          if (ws1[addr]) ws1[addr].s = { font: { bold: true } };
+        });
+        XLSX.utils.book_append_sheet(wb, ws1, "\u{1F4CB} Inventario");
+        const marcasRows = [
+          ["MARCAS REGISTRADAS EN TOSCANA HOUSE", ""],
+          ["Usa el nombre exacto tal como aparece en la columna 'Nombre de Marca'", ""],
+          [""],
+          ["#", "Nombre de Marca"],
+          ...MARCAS.filter((m) => m.estado !== "inactiva").map((m, i) => [i + 1, m.nombre])
+        ];
+        const ws2 = XLSX.utils.aoa_to_sheet(marcasRows);
+        ws2["!cols"] = [{ wch: 6 }, { wch: 28 }];
+        ws2["!merges"] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 1 } }, { s: { r: 1, c: 0 }, e: { r: 1, c: 1 } }];
+        XLSX.utils.book_append_sheet(wb, ws2, "\u{1F3F7}\uFE0F Marcas");
+        const instrRows = [
+          ["INSTRUCCIONES \u2014 Plantilla de Inventario Toscana House"],
+          [""],
+          ["COLUMNAS OBLIGATORIAS (marcadas con *)"],
+          ["Marca *", "Nombre de tu marca tal como aparece en la hoja '\u{1F3F7}\uFE0F Marcas'"],
+          ["Descripci\xF3n *", "Nombre completo del producto. Incluye material, tipo, etc."],
+          ["Precio (Bs) *", "Precio de venta en bolivianos. Solo n\xFAmero (ej: 100). Sin s\xEDmbolo."],
+          [""],
+          ["COLUMNAS OPCIONALES"],
+          ["Stock", "Cantidad de unidades disponibles. Si se omite, se asume 1."],
+          ["Talla", "Talla del art\xEDculo: XS / S / M / L / XL / TU / \xDAnica / n\xFAmero"],
+          ["Categor\xEDa", "Tipo de prenda: Lencer\xEDa, Vestidos, Camisas, Pantalones, etc."],
+          ["Color", "Color principal del art\xEDculo"],
+          ["SKU / C\xF3digo", "C\xF3digo propio del producto. Si lo dejas vac\xEDo, Toscana lo genera autom\xE1ticamente con el formato: MARCA-INICIALES-TALLA-001"],
+          [""],
+          ["PASOS PARA COMPLETAR LA PLANTILLA"],
+          ["1.", "Ve a la hoja '\u{1F4CB} Inventario' y llena una fila por producto"],
+          ["2.", "Verifica que el nombre de tu marca coincida exactamente con la hoja '\u{1F3F7}\uFE0F Marcas'"],
+          ["3.", "Guarda el archivo como .xlsx"],
+          ["4.", "Env\xEDa el archivo a Toscana House"],
+          [""],
+          ["IMPORTANTE"],
+          ["\u2022", "No modifiques ni elimines la fila de encabezados (fila 4 de la hoja Inventario)"],
+          ["\u2022", "Puedes eliminar las 3 filas de ejemplo (filas 5, 6 y 7)"],
+          ["\u2022", "No combines celdas en la zona de datos"],
+          ["\u2022", "No agregues columnas adicionales"],
+          ["\u2022", "Si un producto tiene varias tallas, pon una fila por talla"]
+        ];
+        const ws3 = XLSX.utils.aoa_to_sheet(instrRows);
+        ws3["!cols"] = [{ wch: 28 }, { wch: 60 }];
+        ws3["!merges"] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 1 } }];
+        XLSX.utils.book_append_sheet(wb, ws3, "\u{1F4D6} Instrucciones");
+        const buf = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+        const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+        descargarArchivo(blob, `ToscanaHouse_Plantilla_Inventario_${hoy()}.xlsx`);
+      } catch (e) {
+        alert("Error generando plantilla: " + e.message);
+      }
+    }
     function onDragOver(e) {
       e.preventDefault();
       setIsDragging(true);
@@ -26069,7 +26156,43 @@ Fecha: ${venta.fecha}`);
     const nErrores = preview.filter((f) => f._errs.length > 0).length;
     const nDups = preview.filter((f) => f._dup).length;
     const nAuto = preview.filter((f) => f.autoSKU).length;
-    return /* @__PURE__ */ import_react.default.createElement(Sheet, { open: true, title: "Importar Excel \u2014 Inventario", onClose, tall: true }, /* @__PURE__ */ import_react.default.createElement("div", { style: { padding: "0 4px 20px" } }, estado === "idle" && /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement(
+    return /* @__PURE__ */ import_react.default.createElement(Sheet, { open: true, title: "Importar Excel \u2014 Inventario", onClose, tall: true }, /* @__PURE__ */ import_react.default.createElement("div", { style: { padding: "0 4px 20px" } }, estado === "idle" && /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      background: `${C.gold}10`,
+      border: `1.5px solid ${C.gold}35`,
+      borderRadius: 18,
+      padding: "16px 18px",
+      marginBottom: 16,
+      display: "flex",
+      alignItems: "center",
+      gap: 14
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 32, flexShrink: 0 } }, "\u{1F4CB}"), /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      fontSize: 13,
+      fontWeight: 700,
+      color: C.label,
+      fontFamily: FONT,
+      marginBottom: 3,
+      letterSpacing: "0.01em"
+    } }, "Plantilla oficial para marcas"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT_UI, lineHeight: 1.45 } }, "Descarga el Excel modelo, comp\xE1rtelo con la marca para que llene su inventario y te lo devuelva listo para importar.")), /* @__PURE__ */ import_react.default.createElement(
+      "button",
+      {
+        onClick: generarPlantilla,
+        style: {
+          flexShrink: 0,
+          background: C.gold,
+          border: "none",
+          borderRadius: 12,
+          padding: "10px 16px",
+          fontSize: 12,
+          fontWeight: 700,
+          color: "#fff",
+          cursor: "pointer",
+          fontFamily: FONT_UI,
+          whiteSpace: "nowrap",
+          WebkitTapHighlightColor: "transparent"
+        }
+      },
+      "\u2193 Descargar plantilla"
+    )), /* @__PURE__ */ import_react.default.createElement(
       "div",
       {
         onDragOver,
@@ -26095,8 +26218,8 @@ Fecha: ${venta.fecha}`);
         fontFamily: FONT_DISPLAY,
         letterSpacing: "0.01em",
         marginBottom: 6
-      } }, isDragging ? "Suelta el archivo aqu\xED" : "Importar desde Excel"),
-      /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.label3, fontFamily: FONT_UI, marginBottom: 16 } }, "Arrastra un archivo o haz clic para seleccionar"),
+      } }, isDragging ? "Suelta el archivo aqu\xED" : "Importar inventario rellenado"),
+      /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.label3, fontFamily: FONT_UI, marginBottom: 16 } }, "Arrastra el Excel completado por la marca o haz clic para seleccionar"),
       /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap" } }, [".xlsx", ".xls", ".csv"].map((ext) => /* @__PURE__ */ import_react.default.createElement("span", { key: ext, style: {
         fontSize: 11,
         fontWeight: 700,
@@ -26127,32 +26250,27 @@ Fecha: ${venta.fecha}`);
       textTransform: "uppercase",
       letterSpacing: 0.7,
       marginBottom: 12
-    } }, "Columnas del Excel (en cualquier orden)"), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 8 } }, [
-      ["Marca *", "Nombre de la marca", true],
-      ["Descripci\xF3n *", "Nombre del producto", true],
-      ["Precio *", "Precio en Bs", true],
-      ["Talla", "XS / S / M / L / XL / TU \u2014 para el c\xF3digo", false],
-      ["Stock", "Unidades (default: 1)", false],
-      ["Categor\xEDa", "Tipo de prenda", false],
-      ["Color", "Color del art\xEDculo", false],
-      ["SKU / C\xF3digo", "Si no existe, se auto-genera \u{1F916}", false]
-    ].map(([col, info, req]) => /* @__PURE__ */ import_react.default.createElement("div", { key: col, style: { display: "flex", alignItems: "center", gap: 10 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: {
+    } }, "Qu\xE9 analiza el sistema al importar"), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 8 } }, [
+      ["\u{1F50D} Detecta columnas", "Auto-detecta Marca, Descripci\xF3n, Precio, Talla, Stock, SKU \u2014 en cualquier orden y con nombres similares", C.label],
+      ["\u{1F3F7}\uFE0F Auto-c\xF3digo", "Si no hay SKU, genera: MARCA-INICIALES-TALLA-001 garantizando que sea \xFAnico", C.gold],
+      ["\u2705 Verifica precio", "Detecta precio inv\xE1lido o 0 y lo marca como error antes de importar", C.green],
+      ["\u{1F50E} Verifica marca", "Coteja el nombre con las marcas registradas (fuzzy matching)", C.blue],
+      ["\u26A0\uFE0F Duplicados", "Si el c\xF3digo ya existe, propone actualizar el stock en lugar de duplicar", C.amber],
+      ["\u{1F4CA} Preview completo", "Muestra cada fila con su c\xF3digo, estado y errores antes de confirmar", C.label3]
+    ].map(([lbl, info, c]) => /* @__PURE__ */ import_react.default.createElement("div", { key: lbl, style: { display: "flex", gap: 10, alignItems: "flex-start" } }, /* @__PURE__ */ import_react.default.createElement("span", { style: {
       fontSize: 11,
-      fontFamily: "monospace",
-      background: req ? `${C.gold}18` : C.bg0,
-      padding: "2px 8px",
-      borderRadius: 6,
-      color: req ? C.gold : C.label3,
+      fontFamily: FONT_UI,
+      color: c,
       fontWeight: 700,
-      border: `1px solid ${req ? C.gold + "40" : C.sep}`,
-      flexShrink: 0
-    } }, col), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 12, color: C.label3, fontFamily: FONT_UI } }, info)))), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      flexShrink: 0,
+      minWidth: 130
+    } }, lbl), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 11, color: C.label3, fontFamily: FONT_UI, lineHeight: 1.4 } }, info)))), /* @__PURE__ */ import_react.default.createElement("div", { style: {
       marginTop: 14,
       padding: "10px 14px",
       background: `${C.gold}10`,
       borderRadius: 12,
       border: `1px solid ${C.gold}25`
-    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, fontWeight: 700, color: C.gold, fontFamily: FONT_UI, marginBottom: 4 } }, "\u{1F916} Auto-generaci\xF3n de c\xF3digos"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT_UI, lineHeight: 1.5 } }, "Si tu Excel ", /* @__PURE__ */ import_react.default.createElement("strong", null, "no tiene columna C\xF3digo"), ", Toscana genera autom\xE1ticamente:", /* @__PURE__ */ import_react.default.createElement("br", null), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontFamily: "monospace", color: C.label, fontWeight: 600 } }, "RAM-VLB-S-001"), " ", " = ", /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.label3 } }, "Marca \xB7 Iniciales \xB7 Talla \xB7 N\xFAmero"))))), estado === "leyendo" && /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center", padding: "50px 20px" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 40, marginBottom: 16 } }, "\u23F3"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 16, fontWeight: 600, color: C.label, fontFamily: FONT_UI, marginBottom: 6 } }, "Analizando archivo\u2026"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.label3, fontFamily: FONT_UI } }, "Detectando columnas y generando c\xF3digos")), estado === "preview" && /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 8, marginBottom: 16 } }, [
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT_UI, lineHeight: 1.5 } }, "\u{1F4A1} Formato de c\xF3digo auto-generado:", " ", /* @__PURE__ */ import_react.default.createElement("span", { style: { fontFamily: "monospace", color: C.label, fontWeight: 700 } }, "RAM-VLB-S-001"), " ", /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.label3 } }, "= Marca \xB7 Iniciales prod. \xB7 Talla \xB7 N\xFAmero secuencial"))))), estado === "leyendo" && /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center", padding: "50px 20px" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 40, marginBottom: 16 } }, "\u23F3"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 16, fontWeight: 600, color: C.label, fontFamily: FONT_UI, marginBottom: 6 } }, "Analizando archivo\u2026"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.label3, fontFamily: FONT_UI } }, "Detectando columnas y generando c\xF3digos")), estado === "preview" && /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 8, marginBottom: 16 } }, [
       { v: preview.length, l: "Total", c: C.label },
       { v: nValidas, l: "V\xE1lidas", c: C.green },
       { v: nErrores, l: "Errores", c: C.red },
@@ -31792,7 +31910,37 @@ Fecha: ${venta.fecha}`);
         "\u{1F5A8} ",
         isDesktop ? "Ticket" : "Imprimir ticket"
       )));
-    })), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 10, marginBottom: 12 } }, /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: onBaja, variant: "fill", full: true, icon: "\u{1F5D1}" }, "Dar de Baja"), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: onRecibir, full: true, icon: "+" }, "Recibir")), /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 20 } }, /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: onImportarExcel, variant: "fill", full: true, icon: "\u{1F4E5}" }, "Importar Excel")));
+    })), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 10, marginBottom: 12 } }, /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: onBaja, variant: "fill", full: true, icon: "\u{1F5D1}" }, "Dar de Baja"), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: onRecibir, full: true, icon: "+" }, "Recibir")), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 8, marginBottom: 20 } }, /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: onImportarExcel, variant: "fill", full: true, icon: "\u{1F4E5}" }, "Importar Excel"), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: async () => {
+      try {
+        const XLSX = await loadXLSX();
+        const wb = XLSX.utils.book_new();
+        const H = ["Marca *", "Descripci\xF3n / Nombre del producto *", "Precio (Bs) *", "Stock (unidades)", "Talla", "Categor\xEDa", "Color", "SKU / C\xF3digo (dejar vac\xEDo = auto)"];
+        const ws1 = XLSX.utils.aoa_to_sheet([
+          ["TOSCANA HOUSE \u2014 Plantilla de Inventario", "", "", "", "", "", "", ""],
+          [`Versi\xF3n: ${hoy()} | Completa las columnas con * y env\xEDa este archivo`, "", "", "", "", "", "", ""],
+          ["", "", "", "", "", "", "", ""],
+          H,
+          ["NOMBRE DE TU MARCA", "Bralette microfibra esponja removible", 100, 3, "S/M", "Lencer\xEDa", "Negro", ""],
+          ["NOMBRE DE TU MARCA", "Kit 3 piezas tang\xF3n alto especial", 150, 2, "S/M", "Lencer\xEDa", "Nude", ""]
+        ]);
+        ws1["!cols"] = [{ wch: 22 }, { wch: 42 }, { wch: 14 }, { wch: 14 }, { wch: 10 }, { wch: 16 }, { wch: 14 }, { wch: 28 }];
+        ws1["!merges"] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 7 } }, { s: { r: 1, c: 0 }, e: { r: 1, c: 7 } }];
+        XLSX.utils.book_append_sheet(wb, ws1, "\u{1F4CB} Inventario");
+        const ws2 = XLSX.utils.aoa_to_sheet([
+          ["MARCAS REGISTRADAS", ""],
+          ["Usa el nombre exacto de esta lista", ""],
+          [""],
+          ["#", "Marca"],
+          ...MARCAS.filter((m) => m.estado !== "inactiva").map((m, i) => [i + 1, m.nombre])
+        ]);
+        ws2["!cols"] = [{ wch: 6 }, { wch: 28 }];
+        XLSX.utils.book_append_sheet(wb, ws2, "\u{1F3F7}\uFE0F Marcas");
+        const buf = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+        descargarArchivo(new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), `ToscanaHouse_Plantilla_${hoy()}.xlsx`);
+      } catch (e) {
+        alert("Error: " + e.message);
+      }
+    }, full: true, icon: "\u{1F4CB}" }, "Plantilla")));
   }
   function MarcaDetalle({ marcaId, inv, ventas, vMes, mes, anio, MK, cierres, setCierres, getHist, getLiq }) {
     const isDesktop = useIsDesktop();
