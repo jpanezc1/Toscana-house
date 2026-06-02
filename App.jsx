@@ -2889,31 +2889,39 @@ function useAuth() {
   }, []);
 
   async function login(usuario, password) {
-    // 1. Intentar con lista local (rápido, funciona offline)
-    const listaActual = (() => {
-      try { return JSON.parse(localStorage.getItem("th_usuarios")||"null") || USUARIOS; }
-      catch { return USUARIOS; }
-    })();
-    let found = listaActual.find(u =>
-      u.usuario.toLowerCase() === usuario.toLowerCase() &&
-      u.password === password
+    const uLow = usuario.toLowerCase().trim();
+    const pass  = password.trim();
+
+    // 1. Siempre verificar primero contra USUARIOS del código (garantizado)
+    const enCodigo = USUARIOS.find(u =>
+      u.usuario.toLowerCase() === uLow && u.password === pass
     );
-    if (!found) {
-      // 2. Fallback a Supabase — encuentra usuarios creados en otros dispositivos
-      const sbUsers = await sbCargarUsuarios();
-      if (sbUsers && sbUsers.length > 0) {
-        // Actualizar localStorage con lista de la nube
-        localStorage.setItem("th_usuarios", JSON.stringify(sbUsers));
-        found = sbUsers.find(u =>
-          u.usuario.toLowerCase() === usuario.toLowerCase() &&
-          u.password === password
-        );
-      }
-    }
-    if (found) {
-      if (found.estado === "inactivo") {
+    if (enCodigo) {
+      if (enCodigo.estado === "inactivo")
         return { ok: false, error: "Cuenta desactivada. Contactá al administrador." };
-      }
+      setUser({ ...enCodigo, loginAt: Date.now() });
+      return { ok: true };
+    }
+
+    // 2. Buscar en usuarios custom (localStorage + Supabase)
+    let lista = (() => {
+      try { return JSON.parse(localStorage.getItem("th_usuarios")||"null"); }
+      catch { return null; }
+    })();
+    // Intentar actualizar desde Supabase
+    const sbUsers = await sbCargarUsuarios();
+    if (sbUsers && sbUsers.length > 0) {
+      // Combinar: mantener USUARIOS base + custom de Supabase
+      const custom = sbUsers.filter(u => !USUARIOS.find(b => b.usuario === u.usuario));
+      lista = [...USUARIOS, ...custom];
+      localStorage.setItem("th_usuarios", JSON.stringify(lista));
+    }
+    const found = (lista||[]).find(u =>
+      u.usuario.toLowerCase() === uLow && u.password === pass
+    );
+    if (found) {
+      if (found.estado === "inactivo")
+        return { ok: false, error: "Cuenta desactivada. Contactá al administrador." };
       setUser({ ...found, loginAt: Date.now() });
       return { ok: true };
     }
