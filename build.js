@@ -12,11 +12,17 @@ root.render(React.createElement(App));
 `;
 fs.writeFileSync("main.jsx", main);
 
-// ── Compilar bundle ───────────────────────────────────────────────────────────
+// ── Versión única por build ───────────────────────────────────────────────────
+const v = Date.now();
+
+// Eliminar bundles anteriores
+fs.readdirSync(".").filter(f=>/^bundle-\d+\.js$/.test(f)).forEach(f=>fs.unlinkSync(f));
+
+// ── Compilar bundle con nombre versionado ─────────────────────────────────────
 esbuild.buildSync({
   entryPoints: ["main.jsx"],
   bundle: true,
-  outfile: "bundle.js",
+  outfile: `bundle-${v}.js`,
   loader: { ".jsx": "jsx" },
   jsx: "transform",
   platform: "browser",
@@ -41,9 +47,6 @@ const manifest = {
   ]
 };
 fs.writeFileSync("manifest.json", JSON.stringify(manifest, null, 2));
-
-// ── Cache-busting: timestamp en script tag ────────────────────────────────────
-const v = Date.now();
 
 const html = `<!DOCTYPE html>
 <html lang="es">
@@ -81,7 +84,7 @@ const html = `<!DOCTYPE html>
   <!-- Tipografías premium -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400;1,500&family=Inter:wght@300;400;500;600;700&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
 
   <style>
     /* ═══════════════════════════════════════════════════════════════
@@ -114,7 +117,7 @@ const html = `<!DOCTYPE html>
       /* Fallback para browsers que no soportan dvh */
       min-height: -webkit-fill-available;
 
-      background: #FAF9F7;
+      background: #F5F3EE;
       color: #1A1714;
 
       /* Previene scroll horizontal indeseado */
@@ -169,29 +172,34 @@ const html = `<!DOCTYPE html>
       max-width: 100%;
     }
 
-    /* ── Scrollbars responsivos ──────────────────────────────────── */
-    /* Scrollbars delgados en WebKit (Mac/iOS) */
+    /* ── Scrollbars refinados — Atelier ─────────────────────────── */
     ::-webkit-scrollbar {
-      width: 4px;
-      height: 4px;
+      width: 3px;
+      height: 3px;
     }
     ::-webkit-scrollbar-track {
       background: transparent;
     }
     ::-webkit-scrollbar-thumb {
-      background: rgba(120, 113, 108, 0.25);
-      border-radius: 4px;
+      background: rgba(138, 100, 24, 0.18);
+      border-radius: 3px;
     }
     ::-webkit-scrollbar-thumb:hover {
-      background: rgba(120, 113, 108, 0.45);
+      background: rgba(138, 100, 24, 0.35);
     }
 
     /* ── Focus visible accesible ─────────────────────────────────── */
     :focus           { outline: none; }
     :focus-visible   {
-      outline: 2px solid rgba(154, 123, 79, 0.55);
+      outline: 2px solid rgba(138, 100, 24, 0.42);
       outline-offset: 2px;
-      border-radius: 4px;
+      border-radius: 6px;
+    }
+
+    /* ── Animación page entry ────────────────────────────────────── */
+    @keyframes fadeUp {
+      from { opacity:0; transform:translateY(6px); }
+      to   { opacity:1; transform:translateY(0); }
     }
 
     /* ── Contenedores con scroll suave en iOS ────────────────────── */
@@ -219,7 +227,7 @@ const html = `<!DOCTYPE html>
 </head>
 <body>
   <div id="root"></div>
-  <script src="bundle.js?v=${v}"></script>
+  <script src="bundle-${v}.js"></script>
 </body>
 </html>`;
 

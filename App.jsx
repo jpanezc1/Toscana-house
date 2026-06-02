@@ -635,45 +635,46 @@ function DriveIndicator({ syncing, connected }) {
 
 // ── Paleta Luxury — Toscana House (warm ivory / champagne gold) ──
 const C = {
-  bg0:   "#FCFAF7",    // warm-white — main background
-  bg1:   "#FFFFFF",    // white — cards
-  bg2:   "#F5F1EB",    // ivory — secondary bg
-  bg3:   "#EDE8DF",    // warm beige — tertiary
-  label:    "#171717", // soft-black — primary text
-  label2:   "#2B2B2B", // graphite — secondary text
-  label3:   "#9B8F83", // stone — muted text
-  label4:   "rgba(23,23,23,0.10)",
-  sep:   "rgba(0,0,0,0.08)",
-  sepH:  "rgba(0,0,0,0.15)",
-  // Warm champagne gold — primary accent
-  gold:  "#9A7B4F",
-  goldL: "#B8965E",
-  goldD: "#7A5F38",
-  accent:"#D4B896",
-  cream: "#FCFAF7",
-  green: "#2D6A4F",
-  red:   "#9B2335",
-  blue:  "#1E3A5F",
-  amber: "#92400E",
-  indigo:"#4A3D8F",
+  // ── Atelier · Lino Cálido ────────────────────────────────
+  bg0:   "#F5F3EE",    // lino cálido — fondo principal
+  bg1:   "#FFFFFF",    // blanco puro — cards y paneles
+  bg2:   "#EFEDE8",    // marfil — fondo secundario
+  bg3:   "#E5E1DA",    // piedra cálida — terciario
+  label:    "#1A1714", // negro cálido — texto principal
+  label2:   "#57534E", // grafito cálido — texto secundario
+  label3:   "#A8A29E", // taupe — texto muted
+  label4:   "rgba(26,23,20,0.08)",
+  sep:   "#E2DED8",    // separador cálido
+  sepH:  "#CEC8C0",    // separador hover
+  // Oro profundo — acento refinado
+  gold:  "#8A6418",    // oro oscuro
+  goldL: "#C49A3C",    // oro medio
+  goldD: "#6A4C10",    // oro profundo
+  accent:"#D4B068",    // acento cálido
+  cream: "#F5F3EE",
+  green: "#166534",    // esmeralda bosque
+  red:   "#991B1B",    // borgoña
+  blue:  "#1E3A5F",    // navy
+  amber: "#92400E",    // ámbar profundo
+  indigo:"#4338CA",    // índigo
   // Tab accent colors
-  tabPos:"#171717",
-  tabInv:"#2D6A4F",
-  tabMar:"#6B4E71",
+  tabPos:"#1A1714",
+  tabInv:"#166534",
+  tabMar:"#5B2D8E",
   tabVen:"#1E3A5F",
-  tabLiq:"#9B2335",
+  tabLiq:"#991B1B",
   // Fill tints
-  fill1: "rgba(154,123,79,0.04)",
-  fill2: "rgba(154,123,79,0.09)",
-  fill3: "rgba(154,123,79,0.15)",
+  fill1: "rgba(138,100,24,0.04)",
+  fill2: "rgba(138,100,24,0.09)",
+  fill3: "rgba(138,100,24,0.16)",
   // Status backgrounds
-  stockOk:  "#EFF7F2",
-  stockLow: "#FEFAEF",
-  stockOut: "#FDF0F2",
-  stockSold:"#F2F0F8",
-  greenBg:  "#EFF7F2",
-  redBg:    "#FDF0F2",
-  amberBg:  "#FEFAEF",
+  stockOk:  "#F0FDF4",
+  stockLow: "#FEFCE8",
+  stockOut: "#FEF2F2",
+  stockSold:"#F5F3FF",
+  greenBg:  "#F0FDF4",
+  redBg:    "#FEF2F2",
+  amberBg:  "#FEFCE8",
 };
 
 const ALQUILERES = {
@@ -703,22 +704,38 @@ const LOGO_B64 = "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1B
 // Marcas base (semilla). Las marcas creadas dinámicamente se guardan en
 // localStorage "th_marcas" y se fusionan con esta lista al iniciar.
 const MARCAS_SEED = [
-  {id:1,  nombre:"Donaire",       color:"#A8C5A0", emoji:"✨"},
-  {id:2,  nombre:"Ramona",        color:"#F4A8A8", emoji:"🌸"},
-  {id:3,  nombre:"Materia",       color:"#A8D4B0", emoji:"🌿"},
-  {id:4,  nombre:"Dual",          color:"#A8BCD4", emoji:"◈"},
-  {id:5,  nombre:"Sensually",     color:"#F4A8C8", emoji:"💫"},
-  {id:6,  nombre:"Glowphoria",    color:"#F4D4A8", emoji:"✦"},
-  {id:7,  nombre:"Monas",         color:"#C8A8D4", emoji:"🔮"},
-  {id:8,  nombre:"Bonita",        color:"#F4BCA8", emoji:"🌺"},
-  {id:9,  nombre:"She",           color:"#A8D4C4", emoji:"◎"},
-  {id:10, nombre:"Ellá",          color:"#D4C4A8", emoji:"🍂"},
-  {id:11, nombre:"Magenta",       color:"#D4A8BC", emoji:"◆"},
-  {id:12, nombre:"Ikawi",         color:"#A8CCD4", emoji:"🌊"},
-  {id:13, nombre:"Romero Brand",  color:"#C4B89A", emoji:"⚡"},
-  {id:14, nombre:"Minimal",       color:"#C4C4C4", emoji:"◻"},
-  {id:15, nombre:"Comfy",         color:"#C8B8A8", emoji:"☁"},
-  {id:16, nombre:"Essenza",       color:"#D4C8A0", emoji:"🕊"},
+  {id:1,  nombre:"Donaire",       color:"#A8C5A0", emoji:"✨",
+   imagen:"data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PScwIDAgMjAwIDIwMCcgeG1sbnM9J2h0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnJz4KICA8cmVjdCB3aWR0aD0nMjAwJyBoZWlnaHQ9JzIwMCcgcng9JzQ0JyBmaWxsPScjQThDNUEwJy8+CiAgPHBhdGggZD0nTTEwMCAzNiBMMTA5IDkxIEwxNjQgMTAwIEwxMDkgMTA5IEwxMDAgMTY0IEw5MSAxMDkgTDM2IDEwMCBMOTEgOTEgWicgZmlsbD0nd2hpdGUnIG9wYWNpdHk9Jy45NScvPgogIDxjaXJjbGUgY3g9JzEwMCcgY3k9JzEwMCcgcj0nOCcgZmlsbD0nI0E4QzVBMCcvPgo8L3N2Zz4="},
+  {id:2,  nombre:"Ramona",        color:"#F4A8A8", emoji:"🌸",
+   imagen:"data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PScwIDAgMjAwIDIwMCcgeG1sbnM9J2h0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnJz4KICA8cmVjdCB3aWR0aD0nMjAwJyBoZWlnaHQ9JzIwMCcgcng9JzQ0JyBmaWxsPScjRjRBOEE4Jy8+CiAgPGVsbGlwc2UgY3g9JzEwMCcgY3k9JzYyJyByeD0nMTgnIHJ5PScyOCcgZmlsbD0nd2hpdGUnIG9wYWNpdHk9Jy45MicvPgogIDxlbGxpcHNlIGN4PScxMDAnIGN5PSc2Micgcng9JzE4JyByeT0nMjgnIGZpbGw9J3doaXRlJyBvcGFjaXR5PScuOTInIHRyYW5zZm9ybT0ncm90YXRlKDcyIDEwMCAxMDApJy8+CiAgPGVsbGlwc2UgY3g9JzEwMCcgY3k9JzYyJyByeD0nMTgnIHJ5PScyOCcgZmlsbD0nd2hpdGUnIG9wYWNpdHk9Jy45MicgdHJhbnNmb3JtPSdyb3RhdGUoMTQ0IDEwMCAxMDApJy8+CiAgPGVsbGlwc2UgY3g9JzEwMCcgY3k9JzYyJyByeD0nMTgnIHJ5PScyOCcgZmlsbD0nd2hpdGUnIG9wYWNpdHk9Jy45MicgdHJhbnNmb3JtPSdyb3RhdGUoMjE2IDEwMCAxMDApJy8+CiAgPGVsbGlwc2UgY3g9JzEwMCcgY3k9JzYyJyByeD0nMTgnIHJ5PScyOCcgZmlsbD0nd2hpdGUnIG9wYWNpdHk9Jy45MicgdHJhbnNmb3JtPSdyb3RhdGUoMjg4IDEwMCAxMDApJy8+CiAgPGNpcmNsZSBjeD0nMTAwJyBjeT0nMTAwJyByPScyMCcgZmlsbD0nI0Y0QThBOCcvPgogIDxjaXJjbGUgY3g9JzEwMCcgY3k9JzEwMCcgcj0nMTInIGZpbGw9J3doaXRlJyBvcGFjaXR5PScuNycvPgo8L3N2Zz4="},
+  {id:3,  nombre:"Materia",       color:"#A8D4B0", emoji:"🌿",
+   imagen:"data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PScwIDAgMjAwIDIwMCcgeG1sbnM9J2h0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnJz4KICA8cmVjdCB3aWR0aD0nMjAwJyBoZWlnaHQ9JzIwMCcgcng9JzQ0JyBmaWxsPScjQThENEIwJy8+CiAgPHBhdGggZD0nTTEwMCA0MCBRMTQ4IDY4IDE0OCAxMTAgUTE0OCAxNTIgMTAwIDE2OCBRNTIgMTUyIDUyIDExMCBRNTIgNjggMTAwIDQwIFonIGZpbGw9J3doaXRlJyBvcGFjaXR5PScuOTInLz4KICA8bGluZSB4MT0nMTAwJyB5MT0nNTAnIHgyPScxMDAnIHkyPScxNjInIHN0cm9rZT0nI0E4RDRCMCcgc3Ryb2tlLXdpZHRoPScyLjUnIG9wYWNpdHk9Jy43Jy8+CiAgPGxpbmUgeDE9JzEwMCcgeTE9JzkwJyB4Mj0nNzgnIHkyPScxMTInIHN0cm9rZT0nI0E4RDRCMCcgc3Ryb2tlLXdpZHRoPScxLjgnIG9wYWNpdHk9Jy42Jy8+CiAgPGxpbmUgeDE9JzEwMCcgeTE9JzkwJyB4Mj0nMTIyJyB5Mj0nMTEyJyBzdHJva2U9JyNBOEQ0QjAnIHN0cm9rZS13aWR0aD0nMS44JyBvcGFjaXR5PScuNicvPgogIDxsaW5lIHgxPScxMDAnIHkxPScxMTUnIHgyPSc4MicgeTI9JzEzMicgc3Ryb2tlPScjQThENEIwJyBzdHJva2Utd2lkdGg9JzEuNScgb3BhY2l0eT0nLjUnLz4KICA8bGluZSB4MT0nMTAwJyB5MT0nMTE1JyB4Mj0nMTE4JyB5Mj0nMTMyJyBzdHJva2U9JyNBOEQ0QjAnIHN0cm9rZS13aWR0aD0nMS41JyBvcGFjaXR5PScuNScvPgo8L3N2Zz4="},
+  {id:4,  nombre:"Dual",          color:"#A8BCD4", emoji:"◈",
+   imagen:"data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PScwIDAgMjAwIDIwMCcgeG1sbnM9J2h0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnJz4KICA8cmVjdCB3aWR0aD0nMjAwJyBoZWlnaHQ9JzIwMCcgcng9JzQ0JyBmaWxsPScjQThCQ0Q0Jy8+CiAgPHBhdGggZD0nTTc4IDYyIEEzOCAzOCAwIDEgMCA3OCAxMzggQTI0IDI0IDAgMSAxIDc4IDYyIFonIGZpbGw9J3doaXRlJyBvcGFjaXR5PScuOTInLz4KICA8cGF0aCBkPSdNMTIyIDYyIEEzOCAzOCAwIDEgMSAxMjIgMTM4IEEyNCAyNCAwIDEgMCAxMjIgNjIgWicgZmlsbD0nd2hpdGUnIG9wYWNpdHk9Jy42OCcvPgo8L3N2Zz4="},
+  {id:5,  nombre:"Sensually",     color:"#F4A8C8", emoji:"💫",
+   imagen:"data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PScwIDAgMjAwIDIwMCcgeG1sbnM9J2h0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnJz4KICA8cmVjdCB3aWR0aD0nMjAwJyBoZWlnaHQ9JzIwMCcgcng9JzQ0JyBmaWxsPScjRjRBOEM4Jy8+CiAgPHBhdGggZD0nTTEwMCAzOCBDMTM4IDM4IDE1NiA2MiAxNTYgODIgQzE1NiAxMDIgMTIwIDExMCAxMDAgMTEwIEM4MCAxMTAgNDQgMTE4IDQ0IDE0MCBDNDQgMTYyIDYyIDE2NCAxMDAgMTY0JyBzdHJva2U9J3doaXRlJyBzdHJva2Utd2lkdGg9JzE0JyBmaWxsPSdub25lJyBzdHJva2UtbGluZWNhcD0ncm91bmQnIG9wYWNpdHk9Jy45NScvPgogIDxwYXRoIGQ9J00xMDAgMzggQzEzOCAzOCAxNTYgNjIgMTU2IDgyIEMxNTYgMTAyIDEyMCAxMTAgMTAwIDExMCBDODAgMTEwIDQ0IDExOCA0NCAxNDAgQzQ0IDE2MiA2MiAxNjQgMTAwIDE2NCcgc3Ryb2tlPScjRjRBOEM4JyBzdHJva2Utd2lkdGg9JzQnIGZpbGw9J25vbmUnIHN0cm9rZS1saW5lY2FwPSdyb3VuZCcgb3BhY2l0eT0nLjQnLz4KPC9zdmc+"},
+  {id:6,  nombre:"Glowphoria",    color:"#F4D4A8", emoji:"✦",
+   imagen:"data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PScwIDAgMjAwIDIwMCcgeG1sbnM9J2h0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnJz4KICA8cmVjdCB3aWR0aD0nMjAwJyBoZWlnaHQ9JzIwMCcgcng9JzQ0JyBmaWxsPScjRjRENEE4Jy8+CiAgPHBhdGggZD0nTTEwMCAzOCBMMTA4IDkyIEwxNTYgNjggTDExOCAxMDQgTDE2MiAxMDAgTDExOCAxMTggTDE0OCAxNTYgTDEwOCAxMTggTDEwMCAxNjIgTDkyIDExOCBMNTIgMTQ4IEw4NCAxMTQgTDM4IDEwMCBMODQgOTIgTDU2IDU4IEw5NCA5NiBaJyBmaWxsPSd3aGl0ZScgb3BhY2l0eT0nLjknLz4KICA8Y2lyY2xlIGN4PScxMDAnIGN5PScxMDAnIHI9JzE0JyBmaWxsPScjRjRENEE4Jy8+Cjwvc3ZnPg=="},
+  {id:7,  nombre:"Monas",         color:"#C8A8D4", emoji:"🔮",
+   imagen:"data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PScwIDAgMjAwIDIwMCcgeG1sbnM9J2h0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnJz4KICA8cmVjdCB3aWR0aD0nMjAwJyBoZWlnaHQ9JzIwMCcgcng9JzQ0JyBmaWxsPScjQzhBOEQ0Jy8+CiAgPGVsbGlwc2UgY3g9JzY2JyBjeT0nNzYnIHJ4PScyMicgcnk9JzE4JyBmaWxsPSd3aGl0ZScgb3BhY2l0eT0nLjg4Jy8+CiAgPGVsbGlwc2UgY3g9JzEzNCcgY3k9Jzc2JyByeD0nMjInIHJ5PScxOCcgZmlsbD0nd2hpdGUnIG9wYWNpdHk9Jy44OCcvPgogIDxjaXJjbGUgY3g9JzEwMCcgY3k9JzExNScgcj0nNTInIGZpbGw9J3doaXRlJyBvcGFjaXR5PScuOTInLz4KICA8Y2lyY2xlIGN4PSc4OCcgY3k9JzEwOCcgcj0nNicgZmlsbD0nI0M4QThENCcvPgogIDxjaXJjbGUgY3g9JzExMicgY3k9JzEwOCcgcj0nNicgZmlsbD0nI0M4QThENCcvPgogIDxwYXRoIGQ9J005MCAxMjQgUTEwMCAxMzIgMTEwIDEyNCcgc3Ryb2tlPScjQzhBOEQ0JyBzdHJva2Utd2lkdGg9JzIuNScgZmlsbD0nbm9uZScgc3Ryb2tlLWxpbmVjYXA9J3JvdW5kJy8+Cjwvc3ZnPg=="},
+  {id:8,  nombre:"Bonita",        color:"#F4BCA8", emoji:"🌺",
+   imagen:"data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PScwIDAgMjAwIDIwMCcgeG1sbnM9J2h0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnJz4KICA8cmVjdCB3aWR0aD0nMjAwJyBoZWlnaHQ9JzIwMCcgcng9JzQ0JyBmaWxsPScjRjRCQ0E4Jy8+CiAgPHBhdGggZD0nTTEwMCAxNTIgQzYwIDEyOCAzNCAxMDYgMzQgODAgQzM0IDU4IDUyIDQyIDcwIDQyIEM4MiA0MiA5MiA1MCAxMDAgNjAgQzEwOCA1MCAxMTggNDIgMTMwIDQyIEMxNDggNDIgMTY2IDU4IDE2NiA4MCBDMTY2IDEwNiAxNDAgMTI4IDEwMCAxNTIgWicgZmlsbD0nd2hpdGUnIG9wYWNpdHk9Jy45MycvPgogIDxwYXRoIGQ9J00xMDAgMTQwIEM3MiAxMjIgNTQgMTA2IDU0IDg2IEM1NCA3NCA2MiA2NiA3MiA2NiBDODAgNjYgODggNzIgMTAwIDg0IEMxMTIgNzIgMTIwIDY2IDEyOCA2NiBDMTM4IDY2IDE0NiA3NCAxNDYgODYgQzE0NiAxMDYgMTI4IDEyMiAxMDAgMTQwIFonIGZpbGw9JyNGNEJDQTgnIG9wYWNpdHk9Jy4zNScvPgo8L3N2Zz4="},
+  {id:9,  nombre:"She",           color:"#A8D4C4", emoji:"◎",
+   imagen:"data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PScwIDAgMjAwIDIwMCcgeG1sbnM9J2h0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnJz4KICA8cmVjdCB3aWR0aD0nMjAwJyBoZWlnaHQ9JzIwMCcgcng9JzQ0JyBmaWxsPScjQThENEM0Jy8+CiAgPGNpcmNsZSBjeD0nMTAwJyBjeT0nODInIHI9JzQwJyBmaWxsPSdub25lJyBzdHJva2U9J3doaXRlJyBzdHJva2Utd2lkdGg9JzEyJyBvcGFjaXR5PScuOTMnLz4KICA8bGluZSB4MT0nMTAwJyB5MT0nMTIyJyB4Mj0nMTAwJyB5Mj0nMTYyJyBzdHJva2U9J3doaXRlJyBzdHJva2Utd2lkdGg9JzEyJyBzdHJva2UtbGluZWNhcD0ncm91bmQnIG9wYWNpdHk9Jy45MycvPgogIDxsaW5lIHgxPSc4MCcgeTE9JzE0NCcgeDI9JzEyMCcgeTI9JzE0NCcgc3Ryb2tlPSd3aGl0ZScgc3Ryb2tlLXdpZHRoPScxMicgc3Ryb2tlLWxpbmVjYXA9J3JvdW5kJyBvcGFjaXR5PScuOTMnLz4KPC9zdmc+"},
+  {id:10, nombre:"Ellá",          color:"#D4C4A8", emoji:"🍂",
+   imagen:"data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PScwIDAgMjAwIDIwMCcgeG1sbnM9J2h0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnJz4KICA8cmVjdCB3aWR0aD0nMjAwJyBoZWlnaHQ9JzIwMCcgcng9JzQ0JyBmaWxsPScjRDRDNEE4Jy8+CiAgPHBhdGggZD0nTTEwMCAxNTUgUTcyIDEzMCA2OCA5OCBRNjggNjggMTAwIDUyIFExMDAgNTIgMTAwIDUyIFExMDAgNjggOTIgOTAgUTg4IDEwOCAxMDAgMTI4IFonIGZpbGw9J3doaXRlJyBvcGFjaXR5PScuOScvPgogIDxwYXRoIGQ9J00xMDAgMTU1IFExMjggMTMwIDEzMiA5OCBRMTMyIDY4IDEwMCA1MiBRMTAwIDUyIDEwMCA1MiBRMTAwIDY4IDEwOCA5MCBRMTEyIDEwOCAxMDAgMTI4IFonIGZpbGw9J3doaXRlJyBvcGFjaXR5PScuNycvPgogIDxwYXRoIGQ9J00xMDAgMTU1IFExMDAgMTUwIDEwMCAxMjggTDEwMCA1Micgc3Ryb2tlPSd3aGl0ZScgc3Ryb2tlLXdpZHRoPSczJyBvcGFjaXR5PScuNScvPgogIDxwYXRoIGQ9J003MiA3OCBRNTYgNTggNjQgMzggUTgwIDQ2IDg0IDY4IFonIGZpbGw9J3doaXRlJyBvcGFjaXR5PScuOCcvPgogIDxwYXRoIGQ9J00xMjggNzggUTE0NCA1OCAxMzYgMzggUTEyMCA0NiAxMTYgNjggWicgZmlsbD0nd2hpdGUnIG9wYWNpdHk9Jy42NScvPgo8L3N2Zz4="},
+  {id:11, nombre:"Magenta",       color:"#D4A8BC", emoji:"◆",
+   imagen:"data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PScwIDAgMjAwIDIwMCcgeG1sbnM9J2h0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnJz4KICA8cmVjdCB3aWR0aD0nMjAwJyBoZWlnaHQ9JzIwMCcgcng9JzQ0JyBmaWxsPScjRDRBOEJDJy8+CiAgPHBvbHlnb24gcG9pbnRzPScxMDAsMzYgMTU2LDEwMCAxMDAsMTY0IDQ0LDEwMCcgZmlsbD0nd2hpdGUnIG9wYWNpdHk9Jy45MycvPgogIDxwb2x5Z29uIHBvaW50cz0nMTAwLDU2IDE0MCwxMDAgMTAwLDE0NCA2MCwxMDAnIGZpbGw9JyNENEE4QkMnIG9wYWNpdHk9Jy4zOCcvPgogIDxsaW5lIHgxPScxMDAnIHkxPSczNicgeDI9JzEwMCcgeTI9JzE2NCcgc3Ryb2tlPScjRDRBOEJDJyBzdHJva2Utd2lkdGg9JzEuNScgb3BhY2l0eT0nLjMnLz4KICA8bGluZSB4MT0nNDQnIHkxPScxMDAnIHgyPScxNTYnIHkyPScxMDAnIHN0cm9rZT0nI0Q0QThCQycgc3Ryb2tlLXdpZHRoPScxLjUnIG9wYWNpdHk9Jy4zJy8+Cjwvc3ZnPg=="},
+  {id:12, nombre:"Ikawi",         color:"#A8CCD4", emoji:"🌊",
+   imagen:"data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PScwIDAgMjAwIDIwMCcgeG1sbnM9J2h0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnJz4KICA8cmVjdCB3aWR0aD0nMjAwJyBoZWlnaHQ9JzIwMCcgcng9JzQ0JyBmaWxsPScjQThDQ0Q0Jy8+CiAgPHBhdGggZD0nTTM2IDgwIFE1NiA2MiA3NiA4MCBROTYgOTggMTE2IDgwIFExMzYgNjIgMTY0IDgwJyBzdHJva2U9J3doaXRlJyBzdHJva2Utd2lkdGg9JzEwJyBmaWxsPSdub25lJyBzdHJva2UtbGluZWNhcD0ncm91bmQnIG9wYWNpdHk9Jy45NScvPgogIDxwYXRoIGQ9J00zNiAxMDggUTU2IDkwIDc2IDEwOCBROTYgMTI2IDExNiAxMDggUTEzNiA5MCAxNjQgMTA4JyBzdHJva2U9J3doaXRlJyBzdHJva2Utd2lkdGg9JzEwJyBmaWxsPSdub25lJyBzdHJva2UtbGluZWNhcD0ncm91bmQnIG9wYWNpdHk9Jy43OCcvPgogIDxwYXRoIGQ9J00zNiAxMzYgUTU2IDExOCA3NiAxMzYgUTk2IDE1NCAxMTYgMTM2IFExMzYgMTE4IDE2NCAxMzYnIHN0cm9rZT0nd2hpdGUnIHN0cm9rZS13aWR0aD0nMTAnIGZpbGw9J25vbmUnIHN0cm9rZS1saW5lY2FwPSdyb3VuZCcgb3BhY2l0eT0nLjU1Jy8+Cjwvc3ZnPg=="},
+  {id:13, nombre:"Romero Brand",  color:"#C4B89A", emoji:"⚡",
+   imagen:"data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PScwIDAgMjAwIDIwMCcgeG1sbnM9J2h0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnJz4KICA8cmVjdCB3aWR0aD0nMjAwJyBoZWlnaHQ9JzIwMCcgcng9JzQ0JyBmaWxsPScjQzRCODlBJy8+CiAgPHBhdGggZD0nTTY4IDQ2IEw2OCAxNTQnIHN0cm9rZT0nd2hpdGUnIHN0cm9rZS13aWR0aD0nMTQnIHN0cm9rZS1saW5lY2FwPSdyb3VuZCcgb3BhY2l0eT0nLjk1Jy8+CiAgPHBhdGggZD0nTTY4IDQ2IEwxMTYgNDYgUTE0OCA0NiAxNDggODIgUTE0OCAxMTggMTE2IDExOCBMNjggMTE4JyBzdHJva2U9J3doaXRlJyBzdHJva2Utd2lkdGg9JzE0JyBmaWxsPSdub25lJyBzdHJva2UtbGluZWNhcD0ncm91bmQnIHN0cm9rZS1saW5lam9pbj0ncm91bmQnIG9wYWNpdHk9Jy45NScvPgogIDxsaW5lIHgxPScxMTYnIHkxPScxMTgnIHgyPScxNTAnIHkyPScxNTQnIHN0cm9rZT0nd2hpdGUnIHN0cm9rZS13aWR0aD0nMTQnIHN0cm9rZS1saW5lY2FwPSdyb3VuZCcgb3BhY2l0eT0nLjk1Jy8+Cjwvc3ZnPg=="},
+  {id:14, nombre:"Minimal",       color:"#C4C4C4", emoji:"◻",
+   imagen:"data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PScwIDAgMjAwIDIwMCcgeG1sbnM9J2h0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnJz4KICA8cmVjdCB3aWR0aD0nMjAwJyBoZWlnaHQ9JzIwMCcgcng9JzQ0JyBmaWxsPScjQzRDNEM0Jy8+CiAgPGNpcmNsZSBjeD0nMTAwJyBjeT0nNzgnIHI9JzI4JyBmaWxsPSd3aGl0ZScgb3BhY2l0eT0nLjk1Jy8+CiAgPHJlY3QgeD0nNTInIHk9JzEyMicgd2lkdGg9Jzk2JyBoZWlnaHQ9JzExJyByeD0nNS41JyBmaWxsPSd3aGl0ZScgb3BhY2l0eT0nLjkyJy8+CiAgPHJlY3QgeD0nNjYnIHk9JzE0NScgd2lkdGg9JzY4JyBoZWlnaHQ9JzExJyByeD0nNS41JyBmaWxsPSd3aGl0ZScgb3BhY2l0eT0nLjcyJy8+Cjwvc3ZnPg=="},
+  {id:15, nombre:"Comfy",         color:"#C8B8A8", emoji:"☁",
+   imagen:"data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PScwIDAgMjAwIDIwMCcgeG1sbnM9J2h0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnJz4KICA8cmVjdCB3aWR0aD0nMjAwJyBoZWlnaHQ9JzIwMCcgcng9JzQ0JyBmaWxsPScjQzhCOEE4Jy8+CiAgPGNpcmNsZSBjeD0nODAnIGN5PScxMDQnIHI9JzM2JyBmaWxsPSd3aGl0ZScgb3BhY2l0eT0nLjk1Jy8+CiAgPGNpcmNsZSBjeD0nMTIwJyBjeT0nMTA0JyByPSczNicgZmlsbD0nd2hpdGUnIG9wYWNpdHk9Jy45NScvPgogIDxjaXJjbGUgY3g9JzEwMCcgY3k9Jzg4JyByPSczOCcgZmlsbD0nd2hpdGUnIG9wYWNpdHk9Jy45NScvPgogIDxjaXJjbGUgY3g9JzY4JyBjeT0nOTQnIHI9JzI4JyBmaWxsPSd3aGl0ZScgb3BhY2l0eT0nLjk1Jy8+CiAgPGNpcmNsZSBjeD0nMTMyJyBjeT0nOTQnIHI9JzI4JyBmaWxsPSd3aGl0ZScgb3BhY2l0eT0nLjk1Jy8+CiAgPHJlY3QgeD0nNDQnIHk9JzEwNCcgd2lkdGg9JzExMicgaGVpZ2h0PSczNicgcng9JzAnIGZpbGw9J3doaXRlJyBvcGFjaXR5PScuOTUnLz4KPC9zdmc+"},
+  {id:16, nombre:"Essenza",       color:"#D4C8A0", emoji:"🕊",
+   imagen:"data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PScwIDAgMjAwIDIwMCcgeG1sbnM9J2h0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnJz4KICA8cmVjdCB3aWR0aD0nMjAwJyBoZWlnaHQ9JzIwMCcgcng9JzQ0JyBmaWxsPScjRDRDOEEwJy8+CiAgPHBhdGggZD0nTTEwMCAzNiBMMTAwIDM2IFExMDAgMzYgMTQwIDkwIEE0MiA0MiAwIDEgMSA2MCA5MCBRMTAwIDM2IDEwMCAzNiBaJyBmaWxsPSd3aGl0ZScgb3BhY2l0eT0nLjkzJy8+CiAgPHBhdGggZD0nTTEwMCA2MCBRMTI0IDkwIDEyNCAxMDggQTI0IDI0IDAgMCAxIDc2IDEwOCBRNzYgOTAgMTAwIDYwIFonIGZpbGw9JyNENEM4QTAnIG9wYWNpdHk9Jy4zJy8+CiAgPGVsbGlwc2UgY3g9Jzg2JyBjeT0nOTYnIHJ4PSc2JyByeT0nMTAnIGZpbGw9J3doaXRlJyBvcGFjaXR5PScuNScgdHJhbnNmb3JtPSdyb3RhdGUoLTIwIDg2IDk2KScvPgo8L3N2Zz4="},
   {id:17, nombre:"Doña Mamushka", color:"#F4ACA8", emoji:"🎀",
    imagen:"data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PScwIDAgMjAwIDIwMCcgeG1sbnM9J2h0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnJz4KICA8cmVjdCB3aWR0aD0nMjAwJyBoZWlnaHQ9JzIwMCcgcng9JzQ0JyBmaWxsPScjRjRBQ0E4Jy8+CiAgPHBhdGggZD0nTTEwMCAyNCBMMTU0IDgwIEw0NiA4MCBaJyBmaWxsPSd3aGl0ZScgb3BhY2l0eT0nLjgnLz4KICA8Y2lyY2xlIGN4PScxMDAnIGN5PSc5Micgcj0nMzMnIGZpbGw9J3doaXRlJy8+CiAgPGVsbGlwc2UgY3g9JzEwMCcgY3k9JzE1OCcgcng9JzU2JyByeT0nNDQnIGZpbGw9J3doaXRlJy8+CiAgPGVsbGlwc2UgY3g9JzEwMCcgY3k9JzE2Micgcng9JzI4JyByeT0nMjEnIGZpbGw9JyNGNEFDQTgnIG9wYWNpdHk9Jy4zOCcvPgogIDxjaXJjbGUgY3g9Jzg5JyBjeT0nODgnIHI9JzQnIGZpbGw9JyNEMDYwN0EnLz4KICA8Y2lyY2xlIGN4PScxMTEnIGN5PSc4OCcgcj0nNCcgZmlsbD0nI0QwNjA3QScvPgogIDxlbGxpcHNlIGN4PSc4MicgY3k9Jzk4JyByeD0nNi41JyByeT0nNCcgZmlsbD0nI0U4ODA5OCcgb3BhY2l0eT0nLjMyJy8+CiAgPGVsbGlwc2UgY3g9JzExOCcgY3k9Jzk4JyByeD0nNi41JyByeT0nNCcgZmlsbD0nI0U4ODA5OCcgb3BhY2l0eT0nLjMyJy8+CiAgPHBhdGggZD0nTTkwIDEwMSBRMTAwIDEwOSAxMTAgMTAxJyBzdHJva2U9JyNEMDYwN0EnIHN0cm9rZS13aWR0aD0nMi41JyBmaWxsPSdub25lJyBzdHJva2UtbGluZWNhcD0ncm91bmQnLz4KPC9zdmc+"},
   {id:18, nombre:"Shalé",         color:"#ACBCAC", emoji:"◠",
@@ -732,7 +749,23 @@ const MARCAS_SEED = [
 function cargarMarcas(){
   try{
     const saved=JSON.parse(localStorage.getItem("th_marcas")||"null");
-    if(saved&&Array.isArray(saved)&&saved.length>0) return saved;
+    if(saved&&Array.isArray(saved)&&saved.length>0){
+      let cambiado=false;
+      const enriquecidas=saved.map(m=>{
+        if(m.imagenPersonalizada) return m;
+        const seed=MARCAS_SEED.find(s=>s.id===m.id);
+        if(seed?.imagen && m.imagen!==seed.imagen){
+          cambiado=true;
+          return {...m, imagen:seed.imagen};
+        }
+        return m;
+      });
+      // Persistir la migración de vuelta a localStorage
+      if(cambiado){
+        try{ localStorage.setItem("th_marcas",JSON.stringify(enriquecidas)); }catch{}
+      }
+      return enriquecidas;
+    }
   }catch{}
   return [...MARCAS_SEED];
 }
@@ -835,12 +868,24 @@ function PagoDisplay({mp, total, small, inline}){
   return <Chip color={colorPago(mp)} small={small}>{iconPago(mp)} {labelPago(mp)}</Chip>;
 }
 
+// ── getMarcaImg: imagen efectiva de una marca ────────────────────────────────
+// Prioridad: logo personalizado → seed por id → seed por nombre → imagen guardada
+function getMarcaImg(m){
+  if(!m) return "";
+  if(m.imagenPersonalizada && m.imagen) return m.imagen;
+  // Buscar en seed por id (tolerante a string/number) o por nombre como fallback
+  const seed = MARCAS_SEED.find(s=>String(s.id)===String(m.id))
+            || MARCAS_SEED.find(s=>s.nombre===m.nombre);
+  return seed?.imagen || m.imagen || "";
+}
+
 // ── MarcaIcon: muestra imagen de logo o emoji como fallback ──────────────────
 // Usar en cualquier lugar del UI donde aparezca el ícono de una marca.
 function MarcaIcon({marca, size=20, radius=8, style={}}){
   if(!marca) return null;
-  if(marca.imagen){
-    return <img src={marca.imagen} alt={marca.nombre||""}
+  const img = getMarcaImg(marca);
+  if(img){
+    return <img src={img} alt={marca.nombre||""}
       style={{width:size,height:size,borderRadius:radius,
         objectFit:"cover",flexShrink:0,display:"inline-block",...style}}/>;
   }
@@ -1839,6 +1884,7 @@ function verNotaVenta(v,n){abrirNotaVenta(v,n,false);}
 const FONT = "'Inter', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif";
 const FONT_UI = "'Inter', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif";
 const FONT_DISPLAY = "'Cormorant Garamond', Georgia, 'Times New Roman', serif";
+const FONT_MONO = "'DM Mono', 'Fira Code', 'SF Mono', 'Menlo', monospace";
 
 // Logo SVG inline de Toscana House
 const LOGO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 120" fill="none">
@@ -1873,10 +1919,10 @@ function usePress(onPress) {
 
 // ── Desktop breakpoint hook ───────────────────────────────
 function useIsDesktop() {
-  var _hND = useState(function(){ return typeof window !== "undefined" && window.innerWidth >= 1024; });
+  var _hND = useState(function(){ return typeof window !== "undefined" && window.innerWidth >= 768; });
   var isDesktop = _hND[0]; var setIsDesktop = _hND[1];
   useEffect(function(){
-    function check(){ setIsDesktop(window.innerWidth >= 1024); }
+    function check(){ setIsDesktop(window.innerWidth >= 768); }
     window.addEventListener("resize", check);
     return function(){ window.removeEventListener("resize", check); };
   },[]);
@@ -2018,11 +2064,11 @@ function DotsMenu({ items, open, onToggle, align="right" }){
 // iOS-style pill badge
 function Chip({children, color=C.gold, small}){
   return <span style={{
-    background:`${color}14`, color,
-    border:`1px solid ${color}28`,
-    borderRadius:20, padding: small?"2px 8px":"4px 11px",
-    fontSize: small?9.5:11, fontWeight:600, fontFamily:FONT,
-    letterSpacing:"0.04em", whiteSpace:"nowrap",
+    background:`${color}12`, color,
+    border:`1px solid ${color}24`,
+    borderRadius:6, padding: small?"2px 7px":"3px 10px",
+    fontSize: small?9:10.5, fontWeight:600, fontFamily:FONT,
+    letterSpacing:"0.05em", whiteSpace:"nowrap",
     textTransform:"uppercase",
   }}>{children}</span>;
 }
@@ -2032,10 +2078,10 @@ function Cell({icon,iconBg,label,value,chevron,onPress,danger,first,last,badge})
   const {pressed,...handlers}=usePress(onPress);
   return (
     <div {...handlers} style={{
-      background: pressed?"rgba(0,0,0,0.03)":"rgba(255,255,255,0.75)",
+      background: pressed?C.bg2:C.bg1,
       padding:"13px 16px",
-      borderRadius: first&&last?"16px":first?"16px 16px 0 0":last?"0 0 16px 16px":"0",
-      display:"flex",alignItems:"center",gap:13,
+      borderRadius: first&&last?"10px":first?"10px 10px 0 0":last?"0 0 10px 10px":"0",
+      display:"flex",alignItems:"center",gap:12,
       cursor:onPress?"pointer":"default",
       transition:"background .12s",
       borderBottom: last?"none":`1px solid ${C.sep}`,
@@ -2058,56 +2104,153 @@ function Cell({icon,iconBg,label,value,chevron,onPress,danger,first,last,badge})
   );
 }
 
-// iOS Navigation Bar
+// Atelier Navigation Bar
 function NavBar({title, subtitle, back, onBack, right}){
   return (
     <div style={{
-      background:"rgba(252,250,247,0.94)",
-      backdropFilter:"blur(24px) saturate(200%)",
-      WebkitBackdropFilter:"blur(24px) saturate(200%)",
+      background:"rgba(245,243,238,0.96)",
+      backdropFilter:"blur(20px) saturate(180%)",
+      WebkitBackdropFilter:"blur(20px) saturate(180%)",
       borderBottom:`1px solid ${C.sep}`,
-      padding:"0 16px",
+      padding:"0 20px",
       position:"sticky",top:0,zIndex:100,
-      display:"flex",alignItems:"center",minHeight:50,
-      gap:10,
+      display:"flex",alignItems:"center",minHeight:52,
+      gap:12,
+      boxShadow:"0 1px 0 rgba(0,0,0,0.03)",
     }}>
       {back&&(
         <button onClick={onBack} style={{
           background:"none",border:"none",
           color:C.label3,fontSize:13,fontFamily:FONT,fontWeight:500,
-          cursor:"pointer",padding:"8px 0",
-          display:"flex",alignItems:"center",gap:4,
+          cursor:"pointer",padding:"6px 0",
+          display:"flex",alignItems:"center",gap:3,
           WebkitTapHighlightColor:"transparent",
-          minWidth:44,letterSpacing:"-0.01em",
+          flexShrink:0,letterSpacing:"-0.01em",
         }}>
-          <span style={{fontSize:18,lineHeight:1,opacity:.7}}>‹</span>
-          {typeof back==="string"?<span style={{opacity:.8}}>{back}</span>:""}
+          <span style={{fontSize:22,lineHeight:1,opacity:.5,fontWeight:300,marginTop:-1}}>‹</span>
+          {typeof back==="string"?<span style={{fontSize:13,color:C.label3}}>{back}</span>:""}
         </button>
       )}
-      <div style={{flex:1,textAlign:"center"}}>
+      <div style={{flex:1,minWidth:0}}>
         <div style={{
-          fontSize:14,fontWeight:600,color:C.label,
-          fontFamily:FONT,letterSpacing:"-0.01em",lineHeight:1.2,
+          fontSize:15,fontWeight:600,color:C.label,
+          fontFamily:FONT,letterSpacing:"-0.015em",lineHeight:1.25,
+          overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",
         }}>{title}</div>
-        {subtitle&&<div style={{fontSize:10,color:C.label3,fontFamily:FONT,marginTop:2,letterSpacing:"0.04em",textTransform:"uppercase"}}>{subtitle}</div>}
+        {subtitle&&<div style={{
+          fontSize:10,color:C.label3,fontFamily:FONT,marginTop:1,
+          letterSpacing:"0.07em",textTransform:"uppercase",fontWeight:500,
+        }}>{subtitle}</div>}
       </div>
-      <div style={{minWidth:back?44:0,display:"flex",justifyContent:"flex-end"}}>{right}</div>
+      <div style={{display:"flex",justifyContent:"flex-end",alignItems:"center",gap:8,flexShrink:0}}>
+        {right}
+      </div>
     </div>
   );
 }
 
-// Dark tab bar — corporate & editorial
+// ── Atelier Desktop Sidebar ──────────────────────────────────────────────────
+function DesktopSidebar({tabs, active, onChange, user, logout}){
+  const GROUPS = [
+    {label:"Principal", ids:["inicio","pos","ventas"]},
+    {label:"Gestión",   ids:["inventario","marcas","liquidaciones","giftcards"]},
+    {label:"Sistema",   ids:["config"]},
+  ];
+  const DOT = {
+    inicio:"#8A6418",pos:"#1A1714",ventas:"#1E3A5F",
+    inventario:"#166534",marcas:"#5B2D8E",liquidaciones:"#991B1B",
+    giftcards:"#92400E",config:C.label3,
+  };
+  return (
+    <div style={{
+      width:220,flexShrink:0,
+      height:"100vh",position:"sticky",top:0,
+      background:C.bg2,
+      borderRight:`1px solid ${C.sep}`,
+      display:"flex",flexDirection:"column",
+      overflow:"hidden",
+    }}>
+      {/* Logo */}
+      <div style={{padding:"22px 22px 18px",borderBottom:`1px solid ${C.sep}`,flexShrink:0}}>
+        <div style={{fontFamily:FONT_DISPLAY,fontSize:22,fontWeight:400,color:C.label,letterSpacing:".14em",lineHeight:1}}>T H</div>
+        <div style={{fontSize:9,letterSpacing:".22em",textTransform:"uppercase",color:C.label3,marginTop:3}}>Casa de Moda</div>
+      </div>
+
+      {/* Nav groups */}
+      <nav style={{flex:1,padding:"14px 10px",overflowY:"auto"}}>
+        {GROUPS.map(g=>(
+          <div key={g.label} style={{marginBottom:4}}>
+            <div style={{
+              fontSize:9,letterSpacing:".18em",textTransform:"uppercase",
+              color:C.label3,padding:"4px 10px",
+              margin:"14px 0 5px",fontWeight:500,
+            }}>{g.label}</div>
+            {tabs.filter(t=>g.ids.includes(t.id)).map(t=>{
+              const isActive=active===t.id;
+              return (
+                <button key={t.id} onClick={()=>onChange(t.id)} style={{
+                  display:"flex",alignItems:"center",gap:10,
+                  width:"100%",padding:"8px 10px",borderRadius:8,border:"none",
+                  background:isActive?C.bg1:"transparent",
+                  color:isActive?C.label:C.label2,
+                  fontFamily:FONT,fontSize:13,fontWeight:isActive?600:400,
+                  cursor:"pointer",transition:"background .12s",
+                  boxShadow:isActive?"0 1px 3px rgba(0,0,0,.06),0 1px 2px rgba(0,0,0,.04)":"none",
+                  textAlign:"left",marginBottom:1,
+                  WebkitTapHighlightColor:"transparent",
+                  letterSpacing:"-0.01em",
+                }}>
+                  <span style={{width:6,height:6,borderRadius:2,flexShrink:0,
+                    background:isActive?(DOT[t.id]||C.gold):"rgba(26,23,20,.15)",
+                    transition:"background .12s",
+                  }}/>
+                  <span style={{flex:1}}>{t.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        ))}
+      </nav>
+
+      {/* User footer */}
+      <div style={{
+        padding:"12px 14px",borderTop:`1px solid ${C.sep}`,
+        display:"flex",alignItems:"center",gap:10,flexShrink:0,
+      }}>
+        <div style={{
+          width:30,height:30,borderRadius:8,
+          background:C.label,color:"#fff",
+          display:"flex",alignItems:"center",justifyContent:"center",
+          fontSize:10,fontWeight:700,flexShrink:0,fontFamily:FONT,
+        }}>TH</div>
+        <div style={{flex:1,minWidth:0}}>
+          <div style={{fontSize:12,fontWeight:600,color:C.label,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+            {user?.nombre||"Toscana House"}
+          </div>
+          <div style={{fontSize:10,color:C.label3,textTransform:"capitalize"}}>{user?.rol||"Admin"}</div>
+        </div>
+        <button onClick={logout} style={{
+          background:"none",border:"none",color:C.label3,
+          fontSize:11,cursor:"pointer",fontFamily:FONT,padding:"4px",
+          WebkitTapHighlightColor:"transparent",
+        }}>Salir</button>
+      </div>
+    </div>
+  );
+}
+
+// Atelier tab bar — refined editorial
 function TabBar({tabs, active, onChange}){
   return (
     <div style={{
       position:"fixed",bottom:0,left:0,right:0,zIndex:200,
-      background:"rgba(252,250,247,0.97)",
-      backdropFilter:"blur(32px) saturate(200%)",
-      WebkitBackdropFilter:"blur(32px) saturate(200%)",
+      background:"rgba(245,243,238,0.98)",
+      backdropFilter:"blur(24px) saturate(180%)",
+      WebkitBackdropFilter:"blur(24px) saturate(180%)",
       borderTop:`1px solid ${C.sep}`,
       display:"flex",justifyContent:"center",alignItems:"stretch",
-      paddingBottom:"env(safe-area-inset-bottom,8px)",
-      boxShadow:"0 -1px 0 rgba(0,0,0,0.05), 0 -8px 24px rgba(0,0,0,0.04)",
+      paddingBottom:"env(safe-area-inset-bottom,6px)",
+      boxShadow:"0 -1px 0 rgba(0,0,0,0.04), 0 -4px 20px rgba(0,0,0,0.03)",
     }}>
       <div style={{display:"flex",width:"100%",maxWidth:560}}>
         {tabs.map(t=>{
@@ -2117,33 +2260,29 @@ function TabBar({tabs, active, onChange}){
               flex:1,border:"none",
               background:"transparent",
               display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",
-              padding:"8px 2px 6px",
+              padding:"7px 2px 5px",
               cursor:"pointer",
               WebkitTapHighlightColor:"transparent",
-              gap:4,
-              minWidth:0,
-              position:"relative",
+              gap:3,minWidth:0,position:"relative",
             }}>
-              {/* Active pill indicator — top */}
+              {/* Active indicator — top line */}
               <div style={{
                 position:"absolute",top:0,left:"50%",
                 transform:"translateX(-50%)",
-                width: isActive ? 20 : 0,
-                height:2,
-                borderRadius:2,
+                width: isActive ? 18 : 0,
+                height:1.5,borderRadius:1,
                 background:C.gold,
-                transition:"width .25s cubic-bezier(.34,1.56,.64,1)",
+                transition:"width .22s cubic-bezier(.34,1.56,.64,1)",
               }}/>
 
-              {/* Icon container */}
+              {/* Icon pill */}
               <div style={{
-                width:34,height:28,
-                borderRadius:9,
-                background: isActive ? `${C.gold}14` : "transparent",
+                width:32,height:26,borderRadius:8,
+                background: isActive ? `${C.gold}12` : "transparent",
                 display:"flex",alignItems:"center",justifyContent:"center",
-                fontSize:17,lineHeight:1,
-                transition:"background .2s",
-                opacity: isActive ? 1 : 0.36,
+                fontSize:16,lineHeight:1,
+                transition:"background .18s",
+                opacity: isActive ? 1 : 0.32,
               }}>{t.icon}</div>
 
               {/* Label */}
@@ -2151,10 +2290,9 @@ function TabBar({tabs, active, onChange}){
                 fontSize:9,fontFamily:FONT,
                 fontWeight: isActive ? 600 : 400,
                 color: isActive ? C.gold : C.label3,
-                transition:"color .2s",
-                letterSpacing: isActive ? "0.05em" : "0.02em",
-                whiteSpace:"nowrap",
-                textTransform:"uppercase",
+                transition:"color .18s",
+                letterSpacing:"0.06em",
+                whiteSpace:"nowrap",textTransform:"uppercase",
               }}>{t.label}</span>
             </button>
           );
@@ -2192,20 +2330,20 @@ function IOSBtn({children,onPress,variant="primary",full,disabled,small,icon}){
       style={{
         background: bg[variant],
         border: variant==="ghost" ? `1px solid ${C.sep}` : "none",
-        borderRadius: small ? 14 : 18,
-        padding: small ? "10px 18px" : "15px 24px",
-        minHeight: small ? 40 : 52,
+        borderRadius: small ? 10 : 12,
+        padding: small ? "9px 18px" : "14px 24px",
+        minHeight: small ? 38 : 50,
         width: full ? "100%" : "auto",
         cursor: disabled ? "not-allowed" : "pointer",
         display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
         fontFamily: FONT, fontWeight: 600,
-        fontSize: small ? 13 : 15,
-        letterSpacing: "0.01em",
+        fontSize: small ? 13 : 14,
+        letterSpacing: "0.02em",
         color: textColor[variant],
-        transform: pressed&&!disabled ? "scale(0.97)" : btnHov&&!disabled ? "translateY(-1px)" : "scale(1)",
-        transition: "transform .18s cubic-bezier(.4,0,.2,1), opacity .18s, box-shadow .18s",
-        opacity: disabled ? 0.45 : pressed ? 0.88 : 1,
-        boxShadow: btnHov&&!disabled&&variant==="primary" ? "0 4px 16px rgba(0,0,0,0.18)" : "none",
+        transform: pressed&&!disabled ? "scale(0.98)" : btnHov&&!disabled ? "translateY(-1px)" : "scale(1)",
+        transition: "transform .15s cubic-bezier(.4,0,.2,1), opacity .15s, box-shadow .15s",
+        opacity: disabled ? 0.4 : pressed ? 0.9 : 1,
+        boxShadow: btnHov&&!disabled&&variant==="primary" ? "0 4px 14px rgba(0,0,0,0.15)" : "none",
         WebkitTapHighlightColor: "transparent",
         userSelect: "none",
       }}>
@@ -2278,15 +2416,15 @@ function IOSInput({label,prefix,style:st={},...p}){
         {prefix&&<span style={{position:"absolute",left:14,top:"50%",transform:"translateY(-50%)",
           color:C.label3,fontSize:15,fontFamily:FONT,pointerEvents:"none"}}>{prefix}</span>}
         <input {...p} style={{
-          width:"100%",padding:"13px 16px",paddingLeft:prefix?"38px":"16px",
-          borderRadius:14,border:`1px solid ${C.sep}`,
-          background:C.bg2,fontSize:15,color:C.label,
+          width:"100%",padding:"12px 14px",paddingLeft:prefix?"38px":"14px",
+          borderRadius:10,border:`1px solid ${C.sep}`,
+          background:C.bg2,fontSize:14,color:C.label,
           outline:"none",fontFamily:FONT,boxSizing:"border-box",
           WebkitAppearance:"none",fontWeight:400,
-          transition:"border-color .15s, background .15s",
+          transition:"border-color .15s, background .15s, box-shadow .15s",
           ...st
         }}
-        onFocus={e=>{e.target.style.borderColor=C.gold;e.target.style.background="#FFFFFF";e.target.style.boxShadow=`0 0 0 3px ${C.gold}18`;}}
+        onFocus={e=>{e.target.style.borderColor=C.gold;e.target.style.background=C.bg1;e.target.style.boxShadow=`0 0 0 3px ${C.gold}14`;}}
         onBlur={e=>{e.target.style.borderColor=C.sep;e.target.style.background=C.bg2;e.target.style.boxShadow="none";}}
         />
       </div>
@@ -2298,19 +2436,19 @@ function IOSInput({label,prefix,style:st={},...p}){
 function SegControl({options,value,onChange}){
   return (
     <div style={{
-      background:C.bg2,borderRadius:12,padding:3,
-      display:"flex",gap:3,border:`1px solid ${C.sep}`,
+      background:C.bg2,borderRadius:10,padding:3,
+      display:"flex",gap:2,border:`1px solid ${C.sep}`,
     }}>
       {options.map(o=>(
         <button key={o.value} onClick={()=>onChange(o.value)} style={{
-          flex:1,padding:"8px 0",borderRadius:10,border:"none",
-          background:value===o.value?"#FFFFFF":"transparent",
+          flex:1,padding:"7px 0",borderRadius:8,border:"none",
+          background:value===o.value?C.bg1:"transparent",
           color:value===o.value?C.label:C.label3,
           fontFamily:FONT,fontSize:12,fontWeight:value===o.value?600:400,
-          cursor:"pointer",transition:"all .18s cubic-bezier(.4,0,.2,1)",
-          boxShadow:value===o.value?"0 1px 6px rgba(0,0,0,0.08), 0 0.5px 2px rgba(0,0,0,0.06)":"none",
+          cursor:"pointer",transition:"all .15s ease",
+          boxShadow:value===o.value?"0 1px 3px rgba(0,0,0,0.06),0 1px 2px rgba(0,0,0,0.04)":"none",
           WebkitTapHighlightColor:"transparent",
-          letterSpacing:value===o.value?"-0.01em":"0",
+          letterSpacing:"0.01em",
         }}>{o.label}</button>
       ))}
     </div>
@@ -2341,29 +2479,31 @@ function IOSSel({label,children,style:st={},...p}){
 function StatCard({icon,label,value,sub,color=C.gold,compact}){
   return (
     <div style={{
-      background:"rgba(255,255,255,0.80)",
-      backdropFilter:"blur(16px)",
-      WebkitBackdropFilter:"blur(16px)",
-      borderRadius: compact ? 16 : 20,
-      padding: compact ? "13px 15px" : "16px 18px",
+      background:C.bg1,
+      borderRadius:10,
+      padding: compact ? "14px 16px" : "16px 18px",
       border:`1px solid ${C.sep}`,
-      boxShadow:"0 2px 12px rgba(0,0,0,0.04)",
+      boxShadow:"0 1px 3px rgba(0,0,0,0.06),0 1px 2px rgba(0,0,0,0.04)",
     }}>
-      <div style={{display:"flex",alignItems:"center",gap: compact ? 8 : 10, marginBottom: compact ? 8 : 10}}>
-        <div style={{
-          width: compact ? 28 : 34, height: compact ? 28 : 34,
-          borderRadius: compact ? 9 : 11,
-          background:`${color}12`,border:`1px solid ${color}20`,
-          display:"flex",alignItems:"center",justifyContent:"center",
-          fontSize: compact ? 14 : 16,
-        }}>{icon}</div>
-        <span style={{
-          fontSize:10,color:C.label3,fontFamily:FONT,fontWeight:600,
-          letterSpacing:"0.07em",textTransform:"uppercase",
-        }}>{label}</span>
+      <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",marginBottom: compact ? 10 : 12}}>
+        <span style={{fontSize: compact ? 18 : 20}}>{icon}</span>
+        {sub&&<span style={{
+          fontSize:10,color:sub.startsWith?.("+")?C.green:sub.startsWith?.("-")?C.red:C.label3,
+          fontFamily:FONT,fontWeight:600,letterSpacing:"0.04em",
+        }}>{sub}</span>}
       </div>
-      <div style={{fontSize: compact ? 20 : 24, fontWeight:600,color:C.label,fontFamily:FONT,lineHeight:1,letterSpacing:"-0.02em"}}>{value}</div>
-      {sub&&<div style={{fontSize:11,color:C.label3,fontFamily:FONT,marginTop:5}}>{sub}</div>}
+      <div style={{
+        fontSize: compact ? 20 : 24,
+        fontWeight:700,
+        color:C.label,
+        fontFamily:FONT,
+        lineHeight:1,letterSpacing:"-0.03em",
+        marginBottom:5,
+      }}>{value}</div>
+      <div style={{
+        fontSize:10,color:C.label3,fontFamily:FONT,
+        textTransform:"uppercase",letterSpacing:"0.08em",fontWeight:500,
+      }}>{label}</div>
     </div>
   );
 }
@@ -2477,8 +2617,8 @@ function PctMarcasPanel({ onCfgChange }) {
                     overflow:"hidden", display:"flex", alignItems:"center",
                     justifyContent:"center", fontSize:13,
                   }}>
-                    {m.imagen
-                      ? <img src={m.imagen} alt="" style={{width:26, height:26, objectFit:"cover"}}/>
+                    {getMarcaImg(m)
+                      ? <img src={getMarcaImg(m)} alt="" style={{width:26, height:26, objectFit:"cover"}}/>
                       : m.emoji}
                   </div>
                   <span style={{
@@ -4264,33 +4404,27 @@ function generarPlanillaAlquileres(ventas, mes, anio) {
 function KPICard({icon, label, val, sub, color, compact}){
   return (
     <div style={{
-      background:"rgba(255,255,255,0.85)",
-      backdropFilter:"blur(20px)",
-      WebkitBackdropFilter:"blur(20px)",
-      borderRadius: compact ? 18 : 22,
+      background:C.bg1,
+      borderRadius: compact ? 10 : 12,
       padding: compact ? "14px 16px" : "18px 20px",
       border:`1px solid ${C.sep}`,
-      boxShadow:"0 4px 24px rgba(0,0,0,0.04), 0 1px 4px rgba(0,0,0,0.03)",
+      boxShadow:"0 1px 3px rgba(0,0,0,0.06),0 1px 2px rgba(0,0,0,0.04)",
     }}>
-      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom: compact ? 9 : 12}}>
-        <div style={{
-          width: compact ? 28 : 34, height: compact ? 28 : 34,
-          borderRadius: compact ? 9 : 11,
-          background:`${color}12`,
-          display:"flex",alignItems:"center",justifyContent:"center",
-          fontSize: compact ? 14 : 16,
-          border:`1px solid ${color}20`,
-        }}>{icon}</div>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom: compact ? 10 : 14}}>
         <span style={{
           fontSize:10,color:C.label3,fontFamily:FONT,fontWeight:600,
-          letterSpacing:"0.08em",textTransform:"uppercase",
+          letterSpacing:"0.1em",textTransform:"uppercase",
         }}>{label}</span>
+        <span style={{fontSize: compact ? 16 : 18, opacity:.7}}>{icon}</span>
       </div>
       <div style={{
-        fontSize: compact ? 21 : 27, fontWeight:600,color:C.label,fontFamily:FONT,
-        lineHeight:1,letterSpacing:"-0.02em",
+        fontSize: compact ? 22 : 26,
+        fontWeight:700,
+        color: C.label,
+        fontFamily:FONT,
+        lineHeight:1,letterSpacing:"-0.03em",
       }}>{val}</div>
-      {sub&&<div style={{fontSize:11,color:C.label3,fontFamily:FONT,marginTop: compact ? 5 : 6, letterSpacing:"0.01em"}}>{sub}</div>}
+      {sub&&<div style={{fontSize:11,color:C.label3,fontFamily:FONT,marginTop: compact ? 6 : 8}}>{sub}</div>}
     </div>
   );
 }
@@ -5932,8 +6066,8 @@ function BrandPortal({user, ventas, inv, logout}){
             <div style={{width:40,height:40,borderRadius:12,flexShrink:0,
               background:`${marca.color}30`,overflow:"hidden",
               display:"flex",alignItems:"center",justifyContent:"center",fontSize:20}}>
-              {marca.imagen
-                ? <img src={marca.imagen} alt={marca.nombre} style={{width:40,height:40,objectFit:"cover"}}/>
+              {getMarcaImg(marca)
+                ? <img src={getMarcaImg(marca)} alt={marca.nombre} style={{width:40,height:40,objectFit:"cover"}}/>
                 : marca.emoji}
             </div>
             <div>
@@ -6806,12 +6940,14 @@ function NuevaMarcaModal({editMarca, marcasActuales, onClose, onGuardar}){
       }
       if(!uPass||uPass.length<6){ setMsg("Contraseña mínimo 6 caracteres"); return; }
     }
+    const seedImagen = MARCAS_SEED.find(s=>s.id===(isNew?nextId:editMarca.id))?.imagen||"";
     const marca = {
       id: isNew ? nextId : editMarca.id,
       nombre: f.nombre.trim(),
       emoji:  f.emoji,
       color:  f.color,
       imagen: f.imagen||"",
+      imagenPersonalizada: !!(f.imagen && f.imagen!==seedImagen),
       email:  (f.email||"").trim(),
       telefono: (f.telefono||"").trim(),
       pctComision: Number(f.pctComision)||10,
@@ -8061,6 +8197,27 @@ function App(){
   // ── Realtime sync — cualquier cambio en Supabase (otro dispositivo) actualiza aquí ──
   useRealtimeSync(setVentas, setInv);
 
+  // ── Migración de íconos: aplica imágenes del seed a marcas sin logo personalizado ──
+  useEffect(()=>{
+    setMarcasState(prev=>{
+      let cambiado=false;
+      const lista=prev.map(m=>{
+        if(m.imagenPersonalizada) return m;
+        const seed=MARCAS_SEED.find(s=>s.id===m.id);
+        if(seed?.imagen && m.imagen!==seed.imagen){
+          cambiado=true;
+          return {...m, imagen:seed.imagen};
+        }
+        return m;
+      });
+      if(cambiado){
+        try{ localStorage.setItem("th_marcas",JSON.stringify(lista)); }catch{}
+        MARCAS=lista;
+      }
+      return cambiado ? lista : prev;
+    });
+  },[]);// eslint-disable-line
+
   // Cargar retiros desde Supabase al inicio
   useEffect(()=>{
     sbCargarRetiros().then(data=>{ if(data.length>0) setRetiros(data); });
@@ -8264,14 +8421,15 @@ function App(){
       background:C.bg0,
       color:C.label,
       fontFamily:FONT_UI,
-      paddingBottom:84, // espacio para tab bar + safe area
+      paddingBottom: isDesktop ? 0 : 84,
       WebkitFontSmoothing:"antialiased",
       MozOsxFontSmoothing:"grayscale",
+      display: isDesktop ? "flex" : "block",
     }}>
 
       {/* ── LOADING SCREEN ── */}
       {cargando&&(
-        <div style={{position:"fixed",inset:0,background:"rgba(244,247,251,0.97)",
+        <div style={{position:"fixed",inset:0,background:"rgba(245,243,238,0.97)",
           display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",
           zIndex:9999,gap:20}}>
           <LogoMark size={48} color={C.gold}/>
@@ -8283,6 +8441,12 @@ function App(){
           <style>{`@keyframes loadbar{0%{transform:translateX(-100%)}100%{transform:translateX(200%)}}@keyframes slideUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}`}</style>
         </div>
       )}
+
+      {/* ── DESKTOP SIDEBAR ── */}
+      {isDesktop&&<DesktopSidebar tabs={TABS} active={tab} onChange={t=>{setTab(t);setMD(null);}} user={user} logout={logout}/>}
+
+      {/* ── MAIN CONTENT AREA (desktop: flex-1 scroll) ── */}
+      <div style={isDesktop?{flex:1,minWidth:0,overflowY:"auto",height:"100vh"}:{}}>
 
       {/* ── NAV BAR ── */}
       {showingDetail ? (
@@ -8437,8 +8601,8 @@ function App(){
                       border:`1.5px solid ${m.color}30`,
                       boxShadow:`0 2px 10px ${m.color}20`,
                     }}>
-                      {m.imagen
-                        ? <img src={m.imagen} alt={m.nombre}
+                      {getMarcaImg(m)
+                        ? <img src={getMarcaImg(m)} alt={m.nombre}
                             style={{width:"100%",height:"100%",objectFit:"cover"}}/>
                         : m.emoji}
                     </div>
@@ -8668,8 +8832,8 @@ function App(){
                     <div style={{width: isDesktop ? 32 : 38, height: isDesktop ? 32 : 38, borderRadius:10,flexShrink:0,
                       background:`${m.color}22`,overflow:"hidden",
                       display:"flex",alignItems:"center",justifyContent:"center",fontSize:18}}>
-                      {m.imagen
-                        ? <img src={m.imagen} alt={m.nombre} style={{width: isDesktop ? 32 : 38, height: isDesktop ? 32 : 38, objectFit:"cover"}}/>
+                      {getMarcaImg(m)
+                        ? <img src={getMarcaImg(m)} alt={m.nombre} style={{width: isDesktop ? 32 : 38, height: isDesktop ? 32 : 38, objectFit:"cover"}}/>
                         : m.emoji}
                     </div>
                     <div style={{flex:1}}>
@@ -8710,8 +8874,11 @@ function App(){
         )}
       </div>
 
-      {/* ── BOTTOM TAB BAR ── */}
-      <TabBar tabs={TABS} active={tab} onChange={t=>{setTab(t);setMD(null);}}/>
+      {/* ── CLOSE MAIN CONTENT AREA ── */}
+      </div>
+
+      {/* ── BOTTOM TAB BAR (solo mobile) ── */}
+      {!isDesktop&&<TabBar tabs={TABS} active={tab} onChange={t=>{setTab(t);setMD(null);}}/>}
 
       {/* ── NOTA DE VENTA MODAL ── */}
       <NotaVentaModal
