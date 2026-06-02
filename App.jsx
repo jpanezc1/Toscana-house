@@ -1919,10 +1919,10 @@ function usePress(onPress) {
 
 // ── Desktop breakpoint hook ───────────────────────────────
 function useIsDesktop() {
-  var _hND = useState(function(){ return typeof window !== "undefined" && window.innerWidth >= 768; });
+  var _hND = useState(function(){ return typeof window !== "undefined" && window.innerWidth >= 500; });
   var isDesktop = _hND[0]; var setIsDesktop = _hND[1];
   useEffect(function(){
-    function check(){ setIsDesktop(window.innerWidth >= 768); }
+    function check(){ setIsDesktop(window.innerWidth >= 500); }
     window.addEventListener("resize", check);
     return function(){ window.removeEventListener("resize", check); };
   },[]);
@@ -5388,9 +5388,10 @@ function HomeDashboard({ventas, inv, vMes, mes, anio, onGoTab}){
         // combine last 6 ventas into a live activity feed
         const feed = [
           ...ultVentas.slice(0,6).map(v=>({
-            id:v.id, hora:v.hora||"—", tipo:"Venta",
+            id:v.id, hora:v.hora||"—", fecha:v.fecha||"—", tipo:"Venta",
             producto:v.items?.[0]?.nombre||"—",
             marca:v.items?.[0]?.marcaNombre||"—",
+            marcaObj:MARCAS.find(m=>m.id===v.items?.[0]?.marcaId)||null,
             usuario:v.vendedor||"Tienda",
             color:C.green, bg:C.greenBg,
           })),
@@ -5404,26 +5405,32 @@ function HomeDashboard({ventas, inv, vMes, mes, anio, onGoTab}){
             </div>
             {feed.map((a,i)=>(
               <div key={a.id} style={{
-                display:"grid",gridTemplateColumns:"44px 52px 1fr 80px",
+                display:"grid",gridTemplateColumns:"64px 52px 1fr 80px",
                 alignItems:"center",gap:8,
                 padding:"9px 0",
                 borderTop:i>0?`1px solid ${C.sep}`:"",
               }}>
-                <span style={{fontSize:11,color:C.label3,fontFamily:"monospace",fontWeight:500}}>
-                  {a.hora}
-                </span>
+                <div>
+                  <div style={{fontSize:11,color:C.label,fontFamily:FONT_MONO,fontWeight:600,lineHeight:1.4}}>
+                    {a.hora}
+                  </div>
+                  <div style={{fontSize:9,color:C.label2,fontFamily:FONT_MONO,fontWeight:500,lineHeight:1.3}}>
+                    {a.fecha}
+                  </div>
+                </div>
                 <span style={{
                   fontSize:10,fontWeight:700,color:a.color,fontFamily:FONT,
                   background:a.bg,padding:"2px 7px",borderRadius:20,
                   textAlign:"center",letterSpacing:.3,
                 }}>{a.tipo}</span>
-                <div>
+                <div style={{minWidth:0}}>
                   <div style={{fontSize:13,color:C.label,fontFamily:FONT,fontWeight:500,
                     whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>
                     {a.producto}
                   </div>
-                  <div style={{fontSize:11,color:C.label3,fontFamily:FONT}}>
-                    {a.marca}
+                  <div style={{display:"flex",alignItems:"center",gap:5,marginTop:2}}>
+                    <MarcaIcon marca={a.marcaObj} size={14} radius={4}/>
+                    <span style={{fontSize:11,color:C.label3,fontFamily:FONT}}>{a.marca}</span>
                   </div>
                 </div>
                 <div style={{fontSize:11,color:C.label2,fontFamily:FONT,textAlign:"right"}}>
@@ -8204,6 +8211,17 @@ function App(){
 
   // ── Realtime sync — cualquier cambio en Supabase (otro dispositivo) actualiza aquí ──
   useRealtimeSync(setVentas, setInv);
+
+  // ── Reset de datos: limpia localStorage de ventas e inventario ──
+  useEffect(()=>{
+    const RESET_V = "th_reset_v1";
+    if(!localStorage.getItem(RESET_V)){
+      ["th_inv","th_ventas","th_alq","th_cierres","th_retiros_v1"].forEach(k=>{
+        try{ localStorage.removeItem(k); }catch{}
+      });
+      localStorage.setItem(RESET_V,"done");
+    }
+  },[]);
 
   // ── Migración de íconos: aplica imágenes del seed a marcas sin logo personalizado ──
   useEffect(()=>{
