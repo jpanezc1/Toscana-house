@@ -4752,12 +4752,10 @@ function ImportarExcelModal({inv, onImportar, onClose}){
 
   // ── Auto-generar código [MARCA3]-[INICIALES3]-[TALLA]-[NUM] ───────
   function genCodImport(marcaNombre, desc, talla, usadosSet){
+    // Formato: MARCA-TALLA-NNN (ej: SEN-S-001, SHA-M-003)
     const prefix  = norm(marcaNombre||"TOS").replace(/[^A-Za-z]/gi,"").toUpperCase().slice(0,3)||"TOS";
-    const words   = norm(desc||"ITEM").split(/\s+/).filter(w=>w.length>0);
-    const inics   = words.map(w=>w.replace(/[^A-Za-z]/gi,"")[0]||"").filter(Boolean).join("").toUpperCase().slice(0,3)||"ITM";
-    const tallaUp = norm(talla||"TU").replace(/[^A-Z0-9]/gi,"").toUpperCase().slice(0,3)||"TU";
-    const base    = `${prefix}-${inics}-${tallaUp}`;
-    // buscar siguiente número libre (inventory actual + lote actual)
+    const tallaUp = norm(talla||"").replace(/\s+/g,"").replace(/[^A-Z0-9]/gi,"").toUpperCase().slice(0,5)||"TU";
+    const base    = `${prefix}-${tallaUp}`;
     const invNums = new Set(inv.map(p=>p.codigo.toUpperCase()));
     let n=1;
     while(invNums.has(`${base}-${String(n).padStart(3,"0")}`) || usadosSet.has(`${base}-${String(n).padStart(3,"0")}`)) n++;
@@ -4925,13 +4923,13 @@ function ImportarExcelModal({inv, onImportar, onClose}){
       } else {
         ok++;
         onImportar({tipo:"create", producto:{
-          codigo:      f.sku,
-          nombre:      f.desc,
+          codigo:      f.sku.toUpperCase(),
+          nombre:      (f.desc||"").toUpperCase(),
           marcaId:     f.marcaId,
           marcaNombre: f.marcaNombre,
-          categoria:   f.cat||"General",
-          descripcion: [f.talla&&`Talla: ${f.talla}`, f.color&&`Color: ${f.color}`].filter(Boolean).join(" · ")||"",
-          subcat:      f.subcat||f.talla||"",
+          categoria:   (f.cat||"General").toUpperCase(),
+          descripcion: [f.talla&&`TALLA: ${(f.talla||"").toUpperCase()}`, f.color&&`COLOR: ${(f.color||"").toUpperCase()}`].filter(Boolean).join(" · ")||"",
+          subcat:      (f.subcat||f.talla||"").toUpperCase(),
           precio:      f.precio,
           stock:       f.stock,
           stockInicial:f.stock,
@@ -9938,10 +9936,12 @@ function SheetRecibir({open, onClose, inv, onAdd, fInv, setFInv}){
 // ══════════════════════════════════════════════════════════
 function InventarioPorMarca({inv, ventas, onRecibir, onBaja, onImportarExcel}){
   const isDesktop = useIsDesktop();
-  var _hN149 = useState(MARCAS[0].id); var marcaSelec = _hN149[0]; var setMarcaSelec = _hN149[1];;
+  // null = "TODOS"
+  var _hN149 = useState(null); var marcaSelec = _hN149[0]; var setMarcaSelec = _hN149[1];;
   var _hInvBq = useState(""); var invBusq = _hInvBq[0]; var setInvBusq = _hInvBq[1];;
-  var _hInvFd = useState(""); var invFechaFin = _hInvFd[0]; var setInvFechaFin = _hInvFd[1];;
-  const marca = MARCAS.find(m=>m.id===marcaSelec);
+  var _hInvFd = useState(""); var invFechaDesde = _hInvFd[0]; var setInvFechaDesde = _hInvFd[1];;
+  var _hInvFh = useState(""); var invFechaHasta = _hInvFh[0]; var setInvFechaHasta = _hInvFh[1];;
+  const marca = marcaSelec ? MARCAS.find(m=>m.id===marcaSelec) : null;
 
   // Calcular unidades vendidas por producto
   const vendidosPorProd = useMemo(()=>{
@@ -9952,85 +9952,107 @@ function InventarioPorMarca({inv, ventas, onRecibir, onBaja, onImportarExcel}){
     return map;
   },[ventas]);
 
+  // Búsqueda SIEMPRE global — filtra sobre todo el inventario
   const productos = useMemo(()=>{
-    let r = inv.filter(i=>i.marcaId===marcaSelec);
-    if(invBusq.trim()){
-      const q=invBusq.trim().toLowerCase();
-      r=r.filter(p=>p.codigo.toLowerCase().includes(q)||p.nombre.toLowerCase().includes(q));
-    }
-    if(invFechaFin) r=r.filter(p=>p.fecha&&p.fecha<=invFechaFin);
-    return r;
-  },[inv,marcaSelec,invBusq,invFechaFin]);
+    const q = invBusq.trim().toUpperCase();
+    const hayFiltro = q || invFechaDesde || invFechaHasta;
+    // Base: si hay filtro activo → buscar en TODO el inv; si no → solo la marca seleccionada (o todos si null)
+    let r = (hayFiltro || !marcaSelec) ? [...inv] : inv.filter(i=>i.marcaId===marcaSelec);
+    if(q) r=r.filter(p=>
+      (p.codigo||"").toUpperCase().includes(q)||
+      (p.nombre||"").toUpperCase().includes(q)||
+      (p.categoria||"").toUpperCase().includes(q)
+    );
+    if(invFechaDesde) r=r.filter(p=>p.fecha&&p.fecha>=invFechaDesde);
+    if(invFechaHasta) r=r.filter(p=>p.fecha&&p.fecha<=invFechaHasta);
+    // Si hay marca seleccionada y NO hay filtro, limitar a esa marca
+    if(marcaSelec && !hayFiltro) r=r.filter(i=>i.marcaId===marcaSelec);
+    return r.sort((a,b)=>(a.nombre||"").localeCompare(b.nombre||""));
+  },[inv,marcaSelec,invBusq,invFechaDesde,invFechaHasta]);
   const totalStock = productos.reduce((s,p)=>s+p.stock,0);
   const totalVendidas = productos.reduce((s,p)=>s+(vendidosPorProd[p.id]||0),0);
   const agotados = productos.filter(p=>p.stock===0).length;
 
+  const hayFiltro = invBusq.trim() || invFechaDesde || invFechaHasta;
+
   return (
     <div>
-      {/* Selector de marcas — scroll horizontal */}
-      <div style={{marginBottom:16}}>
-        <div style={{fontSize:11,fontWeight:700,color:C.label3,textTransform:"uppercase",
-          letterSpacing:.8,marginBottom:10,paddingLeft:2}}>Seleccionar Marca</div>
-        <div style={{display:"flex",gap:8,overflowX:"auto",paddingBottom:8,
+      {/* ── Selector de marcas — scroll horizontal ── */}
+      <div style={{marginBottom:14}}>
+        <div style={{fontSize:10,fontWeight:600,color:C.label3,textTransform:"uppercase",
+          letterSpacing:.8,marginBottom:8,paddingLeft:2}}>Filtrar por marca</div>
+        <div style={{display:"flex",gap:6,overflowX:"auto",paddingBottom:6,
           scrollbarWidth:"none",WebkitOverflowScrolling:"touch"}}>
+          {/* TODOS */}
+          <button onClick={()=>setMarcaSelec(null)} style={{
+            flexShrink:0,padding:"7px 14px",borderRadius:10,
+            border:`1.5px solid ${!marcaSelec?C.label:C.sep}`,
+            background:!marcaSelec?C.label:C.bg2,
+            color:!marcaSelec?"#fff":C.label2,
+            cursor:"pointer",fontFamily:FONT,fontSize:11,fontWeight:600,
+            WebkitTapHighlightColor:"transparent",whiteSpace:"nowrap",
+            letterSpacing:"0.04em",textTransform:"uppercase",transition:"all .18s",
+          }}>TODAS</button>
           {MARCAS.map(m=>{
-            const prods=inv.filter(i=>i.marcaId===m.id);
-            const stock=prods.reduce((s,p)=>s+p.stock,0);
+            const stock=inv.filter(i=>i.marcaId===m.id).reduce((s,p)=>s+p.stock,0);
             const activa=m.id===marcaSelec;
             return (
-              <button key={m.id} onClick={()=>setMarcaSelec(m.id)} style={{
-                flexShrink:0,padding:"10px 16px",borderRadius:14,
-                border:`2px solid ${activa?m.color:C.sep}`,
-                background:activa?m.color+"30":C.bg2,
+              <button key={m.id} onClick={()=>setMarcaSelec(activa?null:m.id)} style={{
+                flexShrink:0,padding:"6px 12px",borderRadius:10,
+                border:`1.5px solid ${activa?m.color:C.sep}`,
+                background:activa?`${m.color}22`:C.bg2,
                 cursor:"pointer",fontFamily:FONT,
                 WebkitTapHighlightColor:"transparent",
-                display:"flex",flexDirection:"column",alignItems:"center",gap:3,
-                minWidth:80,transition:"all .2s",
+                display:"flex",alignItems:"center",gap:6,
+                transition:"all .18s",
               }}>
-                <MarcaIcon marca={m} size={22} radius={6}/>
-                <span style={{fontSize:11,fontWeight:activa?700:500,
-                  color:activa?m.color:C.label2,whiteSpace:"nowrap",letterSpacing:"0.02em"}}>{m.nombre}</span>
-                <span style={{fontSize:10,color:activa?m.color:C.label3}}>
-                  {stock} uds
-                </span>
+                <MarcaIcon marca={m} size={16} radius={4}/>
+                <span style={{fontSize:11,fontWeight:activa?700:400,
+                  color:activa?m.color:C.label2,whiteSpace:"nowrap"}}>{m.nombre}</span>
+                <span style={{fontSize:10,color:activa?m.color:C.label3,
+                  background:activa?`${m.color}18`:"transparent",
+                  padding:"0 4px",borderRadius:4}}>{stock}</span>
               </button>
             );
           })}
         </div>
       </div>
 
-      {/* Buscador + filtro fecha */}
+      {/* ── Búsqueda global + filtros de fecha ── */}
       <div style={{display:"flex",gap:8,marginBottom:12,flexWrap:"wrap"}}>
-        <div style={{flex:2,minWidth:160,position:"relative"}}>
-          <span style={{position:"absolute",left:10,top:"50%",transform:"translateY(-50%)",fontSize:14,color:C.label3}}>🔍</span>
+        <div style={{flex:2,minWidth:180,position:"relative"}}>
+          <span style={{position:"absolute",left:11,top:"50%",transform:"translateY(-50%)",fontSize:13,color:C.label3}}>⌕</span>
           <input
             value={invBusq}
-            onChange={e=>setInvBusq(e.target.value)}
-            placeholder="Código o nombre del producto…"
-            style={{width:"100%",padding:"10px 12px 10px 34px",border:`1px solid ${C.sep}`,
-              borderRadius:10,background:C.bg1,fontSize:13,color:C.label,
-              fontFamily:FONT_UI,outline:"none",boxSizing:"border-box"}}
+            onChange={e=>setInvBusq(e.target.value.toUpperCase())}
+            placeholder="Buscar código QR, nombre o categoría en TODAS las marcas…"
+            style={{width:"100%",padding:"10px 12px 10px 32px",border:`1px solid ${invBusq?C.gold:C.sep}`,
+              borderRadius:9,background:C.bg1,fontSize:13,color:C.label,
+              fontFamily:FONT_UI,outline:"none",boxSizing:"border-box",
+              boxShadow:invBusq?`0 0 0 3px ${C.gold}14`:"none",
+              transition:"border-color .15s,box-shadow .15s"}}
           />
         </div>
-        <div style={{flex:1,minWidth:120}}>
-          <input type="date" value={invFechaFin} onChange={e=>setInvFechaFin(e.target.value)}
-            title="Filtrar por fecha de ingreso hasta…"
-            style={{width:"100%",padding:"10px 12px",border:`1px solid ${C.sep}`,
-              borderRadius:10,background:C.bg1,fontSize:13,color:C.label,
-              fontFamily:FONT_UI,outline:"none",boxSizing:"border-box"}}/>
-        </div>
-        {(invBusq||invFechaFin)&&(
-          <button onClick={()=>{setInvBusq("");setInvFechaFin("");}}
-            style={{padding:"10px 14px",borderRadius:10,border:`1px solid ${C.sep}`,
+        <input type="date" value={invFechaDesde} onChange={e=>setInvFechaDesde(e.target.value)}
+          title="Desde"
+          style={{flex:1,minWidth:130,padding:"10px 12px",border:`1px solid ${C.sep}`,
+            borderRadius:9,background:C.bg1,fontSize:13,color:C.label,
+            fontFamily:FONT_UI,outline:"none",boxSizing:"border-box"}}/>
+        <input type="date" value={invFechaHasta} onChange={e=>setInvFechaHasta(e.target.value)}
+          title="Hasta"
+          style={{flex:1,minWidth:130,padding:"10px 12px",border:`1px solid ${C.sep}`,
+            borderRadius:9,background:C.bg1,fontSize:13,color:C.label,
+            fontFamily:FONT_UI,outline:"none",boxSizing:"border-box"}}/>
+        {(invBusq||invFechaDesde||invFechaHasta)&&(
+          <button onClick={()=>{setInvBusq("");setInvFechaDesde("");setInvFechaHasta("");}}
+            style={{padding:"10px 12px",borderRadius:9,border:`1px solid ${C.sep}`,
               background:C.bg2,fontSize:12,color:C.label3,cursor:"pointer",fontFamily:FONT_UI,
-              whiteSpace:"nowrap",WebkitTapHighlightColor:"transparent"}}>
-            ✕ Limpiar
-          </button>
+              whiteSpace:"nowrap",WebkitTapHighlightColor:"transparent"}}>✕</button>
         )}
       </div>
 
-      {/* Stats de la marca */}
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap: isDesktop ? 8 : 10, marginBottom: isDesktop ? 12 : 16}}>
+      {/* Stats */}
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8, marginBottom:14}}>
         {[
           {icon:"📦",label:"En stock",value:totalStock,color:C.green},
           {icon:"✅",label:"Vendidas",value:totalVendidas,color:C.blue},
@@ -10045,119 +10067,100 @@ function InventarioPorMarca({inv, ventas, onRecibir, onBaja, onImportarExcel}){
         ))}
       </div>
 
-      {/* Lista de productos */}
+      {/* ── Lista profesional de productos ── */}
       {productos.length===0
-        ? <div style={{textAlign:"center",padding:"48px 20px",color:C.label3}}>
-            <div style={{fontSize:40,marginBottom:10,opacity:.5}}>📦</div>
-            <div style={{fontSize:16,fontWeight:600,color:C.label2,fontFamily:FONT}}>
-              Sin productos para {marca?.nombre}
-            </div>
-            <div style={{fontSize:13,color:C.label3,fontFamily:FONT,marginTop:6}}>
-              Usa "Recibir" para agregar ítems
-            </div>
-          </div>
-        : <div style={{
-            display: isDesktop ? "grid" : "flex",
-            gridTemplateColumns: isDesktop ? "1fr 1fr" : undefined,
-            flexDirection: isDesktop ? undefined : "column",
-            gap: isDesktop ? 8 : 8, marginBottom:16
-          }}>
-            {/* Leyenda */}
+        ? <EmptyState icon="📦"
+            title={hayFiltro?"Sin resultados para esa búsqueda":"Sin productos en este filtro"}
+            sub={hayFiltro?"Intentá con otro código, nombre o rango de fechas":"Usá «Recibir» o importá un Excel"}/>
+        : <div style={{background:C.bg1,border:`1px solid ${C.sep}`,borderRadius:10,
+            overflow:"hidden",marginBottom:16,
+            boxShadow:"0 1px 3px rgba(0,0,0,.06)"}}>
+
+            {/* Encabezado de tabla */}
             <div style={{
-              display:"flex",gap:12,padding:"8px 12px",background:C.bg2,
-              borderRadius:10,marginBottom:4,
-              gridColumn: isDesktop ? "1 / -1" : undefined,
+              display:"grid",
+              gridTemplateColumns: hayFiltro||!marcaSelec ? "140px 1fr 90px 80px 72px" : "1fr 90px 80px 72px",
+              gap:0,padding:"8px 14px",
+              background:C.bg2,borderBottom:`1px solid ${C.sep}`,
             }}>
-              {[
-                {color:C.stockOk,label:"En stock"},
-                {color:C.stockLow,label:"Stock bajo"},
-                {color:C.stockOut,label:"Agotado"},
-                {color:C.stockSold,label:"Vendido"},
-              ].map(l=>(
-                <div key={l.label} style={{display:"flex",alignItems:"center",gap:5}}>
-                  <div style={{width:10,height:10,borderRadius:3,background:l.color,
-                    border:`1px solid ${C.sep}`}}/>
-                  <span style={{fontSize:10,color:C.label3,fontFamily:FONT}}>{l.label}</span>
-                </div>
-              ))}
+              {(hayFiltro||!marcaSelec)&&<div style={{fontSize:9,fontWeight:700,color:C.label3,textTransform:"uppercase",letterSpacing:.8}}>Marca</div>}
+              <div style={{fontSize:9,fontWeight:700,color:C.label3,textTransform:"uppercase",letterSpacing:.8}}>Producto · Código</div>
+              <div style={{fontSize:9,fontWeight:700,color:C.label3,textTransform:"uppercase",letterSpacing:.8,textAlign:"right"}}>Precio</div>
+              <div style={{fontSize:9,fontWeight:700,color:C.label3,textTransform:"uppercase",letterSpacing:.8,textAlign:"center"}}>Stock</div>
+              <div style={{fontSize:9,fontWeight:700,color:C.label3,textTransform:"uppercase",letterSpacing:.8,textAlign:"right"}}>Etiq.</div>
             </div>
 
-            {productos.map(prod=>{
+            {productos.map((prod,i)=>{
               const vendidas=vendidosPorProd[prod.id]||0;
-              const pctVendido=prod.stockInicial>0?Math.round((vendidas/prod.stockInicial)*100):0;
-              const bgColor=prod.stock===0?C.stockOut:prod.stock<3?C.stockLow:C.stockOk;
-              const borderColor=prod.stock===0?"#F4A8A8":prod.stock<3?"#F4D4A8":"#A8D4A8";
+              const marcaProd=MARCAS.find(m=>m.id===prod.marcaId);
+              const stockColor=prod.stock===0?C.red:prod.stock<3?C.amber:C.green;
+              const stockBg=prod.stock===0?C.redBg:prod.stock<3?C.amberBg:C.greenBg;
+              const showBrand = hayFiltro || !marcaSelec;
 
               return (
                 <div key={prod.id} style={{
-                  background:bgColor,
-                  border:`1px solid ${borderColor}`,
-                  borderRadius: isDesktop ? 10 : 12,
-                  padding: isDesktop ? "8px 12px" : "10px 14px",
+                  display:"grid",
+                  gridTemplateColumns: showBrand ? "140px 1fr 90px 80px 72px" : "1fr 90px 80px 72px",
+                  gap:0,padding:"11px 14px",
+                  borderTop:i>0?`1px solid ${C.sep}`:"",
+                  background:i%2===0?C.bg1:C.bg0,
+                  alignItems:"center",
+                  transition:"background .12s",
                 }}>
-                  {/* Header producto */}
-                  <div style={{display:"flex",justifyContent:"space-between",
-                    alignItems:"center",marginBottom: isDesktop ? 4 : 6}}>
-                    <div style={{flex:1,minWidth:0}}>
-                      <div style={{fontSize: isDesktop ? 13 : 14, fontWeight:600, color:C.label,
-                        fontFamily:FONT,marginBottom: isDesktop ? 2 : 3,lineHeight:"1.3"}}>{prod.nombre}</div>
-                      <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
-                        <span style={{fontFamily:"monospace",fontSize:10,color:C.gold,
-                          background:C.gold+"18",padding:"1px 6px",borderRadius:4,
-                          fontWeight:600}}>{prod.codigo}</span>
-                        <span style={{fontSize:10,color:C.label3,fontFamily:FONT,opacity:.7}}>
-                          {prod.categoria}
-                        </span>
-                      </div>
+                  {/* Marca (solo si búsqueda global) */}
+                  {showBrand&&(
+                    <div style={{display:"flex",alignItems:"center",gap:7,minWidth:0,paddingRight:8}}>
+                      <MarcaIcon marca={marcaProd} size={22} radius={5}/>
+                      <span style={{fontSize:10,color:C.label3,fontFamily:FONT,
+                        overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",
+                        letterSpacing:"0.02em"}}>{marcaProd?.nombre||prod.marcaNombre}</span>
                     </div>
-                    <div style={{textAlign:"right",flexShrink:0}}>
-                      <div style={{fontSize: isDesktop ? 13 : 15, fontWeight:600, color:C.gold, fontFamily:FONT, letterSpacing:"-0.01em"}}>
-                        {$(prod.precio)}
-                      </div>
-                      <div style={{fontSize:12,fontFamily:FONT,fontWeight:600,
-                        color:prod.stock===0?C.red:prod.stock<3?C.amber:C.green}}>
-                        {prod.stock===0?"AGOTADO":prod.stock<3?`⚠ ${prod.stock} rest.`:`✓ ${prod.stock} en stock`}
-                      </div>
+                  )}
+
+                  {/* Nombre + código */}
+                  <div style={{minWidth:0,paddingRight:8}}>
+                    <div style={{
+                      fontSize:13,fontWeight:700,color:C.label,fontFamily:FONT,
+                      letterSpacing:"0.01em",lineHeight:1.3,
+                      overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",
+                    }}>{(prod.nombre||"").toUpperCase()}</div>
+                    <div style={{display:"flex",alignItems:"center",gap:6,marginTop:3,flexWrap:"wrap"}}>
+                      <span style={{fontFamily:FONT_MONO,fontSize:10,color:C.gold,
+                        background:`${C.gold}12`,padding:"1px 7px",borderRadius:4,fontWeight:500,
+                        letterSpacing:"0.04em"}}>{prod.codigo}</span>
+                      {prod.categoria&&<span style={{fontSize:10,color:C.label3,fontFamily:FONT}}>{prod.categoria}</span>}
+                      {prod.fecha&&<span style={{fontSize:9,color:C.label3,fontFamily:FONT_MONO,opacity:.7}}>{prod.fecha}</span>}
                     </div>
                   </div>
 
-                  {/* Barra de progreso vendido/stock */}
-                  <div style={{marginBottom: isDesktop ? 6 : 8}}>
-                    <div style={{display:"flex",justifyContent:"space-between",
-                      fontSize:11,color:C.label3,fontFamily:FONT,marginBottom:4}}>
-                      <span>Vendidas: <strong style={{color:C.blue}}>{vendidas}</strong></span>
-                      {!isDesktop && <span>Inicial: <strong>{prod.stockInicial}</strong></span>}
-                      <span>{pctVendido}% vendido</span>
-                    </div>
-                    <div style={{background:"rgba(0,0,0,0.08)",borderRadius:6,height: isDesktop ? 5 : 8, overflow:"hidden"}}>
-                      <div style={{
-                        width:`${pctVendido}%`,
-                        background:prod.stock===0?"#C0504A":prod.stock<3?"#C8922A":"#4A9B6F",
-                        height:"100%",borderRadius:6,
-                        transition:"width .4s ease",
-                        minWidth:pctVendido>0?4:0,
-                      }}/>
-                    </div>
+                  {/* Precio */}
+                  <div style={{textAlign:"right",fontFamily:FONT,paddingRight:8}}>
+                    <div style={{fontSize:14,fontWeight:700,color:C.label,letterSpacing:"-0.02em"}}>{$(prod.precio)}</div>
+                    {vendidas>0&&<div style={{fontSize:10,color:C.blue,fontFamily:FONT}}>↑{vendidas} vend.</div>}
                   </div>
 
-                  {/* Footer: vendidas + botón imprimir */}
-                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,flexWrap:"wrap"}}>
-                    {vendidas>0&&(
-                      <div style={{padding: isDesktop ? "4px 8px" : "6px 10px", background:C.stockSold,
-                        borderRadius:8,border:`1px solid #C8D4F4`,
-                        fontSize: isDesktop ? 11 : 12, color:C.blue,fontFamily:FONT,flex:1}}>
-                        🛒 {vendidas} vendida{vendidas!==1?"s":""} · {prod.fecha}
-                      </div>
-                    )}
+                  {/* Stock badge */}
+                  <div style={{textAlign:"center"}}>
+                    <span style={{
+                      display:"inline-block",fontFamily:FONT,fontSize:11,fontWeight:700,
+                      color:stockColor,background:stockBg,
+                      padding:"3px 10px",borderRadius:6,letterSpacing:"0.02em",
+                    }}>
+                      {prod.stock===0?"✗ 0":prod.stock<3?`⚠ ${prod.stock}`:`✓ ${prod.stock}`}
+                    </span>
+                  </div>
+
+                  {/* Imprimir */}
+                  <div style={{textAlign:"right"}}>
                     <button
-                      onClick={()=>imprimirTicket(prod, marca?.nombre||"")}
+                      onClick={()=>imprimirTicket(prod, marcaProd?.nombre||prod.marcaNombre||"")}
                       style={{
-                        padding: isDesktop ? "5px 10px" : "7px 14px", borderRadius:10, border:`1.5px solid ${C.gold}`,
-                        background:"white",color:C.gold,fontSize:12,fontFamily:FONT,
-                        fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",gap:6,
-                        WebkitTapHighlightColor:"transparent",whiteSpace:"nowrap",flexShrink:0,
+                        padding:"5px 8px",borderRadius:7,border:`1px solid ${C.gold}40`,
+                        background:`${C.gold}08`,color:C.gold,fontSize:11,fontFamily:FONT,
+                        fontWeight:600,cursor:"pointer",
+                        WebkitTapHighlightColor:"transparent",
                       }}>
-                      🖨 {isDesktop ? "Ticket" : "Imprimir ticket"}
+                      🖨
                     </button>
                   </div>
                 </div>
