@@ -497,6 +497,87 @@ async function imprimirTicket(producto, marcaNombre) {
 }
 
 
+// ── Impresión de etiquetas en lote (un solo popup para todo el cargamento) ──
+function imprimirEtiquetasLote(items) {
+  if (!items || items.length === 0) return;
+  const win = window.open("", "_blank", "width=900,height=700");
+  if (!win) { alert("Activá las ventanas emergentes para imprimir"); return; }
+
+  const etiquetas = items.map(it => {
+    const nombre  = (it.nombre || it.desc || "").toUpperCase();
+    const codigo  = (it.codigo || it.sku || "").toUpperCase();
+    const precio  = it.precio || 0;
+    const marca   = it.marcaNombre || it.marca || "";
+    return `
+      <div class="label">
+        <div class="brand">TOSCANA HOUSE</div>
+        <div class="marca">${marca.toUpperCase()}</div>
+        <div class="producto">${nombre}</div>
+        <div class="qr-wrap" id="qr-${codigo.replace(/[^a-z0-9]/gi,'_')}"></div>
+        <div class="codigo">${codigo}</div>
+        <div class="precio">Bs ${precio}</div>
+        <div class="footer">CASA DE MODA · BOLIVIA</div>
+      </div>`;
+  }).join('');
+
+  const qrScripts = items.map(it => {
+    const codigo = (it.codigo || it.sku || "").toUpperCase();
+    const safeId = codigo.replace(/[^a-z0-9]/gi,'_');
+    return `new QRCode(document.getElementById("qr-${safeId}"),{text:"${codigo}",width:120,height:120,correctLevel:QRCode.CorrectLevel.M});`;
+  }).join('\n');
+
+  win.document.write(`<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Etiquetas — ${items.length} items</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><\/script>
+  <style>
+    @page { size: 58mm auto; margin: 0; }
+    * { box-sizing:border-box; margin:0; padding:0; }
+    body { font-family:'Courier New',monospace; background:#fff; }
+    .controls { padding:16px; background:#f5f3ee; display:flex; gap:12px; align-items:center;
+      border-bottom:1px solid #e2ded8; }
+    .btn-print { background:#1a1714; color:#fff; border:none; padding:10px 24px;
+      border-radius:8px; font-size:14px; font-weight:700; cursor:pointer; }
+    .btn-print:hover { background:#333; }
+    .info { font-family:sans-serif; font-size:13px; color:#57534e; }
+    .labels-grid { display:flex; flex-wrap:wrap; gap:4mm; padding:8mm; }
+    .label { width:58mm; border:1px dashed #ccc; padding:4mm; text-align:center;
+      page-break-inside:avoid; background:#fff; }
+    .brand { font-size:11px; font-weight:900; letter-spacing:3px; text-transform:uppercase; }
+    .marca { font-size:8px; letter-spacing:2px; color:#444; margin:1mm 0; text-transform:uppercase; }
+    .producto { font-size:9px; font-weight:bold; margin:2mm 0; text-transform:uppercase;
+      line-height:1.3; min-height:20px; }
+    .qr-wrap { display:flex; justify-content:center; margin:2mm 0; }
+    .qr-wrap canvas, .qr-wrap img { width:38mm!important; height:38mm!important; }
+    .codigo { font-size:7px; color:#555; font-family:monospace; margin:1mm 0; word-break:break-all; }
+    .precio { font-size:18px; font-weight:900; margin:2mm 0; }
+    .footer { font-size:7px; color:#888; letter-spacing:1px; border-top:1px dashed #ccc; padding-top:1mm; }
+    @media print {
+      .controls { display:none!important; }
+      body { padding:0; }
+      .labels-grid { gap:2mm; padding:4mm; }
+    }
+  </style>
+</head>
+<body>
+  <div class="controls">
+    <button class="btn-print" onclick="window.print()">🖨 Imprimir ${items.length} etiqueta${items.length!==1?'s':''}</button>
+    <span class="info">${items.length} etiqueta${items.length!==1?'s':''} generadas · Cargamento completo</span>
+  </div>
+  <div class="labels-grid">${etiquetas}</div>
+  <script>
+    window.onload = function(){
+      ${qrScripts}
+      setTimeout(()=>{ if(confirm('¿Imprimir ahora?')) window.print(); }, 800);
+    };
+  <\/script>
+</body>
+</html>`);
+  win.document.close();
+}
+
 // ════════════════════════════════════════════════════════════
 // GOOGLE DRIVE — Apps Script integration
 // ════════════════════════════════════════════════════════════
@@ -5252,8 +5333,29 @@ function ImportarExcelModal({inv, onImportar, onClose}){
               </div>
             ))}
           </div>
+          {/* Imprimir etiquetas de todo el cargamento */}
+          {stats.ok > 0 && (
+            <button
+              onClick={()=>{
+                const importados = preview
+                  .filter(f=>f.desc&&f.marcaId&&f.precio>0&&f._errs.length===0&&!f._dup)
+                  .map(f=>({
+                    nombre: (f.desc||"").toUpperCase(),
+                    codigo: f.sku.toUpperCase(),
+                    precio: f.precio,
+                    marcaNombre: f.marcaNombre,
+                  }));
+                imprimirEtiquetasLote(importados);
+              }}
+              style={{width:"100%",background:`${C.gold}14`,border:`1.5px solid ${C.gold}`,
+                borderRadius:12,padding:"13px",fontSize:14,fontWeight:700,
+                color:C.gold,cursor:"pointer",fontFamily:FONT_UI,marginBottom:10,
+                display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+              🏷 Imprimir {stats.ok} etiqueta{stats.ok!==1?"s":""} del cargamento
+            </button>
+          )}
           <button onClick={onClose} style={{width:"100%",background:C.label,border:"none",
-            borderRadius:14,padding:"14px",fontSize:15,fontWeight:700,
+            borderRadius:12,padding:"14px",fontSize:15,fontWeight:700,
             color:C.bg0,cursor:"pointer",fontFamily:FONT_UI}}>
             Listo — Ver inventario
           </button>
