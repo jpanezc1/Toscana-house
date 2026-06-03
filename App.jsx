@@ -10272,17 +10272,26 @@ function InventarioPorMarca({inv, ventas, onRecibir, onBaja, onImportarExcel}){
           </div>
       }
 
-      {/* Botones acción */}
-      <div style={{display:"flex",gap:10,marginBottom:12}}>
-        <IOSBtn onPress={onBaja} variant="fill" full icon="🗑">Dar de Baja</IOSBtn>
-        <IOSBtn onPress={onRecibir} full icon="+">Recibir</IOSBtn>
-      </div>
-      <div style={{display:"flex",gap:8,marginBottom:20}}>
-        <IOSBtn onPress={onImportarExcel} variant="fill" full icon="📥">Importar Excel</IOSBtn>
-        <IOSBtn onPress={async()=>{
-          try{ await generarPlantillaXLSX(); }
-          catch(e){ alert("Error: "+e.message); }
-        }} full icon="📋">Plantilla</IOSBtn>
+      {/* ── Barra de acciones sticky — siempre visible ── */}
+      <div style={{
+        position:"sticky",
+        bottom: isDesktop ? 0 : 84,
+        zIndex:50,
+        background:C.bg0,
+        borderTop:`1px solid ${C.sep}`,
+        padding:"12px 0 4px",
+        marginTop:8,
+        boxShadow:"0 -4px 16px rgba(0,0,0,0.06)",
+      }}>
+        <div style={{display:"flex",gap:8,marginBottom:8}}>
+          <IOSBtn onPress={onBaja}    variant="fill" full small icon="🗑">Dar de Baja</IOSBtn>
+          <IOSBtn onPress={onRecibir} full small icon="+">Recibir</IOSBtn>
+        </div>
+        <div style={{display:"flex",gap:8}}>
+          <IOSBtn onPress={onImportarExcel} variant="fill" full small icon="📥">Importar Excel</IOSBtn>
+          <IOSBtn onPress={async()=>{ try{await generarPlantillaXLSX();}catch(e){alert("Error: "+e.message);} }}
+            full small icon="📋">Plantilla</IOSBtn>
+        </div>
       </div>
     </div>
   );
