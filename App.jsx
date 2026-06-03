@@ -37,13 +37,34 @@ async function getSupabase() {
 async function sbGuardarProducto(prod) {
   try {
     const db = await getSupabase();
-    await db.from("inventario").upsert({
-      id: prod.id, codigo: prod.codigo, marca_id: prod.marcaId,
-      marca_nombre: prod.marcaNombre, nombre: prod.nombre,
-      categoria: prod.categoria, precio: prod.precio,
-      stock: prod.stock, stock_inicial: prod.stockInicial, fecha: prod.fecha
-    });
-  } catch(e) { console.warn("Supabase save prod:", e.message); }
+    // La tabla inventario usa bigint para id.
+    // Solo se envía id si es numérico válido; si es string (ID local), insert sin id.
+    const numId = Number(prod.id);
+    const idEsNumerico = !isNaN(numId) && numId > 0 && Number.isFinite(numId);
+    const payload = {
+      codigo:      prod.codigo,
+      marca_id:    prod.marcaId,
+      marca_nombre:prod.marcaNombre,
+      nombre:      prod.nombre,
+      categoria:   prod.categoria||"GENERAL",
+      descripcion: prod.descripcion||"",
+      subcat:      prod.subcat||"",
+      precio:      prod.precio,
+      stock:       prod.stock,
+      stock_inicial:prod.stockInicial||prod.stock,
+      fecha:       prod.fecha||hoy(),
+    };
+    if(idEsNumerico) payload.id = numId;
+    const { data, error } = await db.from("inventario")
+      .upsert(payload, { onConflict: idEsNumerico ? "id" : "codigo" })
+      .select("id").maybeSingle();
+    if(error) throw error;
+    // Devuelve el id asignado por Supabase para actualizar estado local
+    return data?.id ?? prod.id;
+  } catch(e) {
+    console.error("[Supabase] inventario save FAILED:", e.message, "prod.id:", prod.id);
+    return null;
+  }
 }
 
 async function sbActualizarStock(prodId, nuevoStock) {
@@ -8357,19 +8378,46 @@ function App(){
     sbGuardarRetiro(r);
   }
 
-  // Cargar datos desde Supabase al inicio — siempre gana sobre localStorage
+  // Cargar datos desde Supabase al inicio — merge inteligente con localStorage
   useEffect(()=>{
     setDbStatus("connecting");
     sbCargarTodo().then(data=>{
       if(data){
-        // Supabase es la fuente de verdad — reemplaza local
-        setInv(data.inv);
-        setVentas(data.ventas);
+        // ── Inventario: merge — Supabase gana para ítems conocidos,
+        //    ítems locales no sincronizados se mantienen y se reintenta guardarlos
+        setInv(prev=>{
+          const sbIds = new Set(data.inv.map(i=>String(i.id)));
+          // Ítems que están en local pero NO en Supabase = sin sincronizar
+          const pendientes = prev.filter(i=>!sbIds.has(String(i.id)));
+          // Reintentar guardar ítems pendientes
+          pendientes.forEach(p=>sbGuardarProducto(p).then(sbId=>{
+            if(sbId && sbId!==p.id) setInv(x=>x.map(i=>i.id===p.id?{...i,id:sbId}:i));
+          }));
+          if(data.inv.length===0 && prev.length>0){
+            // Supabase vacío pero tenemos datos locales — guardar todo
+            prev.forEach(p=>sbGuardarProducto(p));
+            return prev; // mantener datos locales
+          }
+          // Combinar: Supabase + pendientes locales
+          return pendientes.length>0 ? [...data.inv, ...pendientes] : data.inv;
+        });
+
+        // ── Ventas: misma lógica
+        setVentas(prev=>{
+          if(data.ventas.length===0 && prev.length>0) return prev;
+          const sbIds = new Set(data.ventas.map(v=>String(v.id)));
+          const pendientes = prev.filter(v=>!sbIds.has(String(v.id)));
+          if(pendientes.length>0){
+            pendientes.forEach(v=>sbGuardarVenta(v));
+            return [...data.ventas, ...pendientes];
+          }
+          return data.ventas;
+        });
+
         if(Object.keys(data.cierres).length>0) setCierres(data.cierres);
         setDbStatus("ok");
       } else {
-        // Si Supabase falla, los datos de localStorage ya están en el estado
-        // (inicializados en useState). Solo marcamos el error.
+        // Supabase no responde — datos de localStorage siguen disponibles
         setDbStatus("error");
       }
       setCargando(false);
@@ -8442,12 +8490,16 @@ function App(){
       const prod = inv.find(p=>p.codigo===codigo);
       if(prod) sbActualizarStock(prod.id, (prod.stock||0)+stock);
     } else if(tipo==="create"){
-      const newProd = {
-        id: `IMPORT-${Date.now()}-${Math.random().toString(36).slice(2,6)}`,
-        ...producto,
-      };
+      // ID numérico compatible con bigint de Supabase
+      const localId = Date.now() * 1000 + Math.floor(Math.random()*999);
+      const newProd = { id: localId, ...producto };
       setInv(prev=>[...prev, newProd]);
-      sbGuardarProducto(newProd);
+      // Guardar en Supabase — actualiza id local con el asignado por Supabase
+      sbGuardarProducto(newProd).then(sbId=>{
+        if(sbId && sbId !== localId){
+          setInv(prev=>prev.map(p=>p.id===localId ? {...p, id:sbId} : p));
+        }
+      });
     }
   }
 
