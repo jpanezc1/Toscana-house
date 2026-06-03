@@ -155,8 +155,8 @@ async function sbCargarTodo() {
   try {
     const db = await getSupabase();
     const [{ data: inv }, { data: ventas }, { data: items }, { data: cierres }] = await Promise.all([
-      db.from("inventario").select("*").order("created_at"),
-      db.from("ventas").select("*").order("created_at"),
+      db.from("inventario").select("*"),
+      db.from("ventas").select("*"),
       db.from("venta_items").select("*"),
       db.from("cierres").select("*"),
     ]);
@@ -8153,10 +8153,11 @@ function App(){
   const isDesktop = useIsDesktop();
   const now=new Date();
   const[tab,setTab]         =useState("inicio");
-  const[inv,setInv]         =useState([]);
-  const[ventas,setVentas]   =useState([]);
-  const[alq,setAlq]         =useState([]);
-  const[cierres,setCierres] =useState({});
+  // ── Persistencia local: ini desde localStorage, sync a nube con Supabase ──
+  const[inv,setInv]     =useState(()=>{ try{return JSON.parse(localStorage.getItem("th_inv")||"[]");}catch{return[];} });
+  const[ventas,setVentas]=useState(()=>{ try{return JSON.parse(localStorage.getItem("th_ventas")||"[]");}catch{return[];} });
+  const[alq,setAlq]     =useState(()=>{ try{return JSON.parse(localStorage.getItem("th_alq")||"[]");}catch{return[];} });
+  const[cierres,setCierres]=useState(()=>{ try{return JSON.parse(localStorage.getItem("th_cierres")||"{}");}catch{return {};} });
   const[cargando,setCargando]=useState(true);
   const[dbStatus,setDbStatus]=useState("connecting");
   const[mes,setMes]         =useState(now.getMonth());
@@ -8207,19 +8208,16 @@ function App(){
     }
   }
 
+  // ── Sync localStorage ← siempre que cambie inv, ventas, alq o cierres ──
+  useEffect(()=>{ try{localStorage.setItem("th_inv",JSON.stringify(inv));}catch{} },[inv]);
+  useEffect(()=>{ try{localStorage.setItem("th_ventas",JSON.stringify(ventas));}catch{} },[ventas]);
+  useEffect(()=>{ try{localStorage.setItem("th_alq",JSON.stringify(alq));}catch{} },[alq]);
+  useEffect(()=>{ try{localStorage.setItem("th_cierres",JSON.stringify(cierres));}catch{} },[cierres]);
+
   // ── Realtime sync — cualquier cambio en Supabase (otro dispositivo) actualiza aquí ──
   useRealtimeSync(setVentas, setInv);
 
-  // ── Reset de datos: limpia localStorage de ventas e inventario ──
-  useEffect(()=>{
-    const RESET_V = "th_reset_v1";
-    if(!localStorage.getItem(RESET_V)){
-      ["th_inv","th_ventas","th_alq","th_cierres","th_retiros_v1"].forEach(k=>{
-        try{ localStorage.removeItem(k); }catch{}
-      });
-      localStorage.setItem(RESET_V,"done");
-    }
-  },[]);
+  // (reset de datos eliminado — localStorage persiste entre sesiones)
 
   // ── Migración de íconos: aplica imágenes del seed a marcas sin logo personalizado ──
   useEffect(()=>{
@@ -8257,16 +8255,19 @@ function App(){
     sbGuardarRetiro(r);
   }
 
-  // Cargar datos desde Supabase al inicio
+  // Cargar datos desde Supabase al inicio — siempre gana sobre localStorage
   useEffect(()=>{
     setDbStatus("connecting");
     sbCargarTodo().then(data=>{
       if(data){
-        if(data.inv.length>0)    setInv(data.inv);
-        if(data.ventas.length>0) setVentas(data.ventas);
+        // Supabase es la fuente de verdad — reemplaza local
+        setInv(data.inv);
+        setVentas(data.ventas);
         if(Object.keys(data.cierres).length>0) setCierres(data.cierres);
         setDbStatus("ok");
       } else {
+        // Si Supabase falla, los datos de localStorage ya están en el estado
+        // (inicializados en useState). Solo marcamos el error.
         setDbStatus("error");
       }
       setCargando(false);
