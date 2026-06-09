@@ -239,7 +239,7 @@ async function sbCargarTodo() {
 // ── Realtime sync — escucha cambios en Supabase y actualiza estado local ────
 // Activa canales en: ventas (INSERT/UPDATE) + inventario (INSERT/UPDATE)
 // Deduplicación: si la fila ya existe (optimistic update local), no se agrega.
-function useRealtimeSync(setVentas, setInv) {
+function useRealtimeSync(setVentas, setInv, setRetiros) {
   useEffect(() => {
     let channel = null;
     let mounted = true;
@@ -299,6 +299,19 @@ function useRealtimeSync(setVentas, setInv) {
           if (mounted) setInv(prev => prev.map(i => i.id === p.id ? {
             ...i, stock: p.stock, nombre: p.nombre, precio: p.precio, categoria: p.categoria
           } : i));
+        })
+        // ── Retiro registrado en otro dispositivo ───────────────────────
+        .on("postgres_changes", { event: "INSERT", schema: "public", table: "retiros" }, payload => {
+          const r = payload.new;
+          const retiro = {
+            id: r.id, fecha: r.fecha, hora: r.hora,
+            prodId: r.prod_id, codigo: r.codigo, nombre: r.nombre,
+            marcaId: r.marca_id, marcaNombre: r.marca_nombre,
+            cantidad: r.cantidad, destinatario: r.destinatario, motivo: r.motivo||""
+          };
+          if (mounted && setRetiros) setRetiros(prev =>
+            prev.some(x => x.id === retiro.id) ? prev : [...prev, retiro]
+          );
         })
         .subscribe(status => {
           if (status === "SUBSCRIBED") console.log("[Toscana Realtime] ✓ conectado");
@@ -8492,9 +8505,10 @@ function App(){
   useEffect(()=>{ try{localStorage.setItem("th_ventas",JSON.stringify(ventas));}catch{} },[ventas]);
   useEffect(()=>{ try{localStorage.setItem("th_alq",JSON.stringify(alq));}catch{} },[alq]);
   useEffect(()=>{ try{localStorage.setItem("th_cierres",JSON.stringify(cierres));}catch{} },[cierres]);
+  useEffect(()=>{ try{localStorage.setItem("th_retiros_v1",JSON.stringify(retiros));}catch{} },[retiros]);
 
   // ── Realtime sync — cualquier cambio en Supabase (otro dispositivo) actualiza aquí ──
-  useRealtimeSync(setVentas, setInv);
+  useRealtimeSync(setVentas, setInv, setRetiros);
 
   // (reset de datos eliminado — localStorage persiste entre sesiones)
 

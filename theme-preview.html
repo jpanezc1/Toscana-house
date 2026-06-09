@@ -1,0 +1,1258 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Toscana House — Propuestas de Diseño</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400;1,500&family=Inter:wght@300;400;500;600;700&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box;}
+body{background:#080808;font-family:'Inter',sans-serif;color:#fff;min-height:100vh;padding:0 0 80px;}
+
+/* ── Header ── */
+.page-header{
+  padding:56px 0 40px;text-align:center;
+  background:linear-gradient(180deg,#111 0%,transparent 100%);
+}
+.page-header h1{
+  font-family:'Cormorant Garamond',serif;
+  font-size:48px;font-weight:300;letter-spacing:.16em;
+  text-transform:uppercase;color:#fff;margin-bottom:6px;
+}
+.page-header p{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.35);}
+
+/* ── Nav tabs ── */
+.nav-tabs{
+  display:flex;justify-content:center;gap:2px;
+  padding:0 24px;margin:0 auto 56px;max-width:600px;
+  background:rgba(255,255,255,.05);border-radius:12px;padding:4px;
+}
+.nav-tab{
+  flex:1;padding:10px;border:none;background:none;
+  font-family:'Inter',sans-serif;font-size:12px;font-weight:500;
+  letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.4);
+  cursor:pointer;border-radius:9px;transition:all .2s;
+}
+.nav-tab.active{background:#fff;color:#000;}
+
+/* ── Theme panel ── */
+.theme-panel{display:none;max-width:1200px;margin:0 auto;padding:0 24px;}
+.theme-panel.active{display:block;}
+
+.theme-intro{text-align:center;margin-bottom:40px;}
+.theme-intro .t-name{
+  font-family:'Cormorant Garamond',serif;font-size:36px;
+  font-weight:300;letter-spacing:.06em;color:#fff;margin-bottom:8px;
+}
+.theme-intro .t-desc{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.35);}
+
+/* ── Screen showcase grid ── */
+.screens{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:40px;}
+.screens.three{grid-template-columns:1fr 1fr 1fr;}
+.screen-wrap{display:flex;flex-direction:column;gap:8px;}
+.screen-label{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.25);}
+.screen-frame{
+  border-radius:14px;overflow:hidden;
+  box-shadow:0 0 0 1px rgba(255,255,255,.08), 0 32px 64px rgba(0,0,0,.5);
+}
+
+/* ── Detail section ── */
+.details-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:32px;}
+.detail-card{
+  background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);
+  border-radius:12px;padding:20px;
+}
+.detail-card h4{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.3);margin-bottom:14px;}
+.color-row{display:flex;gap:6px;flex-wrap:wrap;}
+.swatch{
+  display:flex;flex-direction:column;align-items:center;gap:5px;
+}
+.swatch-color{width:36px;height:36px;border-radius:8px;}
+.swatch-name{font-size:9px;color:rgba(255,255,255,.35);text-align:center;letter-spacing:.04em;}
+.swatch-hex{font-family:'DM Mono',monospace;font-size:9px;color:rgba(255,255,255,.5);}
+.font-sample{margin-bottom:10px;}
+.font-sample .fs-label{font-size:9px;color:rgba(255,255,255,.3);letter-spacing:.1em;text-transform:uppercase;margin-bottom:4px;}
+.font-sample .fs-text{font-size:22px;color:#fff;}
+.font-sample .fs-sub{font-size:12px;color:rgba(255,255,255,.5);margin-top:2px;}
+
+/* ── CTA ── */
+.cta-area{text-align:center;padding:24px 0;}
+.cta-label{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.25);margin-bottom:16px;}
+.cta-btns{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;}
+.cta-btn{
+  padding:13px 32px;border-radius:8px;font-family:'Inter',sans-serif;
+  font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;
+  cursor:pointer;border:none;transition:all .2s;
+}
+.cta-btn:hover{transform:translateY(-2px);box-shadow:0 12px 32px rgba(0,0,0,.4);}
+
+/* ══════════════════════════════════════
+   TEMA 1 — ATELIER
+   Inspirado en Stripe Dashboard + Hermès
+   Fondo lino cálido, tipografía editorial
+   ══════════════════════════════════════ */
+
+/* Variables */
+:root{
+  --a-bg0:#F5F3EE;
+  --a-bg1:#FFFFFF;
+  --a-bg2:#EFEDE8;
+  --a-t1:#1A1714;
+  --a-t2:#57534E;
+  --a-t3:#A8A29E;
+  --a-sep:#E2DED8;
+  --a-gold:#8A6418;
+  --a-gold2:#C49A3C;
+  --a-green:#166534;
+  --a-red:#991B1B;
+  --a-shadow:0 1px 3px rgba(0,0,0,.06),0 1px 2px rgba(0,0,0,.04);
+  --a-shadow-md:0 4px 16px rgba(0,0,0,.08),0 2px 4px rgba(0,0,0,.04);
+}
+
+/* Sidebar layout */
+.a-app{display:flex;height:580px;background:var(--a-bg0);font-family:'Inter',sans-serif;}
+.a-sidebar{
+  width:220px;flex-shrink:0;
+  background:var(--a-bg0);border-right:1px solid var(--a-sep);
+  display:flex;flex-direction:column;padding:0;
+}
+.a-sidebar-logo{
+  padding:22px 20px 18px;border-bottom:1px solid var(--a-sep);
+}
+.a-sidebar-logo .brand{
+  font-family:'Cormorant Garamond',serif;
+  font-size:19px;font-weight:400;color:var(--a-t1);
+  letter-spacing:.14em;text-transform:uppercase;line-height:1;
+}
+.a-sidebar-logo .sub{
+  font-size:9px;letter-spacing:.18em;text-transform:uppercase;
+  color:var(--a-t3);margin-top:3px;
+}
+.a-nav{padding:16px 12px;flex:1;}
+.a-nav-section{font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--a-t3);padding:0 8px;margin:16px 0 6px;}
+.a-nav-section:first-child{margin-top:0;}
+.a-nav-item{
+  display:flex;align-items:center;gap:10px;
+  padding:8px;border-radius:8px;cursor:pointer;
+  font-size:13px;color:var(--a-t2);font-weight:400;
+  transition:all .15s;margin-bottom:2px;
+}
+.a-nav-item.active{background:var(--a-bg1);color:var(--a-t1);font-weight:500;box-shadow:var(--a-shadow);}
+.a-nav-item .dot{width:6px;height:6px;border-radius:2px;flex-shrink:0;}
+.a-nav-badge{margin-left:auto;background:var(--a-gold);color:#fff;font-size:9px;padding:1px 6px;border-radius:10px;font-weight:600;}
+.a-sidebar-bottom{
+  padding:14px;border-top:1px solid var(--a-sep);
+  display:flex;align-items:center;gap:10px;
+}
+.a-avatar{width:30px;height:30px;border-radius:8px;background:var(--a-t1);display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:600;flex-shrink:0;}
+.a-user-name{font-size:12px;color:var(--a-t1);font-weight:500;}
+.a-user-role{font-size:10px;color:var(--a-t3);}
+
+/* Main content */
+.a-main{flex:1;overflow:hidden;display:flex;flex-direction:column;}
+.a-topbar{
+  height:52px;background:var(--a-bg1);border-bottom:1px solid var(--a-sep);
+  display:flex;align-items:center;padding:0 24px;gap:16px;
+  box-shadow:0 1px 0 var(--a-sep);
+}
+.a-topbar-title{font-size:15px;font-weight:600;color:var(--a-t1);letter-spacing:-.01em;}
+.a-topbar-right{margin-left:auto;display:flex;align-items:center;gap:10px;}
+.a-badge{
+  background:var(--a-bg2);border:1px solid var(--a-sep);
+  color:var(--a-t2);font-size:11px;padding:4px 10px;border-radius:6px;
+  font-weight:500;letter-spacing:.02em;
+}
+.a-badge.gold{background:rgba(138,100,24,.1);border-color:rgba(138,100,24,.2);color:var(--a-gold);}
+.a-btn-primary{
+  background:var(--a-t1);color:#fff;border:none;
+  font-size:12px;font-weight:600;padding:7px 16px;border-radius:8px;
+  cursor:pointer;letter-spacing:.02em;
+}
+.a-content{flex:1;overflow:auto;padding:24px;}
+
+/* KPI grid */
+.a-kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px;}
+.a-kpi{
+  background:var(--a-bg1);border:1px solid var(--a-sep);
+  border-radius:10px;padding:16px;box-shadow:var(--a-shadow);
+}
+.a-kpi-label{font-size:11px;color:var(--a-t3);font-weight:500;letter-spacing:.04em;text-transform:uppercase;margin-bottom:8px;}
+.a-kpi-value{
+  font-family:'Cormorant Garamond',serif;
+  font-size:28px;font-weight:500;color:var(--a-t1);line-height:1;letter-spacing:-.01em;
+}
+.a-kpi-value.gold{color:var(--a-gold);}
+.a-kpi-sub{font-size:11px;color:var(--a-t3);margin-top:6px;}
+.a-kpi-trend{display:inline-flex;align-items:center;gap:3px;font-size:11px;font-weight:600;margin-top:6px;}
+.a-kpi-trend.up{color:var(--a-green);}
+.a-kpi-trend.dn{color:var(--a-red);}
+
+/* Two-col layout */
+.a-two-col{display:grid;grid-template-columns:1fr 340px;gap:12px;}
+.a-card{
+  background:var(--a-bg1);border:1px solid var(--a-sep);
+  border-radius:10px;box-shadow:var(--a-shadow);overflow:hidden;
+}
+.a-card-header{
+  padding:16px 20px;border-bottom:1px solid var(--a-sep);
+  display:flex;align-items:center;justify-content:space-between;
+}
+.a-card-title{font-size:13px;font-weight:600;color:var(--a-t1);letter-spacing:-.01em;}
+.a-card-action{font-size:12px;color:var(--a-gold);font-weight:500;cursor:pointer;}
+
+/* Table rows */
+.a-table-row{
+  display:flex;align-items:center;padding:11px 20px;
+  border-bottom:1px solid var(--a-sep);gap:12px;
+}
+.a-table-row:last-child{border-bottom:none;}
+.a-row-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;}
+.a-row-name{font-size:13px;color:var(--a-t1);font-weight:500;flex:1;}
+.a-row-meta{font-size:11px;color:var(--a-t3);}
+.a-row-price{font-family:'DM Mono',monospace;font-size:13px;color:var(--a-t1);font-weight:500;}
+.a-row-badge{font-size:10px;padding:2px 8px;border-radius:4px;font-weight:600;}
+.a-row-badge.v{background:rgba(22,101,52,.1);color:var(--a-green);}
+.a-row-badge.p{background:rgba(138,100,24,.1);color:var(--a-gold);}
+
+/* Brand list */
+.a-brand-row{
+  display:flex;align-items:center;padding:12px 20px;
+  border-bottom:1px solid var(--a-sep);gap:12px;
+}
+.a-brand-row:last-child{border-bottom:none;}
+.a-brand-icon{
+  width:36px;height:36px;border-radius:9px;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;font-size:18px;
+}
+.a-brand-name{font-size:13px;font-weight:600;color:var(--a-t1);letter-spacing:-.01em;}
+.a-brand-sub{font-size:11px;color:var(--a-t3);margin-top:1px;}
+.a-brand-val{font-family:'DM Mono',monospace;font-size:13px;color:var(--a-gold);font-weight:500;margin-left:auto;}
+.a-brand-arr{color:var(--a-sep);font-size:18px;margin-left:8px;}
+
+/* ── POS screen ── */
+.a-pos{display:flex;height:580px;background:var(--a-bg0);font-family:'Inter',sans-serif;}
+.a-pos-left{flex:1;display:flex;flex-direction:column;border-right:1px solid var(--a-sep);}
+.a-pos-header{
+  padding:16px 24px;background:var(--a-bg1);border-bottom:1px solid var(--a-sep);
+  display:flex;align-items:center;justify-content:space-between;
+}
+.a-pos-title{font-size:16px;font-weight:600;color:var(--a-t1);}
+.a-pos-date{font-size:11px;color:var(--a-t3);letter-spacing:.06em;}
+.a-pos-items{flex:1;padding:16px 24px;overflow:auto;}
+.a-pos-item{
+  background:var(--a-bg1);border:1px solid var(--a-sep);
+  border-radius:10px;padding:14px 16px;margin-bottom:8px;
+  display:flex;align-items:center;gap:12px;
+  box-shadow:var(--a-shadow);
+}
+.a-pos-item-num{
+  width:28px;height:28px;border-radius:7px;
+  background:var(--a-bg2);display:flex;align-items:center;
+  justify-content:center;font-size:12px;font-weight:700;color:var(--a-t2);flex-shrink:0;
+}
+.a-pos-item-name{font-size:13px;font-weight:500;color:var(--a-t1);flex:1;}
+.a-pos-item-brand{font-size:11px;color:var(--a-t3);margin-top:1px;}
+.a-pos-item-price{font-family:'DM Mono',monospace;font-size:14px;font-weight:600;color:var(--a-t1);}
+.a-pos-item-x{color:var(--a-t3);font-size:16px;cursor:pointer;margin-left:8px;}
+.a-pos-right{
+  width:300px;flex-shrink:0;display:flex;flex-direction:column;
+  background:var(--a-bg1);
+}
+.a-pos-right-head{
+  padding:20px 20px 16px;border-bottom:1px solid var(--a-sep);
+}
+.a-pos-right-title{font-size:13px;font-weight:600;color:var(--a-t1);margin-bottom:14px;}
+.a-pos-line{display:flex;justify-content:space-between;margin-bottom:8px;}
+.a-pos-line-label{font-size:12px;color:var(--a-t3);}
+.a-pos-line-val{font-family:'DM Mono',monospace;font-size:12px;color:var(--a-t1);}
+.a-pos-total-area{padding:16px 20px;border-bottom:1px solid var(--a-sep);}
+.a-pos-total-label{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--a-t3);margin-bottom:6px;}
+.a-pos-total-val{
+  font-family:'Cormorant Garamond',serif;
+  font-size:38px;font-weight:500;color:var(--a-t1);letter-spacing:-.01em;line-height:1;
+}
+.a-pos-methods{padding:16px 20px;border-bottom:1px solid var(--a-sep);}
+.a-pos-method-label{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--a-t3);margin-bottom:8px;}
+.a-pos-method-row{display:flex;gap:6px;}
+.a-pos-method-btn{
+  flex:1;padding:8px;border-radius:8px;font-size:11px;font-weight:500;
+  border:1px solid var(--a-sep);background:var(--a-bg2);color:var(--a-t2);
+  cursor:pointer;text-align:center;letter-spacing:.04em;
+}
+.a-pos-method-btn.active{background:var(--a-t1);border-color:var(--a-t1);color:#fff;}
+.a-pos-confirm{
+  margin:16px;background:var(--a-t1);color:#fff;border:none;
+  width:calc(100% - 32px);padding:14px;border-radius:10px;
+  font-family:'Inter',sans-serif;font-size:13px;font-weight:600;
+  cursor:pointer;letter-spacing:.04em;
+}
+
+/* ══════════════════════════════════════
+   TEMA 2 — ONYX
+   Inspirado en Linear + Bloomberg
+   Dark precision, monotype data
+   ══════════════════════════════════════ */
+:root{
+  --b-bg0:#0D0D10;
+  --b-bg1:#16161B;
+  --b-bg2:#1E1E24;
+  --b-t1:#F2F2F5;
+  --b-t2:#A0A0AE;
+  --b-t3:#5A5A66;
+  --b-sep:rgba(255,255,255,.07);
+  --b-gold:#D4A843;
+  --b-goldD:#A07820;
+  --b-green:#34D399;
+  --b-red:#F87171;
+  --b-blue:#818CF8;
+}
+
+.b-app{display:flex;height:580px;background:var(--b-bg0);font-family:'Inter',sans-serif;}
+.b-sidebar{
+  width:56px;flex-shrink:0;background:var(--b-bg1);
+  border-right:1px solid var(--b-sep);
+  display:flex;flex-direction:column;align-items:center;
+  padding:16px 0;gap:4px;
+}
+.b-sidebar-logo{
+  font-family:'Cormorant Garamond',serif;font-size:16px;
+  color:var(--b-gold);letter-spacing:.08em;margin-bottom:20px;
+}
+.b-icon{
+  width:38px;height:38px;border-radius:10px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:14px;color:var(--b-t3);cursor:pointer;
+  transition:all .15s;
+}
+.b-icon.active{background:rgba(212,168,67,.12);color:var(--b-gold);}
+.b-icon:hover{background:var(--b-bg2);color:var(--b-t2);}
+.b-sidebar-divider{width:24px;height:1px;background:var(--b-sep);margin:8px 0;}
+.b-sidebar-bottom{margin-top:auto;}
+.b-avatar-sm{width:28px;height:28px;border-radius:8px;background:var(--b-gold);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:var(--b-bg0);}
+
+/* Main */
+.b-main{flex:1;display:flex;flex-direction:column;overflow:hidden;}
+.b-topbar{
+  height:44px;background:var(--b-bg1);border-bottom:1px solid var(--b-sep);
+  display:flex;align-items:center;padding:0 20px;gap:12px;
+}
+.b-breadcrumb{font-size:12px;color:var(--b-t3);}
+.b-breadcrumb span{color:var(--b-t2);}
+.b-topbar-right{margin-left:auto;display:flex;align-items:center;gap:8px;}
+.b-chip{
+  background:var(--b-bg2);border:1px solid var(--b-sep);
+  color:var(--b-t2);font-size:11px;padding:4px 10px;border-radius:6px;
+}
+.b-chip.gold{background:rgba(212,168,67,.1);border-color:rgba(212,168,67,.2);color:var(--b-gold);}
+.b-btn{
+  background:var(--b-gold);color:var(--b-bg0);
+  border:none;font-size:11px;font-weight:700;
+  padding:6px 14px;border-radius:6px;cursor:pointer;letter-spacing:.04em;
+}
+.b-content{flex:1;padding:20px;overflow:auto;display:flex;flex-direction:column;gap:14px;}
+
+/* Stats row */
+.b-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;}
+.b-stat{
+  background:var(--b-bg1);border:1px solid var(--b-sep);
+  border-radius:10px;padding:16px;position:relative;overflow:hidden;
+}
+.b-stat::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:2px;
+}
+.b-stat.s1::before{background:var(--b-gold);}
+.b-stat.s2::before{background:var(--b-green);}
+.b-stat.s3::before{background:var(--b-blue);}
+.b-stat.s4::before{background:var(--b-t3);}
+.b-stat-label{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--b-t3);margin-bottom:10px;}
+.b-stat-value{font-family:'DM Mono',monospace;font-size:26px;font-weight:400;color:var(--b-t1);line-height:1;}
+.b-stat-value.gold{color:var(--b-gold);}
+.b-stat-sub{font-size:10px;color:var(--b-t3);margin-top:6px;font-family:'DM Mono',monospace;}
+.b-stat-trend{font-size:11px;font-weight:600;margin-top:6px;}
+.b-stat-trend.up{color:var(--b-green);}
+
+/* Grid */
+.b-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;flex:1;}
+.b-panel{
+  background:var(--b-bg1);border:1px solid var(--b-sep);
+  border-radius:10px;overflow:hidden;display:flex;flex-direction:column;
+}
+.b-panel-header{
+  padding:14px 18px;border-bottom:1px solid var(--b-sep);
+  display:flex;align-items:center;justify-content:space-between;
+}
+.b-panel-title{font-size:12px;font-weight:600;color:var(--b-t2);letter-spacing:.04em;text-transform:uppercase;}
+.b-panel-action{font-size:11px;color:var(--b-gold);cursor:pointer;}
+.b-row{
+  display:flex;align-items:center;padding:10px 18px;
+  border-bottom:1px solid var(--b-sep);gap:10px;
+}
+.b-row:last-child{border-bottom:none;}
+.b-row-indicator{width:3px;border-radius:2px;flex-shrink:0;align-self:stretch;}
+.b-row-name{font-size:12px;color:var(--b-t1);font-weight:500;flex:1;}
+.b-row-sub{font-size:10px;color:var(--b-t3);font-family:'DM Mono',monospace;}
+.b-row-val{font-family:'DM Mono',monospace;font-size:12px;color:var(--b-gold);font-weight:400;}
+.b-status{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:600;padding:2px 7px;border-radius:4px;}
+.b-status.ok{background:rgba(52,211,153,.1);color:var(--b-green);}
+.b-status.pend{background:rgba(212,168,67,.1);color:var(--b-gold);}
+.b-brand-mini{
+  display:flex;align-items:center;padding:10px 18px;
+  border-bottom:1px solid var(--b-sep);gap:10px;
+}
+.b-brand-mini:last-child{border-bottom:none;}
+.b-brand-dot{width:24px;height:24px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0;}
+.b-brand-n{font-size:12px;color:var(--b-t1);flex:1;}
+.b-brand-prods{font-size:10px;color:var(--b-t3);font-family:'DM Mono',monospace;}
+.b-brand-val{font-family:'DM Mono',monospace;font-size:12px;color:var(--b-gold);}
+
+/* POS - Onyx */
+.b-pos{display:flex;height:580px;background:var(--b-bg0);font-family:'Inter',sans-serif;}
+.b-pos-left{flex:1;display:flex;flex-direction:column;border-right:1px solid var(--b-sep);}
+.b-pos-hdr{
+  padding:14px 20px;background:var(--b-bg1);border-bottom:1px solid var(--b-sep);
+  display:flex;align-items:center;justify-content:space-between;
+}
+.b-pos-ttl{font-size:14px;font-weight:600;color:var(--b-t1);}
+.b-pos-dt{font-family:'DM Mono',monospace;font-size:11px;color:var(--b-t3);}
+.b-pos-list{flex:1;padding:14px;overflow:auto;display:flex;flex-direction:column;gap:6px;}
+.b-pos-item{
+  background:var(--b-bg1);border:1px solid var(--b-sep);
+  border-radius:8px;padding:12px 14px;
+  display:flex;align-items:center;gap:10px;
+}
+.b-pos-item-idx{
+  font-family:'DM Mono',monospace;font-size:10px;color:var(--b-t3);
+  width:20px;text-align:center;flex-shrink:0;
+}
+.b-pos-item-n{font-size:12px;font-weight:500;color:var(--b-t1);flex:1;}
+.b-pos-item-brand{font-size:10px;color:var(--b-t3);margin-top:1px;}
+.b-pos-item-p{font-family:'DM Mono',monospace;font-size:13px;color:var(--b-gold);}
+.b-pos-right{
+  width:280px;flex-shrink:0;
+  background:var(--b-bg1);display:flex;flex-direction:column;
+}
+.b-pos-summary{padding:18px;border-bottom:1px solid var(--b-sep);flex:1;}
+.b-pos-line{display:flex;justify-content:space-between;margin-bottom:8px;}
+.b-pos-line-k{font-size:11px;color:var(--b-t3);font-family:'DM Mono',monospace;}
+.b-pos-line-v{font-family:'DM Mono',monospace;font-size:11px;color:var(--b-t2);}
+.b-pos-divider{height:1px;background:var(--b-sep);margin:12px 0;}
+.b-pos-total{font-family:'DM Mono',monospace;font-size:32px;color:var(--b-gold);line-height:1;}
+.b-pos-total-label{font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--b-t3);margin-bottom:6px;}
+.b-pos-btns{padding:14px;display:flex;flex-direction:column;gap:6px;}
+.b-pos-confirm{
+  background:var(--b-gold);color:var(--b-bg0);border:none;
+  padding:13px;border-radius:8px;font-size:12px;font-weight:700;
+  cursor:pointer;letter-spacing:.06em;text-transform:uppercase;
+}
+.b-pos-alt{
+  display:flex;gap:6px;
+}
+.b-pos-alt-btn{
+  flex:1;background:var(--b-bg2);border:1px solid var(--b-sep);
+  color:var(--b-t2);border-radius:8px;padding:9px;
+  font-size:11px;cursor:pointer;text-align:center;
+}
+
+/* ══════════════════════════════════════
+   TEMA 3 — IVORY
+   Inspirado en Notion + Loro Piana
+   Sidebar tipo editorial, warmth total
+   ══════════════════════════════════════ */
+:root{
+  --c-bg0:#FAFAF7;
+  --c-bg1:#FFFFFF;
+  --c-side:#F3F1EB;
+  --c-t1:#111111;
+  --c-t2:#4A4540;
+  --c-t3:#9E9891;
+  --c-sep:rgba(0,0,0,.07);
+  --c-sepS:rgba(0,0,0,.04);
+  --c-gold:#7D5C1A;
+  --c-gold2:#C49A3C;
+  --c-green:#1A6B3C;
+  --c-red:#B01C1C;
+}
+
+.c-app{display:flex;height:580px;background:var(--c-bg0);font-family:'Inter',sans-serif;}
+.c-sidebar{
+  width:240px;flex-shrink:0;background:var(--c-side);
+  border-right:1px solid var(--c-sep);
+  display:flex;flex-direction:column;
+}
+.c-sidebar-top{padding:20px 16px 16px;}
+.c-workspace{
+  display:flex;align-items:center;gap:10px;
+  padding:10px 12px;border-radius:10px;
+  background:rgba(0,0,0,.04);cursor:pointer;margin-bottom:20px;
+}
+.c-workspace-icon{
+  width:30px;height:30px;border-radius:8px;background:var(--c-t1);
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;
+}
+.c-workspace-icon svg{display:block;}
+.c-workspace-name{font-size:13px;font-weight:600;color:var(--c-t1);}
+.c-workspace-sub{font-size:10px;color:var(--c-t3);}
+.c-workspace-caret{margin-left:auto;color:var(--c-t3);font-size:12px;}
+.c-nav{flex:1;padding:0 8px;overflow:auto;}
+.c-nav-group{margin-bottom:4px;}
+.c-nav-label{
+  font-size:10px;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--c-t3);padding:4px 8px;margin-bottom:2px;font-weight:500;
+}
+.c-nav-item{
+  display:flex;align-items:center;gap:8px;
+  padding:7px 10px;border-radius:8px;cursor:pointer;
+  font-size:13px;color:var(--c-t2);
+  transition:background .12s;margin-bottom:1px;
+}
+.c-nav-item:hover{background:rgba(0,0,0,.04);}
+.c-nav-item.active{background:var(--c-bg1);color:var(--c-t1);font-weight:500;box-shadow:0 1px 3px rgba(0,0,0,.06);}
+.c-nav-item .ni-icon{font-size:14px;width:20px;text-align:center;flex-shrink:0;}
+.c-nav-item .ni-badge{margin-left:auto;font-size:10px;background:rgba(125,92,26,.1);color:var(--c-gold);padding:1px 7px;border-radius:8px;font-weight:600;}
+.c-sidebar-footer{
+  border-top:1px solid var(--c-sep);padding:12px 16px;
+  display:flex;align-items:center;gap:10px;
+}
+.c-user-avatar{
+  width:28px;height:28px;border-radius:8px;background:var(--c-t1);
+  color:#fff;font-size:10px;font-weight:700;
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;
+}
+.c-user-name{font-size:12px;font-weight:600;color:var(--c-t1);}
+.c-user-role{font-size:10px;color:var(--c-t3);}
+.c-user-more{margin-left:auto;color:var(--c-t3);font-size:16px;cursor:pointer;}
+
+/* Main */
+.c-main{flex:1;display:flex;flex-direction:column;overflow:hidden;}
+.c-topbar{
+  height:52px;background:var(--c-bg0);border-bottom:1px solid var(--c-sep);
+  display:flex;align-items:center;padding:0 28px;gap:16px;
+}
+.c-page-title{
+  font-family:'Cormorant Garamond',serif;
+  font-size:22px;font-weight:400;color:var(--c-t1);letter-spacing:.01em;
+}
+.c-topbar-right{margin-left:auto;display:flex;align-items:center;gap:8px;}
+.c-tag{
+  background:rgba(0,0,0,.05);color:var(--c-t3);
+  font-size:11px;padding:4px 10px;border-radius:20px;font-weight:400;
+  letter-spacing:.04em;border:1px solid var(--c-sep);
+}
+.c-tag.gold{background:rgba(125,92,26,.08);color:var(--c-gold);border-color:rgba(125,92,26,.15);}
+.c-add-btn{
+  background:var(--c-t1);color:#fff;border:none;
+  font-size:12px;font-weight:600;padding:8px 16px;border-radius:8px;cursor:pointer;
+}
+.c-content{flex:1;padding:24px 28px;overflow:auto;}
+
+/* Hero section */
+.c-hero{margin-bottom:24px;}
+.c-hero-eyebrow{font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--c-t3);margin-bottom:4px;}
+.c-hero-heading{
+  font-family:'Cormorant Garamond',serif;
+  font-size:32px;font-weight:300;color:var(--c-t1);line-height:1.15;
+  letter-spacing:.01em;margin-bottom:20px;
+}
+.c-hero-heading em{font-style:italic;color:var(--c-gold);}
+
+/* Metrics */
+.c-metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:22px;}
+.c-metric{
+  background:var(--c-bg1);border-radius:10px;padding:16px;
+  border:1px solid var(--c-sep);
+}
+.c-metric-label{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--c-t3);margin-bottom:8px;font-weight:500;}
+.c-metric-value{
+  font-family:'Cormorant Garamond',serif;
+  font-size:26px;font-weight:500;color:var(--c-t1);line-height:1;
+}
+.c-metric-value.gold{color:var(--c-gold);}
+.c-metric-sub{font-size:11px;color:var(--c-t3);margin-top:5px;}
+
+/* Content grid */
+.c-content-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.c-block{background:var(--c-bg1);border:1px solid var(--c-sep);border-radius:12px;overflow:hidden;}
+.c-block-header{
+  padding:16px 20px;border-bottom:1px solid var(--c-sep);
+  display:flex;align-items:center;justify-content:space-between;
+}
+.c-block-title{font-size:13px;font-weight:600;color:var(--c-t1);}
+.c-block-action{font-size:12px;color:var(--c-gold);cursor:pointer;font-weight:400;}
+
+/* Feed items */
+.c-feed-item{
+  display:flex;align-items:center;padding:12px 20px;
+  border-bottom:1px solid var(--c-sepS);gap:12px;
+}
+.c-feed-item:last-child{border-bottom:none;}
+.c-feed-time{font-size:10px;color:var(--c-t3);width:36px;flex-shrink:0;font-family:'DM Mono',monospace;}
+.c-feed-type{
+  font-size:10px;font-weight:600;padding:2px 7px;border-radius:4px;
+  flex-shrink:0;
+}
+.c-feed-type.v{background:rgba(26,107,60,.08);color:var(--c-green);}
+.c-feed-type.r{background:rgba(176,28,28,.08);color:var(--c-red);}
+.c-feed-desc{font-size:12px;color:var(--c-t1);flex:1;}
+.c-feed-brand{font-size:10px;color:var(--c-t3);margin-top:1px;}
+.c-feed-amount{font-family:'DM Mono',monospace;font-size:13px;color:var(--c-t1);font-weight:500;}
+
+/* Brand cards */
+.c-brand-item{
+  display:flex;align-items:center;padding:12px 20px;
+  border-bottom:1px solid var(--c-sepS);gap:12px;
+}
+.c-brand-item:last-child{border-bottom:none;}
+.c-brand-icon-sm{
+  width:36px;height:36px;border-radius:10px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:18px;flex-shrink:0;
+}
+.c-brand-name{font-size:13px;font-weight:500;color:var(--c-t1);flex:1;}
+.c-brand-count{font-size:11px;color:var(--c-t3);margin-top:1px;}
+.c-brand-revenue{font-family:'DM Mono',monospace;font-size:12px;color:var(--c-gold);font-weight:400;}
+.c-brand-pill{
+  font-size:10px;padding:2px 7px;border-radius:4px;margin-left:4px;
+}
+.c-brand-pill.ok{background:rgba(26,107,60,.08);color:var(--c-green);}
+</style>
+</head>
+<body>
+
+<div class="page-header">
+  <h1>Toscana House</h1>
+  <p>Tres propuestas editoriales · Seleccioná tu dirección</p>
+</div>
+
+<div class="nav-tabs" style="max-width:500px;margin:0 auto 48px">
+  <button class="nav-tab active" onclick="show('a')">① Atelier</button>
+  <button class="nav-tab" onclick="show('b')">② Onyx</button>
+  <button class="nav-tab" onclick="show('c')">③ Ivory</button>
+</div>
+
+<!-- ══ TEMA A: ATELIER ══ -->
+<div class="theme-panel active" id="p-a">
+  <div class="theme-intro">
+    <div class="t-name">① Atelier — Lino Cálido</div>
+    <div class="t-desc">Stripe-quality precision · Fondo lino · Tipografía editorial · DM Mono para números</div>
+  </div>
+
+  <div class="screens" style="grid-template-columns:1.4fr 1fr;margin-bottom:16px;">
+    <div class="screen-wrap">
+      <div class="screen-label">Dashboard Principal</div>
+      <div class="screen-frame">
+        <div class="a-app">
+          <!-- Sidebar -->
+          <div class="a-sidebar">
+            <div class="a-sidebar-logo">
+              <div class="brand">T H</div>
+              <div class="sub">Casa de Moda</div>
+            </div>
+            <div class="a-nav">
+              <div class="a-nav-section">Principal</div>
+              <div class="a-nav-item active"><span class="dot" style="background:#8A6418"></span>Inicio</div>
+              <div class="a-nav-item"><span class="dot" style="background:#1a1714"></span>Caja POS</div>
+              <div class="a-nav-item"><span class="dot" style="background:#1E3A5F"></span>Ventas<span class="a-nav-badge">15</span></div>
+              <div class="a-nav-section">Gestión</div>
+              <div class="a-nav-item"><span class="dot" style="background:#166534"></span>Inventario</div>
+              <div class="a-nav-item"><span class="dot" style="background:#4A3D8F"></span>Marcas</div>
+              <div class="a-nav-item"><span class="dot" style="background:#9B2335"></span>Liquidar</div>
+              <div class="a-nav-section">Sistema</div>
+              <div class="a-nav-item"><span class="dot" style="background:#A8A29E"></span>Configuración</div>
+            </div>
+            <div class="a-sidebar-bottom">
+              <div class="a-avatar">TH</div>
+              <div><div class="a-user-name">Toscana House</div><div class="a-user-role">Administrador</div></div>
+            </div>
+          </div>
+          <!-- Main -->
+          <div class="a-main">
+            <div class="a-topbar">
+              <div class="a-topbar-title">Resumen del día</div>
+              <div class="a-topbar-right">
+                <div class="a-badge">Sáb 30 Mayo 2026</div>
+                <div class="a-badge gold">● Nube sync</div>
+                <button class="a-btn-primary">+ Nueva venta</button>
+              </div>
+            </div>
+            <div class="a-content">
+              <div class="a-kpi-grid">
+                <div class="a-kpi">
+                  <div class="a-kpi-label">Ventas hoy</div>
+                  <div class="a-kpi-value">Bs 0</div>
+                  <div class="a-kpi-sub">0 transacciones</div>
+                </div>
+                <div class="a-kpi">
+                  <div class="a-kpi-label">Mayo 2026</div>
+                  <div class="a-kpi-value gold">Bs 3.375</div>
+                  <div class="a-kpi-trend up">↑ 12% vs abril</div>
+                </div>
+                <div class="a-kpi">
+                  <div class="a-kpi-label">Stock total</div>
+                  <div class="a-kpi-value">238</div>
+                  <div class="a-kpi-sub">unidades en tienda</div>
+                </div>
+                <div class="a-kpi">
+                  <div class="a-kpi-label">Marcas activas</div>
+                  <div class="a-kpi-value">19</div>
+                  <div class="a-kpi-sub">en consignación</div>
+                </div>
+              </div>
+              <div class="a-two-col">
+                <div class="a-card">
+                  <div class="a-card-header">
+                    <div class="a-card-title">Actividad reciente</div>
+                    <div class="a-card-action">Ver todo →</div>
+                  </div>
+                  <div class="a-table-row">
+                    <div class="a-row-dot" style="background:#7C3AED"></div>
+                    <div style="flex:1"><div class="a-row-name">Brasier microfibra</div><div class="a-row-meta">Sensually · 06:06 AM</div></div>
+                    <div class="a-row-badge v">Venta</div>
+                    <div class="a-row-price">Bs 135</div>
+                  </div>
+                  <div class="a-table-row">
+                    <div class="a-row-dot" style="background:#8A6418"></div>
+                    <div style="flex:1"><div class="a-row-name">Kit 3 unidades bralette</div><div class="a-row-meta">Sensually · 04:12 PM</div></div>
+                    <div class="a-row-badge v">Venta</div>
+                    <div class="a-row-price">Bs 285</div>
+                  </div>
+                  <div class="a-table-row">
+                    <div class="a-row-dot" style="background:#ACBCAC"></div>
+                    <div style="flex:1"><div class="a-row-name">Chompa gabardina slim</div><div class="a-row-meta">Shalé · 07:44 PM</div></div>
+                    <div class="a-row-badge p">Pendiente</div>
+                    <div class="a-row-price">Bs 380</div>
+                  </div>
+                  <div class="a-table-row">
+                    <div class="a-row-dot" style="background:#F4A8A8"></div>
+                    <div style="flex:1"><div class="a-row-name">Brasier colores pasteles</div><div class="a-row-meta">Sensually · 07:59 PM</div></div>
+                    <div class="a-row-badge v">Venta</div>
+                    <div class="a-row-price">Bs 130</div>
+                  </div>
+                </div>
+                <div class="a-card">
+                  <div class="a-card-header">
+                    <div class="a-card-title">Top marcas · Mayo</div>
+                    <div class="a-card-action">Detalle</div>
+                  </div>
+                  <div class="a-brand-row">
+                    <div class="a-brand-icon" style="background:#F4A8C820"><span>💫</span></div>
+                    <div style="flex:1"><div class="a-brand-name">Sensually</div><div class="a-brand-sub">54 productos</div></div>
+                    <div class="a-brand-val">Bs 1.345</div>
+                    <div class="a-brand-arr">›</div>
+                  </div>
+                  <div class="a-brand-row">
+                    <div class="a-brand-icon" style="background:#ACBCAC20"><span>◠</span></div>
+                    <div style="flex:1"><div class="a-brand-name">Shalé</div><div class="a-brand-sub">34 productos</div></div>
+                    <div class="a-brand-val">Bs 890</div>
+                    <div class="a-brand-arr">›</div>
+                  </div>
+                  <div class="a-brand-row">
+                    <div class="a-brand-icon" style="background:#F4BCA820"><span>🌺</span></div>
+                    <div style="flex:1"><div class="a-brand-name">Bonita</div><div class="a-brand-sub">5 productos</div></div>
+                    <div class="a-brand-val">Bs 1.780</div>
+                    <div class="a-brand-arr">›</div>
+                  </div>
+                  <div class="a-brand-row">
+                    <div class="a-brand-icon" style="background:#F4ACA820"><span>🎀</span></div>
+                    <div style="flex:1"><div class="a-brand-name">Doña Mamushka</div><div class="a-brand-sub">0 productos</div></div>
+                    <div class="a-brand-val">—</div>
+                    <div class="a-brand-arr">›</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- POS -->
+    <div class="screen-wrap">
+      <div class="screen-label">Punto de Venta</div>
+      <div class="screen-frame">
+        <div class="a-pos">
+          <div class="a-pos-left">
+            <div class="a-pos-header">
+              <div><div class="a-pos-title">Caja · Punto de Venta</div><div class="a-pos-date">Sábado 30 Mayo 2026</div></div>
+              <button class="a-btn-primary">+ Agregar ítem</button>
+            </div>
+            <div class="a-pos-items">
+              <div class="a-pos-item">
+                <div class="a-pos-item-num">1</div>
+                <div style="flex:1"><div class="a-pos-item-name">Brasier microfibra esponja removible</div><div class="a-pos-item-brand">Sensually</div></div>
+                <div class="a-pos-item-price">Bs 135</div>
+                <div class="a-pos-item-x">×</div>
+              </div>
+              <div class="a-pos-item">
+                <div class="a-pos-item-num">2</div>
+                <div style="flex:1"><div class="a-pos-item-name">Bralette basic tiras finas</div><div class="a-pos-item-brand">Sensually</div></div>
+                <div class="a-pos-item-price">Bs 95</div>
+                <div class="a-pos-item-x">×</div>
+              </div>
+              <div class="a-pos-item">
+                <div class="a-pos-item-num">3</div>
+                <div style="flex:1"><div class="a-pos-item-name">Chompa gabardina slim fit</div><div class="a-pos-item-brand">Shalé</div></div>
+                <div class="a-pos-item-price">Bs 380</div>
+                <div class="a-pos-item-x">×</div>
+              </div>
+            </div>
+          </div>
+          <div class="a-pos-right">
+            <div class="a-pos-right-head">
+              <div class="a-pos-right-title">Resumen de venta</div>
+              <div class="a-pos-line"><span class="a-pos-line-label">Subtotal</span><span class="a-pos-line-val">Bs 610</span></div>
+              <div class="a-pos-line"><span class="a-pos-line-label">Descuento</span><span class="a-pos-line-val">Bs 0</span></div>
+              <div class="a-pos-line"><span class="a-pos-line-label">Items</span><span class="a-pos-line-val">3 productos</span></div>
+            </div>
+            <div class="a-pos-total-area">
+              <div class="a-pos-total-label">Total a cobrar</div>
+              <div class="a-pos-total-val">Bs 610</div>
+            </div>
+            <div class="a-pos-methods">
+              <div class="a-pos-method-label">Método de pago</div>
+              <div class="a-pos-method-row">
+                <div class="a-pos-method-btn active">Efectivo</div>
+                <div class="a-pos-method-btn">QR</div>
+                <div class="a-pos-method-btn">Tarjeta</div>
+              </div>
+            </div>
+            <button class="a-pos-confirm">Confirmar venta →</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Palette -->
+  <div class="details-grid">
+    <div class="detail-card">
+      <h4>Paleta de colores</h4>
+      <div class="color-row">
+        <div class="swatch"><div class="swatch-color" style="background:#F5F3EE;border:1px solid #ddd"></div><div class="swatch-name">Fondo</div><div class="swatch-hex">#F5F3EE</div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#FFFFFF;border:1px solid #eee"></div><div class="swatch-name">Cards</div><div class="swatch-hex">#FFFFFF</div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#1A1714"></div><div class="swatch-name">Texto</div><div class="swatch-hex">#1A1714</div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#8A6418"></div><div class="swatch-name">Oro</div><div class="swatch-hex">#8A6418</div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#57534E"></div><div class="swatch-name">Stone</div><div class="swatch-hex">#57534E</div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#166534"></div><div class="swatch-name">Verde</div><div class="swatch-hex">#166534</div></div>
+      </div>
+    </div>
+    <div class="detail-card">
+      <h4>Tipografía</h4>
+      <div class="font-sample">
+        <div class="fs-label">Display / Números grandes</div>
+        <div class="fs-text" style="font-family:'Cormorant Garamond',serif;color:#fff;font-weight:400">Bs 3.375</div>
+        <div class="fs-sub">Cormorant Garamond 300–500</div>
+      </div>
+      <div class="font-sample">
+        <div class="fs-label">UI Labels / Cuerpo</div>
+        <div class="fs-text" style="font-family:'Inter',sans-serif;font-size:16px;color:#fff;font-weight:500">Toscana House</div>
+        <div class="fs-sub">Inter 400/500/600</div>
+      </div>
+      <div class="font-sample">
+        <div class="fs-label">Datos / Monospace</div>
+        <div class="fs-text" style="font-family:'DM Mono',monospace;font-size:16px;color:#8A6418;font-weight:400">SKU-2024-001</div>
+        <div class="fs-sub">DM Mono 400</div>
+      </div>
+    </div>
+    <div class="detail-card">
+      <h4>Sistema de sombras</h4>
+      <div style="display:flex;flex-direction:column;gap:12px;margin-top:4px">
+        <div style="background:#F5F3EE;border-radius:8px;padding:12px;box-shadow:0 1px 3px rgba(0,0,0,.06),0 1px 2px rgba(0,0,0,.04)"><div style="font-size:11px;color:#57534E">Shadow SM — tarjetas base</div></div>
+        <div style="background:#F5F3EE;border-radius:8px;padding:12px;box-shadow:0 4px 16px rgba(0,0,0,.08),0 2px 4px rgba(0,0,0,.04)"><div style="font-size:11px;color:#57534E">Shadow MD — hover / elevado</div></div>
+        <div style="background:#F5F3EE;border-radius:8px;padding:12px;border:1px solid #E2DED8"><div style="font-size:11px;color:#57534E">Border 1px #E2DED8 — divisores</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ TEMA B: ONYX ══ -->
+<div class="theme-panel" id="p-b">
+  <div class="theme-intro">
+    <div class="t-name">② Onyx — Precisión Oscura</div>
+    <div class="t-desc">Linear-quality dark · DM Mono data · Gold accents · Alta densidad informacional</div>
+  </div>
+
+  <div class="screens" style="grid-template-columns:1.4fr 1fr;margin-bottom:16px;">
+    <div class="screen-wrap">
+      <div class="screen-label">Dashboard Principal</div>
+      <div class="screen-frame">
+        <div class="b-app">
+          <!-- Icon sidebar -->
+          <div class="b-sidebar">
+            <div class="b-sidebar-logo">TH</div>
+            <div class="b-icon active" title="Inicio">⊞</div>
+            <div class="b-icon" title="Caja">⊕</div>
+            <div class="b-icon" title="Ventas">◈</div>
+            <div class="b-sidebar-divider"></div>
+            <div class="b-icon" title="Inventario">◫</div>
+            <div class="b-icon" title="Marcas">◆</div>
+            <div class="b-icon" title="Liquidar">◎</div>
+            <div class="b-sidebar-divider"></div>
+            <div class="b-icon" title="Config">⚙</div>
+            <div class="b-sidebar-bottom">
+              <div class="b-avatar-sm">T</div>
+            </div>
+          </div>
+          <!-- Main -->
+          <div class="b-main">
+            <div class="b-topbar">
+              <div class="b-breadcrumb">Toscana House <span>/ Inicio</span></div>
+              <div class="b-topbar-right">
+                <div class="b-chip">Sáb 30 May 2026</div>
+                <div class="b-chip gold">● sync</div>
+                <button class="b-btn">+ Venta</button>
+              </div>
+            </div>
+            <div class="b-content">
+              <div class="b-stats">
+                <div class="b-stat s1">
+                  <div class="b-stat-label">Ventas hoy</div>
+                  <div class="b-stat-value">0.00</div>
+                  <div class="b-stat-sub">Bs · 0 trans.</div>
+                </div>
+                <div class="b-stat s2">
+                  <div class="b-stat-label">Mayo 2026</div>
+                  <div class="b-stat-value gold">3.375</div>
+                  <div class="b-stat-trend up">↑ +12%</div>
+                </div>
+                <div class="b-stat s3">
+                  <div class="b-stat-label">Stock total</div>
+                  <div class="b-stat-value">238</div>
+                  <div class="b-stat-sub">uds · 19 marcas</div>
+                </div>
+                <div class="b-stat s4">
+                  <div class="b-stat-label">Ticket prom.</div>
+                  <div class="b-stat-value">225</div>
+                  <div class="b-stat-sub">Bs / venta</div>
+                </div>
+              </div>
+              <div class="b-grid">
+                <div class="b-panel">
+                  <div class="b-panel-header">
+                    <div class="b-panel-title">Actividad reciente</div>
+                    <div class="b-panel-action">ver todo</div>
+                  </div>
+                  <div class="b-row"><div class="b-row-indicator" style="background:#7C3AED"></div><div style="flex:1"><div class="b-row-name">Brasier microfibra</div><div class="b-row-sub">06:06 · Sensually</div></div><div class="b-status ok">Venta</div><div class="b-row-val" style="margin-left:8px">135</div></div>
+                  <div class="b-row"><div class="b-row-indicator" style="background:#D4A843"></div><div style="flex:1"><div class="b-row-name">Kit 3 bralets</div><div class="b-row-sub">04:12 · Sensually</div></div><div class="b-status ok">Venta</div><div class="b-row-val" style="margin-left:8px">285</div></div>
+                  <div class="b-row"><div class="b-row-indicator" style="background:#ACBCAC"></div><div style="flex:1"><div class="b-row-name">Chompa gabardina</div><div class="b-row-sub">07:44 · Shalé</div></div><div class="b-status pend">Pend.</div><div class="b-row-val" style="margin-left:8px">380</div></div>
+                  <div class="b-row"><div class="b-row-indicator" style="background:#F4A8A8"></div><div style="flex:1"><div class="b-row-name">Brasier pasteles</div><div class="b-row-sub">07:59 · Sensually</div></div><div class="b-status ok">Venta</div><div class="b-row-val" style="margin-left:8px">130</div></div>
+                </div>
+                <div class="b-panel">
+                  <div class="b-panel-header">
+                    <div class="b-panel-title">Marcas · Mayo</div>
+                    <div class="b-panel-action">detalle</div>
+                  </div>
+                  <div class="b-brand-mini"><div class="b-brand-dot" style="background:rgba(244,168,200,.15)">💫</div><div class="b-brand-n">Sensually</div><div class="b-brand-prods">54 prods</div><div class="b-brand-val" style="margin-left:8px">1.345</div></div>
+                  <div class="b-brand-mini"><div class="b-brand-dot" style="background:rgba(172,188,172,.15)">◠</div><div class="b-brand-n">Shalé</div><div class="b-brand-prods">34 prods</div><div class="b-brand-val" style="margin-left:8px">890</div></div>
+                  <div class="b-brand-mini"><div class="b-brand-dot" style="background:rgba(244,188,168,.15)">🌺</div><div class="b-brand-n">Bonita</div><div class="b-brand-prods">5 prods</div><div class="b-brand-val" style="margin-left:8px">1.780</div></div>
+                  <div class="b-brand-mini"><div class="b-brand-dot" style="background:rgba(168,197,160,.15)">✨</div><div class="b-brand-n">Donaire</div><div class="b-brand-prods">0 prods</div><div class="b-brand-val" style="color:#5A5A66">—</div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- POS Onyx -->
+    <div class="screen-wrap">
+      <div class="screen-label">Punto de Venta</div>
+      <div class="screen-frame">
+        <div class="b-pos">
+          <div class="b-pos-left">
+            <div class="b-pos-hdr">
+              <div class="b-pos-ttl">Caja</div>
+              <div class="b-pos-dt">SAB 30.05.26 · 20:34</div>
+            </div>
+            <div class="b-pos-list">
+              <div class="b-pos-item"><div class="b-pos-item-idx">01</div><div style="flex:1"><div class="b-pos-item-n">Brasier microfibra esponja</div><div class="b-pos-item-brand">Sensually</div></div><div class="b-pos-item-p">135</div></div>
+              <div class="b-pos-item"><div class="b-pos-item-idx">02</div><div style="flex:1"><div class="b-pos-item-n">Bralette basic tiras finas</div><div class="b-pos-item-brand">Sensually</div></div><div class="b-pos-item-p">95</div></div>
+              <div class="b-pos-item"><div class="b-pos-item-idx">03</div><div style="flex:1"><div class="b-pos-item-n">Chompa gabardina slim</div><div class="b-pos-item-brand">Shalé</div></div><div class="b-pos-item-p">380</div></div>
+            </div>
+          </div>
+          <div class="b-pos-right">
+            <div class="b-pos-summary">
+              <div class="b-pos-line"><div class="b-pos-line-k">subtotal</div><div class="b-pos-line-v">610.00</div></div>
+              <div class="b-pos-line"><div class="b-pos-line-k">descuento</div><div class="b-pos-line-v">0.00</div></div>
+              <div class="b-pos-line"><div class="b-pos-line-k">items</div><div class="b-pos-line-v">3</div></div>
+              <div class="b-pos-divider"></div>
+              <div class="b-pos-total-label">total · Bs</div>
+              <div class="b-pos-total">610.00</div>
+              <div class="b-pos-divider"></div>
+              <div class="b-pos-line"><div class="b-pos-line-k">método</div><div class="b-pos-line-v" style="color:var(--b-gold)">Efectivo ▾</div></div>
+            </div>
+            <div class="b-pos-btns">
+              <button class="b-pos-confirm">CONFIRMAR VENTA</button>
+              <div class="b-pos-alt">
+                <button class="b-pos-alt-btn">QR</button>
+                <button class="b-pos-alt-btn">Mixto</button>
+                <button class="b-pos-alt-btn">Gift</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="details-grid">
+    <div class="detail-card">
+      <h4>Paleta de colores</h4>
+      <div class="color-row">
+        <div class="swatch"><div class="swatch-color" style="background:#0D0D10"></div><div class="swatch-name">Fondo</div><div class="swatch-hex">#0D0D10</div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#16161B;border:1px solid rgba(255,255,255,.08)"></div><div class="swatch-name">Cards</div><div class="swatch-hex">#16161B</div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#D4A843"></div><div class="swatch-name">Gold</div><div class="swatch-hex">#D4A843</div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#34D399"></div><div class="swatch-name">Verde</div><div class="swatch-hex">#34D399</div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#F2F2F5"></div><div class="swatch-name">Texto</div><div class="swatch-hex">#F2F2F5</div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#5A5A66"></div><div class="swatch-name">Muted</div><div class="swatch-hex">#5A5A66</div></div>
+      </div>
+    </div>
+    <div class="detail-card">
+      <h4>Tipografía</h4>
+      <div class="font-sample">
+        <div class="fs-label">Logo / Marca</div>
+        <div class="fs-text" style="font-family:'Cormorant Garamond',serif;color:#D4A843">T H</div>
+        <div class="fs-sub">Cormorant Garamond · Gold</div>
+      </div>
+      <div class="font-sample">
+        <div class="fs-label">Datos financieros</div>
+        <div class="fs-text" style="font-family:'DM Mono',monospace;color:#D4A843;font-size:24px">3,375.00</div>
+        <div class="fs-sub">DM Mono — todos los números</div>
+      </div>
+      <div class="font-sample">
+        <div class="fs-label">Etiquetas UI</div>
+        <div class="fs-text" style="font-family:'Inter',sans-serif;font-size:14px;color:rgba(255,255,255,.7);font-weight:500;letter-spacing:.08em;text-transform:uppercase">VENTAS MAYO</div>
+        <div class="fs-sub">Inter 500 · uppercase tracked</div>
+      </div>
+    </div>
+    <div class="detail-card">
+      <h4>Efectos de profundidad</h4>
+      <div style="display:flex;flex-direction:column;gap:10px;margin-top:4px">
+        <div style="background:#16161B;border:1px solid rgba(255,255,255,.07);border-radius:8px;padding:12px;border-top:2px solid #D4A843"><div style="font-size:11px;color:#A0A0AE">Top accent line — tarjetas KPI</div></div>
+        <div style="background:#16161B;border:1px solid rgba(255,255,255,.07);border-radius:8px;padding:12px;border-left:3px solid #D4A843"><div style="font-size:11px;color:#A0A0AE">Left indicator — items de lista</div></div>
+        <div style="background:#1E1E24;border:1px solid rgba(255,255,255,.05);border-radius:8px;padding:12px"><div style="font-size:11px;color:#5A5A66">Nested depth · bg2</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ TEMA C: IVORY ══ -->
+<div class="theme-panel" id="p-c">
+  <div class="theme-intro">
+    <div class="t-name">③ Ivory — Editorial Serena</div>
+    <div class="t-desc">Notion-quality sidebar · Loro Piana warmth · Cormorant headings · Máximo espacio editorial</div>
+  </div>
+
+  <div class="screens" style="grid-template-columns:1.4fr 1fr;margin-bottom:16px;">
+    <div class="screen-wrap">
+      <div class="screen-label">Dashboard Principal</div>
+      <div class="screen-frame">
+        <div class="c-app">
+          <div class="c-sidebar">
+            <div class="c-sidebar-top">
+              <div class="c-workspace">
+                <div class="c-workspace-icon">
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><text x="2" y="11" font-family="Cormorant Garamond,serif" font-size="10" fill="white" font-weight="500">TH</text></svg>
+                </div>
+                <div><div class="c-workspace-name">Toscana House</div><div class="c-workspace-sub">Casa de Moda</div></div>
+                <div class="c-workspace-caret">⌄</div>
+              </div>
+              <div class="c-nav">
+                <div class="c-nav-group">
+                  <div class="c-nav-label">Principal</div>
+                  <div class="c-nav-item active"><span class="ni-icon">⊞</span>Inicio</div>
+                  <div class="c-nav-item"><span class="ni-icon">⊕</span>Caja POS<span class="ni-badge">●</span></div>
+                  <div class="c-nav-item"><span class="ni-icon">◈</span>Ventas</div>
+                </div>
+                <div class="c-nav-group" style="margin-top:12px">
+                  <div class="c-nav-label">Gestión</div>
+                  <div class="c-nav-item"><span class="ni-icon">◫</span>Inventario</div>
+                  <div class="c-nav-item"><span class="ni-icon">◆</span>Marcas</div>
+                  <div class="c-nav-item"><span class="ni-icon">◎</span>Liquidaciones</div>
+                  <div class="c-nav-item"><span class="ni-icon">🎁</span>Gift Cards</div>
+                </div>
+                <div class="c-nav-group" style="margin-top:12px">
+                  <div class="c-nav-label">Sistema</div>
+                  <div class="c-nav-item"><span class="ni-icon">⚙</span>Configuración</div>
+                </div>
+              </div>
+            </div>
+            <div class="c-sidebar-footer">
+              <div class="c-user-avatar">TH</div>
+              <div><div class="c-user-name">Toscana House</div><div class="c-user-role">Administrador</div></div>
+              <div class="c-user-more">···</div>
+            </div>
+          </div>
+          <div class="c-main">
+            <div class="c-topbar">
+              <div class="c-page-title">Buenos días ✦</div>
+              <div class="c-topbar-right">
+                <div class="c-tag">Sáb, 30 Mayo 2026</div>
+                <div class="c-tag gold">Nube sync ✓</div>
+                <button class="c-add-btn">+ Nueva venta</button>
+              </div>
+            </div>
+            <div class="c-content">
+              <div class="c-hero">
+                <div class="c-hero-eyebrow">Resumen · Mayo 2026</div>
+                <div class="c-hero-heading">Toscana House —<br><em>Casa de Moda</em>, Bolivia</div>
+              </div>
+              <div class="c-metrics">
+                <div class="c-metric"><div class="c-metric-label">Hoy</div><div class="c-metric-value">Bs 0</div><div class="c-metric-sub">Sin ventas registradas</div></div>
+                <div class="c-metric"><div class="c-metric-label">Este mes</div><div class="c-metric-value gold">Bs 3.375</div><div class="c-metric-sub">↑ 12% vs abril</div></div>
+                <div class="c-metric"><div class="c-metric-label">Stock</div><div class="c-metric-value">238 uds</div><div class="c-metric-sub">19 marcas activas</div></div>
+                <div class="c-metric"><div class="c-metric-label">Ticket prom.</div><div class="c-metric-value">Bs 225</div><div class="c-metric-sub">Por transacción</div></div>
+              </div>
+              <div class="c-content-grid">
+                <div class="c-block">
+                  <div class="c-block-header"><div class="c-block-title">Actividad reciente</div><div class="c-block-action">Ver historial →</div></div>
+                  <div class="c-feed-item"><div class="c-feed-time">06:06</div><div class="c-feed-type v">Venta</div><div style="flex:1"><div class="c-feed-desc">Brasier microfibra esponja</div><div class="c-feed-brand">Sensually</div></div><div class="c-feed-amount">Bs 135</div></div>
+                  <div class="c-feed-item"><div class="c-feed-time">04:12</div><div class="c-feed-type v">Venta</div><div style="flex:1"><div class="c-feed-desc">Kit 3 unidades bralette</div><div class="c-feed-brand">Sensually</div></div><div class="c-feed-amount">Bs 285</div></div>
+                  <div class="c-feed-item"><div class="c-feed-time">07:44</div><div class="c-feed-type v">Venta</div><div style="flex:1"><div class="c-feed-desc">Chompa gabardina slim</div><div class="c-feed-brand">Shalé</div></div><div class="c-feed-amount">Bs 380</div></div>
+                  <div class="c-feed-item"><div class="c-feed-time">07:59</div><div class="c-feed-type v">Venta</div><div style="flex:1"><div class="c-feed-desc">Brasier colores pasteles</div><div class="c-feed-brand">Sensually</div></div><div class="c-feed-amount">Bs 130</div></div>
+                </div>
+                <div class="c-block">
+                  <div class="c-block-header"><div class="c-block-title">Marcas destacadas</div><div class="c-block-action">Gestionar</div></div>
+                  <div class="c-brand-item"><div class="c-brand-icon-sm" style="background:#F4A8C818">💫</div><div style="flex:1"><div class="c-brand-name">Sensually</div><div class="c-brand-count">54 productos activos</div></div><div class="c-brand-revenue">Bs 1.345</div><div class="c-brand-pill ok">✓</div></div>
+                  <div class="c-brand-item"><div class="c-brand-icon-sm" style="background:#ACBCAC18">◠</div><div style="flex:1"><div class="c-brand-name">Shalé</div><div class="c-brand-count">34 productos activos</div></div><div class="c-brand-revenue">Bs 890</div></div>
+                  <div class="c-brand-item"><div class="c-brand-icon-sm" style="background:#F4BCA818">🌺</div><div style="flex:1"><div class="c-brand-name">Bonita</div><div class="c-brand-count">5 productos</div></div><div class="c-brand-revenue">Bs 1.780</div><div class="c-brand-pill ok">✓</div></div>
+                  <div class="c-brand-item"><div class="c-brand-icon-sm" style="background:#A8C5A018">✨</div><div style="flex:1"><div class="c-brand-name">Donaire</div><div class="c-brand-count">Sin productos cargados</div></div><div style="font-size:12px;color:#9E9891">—</div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- POS Ivory -->
+    <div class="screen-wrap">
+      <div class="screen-label">Punto de Venta</div>
+      <div class="screen-frame" style="background:#FAFAF7">
+        <div class="c-app" style="background:#FAFAF7">
+          <div class="c-pos-side" style="width:56px;background:#F3F1EB;border-right:1px solid rgba(0,0,0,.07);display:flex;flex-direction:column;align-items:center;padding:16px 0;gap:8px">
+            <div style="font-family:'Cormorant Garamond',serif;font-size:14px;color:#7D5C1A;letter-spacing:.1em;margin-bottom:16px">TH</div>
+            <div style="width:34px;height:34px;border-radius:8px;background:rgba(0,0,0,.06);display:flex;align-items:center;justify-content:center;font-size:13px;color:#7D5C1A">⊕</div>
+            <div style="width:34px;height:34px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:13px;color:#9E9891;cursor:pointer">⊞</div>
+            <div style="width:34px;height:34px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:13px;color:#9E9891;cursor:pointer">◫</div>
+          </div>
+          <div style="flex:1;display:flex;flex-direction:column;background:#FAFAF7">
+            <!-- pos header -->
+            <div style="height:52px;background:#fff;border-bottom:1px solid rgba(0,0,0,.07);display:flex;align-items:center;padding:0 24px;justify-content:space-between">
+              <div style="font-family:'Cormorant Garamond',serif;font-size:20px;font-weight:400;color:#111;letter-spacing:.02em">Caja · POS</div>
+              <div style="display:flex;gap:8px">
+                <div style="background:rgba(0,0,0,.05);border:1px solid rgba(0,0,0,.07);color:#4A4540;font-size:11px;padding:5px 12px;border-radius:20px">Sáb 30 Mayo</div>
+                <button style="background:#111;color:#fff;border:none;font-size:12px;font-weight:600;padding:7px 14px;border-radius:8px;cursor:pointer">+ Item</button>
+              </div>
+            </div>
+            <!-- items -->
+            <div style="flex:1;padding:16px 20px;display:flex;flex-direction:column;gap:8px">
+              <div style="background:#fff;border:1px solid rgba(0,0,0,.07);border-radius:10px;padding:14px 16px;display:flex;align-items:center;gap:12px">
+                <div style="width:26px;height:26px;border-radius:6px;background:#F3F1EB;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#4A4540;flex-shrink:0">1</div>
+                <div style="flex:1"><div style="font-size:13px;font-weight:500;color:#111">Brasier microfibra esponja</div><div style="font-size:11px;color:#9E9891;margin-top:1px">Sensually</div></div>
+                <div style="font-family:'DM Mono',monospace;font-size:13px;color:#111;font-weight:500">Bs 135</div>
+              </div>
+              <div style="background:#fff;border:1px solid rgba(0,0,0,.07);border-radius:10px;padding:14px 16px;display:flex;align-items:center;gap:12px">
+                <div style="width:26px;height:26px;border-radius:6px;background:#F3F1EB;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#4A4540;flex-shrink:0">2</div>
+                <div style="flex:1"><div style="font-size:13px;font-weight:500;color:#111">Bralette basic tiras finas</div><div style="font-size:11px;color:#9E9891;margin-top:1px">Sensually</div></div>
+                <div style="font-family:'DM Mono',monospace;font-size:13px;color:#111;font-weight:500">Bs 95</div>
+              </div>
+              <div style="background:#fff;border:1px solid rgba(0,0,0,.07);border-radius:10px;padding:14px 16px;display:flex;align-items:center;gap:12px">
+                <div style="width:26px;height:26px;border-radius:6px;background:#F3F1EB;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#4A4540;flex-shrink:0">3</div>
+                <div style="flex:1"><div style="font-size:13px;font-weight:500;color:#111">Chompa gabardina slim</div><div style="font-size:11px;color:#9E9891;margin-top:1px">Shalé</div></div>
+                <div style="font-family:'DM Mono',monospace;font-size:13px;color:#111;font-weight:500">Bs 380</div>
+              </div>
+            </div>
+            <!-- total footer -->
+            <div style="background:#fff;border-top:1px solid rgba(0,0,0,.07);padding:18px 20px">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px">
+                <div>
+                  <div style="font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#9E9891;margin-bottom:4px">Total a cobrar</div>
+                  <div style="font-family:'Cormorant Garamond',serif;font-size:38px;font-weight:400;color:#111;line-height:1">Bs 610</div>
+                </div>
+                <div style="text-align:right">
+                  <div style="font-size:10px;color:#9E9891;margin-bottom:4px">Método</div>
+                  <div style="font-size:13px;color:#7D5C1A;font-weight:500;cursor:pointer">Efectivo ▾</div>
+                </div>
+              </div>
+              <button style="background:#111;color:#fff;border:none;width:100%;padding:13px;border-radius:10px;font-family:'Inter',sans-serif;font-size:13px;font-weight:600;cursor:pointer;letter-spacing:.04em">Confirmar venta →</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="details-grid">
+    <div class="detail-card">
+      <h4>Paleta de colores</h4>
+      <div class="color-row">
+        <div class="swatch"><div class="swatch-color" style="background:#FAFAF7;border:1px solid #ddd"></div><div class="swatch-name">Fondo</div><div class="swatch-hex">#FAFAF7</div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#F3F1EB;border:1px solid #ddd"></div><div class="swatch-name">Sidebar</div><div class="swatch-hex">#F3F1EB</div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#111111"></div><div class="swatch-name">Texto</div><div class="swatch-hex">#111111</div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#7D5C1A"></div><div class="swatch-name">Oro</div><div class="swatch-hex">#7D5C1A</div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#4A4540"></div><div class="swatch-name">Stone</div><div class="swatch-hex">#4A4540</div></div>
+        <div class="swatch"><div class="swatch-color" style="background:#1A6B3C"></div><div class="swatch-name">Verde</div><div class="swatch-hex">#1A6B3C</div></div>
+      </div>
+    </div>
+    <div class="detail-card">
+      <h4>Tipografía</h4>
+      <div class="font-sample">
+        <div class="fs-label">Headings editoriales</div>
+        <div class="fs-text" style="font-family:'Cormorant Garamond',serif;color:#fff;font-size:26px;font-style:italic;font-weight:300">Casa de Moda</div>
+        <div class="fs-sub">Cormorant Garamond Italic 300</div>
+      </div>
+      <div class="font-sample">
+        <div class="fs-label">Títulos de sección</div>
+        <div class="fs-text" style="font-family:'Cormorant Garamond',serif;color:#fff;font-size:20px;font-weight:400;letter-spacing:.06em">MARCAS ACTIVAS</div>
+        <div class="fs-sub">Cormorant 400 · tracked</div>
+      </div>
+      <div class="font-sample">
+        <div class="fs-label">UI & datos</div>
+        <div class="fs-text" style="font-family:'Inter',sans-serif;font-size:14px;color:rgba(255,255,255,.8);font-weight:500">54 productos · Bs 1.345</div>
+        <div class="fs-sub">Inter 400/500 + DM Mono números</div>
+      </div>
+    </div>
+    <div class="detail-card">
+      <h4>Componentes clave</h4>
+      <div style="display:flex;flex-direction:column;gap:10px;margin-top:4px">
+        <div style="background:#fff;border-radius:10px;padding:12px;border:1px solid rgba(0,0,0,.07)">
+          <div style="font-size:11px;color:#9E9891;margin-bottom:4px;letter-spacing:.1em;text-transform:uppercase">Card base · bg1</div>
+          <div style="font-size:13px;color:#111;font-weight:500">Brasier microfibra</div>
+        </div>
+        <div style="background:#F3F1EB;border-radius:8px;padding:10px 12px;display:flex;align-items:center;gap:8px">
+          <div style="width:28px;height:28px;border-radius:7px;background:#111;display:flex;align-items:center;justify-content:center">✨</div>
+          <div><div style="font-size:12px;color:#111;font-weight:500">Nav item · sidebar</div><div style="font-size:10px;color:#9E9891">Active state</div></div>
+        </div>
+        <div style="display:flex;gap:6px">
+          <div style="flex:1;background:#111;border-radius:8px;padding:9px;text-align:center;font-size:11px;color:#fff;font-weight:600">Primario</div>
+          <div style="flex:1;background:rgba(0,0,0,.05);border:1px solid rgba(0,0,0,.08);border-radius:8px;padding:9px;text-align:center;font-size:11px;color:#4A4540">Secundario</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── CTA ── -->
+<div class="cta-area">
+  <div class="cta-label">¿Cuál implementamos?</div>
+  <div class="cta-btns">
+    <button class="cta-btn" style="background:#F5F3EE;color:#1A1714;border:2px solid #8A6418;" onclick="pick('Atelier — Lino Cálido')">① Atelier</button>
+    <button class="cta-btn" style="background:#0D0D10;color:#D4A843;border:2px solid #D4A843;" onclick="pick('Onyx — Precisión Oscura')">② Onyx</button>
+    <button class="cta-btn" style="background:#FAFAF7;color:#111;border:2px solid #7D5C1A;" onclick="pick('Ivory — Editorial Serena')">③ Ivory</button>
+  </div>
+  <div id="msg" style="margin-top:16px;height:22px;text-align:center;font-size:12px;color:rgba(255,255,255,.4);letter-spacing:.06em"></div>
+</div>
+
+<script>
+function show(id){
+  document.querySelectorAll('.theme-panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('p-'+id).classList.add('active');
+  const idx={'a':0,'b':1,'c':2};
+  document.querySelectorAll('.nav-tab')[idx[id]].classList.add('active');
+  window.scrollTo({top:120,behavior:'smooth'});
+}
+function pick(name){
+  document.getElementById('msg').textContent='✦  Elegiste: '+name+' — respondé en el chat para implementar';
+}
+</script>
+</body>
+</html>
