@@ -177,6 +177,24 @@
 </head>
 <body>
   <div id="root"></div>
-  <script src="bundle-1781044245193.js"></script>
+  <!-- Auto-updater: detecta nueva versión y recarga sin intervención del usuario -->
+  <script>
+    (function(){
+      var CURRENT = "1781044311398";
+      function check(){
+        fetch("/version.json?_="+Date.now(),{cache:"no-store"})
+          .then(function(r){return r.json();})
+          .then(function(d){
+            if(String(d.v) !== String(CURRENT)){
+              console.log("[TH] Nueva versión "+d.v+" → recargando");
+              window.location.reload(true);
+            }
+          }).catch(function(){});
+      }
+      setTimeout(check, 2000);
+      setInterval(check, 60000);
+    })();
+  </script>
+  <script src="bundle-1781044311398.js"></script>
 </body>
 </html>

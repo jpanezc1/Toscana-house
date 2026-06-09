@@ -227,6 +227,24 @@ const html = `<!DOCTYPE html>
 </head>
 <body>
   <div id="root"></div>
+  <!-- Auto-updater: detecta nueva versión y recarga sin intervención del usuario -->
+  <script>
+    (function(){
+      var CURRENT = "${v}";
+      function check(){
+        fetch("/version.json?_="+Date.now(),{cache:"no-store"})
+          .then(function(r){return r.json();})
+          .then(function(d){
+            if(String(d.v) !== String(CURRENT)){
+              console.log("[TH] Nueva versión "+d.v+" → recargando");
+              window.location.reload(true);
+            }
+          }).catch(function(){});
+      }
+      setTimeout(check, 2000);
+      setInterval(check, 60000);
+    })();
+  </script>
   <script src="bundle-${v}.js"></script>
 </body>
 </html>`;
