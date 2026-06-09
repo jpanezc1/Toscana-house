@@ -7,6 +7,28 @@ import { useState, useMemo, useRef, useCallback, useEffect } from "react";
 const SUPA_URL  = "https://uqphxiixdulqscbfyxhz.supabase.co";
 const SUPA_KEY  = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVxcGh4aWl4ZHVscXNjYmZ5eGh6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcwMzc0NjQsImV4cCI6MjA5MjYxMzQ2NH0.U1EIf4JWqfrvga7CApClLl7nzBuFoPpD8BlicxvfB-w";
 
+// ── Auto-updater: detecta nuevos deploys y recarga la app ─────────────────────
+(function autoUpdater(){
+  // El bundle actual se inyecta en build time
+  const BUNDLE_ACTUAL = document.querySelector('script[src^="bundle-"]')?.src?.match(/bundle-(\d+)\.js/)?.[1];
+  if(!BUNDLE_ACTUAL) return;
+  async function checkVersion(){
+    try{
+      const r = await fetch("/version.json?_="+Date.now(), {cache:"no-store"});
+      if(!r.ok) return;
+      const {v} = await r.json();
+      if(String(v) !== String(BUNDLE_ACTUAL)){
+        console.log("[TH] Nueva versión detectada — recargando...");
+        window.location.reload(true);
+      }
+    }catch{}
+  }
+  // Verificar al cargar (con delay para no bloquear el render)
+  setTimeout(checkVersion, 3000);
+  // Verificar cada 90 segundos
+  setInterval(checkVersion, 90_000);
+})();
+
 // ── Datos de la empresa ──────────────────────────────────
 const NIT_EMPRESA   = "690053037";
 const PROPIETARIA   = "SYLVIA CAROLINA GRANIER ZALLES";

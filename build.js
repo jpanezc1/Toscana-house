@@ -233,4 +233,7 @@ const html = `<!DOCTYPE html>
 
 fs.writeFileSync("index.html", html);
 
+// ── Version manifest (para auto-update del PWA) ───────────────────────────────
+fs.writeFileSync("version.json", JSON.stringify({ v, ts: new Date().toISOString() }));
+
 console.log("Build OK — v" + v);
