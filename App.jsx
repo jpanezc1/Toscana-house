@@ -1471,7 +1471,7 @@ async function generarExcelMensual(ventas, inventario, mes, anio, setGenerando, 
     ];
 
     let totalBruto = 0, totalNeto = 0, totalVentas = 0;
-    const ventasMes = ventas.filter(v => v.mk === MK);
+    const ventasMes = ventas.filter(v => v.mk === MK && !v.anulada);
 
     MARCAS.forEach(m => {
       const vM  = ventasMes.filter(v => v.items.some(i => i.marcaId === m.id));
@@ -1785,7 +1785,7 @@ async function generarExcelStock(inventario, setGenerando) {
 
 function exportCSV(marca,ventas,mes,anio){
   const MK=mkKey(mes,anio);
-  const vm=ventas.filter(v=>v.mk===MK&&v.items.some(i=>i.marcaId===marca.id));
+  const vm=ventas.filter(v=>v.mk===MK&&!v.anulada&&v.items.some(i=>i.marcaId===marca.id));
   const rows=[["ID","Fecha","Hora","Código","Producto","Cant.","Precio","Subtotal","Desc%","Pago"]];
   vm.forEach(v=>v.items.filter(i=>i.marcaId===marca.id).forEach(it=>{
     rows.push([v.id,v.fecha,v.hora,it.codigo,it.nombre,it.cantidad,it.precioUnit,it.subtotal,v.descPct||0,v.metodoPago]);
@@ -1809,7 +1809,7 @@ function exportCSV(marca,ventas,mes,anio){
 function exportTodasCSV(ventas,mes,anio){
   const MK=mkKey(mes,anio);
   const rows=[["Marca","ID","Fecha","Hora","Código","Producto","Cant.","Precio","Subtotal","Pago"]];
-  ventas.filter(v=>v.mk===MK).forEach(v=>v.items.forEach(it=>{
+  ventas.filter(v=>v.mk===MK&&!v.anulada).forEach(v=>v.items.forEach(it=>{
     const m=MARCAS.find(x=>x.id===it.marcaId);
     rows.push([m?.nombre||"",v.id,v.fecha,v.hora,it.codigo,it.nombre,it.cantidad,it.precioUnit,it.subtotal,v.metodoPago]);
   }));
@@ -4444,7 +4444,7 @@ function imprimirComprobante(venta) {
 // ── Planilla de alquileres ──────────────────────────────
 function generarPlanillaAlquileres(ventas, mes, anio) {
   const MK = `${mes}-${anio}`;
-  const vMes = ventas.filter(v => v.mes === mes && v.anio === anio);
+  const vMes = ventas.filter(v => v.mes === mes && v.anio === anio && !v.anulada);
   
   const win = window.open('', '_blank', 'width=800,height=600');
   
@@ -5544,7 +5544,7 @@ function HomeDashboard({ventas, inv, vMes, mes, anio, onGoTab}){
   const isDesktop = useIsDesktop();
 
   const hoyStr = new Date().toISOString().slice(0,10);
-  const vHoy   = ventas.filter(v => v.fecha === hoyStr);
+  const vHoy   = ventas.filter(v => v.fecha === hoyStr && !v.anulada);
   const totalHoy = vHoy.reduce((s, v) => s + v.total, 0);
   const totalMes  = vMes.reduce((s, v) => s + v.total, 0);
   const stockTotal = inv.reduce((s, i) => s + (i.stock || 0), 0);
@@ -5556,7 +5556,7 @@ function HomeDashboard({ventas, inv, vMes, mes, anio, onGoTab}){
       const d = new Date();
       d.setDate(d.getDate() - i);
       const str   = d.toISOString().slice(0,10);
-      const total = ventas.filter(v => v.fecha === str).reduce((s,v) => s + v.total, 0);
+      const total = ventas.filter(v => v.fecha === str && !v.anulada).reduce((s,v) => s + v.total, 0);
       const label = d.toLocaleDateString("es-BO", {weekday:"short"}).slice(0,3);
       days.push({str, total, label});
     }
