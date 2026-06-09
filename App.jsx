@@ -8506,10 +8506,22 @@ function App(){
     const updated=[...retiros,r];
     setRetiros(updated);
     try{localStorage.setItem("th_retiros_v1",JSON.stringify(updated));}catch{}
-    // Dar de baja del inventario
-    setInv(p=>p.map(i=>i.id===r.prodId?{...i,stock:Math.max(0,i.stock-r.cantidad)}:i));
-    sbActualizarStock(r.prodId, Math.max(0,(inv.find(i=>i.id===r.prodId)?.stock||0)-r.cantidad));
+    const prod = inv.find(i=>i.id===r.prodId);
+    const stockAntes = prod?.stock||0;
+    const stockDespues = Math.max(0, stockAntes - r.cantidad);
+    setInv(p=>p.map(i=>i.id===r.prodId?{...i,stock:stockDespues}:i));
+    sbActualizarStock(r.prodId, stockDespues);
     sbGuardarRetiro(r);
+    // ── Audit forense ─────────────────────────────────────────────
+    logAudit("RETIRO", {
+      resumen: `Retiro: ${prod?.nombre||r.codigo} × ${r.cantidad} u.`,
+      codigo: r.codigo, nombre: prod?.nombre||r.codigo,
+      marca: prod?.marcaNombre||"—",
+      cantidad: r.cantidad,
+      destinatario: r.destinatario||"—",
+      motivo: r.motivo||"—",
+      stockAntes, stockDespues,
+    }, user);
   }
 
   // Cargar datos desde Supabase al inicio — merge inteligente con localStorage
@@ -8612,57 +8624,129 @@ function App(){
     const prod=inv.find(i=>i.codigo.toUpperCase()===cod);
     if(!prod){setBajaMsg({ok:false,msg:`"${cod}" no encontrado`});return;}
     if(prod.stock<=0){setBajaMsg({ok:false,msg:`"${prod.nombre}" ya está agotado`});return;}
+    const stockAntes = prod.stock;
     setInv(p=>p.map(i=>i.id===prod.id?{...i,stock:0}:i));
+    sbActualizarStock(prod.id, 0);
     setBajaMsg({ok:true,msg:`✓ "${prod.nombre}" dado de baja`});
     setBajaCod("");
+    // ── Audit forense ─────────────────────────────────────────────
+    logAudit("BAJA", {
+      resumen: `Baja: ${prod.nombre} (${cod}) — stock ${stockAntes}→0`,
+      codigo: cod, nombre: prod.nombre,
+      marca: prod.marcaNombre||"—",
+      precio: prod.precio,
+      stockAntes, stockDespues: 0,
+    }, user);
   }
+
+  // Buffer de importación para consolidar en un solo evento de auditoría
+  const _importBuf = useRef({items:[], ts:0, timer:null});
 
   function handleImportarExcel({tipo, codigo, stock, producto}){
     if(tipo==="update"){
-      setInv(prev=>prev.map(p=>p.codigo===codigo?{...p,stock:p.stock+stock}:p));
-      // sync updated stock to supabase
       const prod = inv.find(p=>p.codigo===codigo);
-      if(prod) sbActualizarStock(prod.id, (prod.stock||0)+stock);
+      const stockAntes = prod?.stock||0;
+      const stockNuevo = stockAntes + stock;
+      setInv(prev=>prev.map(p=>p.codigo===codigo?{...p,stock:stockNuevo}:p));
+      if(prod) sbActualizarStock(prod.id, stockNuevo);
+      // buffer audit
+      _importBuf.current.items.push({tipo:"update", codigo, nombre:prod?.nombre||codigo,
+        marca:prod?.marcaNombre||"—", stockAntes, stockNuevo, stockSumado:stock});
     } else if(tipo==="create"){
-      // ID numérico compatible con bigint de Supabase
       const localId = Date.now() * 1000 + Math.floor(Math.random()*999);
       const newProd = { id: localId, ...producto };
       setInv(prev=>[...prev, newProd]);
-      // Guardar en Supabase — actualiza id local con el asignado por Supabase
       sbGuardarProducto(newProd).then(sbId=>{
         if(sbId && sbId !== localId){
           setInv(prev=>prev.map(p=>p.id===localId ? {...p, id:sbId} : p));
         }
       });
+      // buffer audit
+      _importBuf.current.items.push({tipo:"create", codigo:producto.codigo,
+        nombre:producto.nombre, marca:producto.marcaNombre||"—",
+        stock:producto.stock, precio:producto.precio, categoria:producto.categoria});
     }
+    // Flush audit después de 800ms sin más llamadas (importación por lotes)
+    clearTimeout(_importBuf.current.timer);
+    _importBuf.current.timer = setTimeout(()=>{
+      const buf = _importBuf.current.items;
+      if(buf.length===0) return;
+      const nuevos = buf.filter(i=>i.tipo==="create").length;
+      const actualizados = buf.filter(i=>i.tipo==="update").length;
+      const marcas = [...new Set(buf.map(i=>i.marca).filter(Boolean))].join(", ");
+      logAudit("IMPORT", {
+        resumen: `Importación: ${nuevos} nuevos + ${actualizados} actualizados · ${marcas}`,
+        nuevos, actualizados,
+        totalItems: buf.length,
+        marcas,
+        items: buf,
+      }, user);
+      _importBuf.current.items = [];
+    }, 800);
   }
 
   function handleVenta(v){
     const id=`V${Date.now()}`;
     const vf={...v,id,fecha:hoy(),hora:hora(),mk:MK,mes,anio};
     setVentas(p=>[...p,vf]);
+    const stockCambios = [];
     v.items.forEach(it=>{
-      setInv(p=>p.map(i=>i.id===it.prodId?{...i,stock:Math.max(0,i.stock-it.cantidad)}:i));
-      sbActualizarStock(it.prodId, Math.max(0,(inv.find(i=>i.id===it.prodId)?.stock||0)-it.cantidad));
+      const stockAntes = inv.find(i=>i.id===it.prodId)?.stock||0;
+      const stockDespues = Math.max(0, stockAntes - it.cantidad);
+      setInv(p=>p.map(i=>i.id===it.prodId?{...i,stock:stockDespues}:i));
+      sbActualizarStock(it.prodId, stockDespues);
+      stockCambios.push({prodId:it.prodId, codigo:it.codigo, nombre:it.nombre, stockAntes, stockDespues});
     });
     drive.syncVenta(vf);
     sbGuardarVenta(vf);
+    // ── Audit forense ─────────────────────────────────────────────
+    const marcas = [...new Set(v.items.map(i=>i.marcaNombre))].join(", ");
+    logAudit("VENTA", {
+      resumen: `Venta Bs ${v.total} · ${v.items.length} ítem(s) · ${marcas}`,
+      ventaId: id,
+      total: v.total,
+      subtotal: v.subtotal,
+      descuento: v.descPct||0,
+      metodoPago: v.metodoPago,
+      efectivo: v.efectivo||0,
+      qr: v.qr||0,
+      tarjeta: v.tarjeta||0,
+      vendedor: v.vendedor||"Tienda",
+      cliente: v.clienteNombre||"—",
+      canal: v.canal||"Tienda",
+      marcas,
+      items: v.items.map(it=>({
+        codigo: it.codigo, nombre: it.nombre,
+        marca: it.marcaNombre, cantidad: it.cantidad,
+        precioUnit: it.precioUnit, subtotal: it.subtotal,
+      })),
+      stockCambios,
+    }, user);
     return vf;
   }
 
   function handleAnularVenta(ventaId){
     const v = ventas.find(x=>x.id===ventaId);
     if(!v||v.anulada) return;
-    // Devolver stock
+    const stockCambios = [];
     v.items.forEach(it=>{
       const actual = inv.find(i=>i.id===it.prodId)?.stock||0;
       setInv(p=>p.map(i=>i.id===it.prodId?{...i,stock:actual+it.cantidad}:i));
       sbActualizarStock(it.prodId, actual+it.cantidad);
+      stockCambios.push({codigo:it.codigo, nombre:it.nombre, stockAntes:actual, stockDespues:actual+it.cantidad});
     });
     const vAnulada = {...v, anulada:true, fechaAnulacion:hoy()};
     setVentas(p=>p.map(x=>x.id===ventaId?vAnulada:x));
     setVentaDetalle(vAnulada);
     sbAnularVenta(ventaId);
+    // ── Audit forense ─────────────────────────────────────────────
+    logAudit("ANULACION", {
+      resumen: `Anulación venta ${ventaId} · Bs ${v.total} devueltos`,
+      ventaId, totalOriginal: v.total,
+      fechaVentaOriginal: v.fecha,
+      items: v.items.map(it=>({codigo:it.codigo, nombre:it.nombre, marca:it.marcaNombre, cantidad:it.cantidad, subtotal:it.subtotal})),
+      stockCambios,
+    }, user);
   }
 
   function toggleAlq(marcaId){
@@ -11161,12 +11245,53 @@ function FacturacionConfig(){
 }
 
 // ── Audit log helpers ─────────────────────────────────────────────────────────
-const AUDIT_KEY = "th_audit_log";
+const AUDIT_KEY = "th_audit_v2";
+
+// ── Tipos de evento forense ────────────────────────────────────────────────
+const AUDIT_TIPOS = {
+  VENTA:      { label:"Venta",        icono:"🛍️",  color:"#1A7A45" },
+  ANULACION:  { label:"Anulación",    icono:"↩️",  color:"#C94C4C" },
+  RETIRO:     { label:"Retiro",       icono:"📤",  color:"#8A6418" },
+  BAJA:       { label:"Baja",         icono:"🚫",  color:"#C94C4C" },
+  IMPORT:     { label:"Importación",  icono:"📥",  color:"#1565C0" },
+  STOCK_ADD:  { label:"Entrada stock",icono:"📦",  color:"#2E7D32" },
+  USUARIO:    { label:"Usuario",      icono:"👤",  color:"#6A1B9A" },
+  RESET:      { label:"Factory Reset",icono:"🔄",  color:"#C94C4C" },
+  LOGIN:      { label:"Acceso",       icono:"🔐",  color:"#546E7A" },
+  CIERRE:     { label:"Cierre",       icono:"📊",  color:"#8A6418" },
+};
+
+function logAudit(tipo, detalle, usuario){
+  try{
+    const now = new Date();
+    const evento = {
+      id: "EVT_"+Date.now()+"_"+Math.random().toString(36).slice(2,6),
+      ts: Date.now(),
+      fecha: now.toLocaleDateString("es-BO"),
+      hora:  now.toLocaleTimeString("es-BO",{hour:"2-digit",minute:"2-digit",second:"2-digit"}),
+      tipo,
+      usuario: usuario?.usuario || usuario?.user || "—",
+      nombre:  usuario?.nombre || "—",
+      rol:     usuario?.rol    || "—",
+      ...detalle,
+    };
+    const logs = JSON.parse(localStorage.getItem(AUDIT_KEY)||"[]");
+    logs.unshift(evento);
+    localStorage.setItem(AUDIT_KEY, JSON.stringify(logs.slice(0,1000)));
+  }catch{}
+}
+
+// legacy wrapper — para compatibilidad con código existente
 function agregarAudit(accion, afectado, admin){
   try{
     const logs = JSON.parse(localStorage.getItem(AUDIT_KEY)||"[]");
-    logs.unshift({id:Date.now(), fecha:new Date().toLocaleString("es-BO"), accion, afectado, admin});
-    localStorage.setItem(AUDIT_KEY, JSON.stringify(logs.slice(0,200)));
+    logs.unshift({
+      id:"EVT_"+Date.now(), ts:Date.now(),
+      fecha:new Date().toLocaleDateString("es-BO"),
+      hora: new Date().toLocaleTimeString("es-BO",{hour:"2-digit",minute:"2-digit"}),
+      tipo:"USUARIO", resumen:accion, detalle:{afectado}, nombre:admin, usuario:admin, rol:"admin"
+    });
+    localStorage.setItem(AUDIT_KEY, JSON.stringify(logs.slice(0,1000)));
   }catch{}
 }
 function generarTempPassword(){
@@ -11458,6 +11583,448 @@ function UserFormModal({editUser, usuarios, onClose, onGuardar}){
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+// ── Auditoría Forense Tab ─────────────────────────────────────────────────────
+function AuditoriaTab({auditLog, setAuditLog}){
+  const [filtroTipo,  setFiltroTipo]  = useState("TODOS");
+  const [filtroMarca, setFiltroMarca] = useState("");
+  const [busqueda,    setBusqueda]    = useState("");
+  const [detalle,     setDetalle]     = useState(null); // evento seleccionado
+  const [vista,       setVista]       = useState("timeline"); // timeline | trazabilidad
+  const [trazCod,     setTrazCod]     = useState("");
+
+  // ── Filtrar log ──────────────────────────────────────────────────
+  const logFiltrado = useMemo(()=>{
+    return auditLog.filter(e=>{
+      if(filtroTipo!=="TODOS" && e.tipo!==filtroTipo) return false;
+      const txt = (e.resumen||"")+" "+(e.nombre||"")+" "+(e.marcas||"")+" "+(e.codigo||"")+" "+(e.ventaId||"");
+      if(busqueda && !txt.toLowerCase().includes(busqueda.toLowerCase())) return false;
+      if(filtroMarca && !(e.marcas||"").toLowerCase().includes(filtroMarca.toLowerCase()) &&
+         !(e.marca||"").toLowerCase().includes(filtroMarca.toLowerCase())) return false;
+      return true;
+    });
+  },[auditLog, filtroTipo, busqueda, filtroMarca]);
+
+  // ── Stats rápidas ────────────────────────────────────────────────
+  const stats = useMemo(()=>{
+    const s = {VENTA:0, ANULACION:0, RETIRO:0, BAJA:0, IMPORT:0, USUARIO:0, RESET:0};
+    auditLog.forEach(e=>{ if(s[e.tipo]!==undefined) s[e.tipo]++; });
+    const totalVentas = auditLog.filter(e=>e.tipo==="VENTA").reduce((a,e)=>a+(e.total||0),0);
+    return {...s, totalVentas};
+  },[auditLog]);
+
+  // ── Trazabilidad por código ──────────────────────────────────────
+  const trazLogs = useMemo(()=>{
+    if(!trazCod.trim()) return [];
+    const cod = trazCod.trim().toUpperCase();
+    return auditLog.filter(e=>{
+      if(e.codigo?.toUpperCase()===cod) return true;
+      if(e.items?.some(i=>i.codigo?.toUpperCase()===cod)) return true;
+      if(e.stockCambios?.some(i=>i.codigo?.toUpperCase()===cod)) return true;
+      return false;
+    });
+  },[auditLog, trazCod]);
+
+  // ── Color / icono por tipo ───────────────────────────────────────
+  const tc = t => AUDIT_TIPOS[t] || {label:t, icono:"📝", color:C.label3};
+
+  // ── Exportar log a Excel ─────────────────────────────────────────
+  async function exportarAudit(){
+    const XLSX = await loadXLSX();
+    const rows = [
+      ["TOSCANA HOUSE — Auditoría Forense","","","","",""],
+      ["Exportado:", new Date().toLocaleString("es-BO"),"","","",""],
+      [],
+      ["Fecha","Hora","Tipo","Resumen","Usuario","Detalle"],
+      ...logFiltrado.map(e=>[
+        e.fecha, e.hora,
+        tc(e.tipo).label,
+        e.resumen||"",
+        `${e.nombre||""} (@${e.usuario||""})`,
+        JSON.stringify(e.items||e.stockCambios||{}).slice(0,200)
+      ])
+    ];
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    ws["!cols"] = [12,8,14,48,20,50].map(w=>({wch:w}));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Auditoría");
+    const buf = XLSX.write(wb,{bookType:"xlsx",type:"array"});
+    descargarArchivo(new Blob([buf],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}),
+      `TH_Auditoria_${new Date().toISOString().slice(0,10)}.xlsx`);
+  }
+
+  return (
+    <div>
+      {/* ── Stats chips ── */}
+      <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:16}}>
+        {[
+          {k:"VENTA",    label:`${stats.VENTA} ventas`,    extra:`Bs ${stats.totalVentas.toLocaleString()}`},
+          {k:"ANULACION",label:`${stats.ANULACION} anulac.`},
+          {k:"RETIRO",   label:`${stats.RETIRO} retiros`},
+          {k:"BAJA",     label:`${stats.BAJA} bajas`},
+          {k:"IMPORT",   label:`${stats.IMPORT} imports`},
+        ].map(s=>(
+          <div key={s.k} onClick={()=>setFiltroTipo(filtroTipo===s.k?"TODOS":s.k)}
+            style={{padding:"6px 12px",borderRadius:20,cursor:"pointer",
+              background: filtroTipo===s.k ? tc(s.k).color : `${tc(s.k).color}18`,
+              border:`1.5px solid ${tc(s.k).color}40`,
+              transition:"all .15s"}}>
+            <span style={{fontSize:12,fontWeight:700,fontFamily:FONT,
+              color: filtroTipo===s.k?"#fff":tc(s.k).color}}>
+              {tc(s.k).icono} {s.label}
+            </span>
+            {s.extra&&<span style={{fontSize:10,color:filtroTipo===s.k?"#ffffffaa":C.label3,
+              fontFamily:FONT,marginLeft:4}}>{s.extra}</span>}
+          </div>
+        ))}
+      </div>
+
+      {/* ── Controles: búsqueda + vista ── */}
+      <div style={{display:"flex",gap:8,marginBottom:12}}>
+        <input value={busqueda} onChange={e=>setBusqueda(e.target.value)}
+          placeholder="🔍 Buscar código, marca, usuario..."
+          style={{flex:1,padding:"10px 14px",borderRadius:12,border:`1.5px solid ${C.sep}`,
+            background:C.bg1,fontSize:13,fontFamily:FONT,color:C.label,outline:"none"}}/>
+        <button onClick={()=>setVista(v=>v==="timeline"?"trazabilidad":"timeline")}
+          style={{padding:"10px 14px",borderRadius:12,border:`1.5px solid ${C.sep}`,
+            background:vista==="trazabilidad"?C.gold:C.bg1,
+            color:vista==="trazabilidad"?"#fff":C.label,fontSize:12,fontWeight:600,
+            fontFamily:FONT,cursor:"pointer",whiteSpace:"nowrap"}}>
+          🔎 Trazabilidad
+        </button>
+        <button onClick={exportarAudit}
+          style={{padding:"10px 12px",borderRadius:12,border:`1.5px solid ${C.sep}`,
+            background:C.bg1,color:C.label,fontSize:12,fontWeight:600,
+            fontFamily:FONT,cursor:"pointer"}}>
+          📥 XLS
+        </button>
+      </div>
+
+      {/* ── Vista Trazabilidad ── */}
+      {vista==="trazabilidad"&&(
+        <div style={{marginBottom:16}}>
+          <input value={trazCod} onChange={e=>setTrazCod(e.target.value.toUpperCase())}
+            placeholder="Ingresa código de producto (ej: SEN-M-001)"
+            style={{width:"100%",padding:"12px 16px",borderRadius:12,
+              border:`2px solid ${C.gold}60`,background:C.bg1,
+              fontSize:14,fontFamily:FONT,color:C.label,outline:"none",
+              boxSizing:"border-box",marginBottom:12}}/>
+          {trazCod&&(
+            trazLogs.length===0
+              ? <div style={{textAlign:"center",padding:24,color:C.label3,fontFamily:FONT,fontSize:13}}>
+                  Sin movimientos registrados para "{trazCod}"
+                </div>
+              : <div style={{background:C.bg1,borderRadius:16,border:`1px solid ${C.sep}`,overflow:"hidden"}}>
+                  {trazLogs.map((e,i)=>{
+                    const t=tc(e.tipo);
+                    // ítem específico de ese código
+                    const itemEsp = e.items?.find(it=>it.codigo?.toUpperCase()===trazCod)
+                                 || e.stockCambios?.find(it=>it.codigo?.toUpperCase()===trazCod);
+                    return (
+                      <div key={e.id} onClick={()=>setDetalle(e)}
+                        style={{padding:"12px 16px",borderBottom:i<trazLogs.length-1?`1px solid ${C.sep}`:"",
+                          cursor:"pointer",display:"flex",gap:12,alignItems:"flex-start"}}>
+                        <div style={{width:32,height:32,borderRadius:10,flexShrink:0,
+                          background:`${t.color}18`,display:"flex",alignItems:"center",
+                          justifyContent:"center",fontSize:16}}>{t.icono}</div>
+                        <div style={{flex:1,minWidth:0}}>
+                          <div style={{display:"flex",justifyContent:"space-between",gap:8}}>
+                            <span style={{fontSize:13,fontWeight:700,color:t.color,fontFamily:FONT}}>{t.label}</span>
+                            <span style={{fontSize:10,color:C.label3,fontFamily:FONT}}>{e.fecha} {e.hora}</span>
+                          </div>
+                          {itemEsp&&(
+                            <div style={{fontSize:12,color:C.label,fontFamily:FONT,marginTop:2}}>
+                              {e.tipo==="VENTA"&&`Vendido ×${itemEsp.cantidad} · Bs ${itemEsp.subtotal}`}
+                              {e.tipo==="RETIRO"&&`Retirado ×${e.cantidad}`}
+                              {e.tipo==="BAJA"&&`Dado de baja · stock ${itemEsp.stockAntes||e.stockAntes}→0`}
+                              {e.tipo==="IMPORT"&&`${itemEsp.tipo==="create"?"Ingresado":"Actualizado"} · stock ${itemEsp.stock||itemEsp.stockNuevo}`}
+                              {e.tipo==="ANULACION"&&`Venta anulada · stock devuelto ×${itemEsp.cantidad||""}`}
+                              {e.tipo==="STOCK_ADD"&&`Stock ${itemEsp.stockAntes}→${itemEsp.stockDespues}`}
+                            </div>
+                          )}
+                          <div style={{fontSize:11,color:C.label3,fontFamily:FONT,marginTop:1}}>
+                            @{e.usuario} · {e.nombre}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Timeline ── */}
+      {vista==="timeline"&&(
+        <>
+          <div style={{fontSize:11,color:C.label3,fontFamily:FONT,marginBottom:8}}>
+            {logFiltrado.length} evento{logFiltrado.length!==1?"s":""} · últimos 1000 registrados
+            {auditLog.length===0&&" — los nuevos movimientos aparecerán aquí en tiempo real"}
+          </div>
+
+          {logFiltrado.length===0
+            ? <div style={{textAlign:"center",padding:"48px 0",color:C.label3}}>
+                <div style={{fontSize:40,marginBottom:8,opacity:.3}}>🔬</div>
+                <div style={{fontFamily:FONT,fontSize:14}}>Sin eventos registrados</div>
+                <div style={{fontFamily:FONT,fontSize:12,marginTop:4,opacity:.7}}>
+                  Los movimientos (ventas, retiros, bajas, imports) aparecen aquí al instante
+                </div>
+              </div>
+            : <div style={{background:C.bg1,borderRadius:16,overflow:"hidden",
+                border:`1px solid ${C.sep}`,boxShadow:"0 1px 6px rgba(0,0,0,0.04)"}}>
+                {logFiltrado.slice(0,200).map((e,i)=>{
+                  const t = tc(e.tipo);
+                  return (
+                    <div key={e.id} onClick={()=>setDetalle(e)}
+                      style={{display:"flex",gap:12,padding:"12px 16px",alignItems:"flex-start",
+                        cursor:"pointer",
+                        borderBottom:i<Math.min(logFiltrado.length,200)-1?`1px solid ${C.sep}`:"",
+                        background:"transparent",transition:"background .1s"}}>
+                      {/* Icono tipo */}
+                      <div style={{width:34,height:34,borderRadius:10,flexShrink:0,
+                        background:`${t.color}15`,display:"flex",alignItems:"center",
+                        justifyContent:"center",fontSize:16,marginTop:1}}>
+                        {t.icono}
+                      </div>
+                      {/* Contenido */}
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{display:"flex",justifyContent:"space-between",
+                          alignItems:"flex-start",gap:8,marginBottom:2}}>
+                          <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
+                            <span style={{fontSize:11,fontWeight:700,color:t.color,
+                              fontFamily:FONT,textTransform:"uppercase",letterSpacing:.5}}>
+                              {t.label}
+                            </span>
+                            {e.tipo==="VENTA"&&e.total&&(
+                              <span style={{fontSize:12,fontWeight:700,color:C.label,fontFamily:FONT}}>
+                                Bs {e.total}
+                              </span>
+                            )}
+                            {e.tipo==="IMPORT"&&(
+                              <span style={{fontSize:11,color:C.label2,fontFamily:FONT}}>
+                                +{e.nuevos||0} nuevos
+                              </span>
+                            )}
+                          </div>
+                          <span style={{fontSize:10,color:C.label3,fontFamily:FONT,
+                            flexShrink:0,whiteSpace:"nowrap"}}>
+                            {e.fecha} {e.hora}
+                          </span>
+                        </div>
+                        <div style={{fontSize:12,color:C.label,fontFamily:FONT,
+                          marginBottom:3,lineHeight:1.4,overflow:"hidden",
+                          whiteSpace:"nowrap",textOverflow:"ellipsis"}}>
+                          {e.resumen}
+                        </div>
+                        <div style={{display:"flex",gap:10,alignItems:"center"}}>
+                          <span style={{fontSize:10,color:C.label3,fontFamily:FONT}}>
+                            @{e.usuario} · {e.nombre}
+                          </span>
+                          {e.items?.length>0&&(
+                            <span style={{fontSize:10,color:C.label3,fontFamily:FONT}}>
+                              · {e.items.length} ítem{e.items.length>1?"s":""}
+                            </span>
+                          )}
+                          <span style={{fontSize:10,color:C.label3,fontFamily:FONT,
+                            marginLeft:"auto"}}>ver detalle →</span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+          }
+
+          {auditLog.length>0&&(
+            <button onClick={()=>{
+              if(!window.confirm("¿Limpiar el historial de auditoría?")) return;
+              localStorage.removeItem(AUDIT_KEY);
+              setAuditLog([]);
+            }} style={{marginTop:12,width:"100%",padding:"10px",borderRadius:12,
+              border:`1px solid ${C.sep}`,background:C.bg1,
+              fontSize:12,color:C.label3,fontFamily:FONT,cursor:"pointer"}}>
+              Limpiar historial
+            </button>
+          )}
+        </>
+      )}
+
+      {/* ── Modal detalle evento ── */}
+      {detalle&&(
+        <div onClick={()=>setDetalle(null)}
+          style={{position:"fixed",inset:0,zIndex:700,
+            background:"rgba(0,0,0,0.5)",backdropFilter:"blur(4px)",
+            display:"flex",alignItems:"flex-end",justifyContent:"center"}}>
+          <div onClick={e=>e.stopPropagation()}
+            style={{background:C.bg0,borderRadius:"24px 24px 0 0",
+              width:"100%",maxWidth:680,maxHeight:"85vh",
+              display:"flex",flexDirection:"column",
+              boxShadow:"0 -8px 40px rgba(0,0,0,0.2)"}}>
+            {/* Header modal */}
+            <div style={{padding:"20px 20px 14px",borderBottom:`1px solid ${C.sep}`,
+              display:"flex",justifyContent:"space-between",alignItems:"center",flexShrink:0}}>
+              <div style={{display:"flex",gap:10,alignItems:"center"}}>
+                <span style={{fontSize:24}}>{tc(detalle.tipo).icono}</span>
+                <div>
+                  <div style={{fontSize:14,fontWeight:700,color:tc(detalle.tipo).color,fontFamily:FONT}}>
+                    {tc(detalle.tipo).label}
+                  </div>
+                  <div style={{fontSize:11,color:C.label3,fontFamily:FONT}}>
+                    {detalle.fecha} · {detalle.hora} · @{detalle.usuario}
+                  </div>
+                </div>
+              </div>
+              <button onClick={()=>setDetalle(null)}
+                style={{width:32,height:32,borderRadius:10,border:`1px solid ${C.sep}`,
+                  background:C.bg1,cursor:"pointer",fontSize:16,color:C.label}}>✕</button>
+            </div>
+            {/* Body modal */}
+            <div style={{overflowY:"auto",padding:"16px 20px 32px",flex:1}}>
+              {/* Resumen */}
+              <div style={{background:`${tc(detalle.tipo).color}10`,borderRadius:12,
+                padding:"12px 14px",marginBottom:14,
+                border:`1px solid ${tc(detalle.tipo).color}30`}}>
+                <div style={{fontSize:13,fontWeight:600,color:C.label,fontFamily:FONT,lineHeight:1.5}}>
+                  {detalle.resumen}
+                </div>
+              </div>
+
+              {/* VENTA detalle */}
+              {(detalle.tipo==="VENTA"||detalle.tipo==="ANULACION")&&(
+                <>
+                  <Row k="ID Venta"    v={detalle.ventaId}/>
+                  <Row k="Total"       v={`Bs ${detalle.total||detalle.totalOriginal}`}/>
+                  {detalle.tipo==="VENTA"&&<>
+                    <Row k="Método pago" v={detalle.metodoPago}/>
+                    {detalle.efectivo>0&&<Row k="Efectivo" v={`Bs ${detalle.efectivo}`}/>}
+                    {detalle.qr>0&&      <Row k="QR"       v={`Bs ${detalle.qr}`}/>}
+                    {detalle.tarjeta>0&& <Row k="Tarjeta"  v={`Bs ${detalle.tarjeta}`}/>}
+                    {detalle.descuento>0&&<Row k="Descuento" v={`${detalle.descuento}%`}/>}
+                    <Row k="Vendedor"   v={detalle.vendedor}/>
+                    <Row k="Canal"      v={detalle.canal}/>
+                    <Row k="Cliente"    v={detalle.cliente}/>
+                  </>}
+                  {detalle.tipo==="ANULACION"&&<Row k="Fecha venta orig." v={detalle.fechaVentaOriginal}/>}
+                  {detalle.items?.length>0&&(
+                    <div style={{marginTop:12}}>
+                      <div style={{fontSize:11,fontWeight:700,color:C.label3,
+                        fontFamily:FONT,textTransform:"uppercase",letterSpacing:.7,marginBottom:6}}>
+                        Ítems
+                      </div>
+                      {detalle.items.map((it,j)=>(
+                        <div key={j} style={{padding:"8px 12px",borderRadius:10,
+                          background:C.bg1,border:`1px solid ${C.sep}`,marginBottom:6}}>
+                          <div style={{display:"flex",justifyContent:"space-between"}}>
+                            <span style={{fontSize:13,fontWeight:600,color:C.label,fontFamily:FONT}}>
+                              {it.nombre}
+                            </span>
+                            <span style={{fontSize:13,fontWeight:700,color:C.label,fontFamily:FONT}}>
+                              Bs {it.subtotal}
+                            </span>
+                          </div>
+                          <div style={{fontSize:11,color:C.label3,fontFamily:FONT,marginTop:2}}>
+                            {it.codigo} · {it.marca} · ×{it.cantidad} × Bs {it.precioUnit}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* RETIRO detalle */}
+              {detalle.tipo==="RETIRO"&&(
+                <>
+                  <Row k="Código"       v={detalle.codigo}/>
+                  <Row k="Producto"     v={detalle.nombre}/>
+                  <Row k="Marca"        v={detalle.marca}/>
+                  <Row k="Cantidad"     v={detalle.cantidad}/>
+                  <Row k="Destinatario" v={detalle.destinatario}/>
+                  <Row k="Motivo"       v={detalle.motivo}/>
+                  <Row k="Stock antes"  v={detalle.stockAntes}/>
+                  <Row k="Stock después"v={detalle.stockDespues}/>
+                </>
+              )}
+
+              {/* BAJA detalle */}
+              {detalle.tipo==="BAJA"&&(
+                <>
+                  <Row k="Código"       v={detalle.codigo}/>
+                  <Row k="Producto"     v={detalle.nombre}/>
+                  <Row k="Marca"        v={detalle.marca}/>
+                  <Row k="Precio"       v={`Bs ${detalle.precio}`}/>
+                  <Row k="Stock antes"  v={detalle.stockAntes}/>
+                  <Row k="Stock después"v="0 (dado de baja)"/>
+                </>
+              )}
+
+              {/* IMPORT detalle */}
+              {detalle.tipo==="IMPORT"&&(
+                <>
+                  <Row k="Nuevos"       v={detalle.nuevos}/>
+                  <Row k="Actualizados" v={detalle.actualizados}/>
+                  <Row k="Marcas"       v={detalle.marcas}/>
+                  {detalle.items?.length>0&&(
+                    <div style={{marginTop:12}}>
+                      <div style={{fontSize:11,fontWeight:700,color:C.label3,
+                        fontFamily:FONT,textTransform:"uppercase",letterSpacing:.7,marginBottom:6}}>
+                        Ítems importados
+                      </div>
+                      <div style={{maxHeight:220,overflowY:"auto"}}>
+                        {detalle.items.slice(0,50).map((it,j)=>(
+                          <div key={j} style={{display:"flex",justifyContent:"space-between",
+                            padding:"6px 10px",borderRadius:8,background:C.bg1,
+                            border:`1px solid ${C.sep}`,marginBottom:4,fontSize:12,fontFamily:FONT}}>
+                            <span style={{color:C.label}}>{it.codigo} — {it.nombre||it.descripcion}</span>
+                            <span style={{color:it.tipo==="create"?"#1A7A45":"#8A6418",fontWeight:600}}>
+                              {it.tipo==="create"?`+${it.stock}`:`+${it.stockSumado}`}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* Stock cambios */}
+              {detalle.stockCambios?.length>0&&(
+                <div style={{marginTop:12}}>
+                  <div style={{fontSize:11,fontWeight:700,color:C.label3,
+                    fontFamily:FONT,textTransform:"uppercase",letterSpacing:.7,marginBottom:6}}>
+                    Cambios de stock
+                  </div>
+                  {detalle.stockCambios.map((sc,j)=>(
+                    <div key={j} style={{display:"flex",justifyContent:"space-between",
+                      padding:"8px 12px",borderRadius:10,background:C.bg1,
+                      border:`1px solid ${C.sep}`,marginBottom:6,fontSize:12,fontFamily:FONT}}>
+                      <span style={{color:C.label}}>{sc.codigo} — {sc.nombre}</span>
+                      <span style={{color:sc.stockDespues<sc.stockAntes?"#C94C4C":"#1A7A45",fontWeight:700}}>
+                        {sc.stockAntes} → {sc.stockDespues}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+// Fila de detalle reutilizable
+function Row({k,v}){
+  if(v===undefined||v===null||v==="—"||v==="") return null;
+  return (
+    <div style={{display:"flex",justifyContent:"space-between",
+      padding:"8px 0",borderBottom:`1px solid ${C.sep}20`}}>
+      <span style={{fontSize:12,color:C.label3,fontFamily:FONT}}>{k}</span>
+      <span style={{fontSize:12,fontWeight:600,color:C.label,fontFamily:FONT,
+        textAlign:"right",maxWidth:"60%"}}>{String(v)}</span>
     </div>
   );
 }
@@ -12137,60 +12704,9 @@ create policy "allow all usuarios" on usuarios
         </div>
       )}
 
-      {/* ════ AUDITORÍA (admin) ════ */}
+      {/* ════ AUDITORÍA FORENSE (admin) ════ */}
       {subTab==="auditoria"&&isAdmin&&(
-        <div>
-          <div style={{display:"flex",justifyContent:"space-between",
-            alignItems:"center",marginBottom:14}}>
-            <div>
-              <div style={{fontSize:15,fontWeight:700,color:C.label,fontFamily:FONT}}>
-                Registro de actividad
-              </div>
-              <div style={{fontSize:12,color:C.label3,fontFamily:FONT,marginTop:2}}>
-                {auditLog.length} entradas · últimas 200 acciones
-              </div>
-            </div>
-            {auditLog.length>0&&(
-              <button onClick={()=>{localStorage.removeItem(AUDIT_KEY);
-                setAuditLog([]);}}
-                style={{padding:"6px 12px",borderRadius:10,border:`1px solid ${C.sep}`,
-                  background:C.bg2,fontSize:11,color:C.label3,
-                  fontFamily:FONT,cursor:"pointer"}}>Limpiar</button>
-            )}
-          </div>
-          {auditLog.length===0
-            ? <div style={{textAlign:"center",padding:"48px 0",color:C.label3}}>
-                <div style={{fontSize:36,marginBottom:8,opacity:.3}}>📋</div>
-                <div style={{fontFamily:FONT,fontSize:14}}>Sin actividad registrada</div>
-              </div>
-            : <div style={{background:C.bg1,borderRadius:16,overflow:"hidden",
-                border:`1px solid ${C.sep}`,
-                boxShadow:"0 1px 6px rgba(0,0,0,0.04)"}}>
-                {auditLog.slice(0,50).map((log,i)=>(
-                  <div key={log.id} style={{
-                    display:"grid",gridTemplateColumns:"8px 1fr",
-                    gap:"0 14px",padding:"11px 16px",alignItems:"start",
-                    borderBottom:i<auditLog.slice(0,50).length-1
-                      ?`1px solid ${C.sep}`:""}}>
-                    <div style={{width:8,height:8,borderRadius:"50%",
-                      background:C.gold,marginTop:5}}/>
-                    <div>
-                      <div style={{display:"flex",justifyContent:"space-between",
-                        gap:8,marginBottom:2}}>
-                        <span style={{fontSize:13,fontWeight:600,color:C.label,
-                          fontFamily:FONT}}>{log.accion}</span>
-                        <span style={{fontSize:10,color:C.label3,fontFamily:FONT,
-                          flexShrink:0}}>{log.fecha}</span>
-                      </div>
-                      <div style={{fontSize:11,color:C.label3,fontFamily:FONT}}>
-                        @{log.afectado} · por {log.admin}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-          }
-        </div>
+        <AuditoriaTab auditLog={auditLog} setAuditLog={setAuditLog}/>
       )}
 
       {/* ════ SEGURIDAD ════ */}
