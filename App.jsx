@@ -11334,7 +11334,6 @@ function UserFormModal({editUser, usuarios, onClose, onGuardar}){
 
 // ── Sistema Tab con Factory Reset ────────────────────────────────────────────
 function SistemaTab({user, logout}){
-  const C = useColors();
   const [resetState, setResetState] = useState("idle"); // idle | confirm1 | confirm2 | running | done | error
   const [resetLog, setResetLog]   = useState([]);
   const [inputVal, setInputVal]   = useState("");
