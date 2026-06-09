@@ -2252,13 +2252,13 @@ function NavBar({title, subtitle, back, onBack, right}){
 }
 
 // ── Atelier Desktop Sidebar ──────────────────────────────────────────────────
-function DesktopSidebar({tabs, active, onChange, user, logout}){
-  const GROUPS = [
+function DesktopSidebar({tabs, active, onChange, user, logout, groups: customGroups, dotColors: customDot}){
+  const GROUPS = customGroups || [
     {label:"Principal", ids:["inicio","pos","ventas"]},
     {label:"Gestión",   ids:["inventario","marcas","liquidaciones","giftcards"]},
     {label:"Sistema",   ids:["config"]},
   ];
-  const DOT = {
+  const DOT = customDot || {
     inicio:"#8A6418",pos:"#1A1714",ventas:"#1E3A5F",
     inventario:"#166534",marcas:"#5B2D8E",liquidaciones:"#991B1B",
     giftcards:"#92400E",config:C.label3,
@@ -5986,6 +5986,7 @@ function BrandVentaModal({venta, marca, onClose}){
 
 function BrandPortal({user, ventas, inv, logout}){
   // ── TODOS los hooks ANTES de cualquier return condicional ──
+  const isDesktop = useIsDesktop();
   const now = new Date();
   const [mes,  setMes]  = useState(now.getMonth());
   const [anio, setAnio] = useState(now.getFullYear());
@@ -6183,64 +6184,82 @@ function BrandPortal({user, ventas, inv, logout}){
   );
 
   const PORTAL_TABS=[
-    {id:"dashboard",icon:"📊",label:"Dashboard"},
-    {id:"ventas",   icon:"🛍",label:"Ventas"},
-    {id:"inventario",icon:"📦",label:"Inventario"},
-    {id:"liquidacion",icon:"💰",label:"Liquidación"},
+    {id:"dashboard",  icon:"⊞", label:"Inicio"},
+    {id:"ventas",     icon:"◈", label:"Ventas"},
+    {id:"inventario", icon:"◫", label:"Inventario"},
+    {id:"liquidacion",icon:"◎", label:"Liquidar"},
   ];
+  const BRAND_GROUPS=[
+    {label:"Principal", ids:["dashboard","ventas"]},
+    {label:"Gestión",   ids:["inventario","liquidacion"]},
+  ];
+  const BRAND_DOT={
+    dashboard:"#8A6418", ventas:"#1E3A5F",
+    inventario:"#166534", liquidacion:"#991B1B",
+  };
+
+  const MesSel = (
+    <select value={`${mes}-${anio}`}
+      onChange={e=>{const[m,a]=e.target.value.split("-");setMes(Number(m));setAnio(Number(a));}}
+      style={{padding:"7px 10px",borderRadius:10,border:`1px solid ${C.sep}`,
+        background:C.bg2,fontSize:13,color:C.label,fontFamily:FONT,outline:"none",
+        WebkitAppearance:"none",cursor:"pointer"}}>
+      {Array.from({length:12},(_,i)=>{
+        const d=new Date(now.getFullYear(),now.getMonth()-i,1);
+        return <option key={i} value={`${d.getMonth()}-${d.getFullYear()}`}>
+          {MESES[d.getMonth()].slice(0,3)} {d.getFullYear()}
+        </option>;
+      })}
+    </select>
+  );
 
   return (
-    <div style={{minHeight:"100vh",background:C.bg0,fontFamily:FONT_UI,
-      WebkitFontSmoothing:"antialiased",paddingBottom:84}}>
+    <div style={{
+      minHeight:"100vh",background:C.bg0,color:C.label,
+      fontFamily:FONT_UI,WebkitFontSmoothing:"antialiased",
+      paddingBottom: isDesktop ? 0 : 84,
+      display: isDesktop ? "flex" : "block",
+    }}>
 
-      {/* ── Header ── */}
-      <div style={{background:C.bg1,borderBottom:`1px solid ${C.sep}`,
-        padding:"14px 20px",position:"sticky",top:0,zIndex:100,
-        boxShadow:"0 1px 12px rgba(0,0,0,0.06)"}}>
-        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-          <div style={{display:"flex",alignItems:"center",gap:12}}>
-            <div style={{width:40,height:40,borderRadius:12,flexShrink:0,
-              background:`${marca.color}30`,overflow:"hidden",
-              display:"flex",alignItems:"center",justifyContent:"center",fontSize:20}}>
-              {getMarcaImg(marca)
-                ? <img src={getMarcaImg(marca)} alt={marca.nombre} style={{width:40,height:40,objectFit:"cover"}}/>
-                : marca.emoji}
+      {/* ── Sidebar (desktop) ── */}
+      {isDesktop&&<DesktopSidebar
+        tabs={PORTAL_TABS} active={tab} onChange={setTab}
+        user={user} logout={logout}
+        groups={BRAND_GROUPS} dotColors={BRAND_DOT}
+      />}
+
+      {/* ── Main area ── */}
+      <div style={isDesktop?{flex:1,minWidth:0,overflowY:"auto",height:"100vh"}:{}}>
+
+      {/* ── NavBar (móvil) ── */}
+      {!isDesktop&&(
+        <NavBar
+          title={marca.nombre}
+          subtitle="Portal · Vista de marca"
+          right={MesSel}
+        />
+      )}
+
+      {/* ── Selector de mes en desktop (barra superior) ── */}
+      {isDesktop&&(
+        <div style={{
+          display:"flex",alignItems:"center",justifyContent:"space-between",
+          padding:"16px 28px 0",
+        }}>
+          <div>
+            <div style={{fontSize:18,fontWeight:600,color:C.label,fontFamily:FONT,letterSpacing:"-0.01em"}}>
+              {marca.nombre}
             </div>
-            <div>
-              <div style={{fontSize:17,fontWeight:600,color:C.label,fontFamily:FONT,lineHeight:1,letterSpacing:"0.02em"}}>
-                {marca.nombre}
-              </div>
-              <div style={{fontSize:11,color:C.label3,fontFamily:FONT,marginTop:2}}>
-                Portal · Solo lectura
-              </div>
+            <div style={{fontSize:11,color:C.label3,fontFamily:FONT,marginTop:1,textTransform:"uppercase",letterSpacing:".07em"}}>
+              Vista de marca
             </div>
           </div>
-          <div style={{display:"flex",alignItems:"center",gap:10}}>
-            {/* Selector de mes */}
-            <select value={`${mes}-${anio}`}
-              onChange={e=>{const[m,a]=e.target.value.split("-");setMes(Number(m));setAnio(Number(a));}}
-              style={{padding:"7px 10px",borderRadius:10,border:`1px solid ${C.sep}`,
-                background:C.bg2,fontSize:13,color:C.label,fontFamily:FONT,outline:"none",
-                WebkitAppearance:"none",cursor:"pointer"}}>
-              {Array.from({length:12},(_,i)=>{
-                const d=new Date(now.getFullYear(),now.getMonth()-i,1);
-                return <option key={i} value={`${d.getMonth()}-${d.getFullYear()}`}>
-                  {MESES[d.getMonth()].slice(0,3)} {d.getFullYear()}
-                </option>;
-              })}
-            </select>
-            <button onClick={logout} style={{padding:"7px 12px",borderRadius:10,
-              border:`1px solid ${C.sep}`,background:C.bg2,cursor:"pointer",
-              fontSize:12,color:C.label2,fontFamily:FONT,
-              WebkitTapHighlightColor:"transparent"}}>
-              Salir
-            </button>
-          </div>
+          {MesSel}
         </div>
-      </div>
+      )}
 
       {/* ── Content ── */}
-      <div style={{padding:"16px 16px 0", maxWidth:780, margin:"0 auto"}}>
+      <div style={{padding: isDesktop ? "16px 28px 0" : "16px 16px 0", maxWidth: isDesktop ? 900 : 780, margin:"0 auto"}}>
 
         {/* ══ DASHBOARD ══ */}
         {tab==="dashboard"&&(
@@ -6661,27 +6680,6 @@ function BrandPortal({user, ventas, inv, logout}){
 
       </div>
 
-      {/* ── Tab bar ── */}
-      <div style={{
-        position:"fixed",bottom:0,left:0,right:0,
-        background:C.bg1,borderTop:`1px solid ${C.sep}`,
-        display:"flex",paddingBottom:"env(safe-area-inset-bottom,0px)",
-        boxShadow:"0 -4px 20px rgba(0,0,0,0.08)",zIndex:200,
-      }}>
-        {PORTAL_TABS.map(t=>(
-          <button key={t.id} onClick={()=>setTab(t.id)} style={{
-            flex:1,padding:"10px 4px 8px",background:"none",border:"none",cursor:"pointer",
-            display:"flex",flexDirection:"column",alignItems:"center",gap:3,
-            WebkitTapHighlightColor:"transparent",
-          }}>
-            <span style={{fontSize:20,lineHeight:1}}>{t.icon}</span>
-            <span style={{fontSize:10,fontWeight:tab===t.id?800:500,fontFamily:FONT,
-              color:tab===t.id?marca.color:C.label3,letterSpacing:.2}}>{t.label}</span>
-            {tab===t.id&&<div style={{width:20,height:2.5,borderRadius:2,background:marca.color}}/>}
-          </button>
-        ))}
-      </div>
-
       {/* ── Modal detalle venta ── */}
       {ventaSeleccionada&&(
         <BrandVentaModal
@@ -6690,6 +6688,12 @@ function BrandPortal({user, ventas, inv, logout}){
           onClose={()=>setVentaSeleccionada(null)}
         />
       )}
+
+      </div>{/* fin main area */}
+
+      {/* ── Tab bar (móvil) ── */}
+      {!isDesktop&&<TabBar tabs={PORTAL_TABS} active={tab} onChange={setTab}/>}
+
     </div>
   );
 }
@@ -11328,6 +11332,322 @@ function UserFormModal({editUser, usuarios, onClose, onGuardar}){
   );
 }
 
+// ── Sistema Tab con Factory Reset ────────────────────────────────────────────
+function SistemaTab({user, logout}){
+  const C = useColors();
+  const [resetState, setResetState] = useState("idle"); // idle | confirm1 | confirm2 | running | done | error
+  const [resetLog, setResetLog]   = useState([]);
+  const [inputVal, setInputVal]   = useState("");
+  const isAdmin = user?.rol === "admin";
+
+  const INFO_ROWS = [
+    ["Versión","Toscana House OS v3.1"],
+    ["Base de datos","Supabase (nube)"],
+    ["Almacenamiento","localStorage"],
+    ["Usuario activo", user?.nombre || user?.user],
+    ["Rol", user?.rol === "admin" ? "Administrador" : user?.rol === "caja" ? "Caja" : "Marca"],
+  ];
+
+  async function runFactoryReset(){
+    setResetState("running");
+    const log = [];
+    const addLog = (msg, ok=true) => { log.push({msg, ok}); setResetLog([...log]); };
+    try{
+      const H = {
+        "apikey": SUPA_KEY,
+        "Authorization": `Bearer ${SUPA_KEY}`,
+        "Content-Type": "application/json",
+        "Prefer": "return=minimal"
+      };
+      const del = (t,q) => fetch(`${SUPA_URL}/rest/v1/${t}?${q}`,{method:"DELETE",headers:H});
+
+      addLog("Eliminando líneas de venta...");
+      const r1 = await del("venta_items","id=gt.0");
+      addLog(`venta_items — ${r1.ok ? "OK ✓" : "Error "+r1.status}`, r1.ok);
+
+      addLog("Eliminando ventas...");
+      const r2 = await del("ventas","id=neq.00000000-0000-0000-0000-000000000000");
+      addLog(`ventas — ${r2.ok ? "OK ✓" : "Error "+r2.status}`, r2.ok);
+
+      addLog("Eliminando cierres...");
+      const r3 = await del("cierres","id=neq.00000000-0000-0000-0000-000000000000");
+      addLog(`cierres — ${r3.ok ? "OK ✓" : "Error "+r3.status}`, r3.ok);
+
+      addLog("Eliminando inventario...");
+      const r4 = await del("inventario","stock=gte.0");
+      // also try id=gt.0 as fallback
+      if(!r4.ok){
+        const r4b = await del("inventario","id=gt.0");
+        addLog(`inventario — ${r4b.ok ? "OK ✓" : "Error "+r4b.status}`, r4b.ok);
+      } else {
+        addLog(`inventario — OK ✓`);
+      }
+
+      addLog("Limpiando caché local...");
+      const keys=["th_inv","th_ventas","th_alq","th_cierres","th_gc_v1","th_cajas_v1",
+        "th_liq_cfg","th_cucu_cfg","th_drive_url","th_sync_log","th_pos_draft"];
+      keys.forEach(k=>localStorage.removeItem(k));
+      Object.keys(localStorage).forEach(k=>{
+        if(k.startsWith("th_fac_")||k.startsWith("th_liq_")||k.startsWith("th_gc_"))
+          localStorage.removeItem(k);
+      });
+      addLog("Caché local — OK ✓");
+
+      setResetState("done");
+    } catch(e){
+      addLog("Error inesperado: "+e.message, false);
+      setResetState("error");
+    }
+  }
+
+  // ── Render idle (info + botón iniciar) ──
+  const renderIdle = () => (
+    <>
+      {/* Info del sistema */}
+      <div style={{background:C.bg1,borderRadius:16,overflow:"hidden",
+        border:`1px solid ${C.sep}`,marginBottom:20,
+        boxShadow:"0 1px 6px rgba(0,0,0,0.04)"}}>
+        {INFO_ROWS.map(([k,v],i,arr)=>(
+          <div key={k} style={{display:"flex",justifyContent:"space-between",
+            padding:"13px 16px",
+            borderBottom:i<arr.length-1?`1px solid ${C.sep}`:""}}>
+            <span style={{fontSize:14,color:C.label2,fontFamily:FONT}}>{k}</span>
+            <span style={{fontSize:14,fontWeight:500,color:C.label,fontFamily:FONT}}>{v}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Cache local (siempre visible) */}
+      <div style={{background:C.bg1,borderRadius:16,border:`1px solid ${C.sep}`,
+        padding:"16px",marginBottom:12,boxShadow:"0 1px 6px rgba(0,0,0,0.04)"}}>
+        <div style={{fontSize:13,fontWeight:700,color:C.label,fontFamily:FONT,marginBottom:4}}>
+          🗑 Limpiar caché local
+        </div>
+        <div style={{fontSize:12,color:C.label3,fontFamily:FONT,marginBottom:12,lineHeight:1.5}}>
+          Borra solo el caché del navegador. Los datos en la nube permanecen intactos. La app se recarga.
+        </div>
+        <button onClick={()=>{
+          if(!window.confirm("¿Limpiar datos locales? La app se recargará.")) return;
+          const keys=["th_inv","th_ventas","th_alq","th_cierres","th_gc_v1","th_cajas_v1",
+            "th_liq_cfg","th_cucu_cfg","th_drive_url","th_sync_log","th_pos_draft"];
+          keys.forEach(k=>localStorage.removeItem(k));
+          Object.keys(localStorage).forEach(k=>{
+            if(k.startsWith("th_fac_")||k.startsWith("th_liq_")||k.startsWith("th_gc_"))
+              localStorage.removeItem(k);
+          });
+          window.location.reload();
+        }} style={{
+          width:"100%",padding:"11px",borderRadius:10,
+          border:`1.5px solid ${C.gold}40`,background:`${C.gold}12`,
+          cursor:"pointer",fontSize:13,fontWeight:600,color:C.gold,
+          fontFamily:FONT,WebkitTapHighlightColor:"transparent"}}>
+          🗑 Limpiar caché ahora
+        </button>
+      </div>
+
+      {/* Factory Reset — solo admin */}
+      {isAdmin && (
+        <div style={{background:C.bg1,borderRadius:16,
+          border:`2px solid ${C.red}30`,
+          padding:"20px",marginBottom:16}}>
+          <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
+            <span style={{fontSize:20}}>⚠️</span>
+            <span style={{fontSize:14,fontWeight:700,color:C.red,fontFamily:FONT}}>
+              Factory Reset
+            </span>
+          </div>
+          <div style={{fontSize:12,color:C.label3,fontFamily:FONT,lineHeight:1.6,marginBottom:16}}>
+            Elimina <strong>todo</strong> el contenido del sistema: inventario, ventas, cierres y caché local.
+            El sistema quedará como recién instalado. <strong>Esta acción es irreversible.</strong>
+          </div>
+          <button onClick={()=>setResetState("confirm1")} style={{
+            width:"100%",padding:"12px",borderRadius:10,
+            border:`1.5px solid ${C.red}50`,background:`${C.red}12`,
+            cursor:"pointer",fontSize:13,fontWeight:700,color:C.red,
+            fontFamily:FONT,letterSpacing:"0.02em",
+            WebkitTapHighlightColor:"transparent"}}>
+            Iniciar Factory Reset →
+          </button>
+        </div>
+      )}
+
+      <button onClick={logout} style={{
+        width:"100%",padding:"14px",borderRadius:14,
+        border:`1.5px solid ${C.red}30`,background:`${C.red}10`,
+        cursor:"pointer",fontSize:14,fontWeight:700,color:C.red,
+        fontFamily:FONT,display:"flex",alignItems:"center",
+        justifyContent:"center",gap:8,
+        WebkitTapHighlightColor:"transparent"}}>
+        🚪 Cerrar sesión
+      </button>
+    </>
+  );
+
+  // ── Confirm step 1 ──
+  const renderConfirm1 = () => (
+    <div style={{background:C.bg1,borderRadius:20,border:`2px solid ${C.red}40`,
+      padding:"28px 20px",textAlign:"center"}}>
+      <div style={{fontSize:48,marginBottom:12}}>⚠️</div>
+      <div style={{fontSize:17,fontWeight:700,color:C.red,fontFamily:FONT,marginBottom:8}}>
+        ¿Formatear todo el sistema?
+      </div>
+      <div style={{fontSize:13,color:C.label2,fontFamily:FONT,lineHeight:1.7,marginBottom:24}}>
+        Se eliminarán permanentemente:<br/>
+        <strong>Inventario · Ventas · Cierres · Caché local</strong><br/>
+        El sistema quedará completamente vacío.
+      </div>
+      <div style={{display:"flex",gap:10}}>
+        <button onClick={()=>setResetState("idle")} style={{
+          flex:1,padding:"13px",borderRadius:12,
+          border:`1px solid ${C.sep}`,background:C.bg2,
+          cursor:"pointer",fontSize:14,fontWeight:600,color:C.label2,fontFamily:FONT}}>
+          Cancelar
+        </button>
+        <button onClick={()=>{ setInputVal(""); setResetState("confirm2"); }} style={{
+          flex:2,padding:"13px",borderRadius:12,
+          border:`1.5px solid ${C.red}60`,background:`${C.red}15`,
+          cursor:"pointer",fontSize:14,fontWeight:700,color:C.red,fontFamily:FONT}}>
+          Sí, continuar →
+        </button>
+      </div>
+    </div>
+  );
+
+  // ── Confirm step 2: type "RESET" ──
+  const renderConfirm2 = () => (
+    <div style={{background:C.bg1,borderRadius:20,border:`2px solid ${C.red}50`,
+      padding:"28px 20px",textAlign:"center"}}>
+      <div style={{fontSize:36,marginBottom:12}}>🔐</div>
+      <div style={{fontSize:16,fontWeight:700,color:C.label,fontFamily:FONT,marginBottom:8}}>
+        Confirmación final
+      </div>
+      <div style={{fontSize:13,color:C.label2,fontFamily:FONT,lineHeight:1.6,marginBottom:20}}>
+        Escribe <strong style={{color:C.red,letterSpacing:"0.1em"}}>RESET</strong> para confirmar
+        que deseas borrar todos los datos del sistema.
+      </div>
+      <input
+        value={inputVal}
+        onChange={e=>setInputVal(e.target.value)}
+        placeholder="Escribe RESET aquí"
+        style={{
+          width:"100%",padding:"13px 16px",borderRadius:12,
+          border:`1.5px solid ${inputVal==="RESET"?C.red:C.sep}`,
+          background:C.bg2,fontSize:16,fontFamily:FONT,
+          color:C.label,textAlign:"center",letterSpacing:"0.08em",
+          outline:"none",marginBottom:16,
+          transition:"border-color 0.2s"
+        }}
+      />
+      <div style={{display:"flex",gap:10}}>
+        <button onClick={()=>{ setResetState("idle"); setInputVal(""); }} style={{
+          flex:1,padding:"13px",borderRadius:12,
+          border:`1px solid ${C.sep}`,background:C.bg2,
+          cursor:"pointer",fontSize:14,fontWeight:600,color:C.label2,fontFamily:FONT}}>
+          Cancelar
+        </button>
+        <button
+          disabled={inputVal!=="RESET"}
+          onClick={runFactoryReset}
+          style={{
+            flex:2,padding:"13px",borderRadius:12,
+            border:`1.5px solid ${inputVal==="RESET"?C.red+"80":"#ccc"}`,
+            background:inputVal==="RESET"?`${C.red}18`:"#f0f0f0",
+            cursor:inputVal==="RESET"?"pointer":"not-allowed",
+            fontSize:14,fontWeight:700,
+            color:inputVal==="RESET"?C.red:"#aaa",
+            fontFamily:FONT,transition:"all 0.2s"}}>
+          🗑 Borrar todo
+        </button>
+      </div>
+    </div>
+  );
+
+  // ── Running ──
+  const renderRunning = () => (
+    <div style={{background:C.bg1,borderRadius:20,border:`1px solid ${C.sep}`,
+      padding:"28px 20px"}}>
+      <div style={{fontSize:14,fontWeight:700,color:C.label,fontFamily:FONT,marginBottom:16,textAlign:"center"}}>
+        ⏳ Ejecutando reset...
+      </div>
+      {resetLog.map((l,i)=>(
+        <div key={i} style={{
+          fontSize:12,fontFamily:FONT,color:l.ok?C.label2:C.red,
+          padding:"4px 0",borderBottom:`1px solid ${C.sep}20`,
+          display:"flex",alignItems:"center",gap:6}}>
+          <span>{l.ok?"✓":"✗"}</span>
+          <span>{l.msg}</span>
+        </div>
+      ))}
+      <div style={{fontSize:12,color:C.label3,fontFamily:FONT,marginTop:12,textAlign:"center"}}>
+        No cierres esta ventana...
+      </div>
+    </div>
+  );
+
+  // ── Done ──
+  const renderDone = () => (
+    <div style={{background:C.bg1,borderRadius:20,border:`1px solid ${C.sep}`,
+      padding:"32px 20px",textAlign:"center"}}>
+      <div style={{fontSize:52,marginBottom:12}}>✅</div>
+      <div style={{fontSize:17,fontWeight:700,color:C.label,fontFamily:FONT,marginBottom:8}}>
+        Sistema formateado
+      </div>
+      <div style={{fontSize:13,color:C.label2,fontFamily:FONT,lineHeight:1.6,marginBottom:8}}>
+        Todos los datos han sido eliminados.<br/>
+        El sistema está listo para comenzar de cero.
+      </div>
+      {resetLog.map((l,i)=>(
+        <div key={i} style={{
+          fontSize:11,fontFamily:FONT,color:l.ok?C.label3:C.red,
+          textAlign:"left",padding:"2px 0"}}>
+          {l.ok?"✓":"✗"} {l.msg}
+        </div>
+      ))}
+      <button onClick={()=>window.location.reload()} style={{
+        marginTop:20,width:"100%",padding:"14px",borderRadius:12,
+        border:"none",background:C.gold,
+        cursor:"pointer",fontSize:14,fontWeight:700,color:"#fff",
+        fontFamily:FONT,WebkitTapHighlightColor:"transparent"}}>
+        Recargar app →
+      </button>
+    </div>
+  );
+
+  // ── Error ──
+  const renderError = () => (
+    <div style={{background:C.bg1,borderRadius:20,border:`2px solid ${C.red}40`,
+      padding:"28px 20px",textAlign:"center"}}>
+      <div style={{fontSize:40,marginBottom:8}}>❌</div>
+      <div style={{fontSize:15,fontWeight:700,color:C.red,fontFamily:FONT,marginBottom:8}}>
+        Error durante el reset
+      </div>
+      {resetLog.map((l,i)=>(
+        <div key={i} style={{fontSize:12,fontFamily:FONT,color:l.ok?C.label2:C.red,
+          textAlign:"left",padding:"2px 0"}}>
+          {l.ok?"✓":"✗"} {l.msg}
+        </div>
+      ))}
+      <button onClick={()=>setResetState("idle")} style={{
+        marginTop:16,width:"100%",padding:"12px",borderRadius:12,
+        border:`1px solid ${C.sep}`,background:C.bg2,
+        cursor:"pointer",fontSize:14,fontWeight:600,color:C.label2,fontFamily:FONT}}>
+        Volver
+      </button>
+    </div>
+  );
+
+  return (
+    <div>
+      {resetState==="idle"    && renderIdle()}
+      {resetState==="confirm1"&& renderConfirm1()}
+      {resetState==="confirm2"&& renderConfirm2()}
+      {resetState==="running" && renderRunning()}
+      {resetState==="done"    && renderDone()}
+      {resetState==="error"   && renderError()}
+    </div>
+  );
+}
+
 // ── Panel configuración principal ─────────────────────────────────────────────
 function ConfigTab({user, logout}){
   const [subTab, setSubTab] = useState("perfil");
@@ -11775,36 +12095,7 @@ create policy "allow all usuarios" on usuarios
 
       {/* ════ SISTEMA ════ */}
       {subTab==="sistema"&&(
-        <div>
-          <div style={{background:C.bg1,borderRadius:16,overflow:"hidden",
-            border:`1px solid ${C.sep}`,marginBottom:20,
-            boxShadow:"0 1px 6px rgba(0,0,0,0.04)"}}>
-            {[
-              ["Versión","Toscana House OS v3.1"],
-              ["Base de datos","Supabase (nube)"],
-              ["Almacenamiento","localStorage"],
-              ["Usuario activo",user.nombre],
-              ["Rol",ROL_CFG[user.rol]?.label||user.rol],
-            ].map(([k,v],i,arr)=>(
-              <div key={k} style={{display:"flex",justifyContent:"space-between",
-                padding:"13px 16px",
-                borderBottom:i<arr.length-1?`1px solid ${C.sep}`:""}}>
-                <span style={{fontSize:14,color:C.label2,fontFamily:FONT}}>{k}</span>
-                <span style={{fontSize:14,fontWeight:500,color:C.label,
-                  fontFamily:FONT}}>{v}</span>
-              </div>
-            ))}
-          </div>
-          <button onClick={logout} style={{
-            width:"100%",padding:"14px",borderRadius:14,
-            border:`1.5px solid ${C.red}30`,background:`${C.red}10`,
-            cursor:"pointer",fontSize:14,fontWeight:700,color:C.red,
-            fontFamily:FONT,display:"flex",alignItems:"center",
-            justifyContent:"center",gap:8,
-            WebkitTapHighlightColor:"transparent"}}>
-            🚪 Cerrar sesión
-          </button>
-        </div>
+        <SistemaTab user={user} logout={logout}/>
       )}
 
       {/* ════ FACTURACIÓN ════ */}
