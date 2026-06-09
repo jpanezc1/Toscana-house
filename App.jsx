@@ -4873,135 +4873,265 @@ function ImportarExcelModal({inv, onImportar, onClose}){
       const XLSX = await loadXLSX();
       const buf  = await file.arrayBuffer();
       const wb   = XLSX.read(buf,{type:"array"});
-      const ws   = wb.Sheets[wb.SheetNames[0]];
-      const raw  = XLSX.utils.sheet_to_json(ws,{header:1,defval:""});
+
+      // ── Leer TODAS las hojas y unir filas ────────────────────────────
+      let rawAll = [];
+      for(const shName of wb.SheetNames){
+        const ws  = wb.Sheets[shName];
+        const rows = XLSX.utils.sheet_to_json(ws,{header:1,defval:""});
+        if(rows.length>1) rawAll = rawAll.concat(rows);
+      }
+      const raw = rawAll;
 
       if(raw.length<2){ setEstado("idle"); alert("El archivo está vacío o no tiene datos"); return; }
 
-      // ── Auto-detectar fila de encabezado (hasta 10 filas de preámbulo) ──
-      // Requiere ≥2 celdas distintas con keywords (evita falso positivo con celdas
-      // de texto libre que contengan palabras como "precio" o "marca" en el cuerpo)
-      let hRow=0;
-      for(let i=0;i<Math.min(10,raw.length);i++){
-        const r=raw[i].map(c=>norm(String(c)).toLowerCase());
-        const kwCount=r.filter(c=>
-          c.includes("descripcion")||c.includes("precio")||c.includes("sku")||
-          c.includes("articulo")||c.includes("marca")||c.includes("item")||
-          c.includes("stock")||c.includes("cantidad")||c.includes("codigo")
-        ).length;
-        if(kwCount>=2){ hRow=i; break; }
+      // ── Utilidad: normalizar texto (quita tildes, trim, lowercase) ────
+      const n = s => norm(String(s||"")).toLowerCase().trim();
+
+      // ── Detectar fila de encabezado — busca hasta fila 15 ────────────
+      // Puntúa cada fila según cuántas keywords de inventario contiene
+      const KWS = ["descripcion","precio","sku","articulo","marca","item","stock",
+                   "cantidad","codigo","nombre","producto","talla","categoria","unidad"];
+      let hRow=0, hScore=0;
+      for(let i=0;i<Math.min(15,raw.length);i++){
+        const r = raw[i].map(c=>n(c));
+        const score = r.reduce((acc,c)=>acc + KWS.filter(k=>c.includes(k)).length, 0);
+        if(score>hScore){ hScore=score; hRow=i; }
       }
 
-      const headers = raw[hRow].map(h=>norm(String(h)).toLowerCase().trim());
-      const col     = (...names)=>{
-        for(const n of names){ const i=headers.findIndex(h=>h.includes(n)); if(i>=0)return i; }
+      const headers = raw[hRow].map(h=>n(h));
+
+      // ── Buscador de columna flexible ─────────────────────────────────
+      // Acepta lista de keywords; retorna índice de la primera columna que
+      // contiene cualquiera de ellas. Prioriza match exacto luego includes.
+      const col = (...names) => {
+        for(const nm of names){
+          const exact = headers.findIndex(h=>h===nm);
+          if(exact>=0) return exact;
+        }
+        for(const nm of names){
+          const found = headers.findIndex(h=>h.includes(nm));
+          if(found>=0) return found;
+        }
         return -1;
       };
 
-      // ── Detectar formato iZi ──────────────────────────────────────────
-      // iZi tiene "SUBGATEGORÍA" (typo con G) y "ÍTEM/ARTÍCULO" en el header
-      const isIZi = headers.some(h=>h.includes("subgategoria")||h.includes("item/articulo")||h.includes("item/art"));
+      // ── Detectar formato por fingerprint de headers ───────────────────
+      const hJoined = headers.join("|");
 
-      let cSKU, cMarca, cDesc, cPrecio, cCat, cTalla, cColor, cStock, cSubcat;
+      // Formato A: Plantilla Toscana House oficial
+      // Headers: ★  MARCA | ★  DESCRIPCION DEL PRODUCTO | ★  PRECIO | STOCK | TALLA | CATEGORIA | COLOR | SKU
+      const isTH = headers.some(h=>h.includes("★")||h.includes("descripcion del producto"));
 
-      if(isIZi){
-        // ── Mapeo iZi ─────────────────────────────────────────────────
-        // Col A: "1. Código del ÍTEM/ARTÍCULO" → SKU (siempre vacío → auto)
-        // Col B: "2. CATEGORÍA"               → MARCA (brand)
-        // Col D: "4. SUBGATEGORÍA"            → CATEGORÍA (tipo de prenda)
-        // Col E: "5. DESCRIPCIÓN"             → DESCRIPCIÓN
-        // Col H: "CANTIDAD ACTUAL"            → STOCK
-        // Col I: "PRECIO DE VENTA (Bs.)"      → PRECIO
-        cSKU   = col("codigo","articulo","item");
-        cMarca = headers.findIndex(h=>h.includes("categoria")&&!h.includes("sub")&&!h.includes("gategoria"));
-        if(cMarca===-1) cMarca = headers.findIndex(h=>h.includes("2.")||h.includes("categoria"));
-        cCat   = col("subgategoria","subcategoria","subcat");
-        cDesc  = col("descripcion");
-        cPrecio= col("precio de venta","precio venta","precio");
-        cTalla = -1;  // iZi no tiene columna talla
-        cColor = -1;
-        cStock = col("cantidad actual","cantidad","stock","existencia");
-        cSubcat= -1;
+      // Formato B: Plantilla numérica (PDF de marcas / "1. Código del ÍTEM/ARTÍCULO")
+      // Headers numerados: "1. codigo...", "2. nombre", "3. categoria", "4. descripcion", "5. unidad", "6. cant"
+      const isNumerico = headers.some(h=>/^\d+\.\s/.test(h)||h.includes("item/art")||h.includes("unidad de medida")||h.includes("cant. de ingreso"));
+
+      // Formato C: iZi (SUBGATEGORÍA con typo)
+      const isIZi = !isNumerico && headers.some(h=>h.includes("subgategoria"));
+
+      // Formato D: Estándar genérico (cualquier otro Excel reconocible)
+      // — se maneja con col() flexible abajo
+
+      let cSKU, cMarca, cDesc, cPrecio, cCat, cTalla, cColor, cStock;
+
+      if(isTH){
+        // ── Plantilla Oficial TH ──────────────────────────────────────
+        cMarca  = col("marca");
+        cDesc   = col("descripcion del producto","descripcion","nombre","producto");
+        cPrecio = col("precio");
+        cStock  = col("stock","cantidad","unidades");
+        cTalla  = col("talla","size","medida");
+        cCat    = col("categoria","cat","tipo");
+        cColor  = col("color");
+        cSKU    = col("sku","codigo","cod","code");
+
+      } else if(isNumerico){
+        // ── Plantilla numérica (PDF / marcas) ─────────────────────────
+        // Columnas típicas: [código, nombre/marca, categoria, descripcion, talla/unidad, stock/cant, alerta, precio]
+        // Mapeamos por posición + keyword
+        cSKU    = col("codigo","item","articulo","sku","ref");
+        // "2. Nombre" = nombre de la MARCA
+        cMarca  = headers.findIndex(h=>h.match(/^2\.|h\.includes("nombre")/))||
+                  headers.findIndex(h=>h==="nombre"||h.includes("2. nombre")||h.includes("nombre de"));
+        if(cMarca<0) cMarca = col("nombre","marca","brand");
+        cCat    = headers.findIndex(h=>h.match(/^3\./)&&h.includes("categ"))||col("categoria","cat","tipo","rubro");
+        cDesc   = col("descripcion del producto","descripcion","desc","producto");
+        // "5. Unidad de medida" = talla en este formato
+        cTalla  = col("unidad de medida","unidad","medida","talla","size");
+        // "6. Cant. De ingreso" = stock
+        cStock  = col("cant. de ingreso","cant de ingreso","cantidad de ingreso","cant","cantidad","stock","existencia","ingreso");
+        cColor  = col("color");
+        cPrecio = col("precio de venta","precio venta","precio");
+
+      } else if(isIZi){
+        // ── Formato iZi ───────────────────────────────────────────────
+        cSKU    = col("codigo","articulo","item");
+        cMarca  = headers.findIndex(h=>h.includes("categoria")&&!h.includes("sub")&&!h.includes("gategoria"));
+        if(cMarca<0) cMarca = col("marca","nombre","brand");
+        cCat    = col("subgategoria","subcategoria","subcat");
+        cDesc   = col("descripcion");
+        cPrecio = col("precio de venta","precio venta","precio");
+        cTalla  = -1;
+        cColor  = -1;
+        cStock  = col("cantidad actual","cantidad","stock","existencia");
+
       } else {
-        // ── Mapeo estándar ────────────────────────────────────────────
-        cSKU   = col("sku","codigo","cod","code","referencia","ref");
-        cMarca = col("marca","brand","tienda");
-        cDesc  = col("descripcion","nombre","producto","desc","item","articulo");
-        cPrecio= col("precio","price","valor","importe","costo","pvp");
-        cCat   = col("categoria","cat","tipo","clasificacion","rubro");
-        cTalla = col("talla","size","talle","medida");
-        cColor = col("color","colour");
-        cStock = col("stock","cantidad","qty","existencia","unidades","piezas");
-        cSubcat= col("subcat","subcategoria","subcategory");
+        // ── Formato genérico — detección máxima ───────────────────────
+        cSKU    = col("sku","codigo","cod","code","referencia","ref","clave","id");
+        cMarca  = col("marca","brand","tienda","empresa","proveedor","nombre marca");
+        cDesc   = col("descripcion","nombre","producto","desc","item","articulo","detalle","concepto");
+        cPrecio = col("precio","price","valor","importe","costo","pvp","monto","tarifa");
+        cCat    = col("categoria","cat","tipo","clasificacion","rubro","linea","familia","grupo");
+        cTalla  = col("talla","size","talle","medida","unidad","modelo","presentacion");
+        cColor  = col("color","colour","tono","variante");
+        cStock  = col("stock","cantidad","qty","existencia","unidades","piezas","disponible","inventario");
       }
 
+      // ── Si no se encontró columna MARCA por header, inferir de datos ─
+      // Escanea primeras 5 filas de datos y ve qué columna contiene
+      // un nombre que coincida con alguna marca del sistema
+      if(cMarca<0){
+        const sampleRows = raw.slice(hRow+1, hRow+8).filter(r=>!r.every(c=>String(c).trim()===""));
+        for(let ci=0; ci<(sampleRows[0]||[]).length; ci++){
+          const vals = sampleRows.map(r=>n(String(r[ci]||""))).filter(v=>v.length>1);
+          const hits = vals.filter(v=>MARCAS.some(m=>
+            n(m.nombre)===v || n(m.nombre).startsWith(v.slice(0,4)) || v.startsWith(n(m.nombre).slice(0,4))
+          ));
+          if(hits.length>=Math.min(2,vals.length)){ cMarca=ci; break; }
+        }
+      }
+
+      // ── Si no hay columna DESCRIPCION, tomar la columna con más texto ─
+      if(cDesc<0){
+        const sampleRows = raw.slice(hRow+1, hRow+6).filter(r=>!r.every(c=>String(c).trim()===""));
+        let maxAvg=0;
+        (sampleRows[0]||[]).forEach((_,ci)=>{
+          const avg = sampleRows.reduce((a,r)=>a+String(r[ci]||"").length,0)/sampleRows.length;
+          if(avg>maxAvg && ci!==cMarca && ci!==cSKU){ maxAvg=avg; cDesc=ci; }
+        });
+      }
+
+      // ── Fuzzy brand matcher ───────────────────────────────────────────
+      function matchMarca(nomRaw){
+        if(!nomRaw||!nomRaw.trim()) return null;
+        const v = n(nomRaw);
+        if(v.length<2) return null;
+        return (
+          MARCAS.find(m=>n(m.nombre)===v)
+          || MARCAS.find(m=>v.includes(n(m.nombre))&&n(m.nombre).length>=3)
+          || MARCAS.find(m=>n(m.nombre).includes(v)&&v.length>=3)
+          || MARCAS.find(m=>v.length>=4&&n(m.nombre).startsWith(v.slice(0,4)))
+          || MARCAS.find(m=>v.length>=4&&v.startsWith(n(m.nombre).slice(0,4)))
+          || null
+        );
+      }
+
+      // ── Parsear precio flexible ───────────────────────────────────────
+      // Acepta: "120 bs (kit)", "Bs. 150", "120,00", "$ 200", etc.
+      function parsePrecio(raw){
+        if(!raw&&raw!==0) return 0;
+        const s = String(raw).replace(/bs\.?|bs|kit|\$|€|ufv|usd/gi,"").replace(/[^\d.,]/g,"").replace(",",".");
+        return parseFloat(s)||0;
+      }
+
+      // ── Parsear stock flexible ────────────────────────────────────────
+      function parseStock(raw){
+        if(!raw&&raw!==0) return 1;
+        const s = String(raw).replace(/[^\d]/g,"");
+        return Math.max(1, parseInt(s)||1);
+      }
+
+      // ── Construir índice de códigos existentes (local + normalizado) ──
+      const codigosExistentes = new Set(inv.map(p=>p.codigo.toUpperCase().trim()));
+
+      // ── Iterar filas de datos ─────────────────────────────────────────
       const usadosSet = new Set();
       const filas     = [];
 
+      // Fila de marca constante: si TODO el archivo es de una sola marca
+      // detectada en el nombre del archivo, usarla como fallback
+      const fileMarcaFallback = matchMarca(file.name.replace(/\.[^.]+$/,"").replace(/[_\-]/g," "));
+
       for(let i=hRow+1; i<raw.length; i++){
-        const row=raw[i];
-        if(row.every(c=>String(c).trim()==="")) continue; // fila vacía
+        const row = raw[i];
+        if(!row||row.every(c=>String(c).trim()==="")) continue;
 
-        const marcaNom = cMarca>=0  ? String(row[cMarca]).trim()  : "";
-        const descRaw  = cDesc>=0   ? String(row[cDesc]).trim()   : "";
-        // Saltar filas de ejemplo/placeholder de la propia plantilla
-        if(norm(marcaNom).toUpperCase().includes("NOMBRE DE TU MARCA")) continue;
-        if(norm(marcaNom).toUpperCase().startsWith("★")) continue;
-        // iZi: la descripción a veces incluye "NO INGRESAR" en col F/G — ignorar esas filas
-        if(descRaw.toUpperCase().includes("NO INGRESAR")||descRaw.toUpperCase()==="ATENCIÓN") continue;
-        const desc     = descRaw;
+        // ── Extraer valores crudos ──────────────────────────────────
+        const marcaRaw = cMarca>=0 ? String(row[cMarca]||"").trim() : "";
+        const descRaw  = cDesc>=0  ? String(row[cDesc]||"").trim()  : "";
+        const skuRaw   = cSKU>=0   ? String(row[cSKU]||"").trim().toUpperCase() : "";
+        const catRaw   = cCat>=0   ? String(row[cCat]||"").trim()   : "General";
+        const tallaRaw = cTalla>=0 ? String(row[cTalla]||"").trim() : "";
+        const colorRaw = cColor>=0 ? String(row[cColor]||"").trim() : "";
 
-        const precioRaw= cPrecio>=0 ? String(row[cPrecio]).replace(/[^\d.,]/g,"").replace(",",".") : "";
-        const precio   = parseFloat(precioRaw)||0;
+        // ── Saltar filas de cabecera repetidas o ejemplos ───────────
+        const skips = ["nombre de tu marca","★","no ingresar","atencion","atención",
+                       "ejemplo","example","#ref","##","instrucciones","plantilla"];
+        const rowText = row.map(c=>n(String(c))).join(" ");
+        if(skips.some(s=>rowText.includes(s))) continue;
+        // Saltar si la fila parece ser otra fila de encabezado
+        if(headers.filter(h=>h.length>2).some(h=>rowText.includes(h)&&rowText.length<200)
+           && i>hRow+2) continue;
 
-        // iZi: subcategoría = tipo de prenda (CHOMPA, GABARDINA, etc.)
-        // En formato estándar: categoría normal
-        const cat      = cCat>=0    ? String(row[cCat]).trim().replace(/\s+/g," ")   : "General";
-        const talla    = cTalla>=0  ? String(row[cTalla]).trim() : "";
-        const color    = cColor>=0  ? String(row[cColor]).trim() : "";
+        if(!descRaw && !skuRaw) continue; // fila sin datos útiles
 
-        // Stock: parsear "1." "2." "1" "2" → número
-        const stockRaw = cStock>=0 ? String(row[cStock]).replace(/[^\d]/g,"") : "1";
-        const stock    = Math.max(1, parseInt(stockRaw)||1);
+        // ── Precio ──────────────────────────────────────────────────
+        const precioRaw = cPrecio>=0 ? row[cPrecio] : "";
+        const precio = parsePrecio(precioRaw);
 
-        const subcat   = cSubcat>=0 ? String(row[cSubcat]).trim() : "";
+        // ── Stock ────────────────────────────────────────────────────
+        const stockRaw = cStock>=0 ? row[cStock] : "";
+        const stock = parseStock(stockRaw);
 
-        // Buscar marca — fuzzy: exact → contains → starts-with-4-chars
-        // marcaNomNorm debe tener ≥3 chars para activar fuzzy (evita que "" match todo)
-        const marcaNomNorm = norm(marcaNom).toLowerCase();
-        const marcaEnc = (marcaNomNorm.length<2) ? null : (
-          MARCAS.find(m=>norm(m.nombre).toLowerCase()===marcaNomNorm)
-          || MARCAS.find(m=>marcaNomNorm.length>=3&&marcaNomNorm.startsWith(norm(m.nombre).toLowerCase().slice(0,4)))
-          || MARCAS.find(m=>marcaNomNorm.length>=3&&norm(m.nombre).toLowerCase().startsWith(marcaNomNorm.slice(0,4)))
-          || MARCAS.find(m=>marcaNomNorm.length>=4&&norm(m.nombre).toLowerCase().includes(marcaNomNorm.slice(0,5)))
-        );
+        // ── Descripción final ────────────────────────────────────────
+        // Si la descripción está vacía, construirla desde otras columnas
+        let desc = descRaw;
+        if(!desc && skuRaw){
+          // Reconstruir desde código: MAT-S-870 → info contextual
+          desc = [catRaw, tallaRaw, colorRaw].filter(Boolean).join(" ").trim() || skuRaw;
+        }
 
-        // SKU: usar del Excel si existe, si no auto-generar
-        // iZi: para el código usamos subcategoría como "talla" para mayor descriptividad
-        const skuRaw  = cSKU>=0 ? String(row[cSKU]).trim().toUpperCase() : "";
+        // ── Buscar marca ─────────────────────────────────────────────
+        let marcaEnc = matchMarca(marcaRaw) || fileMarcaFallback;
+
+        // Si aún sin marca, intentar inferir del SKU (SEN-* → Sensually, MAT-* → Materia, etc.)
+        if(!marcaEnc && skuRaw){
+          const prefix = skuRaw.split(/[-_]/)[0];
+          marcaEnc = MARCAS.find(m=>n(m.nombre).startsWith(n(prefix).slice(0,3))&&prefix.length>=2);
+        }
+
+        // ── SKU / Código ─────────────────────────────────────────────
         const autoSKU = !skuRaw;
-        const tallaParaCod = isIZi
-          ? (cat||"").replace(/[^A-Za-z]/g,"").slice(0,3).toUpperCase()||"TU"
-          : (talla||"TU");
-        const sku = skuRaw || genCodImport(marcaEnc?.nombre||marcaNom, desc, tallaParaCod, usadosSet);
+        const tallaParaCod = tallaRaw || (isIZi ? (catRaw||"").replace(/[^A-Za-z]/g,"").slice(0,3).toUpperCase() : "TU");
+        const sku = skuRaw || genCodImport(marcaEnc?.nombre||marcaRaw, desc, tallaParaCod, usadosSet);
         if(skuRaw) usadosSet.add(sku);
 
+        // ── Construir fila ────────────────────────────────────────────
         const fila = {
-          _row: i+1, sku, autoSKU, isIZi,
-          marcaNom, marcaId:marcaEnc?.id||null, marcaNombre:marcaEnc?.nombre||marcaNom,
-          desc, precio, cat, talla, color, stock, subcat,
+          _row: i+1,
+          sku, autoSKU,
+          marcaNom: marcaRaw||marcaEnc?.nombre||"",
+          marcaId: marcaEnc?.id||null,
+          marcaNombre: marcaEnc?.nombre||marcaRaw||"",
+          desc: desc||"",
+          precio, cat: catRaw||"General",
+          talla: tallaRaw, color: colorRaw,
+          stock, subcat:"",
           _errs:[], _dup:false,
         };
 
-        if(!desc)               fila._errs.push("Sin descripción");
-        if(precio<=0)           fila._errs.push("Precio inválido");
-        if(!marcaEnc)           fila._errs.push(`Marca "${marcaNom||"—"}" no encontrada`);
+        if(!fila.desc)    fila._errs.push("Sin descripción");
+        if(fila.precio<=0) fila._errs.push("Precio inválido o cero");
+        if(!marcaEnc)      fila._errs.push(`Marca "${marcaRaw||"—"}" no encontrada`);
 
-        const existe=inv.find(p=>p.codigo.toUpperCase()===sku);
-        if(existe) fila._dup=true;
+        // ── Detectar duplicado por código exacto ─────────────────────
+        if(codigosExistentes.has(sku)) fila._dup=true;
 
         filas.push(fila);
       }
+
+      if(filas.length===0){ setEstado("idle"); alert("No se encontraron productos válidos en el archivo."); return; }
 
       setPreview(filas);
       setFiltro("todas");
