@@ -23443,7 +23443,7 @@
       `= Subtotal sin banco: ${$(Math.round(subtotalBanco))}`,
       `\u2212 Comisi\xF3n ventas (${pctComision}%): -${$(Math.round(comision))}`
     ];
-    if (alquiler > 0) lines.push(`\u2212 Alquiler: -${$(alquiler)}`);
+    lines.push(`\u2212 Alquiler: -${$(alquiler)}`);
     if (totalGastos > 0) {
       lines.push(`\u2212 Gastos extra: -${$(Math.round(totalGastos))}`);
       gastos.filter((g) => g.desc || Number(g.monto) > 0).forEach((g) => {
@@ -23519,11 +23519,14 @@
   }
   function construirImagenLiquidacion(marca, mes, anio, d) {
     const filas = [
+      ["Efectivo", $(Math.round(d.brutoEfect)), false],
+      ["QR", $(Math.round(d.brutoQR)), false],
+      ["Tarjeta", $(Math.round(d.brutoTarjeta)), false],
       ["Ventas brutas", $(Math.round(d.bruto)), false],
-      d.descTarjeta > 0 ? [`\u2212 Desc. banco Tarjeta (${d.pctTarjeta ?? 0}%)`, `-${$(Math.round(d.descTarjeta))}`, false] : null,
-      d.descTarjeta > 0 ? ["= Subtotal sin banco", $(Math.round(d.subtotalBanco)), false] : null,
-      d.pctComision > 0 ? [`\u2212 Comisi\xF3n ventas (${d.pctComision ?? 0}%)`, `-${$(Math.round(d.comision))}`, false] : null,
-      d.alquiler > 0 ? ["\u2212 Alquiler", `-${$(d.alquiler)}`, false] : null,
+      [`\u2212 Desc. banco Tarjeta (${d.pctTarjeta ?? 0}%)`, `-${$(Math.round(d.descTarjeta))}`, false],
+      ["= Subtotal sin banco", $(Math.round(d.subtotalBanco)), false],
+      [`\u2212 Comisi\xF3n ventas (${d.pctComision ?? 0}%)`, `-${$(Math.round(d.comision))}`, false],
+      ["\u2212 Alquiler", `-${$(d.alquiler)}`, false],
       ...d.gastos.filter((g) => g.desc || Number(g.monto) > 0).map(
         (g) => [`\u2212 ${g.desc || "Gasto extra"}`, `-${$(Math.round(Number(g.monto) || 0))}`, false]
       ),
@@ -23551,11 +23554,12 @@
     const width = 720;
     const itemsCount = ventas.reduce((s, v) => s + v.items.filter((i) => i.marcaId === d.marcaId).length, 0);
     const height = 200 + filas.length * 38 + 50 + (ventas.length * 40 + itemsCount * 16) + 70;
+    const logoMarca = getMarcaImg(marca);
     const html = `<div xmlns="http://www.w3.org/1999/xhtml" style="font-family:Arial,sans-serif;color:#222;background:#fff;width:${width}px;padding:24px;box-sizing:border-box">
     <div style="display:flex;align-items:center;gap:16px;margin-bottom:16px">
-      <img src="${LOGO_B64}" style="height:60px"/>
+      ${logoMarca ? `<img src="${logoMarca}" style="height:60px;width:60px;border-radius:12px;object-fit:cover"/>` : `<img src="${LOGO_B64}" style="height:60px"/>`}
       <div>
-        <div style="font-size:20px;font-weight:700">${marca?.emoji || ""} Liquidaci\xF3n \u2014 ${marca?.nombre || ""}</div>
+        <div style="font-size:20px;font-weight:700">Liquidaci\xF3n \u2014 ${marca?.nombre || ""}</div>
         <div style="font-size:13px;color:#666">${MESES[mes]} ${anio} \xB7 Toscana House</div>
       </div>
     </div>
@@ -23600,6 +23604,9 @@
   function generarImagenLiquidacion(marca, mes, anio, liq) {
     construirImagenLiquidacion(marca, mes, anio, {
       bruto: liq.bruto,
+      brutoEfect: liq.brutoEf,
+      brutoQR: liq.brutoQR,
+      brutoTarjeta: liq.brutoTJ,
       descTarjeta: liq.descTJ,
       pctTarjeta: liq.cfg?.pctTarjeta ?? 0,
       subtotalBanco: liq.subBanco,
