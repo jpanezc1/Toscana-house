@@ -25098,26 +25098,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       fontFamily: FONT,
       letterSpacing: "-0.03em",
       lineHeight: 1
-    } }, $(Math.round(neto))))), /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      fontSize: 13,
-      fontWeight: 600,
-      color: C.label3,
-      fontFamily: FONT,
-      textTransform: "uppercase",
-      letterSpacing: 0.8,
-      marginBottom: 8,
-      paddingLeft: 4
-    } }, "Transacciones del per\xEDodo"), gastos.filter((g) => g.desc || Number(g.monto) > 0).map((g) => /* @__PURE__ */ import_react.default.createElement("div", { key: g.id, style: {
-      background: `${C.red}10`,
-      borderRadius: 10,
-      padding: "10px 14px",
-      marginBottom: 5,
-      border: `1px solid ${C.red}20`
-    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center" } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, color: C.label, fontFamily: FONT, fontWeight: 600 } }, g.desc || "Gasto extra"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 15, fontWeight: 700, color: C.red, fontFamily: FONT, letterSpacing: "-0.01em" } }, "-", $(Number(g.monto) || 0))), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT, marginTop: 2, opacity: 0.65 } }, "Gasto extra \xB7 ", MESES[mes]))), vMarca.length === 0 ? /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center", padding: "32px 0", color: C.label3, fontFamily: FONT, fontSize: 16 } }, "Sin ventas en ", MESES[mes]) : vMarca.map((v) => {
-      const its = v.items.filter((i) => i.marcaId === marcaId);
-      const sub = its.reduce((s, i) => s + i.subtotal, 0);
-      return /* @__PURE__ */ import_react.default.createElement("div", { key: v.id, style: { background: C.bg2, borderRadius: 10, padding: "10px 14px", marginBottom: 5 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 3 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontFamily: "monospace", fontSize: 11, color: C.gold, fontWeight: 600 } }, v.id), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 15, fontWeight: 700, color: C.label, fontFamily: FONT, letterSpacing: "-0.01em" } }, $(sub))), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT, marginBottom: 4, opacity: 0.65 } }, v.fecha, " ", v.hora, " \xB7 ", labelPago(v.metodoPago)), its.map((it, ii) => /* @__PURE__ */ import_react.default.createElement("div", { key: `${v.id}-${it.prodId}-${ii}`, style: { fontSize: 12, color: C.label2, fontFamily: FONT, lineHeight: "1.35" } }, "\xB7 ", it.nombre, " \xD7", it.cantidad, " = ", $(it.subtotal))));
-    }), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 10, marginTop: 16 } }, /* @__PURE__ */ import_react.default.createElement(
+    } }, $(Math.round(neto))))), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 10, marginTop: 16 } }, /* @__PURE__ */ import_react.default.createElement(
       IOSBtn,
       {
         onPress: () => generarVistaPreviaLiquidacion(marca, mes, anio, {

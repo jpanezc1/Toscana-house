@@ -3440,51 +3440,6 @@ function LiqModal({marcaId,ventas,mes,anio,MK,cierres,setCierres,onClose,syncCie
         </div>
       </div>
 
-      {/* Ventas */}
-      <div style={{fontSize:13,fontWeight:600,color:C.label3,fontFamily:FONT,
-        textTransform:"uppercase",letterSpacing:.8,marginBottom:8,paddingLeft:4}}>
-        Transacciones del período
-      </div>
-      {gastos.filter(g=>g.desc||Number(g.monto)>0).map(g=>(
-        <div key={g.id} style={{background:`${C.red}10`,borderRadius:10,padding:"10px 14px",
-          marginBottom:5,border:`1px solid ${C.red}20`}}>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-            <span style={{fontSize:13,color:C.label,fontFamily:FONT,fontWeight:600}}>
-              {g.desc || "Gasto extra"}
-            </span>
-            <span style={{fontSize:15,fontWeight:700,color:C.red,fontFamily:FONT,letterSpacing:"-0.01em"}}>
-              -{$(Number(g.monto)||0)}
-            </span>
-          </div>
-          <div style={{fontSize:11,color:C.label3,fontFamily:FONT,marginTop:2,opacity:.65}}>
-            Gasto extra · {MESES[mes]}
-          </div>
-        </div>
-      ))}
-      {vMarca.length===0
-        ? <div style={{textAlign:"center",padding:"32px 0",color:C.label3,fontFamily:FONT,fontSize:16}}>Sin ventas en {MESES[mes]}</div>
-        : vMarca.map(v=>{
-            const its=v.items.filter(i=>i.marcaId===marcaId);
-            const sub=its.reduce((s,i)=>s+i.subtotal,0);
-            return (
-              <div key={v.id} style={{background:C.bg2,borderRadius:10,padding:"10px 14px",marginBottom:5}}>
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:3}}>
-                  <span style={{fontFamily:"monospace",fontSize:11,color:C.gold,fontWeight:600}}>{v.id}</span>
-                  <span style={{fontSize:15,fontWeight:700,color:C.label,fontFamily:FONT,letterSpacing:"-0.01em"}}>{$(sub)}</span>
-                </div>
-                <div style={{fontSize:11,color:C.label3,fontFamily:FONT,marginBottom:4,opacity:.65}}>
-                  {v.fecha} {v.hora} · {labelPago(v.metodoPago)}
-                </div>
-                {its.map((it,ii)=>(
-                  <div key={`${v.id}-${it.prodId}-${ii}`} style={{fontSize:12,color:C.label2,fontFamily:FONT,lineHeight:"1.35"}}>
-                    · {it.nombre} ×{it.cantidad} = {$(it.subtotal)}
-                  </div>
-                ))}
-              </div>
-            );
-          })
-      }
-
       <div style={{display:"flex",flexDirection:"column",gap:10,marginTop:16}}>
         <IOSBtn onPress={()=>generarVistaPreviaLiquidacion(marca,mes,anio,{bruto,brutoEfect,brutoQR,brutoTarjeta,
           descTarjeta,pctTarjeta,subtotalBanco,pctComision,comision,alquiler,gastos,totalGastos,neto,vMarca,marcaId},setImgPreview)}
