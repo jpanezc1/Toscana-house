@@ -180,7 +180,7 @@
   <!-- Auto-updater: detecta nueva versión y recarga sin intervención del usuario -->
   <script>
     (function(){
-      var CURRENT = "1781123348637";
+      var CURRENT = "1781130959647";
       function check(){
         fetch("/version.json?_="+Date.now(),{cache:"no-store"})
           .then(function(r){return r.json();})
@@ -195,6 +195,6 @@
       setInterval(check, 60000);
     })();
   </script>
-  <script src="bundle-1781123348637.js"></script>
+  <script src="bundle-1781130959647.js"></script>
 </body>
 </html>

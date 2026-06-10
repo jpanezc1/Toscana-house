@@ -2292,7 +2292,7 @@ async function exportCargasExcel(cargas, marcas){
     items.forEach(it=>{
       filas.push([
         c.fecha, c.hora, c.nombre||c.usuario||"—", c.rol||"—",
-        c.tipo==="IMPORT"?"Importación Excel":"Carga manual",
+        c.tipo==="IMPORT"?"Importación Excel":c.tipo==="HISTORICO"?"Carga histórica":"Carga manual",
         it.tipo==="update"?"Actualización stock":"Producto nuevo",
         it.marca||c.marcaNombre||"—", it.codigo||"", it.nombre||"",
         it.categoria||"", it.tipo==="update"?(it.stockSumado??""):(it.stock??""),
@@ -9484,6 +9484,46 @@ function App(){
     sbCargarCargas().then(data=>{ if(data.length>0) setCargas(data); });
   },[]);
 
+  // Cargas históricas: productos de inventario que ya existían antes de
+  // habilitar la trazabilidad. Se calculan al vuelo (no se guardan en
+  // Supabase) para que toda la carga histórica aparezca en "Cargas".
+  const cargasCompletas = useMemo(()=>{
+    const yaRegistrados = new Set();
+    cargas.forEach(c=>(c.items||[]).forEach(it=>{ if(it.codigo) yaRegistrados.add(it.codigo); }));
+    const pendientes = inv.filter(p=>p.codigo && !yaRegistrados.has(p.codigo));
+    if(pendientes.length===0) return cargas;
+    const grupos = {};
+    pendientes.forEach(p=>{
+      const key = `${p.fecha||"—"}__${p.marcaId??"—"}`;
+      (grupos[key]=grupos[key]||[]).push(p);
+    });
+    const historicas = Object.entries(grupos).map(([key,items])=>{
+      const marcaIds = [...new Set(items.map(i=>i.marcaId).filter(id=>id!=null))];
+      const marcaNombres = [...new Set(items.map(i=>i.marcaNombre).filter(Boolean))].join(", ");
+      const carga = crearCarga("HISTORICO", {usuario:"sistema", nombre:"Sistema (histórico)", rol:"—"}, {
+        marcaId: marcaIds.length===1 ? marcaIds[0] : null,
+        marcaNombre: marcaNombres||"—",
+        resumen: `Carga histórica: ${items.length} producto${items.length!==1?"s":""} · ${marcaNombres||"—"}`,
+        nuevos: items.length, actualizados:0, totalItems: items.length,
+        items: items.map(p=>({tipo:"create", codigo:p.codigo, nombre:p.nombre, marca:p.marcaNombre,
+          marcaId:p.marcaId, stock:p.stock, precio:p.precio, categoria:p.categoria})),
+      });
+      carga.id = "CRG_HIST_"+key;
+      const fechaIso = items[0].fecha; // formato YYYY-MM-DD
+      const partes = (fechaIso||"").split("-").map(Number);
+      const y=partes[0], m=partes[1], d=partes[2];
+      if(y&&m&&d){
+        carga.fecha = String(d).padStart(2,"0")+"/"+String(m).padStart(2,"0")+"/"+y;
+        carga.hora = "—";
+        carga.ts = new Date(y, m-1, d).getTime();
+      } else {
+        carga.fecha = "—"; carga.hora = "—"; carga.ts = 0;
+      }
+      return carga;
+    });
+    return [...cargas, ...historicas];
+  },[inv, cargas]);
+
   function registrarAuditoria(aud){
     setAuditorias(prev=>[aud, ...prev]);
     sbGuardarAuditoria(aud);
@@ -9810,7 +9850,7 @@ function App(){
   if (!user) return <LoginScreen onLogin={login}/>;
 
   // Portal de marca (lectura)
-  if (user.rol === "marca") return <BrandPortal user={user} ventas={ventas} inv={inv} cargas={cargas} logout={logout}/>;
+  if (user.rol === "marca") return <BrandPortal user={user} ventas={ventas} inv={inv} cargas={cargasCompletas} logout={logout}/>;
 
   // ── Liquidaciones: métricas pre-calculadas — mixto distribuido ─────────────
   const _liqPagos   = sumPagos(vMes);
@@ -9959,7 +9999,7 @@ function App(){
 
         {/* CARGAS — trazabilidad de cargas a inventario (manuales + importaciones) */}
         {tab==="cargas" && (
-          <RegistroCargas cargas={cargas} marcas={MARCAS}/>
+          <RegistroCargas cargas={cargasCompletas} marcas={MARCAS}/>
         )}
 
         {/* MARCAS — lista */}
@@ -11961,7 +12001,7 @@ function RegistroCargas({cargas, marcas, marcaId=null}){
     if(desde && fk && fk<desde) return false;
     if(hasta && fk && fk>hasta) return false;
     return true;
-  }),[cargas,marcaSelec,filTipo,filUsuario,desde,hasta]);
+  }).sort((a,b)=>(b.ts||0)-(a.ts||0)),[cargas,marcaSelec,filTipo,filUsuario,desde,hasta]);
 
   function itemsDe(c){
     return marcaSelec!=null ? (c.items||[]).filter(it=>it.marcaId===marcaSelec) : (c.items||[]);
@@ -12044,6 +12084,7 @@ function RegistroCargas({cargas, marcas, marcaId=null}){
           <option value="">Todos los tipos</option>
           <option value="MANUAL">Carga manual</option>
           <option value="IMPORT">Importación Excel</option>
+          <option value="HISTORICO">Carga histórica</option>
         </select>
         <select value={filUsuario} onChange={e=>setFilUsuario(e.target.value)} style={{
           flex:isDesktop?"0 0 auto":"1 1 140px",padding:"9px 12px",border:`1px solid ${C.sep}`,
@@ -12075,6 +12116,8 @@ function RegistroCargas({cargas, marcas, marcaId=null}){
               const items = itemsDe(c);
               const tipoInfo = c.tipo==="IMPORT"
                 ? {label:"Importación Excel", icon:"📥", color:C.blue}
+                : c.tipo==="HISTORICO"
+                ? {label:"Carga histórica", icon:"🕓", color:C.label3}
                 : {label:"Carga manual", icon:"✍️", color:C.green};
               return (
                 <div key={c.id} style={{background:C.bg1,borderRadius:14,border:`1px solid ${C.sep}`,

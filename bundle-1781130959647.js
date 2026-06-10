@@ -23876,7 +23876,7 @@
           c.hora,
           c.nombre || c.usuario || "\u2014",
           c.rol || "\u2014",
-          c.tipo === "IMPORT" ? "Importaci\xF3n Excel" : "Carga manual",
+          c.tipo === "IMPORT" ? "Importaci\xF3n Excel" : c.tipo === "HISTORICO" ? "Carga hist\xF3rica" : "Carga manual",
           it.tipo === "update" ? "Actualizaci\xF3n stock" : "Producto nuevo",
           it.marca || c.marcaNombre || "\u2014",
           it.codigo || "",
@@ -31605,6 +31605,56 @@ Fecha: ${venta.fecha}`);
         if (data.length > 0) setCargas(data);
       });
     }, []);
+    const cargasCompletas = (0, import_react.useMemo)(() => {
+      const yaRegistrados = /* @__PURE__ */ new Set();
+      cargas.forEach((c) => (c.items || []).forEach((it) => {
+        if (it.codigo) yaRegistrados.add(it.codigo);
+      }));
+      const pendientes = inv.filter((p) => p.codigo && !yaRegistrados.has(p.codigo));
+      if (pendientes.length === 0) return cargas;
+      const grupos = {};
+      pendientes.forEach((p) => {
+        const key = `${p.fecha || "\u2014"}__${p.marcaId ?? "\u2014"}`;
+        (grupos[key] = grupos[key] || []).push(p);
+      });
+      const historicas = Object.entries(grupos).map(([key, items]) => {
+        const marcaIds = [...new Set(items.map((i) => i.marcaId).filter((id) => id != null))];
+        const marcaNombres = [...new Set(items.map((i) => i.marcaNombre).filter(Boolean))].join(", ");
+        const carga = crearCarga("HISTORICO", { usuario: "sistema", nombre: "Sistema (hist\xF3rico)", rol: "\u2014" }, {
+          marcaId: marcaIds.length === 1 ? marcaIds[0] : null,
+          marcaNombre: marcaNombres || "\u2014",
+          resumen: `Carga hist\xF3rica: ${items.length} producto${items.length !== 1 ? "s" : ""} \xB7 ${marcaNombres || "\u2014"}`,
+          nuevos: items.length,
+          actualizados: 0,
+          totalItems: items.length,
+          items: items.map((p) => ({
+            tipo: "create",
+            codigo: p.codigo,
+            nombre: p.nombre,
+            marca: p.marcaNombre,
+            marcaId: p.marcaId,
+            stock: p.stock,
+            precio: p.precio,
+            categoria: p.categoria
+          }))
+        });
+        carga.id = "CRG_HIST_" + key;
+        const fechaIso = items[0].fecha;
+        const partes = (fechaIso || "").split("-").map(Number);
+        const y = partes[0], m = partes[1], d = partes[2];
+        if (y && m && d) {
+          carga.fecha = String(d).padStart(2, "0") + "/" + String(m).padStart(2, "0") + "/" + y;
+          carga.hora = "\u2014";
+          carga.ts = new Date(y, m - 1, d).getTime();
+        } else {
+          carga.fecha = "\u2014";
+          carga.hora = "\u2014";
+          carga.ts = 0;
+        }
+        return carga;
+      });
+      return [...cargas, ...historicas];
+    }, [inv, cargas]);
     function registrarAuditoria(aud) {
       setAuditorias((prev) => [aud, ...prev]);
       sbGuardarAuditoria(aud);
@@ -31945,7 +31995,7 @@ Fecha: ${venta.fecha}`);
     const TABS = user?.rol === "caja" ? TABS_ALL.filter((t) => ["inicio", "pos", "ventas"].includes(t.id)) : user?.rol === "admin" ? TABS_ALL : TABS_ALL.filter((t) => t.id !== "auditoria" && t.id !== "cargas");
     const showingDetail = tab === "marcas" && marcaDetalle;
     if (!user) return /* @__PURE__ */ import_react.default.createElement(LoginScreen, { onLogin: login });
-    if (user.rol === "marca") return /* @__PURE__ */ import_react.default.createElement(BrandPortal, { user, ventas, inv, cargas, logout });
+    if (user.rol === "marca") return /* @__PURE__ */ import_react.default.createElement(BrandPortal, { user, ventas, inv, cargas: cargasCompletas, logout });
     const _liqPagos = sumPagos(vMes);
     const liqEf = _liqPagos.efectivo;
     const liqQr = _liqPagos.qr;
@@ -32132,7 +32182,7 @@ Fecha: ${venta.fecha}`);
         onGuardarAuditoria: registrarAuditoria,
         user
       }
-    ), tab === "cargas" && /* @__PURE__ */ import_react.default.createElement(RegistroCargas, { cargas, marcas: MARCAS }), tab === "marcas" && !marcaDetalle && /* @__PURE__ */ import_react.default.createElement("div", null, marcasState.filter((m) => m.estado === "inactiva").length > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: {
+    ), tab === "cargas" && /* @__PURE__ */ import_react.default.createElement(RegistroCargas, { cargas: cargasCompletas, marcas: MARCAS }), tab === "marcas" && !marcaDetalle && /* @__PURE__ */ import_react.default.createElement("div", null, marcasState.filter((m) => m.estado === "inactiva").length > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: {
       fontSize: 13,
       fontWeight: 600,
       color: C.label3,
@@ -34348,7 +34398,7 @@ Confirmas que el conteo de ${r.contado} unidad(es) es correcto.`)) {
       if (desde && fk && fk < desde) return false;
       if (hasta && fk && fk > hasta) return false;
       return true;
-    }), [cargas, marcaSelec, filTipo, filUsuario, desde, hasta]);
+    }).sort((a, b) => (b.ts || 0) - (a.ts || 0)), [cargas, marcaSelec, filTipo, filUsuario, desde, hasta]);
     function itemsDe(c) {
       return marcaSelec != null ? (c.items || []).filter((it) => it.marcaId === marcaSelec) : c.items || [];
     }
@@ -34440,7 +34490,7 @@ Confirmas que el conteo de ${r.contado} unidad(es) es correcto.`)) {
       color: C.label,
       fontFamily: FONT,
       outline: "none"
-    } }, /* @__PURE__ */ import_react.default.createElement("option", { value: "" }, "Todos los tipos"), /* @__PURE__ */ import_react.default.createElement("option", { value: "MANUAL" }, "Carga manual"), /* @__PURE__ */ import_react.default.createElement("option", { value: "IMPORT" }, "Importaci\xF3n Excel")), /* @__PURE__ */ import_react.default.createElement("select", { value: filUsuario, onChange: (e) => setFilUsuario(e.target.value), style: {
+    } }, /* @__PURE__ */ import_react.default.createElement("option", { value: "" }, "Todos los tipos"), /* @__PURE__ */ import_react.default.createElement("option", { value: "MANUAL" }, "Carga manual"), /* @__PURE__ */ import_react.default.createElement("option", { value: "IMPORT" }, "Importaci\xF3n Excel"), /* @__PURE__ */ import_react.default.createElement("option", { value: "HISTORICO" }, "Carga hist\xF3rica")), /* @__PURE__ */ import_react.default.createElement("select", { value: filUsuario, onChange: (e) => setFilUsuario(e.target.value), style: {
       flex: isDesktop ? "0 0 auto" : "1 1 140px",
       padding: "9px 12px",
       border: `1px solid ${C.sep}`,
@@ -34480,7 +34530,7 @@ Confirmas que el conteo de ${r.contado} unidad(es) es correcto.`)) {
     ) : /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 10 } }, filtradas.map((c) => {
       const abierto = abierta === c.id;
       const items = itemsDe(c);
-      const tipoInfo = c.tipo === "IMPORT" ? { label: "Importaci\xF3n Excel", icon: "\u{1F4E5}", color: C.blue } : { label: "Carga manual", icon: "\u270D\uFE0F", color: C.green };
+      const tipoInfo = c.tipo === "IMPORT" ? { label: "Importaci\xF3n Excel", icon: "\u{1F4E5}", color: C.blue } : c.tipo === "HISTORICO" ? { label: "Carga hist\xF3rica", icon: "\u{1F553}", color: C.label3 } : { label: "Carga manual", icon: "\u270D\uFE0F", color: C.green };
       return /* @__PURE__ */ import_react.default.createElement("div", { key: c.id, style: {
         background: C.bg1,
         borderRadius: 14,
