@@ -33045,6 +33045,7 @@ Fecha: ${venta.fecha}`);
       () => ventas.filter((v) => v.mk === MKSel),
       [ventas, MKSel]
     );
+    const ventasPerActivas = (0, import_react.useMemo)(() => ventasPer.filter((v) => !v.anulada), [ventasPer]);
     const periodosConDatos = (0, import_react.useMemo)(() => {
       const set = new Set(ventas.map((v) => v.mk));
       return Array.from(set).sort((a, b) => b.localeCompare(a)).map((mk) => {
@@ -33052,15 +33053,15 @@ Fecha: ${venta.fecha}`);
         return { mk, mes: Number(mes) - 1, anio: Number(anio) };
       });
     }, [ventas]);
-    const totalPer = ventasPer.reduce((s, v) => s + v.total, 0);
-    const _pagPer = sumPagos(ventasPer);
+    const totalPer = ventasPerActivas.reduce((s, v) => s + v.total, 0);
+    const _pagPer = sumPagos(ventasPerActivas);
     const efectivoPer = _pagPer.efectivo;
     const qrPer = _pagPer.qr;
     const tarjetaPer = _pagPer.tarjeta;
     const porMarcaPer = (0, import_react.useMemo)(
       () => MARCAS.map((m) => {
         let total = 0, ef = 0, qr = 0, tj = 0;
-        ventasPer.forEach((v) => {
+        ventasPerActivas.forEach((v) => {
           const brandSub = v.items.filter((i) => i.marcaId === m.id).reduce((s, i) => s + i.subtotal, 0);
           if (brandSub === 0) return;
           total += brandSub;
@@ -33070,10 +33071,10 @@ Fecha: ${venta.fecha}`);
           qr += p.qr * pct;
           tj += p.tarjeta * pct;
         });
-        const txs = ventasPer.filter((v) => v.items.some((i) => i.marcaId === m.id)).length;
+        const txs = ventasPerActivas.filter((v) => v.items.some((i) => i.marcaId === m.id)).length;
         return { marca: m, total, ef, qr, tj, txs };
       }).filter((x) => x.total > 0).sort((a, b) => b.total - a.total),
-      [ventasPer]
+      [ventasPerActivas]
     );
     const anios = [];
     for (let a = 2024; a <= now.getFullYear() + 1; a++) anios.push(a);
@@ -33170,7 +33171,7 @@ Fecha: ${venta.fecha}`);
         icon: "\u{1F4B0}",
         label: `Total ${MESES[mesSel]} ${anioSel}`,
         value: $(totalPer),
-        sub: `${ventasPer.length} transacciones \xB7 ${porMarcaPer.length} marcas`
+        sub: `${ventasPerActivas.length} transacciones \xB7 ${porMarcaPer.length} marcas`
       }
     )), /* @__PURE__ */ import_react.default.createElement(StatCard, { icon: "\u{1F4B5}", label: "Efectivo", value: $(efectivoPer), color: "#4A9B6F", small: true }), /* @__PURE__ */ import_react.default.createElement(StatCard, { icon: "\u{1F4F1}", label: "QR", value: $(qrPer), color: "#5B8DB8", small: true }), /* @__PURE__ */ import_react.default.createElement(StatCard, { icon: "\u{1F4B3}", label: "Tarjeta", value: $(tarjetaPer), color: "#C8922A", small: true }), /* @__PURE__ */ import_react.default.createElement(StatCard, { icon: "\u{1F3F7}", label: "Comisi\xF3n 10%", value: $(totalPer * 0.1), color: C.red, small: true }), /* @__PURE__ */ import_react.default.createElement(StatCard, { icon: "\u2705", label: "Neto marcas", value: $(totalPer * 0.9), color: C.green, small: true })), /* @__PURE__ */ import_react.default.createElement("div", { style: { background: C.bg2, borderRadius: 14, padding: "14px 16px", marginBottom: 16 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
       fontSize: 12,
@@ -35290,24 +35291,25 @@ Esta acci\xF3n no se puede deshacer.`,
         (v) => v.items.some((it) => it.codigo.toLowerCase().includes(q) || it.nombre.toLowerCase().includes(q))
       );
     }, [ventas, codBusq]);
-    const totalFil = ventasFiltradas.reduce((s, v) => s + v.total, 0);
-    const _pagFil = sumPagos(ventasFiltradas);
+    const ventasFiltradasActivas = (0, import_react.useMemo)(() => ventasFiltradas.filter((v) => !v.anulada), [ventasFiltradas]);
+    const totalFil = ventasFiltradasActivas.reduce((s, v) => s + v.total, 0);
+    const _pagFil = sumPagos(ventasFiltradasActivas);
     const efectivoFil = _pagFil.efectivo;
     const qrFil = _pagFil.qr;
     const tarjetaFil = _pagFil.tarjeta;
     const porMarcaFil = (0, import_react.useMemo)(() => {
       const map = {};
-      ventasFiltradas.forEach((v) => v.items.forEach((it) => {
+      ventasFiltradasActivas.forEach((v) => v.items.forEach((it) => {
         if (!map[it.marcaId]) map[it.marcaId] = { marcaId: it.marcaId, marcaNombre: it.marcaNombre, total: 0, cant: 0 };
         map[it.marcaId].total += it.subtotal;
         map[it.marcaId].cant += it.cantidad;
       }));
       return Object.values(map).sort((a, b) => b.total - a.total);
-    }, [ventasFiltradas]);
+    }, [ventasFiltradasActivas]);
     const fmtDate = (d) => d ? d.split("-").reverse().join("/") : "";
     const itemsView = (0, import_react.useMemo)(() => {
       const map = {};
-      ventasFiltradas.forEach((v) => v.items.forEach((it) => {
+      ventasFiltradasActivas.forEach((v) => v.items.forEach((it) => {
         const k = it.prodId || it.codigo;
         if (!map[k]) map[k] = {
           codigo: it.codigo,
@@ -35322,7 +35324,7 @@ Esta acci\xF3n no se puede deshacer.`,
         map[k].total += it.subtotal;
       }));
       return Object.values(map).sort((a, b) => b.total - a.total);
-    }, [ventasFiltradas]);
+    }, [ventasFiltradasActivas]);
     const totalUdsView = (0, import_react.useMemo)(() => itemsView.reduce((s, i) => s + i.cant, 0), [itemsView]);
     return /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: {
       background: C.bg1,
@@ -35412,7 +35414,7 @@ Esta acci\xF3n no se puede deshacer.`,
       marginBottom: 6,
       textTransform: "uppercase",
       letterSpacing: 0.8
-    } }, "Total facturado \xB7 ", fmtDate(fechaIni), " \u2013 ", fmtDate(fechaFin)), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 32, fontWeight: 700, color: "#fff", fontFamily: FONT, lineHeight: 1 } }, $(totalFil)), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: "rgba(255,255,255,0.75)", fontFamily: FONT, marginTop: 6 } }, ventasFiltradas.length, " venta", ventasFiltradas.length !== 1 ? "s" : "", " en el per\xEDodo")), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 12 } }, [
+    } }, "Total facturado \xB7 ", fmtDate(fechaIni), " \u2013 ", fmtDate(fechaFin)), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 32, fontWeight: 700, color: "#fff", fontFamily: FONT, lineHeight: 1 } }, $(totalFil)), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: "rgba(255,255,255,0.75)", fontFamily: FONT, marginTop: 6 } }, ventasFiltradasActivas.length, " venta", ventasFiltradasActivas.length !== 1 ? "s" : "", " en el per\xEDodo")), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 12 } }, [
       { icon: "\u{1F4B5}", label: "Efectivo", val: efectivoFil, color: C.green },
       { icon: "\u{1F4F1}", label: "QR", val: qrFil, color: C.blue },
       { icon: "\u{1F4B3}", label: "Tarjeta", val: tarjetaFil, color: C.amber }

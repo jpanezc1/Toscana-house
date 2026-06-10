@@ -10880,6 +10880,9 @@ function HistorialTab({ventas, inv, cierres, onVentaClick}){
     ventas.filter(v=>v.mk===MKSel),
   [ventas, MKSel]);
 
+  // Ventas activas del período (excluye anuladas) — para totales y desgloses
+  const ventasPerActivas = useMemo(()=>ventasPer.filter(v=>!v.anulada),[ventasPer]);
+
   // Períodos con datos (para el selector)
   const periodosConDatos = useMemo(()=>{
     const set = new Set(ventas.map(v=>v.mk));
@@ -10890,8 +10893,8 @@ function HistorialTab({ventas, inv, cierres, onVentaClick}){
   },[ventas]);
 
   // Stats del período
-  const totalPer    = ventasPer.reduce((s,v)=>s+v.total,0);
-  const _pagPer     = sumPagos(ventasPer);
+  const totalPer    = ventasPerActivas.reduce((s,v)=>s+v.total,0);
+  const _pagPer     = sumPagos(ventasPerActivas);
   const efectivoPer = _pagPer.efectivo;
   const qrPer       = _pagPer.qr;
   const tarjetaPer  = _pagPer.tarjeta;
@@ -10900,7 +10903,7 @@ function HistorialTab({ventas, inv, cierres, onVentaClick}){
   const porMarcaPer = useMemo(()=>
     MARCAS.map(m=>{
       let total=0,ef=0,qr=0,tj=0;
-      ventasPer.forEach(v=>{
+      ventasPerActivas.forEach(v=>{
         const brandSub=v.items.filter(i=>i.marcaId===m.id).reduce((s,i)=>s+i.subtotal,0);
         if(brandSub===0) return;
         total+=brandSub;
@@ -10908,10 +10911,10 @@ function HistorialTab({ventas, inv, cierres, onVentaClick}){
         const pct=v.total>0?brandSub/v.total:0;
         ef+=p.efectivo*pct; qr+=p.qr*pct; tj+=p.tarjeta*pct;
       });
-      const txs=ventasPer.filter(v=>v.items.some(i=>i.marcaId===m.id)).length;
+      const txs=ventasPerActivas.filter(v=>v.items.some(i=>i.marcaId===m.id)).length;
       return {marca:m, total, ef, qr, tj, txs};
     }).filter(x=>x.total>0).sort((a,b)=>b.total-a.total)
-  ,[ventasPer]);
+  ,[ventasPerActivas]);
 
   // Años disponibles (entre 2024 y año actual+1)
   const anios = [];
@@ -11004,7 +11007,7 @@ function HistorialTab({ventas, inv, cierres, onVentaClick}){
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:16}}>
                 <div style={{gridColumn:"1/-1"}}>
                   <StatCard icon="💰" label={`Total ${MESES[mesSel]} ${anioSel}`}
-                    value={$(totalPer)} sub={`${ventasPer.length} transacciones · ${porMarcaPer.length} marcas`}/>
+                    value={$(totalPer)} sub={`${ventasPerActivas.length} transacciones · ${porMarcaPer.length} marcas`}/>
                 </div>
                 <StatCard icon="💵" label="Efectivo" value={$(efectivoPer)} color="#4A9B6F" small/>
                 <StatCard icon="📱" label="QR"       value={$(qrPer)}       color="#5B8DB8" small/>
@@ -12942,27 +12945,30 @@ function DashboardVentas({ventas, onVentaClick}){
     );
   },[ventas,codBusq]);
 
-  const totalFil = ventasFiltradas.reduce((s,v)=>s+v.total,0);
-  const _pagFil  = sumPagos(ventasFiltradas);
+  // Ventas activas (excluye anuladas) — para totales, KPIs y desgloses
+  const ventasFiltradasActivas = useMemo(()=>ventasFiltradas.filter(v=>!v.anulada),[ventasFiltradas]);
+
+  const totalFil = ventasFiltradasActivas.reduce((s,v)=>s+v.total,0);
+  const _pagFil  = sumPagos(ventasFiltradasActivas);
   const efectivoFil = _pagFil.efectivo;
   const qrFil       = _pagFil.qr;
   const tarjetaFil  = _pagFil.tarjeta;
 
   const porMarcaFil = useMemo(()=>{
     const map={};
-    ventasFiltradas.forEach(v=>v.items.forEach(it=>{
+    ventasFiltradasActivas.forEach(v=>v.items.forEach(it=>{
       if(!map[it.marcaId])map[it.marcaId]={marcaId:it.marcaId,marcaNombre:it.marcaNombre,total:0,cant:0};
       map[it.marcaId].total+=it.subtotal; map[it.marcaId].cant+=it.cantidad;
     }));
     return Object.values(map).sort((a,b)=>b.total-a.total);
-  },[ventasFiltradas]);
+  },[ventasFiltradasActivas]);
 
   const fmtDate = d=>d?d.split("-").reverse().join("/"):"";
 
   // ── Items view: agrupado por producto (evita IIFE en JSX) ────────────────
   const itemsView = useMemo(()=>{
     const map={};
-    ventasFiltradas.forEach(v=>v.items.forEach(it=>{
+    ventasFiltradasActivas.forEach(v=>v.items.forEach(it=>{
       const k=it.prodId||it.codigo;
       if(!map[k])map[k]={codigo:it.codigo,nombre:it.nombre,marcaNombre:it.marcaNombre,
         marcaId:it.marcaId,precioUnit:it.precioUnit,cant:0,total:0};
@@ -12970,7 +12976,7 @@ function DashboardVentas({ventas, onVentaClick}){
       map[k].total+=it.subtotal;
     }));
     return Object.values(map).sort((a,b)=>b.total-a.total);
-  },[ventasFiltradas]);
+  },[ventasFiltradasActivas]);
   const totalUdsView = useMemo(()=>itemsView.reduce((s,i)=>s+i.cant,0),[itemsView]);
 
   return (
@@ -13028,7 +13034,7 @@ function DashboardVentas({ventas, onVentaClick}){
               {$(totalFil)}
             </div>
             <div style={{fontSize:13,color:"rgba(255,255,255,0.75)",fontFamily:FONT,marginTop:6}}>
-              {ventasFiltradas.length} venta{ventasFiltradas.length!==1?"s":""} en el período
+              {ventasFiltradasActivas.length} venta{ventasFiltradasActivas.length!==1?"s":""} en el período
             </div>
           </div>
 
