@@ -1895,8 +1895,8 @@ function sendFacturaWA(fac, venta, telefono){
   window.open(`${waBase}?text=${encodeURIComponent(lines.join("\n"))}`,"_blank");
 }
 
-// ── Compartir liquidación de marca por WhatsApp ───────────
-function sendLiqWA(marca, mes, anio, datos){
+// ── Mensaje de texto de la liquidación de marca ───────────
+function construirMensajeLiquidacion(marca, mes, anio, datos){
   const {bruto, brutoEfect, brutoQR, brutoTarjeta, pctTarjeta, descTarjeta,
     subtotalBanco, pctComision, comision, alquiler, gastos, totalGastos, neto} = datos;
 
@@ -1924,17 +1924,7 @@ function sendLiqWA(marca, mes, anio, datos){
   lines.push(``, `💰 *TOTAL NETO: ${$(Math.round(neto))}*`,
     ``, `📅 ${new Date().toLocaleDateString("es-BO")} · Toscana House`);
 
-  window.open(`https://wa.me/?text=${encodeURIComponent(lines.join("\n"))}`,"_blank");
-}
-
-// ── Compartir liquidación de marca por WhatsApp (desde calcLiqMarca) ──
-function compartirLiquidacionWA(marca, mes, anio, liq){
-  sendLiqWA(marca, mes, anio, {
-    bruto: liq.bruto, brutoEfect: liq.brutoEf, brutoQR: liq.brutoQR, brutoTarjeta: liq.brutoTJ,
-    pctTarjeta: liq.cfg?.pctTarjeta ?? 0, descTarjeta: liq.descTJ,
-    subtotalBanco: liq.subBanco, pctComision: liq.cfg?.pctComision ?? 0, comision: liq.comision,
-    alquiler: liq.alquiler, gastos: liq.gastos, totalGastos: liq.totalGastos, neto: liq.neto,
-  });
+  return lines.join("\n");
 }
 
 // ── Imprimir liquidación de marca (PDF/A4) ────────────────────────────
@@ -2103,19 +2093,20 @@ function generarImagenLiquidacion(marca, mes, anio, liq){
   }).catch(()=>alert("No se pudo generar la imagen"));
 }
 
-// ── Compartir imagen de la liquidación (share sheet / WhatsApp) ───────────────
+// ── Compartir liquidación de marca como imagen (share sheet / WhatsApp) ──────
 function compartirLiquidacionImagen(marca, mes, anio, d){
+  const texto = construirMensajeLiquidacion(marca, mes, anio, d);
   construirImagenLiquidacion(marca, mes, anio, d).then(blob=>{
     const nombre = `Liquidacion_${marca?.nombre||"marca"}_${MESES[mes]}_${anio}.png`;
     const file = new File([blob], nombre, {type:"image/png"});
     if(navigator.canShare && navigator.canShare({files:[file]})){
       navigator.share({
         files:[file],
+        text: texto,
         title:`Liquidación ${marca?.nombre||""} — ${MESES[mes]} ${anio}`,
       }).catch(()=>{});
     } else {
       descargarArchivo(blob, nombre);
-      window.open(`https://wa.me/?text=${encodeURIComponent(`📎 Imagen descargada: ${nombre}\nAdjúntala manualmente en el chat de WhatsApp.`)}`,"_blank");
     }
   }).catch(()=>alert("No se pudo generar la imagen"));
 }
@@ -3297,15 +3288,10 @@ function LiqModal({marcaId,ventas,mes,anio,MK,cierres,setCierres,onClose,syncCie
       }
 
       <div style={{display:"flex",flexDirection:"column",gap:10,marginTop:16}}>
-        <IOSBtn onPress={()=>sendLiqWA(marca,mes,anio,{bruto,brutoEfect,brutoQR,brutoTarjeta,
-          pctTarjeta,descTarjeta,subtotalBanco,pctComision,comision,alquiler,gastos,totalGastos,neto})}
+        <IOSBtn onPress={()=>compartirLiquidacionImagen(marca,mes,anio,{bruto,brutoEfect,brutoQR,brutoTarjeta,
+          descTarjeta,pctTarjeta,subtotalBanco,pctComision,comision,alquiler,gastos,totalGastos,neto,vMarca,marcaId})}
           variant="fill" icon="📤">
           Compartir liquidación
-        </IOSBtn>
-        <IOSBtn onPress={()=>compartirLiquidacionImagen(marca,mes,anio,{bruto,descTarjeta,pctTarjeta,
-          subtotalBanco,pctComision,comision,alquiler,gastos,totalGastos,neto,vMarca,marcaId})}
-          variant="fill" icon="📷">
-          Compartir imagen
         </IOSBtn>
         <IOSBtn onPress={()=>exportCSV(marca,ventas,mes,anio)} variant="fill" icon="⬇">
           Exportar CSV
@@ -11162,7 +11148,13 @@ function MarcaDetalle({marcaId,inv,ventas,vMes,mes,anio,MK,cierres,setCierres,ge
 
           <div style={{display:"flex",flexDirection:"column",gap:10}}>
             <div style={{display:"flex",gap:10}}>
-              <IOSBtn onPress={()=>compartirLiquidacionWA(marca,mes,anio,liq)} variant="fill" full icon="📤">
+              <IOSBtn onPress={()=>compartirLiquidacionImagen(marca,mes,anio,{
+                bruto: liq.bruto, brutoEfect: liq.brutoEf, brutoQR: liq.brutoQR, brutoTarjeta: liq.brutoTJ,
+                descTarjeta: liq.descTJ, pctTarjeta: liq.cfg?.pctTarjeta ?? 0,
+                subtotalBanco: liq.subBanco, pctComision: liq.cfg?.pctComision ?? 0, comision: liq.comision,
+                alquiler: liq.alquiler, gastos: liq.gastos, totalGastos: liq.totalGastos, neto: liq.neto,
+                vMarca: liq.vMarca, marcaId,
+              })} variant="fill" full icon="📤">
                 Compartir
               </IOSBtn>
               <IOSBtn onPress={()=>imprimirLiquidacion(marca,mes,anio,liq)} variant="fill" full icon="🖨">

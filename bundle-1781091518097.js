@@ -23413,7 +23413,7 @@
     lines.push(``, `\u{1F4C5} ${(/* @__PURE__ */ new Date()).toLocaleDateString("es-BO")} \xB7 Toscana House`);
     window.open(`${waBase}?text=${encodeURIComponent(lines.join("\n"))}`, "_blank");
   }
-  function sendLiqWA(marca, mes, anio, datos) {
+  function construirMensajeLiquidacion(marca, mes, anio, datos) {
     const {
       bruto,
       brutoEfect,
@@ -23456,24 +23456,7 @@
       ``,
       `\u{1F4C5} ${(/* @__PURE__ */ new Date()).toLocaleDateString("es-BO")} \xB7 Toscana House`
     );
-    window.open(`https://wa.me/?text=${encodeURIComponent(lines.join("\n"))}`, "_blank");
-  }
-  function compartirLiquidacionWA(marca, mes, anio, liq) {
-    sendLiqWA(marca, mes, anio, {
-      bruto: liq.bruto,
-      brutoEfect: liq.brutoEf,
-      brutoQR: liq.brutoQR,
-      brutoTarjeta: liq.brutoTJ,
-      pctTarjeta: liq.cfg?.pctTarjeta ?? 0,
-      descTarjeta: liq.descTJ,
-      subtotalBanco: liq.subBanco,
-      pctComision: liq.cfg?.pctComision ?? 0,
-      comision: liq.comision,
-      alquiler: liq.alquiler,
-      gastos: liq.gastos,
-      totalGastos: liq.totalGastos,
-      neto: liq.neto
-    });
+    return lines.join("\n");
   }
   function imprimirLiquidacion(marca, mes, anio, liq) {
     const win = window.open("", "_blank", "width=800,height=900");
@@ -23633,19 +23616,19 @@
     }).catch(() => alert("No se pudo generar la imagen"));
   }
   function compartirLiquidacionImagen(marca, mes, anio, d) {
+    const texto = construirMensajeLiquidacion(marca, mes, anio, d);
     construirImagenLiquidacion(marca, mes, anio, d).then((blob) => {
       const nombre = `Liquidacion_${marca?.nombre || "marca"}_${MESES[mes]}_${anio}.png`;
       const file = new File([blob], nombre, { type: "image/png" });
       if (navigator.canShare && navigator.canShare({ files: [file] })) {
         navigator.share({
           files: [file],
+          text: texto,
           title: `Liquidaci\xF3n ${marca?.nombre || ""} \u2014 ${MESES[mes]} ${anio}`
         }).catch(() => {
         });
       } else {
         descargarArchivo(blob, nombre);
-        window.open(`https://wa.me/?text=${encodeURIComponent(`\u{1F4CE} Imagen descargada: ${nombre}
-Adj\xFAntala manualmente en el chat de WhatsApp.`)}`, "_blank");
       }
     }).catch(() => alert("No se pudo generar la imagen"));
   }
@@ -24954,30 +24937,11 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
     }), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 10, marginTop: 16 } }, /* @__PURE__ */ import_react.default.createElement(
       IOSBtn,
       {
-        onPress: () => sendLiqWA(marca, mes, anio, {
+        onPress: () => compartirLiquidacionImagen(marca, mes, anio, {
           bruto,
           brutoEfect,
           brutoQR,
           brutoTarjeta,
-          pctTarjeta,
-          descTarjeta,
-          subtotalBanco,
-          pctComision,
-          comision,
-          alquiler,
-          gastos,
-          totalGastos,
-          neto
-        }),
-        variant: "fill",
-        icon: "\u{1F4E4}"
-      },
-      "Compartir liquidaci\xF3n"
-    ), /* @__PURE__ */ import_react.default.createElement(
-      IOSBtn,
-      {
-        onPress: () => compartirLiquidacionImagen(marca, mes, anio, {
-          bruto,
           descTarjeta,
           pctTarjeta,
           subtotalBanco,
@@ -24991,9 +24955,9 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
           marcaId
         }),
         variant: "fill",
-        icon: "\u{1F4F7}"
+        icon: "\u{1F4E4}"
       },
-      "Compartir imagen"
+      "Compartir liquidaci\xF3n"
     ), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => exportCSV(marca, ventas, mes, anio), variant: "fill", icon: "\u2B07" }, "Exportar CSV"), !cerrado ? /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => {
       setCierres((p) => ({ ...p, [`${MK}-${marcaId}`]: { cerrado: true, fecha: hoy(), mk: MK } }));
       sbGuardarCierre(`${MK}-${marcaId}`, { cerrado: true, fecha: hoy(), mk: MK, marca_id: marcaId });
@@ -33430,7 +33394,23 @@ Fecha: ${venta.fecha}`);
       alignItems: "center",
       padding: "18px 16px",
       background: `${C.gold}12`
-    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 16, fontWeight: 700, color: C.label, fontFamily: FONT } }, "TOTAL A PAGAR"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 24, fontWeight: 700, color: C.label, fontFamily: FONT } }, $(liq.neto)))), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 10 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 10 } }, /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => compartirLiquidacionWA(marca, mes, anio, liq), variant: "fill", full: true, icon: "\u{1F4E4}" }, "Compartir"), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => imprimirLiquidacion(marca, mes, anio, liq), variant: "fill", full: true, icon: "\u{1F5A8}" }, "Imprimir")), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => generarImagenLiquidacion(marca, mes, anio, liq), variant: "fill", full: true, icon: "\u{1F4F7}" }, "Exportar Imagen"), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => exportCSV(MARCAS.find((m) => m.id === marcaId), ventas, mes, anio), variant: "fill", full: true, icon: "\u2B07" }, "Exportar CSV"), !cerrado ? /* @__PURE__ */ import_react.default.createElement(
+    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 16, fontWeight: 700, color: C.label, fontFamily: FONT } }, "TOTAL A PAGAR"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 24, fontWeight: 700, color: C.label, fontFamily: FONT } }, $(liq.neto)))), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 10 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 10 } }, /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => compartirLiquidacionImagen(marca, mes, anio, {
+      bruto: liq.bruto,
+      brutoEfect: liq.brutoEf,
+      brutoQR: liq.brutoQR,
+      brutoTarjeta: liq.brutoTJ,
+      descTarjeta: liq.descTJ,
+      pctTarjeta: liq.cfg?.pctTarjeta ?? 0,
+      subtotalBanco: liq.subBanco,
+      pctComision: liq.cfg?.pctComision ?? 0,
+      comision: liq.comision,
+      alquiler: liq.alquiler,
+      gastos: liq.gastos,
+      totalGastos: liq.totalGastos,
+      neto: liq.neto,
+      vMarca: liq.vMarca,
+      marcaId
+    }), variant: "fill", full: true, icon: "\u{1F4E4}" }, "Compartir"), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => imprimirLiquidacion(marca, mes, anio, liq), variant: "fill", full: true, icon: "\u{1F5A8}" }, "Imprimir")), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => generarImagenLiquidacion(marca, mes, anio, liq), variant: "fill", full: true, icon: "\u{1F4F7}" }, "Exportar Imagen"), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => exportCSV(MARCAS.find((m) => m.id === marcaId), ventas, mes, anio), variant: "fill", full: true, icon: "\u2B07" }, "Exportar CSV"), !cerrado ? /* @__PURE__ */ import_react.default.createElement(
       IOSBtn,
       {
         variant: "success",
