@@ -23534,6 +23534,88 @@
 </html>`);
     win.document.close();
   }
+  function generarImagenLiquidacion(marca, mes, anio, liq) {
+    const filas = [
+      ["Ventas brutas", $(liq.bruto), false],
+      liq.descTJ > 0 ? [`\u2212 Desc. banco Tarjeta (${liq.cfg?.pctTarjeta ?? 0}%)`, `-${$(liq.descTJ)}`, false] : null,
+      liq.descTJ > 0 ? ["= Subtotal sin banco", $(liq.subBanco), false] : null,
+      liq.cfg?.pctComision > 0 ? [`\u2212 Comisi\xF3n ventas (${liq.cfg?.pctComision ?? 0}%)`, `-${$(liq.comision)}`, false] : null,
+      liq.alquiler > 0 ? ["\u2212 Alquiler", `-${$(liq.alquiler)}`, false] : null,
+      ...liq.gastos.filter((g) => g.desc || Number(g.monto) > 0).map(
+        (g) => [`\u2212 ${g.desc || "Gasto extra"}`, `-${$(Math.round(Number(g.monto) || 0))}`, false]
+      ),
+      ["Neto a liquidar", $(liq.neto), true]
+    ].filter(Boolean);
+    const filasHtml = filas.map(([k, v, bold]) => `
+    <tr style="${bold ? "font-weight:700;background:#f5f0e6" : ""}">
+      <td style="padding:8px 12px;border-bottom:1px solid #eee">${k}</td>
+      <td style="padding:8px 12px;border-bottom:1px solid #eee;text-align:right">${v}</td>
+    </tr>`).join("");
+    const ventas = liq.vMarca || [];
+    const transHtml = ventas.map((v) => {
+      const its = v.items.filter((i) => i.marcaId === marca.id);
+      const sub2 = its.reduce((s, i) => s + i.subtotal, 0);
+      const itemsHtml = its.map(
+        (it) => `<div style="font-size:11px;color:#555;margin-left:8px">\xB7 ${it.nombre} \xD7${it.cantidad} = ${$(it.subtotal)}</div>`
+      ).join("");
+      return `<div style="background:#faf8f4;border-radius:8px;padding:8px 12px;margin-bottom:6px;border:1px solid #eee">
+      <div style="display:flex;justify-content:space-between;font-size:12px;font-weight:600">
+        <span>${v.id} \xB7 ${v.fecha} ${v.hora}</span><span>${$(sub2)}</span>
+      </div>
+      ${itemsHtml}
+    </div>`;
+    }).join("");
+    const width = 720;
+    const itemsCount = ventas.reduce((s, v) => s + v.items.filter((i) => i.marcaId === marca.id).length, 0);
+    const height = 200 + filas.length * 38 + 50 + (ventas.length * 40 + itemsCount * 16) + 70;
+    const html = `<div xmlns="http://www.w3.org/1999/xhtml" style="font-family:Arial,sans-serif;color:#222;background:#fff;width:${width}px;padding:24px;box-sizing:border-box">
+    <div style="display:flex;align-items:center;gap:16px;margin-bottom:16px">
+      <img src="${LOGO_B64}" style="height:60px"/>
+      <div>
+        <div style="font-size:20px;font-weight:700">${marca?.emoji || ""} Liquidaci\xF3n \u2014 ${marca?.nombre || ""}</div>
+        <div style="font-size:13px;color:#666">${MESES[mes]} ${anio} \xB7 Toscana House</div>
+      </div>
+    </div>
+    <table style="width:100%;border-collapse:collapse;margin-bottom:20px">
+      <tbody>
+        ${filasHtml}
+        <tr style="border-top:2px solid #1a3a2a">
+          <td style="padding:10px 12px;font-weight:700;font-size:15px">TOTAL A PAGAR</td>
+          <td style="padding:10px 12px;text-align:right;font-weight:700;font-size:15px">${$(liq.neto)}</td>
+        </tr>
+      </tbody>
+    </table>
+    <div style="font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px;color:#888">Transacciones del per\xEDodo</div>
+    ${transHtml || '<div style="font-size:12px;color:#999;margin-bottom:12px">Sin transacciones</div>'}
+    <div style="margin-top:20px;font-size:11px;color:#999">
+      ${PROPIETARIA} \xB7 NIT ${NIT_EMPRESA}<br/>
+      Generado: ${(/* @__PURE__ */ new Date()).toLocaleString("es-BO")}
+    </div>
+  </div>`;
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">
+    <foreignObject width="100%" height="100%">${html}</foreignObject>
+  </svg>`;
+    const dataUrl = "data:image/svg+xml;charset=utf-8;base64," + btoa(unescape(encodeURIComponent(svg)));
+    const img = new Image();
+    img.onload = function() {
+      const scale = 2;
+      const canvas = document.createElement("canvas");
+      canvas.width = width * scale;
+      canvas.height = height * scale;
+      const ctx = canvas.getContext("2d");
+      ctx.scale(scale, scale);
+      ctx.fillStyle = "#fff";
+      ctx.fillRect(0, 0, width, height);
+      ctx.drawImage(img, 0, 0, width, height);
+      canvas.toBlob((blob) => {
+        descargarArchivo(blob, `Liquidacion_${marca?.nombre || "marca"}_${MESES[mes]}_${anio}.png`);
+      });
+    };
+    img.onerror = function() {
+      alert("No se pudo generar la imagen");
+    };
+    img.src = dataUrl;
+  }
   function numeroALetras(monto) {
     const entero = Math.floor(monto), cts = Math.round((monto - entero) * 100);
     const un = [
@@ -33294,7 +33376,7 @@ Fecha: ${venta.fecha}`);
       alignItems: "center",
       padding: "18px 16px",
       background: `${C.gold}12`
-    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 16, fontWeight: 700, color: C.label, fontFamily: FONT } }, "TOTAL A PAGAR"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 24, fontWeight: 700, color: C.label, fontFamily: FONT } }, $(liq.neto)))), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 10 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 10 } }, /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => compartirLiquidacionWA(marca, mes, anio, liq), variant: "fill", full: true, icon: "\u{1F4E4}" }, "Compartir"), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => imprimirLiquidacion(marca, mes, anio, liq), variant: "fill", full: true, icon: "\u{1F5A8}" }, "Imprimir")), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => exportCSV(MARCAS.find((m) => m.id === marcaId), ventas, mes, anio), variant: "fill", full: true, icon: "\u2B07" }, "Exportar CSV"), !cerrado ? /* @__PURE__ */ import_react.default.createElement(
+    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 16, fontWeight: 700, color: C.label, fontFamily: FONT } }, "TOTAL A PAGAR"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 24, fontWeight: 700, color: C.label, fontFamily: FONT } }, $(liq.neto)))), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 10 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 10 } }, /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => compartirLiquidacionWA(marca, mes, anio, liq), variant: "fill", full: true, icon: "\u{1F4E4}" }, "Compartir"), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => imprimirLiquidacion(marca, mes, anio, liq), variant: "fill", full: true, icon: "\u{1F5A8}" }, "Imprimir")), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => generarImagenLiquidacion(marca, mes, anio, liq), variant: "fill", full: true, icon: "\u{1F4F7}" }, "Exportar Imagen"), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => exportCSV(MARCAS.find((m) => m.id === marcaId), ventas, mes, anio), variant: "fill", full: true, icon: "\u2B07" }, "Exportar CSV"), !cerrado ? /* @__PURE__ */ import_react.default.createElement(
       IOSBtn,
       {
         variant: "success",
