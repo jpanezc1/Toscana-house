@@ -21621,6 +21621,56 @@
       return [];
     }
   }
+  async function sbGuardarAuditoria(aud) {
+    try {
+      const db = await getSupabase();
+      await db.from("auditorias_inventario").upsert({
+        id: aud.id,
+        mk: aud.mk,
+        mes: aud.mes,
+        anio: aud.anio,
+        fecha: aud.fecha,
+        hora: aud.hora,
+        usuario: aud.usuario,
+        marca_id: aud.marcaId,
+        total_productos: aud.totalProductos,
+        ok: aud.ok,
+        faltantes: aud.faltantes,
+        sobrantes: aud.sobrantes,
+        valor_fuga: aud.valorFuga,
+        valor_sobrante: aud.valorSobrante,
+        detalle: aud.detalle
+      });
+    } catch (e) {
+      console.warn("Supabase auditoria (tabla puede no existir):", e.message);
+    }
+  }
+  async function sbCargarAuditorias() {
+    try {
+      const db = await getSupabase();
+      const { data } = await db.from("auditorias_inventario").select("*").order("created_at", { ascending: false });
+      return (data || []).map((a) => ({
+        id: a.id,
+        mk: a.mk,
+        mes: a.mes,
+        anio: a.anio,
+        fecha: a.fecha,
+        hora: a.hora,
+        usuario: a.usuario,
+        marcaId: a.marca_id,
+        totalProductos: a.total_productos,
+        ok: a.ok,
+        faltantes: a.faltantes,
+        sobrantes: a.sobrantes,
+        valorFuga: a.valor_fuga,
+        valorSobrante: a.valor_sobrante,
+        detalle: a.detalle || []
+      }));
+    } catch (e) {
+      console.warn("Supabase load auditorias:", e.message);
+      return [];
+    }
+  }
   async function sbGuardarUsuarios(lista) {
     try {
       const db = await getSupabase();
@@ -23553,6 +23603,200 @@
     const buf = XLSX.write(wb, { bookType: "xlsx", type: "array" });
     const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
     descargarArchivo(blob, `TH_${marca.nombre.replace(/ /g, "_")}_${MESES[mes]}_${anio}.xlsx`);
+  }
+  async function exportAuditoriaExcel(aud) {
+    const XLSX = await loadXLSX();
+    const D = "1A1714";
+    const G = "9A7B4F";
+    const GL = "C4A57B";
+    const CR = "F5F0E8";
+    const CL = "FAF7F3";
+    const WH = "FFFFFF";
+    const AM = "FDF3DC";
+    const AB = "E8C97A";
+    const BD = "D4C5A9";
+    const MT = "8B7355";
+    const RD = "7A1F1F";
+    const RDBG = "FBE9E9";
+    const GRBG = "E8F3EC";
+    const bAll = (c = BD) => ({
+      top: { style: "thin", color: { rgb: c } },
+      bottom: { style: "thin", color: { rgb: c } },
+      left: { style: "thin", color: { rgb: c } },
+      right: { style: "thin", color: { rgb: c } }
+    });
+    const NC = 7;
+    function S(ws2, r, c, st) {
+      const a = XLSX.utils.encode_cell({ r, c });
+      if (!ws2[a]) ws2[a] = { t: "z", v: "" };
+      ws2[a].s = st;
+    }
+    const Srow = (ws2, r, nc, st) => {
+      for (let c = 0; c < nc; c++) S(ws2, r, c, st);
+    };
+    const sTitulo = {
+      font: { name: "Arial", sz: 20, bold: true, color: { rgb: WH } },
+      fill: { patternType: "solid", fgColor: { rgb: D } },
+      alignment: { horizontal: "center", vertical: "center" },
+      border: bAll("2A2420")
+    };
+    const sSubtit = {
+      font: { name: "Arial", sz: 13, bold: true, color: { rgb: WH } },
+      fill: { patternType: "solid", fgColor: { rgb: G } },
+      alignment: { horizontal: "center", vertical: "center" },
+      border: bAll(GL)
+    };
+    const sMeta = {
+      font: { name: "Arial", sz: 9, color: { rgb: MT } },
+      fill: { patternType: "solid", fgColor: { rgb: CR } },
+      alignment: { horizontal: "center", vertical: "center" },
+      border: bAll(BD)
+    };
+    const sHdr = {
+      font: { name: "Arial", sz: 10, bold: true, color: { rgb: WH } },
+      fill: { patternType: "solid", fgColor: { rgb: D } },
+      alignment: { horizontal: "center", vertical: "center", wrapText: true },
+      border: bAll("2A2420")
+    };
+    const sDataL = (alt, bg) => ({
+      font: { name: "Arial", sz: 10, color: { rgb: D } },
+      fill: { patternType: "solid", fgColor: { rgb: bg || (alt ? CL : WH) } },
+      alignment: { horizontal: "left", vertical: "center", wrapText: true },
+      border: bAll(BD)
+    });
+    const sDataC = (alt, bg, bold, color) => ({
+      font: { name: "Arial", sz: 10, bold: !!bold, color: { rgb: color || D } },
+      fill: { patternType: "solid", fgColor: { rgb: bg || (alt ? CL : WH) } },
+      alignment: { horizontal: "center", vertical: "center" },
+      border: bAll(BD)
+    });
+    const sBlank = { fill: { patternType: "solid", fgColor: { rgb: WH } }, border: bAll(BD) };
+    const sSeccion = {
+      font: { name: "Arial", sz: 11, bold: true, color: { rgb: WH } },
+      fill: { patternType: "solid", fgColor: { rgb: G } },
+      alignment: { horizontal: "left", vertical: "center" },
+      border: bAll(GL)
+    };
+    const sLabel = {
+      font: { name: "Arial", sz: 10, color: { rgb: D } },
+      fill: { patternType: "solid", fgColor: { rgb: WH } },
+      alignment: { horizontal: "left", vertical: "center" },
+      border: bAll(BD)
+    };
+    const sValor = {
+      font: { name: "Arial", sz: 10, color: { rgb: D } },
+      fill: { patternType: "solid", fgColor: { rgb: WH } },
+      alignment: { horizontal: "right", vertical: "center" },
+      border: bAll(BD),
+      numFmt: "#,##0.00"
+    };
+    const sNeto = (color, bg) => ({
+      font: { name: "Arial", sz: 12, bold: true, color: { rgb: color || D } },
+      fill: { patternType: "solid", fgColor: { rgb: bg || AM } },
+      alignment: { horizontal: "right", vertical: "center" },
+      border: {
+        top: { style: "medium", color: { rgb: AB } },
+        bottom: { style: "medium", color: { rgb: AB } },
+        left: { style: "thin", color: { rgb: AB } },
+        right: { style: "thin", color: { rgb: AB } }
+      },
+      numFmt: "#,##0.00"
+    });
+    const sNetoLabel = (bg) => ({
+      font: { name: "Arial", sz: 12, bold: true, color: { rgb: D } },
+      fill: { patternType: "solid", fgColor: { rgb: bg || AM } },
+      alignment: { horizontal: "left", vertical: "center" },
+      border: {
+        top: { style: "medium", color: { rgb: AB } },
+        bottom: { style: "medium", color: { rgb: AB } },
+        left: { style: "thin", color: { rgb: AB } },
+        right: { style: "thin", color: { rgb: AB } }
+      }
+    });
+    const ESTADO_LBL = { OK: "Coincide", FALTANTE: "Faltante", SOBRANTE: "Sobrante" };
+    const HEAD = ["C\xF3digo", "Producto", "Marca", "Sistema", "Contado", "Diferencia", "Estado"];
+    const marcaNombre = aud.marcaId ? MARCAS.find((m) => m.id === aud.marcaId)?.nombre || "\u2014" : "Todas las marcas";
+    const rows = [
+      [`TOSCANA HOUSE \u2014 CIERRE DE INVENTARIO`, ...Array(NC - 1).fill("")],
+      [`${MESES[aud.mes]} ${aud.anio} \xB7 ${marcaNombre}`, ...Array(NC - 1).fill("")],
+      [`Generado: ${aud.fecha} ${aud.hora || ""} \xB7 Responsable: ${aud.usuario || "\u2014"}`, ...Array(NC - 1).fill("")],
+      [],
+      HEAD,
+      ...aud.detalle.map((d) => [d.codigo, d.nombre, d.marcaNombre || "", d.sistema, d.contado, d.diferencia, ESTADO_LBL[d.estado] || d.estado]),
+      []
+    ];
+    const rTablaHdr = 4;
+    const rItemsStart = 5;
+    const rItemsEnd = rItemsStart + aud.detalle.length - 1;
+    const rSeccionResumen = rows.length;
+    rows.push(["RESUMEN DEL CIERRE", ...Array(NC - 1).fill("")]);
+    const resumen = [
+      ["Productos auditados", aud.totalProductos],
+      ["Coinciden", aud.ok],
+      ["Faltantes (posible fuga)", aud.faltantes],
+      ["Sobrantes", aud.sobrantes]
+    ];
+    const rResumenStart = rows.length;
+    resumen.forEach(([k, v]) => rows.push([k, ...Array(NC - 2).fill(""), v]));
+    const rResumenEnd = rows.length - 1;
+    rows.push([]);
+    const rValorFuga = rows.length;
+    rows.push(["VALOR ESTIMADO DE FUGA", ...Array(NC - 2).fill(""), aud.valorFuga]);
+    const rValorSobrante = rows.length;
+    rows.push(["VALOR DE SOBRANTES", ...Array(NC - 2).fill(""), aud.valorSobrante]);
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    ws["!cols"] = [
+      { wch: 14 },
+      { wch: 38 },
+      { wch: 16 },
+      { wch: 10 },
+      { wch: 10 },
+      { wch: 12 },
+      { wch: 12 }
+    ];
+    ws["!merges"] = [
+      { s: { r: 0, c: 0 }, e: { r: 0, c: NC - 1 } },
+      { s: { r: 1, c: 0 }, e: { r: 1, c: NC - 1 } },
+      { s: { r: 2, c: 0 }, e: { r: 2, c: NC - 1 } },
+      { s: { r: rSeccionResumen, c: 0 }, e: { r: rSeccionResumen, c: NC - 1 } },
+      ...Array.from({ length: rResumenEnd - rResumenStart + 1 }, (_, i) => {
+        const r = rResumenStart + i;
+        return { s: { r, c: 0 }, e: { r, c: NC - 2 } };
+      }),
+      { s: { r: rValorFuga, c: 0 }, e: { r: rValorFuga, c: NC - 2 } },
+      { s: { r: rValorSobrante, c: 0 }, e: { r: rValorSobrante, c: NC - 2 } }
+    ];
+    Srow(ws, 0, NC, sTitulo);
+    Srow(ws, 1, NC, sSubtit);
+    Srow(ws, 2, NC, sMeta);
+    Srow(ws, 3, NC, sBlank);
+    HEAD.forEach((_, c) => S(ws, rTablaHdr, c, sHdr));
+    for (let r = rItemsStart; r <= rItemsEnd; r++) {
+      const alt = (r - rItemsStart) % 2 === 1;
+      const d = aud.detalle[r - rItemsStart];
+      const bg = d.estado === "FALTANTE" ? RDBG : d.estado === "SOBRANTE" ? GRBG : void 0;
+      const estColor = d.estado === "FALTANTE" ? RD : d.estado === "SOBRANTE" ? "1E5C3A" : MT;
+      HEAD.forEach((h, c) => {
+        if (c === 3 || c === 4 || c === 5) S(ws, r, c, sDataC(alt, bg, c === 5, c === 5 ? estColor : void 0));
+        else if (c === 6) S(ws, r, c, sDataC(alt, bg, true, estColor));
+        else S(ws, r, c, sDataL(alt, bg));
+      });
+    }
+    if (rItemsEnd < rItemsStart) Srow(ws, rItemsStart, NC, sBlank);
+    Srow(ws, rSeccionResumen, NC, sSeccion);
+    for (let r = rResumenStart; r <= rResumenEnd; r++) {
+      S(ws, r, 0, sLabel);
+      S(ws, r, NC - 1, { ...sValor, numFmt: "#,##0" });
+    }
+    S(ws, rValorFuga, 0, sNetoLabel(RDBG));
+    S(ws, rValorFuga, NC - 1, sNeto(RD, RDBG));
+    S(ws, rValorSobrante, 0, sNetoLabel(GRBG));
+    S(ws, rValorSobrante, NC - 1, sNeto("1E5C3A", GRBG));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Cierre Inventario");
+    const buf = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+    const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+    descargarArchivo(blob, `TH_CierreInventario_${MESES[aud.mes]}_${aud.anio}_${aud.fecha.replace(/\//g, "-")}.xlsx`);
   }
   function sendWA(venta) {
     const lines = venta.items.map((it) => {
@@ -31040,6 +31284,13 @@ Fecha: ${venta.fecha}`);
         return [];
       }
     });
+    const [auditorias, setAuditorias] = (0, import_react.useState)(() => {
+      try {
+        return JSON.parse(localStorage.getItem("th_auditorias") || "[]");
+      } catch {
+        return [];
+      }
+    });
     const [ventaDetalle, setVentaDetalle] = (0, import_react.useState)(null);
     const [shImportarExcel, setShImportarExcel] = (0, import_react.useState)(false);
     const [modalNuevaMarca, setModalNuevaMarca] = (0, import_react.useState)(false);
@@ -31096,6 +31347,12 @@ Fecha: ${venta.fecha}`);
       } catch {
       }
     }, [retiros]);
+    (0, import_react.useEffect)(() => {
+      try {
+        localStorage.setItem("th_auditorias", JSON.stringify(auditorias));
+      } catch {
+      }
+    }, [auditorias]);
     useRealtimeSync(setVentas, setInv, setRetiros);
     (0, import_react.useEffect)(() => {
       setMarcasState((prev) => {
@@ -31124,6 +31381,15 @@ Fecha: ${venta.fecha}`);
         if (data.length > 0) setRetiros(data);
       });
     }, []);
+    (0, import_react.useEffect)(() => {
+      sbCargarAuditorias().then((data) => {
+        if (data.length > 0) setAuditorias(data);
+      });
+    }, []);
+    function registrarAuditoria(aud) {
+      setAuditorias((prev) => [aud, ...prev]);
+      sbGuardarAuditoria(aud);
+    }
     function registrarRetiro(r) {
       const updated = [...retiros, r];
       setRetiros(updated);
@@ -31416,12 +31682,13 @@ Fecha: ${venta.fecha}`);
       { id: "pos", icon: "\u2295", label: "Caja" },
       { id: "ventas", icon: "\u25C8", label: "Ventas" },
       { id: "inventario", icon: "\u25EB", label: "Inventario" },
+      { id: "auditoria", icon: "\u2316", label: "Auditor\xEDa" },
       { id: "marcas", icon: "\u25C6", label: "Marcas" },
       { id: "liquidaciones", icon: "\u25CE", label: "Liquidar" },
       { id: "giftcards", icon: "\u{1F381}", label: "Gift" },
       { id: "config", icon: "\u2699", label: "Config" }
     ];
-    const TABS = user?.rol === "caja" ? TABS_ALL.filter((t) => ["inicio", "pos", "ventas"].includes(t.id)) : TABS_ALL;
+    const TABS = user?.rol === "caja" ? TABS_ALL.filter((t) => ["inicio", "pos", "ventas"].includes(t.id)) : user?.rol === "admin" ? TABS_ALL : TABS_ALL.filter((t) => t.id !== "auditoria");
     const showingDetail = tab === "marcas" && marcaDetalle;
     if (!user) return /* @__PURE__ */ import_react.default.createElement(LoginScreen, { onLogin: login });
     if (user.rol === "marca") return /* @__PURE__ */ import_react.default.createElement(BrandPortal, { user, ventas, inv, logout });
@@ -31599,7 +31866,19 @@ Fecha: ${venta.fecha}`);
       setShBaja(true);
       setBajaMsg(null);
       setBajaCod("");
-    }, onImportarExcel: () => setShImportarExcel(true) }), tab === "marcas" && !marcaDetalle && /* @__PURE__ */ import_react.default.createElement("div", null, marcasState.filter((m) => m.estado === "inactiva").length > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: {
+    }, onImportarExcel: () => setShImportarExcel(true) }), tab === "auditoria" && /* @__PURE__ */ import_react.default.createElement(
+      AuditoriaInventario,
+      {
+        inv,
+        ventas,
+        mes,
+        anio,
+        MK,
+        auditorias,
+        onGuardarAuditoria: registrarAuditoria,
+        user
+      }
+    ), tab === "marcas" && !marcaDetalle && /* @__PURE__ */ import_react.default.createElement("div", null, marcasState.filter((m) => m.estado === "inactiva").length > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: {
       fontSize: 13,
       fontWeight: 600,
       color: C.label3,
@@ -33123,6 +33402,436 @@ Fecha: ${venta.fecha}`);
       color: C.gold,
       marginBottom: 10
     } }, codigoGenerado), /* @__PURE__ */ import_react.default.createElement(BarcodeDisplay, { codigo: codigoGenerado }), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT, marginTop: 8 } }, fInv.nombre && /* @__PURE__ */ import_react.default.createElement("strong", { style: { color: C.label2 } }, fInv.nombre), fInv.categoria && /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.label3 } }, " \xB7 ", fInv.categoria))), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: onAdd, full: true, variant: "primary" }, "Registrar e Imprimir Ticket"));
+  }
+  function AuditoriaInventario({ inv, ventas, mes, anio, MK, auditorias, onGuardarAuditoria, user }) {
+    const isDesktop = useIsDesktop();
+    const [vista, setVista] = (0, import_react.useState)("conteo");
+    const [marcaSelec, setMarcaSelec] = (0, import_react.useState)(null);
+    const [conteo, setConteo] = (0, import_react.useState)({});
+    const [showScanner, setShowScanner] = (0, import_react.useState)(false);
+    const [scanMsg, setScanMsg] = (0, import_react.useState)(null);
+    const [codManual, setCodManual] = (0, import_react.useState)("");
+    const [auditoriaAbierta, setAuditoriaAbierta] = (0, import_react.useState)(null);
+    const productos = (0, import_react.useMemo)(() => marcaSelec ? inv.filter((p) => p.marcaId === marcaSelec) : inv, [inv, marcaSelec]);
+    function flash(ok, txt) {
+      setScanMsg({ ok, txt });
+      setTimeout(() => setScanMsg(null), 2500);
+    }
+    function agregar(prod, cant) {
+      setConteo((prev) => {
+        const next = (prev[prod.id] || 0) + cant;
+        if (next <= 0) {
+          const { [prod.id]: _, ...rest } = prev;
+          return rest;
+        }
+        return { ...prev, [prod.id]: next };
+      });
+      if (cant > 0) flash(true, `+${cant} \xB7 ${(prod.nombre || "").toUpperCase()} (${prod.codigo})`);
+    }
+    function buscarYAgregar(codigo) {
+      const c = (codigo || "").trim().toUpperCase();
+      if (!c) return;
+      const p = inv.find((i) => i.codigo.toUpperCase() === c);
+      if (!p) {
+        flash(false, `C\xF3digo "${c}" no encontrado en inventario`);
+        return;
+      }
+      agregar(p, 1);
+      setCodManual("");
+    }
+    function reiniciarConteo() {
+      if (Object.keys(conteo).length === 0) return;
+      if (window.confirm("\xBFReiniciar el conteo f\xEDsico? Se perder\xE1n los \xEDtems escaneados hasta ahora.")) setConteo({});
+    }
+    const cruce = (0, import_react.useMemo)(() => {
+      return productos.map((p) => {
+        const sistema = p.stock;
+        const contado = conteo[p.id] || 0;
+        const diferencia = contado - sistema;
+        return {
+          ...p,
+          sistema,
+          contado,
+          diferencia,
+          estado: diferencia === 0 ? "OK" : diferencia < 0 ? "FALTANTE" : "SOBRANTE"
+        };
+      }).filter((r) => r.sistema > 0 || r.contado > 0).sort((a, b) => Math.abs(b.diferencia) - Math.abs(a.diferencia) || (a.nombre || "").localeCompare(b.nombre || ""));
+    }, [productos, conteo]);
+    const itemsContados = Object.keys(conteo).length;
+    const unidadesContadas = Object.values(conteo).reduce((s, v) => s + v, 0);
+    const faltantes = cruce.filter((r) => r.estado === "FALTANTE");
+    const sobrantes = cruce.filter((r) => r.estado === "SOBRANTE");
+    const okCount = cruce.filter((r) => r.estado === "OK").length;
+    const valorFuga = faltantes.reduce((s, r) => s + Math.abs(r.diferencia) * r.precio, 0);
+    const valorSobrante = sobrantes.reduce((s, r) => s + r.diferencia * r.precio, 0);
+    function confirmarCierre() {
+      if (itemsContados === 0) {
+        flash(false, "Escanea o agrega al menos un producto antes de confirmar el cierre");
+        return;
+      }
+      if (!window.confirm(`\xBFConfirmar el cierre de inventario de ${MESES[mes]} ${anio}?
+
+${cruce.length} productos auditados \xB7 ${faltantes.length} faltante(s) \xB7 ${sobrantes.length} sobrante(s)`)) return;
+      const aud = {
+        id: `AUD-${MK}-${Date.now()}`,
+        mk: MK,
+        mes,
+        anio,
+        fecha: hoy(),
+        hora: hora(),
+        usuario: user?.nombre || "\u2014",
+        marcaId: marcaSelec,
+        totalProductos: cruce.length,
+        ok: okCount,
+        faltantes: faltantes.length,
+        sobrantes: sobrantes.length,
+        valorFuga,
+        valorSobrante,
+        detalle: cruce.map((r) => ({
+          codigo: r.codigo,
+          nombre: r.nombre,
+          marcaId: r.marcaId,
+          marcaNombre: r.marcaNombre || MARCAS.find((m) => m.id === r.marcaId)?.nombre,
+          sistema: r.sistema,
+          contado: r.contado,
+          diferencia: r.diferencia,
+          estado: r.estado,
+          precio: r.precio
+        }))
+      };
+      onGuardarAuditoria(aud);
+      setConteo({});
+      flash(true, "\u2713 Cierre de inventario guardado");
+      setVista("historial");
+    }
+    const ESTADO_INFO = {
+      OK: { label: "\u2713 Coincide", color: C.green, bg: C.greenBg },
+      FALTANTE: { label: "\u26A0 Faltante", color: C.red, bg: C.redBg },
+      SOBRANTE: { label: "\u2191 Sobrante", color: C.blue, bg: "#EEF2FF" }
+    };
+    return /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      background: C.bg1,
+      borderRadius: 16,
+      padding: 18,
+      marginBottom: 14,
+      border: `1px solid ${C.sep}`,
+      boxShadow: "0 1px 4px rgba(0,0,0,0.06)"
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      fontSize: 16,
+      fontWeight: 700,
+      color: C.label,
+      fontFamily: FONT,
+      marginBottom: 6,
+      display: "flex",
+      alignItems: "center",
+      gap: 8
+    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 20 } }, "\u2316"), " Cierre de Inventario \xB7 ", MESES[mes], " ", anio), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12.5, color: C.label3, fontFamily: FONT, lineHeight: 1.5 } }, "Escanea (o ingresa el c\xF3digo de) cada producto f\xEDsico en tienda. La app cruza el conteo con el stock del sistema y se\xF1ala faltantes (posible fuga) o sobrantes.")), /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 16 } }, /* @__PURE__ */ import_react.default.createElement(
+      SegControl,
+      {
+        options: [
+          { value: "conteo", label: `Conteo${itemsContados ? ` (${itemsContados})` : ""}` },
+          { value: "cruce", label: "Cruce" },
+          { value: "historial", label: `Historial${auditorias.length ? ` (${auditorias.length})` : ""}` }
+        ],
+        value: vista,
+        onChange: setVista
+      }
+    )), vista === "conteo" && /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 14 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      fontSize: 10,
+      fontWeight: 600,
+      color: C.label3,
+      textTransform: "uppercase",
+      letterSpacing: 0.8,
+      marginBottom: 8,
+      paddingLeft: 2
+    } }, "Filtrar por marca"), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      display: "flex",
+      gap: 6,
+      overflowX: "auto",
+      paddingBottom: 6,
+      scrollbarWidth: "none",
+      WebkitOverflowScrolling: "touch"
+    } }, /* @__PURE__ */ import_react.default.createElement("button", { onClick: () => setMarcaSelec(null), style: {
+      flexShrink: 0,
+      padding: "7px 14px",
+      borderRadius: 10,
+      border: `1.5px solid ${!marcaSelec ? C.label : C.sep}`,
+      background: !marcaSelec ? C.label : C.bg2,
+      color: !marcaSelec ? "#fff" : C.label2,
+      cursor: "pointer",
+      fontFamily: FONT,
+      fontSize: 11,
+      fontWeight: 600,
+      WebkitTapHighlightColor: "transparent",
+      whiteSpace: "nowrap",
+      letterSpacing: "0.04em",
+      textTransform: "uppercase",
+      transition: "all .18s"
+    } }, "TODAS"), MARCAS.map((m) => {
+      const activa = m.id === marcaSelec;
+      return /* @__PURE__ */ import_react.default.createElement("button", { key: m.id, onClick: () => setMarcaSelec(activa ? null : m.id), style: {
+        flexShrink: 0,
+        padding: "6px 12px",
+        borderRadius: 10,
+        border: `1.5px solid ${activa ? m.color : C.sep}`,
+        background: activa ? `${m.color}22` : C.bg2,
+        cursor: "pointer",
+        fontFamily: FONT,
+        WebkitTapHighlightColor: "transparent",
+        display: "flex",
+        alignItems: "center",
+        gap: 6,
+        transition: "all .18s"
+      } }, /* @__PURE__ */ import_react.default.createElement(MarcaIcon, { marca: m, size: 16, radius: 4 }), /* @__PURE__ */ import_react.default.createElement("span", { style: {
+        fontSize: 11,
+        fontWeight: activa ? 700 : 400,
+        color: activa ? m.color : C.label2,
+        whiteSpace: "nowrap"
+      } }, m.nombre));
+    }))), showScanner && /* @__PURE__ */ import_react.default.createElement(CameraScanner, { onDetect: (codigo) => {
+      setShowScanner(false);
+      buscarYAgregar(codigo);
+    }, onClose: () => setShowScanner(false) }), /* @__PURE__ */ import_react.default.createElement("div", { onClick: () => setShowScanner(true), style: {
+      background: C.bg2,
+      borderRadius: 13,
+      border: `1.5px dashed ${C.sep}`,
+      padding: "16px",
+      marginBottom: 12,
+      cursor: "pointer",
+      display: "flex",
+      alignItems: "center",
+      gap: 12,
+      WebkitTapHighlightColor: "transparent"
+    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 24 } }, "\u{1F4F7}"), /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, fontWeight: 700, color: C.label, fontFamily: FONT } }, "Escanear producto"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT, marginTop: 2 } }, "Toca para abrir la c\xE1mara \u2014 cada escaneo suma 1 unidad al conteo"))), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 8, marginBottom: 8 } }, /* @__PURE__ */ import_react.default.createElement(
+      "input",
+      {
+        value: codManual,
+        onChange: (e) => setCodManual(e.target.value.toUpperCase()),
+        onKeyDown: (e) => {
+          if (e.key === "Enter") buscarYAgregar(codManual);
+        },
+        placeholder: "C\xF3digo manual\u2026",
+        style: {
+          flex: 1,
+          padding: "10px 12px",
+          border: `1px solid ${C.sep}`,
+          borderRadius: 9,
+          background: C.bg1,
+          fontSize: 13,
+          color: C.label,
+          fontFamily: FONT_MONO,
+          outline: "none",
+          boxSizing: "border-box"
+        }
+      }
+    ), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => buscarYAgregar(codManual), small: true, icon: "+" }, "Agregar")), scanMsg && /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      padding: "9px 12px",
+      borderRadius: 9,
+      marginBottom: 12,
+      background: scanMsg.ok ? C.greenBg : C.redBg,
+      color: scanMsg.ok ? C.green : C.red,
+      fontSize: 12,
+      fontWeight: 600,
+      fontFamily: FONT
+    } }, scanMsg.ok ? "\u2713 " : "\u2715 ", scanMsg.txt), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 14 } }, /* @__PURE__ */ import_react.default.createElement(StatCard, { icon: "\u{1F50D}", label: "Productos contados", value: itemsContados, color: C.indigo, compact: isDesktop }), /* @__PURE__ */ import_react.default.createElement(StatCard, { icon: "\u{1F4E6}", label: "Unidades contadas", value: unidadesContadas, color: C.blue, compact: isDesktop })), itemsContados === 0 ? /* @__PURE__ */ import_react.default.createElement(
+      EmptyState,
+      {
+        icon: "\u{1F50D}",
+        title: "Sin productos escaneados a\xFAn",
+        sub: "Us\xE1 el esc\xE1ner o ingresa el c\xF3digo manualmente para empezar el conteo"
+      }
+    ) : /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      background: C.bg1,
+      border: `1px solid ${C.sep}`,
+      borderRadius: 10,
+      overflow: "hidden",
+      marginBottom: 16,
+      boxShadow: "0 1px 3px rgba(0,0,0,.06)"
+    } }, Object.entries(conteo).map(([prodId, cant], i) => {
+      const p = inv.find((x) => String(x.id) === String(prodId));
+      if (!p) return null;
+      const marcaP = MARCAS.find((m) => m.id === p.marcaId);
+      return /* @__PURE__ */ import_react.default.createElement("div", { key: prodId, style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        padding: "10px 14px",
+        borderTop: i > 0 ? `1px solid ${C.sep}` : "",
+        background: i % 2 === 0 ? C.bg1 : C.bg0
+      } }, /* @__PURE__ */ import_react.default.createElement(MarcaIcon, { marca: marcaP, size: 26, radius: 6 }), /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+        fontSize: 13,
+        fontWeight: 700,
+        color: C.label,
+        fontFamily: FONT,
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+        whiteSpace: "nowrap"
+      } }, (p.nombre || "").toUpperCase()), /* @__PURE__ */ import_react.default.createElement("span", { style: {
+        fontFamily: FONT_MONO,
+        fontSize: 10,
+        color: C.gold,
+        background: `${C.gold}12`,
+        padding: "1px 7px",
+        borderRadius: 4,
+        fontWeight: 500
+      } }, p.codigo)), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6 } }, /* @__PURE__ */ import_react.default.createElement("button", { onClick: () => agregar(p, -1), style: {
+        width: 28,
+        height: 28,
+        borderRadius: 8,
+        border: `1px solid ${C.sep}`,
+        background: C.bg2,
+        color: C.label2,
+        fontSize: 15,
+        cursor: "pointer",
+        WebkitTapHighlightColor: "transparent"
+      } }, "\u2212"), /* @__PURE__ */ import_react.default.createElement("span", { style: {
+        minWidth: 24,
+        textAlign: "center",
+        fontSize: 14,
+        fontWeight: 700,
+        color: C.label,
+        fontFamily: FONT
+      } }, cant), /* @__PURE__ */ import_react.default.createElement("button", { onClick: () => agregar(p, 1), style: {
+        width: 28,
+        height: 28,
+        borderRadius: 8,
+        border: `1px solid ${C.sep}`,
+        background: C.bg2,
+        color: C.label2,
+        fontSize: 15,
+        cursor: "pointer",
+        WebkitTapHighlightColor: "transparent"
+      } }, "+")));
+    })), itemsContados > 0 && /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: reiniciarConteo, variant: "danger", full: true, small: true, icon: "\u21BA" }, "Reiniciar conteo")), vista === "cruce" && /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "grid", gridTemplateColumns: isDesktop ? "1fr 1fr 1fr 1fr" : "1fr 1fr", gap: 8, marginBottom: 14 } }, /* @__PURE__ */ import_react.default.createElement(StatCard, { icon: "\u2713", label: "Coinciden", value: okCount, color: C.green, compact: isDesktop }), /* @__PURE__ */ import_react.default.createElement(StatCard, { icon: "\u26A0", label: "Faltantes", value: faltantes.length, color: C.red, compact: isDesktop }), /* @__PURE__ */ import_react.default.createElement(StatCard, { icon: "\u2191", label: "Sobrantes", value: sobrantes.length, color: C.blue, compact: isDesktop }), /* @__PURE__ */ import_react.default.createElement(StatCard, { icon: "\u{1F4B0}", label: "Valor en fuga", value: $(Math.round(valorFuga)), color: C.red, compact: isDesktop })), cruce.length === 0 ? /* @__PURE__ */ import_react.default.createElement(
+      EmptyState,
+      {
+        icon: "\u{1F4CA}",
+        title: "Nada que cruzar todav\xEDa",
+        sub: "Escanea productos en la pesta\xF1a \xABConteo\xBB para generar el cruce"
+      }
+    ) : /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      background: C.bg1,
+      border: `1px solid ${C.sep}`,
+      borderRadius: 10,
+      overflow: "hidden",
+      marginBottom: 16,
+      boxShadow: "0 1px 3px rgba(0,0,0,.06)"
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      display: "grid",
+      gridTemplateColumns: "1fr 56px 56px 56px 90px",
+      gap: 0,
+      padding: "8px 14px",
+      background: C.bg2,
+      borderBottom: `1px solid ${C.sep}`
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 9, fontWeight: 700, color: C.label3, textTransform: "uppercase", letterSpacing: 0.8 } }, "Producto \xB7 C\xF3digo"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 9, fontWeight: 700, color: C.label3, textTransform: "uppercase", letterSpacing: 0.8, textAlign: "center" } }, "Sist."), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 9, fontWeight: 700, color: C.label3, textTransform: "uppercase", letterSpacing: 0.8, textAlign: "center" } }, "Cont."), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 9, fontWeight: 700, color: C.label3, textTransform: "uppercase", letterSpacing: 0.8, textAlign: "center" } }, "Dif."), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 9, fontWeight: 700, color: C.label3, textTransform: "uppercase", letterSpacing: 0.8, textAlign: "right" } }, "Estado")), cruce.map((r, i) => {
+      const marcaP = MARCAS.find((m) => m.id === r.marcaId);
+      const ei = ESTADO_INFO[r.estado];
+      return /* @__PURE__ */ import_react.default.createElement("div", { key: r.id, style: {
+        display: "grid",
+        gridTemplateColumns: "1fr 56px 56px 56px 90px",
+        gap: 0,
+        padding: "10px 14px",
+        borderTop: i > 0 ? `1px solid ${C.sep}` : "",
+        background: i % 2 === 0 ? C.bg1 : C.bg0,
+        alignItems: "center"
+      } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { minWidth: 0, paddingRight: 8, display: "flex", alignItems: "center", gap: 8 } }, /* @__PURE__ */ import_react.default.createElement(MarcaIcon, { marca: marcaP, size: 22, radius: 5 }), /* @__PURE__ */ import_react.default.createElement("div", { style: { minWidth: 0 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+        fontSize: 12.5,
+        fontWeight: 700,
+        color: C.label,
+        fontFamily: FONT,
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+        whiteSpace: "nowrap"
+      } }, (r.nombre || "").toUpperCase()), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontFamily: FONT_MONO, fontSize: 10, color: C.gold } }, r.codigo))), /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center", fontSize: 13, fontFamily: FONT, color: C.label2 } }, r.sistema), /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center", fontSize: 13, fontFamily: FONT, color: C.label2 } }, r.contado), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+        textAlign: "center",
+        fontSize: 13,
+        fontWeight: 700,
+        fontFamily: FONT,
+        color: r.diferencia === 0 ? C.label3 : r.diferencia < 0 ? C.red : C.blue
+      } }, r.diferencia > 0 ? `+${r.diferencia}` : r.diferencia), /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "right" } }, /* @__PURE__ */ import_react.default.createElement("span", { style: {
+        display: "inline-block",
+        fontFamily: FONT,
+        fontSize: 10.5,
+        fontWeight: 700,
+        color: ei.color,
+        background: ei.bg,
+        padding: "3px 9px",
+        borderRadius: 6,
+        letterSpacing: "0.02em"
+      } }, ei.label)));
+    })), (faltantes.length > 0 || sobrantes.length > 0) && /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      background: C.bg1,
+      borderRadius: 14,
+      padding: 16,
+      marginBottom: 16,
+      border: `1px solid ${C.sep}`,
+      display: "flex",
+      flexDirection: "column",
+      gap: 8
+    } }, faltantes.length > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", fontSize: 13, fontFamily: FONT } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.label2 } }, "Valor estimado de fuga (", faltantes.length, " \xEDtem", faltantes.length !== 1 ? "s" : "", ")"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontWeight: 700, color: C.red } }, "-", $(Math.round(valorFuga)))), sobrantes.length > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", fontSize: 13, fontFamily: FONT } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.label2 } }, "Valor de sobrantes (", sobrantes.length, " \xEDtem", sobrantes.length !== 1 ? "s" : "", ")"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontWeight: 700, color: C.blue } }, "+", $(Math.round(valorSobrante))))), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 10 } }, /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => exportAuditoriaExcel({
+      id: `AUD-${MK}-preview`,
+      mk: MK,
+      mes,
+      anio,
+      fecha: hoy(),
+      hora: hora(),
+      usuario: user?.nombre || "\u2014",
+      marcaId: marcaSelec,
+      totalProductos: cruce.length,
+      ok: okCount,
+      faltantes: faltantes.length,
+      sobrantes: sobrantes.length,
+      valorFuga,
+      valorSobrante,
+      detalle: cruce.map((r) => ({
+        codigo: r.codigo,
+        nombre: r.nombre,
+        marcaId: r.marcaId,
+        marcaNombre: r.marcaNombre || MARCAS.find((m) => m.id === r.marcaId)?.nombre,
+        sistema: r.sistema,
+        contado: r.contado,
+        diferencia: r.diferencia,
+        estado: r.estado,
+        precio: r.precio
+      }))
+    }), variant: "fill", full: true, icon: "\u2B07", disabled: cruce.length === 0 }, "Exportar Excel"), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: confirmarCierre, variant: "success", full: true, icon: "\u2713", disabled: itemsContados === 0 }, "Confirmar Cierre de Inventario"))), vista === "historial" && (auditorias.length === 0 ? /* @__PURE__ */ import_react.default.createElement(
+      EmptyState,
+      {
+        icon: "\u{1F5C2}",
+        title: "Sin cierres de inventario registrados",
+        sub: "Cuando confirmes un cierre, aparecer\xE1 aqu\xED con su resumen"
+      }
+    ) : /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 10 } }, auditorias.map((a) => {
+      const marcaNombre = a.marcaId ? MARCAS.find((m) => m.id === a.marcaId)?.nombre || "\u2014" : "Todas las marcas";
+      const abierta = auditoriaAbierta === a.id;
+      return /* @__PURE__ */ import_react.default.createElement("div", { key: a.id, style: {
+        background: C.bg1,
+        borderRadius: 14,
+        border: `1px solid ${C.sep}`,
+        overflow: "hidden",
+        boxShadow: "0 1px 3px rgba(0,0,0,.06)"
+      } }, /* @__PURE__ */ import_react.default.createElement("div", { onClick: () => setAuditoriaAbierta(abierta ? null : a.id), style: {
+        padding: 14,
+        cursor: "pointer",
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        gap: 10
+      } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, fontWeight: 700, color: C.label, fontFamily: FONT } }, MESES[a.mes], " ", a.anio, " \xB7 ", marcaNombre), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT, marginTop: 2 } }, a.fecha, " ", a.hora, " \xB7 ", a.usuario, " \xB7 ", a.totalProductos, " productos")), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 6, flexShrink: 0 } }, a.faltantes > 0 && /* @__PURE__ */ import_react.default.createElement(Chip, { color: C.red, small: true }, a.faltantes, " faltante", a.faltantes !== 1 ? "s" : ""), a.sobrantes > 0 && /* @__PURE__ */ import_react.default.createElement(Chip, { color: C.blue, small: true }, a.sobrantes, " sobrante", a.sobrantes !== 1 ? "s" : ""), a.faltantes === 0 && a.sobrantes === 0 && /* @__PURE__ */ import_react.default.createElement(Chip, { color: C.green, small: true }, "\u2713 OK"))), abierta && /* @__PURE__ */ import_react.default.createElement("div", { style: { padding: "0 14px 14px" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+        display: "flex",
+        justifyContent: "space-between",
+        fontSize: 13,
+        fontFamily: FONT,
+        padding: "8px 0",
+        borderTop: `1px solid ${C.sep}`
+      } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.label2 } }, "Valor estimado de fuga"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontWeight: 700, color: C.red } }, "-", $(Math.round(a.valorFuga || 0)))), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+        display: "flex",
+        justifyContent: "space-between",
+        fontSize: 13,
+        fontFamily: FONT,
+        padding: "4px 0 10px"
+      } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.label2 } }, "Valor de sobrantes"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontWeight: 700, color: C.blue } }, "+", $(Math.round(a.valorSobrante || 0)))), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => exportAuditoriaExcel(a), full: true, small: true, icon: "\u2B07" }, "Exportar Excel")));
+    }))));
   }
   function InventarioPorMarca({ inv, ventas, onRecibir, onBaja, onImportarExcel }) {
     const isDesktop = useIsDesktop();
