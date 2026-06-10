@@ -1334,7 +1334,7 @@ function leerCfgLiq(marcaId) {
   const alqD  = ALQUILERES[Number(marcaId)] || {};
   // Defaults: usa ALQUILERES como base real, no genérico 10%
   const def   = {
-    pctTarjeta: 2.5,
+    pctTarjeta: 1.8,
     pctComision: Number(alqD.comision) || 0,
     alquiler:    Number(alqD.alquiler)  || 0,
   };
