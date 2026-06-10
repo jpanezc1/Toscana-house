@@ -2147,7 +2147,7 @@ function imprimirLiquidacion(marca, mes, anio, liq){
 </head>
 <body>
   <div style="display:flex;align-items:center;gap:16px;margin-bottom:16px">
-    <img src="${LOGO_B64}" style="height:60px"/>
+    ${logoSvgSized(140)}
     <div>
       <h1>${marca?.emoji||""} Liquidación — ${marca?.nombre||""}</h1>
       <div class="sub">${MESES[mes]} ${anio} · Toscana House</div>
@@ -2204,7 +2204,7 @@ function construirImagenLiquidacion(marca, mes, anio, d){
     <div style="display:flex;align-items:center;gap:16px;margin-bottom:16px">
       ${logoMarca
         ? `<img src="${logoMarca}" style="height:60px;width:60px;border-radius:12px;object-fit:cover"/>`
-        : `<img src="${LOGO_B64}" style="height:60px"/>`}
+        : logoSvgSized(140)}
       <div>
         <div style="font-size:20px;font-weight:700">Liquidación — ${marca?.nombre||""}</div>
         <div style="font-size:13px;color:#666">${MESES[mes]} ${anio} · Toscana House</div>
@@ -2463,6 +2463,11 @@ const LOGO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 120" 
   <text x="100" y="92" textAnchor="middle" fontFamily="Georgia,serif" fontSize="9" fontWeight="300" fill="currentColor" letterSpacing="6">CASA DE MODA</text>
   <line x1="30" y1="60" x2="170" y2="60" stroke="currentColor" strokeWidth="0.5" opacity="0.4"/>
 </svg>`;
+
+// Logo TH · Casa de Moda con fondo transparente, para documentos generados (HTML/print/canvas)
+function logoSvgSized(width, color="#1A1714"){
+  return LOGO_SVG.replace("<svg ", `<svg width="${width}" height="${Math.round(width*0.6)}" style="color:${color};display:block" `);
+}
 
 function LogoMark({size=36, color="#1565C0"}){
   return <div style={{display:"flex",flexDirection:"column",alignItems:"center",lineHeight:1}}>

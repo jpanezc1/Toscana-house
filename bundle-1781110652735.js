@@ -23669,7 +23669,7 @@
 </head>
 <body>
   <div style="display:flex;align-items:center;gap:16px;margin-bottom:16px">
-    <img src="${LOGO_B64}" style="height:60px"/>
+    ${logoSvgSized(140)}
     <div>
       <h1>${marca?.emoji || ""} Liquidaci\xF3n \u2014 ${marca?.nombre || ""}</h1>
       <div class="sub">${MESES[mes]} ${anio} \xB7 Toscana House</div>
@@ -23718,7 +23718,7 @@
     const logoMarca = getMarcaImg(marca);
     const html = `<div xmlns="http://www.w3.org/1999/xhtml" style="font-family:Arial,sans-serif;color:#222;background:#fff;width:${width}px;padding:24px;box-sizing:border-box">
     <div style="display:flex;align-items:center;gap:16px;margin-bottom:16px">
-      ${logoMarca ? `<img src="${logoMarca}" style="height:60px;width:60px;border-radius:12px;object-fit:cover"/>` : `<img src="${LOGO_B64}" style="height:60px"/>`}
+      ${logoMarca ? `<img src="${logoMarca}" style="height:60px;width:60px;border-radius:12px;object-fit:cover"/>` : logoSvgSized(140)}
       <div>
         <div style="font-size:20px;font-weight:700">Liquidaci\xF3n \u2014 ${marca?.nombre || ""}</div>
         <div style="font-size:13px;color:#666">${MESES[mes]} ${anio} \xB7 Toscana House</div>
@@ -23986,6 +23986,15 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
   var FONT_UI = "'Inter', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif";
   var FONT_DISPLAY = "'Cormorant Garamond', Georgia, 'Times New Roman', serif";
   var FONT_MONO = "'DM Mono', 'Fira Code', 'SF Mono', 'Menlo', monospace";
+  var LOGO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 120" fill="none">
+  <text x="100" y="52" textAnchor="middle" fontFamily="Georgia,serif" fontSize="44" fontWeight="700" fill="currentColor" letterSpacing="2">TH</text>
+  <text x="100" y="76" textAnchor="middle" fontFamily="Georgia,serif" fontSize="13" fontWeight="400" fill="currentColor" letterSpacing="8">TOSCANA</text>
+  <text x="100" y="92" textAnchor="middle" fontFamily="Georgia,serif" fontSize="9" fontWeight="300" fill="currentColor" letterSpacing="6">CASA DE MODA</text>
+  <line x1="30" y1="60" x2="170" y2="60" stroke="currentColor" strokeWidth="0.5" opacity="0.4"/>
+</svg>`;
+  function logoSvgSized(width, color = "#1A1714") {
+    return LOGO_SVG.replace("<svg ", `<svg width="${width}" height="${Math.round(width * 0.6)}" style="color:${color};display:block" `);
+  }
   function LogoMark({ size = 36, color = "#1565C0" }) {
     return /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", flexDirection: "column", alignItems: "center", lineHeight: 1 } }, /* @__PURE__ */ import_react.default.createElement(
       "div",
