@@ -1,6 +1,5 @@
 {
   "buildCommand": "node build.js",
-  "outputDirectory": ".",
   "headers": [
     {
       "source": "/version.json",

@@ -1,0 +1,5 @@
+node_modules
+*.py
+*.sql
+main.jsx
+main_fixed.jsx
