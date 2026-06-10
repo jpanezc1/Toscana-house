@@ -21688,6 +21688,7 @@
         metodoPago: v.metodo_pago,
         vendedor: v.vendedor,
         etiquetaImg: v.etiqueta_img,
+        anulada: v.anulada || false,
         items: (items || []).filter((i) => i.venta_id === v.id).map((i) => ({
           prodId: i.prod_id,
           codigo: i.codigo,

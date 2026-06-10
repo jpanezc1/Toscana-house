@@ -210,6 +210,7 @@ async function sbCargarTodo() {
       mes: v.mes, anio: v.anio, total: v.total, subtotal: v.subtotal,
       descPct: v.desc_pct, metodoPago: v.metodo_pago,
       vendedor: v.vendedor, etiquetaImg: v.etiqueta_img,
+      anulada: v.anulada || false,
       items: (items||[]).filter(i=>i.venta_id===v.id).map(i=>({
         prodId: i.prod_id, codigo: i.codigo, nombre: i.nombre,
         marcaId: i.marca_id, marcaNombre: i.marca_nombre,
