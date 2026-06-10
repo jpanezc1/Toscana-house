@@ -9993,7 +9993,7 @@ function App(){
 
         {/* AUDITORÍA — cierre de inventario mensual (conteo físico vs sistema) */}
         {tab==="auditoria" && (
-          <AuditoriaInventario inv={inv} ventas={ventas} mes={mes} anio={anio} MK={MK}
+          <AuditoriaInventario inv={inv} ventas={ventas} cargas={cargasCompletas} mes={mes} anio={anio} MK={MK}
             auditorias={auditorias} onGuardarAuditoria={registrarAuditoria} user={user}/>
         )}
 
@@ -11368,7 +11368,7 @@ function SheetRecibir({open, onClose, inv, onAdd, fInv, setFInv}){
 // ══════════════════════════════════════════════════════════
 // AUDITORÍA — Cierre de inventario mensual (conteo físico vs sistema)
 // ══════════════════════════════════════════════════════════
-function AuditoriaInventario({inv, ventas, mes, anio, MK, auditorias, onGuardarAuditoria, user}){
+function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, onGuardarAuditoria, user}){
   const isDesktop = useIsDesktop();
   const[vista,setVista]=useState("conteo");
   const[marcaSelec,setMarcaSelec]=useState(null);
@@ -11435,10 +11435,13 @@ function AuditoriaInventario({inv, ventas, mes, anio, MK, auditorias, onGuardarA
     }
   }
 
-  // ── Ventas registradas DESPUÉS de congelar la base ────────────────
-  // Evita "faltantes" falsos por ventas reales ocurridas durante el conteo:
-  // si se vendió 1 unidad mientras se contaba, esa unidad ya no está en
-  // tienda y el "sistema" debe descontarla para que el cruce sea correcto.
+  // ── Movimientos registrados DESPUÉS de congelar la base ───────────
+  // Evita inconsistencias por ventas o cargas/recepciones de stock reales
+  // ocurridas mientras se contaba: si se vendió 1 unidad, esa unidad ya no
+  // está en tienda (se resta); si se recibió mercadería nueva, esa unidad
+  // sí está en tienda aunque el "sistema" congelado no la contemplara
+  // (se suma). Así el cruce queda fiel a lo que hay físicamente, sin
+  // necesidad de reabrir o recongelar la auditoría.
   const ventasAjuste = useMemo(()=>{
     const baseMs = baseTs.getTime();
     const map = {};
@@ -11451,10 +11454,25 @@ function AuditoriaInventario({inv, ventas, mes, anio, MK, auditorias, onGuardarA
     return map;
   },[ventas,baseTs]);
 
-  // ── Cruce: sistema (base congelada, ajustado por ventas en curso) vs conteo físico ─
+  const cargasAjuste = useMemo(()=>{
+    const baseMs = baseTs.getTime();
+    const map = {};
+    (cargas||[]).forEach(c=>{
+      if(!c.ts || c.ts<=baseMs) return;
+      (c.items||[]).forEach(it=>{
+        if(it.tipo!=="update" || !it.stockSumado) return;
+        const p = baseInv.find(b=>b.codigo===it.codigo);
+        if(!p) return;
+        map[p.id]=(map[p.id]||0)+it.stockSumado;
+      });
+    });
+    return map;
+  },[cargas,baseTs,baseInv]);
+
+  // ── Cruce: sistema (base congelada, ajustado por movimientos en curso) vs conteo físico ─
   const cruce = useMemo(()=>{
     return productos.map(p=>{
-      const ajuste = ventasAjuste[p.id]||0;
+      const ajuste = (ventasAjuste[p.id]||0) + (cargasAjuste[p.id]||0);
       const sistema = Math.max(0, p.stock + ajuste);
       const contado = conteo[p.id]||0;
       const diferencia = contado - sistema;
@@ -11463,11 +11481,15 @@ function AuditoriaInventario({inv, ventas, mes, anio, MK, auditorias, onGuardarA
     })
     .filter(r=>r.sistema>0 || r.contado>0)
     .sort((a,b)=> Math.abs(b.diferencia)-Math.abs(a.diferencia) || (a.nombre||"").localeCompare(b.nombre||""));
-  },[productos,conteo,ventasAjuste]);
+  },[productos,conteo,ventasAjuste,cargasAjuste]);
 
   const totalAjustePorVentas = useMemo(()=>
     Object.values(ventasAjuste).reduce((s,v)=>s+Math.abs(v),0)
   ,[ventasAjuste]);
+
+  const totalAjustePorCargas = useMemo(()=>
+    Object.values(cargasAjuste).reduce((s,v)=>s+v,0)
+  ,[cargasAjuste]);
 
   const itemsContados   = Object.keys(conteo).length;
   const unidadesContadas= Object.values(conteo).reduce((s,v)=>s+v,0);
@@ -11583,8 +11605,8 @@ function AuditoriaInventario({inv, ventas, mes, anio, MK, auditorias, onGuardarA
           <span style={{fontSize:13}}>🔒</span>
           <span style={{fontSize:11,color:C.label3,fontFamily:FONT,lineHeight:1.4}}>
             Inventario base congelado: <b style={{color:C.label2}}>{baseTs.toLocaleDateString("es-BO")} {baseTs.toLocaleTimeString("es-BO",{hour:"2-digit",minute:"2-digit"})}</b> ·
-            las ventas registradas durante el conteo se descuentan automáticamente del "sistema"
-            para que el cruce sea fiel a lo que queda físicamente en tienda
+            las ventas y cargas de stock registradas durante el conteo se ajustan automáticamente
+            en el "sistema" para que el cruce sea fiel a lo que queda físicamente en tienda
           </span>
         </div>
         {totalAjustePorVentas>0&&(
@@ -11594,6 +11616,16 @@ function AuditoriaInventario({inv, ventas, mes, anio, MK, auditorias, onGuardarA
             <span style={{fontSize:11,color:C.blue,fontFamily:FONT,lineHeight:1.4,fontWeight:600}}>
               {totalAjustePorVentas} unidad{totalAjustePorVentas!==1?"es":""} vendida{totalAjustePorVentas!==1?"s":""} durante este conteo —
               ya descontada{totalAjustePorVentas!==1?"s":""} del stock del sistema en el cruce
+            </span>
+          </div>
+        )}
+        {totalAjustePorCargas>0&&(
+          <div style={{marginTop:8,display:"flex",alignItems:"center",gap:6,
+            padding:"7px 10px",borderRadius:10,background:C.greenBg,border:`1px solid ${C.green}33`}}>
+            <span style={{fontSize:13}}>📦</span>
+            <span style={{fontSize:11,color:C.green,fontFamily:FONT,lineHeight:1.4,fontWeight:600}}>
+              {totalAjustePorCargas} unidad{totalAjustePorCargas!==1?"es":""} recibida{totalAjustePorCargas!==1?"s":""} durante este conteo —
+              ya sumada{totalAjustePorCargas!==1?"s":""} al stock del sistema en el cruce
             </span>
           </div>
         )}

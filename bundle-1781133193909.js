@@ -32175,6 +32175,7 @@ Fecha: ${venta.fecha}`);
       {
         inv,
         ventas,
+        cargas: cargasCompletas,
         mes,
         anio,
         MK,
@@ -33707,7 +33708,7 @@ Fecha: ${venta.fecha}`);
       marginBottom: 10
     } }, codigoGenerado), /* @__PURE__ */ import_react.default.createElement(BarcodeDisplay, { codigo: codigoGenerado }), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT, marginTop: 8 } }, fInv.nombre && /* @__PURE__ */ import_react.default.createElement("strong", { style: { color: C.label2 } }, fInv.nombre), fInv.categoria && /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.label3 } }, " \xB7 ", fInv.categoria))), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: onAdd, full: true, variant: "primary" }, "Registrar e Imprimir Ticket"));
   }
-  function AuditoriaInventario({ inv, ventas, mes, anio, MK, auditorias, onGuardarAuditoria, user }) {
+  function AuditoriaInventario({ inv, ventas, cargas, mes, anio, MK, auditorias, onGuardarAuditoria, user }) {
     const isDesktop = useIsDesktop();
     const [vista, setVista] = (0, import_react.useState)("conteo");
     const [marcaSelec, setMarcaSelec] = (0, import_react.useState)(null);
@@ -33790,9 +33791,23 @@ Fecha: ${venta.fecha}`);
       });
       return map;
     }, [ventas, baseTs]);
+    const cargasAjuste = (0, import_react.useMemo)(() => {
+      const baseMs = baseTs.getTime();
+      const map = {};
+      (cargas || []).forEach((c) => {
+        if (!c.ts || c.ts <= baseMs) return;
+        (c.items || []).forEach((it) => {
+          if (it.tipo !== "update" || !it.stockSumado) return;
+          const p = baseInv.find((b) => b.codigo === it.codigo);
+          if (!p) return;
+          map[p.id] = (map[p.id] || 0) + it.stockSumado;
+        });
+      });
+      return map;
+    }, [cargas, baseTs, baseInv]);
     const cruce = (0, import_react.useMemo)(() => {
       return productos.map((p) => {
-        const ajuste = ventasAjuste[p.id] || 0;
+        const ajuste = (ventasAjuste[p.id] || 0) + (cargasAjuste[p.id] || 0);
         const sistema = Math.max(0, p.stock + ajuste);
         const contado = conteo[p.id] || 0;
         const diferencia = contado - sistema;
@@ -33806,10 +33821,14 @@ Fecha: ${venta.fecha}`);
           estado: diferencia === 0 ? "OK" : diferencia < 0 ? "FALTANTE" : "SOBRANTE"
         };
       }).filter((r) => r.sistema > 0 || r.contado > 0).sort((a, b) => Math.abs(b.diferencia) - Math.abs(a.diferencia) || (a.nombre || "").localeCompare(b.nombre || ""));
-    }, [productos, conteo, ventasAjuste]);
+    }, [productos, conteo, ventasAjuste, cargasAjuste]);
     const totalAjustePorVentas = (0, import_react.useMemo)(
       () => Object.values(ventasAjuste).reduce((s, v) => s + Math.abs(v), 0),
       [ventasAjuste]
+    );
+    const totalAjustePorCargas = (0, import_react.useMemo)(
+      () => Object.values(cargasAjuste).reduce((s, v) => s + v, 0),
+      [cargasAjuste]
     );
     const itemsContados = Object.keys(conteo).length;
     const unidadesContadas = Object.values(conteo).reduce((s, v) => s + v, 0);
@@ -33954,7 +33973,7 @@ Base de inventario tomada: ${baseTs.toLocaleString("es-BO")}`)) return;
       borderRadius: 10,
       background: C.bg2,
       border: `1px solid ${C.sep}`
-    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13 } }, "\u{1F512}"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 11, color: C.label3, fontFamily: FONT, lineHeight: 1.4 } }, "Inventario base congelado: ", /* @__PURE__ */ import_react.default.createElement("b", { style: { color: C.label2 } }, baseTs.toLocaleDateString("es-BO"), " ", baseTs.toLocaleTimeString("es-BO", { hour: "2-digit", minute: "2-digit" })), ' \xB7 las ventas registradas durante el conteo se descuentan autom\xE1ticamente del "sistema" para que el cruce sea fiel a lo que queda f\xEDsicamente en tienda')), totalAjustePorVentas > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: {
+    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13 } }, "\u{1F512}"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 11, color: C.label3, fontFamily: FONT, lineHeight: 1.4 } }, "Inventario base congelado: ", /* @__PURE__ */ import_react.default.createElement("b", { style: { color: C.label2 } }, baseTs.toLocaleDateString("es-BO"), " ", baseTs.toLocaleTimeString("es-BO", { hour: "2-digit", minute: "2-digit" })), ' \xB7 las ventas y cargas de stock registradas durante el conteo se ajustan autom\xE1ticamente en el "sistema" para que el cruce sea fiel a lo que queda f\xEDsicamente en tienda')), totalAjustePorVentas > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: {
       marginTop: 8,
       display: "flex",
       alignItems: "center",
@@ -33963,7 +33982,16 @@ Base de inventario tomada: ${baseTs.toLocaleString("es-BO")}`)) return;
       borderRadius: 10,
       background: "#EEF2FF",
       border: `1px solid ${C.blue}33`
-    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13 } }, "\u{1F6D2}"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 11, color: C.blue, fontFamily: FONT, lineHeight: 1.4, fontWeight: 600 } }, totalAjustePorVentas, " unidad", totalAjustePorVentas !== 1 ? "es" : "", " vendida", totalAjustePorVentas !== 1 ? "s" : "", " durante este conteo \u2014 ya descontada", totalAjustePorVentas !== 1 ? "s" : "", " del stock del sistema en el cruce"))), /* @__PURE__ */ import_react.default.createElement("button", { onClick: () => setModoCierre(true), style: {
+    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13 } }, "\u{1F6D2}"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 11, color: C.blue, fontFamily: FONT, lineHeight: 1.4, fontWeight: 600 } }, totalAjustePorVentas, " unidad", totalAjustePorVentas !== 1 ? "es" : "", " vendida", totalAjustePorVentas !== 1 ? "s" : "", " durante este conteo \u2014 ya descontada", totalAjustePorVentas !== 1 ? "s" : "", " del stock del sistema en el cruce")), totalAjustePorCargas > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      marginTop: 8,
+      display: "flex",
+      alignItems: "center",
+      gap: 6,
+      padding: "7px 10px",
+      borderRadius: 10,
+      background: C.greenBg,
+      border: `1px solid ${C.green}33`
+    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13 } }, "\u{1F4E6}"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 11, color: C.green, fontFamily: FONT, lineHeight: 1.4, fontWeight: 600 } }, totalAjustePorCargas, " unidad", totalAjustePorCargas !== 1 ? "es" : "", " recibida", totalAjustePorCargas !== 1 ? "s" : "", " durante este conteo \u2014 ya sumada", totalAjustePorCargas !== 1 ? "s" : "", " al stock del sistema en el cruce"))), /* @__PURE__ */ import_react.default.createElement("button", { onClick: () => setModoCierre(true), style: {
       width: "100%",
       border: "none",
       borderRadius: 16,
