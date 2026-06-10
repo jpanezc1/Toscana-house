@@ -11435,18 +11435,39 @@ function AuditoriaInventario({inv, ventas, mes, anio, MK, auditorias, onGuardarA
     }
   }
 
-  // ── Cruce: sistema (base congelada) vs conteo físico ─────────────
+  // ── Ventas registradas DESPUÉS de congelar la base ────────────────
+  // Evita "faltantes" falsos por ventas reales ocurridas durante el conteo:
+  // si se vendió 1 unidad mientras se contaba, esa unidad ya no está en
+  // tienda y el "sistema" debe descontarla para que el cruce sea correcto.
+  const ventasAjuste = useMemo(()=>{
+    const baseMs = baseTs.getTime();
+    const map = {};
+    (ventas||[]).forEach(v=>{
+      if(v.anulada) return;
+      const vTs = Number((v.id||"").replace(/^V/,""))||0;
+      if(vTs<=baseMs) return;
+      (v.items||[]).forEach(it=>{ map[it.prodId]=(map[it.prodId]||0)-it.cantidad; });
+    });
+    return map;
+  },[ventas,baseTs]);
+
+  // ── Cruce: sistema (base congelada, ajustado por ventas en curso) vs conteo físico ─
   const cruce = useMemo(()=>{
     return productos.map(p=>{
-      const sistema = p.stock;
+      const ajuste = ventasAjuste[p.id]||0;
+      const sistema = Math.max(0, p.stock + ajuste);
       const contado = conteo[p.id]||0;
       const diferencia = contado - sistema;
-      return {...p, sistema, contado, diferencia,
+      return {...p, sistema, sistemaBase:p.stock, ajuste, contado, diferencia,
         estado: diferencia===0 ? "OK" : diferencia<0 ? "FALTANTE" : "SOBRANTE"};
     })
     .filter(r=>r.sistema>0 || r.contado>0)
     .sort((a,b)=> Math.abs(b.diferencia)-Math.abs(a.diferencia) || (a.nombre||"").localeCompare(b.nombre||""));
-  },[productos,conteo]);
+  },[productos,conteo,ventasAjuste]);
+
+  const totalAjustePorVentas = useMemo(()=>
+    Object.values(ventasAjuste).reduce((s,v)=>s+Math.abs(v),0)
+  ,[ventasAjuste]);
 
   const itemsContados   = Object.keys(conteo).length;
   const unidadesContadas= Object.values(conteo).reduce((s,v)=>s+v,0);
@@ -11546,9 +11567,20 @@ function AuditoriaInventario({inv, ventas, mes, anio, MK, auditorias, onGuardarA
           <span style={{fontSize:13}}>🔒</span>
           <span style={{fontSize:11,color:C.label3,fontFamily:FONT,lineHeight:1.4}}>
             Inventario base congelado: <b style={{color:C.label2}}>{baseTs.toLocaleDateString("es-BO")} {baseTs.toLocaleTimeString("es-BO",{hour:"2-digit",minute:"2-digit"})}</b> ·
-            el "sistema" del cruce no cambia aunque entren ventas durante el conteo
+            las ventas registradas durante el conteo se descuentan automáticamente del "sistema"
+            para que el cruce sea fiel a lo que queda físicamente en tienda
           </span>
         </div>
+        {totalAjustePorVentas>0&&(
+          <div style={{marginTop:8,display:"flex",alignItems:"center",gap:6,
+            padding:"7px 10px",borderRadius:10,background:"#EEF2FF",border:`1px solid ${C.blue}33`}}>
+            <span style={{fontSize:13}}>🛒</span>
+            <span style={{fontSize:11,color:C.blue,fontFamily:FONT,lineHeight:1.4,fontWeight:600}}>
+              {totalAjustePorVentas} unidad{totalAjustePorVentas!==1?"es":""} vendida{totalAjustePorVentas!==1?"s":""} durante este conteo —
+              ya descontada{totalAjustePorVentas!==1?"s":""} del stock del sistema en el cruce
+            </span>
+          </div>
+        )}
       </div>
 
       {/* ── Cierre Rápido — escaneo continuo de pasada ── */}
