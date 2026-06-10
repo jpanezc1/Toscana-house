@@ -3018,6 +3018,22 @@ function LiqModal({marcaId,ventas,mes,anio,MK,cierres,setCierres,onClose,syncCie
         textTransform:"uppercase",letterSpacing:.8,marginBottom:8,paddingLeft:4}}>
         Transacciones del período
       </div>
+      {gastos.filter(g=>g.desc||Number(g.monto)>0).map(g=>(
+        <div key={g.id} style={{background:`${C.red}10`,borderRadius:10,padding:"10px 14px",
+          marginBottom:5,border:`1px solid ${C.red}20`}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+            <span style={{fontSize:13,color:C.label,fontFamily:FONT,fontWeight:600}}>
+              {g.desc || "Gasto extra"}
+            </span>
+            <span style={{fontSize:15,fontWeight:700,color:C.red,fontFamily:FONT,letterSpacing:"-0.01em"}}>
+              -{$(Number(g.monto)||0)}
+            </span>
+          </div>
+          <div style={{fontSize:11,color:C.label3,fontFamily:FONT,marginTop:2,opacity:.65}}>
+            Gasto extra · {MESES[mes]}
+          </div>
+        </div>
+      ))}
       {vMarca.length===0
         ? <div style={{textAlign:"center",padding:"32px 0",color:C.label3,fontFamily:FONT,fontSize:16}}>Sin ventas en {MESES[mes]}</div>
         : vMarca.map(v=>{
