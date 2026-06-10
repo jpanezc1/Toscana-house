@@ -11192,15 +11192,23 @@ function AuditoriaInventario({inv, ventas, mes, anio, MK, auditorias, onGuardarA
   const isDesktop = useIsDesktop();
   const[vista,setVista]=useState("conteo");
   const[marcaSelec,setMarcaSelec]=useState(null);
-  const[conteo,setConteo]=useState({}); // {prodId: cantidad}
+  const[conteo,setConteo]=useState({}); // {prodId: cantidad} — 1ra pasada
+  const[verifConteo,setVerifConteo]=useState({}); // {prodId: cantidad} — 2da pasada (verificación)
+  const[manualVerif,setManualVerif]=useState({}); // {prodId: true} — verificado manualmente por admin
   const[showScanner,setShowScanner]=useState(false);
   const[modoCierre,setModoCierre]=useState(false); // escaneo continuo de cierre rápido
+  const[modoVerif,setModoVerif]=useState(false); // escaneo continuo de verificación (2da pasada)
   const[liveFeedback,setLiveFeedback]=useState(null); // {ts,ok,title,sub}
   const[scanMsg,setScanMsg]=useState(null); // {ok,txt}
   const[codManual,setCodManual]=useState("");
   const[auditoriaAbierta,setAuditoriaAbierta]=useState(null);
 
-  const productos = useMemo(()=> marcaSelec ? inv.filter(p=>p.marcaId===marcaSelec) : inv, [inv,marcaSelec]);
+  // ── Inventario base congelado al abrir el cierre ────────────────────
+  // Garantiza que "sistema" no cambie a mitad del conteo si entran ventas
+  const[baseInv]=useState(()=> inv.map(p=>({...p})));
+  const[baseTs] =useState(()=> new Date());
+
+  const productos = useMemo(()=> marcaSelec ? baseInv.filter(p=>p.marcaId===marcaSelec) : baseInv, [baseInv,marcaSelec]);
 
   function flash(ok,txt){ setScanMsg({ok,txt}); setTimeout(()=>setScanMsg(null),2500); }
 
@@ -11216,7 +11224,7 @@ function AuditoriaInventario({inv, ventas, mes, anio, MK, auditorias, onGuardarA
   function buscarYAgregar(codigo){
     const c=(codigo||"").trim().toUpperCase();
     if(!c) return;
-    const p=inv.find(i=>i.codigo.toUpperCase()===c);
+    const p=baseInv.find(i=>i.codigo.toUpperCase()===c);
     if(!p){ flash(false, `Código "${c}" no encontrado en inventario`); return; }
     agregar(p,1);
     setCodManual("");
@@ -11225,7 +11233,7 @@ function AuditoriaInventario({inv, ventas, mes, anio, MK, auditorias, onGuardarA
   // ── Cierre rápido: escaneo continuo, sin confirmaciones manuales ──
   function onDetectCierreRapido(codigo){
     const c=(codigo||"").trim().toUpperCase();
-    const p=inv.find(i=>i.codigo.toUpperCase()===c);
+    const p=baseInv.find(i=>i.codigo.toUpperCase()===c);
     if(!p){
       setLiveFeedback({ts:Date.now(),ok:false,title:"Código no encontrado",sub:c});
       return;
@@ -11242,10 +11250,12 @@ function AuditoriaInventario({inv, ventas, mes, anio, MK, auditorias, onGuardarA
 
   function reiniciarConteo(){
     if(Object.keys(conteo).length===0) return;
-    if(window.confirm("¿Reiniciar el conteo físico? Se perderán los ítems escaneados hasta ahora.")) setConteo({});
+    if(window.confirm("¿Reiniciar el conteo físico? Se perderán los ítems escaneados hasta ahora.")) {
+      setConteo({}); setVerifConteo({}); setManualVerif({});
+    }
   }
 
-  // ── Cruce: sistema vs conteo físico ──────────────────────────────
+  // ── Cruce: sistema (base congelada) vs conteo físico ─────────────
   const cruce = useMemo(()=>{
     return productos.map(p=>{
       const sistema = p.stock;
@@ -11266,9 +11276,55 @@ function AuditoriaInventario({inv, ventas, mes, anio, MK, auditorias, onGuardarA
   const valorFuga     = faltantes.reduce((s,r)=>s+Math.abs(r.diferencia)*r.precio,0);
   const valorSobrante = sobrantes.reduce((s,r)=>s+r.diferencia*r.precio,0);
 
+  // ── Verificación (2da revisión) — solo discrepancias ya escaneadas requieren doble conteo
+  // (los productos aún no contados quedan como FALTANTE "pendiente" hasta terminar el conteo)
+  const discrepancias = useMemo(()=> cruce.filter(r=>r.estado!=="OK" && r.contado>0), [cruce]);
+  function itemVerificado(r){
+    if(manualVerif[r.id]) return true;
+    return (verifConteo[r.id]||0) === r.contado;
+  }
+  const verificadosCount = discrepancias.filter(itemVerificado).length;
+  const todoVerificado = discrepancias.length===0 || verificadosCount===discrepancias.length;
+
+  // ── Verificación: escaneo continuo de la 2da pasada ──
+  function onDetectVerificacion(codigo){
+    const c=(codigo||"").trim().toUpperCase();
+    const r=discrepancias.find(d=>d.codigo.toUpperCase()===c);
+    if(!r){
+      const enInv = baseInv.find(i=>i.codigo.toUpperCase()===c);
+      setLiveFeedback({ts:Date.now(),ok:false,
+        title: enInv ? "Sin discrepancia — no requiere verificación" : "Código no encontrado",
+        sub:c});
+      return;
+    }
+    let nuevo=0;
+    setVerifConteo(prev=>{
+      nuevo=(prev[r.id]||0)+1;
+      return {...prev,[r.id]:nuevo};
+    });
+    if(nuevo===r.contado){
+      setLiveFeedback({ts:Date.now(),ok:true,
+        title:`✓ Verificado · ${(r.nombre||"").toUpperCase()}`,
+        sub:`Doble conteo coincide: ${nuevo} unidad${nuevo!==1?"es":""}`});
+    }else if(nuevo>r.contado){
+      setLiveFeedback({ts:Date.now(),ok:false,
+        title:`⚠ No coincide · ${(r.nombre||"").toUpperCase()}`,
+        sub:`1ra pasada: ${r.contado} · 2da pasada: ${nuevo} — recontar`});
+    }else{
+      setLiveFeedback({ts:Date.now(),ok:true,
+        title:(r.nombre||"").toUpperCase(),
+        sub:`Verificando… ${nuevo} de ${r.contado}`});
+    }
+  }
+
   function confirmarCierre(){
     if(itemsContados===0){ flash(false,"Escanea o agrega al menos un producto antes de confirmar el cierre"); return; }
-    if(!window.confirm(`¿Confirmar el cierre de inventario de ${MESES[mes]} ${anio}?\n\n${cruce.length} productos auditados · ${faltantes.length} faltante(s) · ${sobrantes.length} sobrante(s)`)) return;
+    if(!todoVerificado){
+      flash(false,`Faltan ${discrepancias.length-verificadosCount} discrepancia(s) por verificar (doble conteo) antes de confirmar`);
+      setVista("verificacion");
+      return;
+    }
+    if(!window.confirm(`¿Confirmar el cierre de inventario de ${MESES[mes]} ${anio}?\n\n${cruce.length} productos auditados · ${faltantes.length} faltante(s) · ${sobrantes.length} sobrante(s)\n\nBase de inventario tomada: ${baseTs.toLocaleString("es-BO")}`)) return;
     const aud = {
       id:`AUD-${MK}-${Date.now()}`, mk:MK, mes, anio, fecha:hoy(), hora:hora(),
       usuario:user?.nombre||"—", marcaId:marcaSelec,
@@ -11277,10 +11333,11 @@ function AuditoriaInventario({inv, ventas, mes, anio, MK, auditorias, onGuardarA
       detalle:cruce.map(r=>({
         codigo:r.codigo, nombre:r.nombre, marcaId:r.marcaId, marcaNombre:r.marcaNombre||MARCAS.find(m=>m.id===r.marcaId)?.nombre,
         sistema:r.sistema, contado:r.contado, diferencia:r.diferencia, estado:r.estado, precio:r.precio,
+        verificado: r.estado==="OK" ? null : itemVerificado(r),
       })),
     };
     onGuardarAuditoria(aud);
-    setConteo({});
+    setConteo({}); setVerifConteo({}); setManualVerif({});
     flash(true,"✓ Cierre de inventario guardado");
     setVista("historial");
   }
@@ -11303,6 +11360,14 @@ function AuditoriaInventario({inv, ventas, mes, anio, MK, auditorias, onGuardarA
         <div style={{fontSize:12.5,color:C.label3,fontFamily:FONT,lineHeight:1.5}}>
           Escanea (o ingresa el código de) cada producto físico en tienda. La app cruza el conteo
           con el stock del sistema y señala faltantes (posible fuga) o sobrantes.
+        </div>
+        <div style={{marginTop:10,display:"flex",alignItems:"center",gap:6,
+          padding:"7px 10px",borderRadius:10,background:C.bg2,border:`1px solid ${C.sep}`}}>
+          <span style={{fontSize:13}}>🔒</span>
+          <span style={{fontSize:11,color:C.label3,fontFamily:FONT,lineHeight:1.4}}>
+            Inventario base congelado: <b style={{color:C.label2}}>{baseTs.toLocaleDateString("es-BO")} {baseTs.toLocaleTimeString("es-BO",{hour:"2-digit",minute:"2-digit"})}</b> ·
+            el "sistema" del cruce no cambia aunque entren ventas durante el conteo
+          </span>
         </div>
       </div>
 
@@ -11338,12 +11403,23 @@ function AuditoriaInventario({inv, ventas, mes, anio, MK, auditorias, onGuardarA
         />
       )}
 
+      {/* Overlay de verificación (2da pasada) */}
+      {modoVerif && (
+        <CameraScanner continuous
+          onDetect={onDetectVerificacion}
+          feedback={liveFeedback}
+          stats={{productos:verificadosCount, unidades:discrepancias.length}}
+          onClose={()=>setModoVerif(false)}
+        />
+      )}
+
       {/* Segmented */}
       <div style={{marginBottom:16}}>
         <SegControl
           options={[
             {value:"conteo",   label:`Conteo${itemsContados?` (${itemsContados})`:""}`},
             {value:"cruce",    label:"Cruce"},
+            {value:"verificacion", label:`Verificación${discrepancias.length?` (${verificadosCount}/${discrepancias.length})`:""}`},
             {value:"historial",label:`Historial${auditorias.length?` (${auditorias.length})`:""}`},
           ]}
           value={vista} onChange={setVista}
@@ -11443,7 +11519,7 @@ function AuditoriaInventario({inv, ventas, mes, anio, MK, auditorias, onGuardarA
             : <div style={{background:C.bg1,border:`1px solid ${C.sep}`,borderRadius:10,
                 overflow:"hidden",marginBottom:16,boxShadow:"0 1px 3px rgba(0,0,0,.06)"}}>
                 {Object.entries(conteo).map(([prodId,cant],i)=>{
-                  const p = inv.find(x=>String(x.id)===String(prodId));
+                  const p = baseInv.find(x=>String(x.id)===String(prodId));
                   if(!p) return null;
                   const marcaP = MARCAS.find(m=>m.id===p.marcaId);
                   return (
@@ -11551,6 +11627,19 @@ function AuditoriaInventario({inv, ventas, mes, anio, MK, auditorias, onGuardarA
             </div>
           )}
 
+          {!todoVerificado && discrepancias.length>0 && (
+            <div onClick={()=>setVista("verificacion")} style={{
+              display:"flex",alignItems:"center",gap:10,cursor:"pointer",
+              padding:"12px 14px",borderRadius:12,marginBottom:14,
+              background:C.redBg,border:`1px solid ${C.red}33`}}>
+              <span style={{fontSize:18}}>⚠</span>
+              <div style={{flex:1,fontSize:12,color:C.red,fontFamily:FONT,lineHeight:1.4}}>
+                <b>{discrepancias.length-verificadosCount} discrepancia(s) sin verificar.</b> Antes de
+                confirmar el cierre se requiere una segunda revisión (doble conteo) — toca para ir a Verificación.
+              </div>
+            </div>
+          )}
+
           <div style={{display:"flex",flexDirection:"column",gap:10}}>
             <IOSBtn onPress={()=>exportAuditoriaExcel({
               id:`AUD-${MK}-preview`, mk:MK, mes, anio, fecha:hoy(), hora:hora(),
@@ -11561,10 +11650,90 @@ function AuditoriaInventario({inv, ventas, mes, anio, MK, auditorias, onGuardarA
                 marcaNombre:r.marcaNombre||MARCAS.find(m=>m.id===r.marcaId)?.nombre,
                 sistema:r.sistema,contado:r.contado,diferencia:r.diferencia,estado:r.estado,precio:r.precio})),
             })} variant="fill" full icon="⬇" disabled={cruce.length===0}>Exportar Excel</IOSBtn>
-            <IOSBtn onPress={confirmarCierre} variant="success" full icon="✓" disabled={itemsContados===0}>
-              Confirmar Cierre de Inventario
+            <IOSBtn onPress={confirmarCierre} variant="success" full icon="✓" disabled={itemsContados===0||!todoVerificado}>
+              {todoVerificado ? "Confirmar Cierre de Inventario" : `Verificar ${discrepancias.length-verificadosCount} discrepancia(s) primero`}
             </IOSBtn>
           </div>
+        </div>
+      )}
+
+      {/* ── VERIFICACIÓN (2da revisión / doble conteo) ── */}
+      {vista==="verificacion" && (
+        <div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:14}}>
+            <StatCard icon="🔁" label="Discrepancias" value={discrepancias.length} color={C.red} compact={isDesktop}/>
+            <StatCard icon="✓" label="Verificadas" value={verificadosCount} color={C.green} compact={isDesktop}/>
+          </div>
+
+          {discrepancias.length===0
+            ? <EmptyState icon="✓" title="Sin discrepancias"
+                sub="El conteo coincide con el sistema en todos los productos — no se requiere doble revisión"/>
+            : <>
+                <button onClick={()=>setModoVerif(true)} style={{
+                  width:"100%",border:"none",borderRadius:16,marginBottom:14,
+                  padding:"18px 20px",cursor:"pointer",WebkitTapHighlightColor:"transparent",
+                  display:"flex",alignItems:"center",gap:14,textAlign:"left",
+                  background:"linear-gradient(135deg, #1A1714, #2E2620)",
+                  boxShadow:"0 6px 22px rgba(26,23,20,0.28)",
+                }}>
+                  <div style={{width:46,height:46,borderRadius:12,flexShrink:0,
+                    background:"rgba(255,255,255,0.1)",border:"1px solid rgba(255,255,255,0.18)",
+                    display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>🔁</div>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontSize:14.5,fontWeight:800,color:"#fff",fontFamily:FONT,letterSpacing:".01em"}}>
+                      Iniciar segunda revisión
+                    </div>
+                    <div style={{fontSize:11.5,color:"rgba(255,255,255,0.65)",fontFamily:FONT,marginTop:2}}>
+                      Reescanea solo los {discrepancias.length} producto(s) con diferencias
+                    </div>
+                  </div>
+                  <div style={{fontSize:13,color:"#C4A57B",fontWeight:700,fontFamily:FONT,flexShrink:0}}>→</div>
+                </button>
+
+                <div style={{background:C.bg1,border:`1px solid ${C.sep}`,borderRadius:10,
+                  overflow:"hidden",marginBottom:16,boxShadow:"0 1px 3px rgba(0,0,0,.06)"}}>
+                  {discrepancias.map((r,i)=>{
+                    const marcaP = MARCAS.find(m=>m.id===r.marcaId);
+                    const ei = ESTADO_INFO[r.estado];
+                    const verif = verifConteo[r.id]||0;
+                    const ok = itemVerificado(r);
+                    return (
+                      <div key={r.id} style={{display:"flex",alignItems:"center",gap:10,
+                        padding:"10px 14px",borderTop:i>0?`1px solid ${C.sep}`:"",
+                        background:i%2===0?C.bg1:C.bg0}}>
+                        <MarcaIcon marca={marcaP} size={26} radius={6}/>
+                        <div style={{flex:1,minWidth:0}}>
+                          <div style={{fontSize:13,fontWeight:700,color:C.label,fontFamily:FONT,
+                            overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{(r.nombre||"").toUpperCase()}</div>
+                          <div style={{display:"flex",alignItems:"center",gap:6,marginTop:2}}>
+                            <span style={{fontFamily:FONT_MONO,fontSize:10,color:C.gold}}>{r.codigo}</span>
+                            <span style={{fontSize:10.5,fontWeight:700,color:ei.color,background:ei.bg,
+                              padding:"2px 7px",borderRadius:5}}>{ei.label} ({r.diferencia>0?`+${r.diferencia}`:r.diferencia})</span>
+                          </div>
+                        </div>
+                        <div style={{textAlign:"right",flexShrink:0}}>
+                          {ok
+                            ? <span style={{fontSize:11,fontWeight:700,color:C.green,fontFamily:FONT}}>✓ Verificado</span>
+                            : <>
+                                <div style={{fontSize:11,color:C.label3,fontFamily:FONT,marginBottom:4}}>
+                                  2da: {verif} / {r.contado}
+                                </div>
+                                <button onClick={()=>{
+                                  if(window.confirm(`Marcar "${(r.nombre||"").toUpperCase()}" como revisado manualmente?\n\nConfirmas que el conteo de ${r.contado} unidad(es) es correcto.`)){
+                                    setManualVerif(prev=>({...prev,[r.id]:true}));
+                                  }
+                                }} style={{fontSize:10,fontWeight:700,color:C.label2,background:C.bg2,
+                                  border:`1px solid ${C.sep}`,borderRadius:6,padding:"3px 8px",cursor:"pointer",
+                                  fontFamily:FONT,WebkitTapHighlightColor:"transparent"}}>Revisar manual</button>
+                              </>
+                          }
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+          }
         </div>
       )}
 
