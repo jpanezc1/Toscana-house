@@ -23615,22 +23615,38 @@
       descargarArchivo(blob, `Liquidacion_${marca?.nombre || "marca"}_${MESES[mes]}_${anio}.png`);
     }).catch(() => alert("No se pudo generar la imagen"));
   }
-  function compartirLiquidacionImagen(marca, mes, anio, d) {
+  function generarVistaPreviaLiquidacion(marca, mes, anio, d, setPreview) {
     const texto = construirMensajeLiquidacion(marca, mes, anio, d);
     construirImagenLiquidacion(marca, mes, anio, d).then((blob) => {
       const nombre = `Liquidacion_${marca?.nombre || "marca"}_${MESES[mes]}_${anio}.png`;
-      const file = new File([blob], nombre, { type: "image/png" });
+      const url = URL.createObjectURL(blob);
+      setPreview({ url, blob, nombre, texto, marca, mes, anio });
+    }).catch(() => alert("No se pudo generar la imagen"));
+  }
+  function ImagenLiqPreviewModal({ data, onClose }) {
+    if (!data) return null;
+    function compartir() {
+      const file = new File([data.blob], data.nombre, { type: "image/png" });
       if (navigator.canShare && navigator.canShare({ files: [file] })) {
         navigator.share({
           files: [file],
-          text: texto,
-          title: `Liquidaci\xF3n ${marca?.nombre || ""} \u2014 ${MESES[mes]} ${anio}`
+          text: data.texto,
+          title: `Liquidaci\xF3n ${data.marca?.nombre || ""} \u2014 ${MESES[data.mes]} ${data.anio}`
         }).catch(() => {
         });
       } else {
-        descargarArchivo(blob, nombre);
+        descargarArchivo(data.blob, data.nombre);
       }
-    }).catch(() => alert("No se pudo generar la imagen"));
+    }
+    function descargar() {
+      descargarArchivo(data.blob, data.nombre);
+    }
+    return /* @__PURE__ */ import_react.default.createElement(Sheet, { open: !!data, onClose, title: "Vista previa", tall: true }, /* @__PURE__ */ import_react.default.createElement("img", { src: data.url, alt: "Vista previa de liquidaci\xF3n", style: {
+      width: "100%",
+      borderRadius: 12,
+      marginBottom: 16,
+      border: `1px solid ${C.sep}`
+    } }), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 10 } }, /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: compartir, variant: "fill", icon: "\u{1F4E4}" }, "Enviar por WhatsApp"), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: descargar, variant: "fill", icon: "\u2B07" }, "Descargar imagen")));
   }
   function numeroALetras(monto) {
     const entero = Math.floor(monto), cts = Math.round((monto - entero) * 100);
@@ -24676,6 +24692,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
     const marca = MARCAS.find((x) => x.id === marcaId);
     const [cfg, setCfg] = (0, import_react.useState)(() => leerCfgLiq(marcaId));
     const [showCfg, setShowCfg] = (0, import_react.useState)(false);
+    const [imgPreview, setImgPreview] = (0, import_react.useState)(null);
     const pctTarjeta = Number(cfg.pctTarjeta) || 0;
     const pctComision = Number(cfg.pctComision) || 0;
     const alquiler = Number(cfg.alquiler) || 0;
@@ -24732,7 +24749,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
     const subtotalBanco = bruto - descTarjeta;
     const comision = subtotalBanco * pctComision / 100;
     const neto = subtotalBanco - comision - alquiler - totalGastos;
-    return /* @__PURE__ */ import_react.default.createElement(Sheet, { open: !!marcaId, onClose, title: `${marca?.emoji} ${marca?.nombre} \u2014 ${MESES[mes]}`, tall: true }, /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 16 } }, /* @__PURE__ */ import_react.default.createElement("button", { onClick: () => setShowCfg((s) => !s), style: {
+    return /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, null, /* @__PURE__ */ import_react.default.createElement(Sheet, { open: !!marcaId, onClose, title: `${marca?.emoji} ${marca?.nombre} \u2014 ${MESES[mes]}`, tall: true }, /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 16 } }, /* @__PURE__ */ import_react.default.createElement("button", { onClick: () => setShowCfg((s) => !s), style: {
       width: "100%",
       background: C.bg2,
       border: `1px solid ${C.sep}`,
@@ -24937,7 +24954,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
     }), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 10, marginTop: 16 } }, /* @__PURE__ */ import_react.default.createElement(
       IOSBtn,
       {
-        onPress: () => compartirLiquidacionImagen(marca, mes, anio, {
+        onPress: () => generarVistaPreviaLiquidacion(marca, mes, anio, {
           bruto,
           brutoEfect,
           brutoQR,
@@ -24953,7 +24970,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
           neto,
           vMarca,
           marcaId
-        }),
+        }, setImgPreview),
         variant: "fill",
         icon: "\u{1F4E4}"
       },
@@ -24965,7 +24982,10 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
     }, variant: "success", icon: "\u2713" }, "Confirmar Cierre Mensual") : /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => {
       setCierres((p) => ({ ...p, [`${MK}-${marcaId}`]: { cerrado: false, mk: MK } }));
       onClose();
-    }, variant: "danger" }, "Reabrir Liquidaci\xF3n")));
+    }, variant: "danger" }, "Reabrir Liquidaci\xF3n"))), /* @__PURE__ */ import_react.default.createElement(ImagenLiqPreviewModal, { data: imgPreview, onClose: () => {
+      if (imgPreview) URL.revokeObjectURL(imgPreview.url);
+      setImgPreview(null);
+    } }));
   }
   var USUARIOS = [
     { usuario: "toscana", password: "casa2024", nombre: "Toscana House", rol: "admin" },
@@ -33248,6 +33268,7 @@ Fecha: ${venta.fecha}`);
     var filtroMk = _hN151[0];
     var setFMk = _hN151[1];
     ;
+    const [imgPreview, setImgPreview] = (0, import_react.useState)(null);
     const marca = MARCAS.find((m) => m.id === marcaId);
     const liq = getLiq(marcaId);
     const cerrado = cierres[`${MK}-${marcaId}`]?.cerrado;
@@ -33260,7 +33281,7 @@ Fecha: ${venta.fecha}`);
       return s + (a?.gcAmount || 0);
     }, 0);
     const gcVentas = liq.vMarca.filter((v) => v.gcAllocations?.some((x) => x.marcaId === marcaId && x.gcAmount > 0)).length;
-    return /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "grid", gridTemplateColumns: isDesktop ? "1fr 1fr 1fr 1fr" : "1fr 1fr", gap: isDesktop ? 8 : 10, marginBottom: isDesktop ? 14 : 20 } }, /* @__PURE__ */ import_react.default.createElement(
+    return /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, null, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "grid", gridTemplateColumns: isDesktop ? "1fr 1fr 1fr 1fr" : "1fr 1fr", gap: isDesktop ? 8 : 10, marginBottom: isDesktop ? 14 : 20 } }, /* @__PURE__ */ import_react.default.createElement(
       StatCard,
       {
         icon: marca?.imagen ? /* @__PURE__ */ import_react.default.createElement(MarcaIcon, { marca, size: 22, radius: 6 }) : marca?.emoji || "\u25C6",
@@ -33394,7 +33415,7 @@ Fecha: ${venta.fecha}`);
       alignItems: "center",
       padding: "18px 16px",
       background: `${C.gold}12`
-    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 16, fontWeight: 700, color: C.label, fontFamily: FONT } }, "TOTAL A PAGAR"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 24, fontWeight: 700, color: C.label, fontFamily: FONT } }, $(liq.neto)))), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 10 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 10 } }, /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => compartirLiquidacionImagen(marca, mes, anio, {
+    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 16, fontWeight: 700, color: C.label, fontFamily: FONT } }, "TOTAL A PAGAR"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 24, fontWeight: 700, color: C.label, fontFamily: FONT } }, $(liq.neto)))), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 10 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 10 } }, /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => generarVistaPreviaLiquidacion(marca, mes, anio, {
       bruto: liq.bruto,
       brutoEfect: liq.brutoEf,
       brutoQR: liq.brutoQR,
@@ -33410,7 +33431,7 @@ Fecha: ${venta.fecha}`);
       neto: liq.neto,
       vMarca: liq.vMarca,
       marcaId
-    }), variant: "fill", full: true, icon: "\u{1F4E4}" }, "Compartir"), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => imprimirLiquidacion(marca, mes, anio, liq), variant: "fill", full: true, icon: "\u{1F5A8}" }, "Imprimir")), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => generarImagenLiquidacion(marca, mes, anio, liq), variant: "fill", full: true, icon: "\u{1F4F7}" }, "Exportar Imagen"), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => exportCSV(MARCAS.find((m) => m.id === marcaId), ventas, mes, anio), variant: "fill", full: true, icon: "\u2B07" }, "Exportar CSV"), !cerrado ? /* @__PURE__ */ import_react.default.createElement(
+    }, setImgPreview), variant: "fill", full: true, icon: "\u{1F4E4}" }, "Compartir"), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => imprimirLiquidacion(marca, mes, anio, liq), variant: "fill", full: true, icon: "\u{1F5A8}" }, "Imprimir")), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => generarImagenLiquidacion(marca, mes, anio, liq), variant: "fill", full: true, icon: "\u{1F4F7}" }, "Exportar Imagen"), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => exportCSV(MARCAS.find((m) => m.id === marcaId), ventas, mes, anio), variant: "fill", full: true, icon: "\u2B07" }, "Exportar CSV"), !cerrado ? /* @__PURE__ */ import_react.default.createElement(
       IOSBtn,
       {
         variant: "success",
@@ -33462,7 +33483,10 @@ Fecha: ${venta.fecha}`);
         background: "#7C3AED08",
         borderRadius: 6
       } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { color: "#7C3AED", fontWeight: 600 } }, "\u{1F381} GC: ", $(gcAlloc.gcAmount)), gcAlloc.extraAmount > 0.01 && /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.amber, fontWeight: 600 } }, "+ ", $(gcAlloc.extraAmount), " extra")), its.map((it, ii) => /* @__PURE__ */ import_react.default.createElement("div", { key: `liq-${v.id}-${it.prodId}-${ii}`, style: { fontSize: 12, color: C.label2, fontFamily: FONT, lineHeight: "1.3" } }, "\xB7 ", it.nombre, " \xD7", it.cantidad, " = ", $(it.subtotal))));
-    }))));
+    })))), /* @__PURE__ */ import_react.default.createElement(ImagenLiqPreviewModal, { data: imgPreview, onClose: () => {
+      if (imgPreview) URL.revokeObjectURL(imgPreview.url);
+      setImgPreview(null);
+    } }));
   }
   function HistorialTab({ ventas, inv, cierres, onVentaClick }) {
     const now = /* @__PURE__ */ new Date();

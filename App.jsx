@@ -2093,22 +2093,48 @@ function generarImagenLiquidacion(marca, mes, anio, liq){
   }).catch(()=>alert("No se pudo generar la imagen"));
 }
 
-// ── Compartir liquidación de marca como imagen (share sheet / WhatsApp) ──────
-function compartirLiquidacionImagen(marca, mes, anio, d){
+// ── Generar vista previa de la imagen de liquidación ──────────────────────────
+function generarVistaPreviaLiquidacion(marca, mes, anio, d, setPreview){
   const texto = construirMensajeLiquidacion(marca, mes, anio, d);
   construirImagenLiquidacion(marca, mes, anio, d).then(blob=>{
     const nombre = `Liquidacion_${marca?.nombre||"marca"}_${MESES[mes]}_${anio}.png`;
-    const file = new File([blob], nombre, {type:"image/png"});
+    const url = URL.createObjectURL(blob);
+    setPreview({url, blob, nombre, texto, marca, mes, anio});
+  }).catch(()=>alert("No se pudo generar la imagen"));
+}
+
+// ── Modal de vista previa: enviar por WhatsApp o descargar ────────────────────
+function ImagenLiqPreviewModal({data, onClose}){
+  if(!data) return null;
+  function compartir(){
+    const file = new File([data.blob], data.nombre, {type:"image/png"});
     if(navigator.canShare && navigator.canShare({files:[file]})){
       navigator.share({
         files:[file],
-        text: texto,
-        title:`Liquidación ${marca?.nombre||""} — ${MESES[mes]} ${anio}`,
+        text: data.texto,
+        title:`Liquidación ${data.marca?.nombre||""} — ${MESES[data.mes]} ${data.anio}`,
       }).catch(()=>{});
     } else {
-      descargarArchivo(blob, nombre);
+      descargarArchivo(data.blob, data.nombre);
     }
-  }).catch(()=>alert("No se pudo generar la imagen"));
+  }
+  function descargar(){
+    descargarArchivo(data.blob, data.nombre);
+  }
+  return (
+    <Sheet open={!!data} onClose={onClose} title="Vista previa" tall>
+      <img src={data.url} alt="Vista previa de liquidación" style={{
+        width:"100%",borderRadius:12,marginBottom:16,border:`1px solid ${C.sep}`}}/>
+      <div style={{display:"flex",flexDirection:"column",gap:10}}>
+        <IOSBtn onPress={compartir} variant="fill" icon="📤">
+          Enviar por WhatsApp
+        </IOSBtn>
+        <IOSBtn onPress={descargar} variant="fill" icon="⬇">
+          Descargar imagen
+        </IOSBtn>
+      </div>
+    </Sheet>
+  );
 }
 
 // ── Número a letras (es-BO) ───────────────────────────────
@@ -3062,6 +3088,7 @@ function LiqModal({marcaId,ventas,mes,anio,MK,cierres,setCierres,onClose,syncCie
   const marca=MARCAS.find(x=>x.id===marcaId);
   const [cfg, setCfg] = useState(()=>leerCfgLiq(marcaId));
   const [showCfg, setShowCfg] = useState(false);
+  const [imgPreview, setImgPreview] = useState(null);
   const pctTarjeta = Number(cfg.pctTarjeta)||0;
   const pctComision = Number(cfg.pctComision)||0;
   const alquiler = Number(cfg.alquiler)||0;
@@ -3124,6 +3151,7 @@ function LiqModal({marcaId,ventas,mes,anio,MK,cierres,setCierres,onClose,syncCie
   const neto = subtotalBanco - comision - alquiler - totalGastos;
 
   return (
+    <>
     <Sheet open={!!marcaId} onClose={onClose} title={`${marca?.emoji} ${marca?.nombre} — ${MESES[mes]}`} tall>
       {/* Configuración */}
       <div style={{marginBottom:16}}>
@@ -3288,8 +3316,8 @@ function LiqModal({marcaId,ventas,mes,anio,MK,cierres,setCierres,onClose,syncCie
       }
 
       <div style={{display:"flex",flexDirection:"column",gap:10,marginTop:16}}>
-        <IOSBtn onPress={()=>compartirLiquidacionImagen(marca,mes,anio,{bruto,brutoEfect,brutoQR,brutoTarjeta,
-          descTarjeta,pctTarjeta,subtotalBanco,pctComision,comision,alquiler,gastos,totalGastos,neto,vMarca,marcaId})}
+        <IOSBtn onPress={()=>generarVistaPreviaLiquidacion(marca,mes,anio,{bruto,brutoEfect,brutoQR,brutoTarjeta,
+          descTarjeta,pctTarjeta,subtotalBanco,pctComision,comision,alquiler,gastos,totalGastos,neto,vMarca,marcaId},setImgPreview)}
           variant="fill" icon="📤">
           Compartir liquidación
         </IOSBtn>
@@ -3306,6 +3334,11 @@ function LiqModal({marcaId,ventas,mes,anio,MK,cierres,setCierres,onClose,syncCie
         }
       </div>
     </Sheet>
+    <ImagenLiqPreviewModal data={imgPreview} onClose={()=>{
+      if(imgPreview) URL.revokeObjectURL(imgPreview.url);
+      setImgPreview(null);
+    }}/>
+    </>
   );
 }
 
@@ -10952,6 +10985,7 @@ function MarcaDetalle({marcaId,inv,ventas,vMes,mes,anio,MK,cierres,setCierres,ge
   const isDesktop = useIsDesktop();
   var _hN150 = useState("historial"); var sub = _hN150[0]; var setSub = _hN150[1];;
   var _hN151 = useState(""); var filtroMk = _hN151[0]; var setFMk = _hN151[1];;
+  const [imgPreview, setImgPreview] = useState(null);
   const marca   =MARCAS.find(m=>m.id===marcaId);
   const liq     =getLiq(marcaId);
   const cerrado =cierres[`${MK}-${marcaId}`]?.cerrado;
@@ -10964,6 +10998,7 @@ function MarcaDetalle({marcaId,inv,ventas,vMes,mes,anio,MK,cierres,setCierres,ge
   const gcVentas = liq.vMarca.filter(v=>v.gcAllocations?.some(x=>x.marcaId===marcaId&&x.gcAmount>0)).length;
 
   return (
+    <>
     <div>
       {/* Stats */}
       <div style={{display:"grid",gridTemplateColumns: isDesktop ? "1fr 1fr 1fr 1fr" : "1fr 1fr", gap: isDesktop ? 8 : 10, marginBottom: isDesktop ? 14 : 20}}>
@@ -11148,13 +11183,13 @@ function MarcaDetalle({marcaId,inv,ventas,vMes,mes,anio,MK,cierres,setCierres,ge
 
           <div style={{display:"flex",flexDirection:"column",gap:10}}>
             <div style={{display:"flex",gap:10}}>
-              <IOSBtn onPress={()=>compartirLiquidacionImagen(marca,mes,anio,{
+              <IOSBtn onPress={()=>generarVistaPreviaLiquidacion(marca,mes,anio,{
                 bruto: liq.bruto, brutoEfect: liq.brutoEf, brutoQR: liq.brutoQR, brutoTarjeta: liq.brutoTJ,
                 descTarjeta: liq.descTJ, pctTarjeta: liq.cfg?.pctTarjeta ?? 0,
                 subtotalBanco: liq.subBanco, pctComision: liq.cfg?.pctComision ?? 0, comision: liq.comision,
                 alquiler: liq.alquiler, gastos: liq.gastos, totalGastos: liq.totalGastos, neto: liq.neto,
                 vMarca: liq.vMarca, marcaId,
-              })} variant="fill" full icon="📤">
+              },setImgPreview)} variant="fill" full icon="📤">
                 Compartir
               </IOSBtn>
               <IOSBtn onPress={()=>imprimirLiquidacion(marca,mes,anio,liq)} variant="fill" full icon="🖨">
@@ -11223,6 +11258,11 @@ function MarcaDetalle({marcaId,inv,ventas,vMes,mes,anio,MK,cierres,setCierres,ge
         </div>
       )}
     </div>
+    <ImagenLiqPreviewModal data={imgPreview} onClose={()=>{
+      if(imgPreview) URL.revokeObjectURL(imgPreview.url);
+      setImgPreview(null);
+    }}/>
+    </>
   );
 }
 
