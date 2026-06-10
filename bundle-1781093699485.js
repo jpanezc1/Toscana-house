@@ -23713,23 +23713,8 @@
       <td style="padding:8px 12px;border-bottom:1px solid #eee">${k}</td>
       <td style="padding:8px 12px;border-bottom:1px solid #eee;text-align:right">${v}</td>
     </tr>`).join("");
-    const ventas = d.vMarca || [];
-    const transHtml = ventas.map((v) => {
-      const its = v.items.filter((i) => i.marcaId === d.marcaId);
-      const sub2 = its.reduce((s, i) => s + i.subtotal, 0);
-      const itemsHtml = its.map(
-        (it) => `<div style="font-size:11px;color:#555;margin-left:8px">\xB7 ${it.nombre} \xD7${it.cantidad} = ${$(it.subtotal)}</div>`
-      ).join("");
-      return `<div style="background:#faf8f4;border-radius:8px;padding:8px 12px;margin-bottom:6px;border:1px solid #eee">
-      <div style="display:flex;justify-content:space-between;font-size:12px;font-weight:600">
-        <span>${v.id} \xB7 ${v.fecha} ${v.hora}</span><span>${$(sub2)}</span>
-      </div>
-      ${itemsHtml}
-    </div>`;
-    }).join("");
     const width = 720;
-    const itemsCount = ventas.reduce((s, v) => s + v.items.filter((i) => i.marcaId === d.marcaId).length, 0);
-    const height = 200 + filas.length * 38 + 50 + (ventas.length * 40 + itemsCount * 16) + 70;
+    const height = 200 + filas.length * 38 + 70;
     const logoMarca = getMarcaImg(marca);
     const html = `<div xmlns="http://www.w3.org/1999/xhtml" style="font-family:Arial,sans-serif;color:#222;background:#fff;width:${width}px;padding:24px;box-sizing:border-box">
     <div style="display:flex;align-items:center;gap:16px;margin-bottom:16px">
@@ -23748,8 +23733,6 @@
         </tr>
       </tbody>
     </table>
-    <div style="font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px;color:#888">Transacciones del per\xEDodo</div>
-    ${transHtml || '<div style="font-size:12px;color:#999;margin-bottom:12px">Sin transacciones</div>'}
     <div style="margin-top:20px;font-size:11px;color:#999">
       ${PROPIETARIA} \xB7 NIT ${NIT_EMPRESA}<br/>
       Generado: ${(/* @__PURE__ */ new Date()).toLocaleString("es-BO")}
