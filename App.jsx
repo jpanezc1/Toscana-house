@@ -2495,6 +2495,7 @@ function IOSBtn({children,onPress,variant="primary",full,disabled,small,icon}){
 function Sheet({open,onClose,title,children,tall}){
   var _hN106 = useState(false); var visible = _hN106[0]; var setVisible = _hN106[1];;
   var _hN107 = useState(false); var anim = _hN107[0]; var setAnim = _hN107[1];;
+  const isDesktop = useIsDesktop();
   useEffect(()=>{
     if(open){setVisible(true);setTimeout(()=>setAnim(true),10);}
     else{setAnim(false);setTimeout(()=>setVisible(false),320);}
@@ -2505,14 +2506,17 @@ function Sheet({open,onClose,title,children,tall}){
       position:"fixed",inset:0,zIndex:500,
       background:anim?"rgba(0,0,0,.55)":"rgba(0,0,0,0)",
       transition:"background .32s",
-      display:"flex",alignItems:"flex-end",
+      display:"flex",alignItems:isDesktop?"center":"flex-end",
+      justifyContent:isDesktop?"center":"stretch",
     }} onClick={e=>e.target===e.currentTarget&&onClose()}>
       <div style={{
         background:"rgba(255,255,255,0.97)",
         backdropFilter:"blur(32px) saturate(180%)",
         WebkitBackdropFilter:"blur(32px) saturate(180%)",
-        borderRadius:"28px 28px 0 0",
+        borderRadius:isDesktop?28:"28px 28px 0 0",
         width:"100%",
+        maxWidth:isDesktop?520:"100%",
+        margin:isDesktop?"auto":"0",
         maxHeight:tall?"90vh":"80vh",
         overflowY:"auto",
         transform:anim?"translateY(0)":"translateY(100%)",
@@ -5923,6 +5927,7 @@ function MiniBarChart({data, color, height=64}){
 
 // ── Modal de detalle de venta para marca ─────────────────────────────────────
 function BrandVentaModal({venta, marca, onClose}){
+  const isDesktop = useIsDesktop();
   if(!venta) return null;
   const fac   = leerFacturaLocal(venta.id);
   const num   = venta.id.replace(/\D/g,"").slice(-4).padStart(4,"0");
@@ -5938,12 +5943,18 @@ function BrandVentaModal({venta, marca, onClose}){
   );
 
   return (
-    <div style={{position:"fixed",inset:0,zIndex:500,display:"flex",flexDirection:"column",
-      background:"rgba(0,0,0,0.45)",backdropFilter:"blur(4px)"}}>
-      {/* Tap outside to close */}
-      <div style={{flex:"0 0 60px"}} onClick={onClose}/>
+    <div onClick={e=>e.target===e.currentTarget&&onClose()}
+      style={{position:"fixed",inset:0,zIndex:500,display:"flex",
+        flexDirection:isDesktop?"row":"column",
+        alignItems:"center",justifyContent:"center",
+        background:"rgba(0,0,0,0.45)",backdropFilter:"blur(4px)"}}>
+      {/* Tap outside to close (mobile spacer) */}
+      {!isDesktop&&<div style={{position:"absolute",top:0,left:0,right:0,height:60}} onClick={onClose}/>}
       {/* Panel */}
-      <div style={{flex:1,background:C.bg0,borderRadius:"24px 24px 0 0",
+      <div style={{width:"100%",maxWidth:isDesktop?520:"100%",
+        maxHeight:isDesktop?"85vh":"calc(100% - 60px)",
+        alignSelf:isDesktop?"center":"flex-end",
+        background:C.bg0,borderRadius:isDesktop?24:"24px 24px 0 0",
         display:"flex",flexDirection:"column",overflow:"hidden",
         boxShadow:"0 -8px 40px rgba(0,0,0,0.18)"}}>
 
@@ -7208,6 +7219,7 @@ function LogoEditor({ file, onSave, onCancel }) {
 }
 
 function NuevaMarcaModal({editMarca, marcasActuales, onClose, onGuardar}){
+  const isDesktop = useIsDesktop();
   const isNew = !editMarca;
   const lista = marcasActuales || MARCAS;
   const nextId = useMemo(()=> isNew ? Math.max(...lista.map(m=>m.id),17)+1 : editMarca.id, []);
@@ -7308,8 +7320,11 @@ function NuevaMarcaModal({editMarca, marcasActuales, onClose, onGuardar}){
   return (
     <div style={{position:"fixed",inset:0,zIndex:700,
       background:"rgba(0,0,0,0.5)",backdropFilter:"blur(8px)",
-      display:"flex",flexDirection:"column",justifyContent:"flex-end"}}>
-      <div style={{background:C.bg0,borderRadius:"24px 24px 0 0",
+      display:"flex",flexDirection:"column",
+      alignItems:isDesktop?"center":"stretch",
+      justifyContent:isDesktop?"center":"flex-end"}}>
+      <div style={{background:C.bg0,borderRadius:isDesktop?24:"24px 24px 0 0",
+        width:"100%",maxWidth:isDesktop?560:"100%",
         maxHeight:"92vh",display:"flex",flexDirection:"column",
         boxShadow:"0 -8px 40px rgba(0,0,0,0.22)"}}>
 
@@ -11458,6 +11473,7 @@ function PanelCambiarPass({user, usuarios, onGuardar}){
 
 // ── Modal formulario nuevo/editar usuario ─────────────────────────────────────
 function UserFormModal({editUser, usuarios, onClose, onGuardar}){
+  const isDesktop = useIsDesktop();
   const isNew = !editUser;
   const [f, setF] = useState(editUser
     ? {...editUser, password:"", marcaId:String(editUser.marcaId||"")}
@@ -11502,8 +11518,11 @@ function UserFormModal({editUser, usuarios, onClose, onGuardar}){
   return (
     <div style={{position:"fixed",inset:0,zIndex:600,
       background:"rgba(0,0,0,0.45)",backdropFilter:"blur(6px)",
-      display:"flex",flexDirection:"column",justifyContent:"flex-end"}}>
-      <div style={{background:C.bg0,borderRadius:"24px 24px 0 0",
+      display:"flex",flexDirection:"column",
+      alignItems:isDesktop?"center":"stretch",
+      justifyContent:isDesktop?"center":"flex-end"}}>
+      <div style={{background:C.bg0,borderRadius:isDesktop?24:"24px 24px 0 0",
+        width:"100%",maxWidth:isDesktop?480:"100%",
         maxHeight:"92vh",display:"flex",flexDirection:"column",
         boxShadow:"0 -8px 40px rgba(0,0,0,0.18)"}}>
         {/* Header */}
@@ -11636,6 +11655,7 @@ function UserFormModal({editUser, usuarios, onClose, onGuardar}){
 
 // ── Auditoría Forense Tab ─────────────────────────────────────────────────────
 function AuditoriaTab({auditLog, setAuditLog}){
+  const isDesktop = useIsDesktop();
   const [filtroTipo,  setFiltroTipo]  = useState("TODOS");
   const [filtroMarca, setFiltroMarca] = useState("");
   const [busqueda,    setBusqueda]    = useState("");
@@ -11904,12 +11924,12 @@ function AuditoriaTab({auditLog, setAuditLog}){
         <div onClick={()=>setDetalle(null)}
           style={{position:"fixed",inset:0,zIndex:700,
             background:"rgba(0,0,0,0.5)",backdropFilter:"blur(4px)",
-            display:"flex",alignItems:"flex-end",justifyContent:"center"}}>
+            display:"flex",alignItems:isDesktop?"center":"flex-end",justifyContent:"center"}}>
           <div onClick={e=>e.stopPropagation()}
-            style={{background:C.bg0,borderRadius:"24px 24px 0 0",
+            style={{background:C.bg0,borderRadius:isDesktop?24:"24px 24px 0 0",
               width:"100%",maxWidth:680,maxHeight:"85vh",
               display:"flex",flexDirection:"column",
-              boxShadow:"0 -8px 40px rgba(0,0,0,0.2)"}}>
+              boxShadow:isDesktop?"0 24px 70px rgba(0,0,0,0.25)":"0 -8px 40px rgba(0,0,0,0.2)"}}>
             {/* Header modal */}
             <div style={{padding:"20px 20px 14px",borderBottom:`1px solid ${C.sep}`,
               display:"flex",justifyContent:"space-between",alignItems:"center",flexShrink:0}}>
