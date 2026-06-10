@@ -1814,30 +1814,211 @@ async function generarExcelStock(inventario, setGenerando) {
   setGenerando(false);
 }
 
-function exportCSV(marca,ventas,mes,anio){
-  const MK=mkKey(mes,anio);
-  const vm=ventas.filter(v=>v.mk===MK&&!v.anulada&&v.items.some(i=>i.marcaId===marca.id));
-  const rows=[["ID","Fecha","Hora","Código","Producto","Cant.","Precio","Subtotal","Desc%","Pago"]];
+// ── Exportar Excel — detalle de ventas + desglose de liquidación ──
+async function exportExcelLiquidacion(marca,ventas,mes,anio){
+  const XLSX = await loadXLSX();
+  const MK   = mkKey(mes,anio);
+  const vm   = ventas.filter(v=>v.mk===MK&&!v.anulada&&v.items.some(i=>i.marcaId===marca.id));
+  const liq  = calcLiqMarca(vm,marca.id,MK);
+
+  // ── Paleta editorial Toscana House (sin # — RRGGBB) ──────────
+  const D  = "1A1714"; // chocolate oscuro
+  const G  = "9A7B4F"; // oro
+  const GL = "C4A57B"; // oro claro
+  const CR = "F5F0E8"; // crema cálida
+  const CL = "FAF7F3"; // crema muy clara
+  const WH = "FFFFFF"; // blanco
+  const AM = "FDF3DC"; // ámbar (total)
+  const AB = "E8C97A"; // ámbar borde
+  const BD = "D4C5A9"; // borde cálido
+  const MT = "8B7355"; // texto muted
+
+  const bAll = (c=BD) => ({
+    top:{style:"thin",color:{rgb:c}}, bottom:{style:"thin",color:{rgb:c}},
+    left:{style:"thin",color:{rgb:c}}, right:{style:"thin",color:{rgb:c}},
+  });
+
+  const NC = 10; // nº de columnas de la tabla de ventas
+
+  function S(ws, r, c, st){
+    const a = XLSX.utils.encode_cell({r,c});
+    if(!ws[a]) ws[a]={t:"z",v:""};
+    ws[a].s = st;
+  }
+  const Srow = (ws,r,nc,st) => { for(let c=0;c<nc;c++) S(ws,r,c,st); };
+
+  const sTitulo = {
+    font:{name:"Arial",sz:20,bold:true,color:{rgb:WH}},
+    fill:{patternType:"solid",fgColor:{rgb:D}},
+    alignment:{horizontal:"center",vertical:"center"},
+    border:bAll("2A2420"),
+  };
+  const sSubtit = {
+    font:{name:"Arial",sz:13,bold:true,color:{rgb:WH}},
+    fill:{patternType:"solid",fgColor:{rgb:G}},
+    alignment:{horizontal:"center",vertical:"center"},
+    border:bAll(GL),
+  };
+  const sMeta = {
+    font:{name:"Arial",sz:9,color:{rgb:MT}},
+    fill:{patternType:"solid",fgColor:{rgb:CR}},
+    alignment:{horizontal:"center",vertical:"center"},
+    border:bAll(BD),
+  };
+  const sHdr = {
+    font:{name:"Arial",sz:10,bold:true,color:{rgb:WH}},
+    fill:{patternType:"solid",fgColor:{rgb:D}},
+    alignment:{horizontal:"center",vertical:"center",wrapText:true},
+    border:bAll("2A2420"),
+  };
+  const sDataL = (alt) => ({
+    font:{name:"Arial",sz:10,color:{rgb:D}},
+    fill:{patternType:"solid",fgColor:{rgb:alt?CL:WH}},
+    alignment:{horizontal:"left",vertical:"center",wrapText:true},
+    border:bAll(BD),
+  });
+  const sDataC = (alt) => ({
+    font:{name:"Arial",sz:10,color:{rgb:D}},
+    fill:{patternType:"solid",fgColor:{rgb:alt?CL:WH}},
+    alignment:{horizontal:"center",vertical:"center"},
+    border:bAll(BD),
+  });
+  const sDataR = (alt) => ({
+    font:{name:"Arial",sz:10,color:{rgb:D}},
+    fill:{patternType:"solid",fgColor:{rgb:alt?CL:WH}},
+    alignment:{horizontal:"right",vertical:"center"},
+    border:bAll(BD),
+    numFmt:"#,##0.00",
+  });
+  const sBlank = { fill:{patternType:"solid",fgColor:{rgb:WH}}, border:bAll(BD) };
+  const sSeccion = {
+    font:{name:"Arial",sz:11,bold:true,color:{rgb:WH}},
+    fill:{patternType:"solid",fgColor:{rgb:G}},
+    alignment:{horizontal:"left",vertical:"center"},
+    border:bAll(GL),
+  };
+  const sLabel = {
+    font:{name:"Arial",sz:10,color:{rgb:D}},
+    fill:{patternType:"solid",fgColor:{rgb:WH}},
+    alignment:{horizontal:"left",vertical:"center"},
+    border:bAll(BD),
+  };
+  const sValor = {
+    font:{name:"Arial",sz:10,color:{rgb:D}},
+    fill:{patternType:"solid",fgColor:{rgb:WH}},
+    alignment:{horizontal:"right",vertical:"center"},
+    border:bAll(BD),
+    numFmt:"#,##0.00",
+  };
+  const sNeto = {
+    font:{name:"Arial",sz:12,bold:true,color:{rgb:D}},
+    fill:{patternType:"solid",fgColor:{rgb:AM}},
+    alignment:{horizontal:"right",vertical:"center"},
+    border:{
+      top:{style:"medium",color:{rgb:AB}}, bottom:{style:"medium",color:{rgb:AB}},
+      left:{style:"thin",color:{rgb:AB}}, right:{style:"thin",color:{rgb:AB}},
+    },
+    numFmt:"#,##0.00",
+  };
+  const sNetoLabel = {
+    font:{name:"Arial",sz:12,bold:true,color:{rgb:D}},
+    fill:{patternType:"solid",fgColor:{rgb:AM}},
+    alignment:{horizontal:"left",vertical:"center"},
+    border:{
+      top:{style:"medium",color:{rgb:AB}}, bottom:{style:"medium",color:{rgb:AB}},
+      left:{style:"thin",color:{rgb:AB}}, right:{style:"thin",color:{rgb:AB}},
+    },
+  };
+
+  // ── Filas de la tabla de ventas ────────────────────────────────
+  const HEAD = ["ID","Fecha","Hora","Código","Producto","Cant.","Precio","Subtotal","Desc %","Pago"];
+  const itemRows = [];
   vm.forEach(v=>v.items.filter(i=>i.marcaId===marca.id).forEach(it=>{
-    rows.push([v.id,v.fecha,v.hora,it.codigo,it.nombre,it.cantidad,it.precioUnit,it.subtotal,v.descPct||0,v.metodoPago]);
+    itemRows.push([v.id,v.fecha,v.hora,it.codigo,it.nombre,it.cantidad,it.precioUnit,it.subtotal,v.descPct||0,labelPago(v.metodoPago)]);
   }));
-  const liq=calcLiqMarca(vm,marca.id,MK);
-  rows.push([],
-    ["Ventas brutas","","","","","","",+liq.bruto.toFixed(2),"",""],
-    [`Desc. Tarjeta (${liq.cfg.pctTarjeta}%)`, "","","","","","",-liq.descTJ.toFixed(2),"",""],
-    ["Subtotal banco","","","","","","",+liq.subBanco.toFixed(2),"",""],
-    [`Comisión (${liq.cfg.pctComision}%)`, "","","","","","",-liq.comision.toFixed(2),"",""],
-    ["Alquiler","","","","","","",-liq.alquiler.toFixed(2),"",""],
+
+  const rows = [
+    [`TOSCANA HOUSE — LIQUIDACIÓN`, ...Array(NC-1).fill("")],
+    [`${marca.nombre} · ${MESES[mes]} ${anio}`, ...Array(NC-1).fill("")],
+    [`Generado: ${new Date().toLocaleString("es-BO")}`, ...Array(NC-1).fill("")],
+    [],
+    HEAD,
+    ...itemRows,
+    [],
+  ];
+  const rTablaHdr = 4;
+  const rItemsStart = 5;
+  const rItemsEnd = rItemsStart + itemRows.length - 1;
+
+  // ── Filas de desglose ───────────────────────────────────────────
+  const rSeccionDesglose = rows.length;
+  rows.push(["DESGLOSE DE LIQUIDACIÓN", ...Array(NC-1).fill("")]);
+
+  const desglose = [
+    ["Efectivo",                                  liq.brutoEf],
+    ["QR",                                        liq.brutoQR],
+    ["Tarjeta",                                   liq.brutoTJ],
+    ["Ventas brutas",                             liq.bruto],
+    [`Desc. banco Tarjeta (${liq.cfg.pctTarjeta}%)`, -liq.descTJ],
+    ["Subtotal sin banco",                        liq.subBanco],
+    [`Comisión ventas (${liq.cfg.pctComision}%)`, -liq.comision],
+    ["Alquiler",                                  -liq.alquiler],
     ...liq.gastos.filter(g=>g.desc||Number(g.monto)>0).map(g=>
-      [`${g.desc||"Gasto extra"}`,"","","","","","",-(Number(g.monto)||0),"",""]
+      [g.desc||"Gasto extra", -(Number(g.monto)||0)]
     ),
-    ["Neto","","","","","","",+liq.neto.toFixed(2),"",""]);
-  const csv=rows.map(r=>r.map(c=>String(c).includes(",")?`"${c}"`:c).join(",")).join("\n");
-  const blob=new Blob(["\uFEFF"+csv],{type:"text/csv;charset=utf-8;"});
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement("a");
-  a.href=url;a.download=`TH_${marca.nombre.replace(/ /g,"_")}_${MESES[mes]}_${anio}.csv`;
-  a.click();URL.revokeObjectURL(url);
+  ];
+  const rDesgloseStart = rows.length;
+  desglose.forEach(([k,v])=>rows.push([k, ...Array(NC-2).fill(""), v]));
+  const rDesgloseEnd = rows.length-1;
+
+  rows.push([]);
+  const rNeto = rows.length;
+  rows.push(["NETO A LIQUIDAR", ...Array(NC-2).fill(""), liq.neto]);
+
+  // ── Hoja ─────────────────────────────────────────────────────────
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  ws["!cols"] = [
+    {wch:14},{wch:11},{wch:8},{wch:14},{wch:38},{wch:7},{wch:11},{wch:12},{wch:8},{wch:14},
+  ];
+  ws["!merges"] = [
+    {s:{r:0,c:0},e:{r:0,c:NC-1}},
+    {s:{r:1,c:0},e:{r:1,c:NC-1}},
+    {s:{r:2,c:0},e:{r:2,c:NC-1}},
+    {s:{r:rSeccionDesglose,c:0},e:{r:rSeccionDesglose,c:NC-1}},
+    ...Array.from({length:rDesgloseEnd-rDesgloseStart+1},(_,i)=>{
+      const r=rDesgloseStart+i;
+      return {s:{r,c:0},e:{r,c:NC-2}};
+    }),
+    {s:{r:rNeto,c:0},e:{r:rNeto,c:NC-2}},
+  ];
+
+  Srow(ws,0,NC,sTitulo);
+  Srow(ws,1,NC,sSubtit);
+  Srow(ws,2,NC,sMeta);
+  Srow(ws,3,NC,sBlank);
+  HEAD.forEach((_,c)=>S(ws,rTablaHdr,c,sHdr));
+  for(let r=rItemsStart;r<=rItemsEnd;r++){
+    const alt=(r-rItemsStart)%2===1;
+    HEAD.forEach((h,c)=>{
+      if(c===5||c===6||c===7||c===8) S(ws,r,c,sDataR(alt));
+      else if(c===0||c===1||c===2||c===3) S(ws,r,c,sDataC(alt));
+      else S(ws,r,c,sDataL(alt));
+    });
+  }
+  if(rItemsEnd<rItemsStart) Srow(ws,rItemsStart,NC,sBlank); // sin ventas: fila vacía estilizada
+  Srow(ws,rSeccionDesglose,NC,sSeccion);
+  for(let r=rDesgloseStart;r<=rDesgloseEnd;r++){
+    S(ws,r,0,sLabel);
+    S(ws,r,NC-1,sValor);
+  }
+  S(ws,rNeto,0,sNetoLabel);
+  S(ws,rNeto,NC-1,sNeto);
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Liquidación");
+  const buf  = XLSX.write(wb, {bookType:"xlsx", type:"array"});
+  const blob = new Blob([buf], {type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
+  descargarArchivo(blob, `TH_${marca.nombre.replace(/ /g,"_")}_${MESES[mes]}_${anio}.xlsx`);
 }
 
 function exportTodasCSV(ventas,mes,anio){
@@ -3328,8 +3509,8 @@ function LiqModal({marcaId,ventas,mes,anio,MK,cierres,setCierres,onClose,syncCie
           variant="fill" icon="📤">
           Compartir liquidación
         </IOSBtn>
-        <IOSBtn onPress={()=>exportCSV(marca,ventas,mes,anio)} variant="fill" icon="⬇">
-          Exportar CSV
+        <IOSBtn onPress={()=>exportExcelLiquidacion(marca,ventas,mes,anio)} variant="fill" icon="⬇">
+          Exportar Excel
         </IOSBtn>
         {!cerrado
           ? <IOSBtn onPress={()=>{setCierres(p=>({...p,[`${MK}-${marcaId}`]:{cerrado:true,fecha:hoy(),mk:MK}}));sbGuardarCierre(`${MK}-${marcaId}`,{cerrado:true,fecha:hoy(),mk:MK,marca_id:marcaId});onClose();}} variant="success" icon="✓">
@@ -9271,9 +9452,9 @@ function App(){
           onBack={()=>setMD(null)}
           right={
             <div style={{display:"flex",gap:12,alignItems:"center"}}>
-              <button onClick={()=>exportCSV(MARCAS.find(m=>m.id===marcaDetalle),ventas,mes,anio)}
+              <button onClick={()=>exportExcelLiquidacion(MARCAS.find(m=>m.id===marcaDetalle),ventas,mes,anio)}
                 style={{background:"none",border:"none",color:C.label3,fontSize:13,fontFamily:FONT,
-                  cursor:"pointer",padding:"4px 0",WebkitTapHighlightColor:"transparent"}}>CSV</button>
+                  cursor:"pointer",padding:"4px 0",WebkitTapHighlightColor:"transparent"}}>Excel</button>
               <button
                 disabled={generando}
                 onClick={()=>generarExcelMarca(MARCAS.find(m=>m.id===marcaDetalle),ventas,inv,setGenerando)}
@@ -11206,8 +11387,8 @@ function MarcaDetalle({marcaId,inv,ventas,vMes,mes,anio,MK,cierres,setCierres,ge
             <IOSBtn onPress={()=>generarImagenLiquidacion(marca,mes,anio,liq)} variant="fill" full icon="📷">
               Exportar Imagen
             </IOSBtn>
-            <IOSBtn onPress={()=>exportCSV(MARCAS.find(m=>m.id===marcaId),ventas,mes,anio)} variant="fill" full icon="⬇">
-              Exportar CSV
+            <IOSBtn onPress={()=>exportExcelLiquidacion(MARCAS.find(m=>m.id===marcaId),ventas,mes,anio)} variant="fill" full icon="⬇">
+              Exportar Excel
             </IOSBtn>
             {!cerrado
               ? <IOSBtn variant="success" full icon="✓"

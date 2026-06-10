@@ -23349,34 +23349,210 @@
     }
     setGenerando(false);
   }
-  function exportCSV(marca, ventas, mes, anio) {
+  async function exportExcelLiquidacion(marca, ventas, mes, anio) {
+    const XLSX = await loadXLSX();
     const MK = mkKey(mes, anio);
     const vm = ventas.filter((v) => v.mk === MK && !v.anulada && v.items.some((i) => i.marcaId === marca.id));
-    const rows = [["ID", "Fecha", "Hora", "C\xF3digo", "Producto", "Cant.", "Precio", "Subtotal", "Desc%", "Pago"]];
-    vm.forEach((v) => v.items.filter((i) => i.marcaId === marca.id).forEach((it) => {
-      rows.push([v.id, v.fecha, v.hora, it.codigo, it.nombre, it.cantidad, it.precioUnit, it.subtotal, v.descPct || 0, v.metodoPago]);
-    }));
     const liq = calcLiqMarca(vm, marca.id, MK);
-    rows.push(
+    const D = "1A1714";
+    const G = "9A7B4F";
+    const GL = "C4A57B";
+    const CR = "F5F0E8";
+    const CL = "FAF7F3";
+    const WH = "FFFFFF";
+    const AM = "FDF3DC";
+    const AB = "E8C97A";
+    const BD = "D4C5A9";
+    const MT = "8B7355";
+    const bAll = (c = BD) => ({
+      top: { style: "thin", color: { rgb: c } },
+      bottom: { style: "thin", color: { rgb: c } },
+      left: { style: "thin", color: { rgb: c } },
+      right: { style: "thin", color: { rgb: c } }
+    });
+    const NC = 10;
+    function S(ws2, r, c, st) {
+      const a = XLSX.utils.encode_cell({ r, c });
+      if (!ws2[a]) ws2[a] = { t: "z", v: "" };
+      ws2[a].s = st;
+    }
+    const Srow = (ws2, r, nc, st) => {
+      for (let c = 0; c < nc; c++) S(ws2, r, c, st);
+    };
+    const sTitulo = {
+      font: { name: "Arial", sz: 20, bold: true, color: { rgb: WH } },
+      fill: { patternType: "solid", fgColor: { rgb: D } },
+      alignment: { horizontal: "center", vertical: "center" },
+      border: bAll("2A2420")
+    };
+    const sSubtit = {
+      font: { name: "Arial", sz: 13, bold: true, color: { rgb: WH } },
+      fill: { patternType: "solid", fgColor: { rgb: G } },
+      alignment: { horizontal: "center", vertical: "center" },
+      border: bAll(GL)
+    };
+    const sMeta = {
+      font: { name: "Arial", sz: 9, color: { rgb: MT } },
+      fill: { patternType: "solid", fgColor: { rgb: CR } },
+      alignment: { horizontal: "center", vertical: "center" },
+      border: bAll(BD)
+    };
+    const sHdr = {
+      font: { name: "Arial", sz: 10, bold: true, color: { rgb: WH } },
+      fill: { patternType: "solid", fgColor: { rgb: D } },
+      alignment: { horizontal: "center", vertical: "center", wrapText: true },
+      border: bAll("2A2420")
+    };
+    const sDataL = (alt) => ({
+      font: { name: "Arial", sz: 10, color: { rgb: D } },
+      fill: { patternType: "solid", fgColor: { rgb: alt ? CL : WH } },
+      alignment: { horizontal: "left", vertical: "center", wrapText: true },
+      border: bAll(BD)
+    });
+    const sDataC = (alt) => ({
+      font: { name: "Arial", sz: 10, color: { rgb: D } },
+      fill: { patternType: "solid", fgColor: { rgb: alt ? CL : WH } },
+      alignment: { horizontal: "center", vertical: "center" },
+      border: bAll(BD)
+    });
+    const sDataR = (alt) => ({
+      font: { name: "Arial", sz: 10, color: { rgb: D } },
+      fill: { patternType: "solid", fgColor: { rgb: alt ? CL : WH } },
+      alignment: { horizontal: "right", vertical: "center" },
+      border: bAll(BD),
+      numFmt: "#,##0.00"
+    });
+    const sBlank = { fill: { patternType: "solid", fgColor: { rgb: WH } }, border: bAll(BD) };
+    const sSeccion = {
+      font: { name: "Arial", sz: 11, bold: true, color: { rgb: WH } },
+      fill: { patternType: "solid", fgColor: { rgb: G } },
+      alignment: { horizontal: "left", vertical: "center" },
+      border: bAll(GL)
+    };
+    const sLabel = {
+      font: { name: "Arial", sz: 10, color: { rgb: D } },
+      fill: { patternType: "solid", fgColor: { rgb: WH } },
+      alignment: { horizontal: "left", vertical: "center" },
+      border: bAll(BD)
+    };
+    const sValor = {
+      font: { name: "Arial", sz: 10, color: { rgb: D } },
+      fill: { patternType: "solid", fgColor: { rgb: WH } },
+      alignment: { horizontal: "right", vertical: "center" },
+      border: bAll(BD),
+      numFmt: "#,##0.00"
+    };
+    const sNeto = {
+      font: { name: "Arial", sz: 12, bold: true, color: { rgb: D } },
+      fill: { patternType: "solid", fgColor: { rgb: AM } },
+      alignment: { horizontal: "right", vertical: "center" },
+      border: {
+        top: { style: "medium", color: { rgb: AB } },
+        bottom: { style: "medium", color: { rgb: AB } },
+        left: { style: "thin", color: { rgb: AB } },
+        right: { style: "thin", color: { rgb: AB } }
+      },
+      numFmt: "#,##0.00"
+    };
+    const sNetoLabel = {
+      font: { name: "Arial", sz: 12, bold: true, color: { rgb: D } },
+      fill: { patternType: "solid", fgColor: { rgb: AM } },
+      alignment: { horizontal: "left", vertical: "center" },
+      border: {
+        top: { style: "medium", color: { rgb: AB } },
+        bottom: { style: "medium", color: { rgb: AB } },
+        left: { style: "thin", color: { rgb: AB } },
+        right: { style: "thin", color: { rgb: AB } }
+      }
+    };
+    const HEAD = ["ID", "Fecha", "Hora", "C\xF3digo", "Producto", "Cant.", "Precio", "Subtotal", "Desc %", "Pago"];
+    const itemRows = [];
+    vm.forEach((v) => v.items.filter((i) => i.marcaId === marca.id).forEach((it) => {
+      itemRows.push([v.id, v.fecha, v.hora, it.codigo, it.nombre, it.cantidad, it.precioUnit, it.subtotal, v.descPct || 0, labelPago(v.metodoPago)]);
+    }));
+    const rows = [
+      [`TOSCANA HOUSE \u2014 LIQUIDACI\xD3N`, ...Array(NC - 1).fill("")],
+      [`${marca.nombre} \xB7 ${MESES[mes]} ${anio}`, ...Array(NC - 1).fill("")],
+      [`Generado: ${(/* @__PURE__ */ new Date()).toLocaleString("es-BO")}`, ...Array(NC - 1).fill("")],
       [],
-      ["Ventas brutas", "", "", "", "", "", "", +liq.bruto.toFixed(2), "", ""],
-      [`Desc. Tarjeta (${liq.cfg.pctTarjeta}%)`, "", "", "", "", "", "", -liq.descTJ.toFixed(2), "", ""],
-      ["Subtotal banco", "", "", "", "", "", "", +liq.subBanco.toFixed(2), "", ""],
-      [`Comisi\xF3n (${liq.cfg.pctComision}%)`, "", "", "", "", "", "", -liq.comision.toFixed(2), "", ""],
-      ["Alquiler", "", "", "", "", "", "", -liq.alquiler.toFixed(2), "", ""],
+      HEAD,
+      ...itemRows,
+      []
+    ];
+    const rTablaHdr = 4;
+    const rItemsStart = 5;
+    const rItemsEnd = rItemsStart + itemRows.length - 1;
+    const rSeccionDesglose = rows.length;
+    rows.push(["DESGLOSE DE LIQUIDACI\xD3N", ...Array(NC - 1).fill("")]);
+    const desglose = [
+      ["Efectivo", liq.brutoEf],
+      ["QR", liq.brutoQR],
+      ["Tarjeta", liq.brutoTJ],
+      ["Ventas brutas", liq.bruto],
+      [`Desc. banco Tarjeta (${liq.cfg.pctTarjeta}%)`, -liq.descTJ],
+      ["Subtotal sin banco", liq.subBanco],
+      [`Comisi\xF3n ventas (${liq.cfg.pctComision}%)`, -liq.comision],
+      ["Alquiler", -liq.alquiler],
       ...liq.gastos.filter((g) => g.desc || Number(g.monto) > 0).map(
-        (g) => [`${g.desc || "Gasto extra"}`, "", "", "", "", "", "", -(Number(g.monto) || 0), "", ""]
-      ),
-      ["Neto", "", "", "", "", "", "", +liq.neto.toFixed(2), "", ""]
-    );
-    const csv = rows.map((r) => r.map((c) => String(c).includes(",") ? `"${c}"` : c).join(",")).join("\n");
-    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `TH_${marca.nombre.replace(/ /g, "_")}_${MESES[mes]}_${anio}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+        (g) => [g.desc || "Gasto extra", -(Number(g.monto) || 0)]
+      )
+    ];
+    const rDesgloseStart = rows.length;
+    desglose.forEach(([k, v]) => rows.push([k, ...Array(NC - 2).fill(""), v]));
+    const rDesgloseEnd = rows.length - 1;
+    rows.push([]);
+    const rNeto = rows.length;
+    rows.push(["NETO A LIQUIDAR", ...Array(NC - 2).fill(""), liq.neto]);
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    ws["!cols"] = [
+      { wch: 14 },
+      { wch: 11 },
+      { wch: 8 },
+      { wch: 14 },
+      { wch: 38 },
+      { wch: 7 },
+      { wch: 11 },
+      { wch: 12 },
+      { wch: 8 },
+      { wch: 14 }
+    ];
+    ws["!merges"] = [
+      { s: { r: 0, c: 0 }, e: { r: 0, c: NC - 1 } },
+      { s: { r: 1, c: 0 }, e: { r: 1, c: NC - 1 } },
+      { s: { r: 2, c: 0 }, e: { r: 2, c: NC - 1 } },
+      { s: { r: rSeccionDesglose, c: 0 }, e: { r: rSeccionDesglose, c: NC - 1 } },
+      ...Array.from({ length: rDesgloseEnd - rDesgloseStart + 1 }, (_, i) => {
+        const r = rDesgloseStart + i;
+        return { s: { r, c: 0 }, e: { r, c: NC - 2 } };
+      }),
+      { s: { r: rNeto, c: 0 }, e: { r: rNeto, c: NC - 2 } }
+    ];
+    Srow(ws, 0, NC, sTitulo);
+    Srow(ws, 1, NC, sSubtit);
+    Srow(ws, 2, NC, sMeta);
+    Srow(ws, 3, NC, sBlank);
+    HEAD.forEach((_, c) => S(ws, rTablaHdr, c, sHdr));
+    for (let r = rItemsStart; r <= rItemsEnd; r++) {
+      const alt = (r - rItemsStart) % 2 === 1;
+      HEAD.forEach((h, c) => {
+        if (c === 5 || c === 6 || c === 7 || c === 8) S(ws, r, c, sDataR(alt));
+        else if (c === 0 || c === 1 || c === 2 || c === 3) S(ws, r, c, sDataC(alt));
+        else S(ws, r, c, sDataL(alt));
+      });
+    }
+    if (rItemsEnd < rItemsStart) Srow(ws, rItemsStart, NC, sBlank);
+    Srow(ws, rSeccionDesglose, NC, sSeccion);
+    for (let r = rDesgloseStart; r <= rDesgloseEnd; r++) {
+      S(ws, r, 0, sLabel);
+      S(ws, r, NC - 1, sValor);
+    }
+    S(ws, rNeto, 0, sNetoLabel);
+    S(ws, rNeto, NC - 1, sNeto);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Liquidaci\xF3n");
+    const buf = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+    const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+    descargarArchivo(blob, `TH_${marca.nombre.replace(/ /g, "_")}_${MESES[mes]}_${anio}.xlsx`);
   }
   function sendWA(venta) {
     const lines = venta.items.map((it) => {
@@ -24982,7 +25158,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
         icon: "\u{1F4E4}"
       },
       "Compartir liquidaci\xF3n"
-    ), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => exportCSV(marca, ventas, mes, anio), variant: "fill", icon: "\u2B07" }, "Exportar CSV"), !cerrado ? /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => {
+    ), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => exportExcelLiquidacion(marca, ventas, mes, anio), variant: "fill", icon: "\u2B07" }, "Exportar Excel"), !cerrado ? /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => {
       setCierres((p) => ({ ...p, [`${MK}-${marcaId}`]: { cerrado: true, fecha: hoy(), mk: MK } }));
       sbGuardarCierre(`${MK}-${marcaId}`, { cerrado: true, fecha: hoy(), mk: MK, marca_id: marcaId });
       onClose();
@@ -31297,7 +31473,7 @@ Fecha: ${venta.fecha}`);
         right: /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 12, alignItems: "center" } }, /* @__PURE__ */ import_react.default.createElement(
           "button",
           {
-            onClick: () => exportCSV(MARCAS.find((m) => m.id === marcaDetalle), ventas, mes, anio),
+            onClick: () => exportExcelLiquidacion(MARCAS.find((m) => m.id === marcaDetalle), ventas, mes, anio),
             style: {
               background: "none",
               border: "none",
@@ -31309,7 +31485,7 @@ Fecha: ${venta.fecha}`);
               WebkitTapHighlightColor: "transparent"
             }
           },
-          "CSV"
+          "Excel"
         ), /* @__PURE__ */ import_react.default.createElement(
           "button",
           {
@@ -33438,7 +33614,7 @@ Fecha: ${venta.fecha}`);
       neto: liq.neto,
       vMarca: liq.vMarca,
       marcaId
-    }, setImgPreview), variant: "fill", full: true, icon: "\u{1F4E4}" }, "Compartir"), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => imprimirLiquidacion(marca, mes, anio, liq), variant: "fill", full: true, icon: "\u{1F5A8}" }, "Imprimir")), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => generarImagenLiquidacion(marca, mes, anio, liq), variant: "fill", full: true, icon: "\u{1F4F7}" }, "Exportar Imagen"), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => exportCSV(MARCAS.find((m) => m.id === marcaId), ventas, mes, anio), variant: "fill", full: true, icon: "\u2B07" }, "Exportar CSV"), !cerrado ? /* @__PURE__ */ import_react.default.createElement(
+    }, setImgPreview), variant: "fill", full: true, icon: "\u{1F4E4}" }, "Compartir"), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => imprimirLiquidacion(marca, mes, anio, liq), variant: "fill", full: true, icon: "\u{1F5A8}" }, "Imprimir")), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => generarImagenLiquidacion(marca, mes, anio, liq), variant: "fill", full: true, icon: "\u{1F4F7}" }, "Exportar Imagen"), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => exportExcelLiquidacion(MARCAS.find((m) => m.id === marcaId), ventas, mes, anio), variant: "fill", full: true, icon: "\u2B07" }, "Exportar Excel"), !cerrado ? /* @__PURE__ */ import_react.default.createElement(
       IOSBtn,
       {
         variant: "success",
