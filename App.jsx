@@ -2982,12 +2982,12 @@ function NavBar({title, subtitle, back, onBack, right}){
 function DesktopSidebar({tabs, active, onChange, user, logout, groups: customGroups, dotColors: customDot}){
   const GROUPS = customGroups || [
     {label:"Principal", ids:["inicio","pos","ventas"]},
-    {label:"Gestión",   ids:["inventario","marcas","liquidaciones","giftcards"]},
+    {label:"Gestión",   ids:["inventario","auditoria","marcas","liquidaciones","giftcards"]},
     {label:"Sistema",   ids:["config"]},
   ];
   const DOT = customDot || {
     inicio:"#8A6418",pos:"#1A1714",ventas:"#1E3A5F",
-    inventario:"#166534",marcas:"#5B2D8E",liquidaciones:"#991B1B",
+    inventario:"#166534",auditoria:"#7A1F1F",marcas:"#5B2D8E",liquidaciones:"#991B1B",
     giftcards:"#92400E",config:C.label3,
   };
   return (

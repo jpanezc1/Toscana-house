@@ -24525,7 +24525,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
   function DesktopSidebar({ tabs, active, onChange, user, logout, groups: customGroups, dotColors: customDot }) {
     const GROUPS = customGroups || [
       { label: "Principal", ids: ["inicio", "pos", "ventas"] },
-      { label: "Gesti\xF3n", ids: ["inventario", "marcas", "liquidaciones", "giftcards"] },
+      { label: "Gesti\xF3n", ids: ["inventario", "auditoria", "marcas", "liquidaciones", "giftcards"] },
       { label: "Sistema", ids: ["config"] }
     ];
     const DOT = customDot || {
@@ -24533,6 +24533,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       pos: "#1A1714",
       ventas: "#1E3A5F",
       inventario: "#166534",
+      auditoria: "#7A1F1F",
       marcas: "#5B2D8E",
       liquidaciones: "#991B1B",
       giftcards: "#92400E",
