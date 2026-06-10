@@ -1345,6 +1345,15 @@ function guardarCfgLiq(marcaId, cfg) {
   const key = `th_liq_cfg_${marcaId}`;
   try { localStorage.setItem(key, JSON.stringify(cfg)); } catch {}
 }
+function leerGastosLiq(marcaId, MK) {
+  const key = `th_liq_gastos_${marcaId}_${MK}`;
+  try { return JSON.parse(localStorage.getItem(key) || "[]"); }
+  catch { return []; }
+}
+function guardarGastosLiq(marcaId, MK, gastos) {
+  const key = `th_liq_gastos_${marcaId}_${MK}`;
+  try { localStorage.setItem(key, JSON.stringify(gastos)); } catch {}
+}
 function parseMixtoXls(metodoPago, total) {
   if (metodoPago?.startsWith("mixto|")) {
     const obj = { efectivo: 0, qr: 0, tarjeta: 0, giftcard: 0 };
@@ -2836,6 +2845,23 @@ function LiqModal({marcaId,ventas,mes,anio,MK,cierres,setCierres,onClose,syncCie
     if(typeof onCfgChange==="function") onCfgChange();
   }
 
+  // ── Gastos extra del período ──────────────────────────────
+  const [gastos, setGastos] = useState(()=>leerGastosLiq(marcaId, MK));
+  function updateGastos(next){
+    setGastos(next);
+    guardarGastosLiq(marcaId, MK, next);
+  }
+  function addGasto(){
+    updateGastos([...gastos, {id:Date.now(), desc:"", monto:""}]);
+  }
+  function removeGasto(id){
+    updateGastos(gastos.filter(g=>g.id!==id));
+  }
+  function changeGasto(id, field, val){
+    updateGastos(gastos.map(g=>g.id===id?{...g,[field]:val}:g));
+  }
+  const totalGastos = gastos.reduce((s,g)=>s+(Number(g.monto)||0),0);
+
   const vMes=ventas.filter(v=>v.mk===MK&&!v.anulada);
   const vMarca=vMes.filter(v=>v.items.some(i=>i.marcaId===marcaId));
   const cerrado=cierres[`${MK}-${marcaId}`]?.cerrado;
@@ -2868,7 +2894,7 @@ function LiqModal({marcaId,ventas,mes,anio,MK,cierres,setCierres,onClose,syncCie
   const descTarjeta = brutoTarjeta * pctTarjeta/100;
   const subtotalBanco = bruto - descTarjeta;
   const comision = subtotalBanco * pctComision/100;
-  const neto = subtotalBanco - comision - alquiler;
+  const neto = subtotalBanco - comision - alquiler - totalGastos;
 
   return (
     <Sheet open={!!marcaId} onClose={onClose} title={`${marca?.emoji} ${marca?.nombre} — ${MESES[mes]}`} tall>
@@ -2909,6 +2935,39 @@ function LiqModal({marcaId,ventas,mes,anio,MK,cierres,setCierres,onClose,syncCie
         )}
       </div>
 
+      {/* Gastos extra */}
+      <div style={{marginBottom:16}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",
+          marginBottom:8,paddingLeft:4}}>
+          <span style={{fontSize:13,fontWeight:600,color:C.label3,fontFamily:FONT,
+            textTransform:"uppercase",letterSpacing:.8}}>Gastos extra</span>
+          <button onClick={addGasto} style={{
+            width:28,height:28,borderRadius:8,border:`1px solid ${C.sep}`,background:C.bg2,
+            cursor:"pointer",fontSize:16,fontWeight:700,color:C.label2,lineHeight:1,
+            display:"flex",alignItems:"center",justifyContent:"center",
+            WebkitTapHighlightColor:"transparent"}}>+</button>
+        </div>
+        {gastos.map(g=>(
+          <div key={g.id} style={{display:"flex",gap:8,marginBottom:8,alignItems:"center"}}>
+            <input type="text" placeholder="Descripción del gasto" value={g.desc}
+              onChange={e=>changeGasto(g.id,"desc",e.target.value)}
+              style={{flex:1,padding:"9px 10px",borderRadius:8,border:`1px solid ${C.sep}`,
+                background:C.bg1,fontSize:13,color:C.label,fontFamily:FONT,
+                outline:"none",boxSizing:"border-box"}}/>
+            <input type="number" min="0" step="0.01" placeholder="Bs" value={g.monto}
+              onChange={e=>changeGasto(g.id,"monto",e.target.value)}
+              style={{width:90,padding:"9px 10px",borderRadius:8,border:`1px solid ${C.sep}`,
+                background:C.bg1,fontSize:13,color:C.label,fontFamily:FONT,
+                outline:"none",boxSizing:"border-box",textAlign:"right"}}/>
+            <button onClick={()=>removeGasto(g.id)} style={{
+              width:28,height:28,borderRadius:8,border:"none",background:"transparent",
+              cursor:"pointer",fontSize:18,color:C.red,flexShrink:0,lineHeight:1,
+              display:"flex",alignItems:"center",justifyContent:"center",
+              WebkitTapHighlightColor:"transparent"}}>×</button>
+          </div>
+        ))}
+      </div>
+
       {/* Desglose financiero */}
       <div style={{background:C.bg2,borderRadius:16,overflow:"hidden",marginBottom:16}}>
         {/* Ventas por método */}
@@ -2937,6 +2996,7 @@ function LiqModal({marcaId,ventas,mes,anio,MK,cierres,setCierres,onClose,syncCie
           [`= Subtotal sin banco`,$(Math.round(subtotalBanco)),C.label2],
           [`− Comisión ventas (${pctComision}%)`,`-${$(Math.round(comision))}`,C.red],
           alquiler>0?[`− Alquiler`,`-${$(alquiler)}`,C.amber]:null,
+          totalGastos>0?[`− Gastos extra`,`-${$(Math.round(totalGastos))}`,C.red]:null,
         ].filter(Boolean).map(([k,v,c],i,arr)=>(
           <div key={k} style={{display:"flex",justifyContent:"space-between",alignItems:"center",
             padding:"9px 16px",borderBottom:i<arr.length-1?`1px solid ${C.sep}`:""}}>
