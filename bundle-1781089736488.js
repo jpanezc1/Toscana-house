@@ -22483,7 +22483,7 @@
   var PAGOS = [
     { id: "efectivo", label: "Efectivo", icon: "\u{1F4B5}", desc: 0, color: "#4A9B6F" },
     { id: "qr", label: "QR", icon: "\u{1F4F1}", desc: 0, color: "#5B8DB8" },
-    { id: "tarjeta", label: "Tarjeta", icon: "\u{1F4B3}", desc: 2.5, color: "#C8922A" }
+    { id: "tarjeta", label: "Tarjeta", icon: "\u{1F4B3}", desc: 1.8, color: "#C8922A" }
   ];
   function labelPago(mp) {
     if (!mp) return "\u2014";
@@ -22865,7 +22865,7 @@
     const key = `th_liq_cfg_${marcaId}`;
     const alqD = ALQUILERES[Number(marcaId)] || {};
     const def = {
-      pctTarjeta: 2.5,
+      pctTarjeta: 1.8,
       pctComision: Number(alqD.comision) || 0,
       alquiler: Number(alqD.alquiler) || 0
     };
@@ -22879,6 +22879,21 @@
     const key = `th_liq_cfg_${marcaId}`;
     try {
       localStorage.setItem(key, JSON.stringify(cfg));
+    } catch {
+    }
+  }
+  function leerGastosLiq(marcaId, MK) {
+    const key = `th_liq_gastos_${marcaId}_${MK}`;
+    try {
+      return JSON.parse(localStorage.getItem(key) || "[]");
+    } catch {
+      return [];
+    }
+  }
+  function guardarGastosLiq(marcaId, MK, gastos) {
+    const key = `th_liq_gastos_${marcaId}_${MK}`;
+    try {
+      localStorage.setItem(key, JSON.stringify(gastos));
     } catch {
     }
   }
@@ -22898,7 +22913,7 @@
     if (metodoPago === "giftcard") return { efectivo: total, qr: 0, tarjeta: 0 };
     return { efectivo: total, qr: 0, tarjeta: 0 };
   }
-  function calcLiqMarca(vMarca, marcaId) {
+  function calcLiqMarca(vMarca, marcaId, MK) {
     const cfg = leerCfgLiq(marcaId);
     let brutoEf = 0, brutoQR = 0, brutoTJ = 0;
     vMarca.forEach((v) => {
@@ -22915,8 +22930,10 @@
     const subBanco = bruto - descTJ;
     const comision = subBanco * (Number(cfg.pctComision) || 0) / 100;
     const alquiler = Number(cfg.alquiler) || 0;
-    const neto = subBanco - comision - alquiler;
-    return { bruto, brutoEf, brutoQR, brutoTJ, descTJ, subBanco, comision, alquiler, neto, cfg };
+    const gastos = MK ? leerGastosLiq(marcaId, MK) : [];
+    const totalGastos = gastos.reduce((s, g) => s + (Number(g.monto) || 0), 0);
+    const neto = subBanco - comision - alquiler - totalGastos;
+    return { bruto, brutoEf, brutoQR, brutoTJ, descTJ, subBanco, comision, alquiler, gastos, totalGastos, neto, cfg };
   }
   var CUCU_CFG_KEY = "th_cucu_cfg";
   var CUCU_DEF = {
@@ -23043,7 +23060,7 @@
       MARCAS.forEach((m) => {
         const vM = ventasMes.filter((v) => v.items.some((i) => i.marcaId === m.id));
         const uds = vM.reduce((s, v) => s + v.items.filter((i) => i.marcaId === m.id).reduce((ss, i) => ss + i.cantidad, 0), 0);
-        const liq = calcLiqMarca(vM, m.id);
+        const liq = calcLiqMarca(vM, m.id, MK);
         totalBruto += liq.bruto;
         totalNeto += liq.neto;
         totalVentas += vM.length;
@@ -23097,7 +23114,7 @@
             });
           });
         }
-        const liqM = calcLiqMarca(vMarca, m.id);
+        const liqM = calcLiqMarca(vMarca, m.id, MK);
         rows.push(
           [],
           ["", "", "", "", "", "", "", "VENTAS BRUTAS", +liqM.bruto.toFixed(2), "", "", ""],
@@ -23105,6 +23122,9 @@
           ["", "", "", "", "", "", "", "SUBTOTAL BANCO", +liqM.subBanco.toFixed(2), "", "", ""],
           ["", "", "", "", "", "", "", `\u2212 Comisi\xF3n (${liqM.cfg.pctComision}%)`, -liqM.comision.toFixed(2), "", "", ""],
           ["", "", "", "", "", "", "", "\u2212 Alquiler", -liqM.alquiler.toFixed(2), "", "", ""],
+          ...liqM.gastos.filter((g) => g.desc || Number(g.monto) > 0).map(
+            (g) => ["", "", "", "", "", "", "", `\u2212 ${g.desc || "Gasto extra"}`, -(Number(g.monto) || 0), "", "", ""]
+          ),
           ["", "", "", "", "", "", "", "NETO A PAGAR", +liqM.neto.toFixed(2), "", "", ""]
         );
         const ws = XLSX.utils.aoa_to_sheet(rows);
@@ -23237,7 +23257,7 @@
               rows.push([v.id, v.fecha, v.hora, it.codigo, it.nombre, it.categoria || "", it.cantidad, it.precioUnit, it.subtotal, v.descPct || 0, v.metodoPago, v.vendedor || "Tienda"]);
             });
           });
-          const liqP = calcLiqMarca(p.ventas, marca.id);
+          const liqP = calcLiqMarca(p.ventas, marca.id, p.mk);
           rows.push(
             [],
             ["", "", "", "", "", "", "", "Ventas brutas", +liqP.bruto.toFixed(2), "", "", ""],
@@ -23245,6 +23265,9 @@
             ["", "", "", "", "", "", "", "Subtotal banco", +liqP.subBanco.toFixed(2), "", "", ""],
             ["", "", "", "", "", "", "", `\u2212 Comisi\xF3n (${liqP.cfg.pctComision}%)`, -liqP.comision.toFixed(2), "", "", ""],
             ["", "", "", "", "", "", "", "\u2212 Alquiler", -liqP.alquiler.toFixed(2), "", "", ""],
+            ...liqP.gastos.filter((g) => g.desc || Number(g.monto) > 0).map(
+              (g) => ["", "", "", "", "", "", "", `\u2212 ${g.desc || "Gasto extra"}`, -(Number(g.monto) || 0), "", "", ""]
+            ),
             ["", "", "", "", "", "", "", "Neto", +liqP.neto.toFixed(2), "", "", ""]
           );
           const ws = XLSX.utils.aoa_to_sheet(rows);
@@ -23333,7 +23356,7 @@
     vm.forEach((v) => v.items.filter((i) => i.marcaId === marca.id).forEach((it) => {
       rows.push([v.id, v.fecha, v.hora, it.codigo, it.nombre, it.cantidad, it.precioUnit, it.subtotal, v.descPct || 0, v.metodoPago]);
     }));
-    const liq = calcLiqMarca(vm, marca.id);
+    const liq = calcLiqMarca(vm, marca.id, MK);
     rows.push(
       [],
       ["Ventas brutas", "", "", "", "", "", "", +liq.bruto.toFixed(2), "", ""],
@@ -23341,6 +23364,9 @@
       ["Subtotal banco", "", "", "", "", "", "", +liq.subBanco.toFixed(2), "", ""],
       [`Comisi\xF3n (${liq.cfg.pctComision}%)`, "", "", "", "", "", "", -liq.comision.toFixed(2), "", ""],
       ["Alquiler", "", "", "", "", "", "", -liq.alquiler.toFixed(2), "", ""],
+      ...liq.gastos.filter((g) => g.desc || Number(g.monto) > 0).map(
+        (g) => [`${g.desc || "Gasto extra"}`, "", "", "", "", "", "", -(Number(g.monto) || 0), "", ""]
+      ),
       ["Neto", "", "", "", "", "", "", +liq.neto.toFixed(2), "", ""]
     );
     const csv = rows.map((r) => r.map((c) => String(c).includes(",") ? `"${c}"` : c).join(",")).join("\n");
@@ -23386,6 +23412,127 @@
     if (fac.pdf) lines.push(``, `\u{1F4C4} Ver factura: ${fac.pdf}`);
     lines.push(``, `\u{1F4C5} ${(/* @__PURE__ */ new Date()).toLocaleDateString("es-BO")} \xB7 Toscana House`);
     window.open(`${waBase}?text=${encodeURIComponent(lines.join("\n"))}`, "_blank");
+  }
+  function sendLiqWA(marca, mes, anio, datos) {
+    const {
+      bruto,
+      brutoEfect,
+      brutoQR,
+      brutoTarjeta,
+      pctTarjeta,
+      descTarjeta,
+      subtotalBanco,
+      pctComision,
+      comision,
+      alquiler,
+      gastos,
+      totalGastos,
+      neto
+    } = datos;
+    const lines = [
+      `\u{1F3E1} *TOSCANA HOUSE \u2014 LIQUIDACI\xD3N*`,
+      `\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501`,
+      `${marca?.emoji || ""} *${marca?.nombre || ""}* \xB7 ${MESES[mes]} ${anio}`,
+      ``,
+      `\u{1F4B5} Efectivo: ${$(Math.round(brutoEfect))}`,
+      `\u{1F4F1} QR: ${$(Math.round(brutoQR))}`,
+      `\u{1F4B3} Tarjeta: ${$(Math.round(brutoTarjeta))}`,
+      `*Ventas brutas: ${$(Math.round(bruto))}*`,
+      ``,
+      `\u2212 Desc. banco Tarjeta (${pctTarjeta}%): -${$(Math.round(descTarjeta))}`,
+      `= Subtotal sin banco: ${$(Math.round(subtotalBanco))}`,
+      `\u2212 Comisi\xF3n ventas (${pctComision}%): -${$(Math.round(comision))}`
+    ];
+    if (alquiler > 0) lines.push(`\u2212 Alquiler: -${$(alquiler)}`);
+    if (totalGastos > 0) {
+      lines.push(`\u2212 Gastos extra: -${$(Math.round(totalGastos))}`);
+      gastos.filter((g) => g.desc || Number(g.monto) > 0).forEach((g) => {
+        lines.push(`   \xB7 ${g.desc || "Gasto extra"}: -${$(Number(g.monto) || 0)}`);
+      });
+    }
+    lines.push(
+      ``,
+      `\u{1F4B0} *TOTAL NETO: ${$(Math.round(neto))}*`,
+      ``,
+      `\u{1F4C5} ${(/* @__PURE__ */ new Date()).toLocaleDateString("es-BO")} \xB7 Toscana House`
+    );
+    window.open(`https://wa.me/?text=${encodeURIComponent(lines.join("\n"))}`, "_blank");
+  }
+  function compartirLiquidacionWA(marca, mes, anio, liq) {
+    sendLiqWA(marca, mes, anio, {
+      bruto: liq.bruto,
+      brutoEfect: liq.brutoEf,
+      brutoQR: liq.brutoQR,
+      brutoTarjeta: liq.brutoTJ,
+      pctTarjeta: liq.cfg?.pctTarjeta ?? 0,
+      descTarjeta: liq.descTJ,
+      subtotalBanco: liq.subBanco,
+      pctComision: liq.cfg?.pctComision ?? 0,
+      comision: liq.comision,
+      alquiler: liq.alquiler,
+      gastos: liq.gastos,
+      totalGastos: liq.totalGastos,
+      neto: liq.neto
+    });
+  }
+  function imprimirLiquidacion(marca, mes, anio, liq) {
+    const win = window.open("", "_blank", "width=800,height=900");
+    const filas = [
+      ["Ventas brutas", $(liq.bruto), false],
+      liq.descTJ > 0 ? [`\u2212 Desc. banco Tarjeta (${liq.cfg?.pctTarjeta ?? 0}%)`, `-${$(liq.descTJ)}`, false] : null,
+      liq.descTJ > 0 ? ["= Subtotal sin banco", $(liq.subBanco), false] : null,
+      liq.cfg?.pctComision > 0 ? [`\u2212 Comisi\xF3n ventas (${liq.cfg?.pctComision ?? 0}%)`, `-${$(liq.comision)}`, false] : null,
+      liq.alquiler > 0 ? ["\u2212 Alquiler", `-${$(liq.alquiler)}`, false] : null,
+      ...liq.gastos.filter((g) => g.desc || Number(g.monto) > 0).map(
+        (g) => [`\u2212 ${g.desc || "Gasto extra"}`, `-${$(Math.round(Number(g.monto) || 0))}`, false]
+      ),
+      ["Neto a liquidar", $(liq.neto), true]
+    ].filter(Boolean);
+    const filasHtml = filas.map(([k, v, bold]) => `
+    <tr style="${bold ? "font-weight:700;background:#f5f0e6" : ""}">
+      <td style="padding:9px 14px;border-bottom:1px solid #eee">${k}</td>
+      <td style="padding:9px 14px;border-bottom:1px solid #eee;text-align:right">${v}</td>
+    </tr>`).join("");
+    win.document.write(`<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Liquidaci\xF3n ${marca?.nombre} \u2014 ${MESES[mes]} ${anio}</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 24px; color: #222; }
+    h1 { font-size: 20px; margin: 0 0 4px; }
+    .sub { color: #666; font-size: 13px; margin-bottom: 20px; }
+    table { width: 100%; border-collapse: collapse; max-width: 480px; }
+    .total-row td { border-top: 2px solid #1a3a2a; }
+    .footer { margin-top: 24px; font-size: 11px; color: #888; }
+    @media print { button { display:none; } }
+  </style>
+</head>
+<body>
+  <div style="display:flex;align-items:center;gap:16px;margin-bottom:16px">
+    <img src="${LOGO_B64}" style="height:60px"/>
+    <div>
+      <h1>${marca?.emoji || ""} Liquidaci\xF3n \u2014 ${marca?.nombre || ""}</h1>
+      <div class="sub">${MESES[mes]} ${anio} \xB7 Toscana House</div>
+    </div>
+  </div>
+  <table>
+    <tbody>
+      ${filasHtml}
+      <tr class="total-row">
+        <td style="padding:12px 14px;font-weight:700;font-size:15px">TOTAL A PAGAR</td>
+        <td style="padding:12px 14px;text-align:right;font-weight:700;font-size:15px">${$(liq.neto)}</td>
+      </tr>
+    </tbody>
+  </table>
+  <div class="footer">
+    ${PROPIETARIA} \xB7 NIT ${NIT_EMPRESA}<br/>
+    Generado: ${(/* @__PURE__ */ new Date()).toLocaleString("es-BO")}
+  </div>
+  <script>window.onload = function() { window.print(); }<\/script>
+</body>
+</html>`);
+    win.document.close();
   }
   function numeroALetras(monto) {
     const entero = Math.floor(monto), cts = Math.round((monto - entero) * 100);
@@ -24045,6 +24192,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
     var anim = _hN107[0];
     var setAnim = _hN107[1];
     ;
+    const isDesktop = useIsDesktop();
     (0, import_react.useEffect)(() => {
       if (open) {
         setVisible(true);
@@ -24062,13 +24210,16 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       background: anim ? "rgba(0,0,0,.55)" : "rgba(0,0,0,0)",
       transition: "background .32s",
       display: "flex",
-      alignItems: "flex-end"
+      alignItems: isDesktop ? "center" : "flex-end",
+      justifyContent: isDesktop ? "center" : "stretch"
     }, onClick: (e) => e.target === e.currentTarget && onClose() }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
       background: "rgba(255,255,255,0.97)",
       backdropFilter: "blur(32px) saturate(180%)",
       WebkitBackdropFilter: "blur(32px) saturate(180%)",
-      borderRadius: "28px 28px 0 0",
+      borderRadius: isDesktop ? 28 : "28px 28px 0 0",
       width: "100%",
+      maxWidth: isDesktop ? 520 : "100%",
+      margin: isDesktop ? "auto" : "0",
       maxHeight: tall ? "90vh" : "80vh",
       overflowY: "auto",
       transform: anim ? "translateY(0)" : "translateY(100%)",
@@ -24435,6 +24586,21 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       guardarCfgLiq(marcaId, newCfg);
       if (typeof onCfgChange === "function") onCfgChange();
     }
+    const [gastos, setGastos] = (0, import_react.useState)(() => leerGastosLiq(marcaId, MK));
+    function updateGastos(next) {
+      setGastos(next);
+      guardarGastosLiq(marcaId, MK, next);
+    }
+    function addGasto() {
+      updateGastos([...gastos, { id: Date.now(), desc: "", monto: "" }]);
+    }
+    function removeGasto(id) {
+      updateGastos(gastos.filter((g) => g.id !== id));
+    }
+    function changeGasto(id, field, val) {
+      updateGastos(gastos.map((g) => g.id === id ? { ...g, [field]: val } : g));
+    }
+    const totalGastos = gastos.reduce((s, g) => s + (Number(g.monto) || 0), 0);
     const vMes = ventas.filter((v) => v.mk === MK && !v.anulada);
     const vMarca = vMes.filter((v) => v.items.some((i) => i.marcaId === marcaId));
     const cerrado = cierres[`${MK}-${marcaId}`]?.cerrado;
@@ -24467,7 +24633,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
     const descTarjeta = brutoTarjeta * pctTarjeta / 100;
     const subtotalBanco = bruto - descTarjeta;
     const comision = subtotalBanco * pctComision / 100;
-    const neto = subtotalBanco - comision - alquiler;
+    const neto = subtotalBanco - comision - alquiler - totalGastos;
     return /* @__PURE__ */ import_react.default.createElement(Sheet, { open: !!marcaId, onClose, title: `${marca?.emoji} ${marca?.nombre} \u2014 ${MESES[mes]}`, tall: true }, /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 16 } }, /* @__PURE__ */ import_react.default.createElement("button", { onClick: () => setShowCfg((s) => !s), style: {
       width: "100%",
       background: C.bg2,
@@ -24512,7 +24678,93 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
           outline: "none"
         }
       }
-    )))))), /* @__PURE__ */ import_react.default.createElement("div", { style: { background: C.bg2, borderRadius: 16, overflow: "hidden", marginBottom: 16 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { padding: "12px 16px", borderBottom: `1px solid ${C.sep}` } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+    )))))), /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 16 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 8,
+      paddingLeft: 4
+    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: {
+      fontSize: 13,
+      fontWeight: 600,
+      color: C.label3,
+      fontFamily: FONT,
+      textTransform: "uppercase",
+      letterSpacing: 0.8
+    } }, "Gastos extra"), /* @__PURE__ */ import_react.default.createElement("button", { onClick: addGasto, style: {
+      width: 28,
+      height: 28,
+      borderRadius: 8,
+      border: `1px solid ${C.sep}`,
+      background: C.bg2,
+      cursor: "pointer",
+      fontSize: 16,
+      fontWeight: 700,
+      color: C.label2,
+      lineHeight: 1,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      WebkitTapHighlightColor: "transparent"
+    } }, "+")), gastos.map((g) => /* @__PURE__ */ import_react.default.createElement("div", { key: g.id, style: { display: "flex", gap: 8, marginBottom: 8, alignItems: "center" } }, /* @__PURE__ */ import_react.default.createElement(
+      "input",
+      {
+        type: "text",
+        placeholder: "Descripci\xF3n del gasto",
+        value: g.desc,
+        onChange: (e) => changeGasto(g.id, "desc", e.target.value),
+        style: {
+          flex: 1,
+          padding: "9px 10px",
+          borderRadius: 8,
+          border: `1px solid ${C.sep}`,
+          background: C.bg1,
+          fontSize: 13,
+          color: C.label,
+          fontFamily: FONT,
+          outline: "none",
+          boxSizing: "border-box"
+        }
+      }
+    ), /* @__PURE__ */ import_react.default.createElement(
+      "input",
+      {
+        type: "number",
+        min: "0",
+        step: "0.01",
+        placeholder: "Bs",
+        value: g.monto,
+        onChange: (e) => changeGasto(g.id, "monto", e.target.value),
+        style: {
+          width: 90,
+          padding: "9px 10px",
+          borderRadius: 8,
+          border: `1px solid ${C.sep}`,
+          background: C.bg1,
+          fontSize: 13,
+          color: C.label,
+          fontFamily: FONT,
+          outline: "none",
+          boxSizing: "border-box",
+          textAlign: "right"
+        }
+      }
+    ), /* @__PURE__ */ import_react.default.createElement("button", { onClick: () => removeGasto(g.id), style: {
+      width: 28,
+      height: 28,
+      borderRadius: 8,
+      border: "none",
+      background: "transparent",
+      cursor: "pointer",
+      fontSize: 18,
+      color: C.red,
+      flexShrink: 0,
+      lineHeight: 1,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      WebkitTapHighlightColor: "transparent"
+    } }, "\xD7")))), /* @__PURE__ */ import_react.default.createElement("div", { style: { background: C.bg2, borderRadius: 16, overflow: "hidden", marginBottom: 16 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { padding: "12px 16px", borderBottom: `1px solid ${C.sep}` } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
       fontSize: 11,
       fontWeight: 700,
       color: C.label3,
@@ -24534,8 +24786,11 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       [`\u2212 Desc. banco Tarjeta (${pctTarjeta}%)`, `-${$(Math.round(descTarjeta))}`, C.red],
       [`= Subtotal sin banco`, $(Math.round(subtotalBanco)), C.label2],
       [`\u2212 Comisi\xF3n ventas (${pctComision}%)`, `-${$(Math.round(comision))}`, C.red],
-      alquiler > 0 ? [`\u2212 Alquiler`, `-${$(alquiler)}`, C.amber] : null
-    ].filter(Boolean).map(([k, v, c], i, arr) => /* @__PURE__ */ import_react.default.createElement("div", { key: k, style: {
+      alquiler > 0 ? [`\u2212 Alquiler`, `-${$(alquiler)}`, C.amber] : null,
+      ...gastos.filter((g) => g.desc || Number(g.monto) > 0).map(
+        (g) => [`\u2212 ${g.desc || "Gasto extra"}`, `-${$(Math.round(Number(g.monto) || 0))}`, C.red]
+      )
+    ].filter(Boolean).map(([k, v, c], i, arr) => /* @__PURE__ */ import_react.default.createElement("div", { key: `${k}-${i}`, style: {
       display: "flex",
       justifyContent: "space-between",
       alignItems: "center",
@@ -24571,11 +24826,39 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       letterSpacing: 0.8,
       marginBottom: 8,
       paddingLeft: 4
-    } }, "Transacciones del per\xEDodo"), vMarca.length === 0 ? /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center", padding: "32px 0", color: C.label3, fontFamily: FONT, fontSize: 16 } }, "Sin ventas en ", MESES[mes]) : vMarca.map((v) => {
+    } }, "Transacciones del per\xEDodo"), gastos.filter((g) => g.desc || Number(g.monto) > 0).map((g) => /* @__PURE__ */ import_react.default.createElement("div", { key: g.id, style: {
+      background: `${C.red}10`,
+      borderRadius: 10,
+      padding: "10px 14px",
+      marginBottom: 5,
+      border: `1px solid ${C.red}20`
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center" } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, color: C.label, fontFamily: FONT, fontWeight: 600 } }, g.desc || "Gasto extra"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 15, fontWeight: 700, color: C.red, fontFamily: FONT, letterSpacing: "-0.01em" } }, "-", $(Number(g.monto) || 0))), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT, marginTop: 2, opacity: 0.65 } }, "Gasto extra \xB7 ", MESES[mes]))), vMarca.length === 0 ? /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center", padding: "32px 0", color: C.label3, fontFamily: FONT, fontSize: 16 } }, "Sin ventas en ", MESES[mes]) : vMarca.map((v) => {
       const its = v.items.filter((i) => i.marcaId === marcaId);
       const sub = its.reduce((s, i) => s + i.subtotal, 0);
       return /* @__PURE__ */ import_react.default.createElement("div", { key: v.id, style: { background: C.bg2, borderRadius: 10, padding: "10px 14px", marginBottom: 5 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 3 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontFamily: "monospace", fontSize: 11, color: C.gold, fontWeight: 600 } }, v.id), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 15, fontWeight: 700, color: C.label, fontFamily: FONT, letterSpacing: "-0.01em" } }, $(sub))), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT, marginBottom: 4, opacity: 0.65 } }, v.fecha, " ", v.hora, " \xB7 ", labelPago(v.metodoPago)), its.map((it, ii) => /* @__PURE__ */ import_react.default.createElement("div", { key: `${v.id}-${it.prodId}-${ii}`, style: { fontSize: 12, color: C.label2, fontFamily: FONT, lineHeight: "1.35" } }, "\xB7 ", it.nombre, " \xD7", it.cantidad, " = ", $(it.subtotal))));
-    }), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 10, marginTop: 16 } }, /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => exportCSV(marca, ventas, mes, anio), variant: "fill", icon: "\u2B07" }, "Exportar CSV"), !cerrado ? /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => {
+    }), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 10, marginTop: 16 } }, /* @__PURE__ */ import_react.default.createElement(
+      IOSBtn,
+      {
+        onPress: () => sendLiqWA(marca, mes, anio, {
+          bruto,
+          brutoEfect,
+          brutoQR,
+          brutoTarjeta,
+          pctTarjeta,
+          descTarjeta,
+          subtotalBanco,
+          pctComision,
+          comision,
+          alquiler,
+          gastos,
+          totalGastos,
+          neto
+        }),
+        variant: "fill",
+        icon: "\u{1F4E4}"
+      },
+      "Compartir liquidaci\xF3n"
+    ), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => exportCSV(marca, ventas, mes, anio), variant: "fill", icon: "\u2B07" }, "Exportar CSV"), !cerrado ? /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => {
       setCierres((p) => ({ ...p, [`${MK}-${marcaId}`]: { cerrado: true, fecha: hoy(), mk: MK } }));
       sbGuardarCierre(`${MK}-${marcaId}`, { cerrado: true, fecha: hoy(), mk: MK, marca_id: marcaId });
       onClose();
@@ -26083,8 +26366,10 @@ Fecha: ${venta.fecha}`);
       const comision = alq.comision > 0 ? Math.round(bruto * alq.comision / 100) : 0;
       const totalDesc = alq.alquiler + comision;
       const liquido = bruto - totalDesc;
+      const img = getMarcaImg(m);
+      const icono = img ? `<img src="${img}" style="width:18px;height:18px;border-radius:4px;object-fit:cover;vertical-align:middle;margin-right:6px"/>` : `<span style="margin-right:6px">${m.emoji}</span>`;
       return `<tr style="border-bottom:1px solid #eee">
-      <td style="padding:8px 12px">${m.emoji} ${m.nombre}</td>
+      <td style="padding:8px 12px">${icono}${m.nombre}</td>
       <td style="padding:8px 12px;text-align:right">Bs ${bruto.toFixed(2)}</td>
       <td style="padding:8px 12px;text-align:right">Bs ${alq.alquiler.toFixed(2)}</td>
       <td style="padding:8px 12px;text-align:right">${alq.comision > 0 ? `${alq.comision}% = Bs ${comision.toFixed(2)}` : "\u2014"}</td>
@@ -27234,13 +27519,13 @@ Fecha: ${venta.fecha}`);
           id: v.id,
           hora: v.hora || "\u2014",
           fecha: v.fecha || "\u2014",
-          tipo: "Venta",
+          tipo: v.anulada ? "Anulada" : "Venta",
           producto: v.items?.[0]?.nombre || "\u2014",
           marca: v.items?.[0]?.marcaNombre || "\u2014",
           marcaObj: MARCAS.find((m) => m.id === v.items?.[0]?.marcaId) || null,
           usuario: v.vendedor || "Tienda",
-          color: C.green,
-          bg: C.greenBg
+          color: v.anulada ? C.red : C.green,
+          bg: v.anulada ? C.redBg : C.greenBg
         }))
       ].slice(0, 6);
       if (feed.length === 0) return null;
@@ -27349,13 +27634,24 @@ Fecha: ${venta.fecha}`);
       textOverflow: "ellipsis",
       whiteSpace: "nowrap",
       lineHeight: "1.3"
-    } }, iconPago(v.metodoPago), " ", v.items?.map((it) => it.nombre).join(", ") || "Venta"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: C.label3, fontFamily: FONT_UI, marginTop: 1, opacity: 0.65 } }, v.fecha, " \xB7 ", labelPago(v.metodoPago))), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+    } }, iconPago(v.metodoPago), " ", v.items?.map((it) => it.nombre).join(", ") || "Venta"), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 5, marginTop: 1 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 10, color: C.label3, fontFamily: FONT_UI, opacity: 0.65 } }, v.fecha, " \xB7 ", labelPago(v.metodoPago)), v.anulada && /* @__PURE__ */ import_react.default.createElement("span", { style: {
+      fontSize: 8,
+      background: C.redBg,
+      color: C.red,
+      padding: "1px 5px",
+      borderRadius: 20,
+      fontFamily: FONT_UI,
+      fontWeight: 700,
+      textTransform: "uppercase",
+      letterSpacing: 0.4
+    } }, "ANULADA"))), /* @__PURE__ */ import_react.default.createElement("div", { style: {
       fontSize: 14,
       fontWeight: 700,
-      color: C.label,
+      color: v.anulada ? C.label3 : C.label,
       fontFamily: FONT_UI,
       marginLeft: 12,
-      letterSpacing: "-0.01em"
+      letterSpacing: "-0.01em",
+      textDecoration: v.anulada ? "line-through" : "none"
     } }, "Bs ", new Intl.NumberFormat("es-BO", { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(v.total))))), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "grid", gridTemplateColumns: isDesktop ? "1fr 1fr 1fr 1fr" : "1fr 1fr", gap: isDesktop ? 8 : 10, marginBottom: 8 } }, [
       { icon: "\u2295", label: "Nueva venta", tab: "pos", color: C.gold },
       { icon: "\u25EB", label: "Inventario", tab: "inventario", color: C.indigo },
@@ -27392,6 +27688,7 @@ Fecha: ${venta.fecha}`);
     } }, d.label))));
   }
   function BrandVentaModal({ venta, marca, onClose }) {
+    const isDesktop = useIsDesktop();
     if (!venta) return null;
     const fac = leerFacturaLocal(venta.id);
     const num = venta.id.replace(/\D/g, "").slice(-4).padStart(4, "0");
@@ -27404,312 +27701,325 @@ Fecha: ${venta.fecha}`);
       padding: "9px 0",
       borderBottom: `1px solid ${C.sep}`
     } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 12, color: C.label3, fontFamily: FONT } }, lbl), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, fontWeight: 500, color: C.label, fontFamily: FONT } }, val));
-    return /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      position: "fixed",
-      inset: 0,
-      zIndex: 500,
-      display: "flex",
-      flexDirection: "column",
-      background: "rgba(0,0,0,0.45)",
-      backdropFilter: "blur(4px)"
-    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: "0 0 60px" }, onClick: onClose }), /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      flex: 1,
-      background: C.bg0,
-      borderRadius: "24px 24px 0 0",
-      display: "flex",
-      flexDirection: "column",
-      overflow: "hidden",
-      boxShadow: "0 -8px 40px rgba(0,0,0,0.18)"
-    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      padding: "16px 20px 12px",
-      borderBottom: `1px solid ${C.sep}`,
-      background: C.bg1,
-      flexShrink: 0
-    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between" } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      fontSize: 11,
-      color: C.label3,
-      fontFamily: FONT,
-      textTransform: "uppercase",
-      letterSpacing: 0.6,
-      marginBottom: 3
-    } }, "Venta N\xB0 ", num), /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      fontSize: 18,
-      fontWeight: 700,
-      color: C.label,
-      fontFamily: FONT_DISPLAY,
-      letterSpacing: 0.3
-    } }, venta.id)), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } }, venta.anulada && /* @__PURE__ */ import_react.default.createElement("span", { style: {
-      fontSize: 11,
-      background: C.redBg,
-      color: C.red,
-      padding: "3px 10px",
-      borderRadius: 20,
-      fontFamily: FONT,
-      fontWeight: 700
-    } }, "ANULADA"), /* @__PURE__ */ import_react.default.createElement("button", { onClick: onClose, style: {
-      width: 32,
-      height: 32,
-      borderRadius: "50%",
-      border: `1px solid ${C.sep}`,
-      background: C.bg2,
-      cursor: "pointer",
-      fontSize: 16,
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      color: C.label2,
-      WebkitTapHighlightColor: "transparent"
-    } }, "\u2715")))), /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1, overflowY: "auto", padding: "16px 20px 32px", WebkitOverflowScrolling: "touch" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      fontSize: 11,
-      fontWeight: 700,
-      color: C.label3,
-      textTransform: "uppercase",
-      letterSpacing: 0.6,
-      fontFamily: FONT,
-      marginBottom: 10
-    } }, "Informaci\xF3n general"), /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      background: C.bg1,
-      borderRadius: 14,
-      padding: "0 14px",
-      border: `1px solid ${C.sep}`,
-      marginBottom: 20,
-      boxShadow: "0 1px 6px rgba(0,0,0,0.04)"
-    } }, /* @__PURE__ */ import_react.default.createElement(FilaInfo, { lbl: "Fecha", val: `${venta.fecha} ${venta.hora}` }), /* @__PURE__ */ import_react.default.createElement(FilaInfo, { lbl: "Vendedor", val: venta.vendedor || "Tienda" }), /* @__PURE__ */ import_react.default.createElement(FilaInfo, { lbl: "M\xE9todo de pago", val: /* @__PURE__ */ import_react.default.createElement(PagoDisplay, { mp: venta.metodoPago, total: venta.total, small: true }) }), /* @__PURE__ */ import_react.default.createElement(FilaInfo, { lbl: "Estado", val: venta.anulada ? "\u274C Anulada" : "\u2705 Completada" }), venta.descPct > 0 && /* @__PURE__ */ import_react.default.createElement(FilaInfo, { lbl: "Descuento", val: `${venta.descPct}%` })), /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      fontSize: 11,
-      fontWeight: 700,
-      color: C.label3,
-      textTransform: "uppercase",
-      letterSpacing: 0.6,
-      fontFamily: FONT,
-      marginBottom: 10
-    } }, "Productos de ", marca.nombre, " (", items.length, ")"), /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      background: C.bg1,
-      borderRadius: 14,
-      overflow: "hidden",
-      border: `1px solid ${C.sep}`,
-      marginBottom: 20,
-      boxShadow: "0 1px 6px rgba(0,0,0,0.04)"
-    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      display: "grid",
-      gridTemplateColumns: "1fr auto auto",
-      gap: 8,
-      padding: "8px 14px",
-      background: C.bg2,
-      borderBottom: `1px solid ${C.sep}`
-    } }, ["Producto / SKU", "Cant.", "Total"].map((h) => /* @__PURE__ */ import_react.default.createElement("span", { key: h, style: {
-      fontSize: 10,
-      fontWeight: 700,
-      color: C.label3,
-      fontFamily: FONT,
-      textTransform: "uppercase",
-      letterSpacing: 0.4,
-      textAlign: h === "Producto / SKU" ? "left" : "right"
-    } }, h))), items.map((it, i) => /* @__PURE__ */ import_react.default.createElement("div", { key: i, style: {
-      display: "grid",
-      gridTemplateColumns: "1fr auto auto",
-      gap: 8,
-      padding: "10px 14px",
-      borderBottom: i < items.length - 1 ? `1px solid ${C.sep}` : "",
-      alignItems: "center"
-    } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      fontSize: 13,
-      fontWeight: 600,
-      color: C.label,
-      fontFamily: FONT,
-      lineHeight: 1.3
-    } }, it.nombre), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: "monospace", marginTop: 2 } }, it.codigo)), /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      textAlign: "right",
-      fontSize: 13,
-      color: C.label2,
-      fontFamily: FONT,
-      fontWeight: 500
-    } }, "\xD7", it.cantidad), /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      textAlign: "right",
-      fontSize: 13,
-      fontWeight: 700,
-      color: C.label,
-      fontFamily: FONT
-    } }, $(it.subtotal)))), /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      display: "flex",
-      justifyContent: "space-between",
-      alignItems: "center",
-      padding: "12px 14px",
-      background: `${marca.color}10`,
-      borderTop: `2px solid ${marca.color}30`
-    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 14, fontWeight: 700, color: C.label, fontFamily: FONT } }, "Subtotal ", marca.nombre), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 20, fontWeight: 700, color: marca.color, fontFamily: FONT_DISPLAY } }, $(sub)))), fac && /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, null, /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      fontSize: 11,
-      fontWeight: 700,
-      color: C.label3,
-      textTransform: "uppercase",
-      letterSpacing: 0.6,
-      fontFamily: FONT,
-      marginBottom: 10
-    } }, "Cliente"), /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      background: C.bg1,
-      borderRadius: 14,
-      padding: "0 14px",
-      border: `1px solid ${C.sep}`,
-      marginBottom: 20,
-      boxShadow: "0 1px 6px rgba(0,0,0,0.04)"
-    } }, /* @__PURE__ */ import_react.default.createElement(FilaInfo, { lbl: "Raz\xF3n social", val: fac.nombreComprador || "Sin Nombre" }), /* @__PURE__ */ import_react.default.createElement(FilaInfo, { lbl: "NIT / CI", val: fac.nitComprador && fac.nitComprador !== 0 ? fac.nitComprador : "Sin NIT (CF)" }), fac.telefono && /* @__PURE__ */ import_react.default.createElement(FilaInfo, { lbl: "Tel\xE9fono", val: fac.telefono }))), /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      fontSize: 11,
-      fontWeight: 700,
-      color: C.label3,
-      textTransform: "uppercase",
-      letterSpacing: 0.6,
-      fontFamily: FONT,
-      marginBottom: 10
-    } }, "Nota de venta"), /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      background: C.bg1,
-      borderRadius: 14,
-      padding: 14,
-      border: `1px solid ${C.sep}`,
-      marginBottom: 20,
-      boxShadow: "0 1px 6px rgba(0,0,0,0.04)"
-    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      display: "flex",
-      justifyContent: "space-between",
-      alignItems: "center",
-      marginBottom: 12
-    } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 15, fontWeight: 700, color: C.label, fontFamily: FONT } }, "N\xB0 ", num), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT, marginTop: 2 } }, venta.fecha, " \xB7 Total ", $(venta.total))), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 28 } }, iconPago(venta.metodoPago))), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 8 } }, /* @__PURE__ */ import_react.default.createElement(
-      "button",
+    return /* @__PURE__ */ import_react.default.createElement(
+      "div",
       {
-        onClick: () => verNotaVenta(venta, num),
+        onClick: (e) => e.target === e.currentTarget && onClose(),
         style: {
-          flex: 1,
-          padding: "10px 0",
-          borderRadius: 12,
-          border: `1px solid ${C.sep}`,
-          background: C.bg2,
-          cursor: "pointer",
-          fontSize: 13,
-          fontWeight: 600,
-          color: C.label,
-          fontFamily: FONT,
-          WebkitTapHighlightColor: "transparent"
+          position: "fixed",
+          inset: 0,
+          zIndex: 500,
+          display: "flex",
+          flexDirection: isDesktop ? "row" : "column",
+          alignItems: "center",
+          justifyContent: "center",
+          background: "rgba(0,0,0,0.45)",
+          backdropFilter: "blur(4px)"
         }
       },
-      "\u{1F441} Ver nota"
-    ), /* @__PURE__ */ import_react.default.createElement(
-      "button",
-      {
-        onClick: () => imprimirNotaVenta(venta, num),
-        style: {
-          flex: 1,
-          padding: "10px 0",
-          borderRadius: 12,
-          border: "none",
-          background: C.label,
-          cursor: "pointer",
-          fontSize: 13,
-          fontWeight: 600,
-          color: C.bg0,
-          fontFamily: FONT,
-          WebkitTapHighlightColor: "transparent"
-        }
-      },
-      "\u{1F5A8} Imprimir"
-    ))), fac && /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, null, /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      fontSize: 11,
-      fontWeight: 700,
-      color: C.label3,
-      textTransform: "uppercase",
-      letterSpacing: 0.6,
-      fontFamily: FONT,
-      marginBottom: 10
-    } }, "Factura SIAT ", fac.anulada && "(anulada)"), /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      background: "#F3F4FC",
-      borderRadius: 14,
-      padding: 14,
-      border: "1.5px solid #C5C8E8",
-      marginBottom: 20,
-      boxShadow: "0 1px 6px rgba(0,0,0,0.04)"
-    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      display: "flex",
-      justifyContent: "space-between",
-      alignItems: "flex-start",
-      marginBottom: 12
-    } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      fontSize: 11,
-      fontWeight: 700,
-      color: "#1A237E",
-      fontFamily: FONT,
-      textTransform: "uppercase",
-      letterSpacing: 0.5,
-      marginBottom: 4
-    } }, "\u{1F9FE} Factura Electr\xF3nica Bolivia"), /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      fontSize: 18,
-      fontWeight: 700,
-      color: "#1A237E",
-      fontFamily: FONT_DISPLAY
-    } }, "N\xB0 ", fac.numero || "\u2014")), fac.anulada && /* @__PURE__ */ import_react.default.createElement("span", { style: {
-      fontSize: 11,
-      background: "#FDECEA",
-      color: C.red,
-      padding: "3px 10px",
-      borderRadius: 20,
-      fontFamily: FONT,
-      fontWeight: 700
-    } }, "ANULADA")), /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      background: "rgba(255,255,255,0.7)",
-      borderRadius: 10,
-      padding: "0 12px",
-      marginBottom: 12,
-      border: "1px solid #C5C8E8"
-    } }, [
-      ["Cliente", fac.nombreComprador || "Sin Nombre"],
-      ["NIT", fac.nitComprador && fac.nitComprador !== 0 ? fac.nitComprador : "Sin NIT (CF)"],
-      ["Fecha emisi\xF3n", venta.fecha]
-    ].map(([l, v]) => /* @__PURE__ */ import_react.default.createElement("div", { key: l, style: {
-      display: "flex",
-      justifyContent: "space-between",
-      padding: "8px 0",
-      borderBottom: "1px solid #E0E2F0"
-    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 12, color: "#555", fontFamily: FONT } }, l), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 12, fontWeight: 600, color: "#1A237E", fontFamily: FONT } }, v))), fac.cuf && /* @__PURE__ */ import_react.default.createElement("div", { style: { padding: "8px 0" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: "#888", fontFamily: FONT, marginBottom: 2 } }, "CUF"), /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      fontSize: 10,
-      fontFamily: "monospace",
-      color: "#333",
-      wordBreak: "break-all",
-      lineHeight: 1.4
-    } }, fac.cuf))), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 8 } }, fac.pdf && /* @__PURE__ */ import_react.default.createElement(
-      "button",
-      {
-        onClick: () => window.open(fac.pdf, "_blank"),
-        style: {
-          flex: 1,
-          padding: "10px 0",
-          borderRadius: 12,
-          border: "none",
-          background: "#1A237E",
-          cursor: "pointer",
-          fontSize: 13,
-          fontWeight: 600,
-          color: "#fff",
-          fontFamily: FONT,
-          WebkitTapHighlightColor: "transparent"
-        }
-      },
-      "\u{1F4C4} Ver PDF"
-    ), /* @__PURE__ */ import_react.default.createElement(
-      "button",
-      {
-        onClick: () => verNotaVenta(venta, num),
-        style: {
-          flex: 1,
-          padding: "10px 0",
-          borderRadius: 12,
-          border: "1.5px solid #C5C8E8",
-          background: "rgba(255,255,255,0.7)",
-          cursor: "pointer",
-          fontSize: 13,
-          fontWeight: 600,
-          color: "#1A237E",
-          fontFamily: FONT,
-          WebkitTapHighlightColor: "transparent"
-        }
-      },
-      "\u{1F5A8} Nota + Factura"
-    )))))));
+      !isDesktop && /* @__PURE__ */ import_react.default.createElement("div", { style: { position: "absolute", top: 0, left: 0, right: 0, height: 60 }, onClick: onClose }),
+      /* @__PURE__ */ import_react.default.createElement("div", { style: {
+        width: "100%",
+        maxWidth: isDesktop ? 520 : "100%",
+        maxHeight: isDesktop ? "85vh" : "calc(100% - 60px)",
+        alignSelf: isDesktop ? "center" : "flex-end",
+        background: C.bg0,
+        borderRadius: isDesktop ? 24 : "24px 24px 0 0",
+        display: "flex",
+        flexDirection: "column",
+        overflow: "hidden",
+        boxShadow: "0 -8px 40px rgba(0,0,0,0.18)"
+      } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+        padding: "16px 20px 12px",
+        borderBottom: `1px solid ${C.sep}`,
+        background: C.bg1,
+        flexShrink: 0
+      } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between" } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+        fontSize: 11,
+        color: C.label3,
+        fontFamily: FONT,
+        textTransform: "uppercase",
+        letterSpacing: 0.6,
+        marginBottom: 3
+      } }, "Venta N\xB0 ", num), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+        fontSize: 18,
+        fontWeight: 700,
+        color: C.label,
+        fontFamily: FONT_DISPLAY,
+        letterSpacing: 0.3
+      } }, venta.id)), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } }, venta.anulada && /* @__PURE__ */ import_react.default.createElement("span", { style: {
+        fontSize: 11,
+        background: C.redBg,
+        color: C.red,
+        padding: "3px 10px",
+        borderRadius: 20,
+        fontFamily: FONT,
+        fontWeight: 700
+      } }, "ANULADA"), /* @__PURE__ */ import_react.default.createElement("button", { onClick: onClose, style: {
+        width: 32,
+        height: 32,
+        borderRadius: "50%",
+        border: `1px solid ${C.sep}`,
+        background: C.bg2,
+        cursor: "pointer",
+        fontSize: 16,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        color: C.label2,
+        WebkitTapHighlightColor: "transparent"
+      } }, "\u2715")))), /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1, overflowY: "auto", padding: "16px 20px 32px", WebkitOverflowScrolling: "touch" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+        fontSize: 11,
+        fontWeight: 700,
+        color: C.label3,
+        textTransform: "uppercase",
+        letterSpacing: 0.6,
+        fontFamily: FONT,
+        marginBottom: 10
+      } }, "Informaci\xF3n general"), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+        background: C.bg1,
+        borderRadius: 14,
+        padding: "0 14px",
+        border: `1px solid ${C.sep}`,
+        marginBottom: 20,
+        boxShadow: "0 1px 6px rgba(0,0,0,0.04)"
+      } }, /* @__PURE__ */ import_react.default.createElement(FilaInfo, { lbl: "Fecha", val: `${venta.fecha} ${venta.hora}` }), /* @__PURE__ */ import_react.default.createElement(FilaInfo, { lbl: "Vendedor", val: venta.vendedor || "Tienda" }), /* @__PURE__ */ import_react.default.createElement(FilaInfo, { lbl: "M\xE9todo de pago", val: /* @__PURE__ */ import_react.default.createElement(PagoDisplay, { mp: venta.metodoPago, total: venta.total, small: true }) }), /* @__PURE__ */ import_react.default.createElement(FilaInfo, { lbl: "Estado", val: venta.anulada ? "\u274C Anulada" : "\u2705 Completada" }), venta.descPct > 0 && /* @__PURE__ */ import_react.default.createElement(FilaInfo, { lbl: "Descuento", val: `${venta.descPct}%` })), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+        fontSize: 11,
+        fontWeight: 700,
+        color: C.label3,
+        textTransform: "uppercase",
+        letterSpacing: 0.6,
+        fontFamily: FONT,
+        marginBottom: 10
+      } }, "Productos de ", marca.nombre, " (", items.length, ")"), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+        background: C.bg1,
+        borderRadius: 14,
+        overflow: "hidden",
+        border: `1px solid ${C.sep}`,
+        marginBottom: 20,
+        boxShadow: "0 1px 6px rgba(0,0,0,0.04)"
+      } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+        display: "grid",
+        gridTemplateColumns: "1fr auto auto",
+        gap: 8,
+        padding: "8px 14px",
+        background: C.bg2,
+        borderBottom: `1px solid ${C.sep}`
+      } }, ["Producto / SKU", "Cant.", "Total"].map((h) => /* @__PURE__ */ import_react.default.createElement("span", { key: h, style: {
+        fontSize: 10,
+        fontWeight: 700,
+        color: C.label3,
+        fontFamily: FONT,
+        textTransform: "uppercase",
+        letterSpacing: 0.4,
+        textAlign: h === "Producto / SKU" ? "left" : "right"
+      } }, h))), items.map((it, i) => /* @__PURE__ */ import_react.default.createElement("div", { key: i, style: {
+        display: "grid",
+        gridTemplateColumns: "1fr auto auto",
+        gap: 8,
+        padding: "10px 14px",
+        borderBottom: i < items.length - 1 ? `1px solid ${C.sep}` : "",
+        alignItems: "center"
+      } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+        fontSize: 13,
+        fontWeight: 600,
+        color: C.label,
+        fontFamily: FONT,
+        lineHeight: 1.3
+      } }, it.nombre), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: "monospace", marginTop: 2 } }, it.codigo)), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+        textAlign: "right",
+        fontSize: 13,
+        color: C.label2,
+        fontFamily: FONT,
+        fontWeight: 500
+      } }, "\xD7", it.cantidad), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+        textAlign: "right",
+        fontSize: 13,
+        fontWeight: 700,
+        color: C.label,
+        fontFamily: FONT
+      } }, $(it.subtotal)))), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        padding: "12px 14px",
+        background: `${marca.color}10`,
+        borderTop: `2px solid ${marca.color}30`
+      } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 14, fontWeight: 700, color: C.label, fontFamily: FONT } }, "Subtotal ", marca.nombre), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 20, fontWeight: 700, color: marca.color, fontFamily: FONT_DISPLAY } }, $(sub)))), fac && /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, null, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+        fontSize: 11,
+        fontWeight: 700,
+        color: C.label3,
+        textTransform: "uppercase",
+        letterSpacing: 0.6,
+        fontFamily: FONT,
+        marginBottom: 10
+      } }, "Cliente"), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+        background: C.bg1,
+        borderRadius: 14,
+        padding: "0 14px",
+        border: `1px solid ${C.sep}`,
+        marginBottom: 20,
+        boxShadow: "0 1px 6px rgba(0,0,0,0.04)"
+      } }, /* @__PURE__ */ import_react.default.createElement(FilaInfo, { lbl: "Raz\xF3n social", val: fac.nombreComprador || "Sin Nombre" }), /* @__PURE__ */ import_react.default.createElement(FilaInfo, { lbl: "NIT / CI", val: fac.nitComprador && fac.nitComprador !== 0 ? fac.nitComprador : "Sin NIT (CF)" }), fac.telefono && /* @__PURE__ */ import_react.default.createElement(FilaInfo, { lbl: "Tel\xE9fono", val: fac.telefono }))), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+        fontSize: 11,
+        fontWeight: 700,
+        color: C.label3,
+        textTransform: "uppercase",
+        letterSpacing: 0.6,
+        fontFamily: FONT,
+        marginBottom: 10
+      } }, "Nota de venta"), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+        background: C.bg1,
+        borderRadius: 14,
+        padding: 14,
+        border: `1px solid ${C.sep}`,
+        marginBottom: 20,
+        boxShadow: "0 1px 6px rgba(0,0,0,0.04)"
+      } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        marginBottom: 12
+      } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 15, fontWeight: 700, color: C.label, fontFamily: FONT } }, "N\xB0 ", num), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT, marginTop: 2 } }, venta.fecha, " \xB7 Total ", $(venta.total))), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 28 } }, iconPago(venta.metodoPago))), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 8 } }, /* @__PURE__ */ import_react.default.createElement(
+        "button",
+        {
+          onClick: () => verNotaVenta(venta, num),
+          style: {
+            flex: 1,
+            padding: "10px 0",
+            borderRadius: 12,
+            border: `1px solid ${C.sep}`,
+            background: C.bg2,
+            cursor: "pointer",
+            fontSize: 13,
+            fontWeight: 600,
+            color: C.label,
+            fontFamily: FONT,
+            WebkitTapHighlightColor: "transparent"
+          }
+        },
+        "\u{1F441} Ver nota"
+      ), /* @__PURE__ */ import_react.default.createElement(
+        "button",
+        {
+          onClick: () => imprimirNotaVenta(venta, num),
+          style: {
+            flex: 1,
+            padding: "10px 0",
+            borderRadius: 12,
+            border: "none",
+            background: C.label,
+            cursor: "pointer",
+            fontSize: 13,
+            fontWeight: 600,
+            color: C.bg0,
+            fontFamily: FONT,
+            WebkitTapHighlightColor: "transparent"
+          }
+        },
+        "\u{1F5A8} Imprimir"
+      ))), fac && /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, null, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+        fontSize: 11,
+        fontWeight: 700,
+        color: C.label3,
+        textTransform: "uppercase",
+        letterSpacing: 0.6,
+        fontFamily: FONT,
+        marginBottom: 10
+      } }, "Factura SIAT ", fac.anulada && "(anulada)"), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+        background: "#F3F4FC",
+        borderRadius: 14,
+        padding: 14,
+        border: "1.5px solid #C5C8E8",
+        marginBottom: 20,
+        boxShadow: "0 1px 6px rgba(0,0,0,0.04)"
+      } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "flex-start",
+        marginBottom: 12
+      } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+        fontSize: 11,
+        fontWeight: 700,
+        color: "#1A237E",
+        fontFamily: FONT,
+        textTransform: "uppercase",
+        letterSpacing: 0.5,
+        marginBottom: 4
+      } }, "\u{1F9FE} Factura Electr\xF3nica Bolivia"), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+        fontSize: 18,
+        fontWeight: 700,
+        color: "#1A237E",
+        fontFamily: FONT_DISPLAY
+      } }, "N\xB0 ", fac.numero || "\u2014")), fac.anulada && /* @__PURE__ */ import_react.default.createElement("span", { style: {
+        fontSize: 11,
+        background: "#FDECEA",
+        color: C.red,
+        padding: "3px 10px",
+        borderRadius: 20,
+        fontFamily: FONT,
+        fontWeight: 700
+      } }, "ANULADA")), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+        background: "rgba(255,255,255,0.7)",
+        borderRadius: 10,
+        padding: "0 12px",
+        marginBottom: 12,
+        border: "1px solid #C5C8E8"
+      } }, [
+        ["Cliente", fac.nombreComprador || "Sin Nombre"],
+        ["NIT", fac.nitComprador && fac.nitComprador !== 0 ? fac.nitComprador : "Sin NIT (CF)"],
+        ["Fecha emisi\xF3n", venta.fecha]
+      ].map(([l, v]) => /* @__PURE__ */ import_react.default.createElement("div", { key: l, style: {
+        display: "flex",
+        justifyContent: "space-between",
+        padding: "8px 0",
+        borderBottom: "1px solid #E0E2F0"
+      } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 12, color: "#555", fontFamily: FONT } }, l), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 12, fontWeight: 600, color: "#1A237E", fontFamily: FONT } }, v))), fac.cuf && /* @__PURE__ */ import_react.default.createElement("div", { style: { padding: "8px 0" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: "#888", fontFamily: FONT, marginBottom: 2 } }, "CUF"), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+        fontSize: 10,
+        fontFamily: "monospace",
+        color: "#333",
+        wordBreak: "break-all",
+        lineHeight: 1.4
+      } }, fac.cuf))), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 8 } }, fac.pdf && /* @__PURE__ */ import_react.default.createElement(
+        "button",
+        {
+          onClick: () => window.open(fac.pdf, "_blank"),
+          style: {
+            flex: 1,
+            padding: "10px 0",
+            borderRadius: 12,
+            border: "none",
+            background: "#1A237E",
+            cursor: "pointer",
+            fontSize: 13,
+            fontWeight: 600,
+            color: "#fff",
+            fontFamily: FONT,
+            WebkitTapHighlightColor: "transparent"
+          }
+        },
+        "\u{1F4C4} Ver PDF"
+      ), /* @__PURE__ */ import_react.default.createElement(
+        "button",
+        {
+          onClick: () => verNotaVenta(venta, num),
+          style: {
+            flex: 1,
+            padding: "10px 0",
+            borderRadius: 12,
+            border: "1.5px solid #C5C8E8",
+            background: "rgba(255,255,255,0.7)",
+            cursor: "pointer",
+            fontSize: 13,
+            fontWeight: 600,
+            color: "#1A237E",
+            fontFamily: FONT,
+            WebkitTapHighlightColor: "transparent"
+          }
+        },
+        "\u{1F5A8} Nota + Factura"
+      ))))))
+    );
   }
   function BrandPortal({ user, ventas, inv, logout }) {
     const isDesktop = useIsDesktop();
@@ -27738,7 +28048,8 @@ Fecha: ${venta.fecha}`);
     const udsMes = (0, import_react.useMemo)(() => udsV(vMes), [vMes]);
     const udsHoy = (0, import_react.useMemo)(() => udsV(vHoy), [vHoy]);
     const tktProm = vMes.length > 0 ? brutoMes / vMes.length : 0;
-    const liq = (0, import_react.useMemo)(() => calcLiqMarca(vMes, mid), [vMes, mid]);
+    const liq = (0, import_react.useMemo)(() => calcLiqMarca(vMes, mid, MK), [vMes, mid, MK]);
+    const gastos = liq.gastos;
     const gcMarca = (0, import_react.useMemo)(() => vMes.reduce((s, v) => {
       const a = v.gcAllocations?.find((x) => x.marcaId === mid);
       return s + (a?.gcAmount || 0);
@@ -28396,7 +28707,8 @@ Fecha: ${venta.fecha}`);
       { label: `Desc. Tarjeta (${liq.cfg.pctTarjeta}%)`, value: -liq.descTJ, sign: "\u2212", color: C.red, bold: false },
       { label: "Subtotal banco", value: liq.subBanco, sign: "", color: C.blue, bold: true },
       { label: `Comisi\xF3n Toscana (${liq.cfg.pctComision}%)`, value: -liq.comision, sign: "\u2212", color: C.red, bold: false },
-      { label: "Alquiler", value: -liq.alquiler, sign: "\u2212", color: C.red, bold: false }
+      { label: "Alquiler", value: -liq.alquiler, sign: "\u2212", color: C.red, bold: false },
+      ...gastos.filter((g) => g.desc || Number(g.monto) > 0).map((g) => ({ label: g.desc || "Gasto extra", value: -(Number(g.monto) || 0), sign: "\u2212", color: C.red, bold: false, sub: true }))
     ].map((row, i, arr) => /* @__PURE__ */ import_react.default.createElement("div", { key: row.label, style: {
       display: "flex",
       justifyContent: "space-between",
@@ -28813,6 +29125,7 @@ Fecha: ${venta.fecha}`);
     } }, "Arrastr\xE1 para mover \xB7 Scroll o pellizco para zoom")));
   }
   function NuevaMarcaModal({ editMarca, marcasActuales, onClose, onGuardar }) {
+    const isDesktop = useIsDesktop();
     const isNew = !editMarca;
     const lista = marcasActuales || MARCAS;
     const nextId = (0, import_react.useMemo)(() => isNew ? Math.max(...lista.map((m) => m.id), 17) + 1 : editMarca.id, []);
@@ -28957,10 +29270,13 @@ Fecha: ${venta.fecha}`);
       backdropFilter: "blur(8px)",
       display: "flex",
       flexDirection: "column",
-      justifyContent: "flex-end"
+      alignItems: isDesktop ? "center" : "stretch",
+      justifyContent: isDesktop ? "center" : "flex-end"
     } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
       background: C.bg0,
-      borderRadius: "24px 24px 0 0",
+      borderRadius: isDesktop ? 24 : "24px 24px 0 0",
+      width: "100%",
+      maxWidth: isDesktop ? 560 : "100%",
       maxHeight: "92vh",
       display: "flex",
       flexDirection: "column",
@@ -30780,9 +31096,9 @@ Fecha: ${venta.fecha}`);
     }
     const getLiq = (0, import_react.useCallback)((marcaId) => {
       const vM = vMes.filter((v) => v.items.some((i) => i.marcaId === marcaId));
-      const liq = calcLiqMarca(vM, marcaId);
+      const liq = calcLiqMarca(vM, marcaId, MK);
       return { ...liq, vMarca: vM, alqPagado: alqMes.find((a) => a.marcaId === marcaId)?.pagado || false };
-    }, [vMes, alqMes, cfgLiqVersion]);
+    }, [vMes, alqMes, cfgLiqVersion, MK]);
     const getHist = (0, import_react.useCallback)((marcaId) => {
       const map = {};
       ventas.forEach((v) => {
@@ -31166,7 +31482,7 @@ Fecha: ${venta.fecha}`);
     } }, "Conciliaci\xF3n de pagos"), [
       { label: "Efectivo", val: liqEf, n: vMes.filter((v) => v.metodoPago === "efectivo").length, color: C.green, icon: "\u{1F4B5}" },
       { label: "QR", val: liqQr, n: vMes.filter((v) => v.metodoPago === "qr").length, color: C.blue, icon: "\u{1F4F1}" },
-      { label: "Tarjeta (+2.5%)", val: liqTj, n: vMes.filter((v) => v.metodoPago === "tarjeta").length, color: C.amber, icon: "\u{1F4B3}" }
+      { label: "Tarjeta (+1.8%)", val: liqTj, n: vMes.filter((v) => v.metodoPago === "tarjeta").length, color: C.amber, icon: "\u{1F4B3}" }
     ].map((p, i, arr) => /* @__PURE__ */ import_react.default.createElement("div", { key: p.label, style: {
       display: "flex",
       justifyContent: "space-between",
@@ -32130,7 +32446,7 @@ Fecha: ${venta.fecha}`);
       fontSize: 13,
       color: C.amber,
       fontFamily: FONT
-    } }, "\u{1F4B3} Descuento 2.5% por tarjeta aplicado autom\xE1ticamente")), pagoMixto && !pagoGC && /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 16 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { background: C.bg2, borderRadius: 14, padding: 16, border: `1px solid ${C.sep}`, marginBottom: 10 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT, marginBottom: 12, textAlign: "center" } }, "Total a cobrar: ", /* @__PURE__ */ import_react.default.createElement("strong", { style: { color: C.label } }, $(total)), " \u2014 distribuye entre los m\xE9todos"), PAGOS.map(function(p) {
+    } }, "\u{1F4B3} Descuento 1.8% por tarjeta aplicado autom\xE1ticamente")), pagoMixto && !pagoGC && /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 16 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { background: C.bg2, borderRadius: 14, padding: 16, border: `1px solid ${C.sep}`, marginBottom: 10 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT, marginBottom: 12, textAlign: "center" } }, "Total a cobrar: ", /* @__PURE__ */ import_react.default.createElement("strong", { style: { color: C.label } }, $(total)), " \u2014 distribuye entre los m\xE9todos"), PAGOS.map(function(p) {
       var val = montosMixtos[p.id] || "";
       return /* @__PURE__ */ import_react.default.createElement("div", { key: p.id, style: { marginBottom: 12 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10, marginBottom: 6 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 20 } }, p.icon), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 14, fontWeight: 600, color: C.label, fontFamily: FONT } }, p.label)), /* @__PURE__ */ import_react.default.createElement("div", { style: { position: "relative" } }, /* @__PURE__ */ import_react.default.createElement("span", { style: {
         position: "absolute",
@@ -32961,6 +33277,9 @@ Fecha: ${venta.fecha}`);
       liq.descTJ > 0 ? [`= Subtotal sin banco`, $(liq.subBanco), C.label2, false] : null,
       liq.cfg?.pctComision > 0 ? [`\u2212 Comisi\xF3n ventas (${liq.cfg?.pctComision ?? 0}%)`, `-${$(liq.comision)}`, C.red, false] : null,
       liq.alquiler > 0 ? [`\u2212 Alquiler`, `-${$(liq.alquiler)}`, C.amber, false] : null,
+      ...liq.gastos.filter((g) => g.desc || Number(g.monto) > 0).map(
+        (g) => [`\u2212 ${g.desc || "Gasto extra"}`, `-${$(Math.round(Number(g.monto) || 0))}`, C.red, false]
+      ),
       ["Neto a liquidar", $(liq.neto), C.green, true]
     ].filter(Boolean).map(([k, v, c, bold], i, arr) => /* @__PURE__ */ import_react.default.createElement("div", { key: k, style: {
       display: "flex",
@@ -32975,7 +33294,7 @@ Fecha: ${venta.fecha}`);
       alignItems: "center",
       padding: "18px 16px",
       background: `${C.gold}12`
-    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 16, fontWeight: 700, color: C.label, fontFamily: FONT } }, "TOTAL A PAGAR"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 24, fontWeight: 700, color: C.label, fontFamily: FONT } }, $(liq.neto)))), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 10 } }, /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => exportCSV(MARCAS.find((m) => m.id === marcaId), ventas, mes, anio), variant: "fill", full: true, icon: "\u2B07" }, "Exportar CSV"), !cerrado ? /* @__PURE__ */ import_react.default.createElement(
+    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 16, fontWeight: 700, color: C.label, fontFamily: FONT } }, "TOTAL A PAGAR"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 24, fontWeight: 700, color: C.label, fontFamily: FONT } }, $(liq.neto)))), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 10 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 10 } }, /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => compartirLiquidacionWA(marca, mes, anio, liq), variant: "fill", full: true, icon: "\u{1F4E4}" }, "Compartir"), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => imprimirLiquidacion(marca, mes, anio, liq), variant: "fill", full: true, icon: "\u{1F5A8}" }, "Imprimir")), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => exportCSV(MARCAS.find((m) => m.id === marcaId), ventas, mes, anio), variant: "fill", full: true, icon: "\u2B07" }, "Exportar CSV"), !cerrado ? /* @__PURE__ */ import_react.default.createElement(
       IOSBtn,
       {
         variant: "success",
@@ -33599,6 +33918,7 @@ Fecha: ${venta.fecha}`);
     ));
   }
   function UserFormModal({ editUser, usuarios, onClose, onGuardar }) {
+    const isDesktop = useIsDesktop();
     const isNew = !editUser;
     const [f, setF] = (0, import_react.useState)(
       editUser ? { ...editUser, password: "", marcaId: String(editUser.marcaId || "") } : { usuario: "", password: "", nombre: "", rol: "caja", marcaId: "", estado: "activo" }
@@ -33679,10 +33999,13 @@ Fecha: ${venta.fecha}`);
       backdropFilter: "blur(6px)",
       display: "flex",
       flexDirection: "column",
-      justifyContent: "flex-end"
+      alignItems: isDesktop ? "center" : "stretch",
+      justifyContent: isDesktop ? "center" : "flex-end"
     } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
       background: C.bg0,
-      borderRadius: "24px 24px 0 0",
+      borderRadius: isDesktop ? 24 : "24px 24px 0 0",
+      width: "100%",
+      maxWidth: isDesktop ? 480 : "100%",
       maxHeight: "92vh",
       display: "flex",
       flexDirection: "column",
@@ -33887,6 +34210,7 @@ Fecha: ${venta.fecha}`);
     ))));
   }
   function AuditoriaTab({ auditLog, setAuditLog }) {
+    const isDesktop = useIsDesktop();
     const [filtroTipo, setFiltroTipo] = (0, import_react.useState)("TODOS");
     const [filtroMarca, setFiltroMarca] = (0, import_react.useState)("");
     const [busqueda, setBusqueda] = (0, import_react.useState)("");
@@ -34179,7 +34503,7 @@ Fecha: ${venta.fecha}`);
           background: "rgba(0,0,0,0.5)",
           backdropFilter: "blur(4px)",
           display: "flex",
-          alignItems: "flex-end",
+          alignItems: isDesktop ? "center" : "flex-end",
           justifyContent: "center"
         }
       },
@@ -34189,13 +34513,13 @@ Fecha: ${venta.fecha}`);
           onClick: (e) => e.stopPropagation(),
           style: {
             background: C.bg0,
-            borderRadius: "24px 24px 0 0",
+            borderRadius: isDesktop ? 24 : "24px 24px 0 0",
             width: "100%",
             maxWidth: 680,
             maxHeight: "85vh",
             display: "flex",
             flexDirection: "column",
-            boxShadow: "0 -8px 40px rgba(0,0,0,0.2)"
+            boxShadow: isDesktop ? "0 24px 70px rgba(0,0,0,0.25)" : "0 -8px 40px rgba(0,0,0,0.2)"
           }
         },
         /* @__PURE__ */ import_react.default.createElement("div", { style: {
@@ -34980,7 +35304,7 @@ create policy "allow all usuarios" on usuarios
         background: C.bg1,
         borderRadius: 18,
         border: `1px solid ${C.sep}`,
-        overflow: "hidden",
+        overflow: "visible",
         boxShadow: "0 1px 8px rgba(0,0,0,0.05)",
         opacity: u.estado === "inactivo" ? 0.65 : 1
       } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
@@ -35496,10 +35820,20 @@ Esta acci\xF3n no se puede deshacer.`,
           cursor: "pointer",
           boxShadow: "0 1px 3px rgba(0,0,0,0.03)",
           WebkitTapHighlightColor: "transparent",
-          borderLeft: `3px solid ${colorPago(v.metodoPago) || C.sep}`
+          borderLeft: `3px solid ${v.anulada ? C.red : colorPago(v.metodoPago) || C.sep}`
         }
       },
-      /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 5, marginBottom: 2, flexWrap: "wrap" } }, /* @__PURE__ */ import_react.default.createElement(PagoDisplay, { mp: v.metodoPago, total: v.total, small: true }), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 9, color: C.label3, fontFamily: FONT, opacity: 0.7 } }, v.fecha, " \xB7 ", v.vendedor || "Tienda")), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 5, marginBottom: 2, flexWrap: "wrap" } }, /* @__PURE__ */ import_react.default.createElement(PagoDisplay, { mp: v.metodoPago, total: v.total, small: true }), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 9, color: C.label3, fontFamily: FONT, opacity: 0.7 } }, v.fecha, " \xB7 ", v.vendedor || "Tienda"), v.anulada && /* @__PURE__ */ import_react.default.createElement("span", { style: {
+        fontSize: 8,
+        background: C.redBg,
+        color: C.red,
+        padding: "1px 5px",
+        borderRadius: 20,
+        fontFamily: FONT,
+        fontWeight: 700,
+        textTransform: "uppercase",
+        letterSpacing: 0.4
+      } }, "ANULADA")), /* @__PURE__ */ import_react.default.createElement("div", { style: {
         overflow: "hidden",
         textOverflow: "ellipsis",
         whiteSpace: "nowrap",
@@ -35510,9 +35844,10 @@ Esta acci\xF3n no se puede deshacer.`,
       } }, v.items.map((it, i) => `${it.nombre} \xD7${it.cantidad}`).join(" \xB7 "))), /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "right", flexShrink: 0 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
         fontSize: 14,
         fontWeight: 700,
-        color: C.label,
+        color: v.anulada ? C.label3 : C.label,
         fontFamily: FONT,
-        letterSpacing: "-0.02em"
+        letterSpacing: "-0.02em",
+        textDecoration: v.anulada ? "line-through" : "none"
       } }, $(v.total)), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 9, color: C.label3, fontFamily: FONT, marginTop: 1, opacity: 0.6 } }, v.items.length, " \xEDtem", v.items.length !== 1 ? "s" : "")))
     ))), vistaD === "busqueda" && /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { position: "relative", marginBottom: 14 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: {
       position: "absolute",

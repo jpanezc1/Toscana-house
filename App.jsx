@@ -1368,7 +1368,7 @@ function parseMixtoXls(metodoPago, total) {
   if (metodoPago === "giftcard") return { efectivo: total, qr: 0, tarjeta: 0 };
   return { efectivo: total, qr: 0, tarjeta: 0 };
 }
-function calcLiqMarca(vMarca, marcaId) {
+function calcLiqMarca(vMarca, marcaId, MK) {
   const cfg = leerCfgLiq(marcaId);
   let brutoEf = 0, brutoQR = 0, brutoTJ = 0;
   vMarca.forEach(v => {
@@ -1385,8 +1385,10 @@ function calcLiqMarca(vMarca, marcaId) {
   const subBanco = bruto - descTJ;
   const comision = subBanco * (Number(cfg.pctComision)  || 0) / 100;
   const alquiler = Number(cfg.alquiler) || 0;
-  const neto     = subBanco - comision - alquiler;
-  return { bruto, brutoEf, brutoQR, brutoTJ, descTJ, subBanco, comision, alquiler, neto, cfg };
+  const gastos   = MK ? leerGastosLiq(marcaId, MK) : [];
+  const totalGastos = gastos.reduce((s,g)=>s+(Number(g.monto)||0),0);
+  const neto     = subBanco - comision - alquiler - totalGastos;
+  return { bruto, brutoEf, brutoQR, brutoTJ, descTJ, subBanco, comision, alquiler, gastos, totalGastos, neto, cfg };
 }
 
 // ── FACTURACIÓN SIAT BOLIVIA — CUCU API ────────────────────────
@@ -1499,7 +1501,7 @@ async function generarExcelMensual(ventas, inventario, mes, anio, setGenerando, 
     MARCAS.forEach(m => {
       const vM  = ventasMes.filter(v => v.items.some(i => i.marcaId === m.id));
       const uds = vM.reduce((s,v) => s + v.items.filter(i=>i.marcaId===m.id).reduce((ss,i)=>ss+i.cantidad,0), 0);
-      const liq = calcLiqMarca(vM, m.id);
+      const liq = calcLiqMarca(vM, m.id, MK);
       totalBruto += liq.bruto; totalNeto += liq.neto; totalVentas += vM.length;
       resumenRows.push([
         m.nombre,
@@ -1551,7 +1553,7 @@ async function generarExcelMensual(ventas, inventario, mes, anio, setGenerando, 
       }
 
       // Totales con config real de liquidación
-      const liqM = calcLiqMarca(vMarca, m.id);
+      const liqM = calcLiqMarca(vMarca, m.id, MK);
       rows.push(
         [],
         ["","","","","","","","VENTAS BRUTAS",       +liqM.bruto.toFixed(2),"","",""],
@@ -1559,6 +1561,9 @@ async function generarExcelMensual(ventas, inventario, mes, anio, setGenerando, 
         ["","","","","","","","SUBTOTAL BANCO",       +liqM.subBanco.toFixed(2),"","",""],
         ["","","","","","","",`− Comisión (${liqM.cfg.pctComision}%)`, -liqM.comision.toFixed(2),"","",""],
         ["","","","","","","","− Alquiler",           -liqM.alquiler.toFixed(2),"","",""],
+        ...liqM.gastos.filter(g=>g.desc||Number(g.monto)>0).map(g=>
+          ["","","","","","","",`− ${g.desc||"Gasto extra"}`, -(Number(g.monto)||0),"","",""]
+        ),
         ["","","","","","","","NETO A PAGAR",          +liqM.neto.toFixed(2),"","",""],
       );
 
@@ -1710,7 +1715,7 @@ async function generarExcelMarca(marca, ventas, inventario, setGenerando) {
             rows.push([v.id, v.fecha, v.hora, it.codigo, it.nombre, it.categoria||"", it.cantidad, it.precioUnit, it.subtotal, v.descPct||0, v.metodoPago, v.vendedor||"Tienda"]);
           });
         });
-        const liqP = calcLiqMarca(p.ventas, marca.id);
+        const liqP = calcLiqMarca(p.ventas, marca.id, p.mk);
         rows.push(
           [],
           ["","","","","","","","Ventas brutas",        +liqP.bruto.toFixed(2),"","",""],
@@ -1718,6 +1723,9 @@ async function generarExcelMarca(marca, ventas, inventario, setGenerando) {
           ["","","","","","","","Subtotal banco",        +liqP.subBanco.toFixed(2),"","",""],
           ["","","","","","","",`− Comisión (${liqP.cfg.pctComision}%)`,  -liqP.comision.toFixed(2),"","",""],
           ["","","","","","","","− Alquiler",            -liqP.alquiler.toFixed(2),"","",""],
+          ...liqP.gastos.filter(g=>g.desc||Number(g.monto)>0).map(g=>
+            ["","","","","","","",`− ${g.desc||"Gasto extra"}`, -(Number(g.monto)||0),"","",""]
+          ),
           ["","","","","","","","Neto",                  +liqP.neto.toFixed(2),"","",""],
         );
         const ws = XLSX.utils.aoa_to_sheet(rows);
@@ -1813,13 +1821,16 @@ function exportCSV(marca,ventas,mes,anio){
   vm.forEach(v=>v.items.filter(i=>i.marcaId===marca.id).forEach(it=>{
     rows.push([v.id,v.fecha,v.hora,it.codigo,it.nombre,it.cantidad,it.precioUnit,it.subtotal,v.descPct||0,v.metodoPago]);
   }));
-  const liq=calcLiqMarca(vm,marca.id);
+  const liq=calcLiqMarca(vm,marca.id,MK);
   rows.push([],
     ["Ventas brutas","","","","","","",+liq.bruto.toFixed(2),"",""],
     [`Desc. Tarjeta (${liq.cfg.pctTarjeta}%)`, "","","","","","",-liq.descTJ.toFixed(2),"",""],
     ["Subtotal banco","","","","","","",+liq.subBanco.toFixed(2),"",""],
     [`Comisión (${liq.cfg.pctComision}%)`, "","","","","","",-liq.comision.toFixed(2),"",""],
     ["Alquiler","","","","","","",-liq.alquiler.toFixed(2),"",""],
+    ...liq.gastos.filter(g=>g.desc||Number(g.monto)>0).map(g=>
+      [`${g.desc||"Gasto extra"}`,"","","","","","",-(Number(g.monto)||0),"",""]
+    ),
     ["Neto","","","","","","",+liq.neto.toFixed(2),"",""]);
   const csv=rows.map(r=>r.map(c=>String(c).includes(",")?`"${c}"`:c).join(",")).join("\n");
   const blob=new Blob(["\uFEFF"+csv],{type:"text/csv;charset=utf-8;"});
@@ -1882,6 +1893,112 @@ function sendFacturaWA(fac, venta, telefono){
   lines.push(``, `📅 ${new Date().toLocaleDateString("es-BO")} · Toscana House`);
 
   window.open(`${waBase}?text=${encodeURIComponent(lines.join("\n"))}`,"_blank");
+}
+
+// ── Compartir liquidación de marca por WhatsApp ───────────
+function sendLiqWA(marca, mes, anio, datos){
+  const {bruto, brutoEfect, brutoQR, brutoTarjeta, pctTarjeta, descTarjeta,
+    subtotalBanco, pctComision, comision, alquiler, gastos, totalGastos, neto} = datos;
+
+  const lines = [
+    `🏡 *TOSCANA HOUSE — LIQUIDACIÓN*`,
+    `━━━━━━━━━━━━━━━━━━━━`,
+    `${marca?.emoji||""} *${marca?.nombre||""}* · ${MESES[mes]} ${anio}`,
+    ``,
+    `💵 Efectivo: ${$(Math.round(brutoEfect))}`,
+    `📱 QR: ${$(Math.round(brutoQR))}`,
+    `💳 Tarjeta: ${$(Math.round(brutoTarjeta))}`,
+    `*Ventas brutas: ${$(Math.round(bruto))}*`,
+    ``,
+    `− Desc. banco Tarjeta (${pctTarjeta}%): -${$(Math.round(descTarjeta))}`,
+    `= Subtotal sin banco: ${$(Math.round(subtotalBanco))}`,
+    `− Comisión ventas (${pctComision}%): -${$(Math.round(comision))}`,
+  ];
+  if(alquiler>0) lines.push(`− Alquiler: -${$(alquiler)}`);
+  if(totalGastos>0){
+    lines.push(`− Gastos extra: -${$(Math.round(totalGastos))}`);
+    gastos.filter(g=>g.desc||Number(g.monto)>0).forEach(g=>{
+      lines.push(`   · ${g.desc||"Gasto extra"}: -${$(Number(g.monto)||0)}`);
+    });
+  }
+  lines.push(``, `💰 *TOTAL NETO: ${$(Math.round(neto))}*`,
+    ``, `📅 ${new Date().toLocaleDateString("es-BO")} · Toscana House`);
+
+  window.open(`https://wa.me/?text=${encodeURIComponent(lines.join("\n"))}`,"_blank");
+}
+
+// ── Compartir liquidación de marca por WhatsApp (desde calcLiqMarca) ──
+function compartirLiquidacionWA(marca, mes, anio, liq){
+  sendLiqWA(marca, mes, anio, {
+    bruto: liq.bruto, brutoEfect: liq.brutoEf, brutoQR: liq.brutoQR, brutoTarjeta: liq.brutoTJ,
+    pctTarjeta: liq.cfg?.pctTarjeta ?? 0, descTarjeta: liq.descTJ,
+    subtotalBanco: liq.subBanco, pctComision: liq.cfg?.pctComision ?? 0, comision: liq.comision,
+    alquiler: liq.alquiler, gastos: liq.gastos, totalGastos: liq.totalGastos, neto: liq.neto,
+  });
+}
+
+// ── Imprimir liquidación de marca (PDF/A4) ────────────────────────────
+function imprimirLiquidacion(marca, mes, anio, liq){
+  const win = window.open('', '_blank', 'width=800,height=900');
+
+  const filas = [
+    ["Ventas brutas", $(liq.bruto), false],
+    liq.descTJ>0 ? [`− Desc. banco Tarjeta (${liq.cfg?.pctTarjeta ?? 0}%)`, `-${$(liq.descTJ)}`, false] : null,
+    liq.descTJ>0 ? ["= Subtotal sin banco", $(liq.subBanco), false] : null,
+    (liq.cfg?.pctComision>0) ? [`− Comisión ventas (${liq.cfg?.pctComision ?? 0}%)`, `-${$(liq.comision)}`, false] : null,
+    (liq.alquiler>0) ? ["− Alquiler", `-${$(liq.alquiler)}`, false] : null,
+    ...liq.gastos.filter(g=>g.desc||Number(g.monto)>0).map(g=>
+      [`− ${g.desc||"Gasto extra"}`, `-${$(Math.round(Number(g.monto)||0))}`, false]
+    ),
+    ["Neto a liquidar", $(liq.neto), true],
+  ].filter(Boolean);
+
+  const filasHtml = filas.map(([k,v,bold])=>`
+    <tr style="${bold?'font-weight:700;background:#f5f0e6':''}">
+      <td style="padding:9px 14px;border-bottom:1px solid #eee">${k}</td>
+      <td style="padding:9px 14px;border-bottom:1px solid #eee;text-align:right">${v}</td>
+    </tr>`).join('');
+
+  win.document.write(`<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Liquidación ${marca?.nombre} — ${MESES[mes]} ${anio}</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 24px; color: #222; }
+    h1 { font-size: 20px; margin: 0 0 4px; }
+    .sub { color: #666; font-size: 13px; margin-bottom: 20px; }
+    table { width: 100%; border-collapse: collapse; max-width: 480px; }
+    .total-row td { border-top: 2px solid #1a3a2a; }
+    .footer { margin-top: 24px; font-size: 11px; color: #888; }
+    @media print { button { display:none; } }
+  </style>
+</head>
+<body>
+  <div style="display:flex;align-items:center;gap:16px;margin-bottom:16px">
+    <img src="${LOGO_B64}" style="height:60px"/>
+    <div>
+      <h1>${marca?.emoji||""} Liquidación — ${marca?.nombre||""}</h1>
+      <div class="sub">${MESES[mes]} ${anio} · Toscana House</div>
+    </div>
+  </div>
+  <table>
+    <tbody>
+      ${filasHtml}
+      <tr class="total-row">
+        <td style="padding:12px 14px;font-weight:700;font-size:15px">TOTAL A PAGAR</td>
+        <td style="padding:12px 14px;text-align:right;font-weight:700;font-size:15px">${$(liq.neto)}</td>
+      </tr>
+    </tbody>
+  </table>
+  <div class="footer">
+    ${PROPIETARIA} · NIT ${NIT_EMPRESA}<br/>
+    Generado: ${new Date().toLocaleString("es-BO")}
+  </div>
+  <script>window.onload = function() { window.print(); }</script>
+</body>
+</html>`);
+  win.document.close();
 }
 
 // ── Número a letras (es-BO) ───────────────────────────────
@@ -2996,9 +3113,11 @@ function LiqModal({marcaId,ventas,mes,anio,MK,cierres,setCierres,onClose,syncCie
           [`= Subtotal sin banco`,$(Math.round(subtotalBanco)),C.label2],
           [`− Comisión ventas (${pctComision}%)`,`-${$(Math.round(comision))}`,C.red],
           alquiler>0?[`− Alquiler`,`-${$(alquiler)}`,C.amber]:null,
-          totalGastos>0?[`− Gastos extra`,`-${$(Math.round(totalGastos))}`,C.red]:null,
+          ...gastos.filter(g=>g.desc||Number(g.monto)>0).map(g=>
+            [`− ${g.desc||"Gasto extra"}`,`-${$(Math.round(Number(g.monto)||0))}`,C.red]
+          ),
         ].filter(Boolean).map(([k,v,c],i,arr)=>(
-          <div key={k} style={{display:"flex",justifyContent:"space-between",alignItems:"center",
+          <div key={`${k}-${i}`} style={{display:"flex",justifyContent:"space-between",alignItems:"center",
             padding:"9px 16px",borderBottom:i<arr.length-1?`1px solid ${C.sep}`:""}}>
             <span style={{fontSize:13,color:C.label2,fontFamily:FONT,lineHeight:"1.35"}}>{k}</span>
             <span style={{fontSize:13,fontWeight:600,color:c,fontFamily:FONT}}>{v}</span>
@@ -3059,6 +3178,11 @@ function LiqModal({marcaId,ventas,mes,anio,MK,cierres,setCierres,onClose,syncCie
       }
 
       <div style={{display:"flex",flexDirection:"column",gap:10,marginTop:16}}>
+        <IOSBtn onPress={()=>sendLiqWA(marca,mes,anio,{bruto,brutoEfect,brutoQR,brutoTarjeta,
+          pctTarjeta,descTarjeta,subtotalBanco,pctComision,comision,alquiler,gastos,totalGastos,neto})}
+          variant="fill" icon="📤">
+          Compartir liquidación
+        </IOSBtn>
         <IOSBtn onPress={()=>exportCSV(marca,ventas,mes,anio)} variant="fill" icon="⬇">
           Exportar CSV
         </IOSBtn>
@@ -6282,8 +6406,9 @@ function BrandPortal({user, ventas, inv, logout}){
   const udsHoy   = useMemo(()=>udsV(vHoy),[vHoy]);
   const tktProm  = vMes.length>0?(brutoMes/vMes.length):0;
 
-  // Liquidación con config real
-  const liq = useMemo(()=>calcLiqMarca(vMes, mid),[vMes, mid]);
+  // Liquidación con config real (incluye gastos extra del período)
+  const liq = useMemo(()=>calcLiqMarca(vMes, mid, MK),[vMes, mid, MK]);
+  const gastos = liq.gastos;
 
   // GC usadas en ventas de esta marca este mes
   const gcMarca = useMemo(()=>vMes.reduce((s,v)=>{
@@ -6907,6 +7032,9 @@ function BrandPortal({user, ventas, inv, logout}){
                 {label:"Subtotal banco",                                  value:liq.subBanco,   sign:"",  color:C.blue,  bold:true},
                 {label:`Comisión Toscana (${liq.cfg.pctComision}%)`,      value:-liq.comision,  sign:"−", color:C.red,   bold:false},
                 {label:"Alquiler",                                        value:-liq.alquiler,  sign:"−", color:C.red,   bold:false},
+                ...gastos.filter(g=>g.desc||Number(g.monto)>0).map(g=>(
+                  {label:g.desc||"Gasto extra", value:-(Number(g.monto)||0), sign:"−", color:C.red, bold:false, sub:true}
+                )),
               ].map((row,i,arr)=>(
                 <div key={row.label} style={{
                   display:"flex",justifyContent:"space-between",alignItems:"center",
@@ -8900,9 +9028,9 @@ function App(){
 
   const getLiq=useCallback((marcaId)=>{
     const vM=vMes.filter(v=>v.items.some(i=>i.marcaId===marcaId));
-    const liq=calcLiqMarca(vM, marcaId);
+    const liq=calcLiqMarca(vM, marcaId, MK);
     return{...liq, vMarca:vM, alqPagado:alqMes.find(a=>a.marcaId===marcaId)?.pagado||false};
-  },[vMes, alqMes, cfgLiqVersion]);
+  },[vMes, alqMes, cfgLiqVersion, MK]);
 
   const getHist=useCallback((marcaId)=>{
     const map={};
@@ -10889,6 +11017,9 @@ function MarcaDetalle({marcaId,inv,ventas,vMes,mes,anio,MK,cierres,setCierres,ge
               (liq.alquiler > 0)
                 ? [`− Alquiler`, `-${$(liq.alquiler)}`, C.amber, false]
                 : null,
+              ...liq.gastos.filter(g=>g.desc||Number(g.monto)>0).map(g=>
+                [`− ${g.desc||"Gasto extra"}`, `-${$(Math.round(Number(g.monto)||0))}`, C.red, false]
+              ),
               ["Neto a liquidar", $(liq.neto), C.green, true],
             ].filter(Boolean).map(([k,v,c,bold],i,arr)=>(
               <div key={k} style={{display:"flex",justifyContent:"space-between",alignItems:"center",
@@ -10906,6 +11037,14 @@ function MarcaDetalle({marcaId,inv,ventas,vMes,mes,anio,MK,cierres,setCierres,ge
           </div>
 
           <div style={{display:"flex",flexDirection:"column",gap:10}}>
+            <div style={{display:"flex",gap:10}}>
+              <IOSBtn onPress={()=>compartirLiquidacionWA(marca,mes,anio,liq)} variant="fill" full icon="📤">
+                Compartir
+              </IOSBtn>
+              <IOSBtn onPress={()=>imprimirLiquidacion(marca,mes,anio,liq)} variant="fill" full icon="🖨">
+                Imprimir
+              </IOSBtn>
+            </div>
             <IOSBtn onPress={()=>exportCSV(MARCAS.find(m=>m.id===marcaId),ventas,mes,anio)} variant="fill" full icon="⬇">
               Exportar CSV
             </IOSBtn>
