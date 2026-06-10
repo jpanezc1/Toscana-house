@@ -5343,12 +5343,13 @@ function ClockWidget(){
 // CAMERA SCANNER — híbrido: foto nativa (sin permisos) +
 //                  escaneo en vivo (getUserMedia, opcional)
 // ══════════════════════════════════════════════════════════
-function CameraScanner({onDetect, onClose}){
+function CameraScanner({onDetect, onClose, continuous, feedback, stats}){
   const fileRef   = useRef(null);
   const videoRef  = useRef(null);
   const canvasRef = useRef(null);
   const streamRef = useRef(null);
   const timerRef  = useRef(null);
+  const cooldownRef = useRef(null);
   const firedRef  = useRef(false);
 
   // "foto" = input file (sin diálogo permisos, funciona siempre en iOS)
@@ -5357,6 +5358,20 @@ function CameraScanner({onDetect, onClose}){
   const [modo, setModo] = useState("foto");
   const [liveStatus, setLiveStatus] = useState("parado"); // parado|cargando|activo|error
   const [scanMsg, setScanMsg] = useState("");
+  const [flash, setFlash] = useState(null); // {ts,ok,title,sub}
+
+  // ── Modo continuo: arranca el escaneo en vivo automáticamente ──
+  useEffect(()=>{
+    if(continuous) iniciarLive();
+  },[]);
+
+  // ── Mostrar feedback de cada escaneo (flash en pantalla) ──
+  useEffect(()=>{
+    if(!feedback) return;
+    setFlash(feedback);
+    const t = setTimeout(()=>setFlash(null), 1100);
+    return ()=>clearTimeout(t);
+  },[feedback?.ts]);
 
   // ── Foto nativa (sin permisos del navegador) ─────────────
   async function handleFoto(e){
@@ -5369,6 +5384,7 @@ function CameraScanner({onDetect, onClose}){
       const codigo = await leerCodigoDeImagen(f);
       if(codigo){
         beep(); onDetect(codigo);
+        setModo(continuous?"foto":"leyendo");
       } else {
         setScanMsg("No se detectó código — intenta de nuevo");
         setModo("foto");
@@ -5421,7 +5437,12 @@ function CameraScanner({onDetect, onClose}){
           );
           if(res&&!firedRef.current){
             firedRef.current=true;
-            detenerLive(); beep(); onDetect(res.getText());
+            beep(); onDetect(res.getText());
+            if(continuous){
+              cooldownRef.current=setTimeout(()=>{firedRef.current=false;},1300);
+            }else{
+              detenerLive();
+            }
           }
         }catch(_){}
       }, 250);
@@ -5436,6 +5457,7 @@ function CameraScanner({onDetect, onClose}){
 
   function detenerLive(){
     clearInterval(timerRef.current);
+    clearTimeout(cooldownRef.current);
     if(streamRef.current){ streamRef.current.getTracks().forEach(t=>t.stop()); streamRef.current=null; }
   }
 
@@ -5465,17 +5487,55 @@ function CameraScanner({onDetect, onClose}){
         padding:"calc(env(safe-area-inset-top,0px) + 10px) 16px 10px",
         background:"rgba(0,0,0,0.85)"}}>
         <span style={{fontSize:15,fontWeight:700,color:"#fff"}}>
-          {modo==="live"&&liveStatus==="activo"?"📷 Apunta al código"
+          {continuous?"⚡ Cierre rápido — escaneo continuo"
+           :modo==="live"&&liveStatus==="activo"?"📷 Apunta al código"
            :modo==="leyendo"?"⏳ Leyendo…"
            :"📷 Escanear código"}
         </span>
         <button onClick={cerrar} style={{
-          background:"rgba(255,255,255,0.15)",border:"1px solid rgba(255,255,255,0.3)",
+          background: continuous?"rgba(34,197,94,0.25)":"rgba(255,255,255,0.15)",
+          border: continuous?"1px solid rgba(74,222,128,0.5)":"1px solid rgba(255,255,255,0.3)",
           borderRadius:9,padding:"7px 16px",color:"#fff",fontSize:14,
           fontWeight:700,cursor:"pointer",WebkitTapHighlightColor:"transparent"}}>
-          ✕ Cerrar
+          {continuous?"✓ Finalizar":"✕ Cerrar"}
         </button>
       </div>
+
+      {/* ── HUD de progreso (modo continuo) ── */}
+      {continuous&&stats&&(
+        <div style={{position:"absolute",top:"calc(env(safe-area-inset-top,0px) + 56px)",
+          left:0,right:0,display:"flex",justifyContent:"center",zIndex:9510,
+          pointerEvents:"none"}}>
+          <div style={{display:"flex",gap:10,background:"rgba(0,0,0,0.65)",
+            border:"1px solid rgba(255,255,255,0.15)",borderRadius:999,
+            padding:"7px 18px",backdropFilter:"blur(6px)"}}>
+            <span style={{color:"#fff",fontSize:13,fontWeight:700}}>📦 {stats.unidades}</span>
+            <span style={{color:"rgba(255,255,255,0.35)"}}>·</span>
+            <span style={{color:"rgba(255,255,255,0.85)",fontSize:13}}>{stats.productos} producto{stats.productos!==1?"s":""}</span>
+          </div>
+        </div>
+      )}
+
+      {/* ── Flash de feedback por escaneo ── */}
+      {flash&&(
+        <div style={{position:"absolute",inset:0,zIndex:9520,
+          display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",
+          gap:10,pointerEvents:"none",
+          background: flash.ok?"rgba(22,163,74,0.32)":"rgba(220,38,38,0.32)",
+          animation:"thFlashFade 1.1s ease-out forwards"}}>
+          <div style={{width:84,height:84,borderRadius:"50%",
+            background: flash.ok?"#16A34A":"#DC2626",
+            display:"flex",alignItems:"center",justifyContent:"center",
+            fontSize:42,color:"#fff",boxShadow:"0 8px 28px rgba(0,0,0,0.35)",
+            animation:"thFlashPop .35s cubic-bezier(.34,1.56,.64,1)"}}>
+            {flash.ok?"✓":"✕"}
+          </div>
+          <div style={{color:"#fff",fontSize:16,fontWeight:800,textAlign:"center",
+            padding:"0 32px",textShadow:"0 1px 4px rgba(0,0,0,0.4)"}}>{flash.title}</div>
+          {flash.sub&&<div style={{color:"rgba(255,255,255,0.85)",fontSize:13,
+            textAlign:"center",padding:"0 32px"}}>{flash.sub}</div>}
+        </div>
+      )}
 
       {/* ── Modo foto (principal, sin permisos) ── */}
       {(modo==="foto"||modo==="leyendo")&&(
@@ -5603,6 +5663,12 @@ function CameraScanner({onDetect, onClose}){
       <style>{`
         @keyframes thScan{
           0%{top:8px;opacity:0} 15%{opacity:1} 85%{opacity:1} 100%{top:244px;opacity:0}
+        }
+        @keyframes thFlashFade{
+          0%{opacity:0} 12%{opacity:1} 70%{opacity:1} 100%{opacity:0}
+        }
+        @keyframes thFlashPop{
+          0%{transform:scale(.4);opacity:0} 60%{transform:scale(1.12);opacity:1} 100%{transform:scale(1)}
         }
       `}</style>
     </div>
@@ -11128,6 +11194,8 @@ function AuditoriaInventario({inv, ventas, mes, anio, MK, auditorias, onGuardarA
   const[marcaSelec,setMarcaSelec]=useState(null);
   const[conteo,setConteo]=useState({}); // {prodId: cantidad}
   const[showScanner,setShowScanner]=useState(false);
+  const[modoCierre,setModoCierre]=useState(false); // escaneo continuo de cierre rápido
+  const[liveFeedback,setLiveFeedback]=useState(null); // {ts,ok,title,sub}
   const[scanMsg,setScanMsg]=useState(null); // {ok,txt}
   const[codManual,setCodManual]=useState("");
   const[auditoriaAbierta,setAuditoriaAbierta]=useState(null);
@@ -11152,6 +11220,24 @@ function AuditoriaInventario({inv, ventas, mes, anio, MK, auditorias, onGuardarA
     if(!p){ flash(false, `Código "${c}" no encontrado en inventario`); return; }
     agregar(p,1);
     setCodManual("");
+  }
+
+  // ── Cierre rápido: escaneo continuo, sin confirmaciones manuales ──
+  function onDetectCierreRapido(codigo){
+    const c=(codigo||"").trim().toUpperCase();
+    const p=inv.find(i=>i.codigo.toUpperCase()===c);
+    if(!p){
+      setLiveFeedback({ts:Date.now(),ok:false,title:"Código no encontrado",sub:c});
+      return;
+    }
+    let cantNueva=1;
+    setConteo(prev=>{
+      cantNueva=(prev[p.id]||0)+1;
+      return {...prev,[p.id]:cantNueva};
+    });
+    setLiveFeedback({ts:Date.now(),ok:true,
+      title:(p.nombre||"").toUpperCase(),
+      sub:`${p.codigo} · contabilizado ×${cantNueva}`});
   }
 
   function reiniciarConteo(){
@@ -11219,6 +11305,38 @@ function AuditoriaInventario({inv, ventas, mes, anio, MK, auditorias, onGuardarA
           con el stock del sistema y señala faltantes (posible fuga) o sobrantes.
         </div>
       </div>
+
+      {/* ── Cierre Rápido — escaneo continuo de pasada ── */}
+      <button onClick={()=>setModoCierre(true)} style={{
+        width:"100%",border:"none",borderRadius:16,marginBottom:14,
+        padding:"18px 20px",cursor:"pointer",WebkitTapHighlightColor:"transparent",
+        display:"flex",alignItems:"center",gap:14,textAlign:"left",
+        background:"linear-gradient(135deg, #1A1714, #2E2620)",
+        boxShadow:"0 6px 22px rgba(26,23,20,0.28)",
+      }}>
+        <div style={{width:46,height:46,borderRadius:12,flexShrink:0,
+          background:"rgba(255,255,255,0.1)",border:"1px solid rgba(255,255,255,0.18)",
+          display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>⚡</div>
+        <div style={{flex:1,minWidth:0}}>
+          <div style={{fontSize:14.5,fontWeight:800,color:"#fff",fontFamily:FONT,letterSpacing:".01em"}}>
+            Iniciar Cierre Rápido
+          </div>
+          <div style={{fontSize:11.5,color:"rgba(255,255,255,0.65)",fontFamily:FONT,marginTop:2}}>
+            Escaneo continuo — apunta y sigue, sin tocar la pantalla
+          </div>
+        </div>
+        <div style={{fontSize:13,color:"#C4A57B",fontWeight:700,fontFamily:FONT,flexShrink:0}}>→</div>
+      </button>
+
+      {/* Overlay de escaneo continuo */}
+      {modoCierre && (
+        <CameraScanner continuous
+          onDetect={onDetectCierreRapido}
+          feedback={liveFeedback}
+          stats={{productos:itemsContados, unidades:unidadesContadas}}
+          onClose={()=>setModoCierre(false)}
+        />
+      )}
 
       {/* Segmented */}
       <div style={{marginBottom:16}}>

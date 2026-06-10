@@ -27025,16 +27025,27 @@ Fecha: ${venta.fecha}`);
       marginTop: 2
     } }, clock);
   }
-  function CameraScanner({ onDetect, onClose }) {
+  function CameraScanner({ onDetect, onClose, continuous, feedback, stats }) {
     const fileRef = (0, import_react.useRef)(null);
     const videoRef = (0, import_react.useRef)(null);
     const canvasRef = (0, import_react.useRef)(null);
     const streamRef = (0, import_react.useRef)(null);
     const timerRef = (0, import_react.useRef)(null);
+    const cooldownRef = (0, import_react.useRef)(null);
     const firedRef = (0, import_react.useRef)(false);
     const [modo, setModo] = (0, import_react.useState)("foto");
     const [liveStatus, setLiveStatus] = (0, import_react.useState)("parado");
     const [scanMsg, setScanMsg] = (0, import_react.useState)("");
+    const [flash, setFlash] = (0, import_react.useState)(null);
+    (0, import_react.useEffect)(() => {
+      if (continuous) iniciarLive();
+    }, []);
+    (0, import_react.useEffect)(() => {
+      if (!feedback) return;
+      setFlash(feedback);
+      const t = setTimeout(() => setFlash(null), 1100);
+      return () => clearTimeout(t);
+    }, [feedback?.ts]);
     async function handleFoto(e) {
       const f = e.target.files?.[0];
       if (!f) return;
@@ -27046,6 +27057,7 @@ Fecha: ${venta.fecha}`);
         if (codigo) {
           beep();
           onDetect(codigo);
+          setModo(continuous ? "foto" : "leyendo");
         } else {
           setScanMsg("No se detect\xF3 c\xF3digo \u2014 intenta de nuevo");
           setModo("foto");
@@ -27099,9 +27111,15 @@ Fecha: ${venta.fecha}`);
             );
             if (res && !firedRef.current) {
               firedRef.current = true;
-              detenerLive();
               beep();
               onDetect(res.getText());
+              if (continuous) {
+                cooldownRef.current = setTimeout(() => {
+                  firedRef.current = false;
+                }, 1300);
+              } else {
+                detenerLive();
+              }
             }
           } catch (_) {
           }
@@ -27115,6 +27133,7 @@ Fecha: ${venta.fecha}`);
     }
     function detenerLive() {
       clearInterval(timerRef.current);
+      clearTimeout(cooldownRef.current);
       if (streamRef.current) {
         streamRef.current.getTracks().forEach((t) => t.stop());
         streamRef.current = null;
@@ -27157,9 +27176,9 @@ Fecha: ${venta.fecha}`);
       justifyContent: "space-between",
       padding: "calc(env(safe-area-inset-top,0px) + 10px) 16px 10px",
       background: "rgba(0,0,0,0.85)"
-    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 15, fontWeight: 700, color: "#fff" } }, modo === "live" && liveStatus === "activo" ? "\u{1F4F7} Apunta al c\xF3digo" : modo === "leyendo" ? "\u23F3 Leyendo\u2026" : "\u{1F4F7} Escanear c\xF3digo"), /* @__PURE__ */ import_react.default.createElement("button", { onClick: cerrar, style: {
-      background: "rgba(255,255,255,0.15)",
-      border: "1px solid rgba(255,255,255,0.3)",
+    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 15, fontWeight: 700, color: "#fff" } }, continuous ? "\u26A1 Cierre r\xE1pido \u2014 escaneo continuo" : modo === "live" && liveStatus === "activo" ? "\u{1F4F7} Apunta al c\xF3digo" : modo === "leyendo" ? "\u23F3 Leyendo\u2026" : "\u{1F4F7} Escanear c\xF3digo"), /* @__PURE__ */ import_react.default.createElement("button", { onClick: cerrar, style: {
+      background: continuous ? "rgba(34,197,94,0.25)" : "rgba(255,255,255,0.15)",
+      border: continuous ? "1px solid rgba(74,222,128,0.5)" : "1px solid rgba(255,255,255,0.3)",
       borderRadius: 9,
       padding: "7px 16px",
       color: "#fff",
@@ -27167,7 +27186,60 @@ Fecha: ${venta.fecha}`);
       fontWeight: 700,
       cursor: "pointer",
       WebkitTapHighlightColor: "transparent"
-    } }, "\u2715 Cerrar")), (modo === "foto" || modo === "leyendo") && /* @__PURE__ */ import_react.default.createElement("div", { style: {
+    } }, continuous ? "\u2713 Finalizar" : "\u2715 Cerrar")), continuous && stats && /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      position: "absolute",
+      top: "calc(env(safe-area-inset-top,0px) + 56px)",
+      left: 0,
+      right: 0,
+      display: "flex",
+      justifyContent: "center",
+      zIndex: 9510,
+      pointerEvents: "none"
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      display: "flex",
+      gap: 10,
+      background: "rgba(0,0,0,0.65)",
+      border: "1px solid rgba(255,255,255,0.15)",
+      borderRadius: 999,
+      padding: "7px 18px",
+      backdropFilter: "blur(6px)"
+    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { color: "#fff", fontSize: 13, fontWeight: 700 } }, "\u{1F4E6} ", stats.unidades), /* @__PURE__ */ import_react.default.createElement("span", { style: { color: "rgba(255,255,255,0.35)" } }, "\xB7"), /* @__PURE__ */ import_react.default.createElement("span", { style: { color: "rgba(255,255,255,0.85)", fontSize: 13 } }, stats.productos, " producto", stats.productos !== 1 ? "s" : ""))), flash && /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      position: "absolute",
+      inset: 0,
+      zIndex: 9520,
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 10,
+      pointerEvents: "none",
+      background: flash.ok ? "rgba(22,163,74,0.32)" : "rgba(220,38,38,0.32)",
+      animation: "thFlashFade 1.1s ease-out forwards"
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      width: 84,
+      height: 84,
+      borderRadius: "50%",
+      background: flash.ok ? "#16A34A" : "#DC2626",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      fontSize: 42,
+      color: "#fff",
+      boxShadow: "0 8px 28px rgba(0,0,0,0.35)",
+      animation: "thFlashPop .35s cubic-bezier(.34,1.56,.64,1)"
+    } }, flash.ok ? "\u2713" : "\u2715"), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      color: "#fff",
+      fontSize: 16,
+      fontWeight: 800,
+      textAlign: "center",
+      padding: "0 32px",
+      textShadow: "0 1px 4px rgba(0,0,0,0.4)"
+    } }, flash.title), flash.sub && /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      color: "rgba(255,255,255,0.85)",
+      fontSize: 13,
+      textAlign: "center",
+      padding: "0 32px"
+    } }, flash.sub)), (modo === "foto" || modo === "leyendo") && /* @__PURE__ */ import_react.default.createElement("div", { style: {
       flex: 1,
       display: "flex",
       flexDirection: "column",
@@ -27284,6 +27356,12 @@ Fecha: ${venta.fecha}`);
     } }, "\u{1F4F7} Usar foto en cambio")), /* @__PURE__ */ import_react.default.createElement("style", null, `
         @keyframes thScan{
           0%{top:8px;opacity:0} 15%{opacity:1} 85%{opacity:1} 100%{top:244px;opacity:0}
+        }
+        @keyframes thFlashFade{
+          0%{opacity:0} 12%{opacity:1} 70%{opacity:1} 100%{opacity:0}
+        }
+        @keyframes thFlashPop{
+          0%{transform:scale(.4);opacity:0} 60%{transform:scale(1.12);opacity:1} 100%{transform:scale(1)}
         }
       `));
   }
@@ -33410,6 +33488,8 @@ Fecha: ${venta.fecha}`);
     const [marcaSelec, setMarcaSelec] = (0, import_react.useState)(null);
     const [conteo, setConteo] = (0, import_react.useState)({});
     const [showScanner, setShowScanner] = (0, import_react.useState)(false);
+    const [modoCierre, setModoCierre] = (0, import_react.useState)(false);
+    const [liveFeedback, setLiveFeedback] = (0, import_react.useState)(null);
     const [scanMsg, setScanMsg] = (0, import_react.useState)(null);
     const [codManual, setCodManual] = (0, import_react.useState)("");
     const [auditoriaAbierta, setAuditoriaAbierta] = (0, import_react.useState)(null);
@@ -33439,6 +33519,25 @@ Fecha: ${venta.fecha}`);
       }
       agregar(p, 1);
       setCodManual("");
+    }
+    function onDetectCierreRapido(codigo) {
+      const c = (codigo || "").trim().toUpperCase();
+      const p = inv.find((i) => i.codigo.toUpperCase() === c);
+      if (!p) {
+        setLiveFeedback({ ts: Date.now(), ok: false, title: "C\xF3digo no encontrado", sub: c });
+        return;
+      }
+      let cantNueva = 1;
+      setConteo((prev) => {
+        cantNueva = (prev[p.id] || 0) + 1;
+        return { ...prev, [p.id]: cantNueva };
+      });
+      setLiveFeedback({
+        ts: Date.now(),
+        ok: true,
+        title: (p.nombre || "").toUpperCase(),
+        sub: `${p.codigo} \xB7 contabilizado \xD7${cantNueva}`
+      });
     }
     function reiniciarConteo() {
       if (Object.keys(conteo).length === 0) return;
@@ -33526,7 +33625,41 @@ ${cruce.length} productos auditados \xB7 ${faltantes.length} faltante(s) \xB7 ${
       display: "flex",
       alignItems: "center",
       gap: 8
-    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 20 } }, "\u2316"), " Cierre de Inventario \xB7 ", MESES[mes], " ", anio), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12.5, color: C.label3, fontFamily: FONT, lineHeight: 1.5 } }, "Escanea (o ingresa el c\xF3digo de) cada producto f\xEDsico en tienda. La app cruza el conteo con el stock del sistema y se\xF1ala faltantes (posible fuga) o sobrantes.")), /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 16 } }, /* @__PURE__ */ import_react.default.createElement(
+    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 20 } }, "\u2316"), " Cierre de Inventario \xB7 ", MESES[mes], " ", anio), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12.5, color: C.label3, fontFamily: FONT, lineHeight: 1.5 } }, "Escanea (o ingresa el c\xF3digo de) cada producto f\xEDsico en tienda. La app cruza el conteo con el stock del sistema y se\xF1ala faltantes (posible fuga) o sobrantes.")), /* @__PURE__ */ import_react.default.createElement("button", { onClick: () => setModoCierre(true), style: {
+      width: "100%",
+      border: "none",
+      borderRadius: 16,
+      marginBottom: 14,
+      padding: "18px 20px",
+      cursor: "pointer",
+      WebkitTapHighlightColor: "transparent",
+      display: "flex",
+      alignItems: "center",
+      gap: 14,
+      textAlign: "left",
+      background: "linear-gradient(135deg, #1A1714, #2E2620)",
+      boxShadow: "0 6px 22px rgba(26,23,20,0.28)"
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      width: 46,
+      height: 46,
+      borderRadius: 12,
+      flexShrink: 0,
+      background: "rgba(255,255,255,0.1)",
+      border: "1px solid rgba(255,255,255,0.18)",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      fontSize: 22
+    } }, "\u26A1"), /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 14.5, fontWeight: 800, color: "#fff", fontFamily: FONT, letterSpacing: ".01em" } }, "Iniciar Cierre R\xE1pido"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11.5, color: "rgba(255,255,255,0.65)", fontFamily: FONT, marginTop: 2 } }, "Escaneo continuo \u2014 apunta y sigue, sin tocar la pantalla")), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: "#C4A57B", fontWeight: 700, fontFamily: FONT, flexShrink: 0 } }, "\u2192")), modoCierre && /* @__PURE__ */ import_react.default.createElement(
+      CameraScanner,
+      {
+        continuous: true,
+        onDetect: onDetectCierreRapido,
+        feedback: liveFeedback,
+        stats: { productos: itemsContados, unidades: unidadesContadas },
+        onClose: () => setModoCierre(false)
+      }
+    ), /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 16 } }, /* @__PURE__ */ import_react.default.createElement(
       SegControl,
       {
         options: [
