@@ -23718,7 +23718,7 @@
     const logoMarca = getMarcaImg(marca);
     const html = `<div xmlns="http://www.w3.org/1999/xhtml" style="font-family:Arial,sans-serif;color:#222;background:#fff;width:${width}px;padding:24px;box-sizing:border-box">
     <div style="display:flex;align-items:center;gap:16px;margin-bottom:16px">
-      ${logoMarca ? `<img src="${logoMarca}" style="height:60px;width:60px;border-radius:12px;object-fit:cover"/>` : logoSvgSized(140)}
+      ${logoMarca ? `<img src="${logoMarca}" style="height:60px;width:60px;border-radius:12px;object-fit:cover"/>` : logoSvgImg(140)}
       <div>
         <div style="font-size:20px;font-weight:700">Liquidaci\xF3n \u2014 ${marca?.nombre || ""}</div>
         <div style="font-size:13px;color:#666">${MESES[mes]} ${anio} \xB7 Toscana House</div>
@@ -23994,6 +23994,11 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
 </svg>`;
   function logoSvgSized(width, color = "#1A1714") {
     return LOGO_SVG.replace("<svg ", `<svg width="${width}" height="${Math.round(width * 0.6)}" style="color:${color};display:block" `);
+  }
+  function logoSvgImg(width, color = "#1A1714") {
+    const svg = LOGO_SVG.replace("<svg ", `<svg width="${width}" height="${Math.round(width * 0.6)}" `).replace(/currentColor/g, color);
+    const b64 = btoa(unescape(encodeURIComponent(svg)));
+    return `<img src="data:image/svg+xml;base64,${b64}" style="height:${Math.round(width * 0.6)}px;width:${width}px;display:block"/>`;
   }
   function LogoMark({ size = 36, color = "#1565C0" }) {
     return /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", flexDirection: "column", alignItems: "center", lineHeight: 1 } }, /* @__PURE__ */ import_react.default.createElement(

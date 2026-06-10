@@ -2204,7 +2204,7 @@ function construirImagenLiquidacion(marca, mes, anio, d){
     <div style="display:flex;align-items:center;gap:16px;margin-bottom:16px">
       ${logoMarca
         ? `<img src="${logoMarca}" style="height:60px;width:60px;border-radius:12px;object-fit:cover"/>`
-        : logoSvgSized(140)}
+        : logoSvgImg(140)}
       <div>
         <div style="font-size:20px;font-weight:700">Liquidación — ${marca?.nombre||""}</div>
         <div style="font-size:13px;color:#666">${MESES[mes]} ${anio} · Toscana House</div>
@@ -2467,6 +2467,15 @@ const LOGO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 120" 
 // Logo TH · Casa de Moda con fondo transparente, para documentos generados (HTML/print/canvas)
 function logoSvgSized(width, color="#1A1714"){
   return LOGO_SVG.replace("<svg ", `<svg width="${width}" height="${Math.round(width*0.6)}" style="color:${color};display:block" `);
+}
+
+// Versión data-URI del logo TH (como <img>), necesaria dentro de <foreignObject> que se rasteriza a canvas
+function logoSvgImg(width, color="#1A1714"){
+  const svg = LOGO_SVG
+    .replace("<svg ", `<svg width="${width}" height="${Math.round(width*0.6)}" `)
+    .replace(/currentColor/g, color);
+  const b64 = btoa(unescape(encodeURIComponent(svg)));
+  return `<img src="data:image/svg+xml;base64,${b64}" style="height:${Math.round(width*0.6)}px;width:${width}px;display:block"/>`;
 }
 
 function LogoMark({size=36, color="#1565C0"}){
