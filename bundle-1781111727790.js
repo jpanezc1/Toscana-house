@@ -23668,8 +23668,8 @@
   </style>
 </head>
 <body>
-  <div style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);opacity:0.05;pointer-events:none">
-    ${logoSvgSized(420)}
+  <div style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);opacity:0.07;pointer-events:none;z-index:-1">
+    ${logoWatermarkSized(480)}
   </div>
   <div style="display:flex;align-items:center;gap:16px;margin-bottom:16px">
     ${logoSvgSized(140)}
@@ -23741,10 +23741,10 @@
       Generado: ${(/* @__PURE__ */ new Date()).toLocaleString("es-BO")}
     </div>
   </div>`;
-    const wmW = 420, wmH = Math.round(wmW * 0.6);
+    const wm = Math.round(Math.min(width, height) * 0.85);
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">
     <rect width="100%" height="100%" fill="#fff"/>
-    <image href="${logoSvgDataUri(wmW)}" x="${(width - wmW) / 2}" y="${(height - wmH) / 2}" width="${wmW}" height="${wmH}" opacity="0.05"/>
+    <image href="${logoWatermarkDataUri(wm)}" x="${(width - wm) / 2}" y="${(height - wm) / 2}" width="${wm}" height="${wm}" opacity="0.07"/>
     <foreignObject width="100%" height="100%">${html}</foreignObject>
   </svg>`;
     const dataUrl = "data:image/svg+xml;charset=utf-8;base64," + btoa(unescape(encodeURIComponent(svg)));
@@ -24000,6 +24000,17 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
 </svg>`;
   function logoSvgSized(width, color = "#1A1714") {
     return LOGO_SVG.replace("<svg ", `<svg width="${width}" height="${Math.round(width * 0.6)}" style="color:${color};display:block" `);
+  }
+  var LOGO_WATERMARK_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" fill="none">
+  <text x="120" y="148" textAnchor="middle" fontFamily="Georgia,serif" fontSize="150" fontWeight="600" fill="currentColor" letterSpacing="6">TH</text>
+  <line x1="40" y1="172" x2="200" y2="172" stroke="currentColor" strokeWidth="1.5"/>
+</svg>`;
+  function logoWatermarkSized(size, color = "#C4A57B") {
+    return LOGO_WATERMARK_SVG.replace("<svg ", `<svg width="${size}" height="${size}" style="color:${color};display:block" `);
+  }
+  function logoWatermarkDataUri(size, color = "#C4A57B") {
+    const svg = LOGO_WATERMARK_SVG.replace("<svg ", `<svg width="${size}" height="${size}" `).replace(/currentColor/g, color);
+    return `data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(svg)))}`;
   }
   function logoSvgDataUri(width, color = "#1A1714") {
     const svg = LOGO_SVG.replace("<svg ", `<svg width="${width}" height="${Math.round(width * 0.6)}" `).replace(/currentColor/g, color);
