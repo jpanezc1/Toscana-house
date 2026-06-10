@@ -2001,18 +2001,19 @@ function imprimirLiquidacion(marca, mes, anio, liq){
   win.document.close();
 }
 
-// ── Exportar imagen (captura) de la liquidación de marca ────────────────────
-function generarImagenLiquidacion(marca, mes, anio, liq){
+// ── Generar imagen (captura) de la liquidación de marca ──────────────────────
+// d: {bruto, descTarjeta, pctTarjeta, subtotalBanco, pctComision, comision, alquiler, gastos, totalGastos, neto, vMarca, marcaId}
+function construirImagenLiquidacion(marca, mes, anio, d){
   const filas = [
-    ["Ventas brutas", $(liq.bruto), false],
-    liq.descTJ>0 ? [`− Desc. banco Tarjeta (${liq.cfg?.pctTarjeta ?? 0}%)`, `-${$(liq.descTJ)}`, false] : null,
-    liq.descTJ>0 ? ["= Subtotal sin banco", $(liq.subBanco), false] : null,
-    (liq.cfg?.pctComision>0) ? [`− Comisión ventas (${liq.cfg?.pctComision ?? 0}%)`, `-${$(liq.comision)}`, false] : null,
-    (liq.alquiler>0) ? ["− Alquiler", `-${$(liq.alquiler)}`, false] : null,
-    ...liq.gastos.filter(g=>g.desc||Number(g.monto)>0).map(g=>
+    ["Ventas brutas", $(Math.round(d.bruto)), false],
+    d.descTarjeta>0 ? [`− Desc. banco Tarjeta (${d.pctTarjeta ?? 0}%)`, `-${$(Math.round(d.descTarjeta))}`, false] : null,
+    d.descTarjeta>0 ? ["= Subtotal sin banco", $(Math.round(d.subtotalBanco)), false] : null,
+    (d.pctComision>0) ? [`− Comisión ventas (${d.pctComision ?? 0}%)`, `-${$(Math.round(d.comision))}`, false] : null,
+    (d.alquiler>0) ? ["− Alquiler", `-${$(d.alquiler)}`, false] : null,
+    ...d.gastos.filter(g=>g.desc||Number(g.monto)>0).map(g=>
       [`− ${g.desc||"Gasto extra"}`, `-${$(Math.round(Number(g.monto)||0))}`, false]
     ),
-    ["Neto a liquidar", $(liq.neto), true],
+    ["Neto a liquidar", $(Math.round(d.neto)), true],
   ].filter(Boolean);
 
   const filasHtml = filas.map(([k,v,bold])=>`
@@ -2021,9 +2022,9 @@ function generarImagenLiquidacion(marca, mes, anio, liq){
       <td style="padding:8px 12px;border-bottom:1px solid #eee;text-align:right">${v}</td>
     </tr>`).join('');
 
-  const ventas = liq.vMarca || [];
+  const ventas = d.vMarca || [];
   const transHtml = ventas.map(v=>{
-    const its = v.items.filter(i=>i.marcaId===marca.id);
+    const its = v.items.filter(i=>i.marcaId===d.marcaId);
     const sub2 = its.reduce((s,i)=>s+i.subtotal,0);
     const itemsHtml = its.map(it=>
       `<div style="font-size:11px;color:#555;margin-left:8px">· ${it.nombre} ×${it.cantidad} = ${$(it.subtotal)}</div>`
@@ -2037,7 +2038,7 @@ function generarImagenLiquidacion(marca, mes, anio, liq){
   }).join('');
 
   const width = 720;
-  const itemsCount = ventas.reduce((s,v)=>s + v.items.filter(i=>i.marcaId===marca.id).length, 0);
+  const itemsCount = ventas.reduce((s,v)=>s + v.items.filter(i=>i.marcaId===d.marcaId).length, 0);
   const height = 200 + filas.length*38 + 50 + (ventas.length*40 + itemsCount*16) + 70;
 
   const html = `<div xmlns="http://www.w3.org/1999/xhtml" style="font-family:Arial,sans-serif;color:#222;background:#fff;width:${width}px;padding:24px;box-sizing:border-box">
@@ -2053,7 +2054,7 @@ function generarImagenLiquidacion(marca, mes, anio, liq){
         ${filasHtml}
         <tr style="border-top:2px solid #1a3a2a">
           <td style="padding:10px 12px;font-weight:700;font-size:15px">TOTAL A PAGAR</td>
-          <td style="padding:10px 12px;text-align:right;font-weight:700;font-size:15px">${$(liq.neto)}</td>
+          <td style="padding:10px 12px;text-align:right;font-weight:700;font-size:15px">${$(Math.round(d.neto))}</td>
         </tr>
       </tbody>
     </table>
@@ -2070,25 +2071,53 @@ function generarImagenLiquidacion(marca, mes, anio, liq){
   </svg>`;
 
   const dataUrl = "data:image/svg+xml;charset=utf-8;base64," + btoa(unescape(encodeURIComponent(svg)));
-  const img = new Image();
-  img.onload = function(){
-    const scale = 2;
-    const canvas = document.createElement("canvas");
-    canvas.width = width*scale;
-    canvas.height = height*scale;
-    const ctx = canvas.getContext("2d");
-    ctx.scale(scale, scale);
-    ctx.fillStyle = "#fff";
-    ctx.fillRect(0, 0, width, height);
-    ctx.drawImage(img, 0, 0, width, height);
-    canvas.toBlob(blob=>{
-      descargarArchivo(blob, `Liquidacion_${marca?.nombre||"marca"}_${MESES[mes]}_${anio}.png`);
-    });
-  };
-  img.onerror = function(){
-    alert("No se pudo generar la imagen");
-  };
-  img.src = dataUrl;
+
+  return new Promise((resolve, reject)=>{
+    const img = new Image();
+    img.onload = function(){
+      const scale = 2;
+      const canvas = document.createElement("canvas");
+      canvas.width = width*scale;
+      canvas.height = height*scale;
+      const ctx = canvas.getContext("2d");
+      ctx.scale(scale, scale);
+      ctx.fillStyle = "#fff";
+      ctx.fillRect(0, 0, width, height);
+      ctx.drawImage(img, 0, 0, width, height);
+      canvas.toBlob(blob=>blob?resolve(blob):reject(new Error("toBlob falló")));
+    };
+    img.onerror = ()=>reject(new Error("No se pudo generar la imagen"));
+    img.src = dataUrl;
+  });
+}
+
+// ── Descargar imagen de la liquidación de marca ───────────────────────────────
+function generarImagenLiquidacion(marca, mes, anio, liq){
+  construirImagenLiquidacion(marca, mes, anio, {
+    bruto: liq.bruto, descTarjeta: liq.descTJ, pctTarjeta: liq.cfg?.pctTarjeta ?? 0,
+    subtotalBanco: liq.subBanco, pctComision: liq.cfg?.pctComision ?? 0, comision: liq.comision,
+    alquiler: liq.alquiler, gastos: liq.gastos, totalGastos: liq.totalGastos, neto: liq.neto,
+    vMarca: liq.vMarca, marcaId: marca?.id,
+  }).then(blob=>{
+    descargarArchivo(blob, `Liquidacion_${marca?.nombre||"marca"}_${MESES[mes]}_${anio}.png`);
+  }).catch(()=>alert("No se pudo generar la imagen"));
+}
+
+// ── Compartir imagen de la liquidación (share sheet / WhatsApp) ───────────────
+function compartirLiquidacionImagen(marca, mes, anio, d){
+  construirImagenLiquidacion(marca, mes, anio, d).then(blob=>{
+    const nombre = `Liquidacion_${marca?.nombre||"marca"}_${MESES[mes]}_${anio}.png`;
+    const file = new File([blob], nombre, {type:"image/png"});
+    if(navigator.canShare && navigator.canShare({files:[file]})){
+      navigator.share({
+        files:[file],
+        title:`Liquidación ${marca?.nombre||""} — ${MESES[mes]} ${anio}`,
+      }).catch(()=>{});
+    } else {
+      descargarArchivo(blob, nombre);
+      window.open(`https://wa.me/?text=${encodeURIComponent(`📎 Imagen descargada: ${nombre}\nAdjúntala manualmente en el chat de WhatsApp.`)}`,"_blank");
+    }
+  }).catch(()=>alert("No se pudo generar la imagen"));
 }
 
 // ── Número a letras (es-BO) ───────────────────────────────
@@ -3272,6 +3301,11 @@ function LiqModal({marcaId,ventas,mes,anio,MK,cierres,setCierres,onClose,syncCie
           pctTarjeta,descTarjeta,subtotalBanco,pctComision,comision,alquiler,gastos,totalGastos,neto})}
           variant="fill" icon="📤">
           Compartir liquidación
+        </IOSBtn>
+        <IOSBtn onPress={()=>compartirLiquidacionImagen(marca,mes,anio,{bruto,descTarjeta,pctTarjeta,
+          subtotalBanco,pctComision,comision,alquiler,gastos,totalGastos,neto,vMarca,marcaId})}
+          variant="fill" icon="📷">
+          Compartir imagen
         </IOSBtn>
         <IOSBtn onPress={()=>exportCSV(marca,ventas,mes,anio)} variant="fill" icon="⬇">
           Exportar CSV
