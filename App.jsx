@@ -2203,7 +2203,10 @@ function construirImagenLiquidacion(marca, mes, anio, d){
   const height = 200 + filas.length*38 + 70;
 
   const logoMarca = getMarcaImg(marca);
-  const html = `<div xmlns="http://www.w3.org/1999/xhtml" style="font-family:Arial,sans-serif;color:#222;background:#fff;width:${width}px;padding:24px;box-sizing:border-box">
+  const html = `<div xmlns="http://www.w3.org/1999/xhtml" style="position:relative;font-family:Arial,sans-serif;color:#222;background:#fff;width:${width}px;height:${height}px;padding:24px;box-sizing:border-box">
+    <div style="position:absolute;z-index:-1;top:50%;left:50%;transform:translate(-50%,-50%);opacity:0.05">
+      ${logoSvgImg(420)}
+    </div>
     <div style="display:flex;align-items:center;gap:16px;margin-bottom:16px">
       ${logoMarca
         ? `<img src="${logoMarca}" style="height:60px;width:60px;border-radius:12px;object-fit:cover"/>`
