@@ -25721,7 +25721,21 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       fontFamily: FONT,
       textAlign: "center",
       letterSpacing: "0.04em"
-    } }, "\xA9 ", (/* @__PURE__ */ new Date()).getFullYear(), " Toscana House \xB7 Santa Cruz, Bolivia"));
+    } }, "\xA9 ", (/* @__PURE__ */ new Date()).getFullYear(), " Toscana House \xB7 Santa Cruz, Bolivia"), /* @__PURE__ */ import_react.default.createElement("div", { style: { marginTop: 14, display: "flex", alignItems: "center", justifyContent: "center", gap: 7 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: {
+      fontSize: 8.5,
+      color: C.label3,
+      letterSpacing: "0.22em",
+      fontFamily: FONT,
+      fontWeight: 500,
+      textTransform: "uppercase"
+    } }, "Powered by"), /* @__PURE__ */ import_react.default.createElement("span", { style: {
+      fontSize: 12.5,
+      fontWeight: 800,
+      color: "#28282f",
+      letterSpacing: "-0.04em",
+      fontFamily: FONT,
+      lineHeight: 1
+    } }, "FORGE", /* @__PURE__ */ import_react.default.createElement("span", { style: { color: "#9b8fa0" } }, "."))));
   }
   function RetirosTab({ inv, retiros, onRetiro }) {
     const [codBusq, setCodBusq] = (0, import_react.useState)("");

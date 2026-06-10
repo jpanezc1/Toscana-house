@@ -3978,6 +3978,15 @@ function LoginScreen({ onLogin }) {
         fontFamily:FONT, textAlign:"center", letterSpacing:"0.04em"}}>
         © {new Date().getFullYear()} Toscana House · Santa Cruz, Bolivia
       </div>
+
+      <div style={{marginTop:14, display:"flex", alignItems:"center", justifyContent:"center", gap:7}}>
+        <span style={{fontSize:8.5, color:C.label3, letterSpacing:"0.22em",
+          fontFamily:FONT, fontWeight:500, textTransform:"uppercase"}}>Powered by</span>
+        <span style={{fontSize:12.5, fontWeight:800, color:"#28282f",
+          letterSpacing:"-0.04em", fontFamily:FONT, lineHeight:1}}>
+          FORGE<span style={{color:"#9b8fa0"}}>.</span>
+        </span>
+      </div>
     </div>
   );
 }
