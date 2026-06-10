@@ -5675,12 +5675,12 @@ function HomeDashboard({ventas, inv, vMes, mes, anio, onGoTab}){
         // combine last 6 ventas into a live activity feed
         const feed = [
           ...ultVentas.slice(0,6).map(v=>({
-            id:v.id, hora:v.hora||"—", fecha:v.fecha||"—", tipo:"Venta",
+            id:v.id, hora:v.hora||"—", fecha:v.fecha||"—", tipo:v.anulada?"Anulada":"Venta",
             producto:v.items?.[0]?.nombre||"—",
             marca:v.items?.[0]?.marcaNombre||"—",
             marcaObj:MARCAS.find(m=>m.id===v.items?.[0]?.marcaId)||null,
             usuario:v.vendedor||"Tienda",
-            color:C.green, bg:C.greenBg,
+            color:v.anulada?C.red:C.green, bg:v.anulada?C.redBg:C.greenBg,
           })),
         ].slice(0,6);
         if(feed.length===0) return null;
@@ -5851,12 +5851,19 @@ function HomeDashboard({ventas, inv, vMes, mes, anio, onGoTab}){
                   overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", lineHeight:"1.3"}}>
                   {iconPago(v.metodoPago)} {v.items?.map(it => it.nombre).join(", ") || "Venta"}
                 </div>
-                <div style={{fontSize:10, color:C.label3, fontFamily:FONT_UI, marginTop:1, opacity:.65}}>
-                  {v.fecha} · {labelPago(v.metodoPago)}
+                <div style={{display:"flex",alignItems:"center",gap:5,marginTop:1}}>
+                  <span style={{fontSize:10, color:C.label3, fontFamily:FONT_UI, opacity:.65}}>
+                    {v.fecha} · {labelPago(v.metodoPago)}
+                  </span>
+                  {v.anulada&&(
+                    <span style={{fontSize:8,background:C.redBg,color:C.red,
+                      padding:"1px 5px",borderRadius:20,fontFamily:FONT_UI,fontWeight:700,
+                      textTransform:"uppercase",letterSpacing:.4}}>ANULADA</span>
+                  )}
                 </div>
               </div>
-              <div style={{fontSize:14, fontWeight:700, color:C.label, fontFamily:FONT_UI, marginLeft:12,
-                letterSpacing:"-0.01em"}}>
+              <div style={{fontSize:14, fontWeight:700, color:v.anulada?C.label3:C.label, fontFamily:FONT_UI, marginLeft:12,
+                letterSpacing:"-0.01em", textDecoration:v.anulada?"line-through":"none"}}>
                 Bs {new Intl.NumberFormat("es-BO",{minimumFractionDigits:0,maximumFractionDigits:0}).format(v.total)}
               </div>
             </div>
@@ -13176,7 +13183,7 @@ function DashboardVentas({ventas, onVentaClick}){
                     border:`1px solid ${C.sep}`,cursor:"pointer",
                     boxShadow:"0 1px 3px rgba(0,0,0,0.03)",
                     WebkitTapHighlightColor:"transparent",
-                    borderLeft:`3px solid ${colorPago(v.metodoPago)||C.sep}`}}>
+                    borderLeft:`3px solid ${v.anulada?C.red:(colorPago(v.metodoPago)||C.sep)}`}}>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10}}>
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{display:"flex",alignItems:"center",gap:5,marginBottom:2,flexWrap:"wrap"}}>
@@ -13184,6 +13191,11 @@ function DashboardVentas({ventas, onVentaClick}){
                         <span style={{fontSize:9,color:C.label3,fontFamily:FONT,opacity:.7}}>
                           {v.fecha} · {v.vendedor||"Tienda"}
                         </span>
+                        {v.anulada&&(
+                          <span style={{fontSize:8,background:C.redBg,color:C.red,
+                            padding:"1px 5px",borderRadius:20,fontFamily:FONT,fontWeight:700,
+                            textTransform:"uppercase",letterSpacing:.4}}>ANULADA</span>
+                        )}
                       </div>
                       <div style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",
                         fontSize:11,color:C.label,fontFamily:FONT,fontWeight:500}}>
@@ -13191,8 +13203,8 @@ function DashboardVentas({ventas, onVentaClick}){
                       </div>
                     </div>
                     <div style={{textAlign:"right",flexShrink:0}}>
-                      <div style={{fontSize:14,fontWeight:700,color:C.label,fontFamily:FONT,
-                        letterSpacing:"-0.02em"}}>{$(v.total)}</div>
+                      <div style={{fontSize:14,fontWeight:700,color:v.anulada?C.label3:C.label,fontFamily:FONT,
+                        letterSpacing:"-0.02em",textDecoration:v.anulada?"line-through":"none"}}>{$(v.total)}</div>
                       <div style={{fontSize:9,color:C.label3,fontFamily:FONT,marginTop:1,opacity:.6}}>
                         {v.items.length} ítem{v.items.length!==1?"s":""}
                       </div>
