@@ -155,6 +155,35 @@ async function sbCargarRetiros() {
   } catch(e) { console.warn("Supabase load retiros:", e.message); return []; }
 }
 
+// ── Trazabilidad de cargas a inventario (manuales + importaciones) ──
+async function sbGuardarCarga(c) {
+  try {
+    const db = await getSupabase();
+    await db.from("cargas_inventario").insert({
+      id: c.id, ts: c.ts, fecha: c.fecha, hora: c.hora, tipo: c.tipo,
+      usuario: c.usuario, nombre: c.nombre, rol: c.rol,
+      marca_id: c.marcaId, marca_nombre: c.marcaNombre,
+      resumen: c.resumen, total_items: c.totalItems,
+      nuevos: c.nuevos||0, actualizados: c.actualizados||0,
+      detalle: c.items||[],
+    });
+  } catch(e) { console.warn("Supabase carga (tabla puede no existir):", e.message); }
+}
+
+async function sbCargarCargas() {
+  try {
+    const db = await getSupabase();
+    const {data} = await db.from("cargas_inventario").select("*").order("created_at",{ascending:false}).limit(500);
+    return (data||[]).map(c=>({
+      id:c.id, ts:c.ts, fecha:c.fecha, hora:c.hora, tipo:c.tipo,
+      usuario:c.usuario, nombre:c.nombre, rol:c.rol,
+      marcaId:c.marca_id, marcaNombre:c.marca_nombre,
+      resumen:c.resumen, totalItems:c.total_items,
+      nuevos:c.nuevos||0, actualizados:c.actualizados||0, items:c.detalle||[],
+    }));
+  } catch(e) { console.warn("Supabase load cargas:", e.message); return []; }
+}
+
 // ── Auditorías de inventario (cierre mensual / conteo físico) ──────
 async function sbGuardarAuditoria(aud) {
   try {
@@ -2239,6 +2268,70 @@ async function exportAuditoriaExcel(aud){
   descargarArchivo(blob, `TH_CierreInventario_${MESES[aud.mes]}_${aud.anio}_${aud.fecha.replace(/\//g,"-")}.xlsx`);
 }
 
+// ── Exportar trazabilidad de cargas a inventario ──────────────────────────
+async function exportCargasExcel(cargas, marcas){
+  const XLSX = await loadXLSX();
+
+  const D="1A1714", G="9A7B4F", GL="C4A57B", CR="F5F0E8", CL="FAF7F3", WH="FFFFFF", BD="D4C5A9", MT="8B7355";
+  const bAll=(c=BD)=>({top:{style:"thin",color:{rgb:c}},bottom:{style:"thin",color:{rgb:c}},left:{style:"thin",color:{rgb:c}},right:{style:"thin",color:{rgb:c}}});
+  function S(ws,r,c,st){ const a=XLSX.utils.encode_cell({r,c}); if(!ws[a]) ws[a]={t:"z",v:""}; ws[a].s=st; }
+  const Srow=(ws,r,nc,st)=>{ for(let c=0;c<nc;c++) S(ws,r,c,st); };
+
+  const sTitulo={font:{name:"Arial",sz:18,bold:true,color:{rgb:WH}},fill:{patternType:"solid",fgColor:{rgb:D}},alignment:{horizontal:"center",vertical:"center"},border:bAll("2A2420")};
+  const sMeta={font:{name:"Arial",sz:9,color:{rgb:MT}},fill:{patternType:"solid",fgColor:{rgb:CR}},alignment:{horizontal:"center",vertical:"center"},border:bAll(BD)};
+  const sHdr={font:{name:"Arial",sz:10,bold:true,color:{rgb:WH}},fill:{patternType:"solid",fgColor:{rgb:D}},alignment:{horizontal:"center",vertical:"center",wrapText:true},border:bAll("2A2420")};
+  const sDataL=(alt)=>({font:{name:"Arial",sz:10,color:{rgb:D}},fill:{patternType:"solid",fgColor:{rgb:alt?CL:WH}},alignment:{horizontal:"left",vertical:"center",wrapText:true},border:bAll(BD)});
+  const sDataC=(alt,bold,color)=>({font:{name:"Arial",sz:10,bold:!!bold,color:{rgb:color||D}},fill:{patternType:"solid",fgColor:{rgb:alt?CL:WH}},alignment:{horizontal:"center",vertical:"center"},border:bAll(BD)});
+
+  const HEAD=["Fecha","Hora","Usuario","Rol","Tipo de carga","Acción","Marca","Código","Producto","Categoría","Stock/Cant.","Precio (Bs.)"];
+  const NC=HEAD.length;
+
+  const filas=[];
+  cargas.forEach(c=>{
+    const items = (c.items&&c.items.length) ? c.items : [{}];
+    items.forEach(it=>{
+      filas.push([
+        c.fecha, c.hora, c.nombre||c.usuario||"—", c.rol||"—",
+        c.tipo==="IMPORT"?"Importación Excel":"Carga manual",
+        it.tipo==="update"?"Actualización stock":"Producto nuevo",
+        it.marca||c.marcaNombre||"—", it.codigo||"", it.nombre||"",
+        it.categoria||"", it.tipo==="update"?(it.stockSumado??""):(it.stock??""),
+        it.precio??"",
+      ]);
+    });
+  });
+
+  const rows=[
+    ["TOSCANA HOUSE — TRAZABILIDAD DE CARGAS A INVENTARIO", ...Array(NC-1).fill("")],
+    [`Generado: ${new Date().toLocaleDateString("es-BO")} ${new Date().toLocaleTimeString("es-BO",{hour:"2-digit",minute:"2-digit"})} · ${cargas.length} carga(s) · ${filas.length} ítem(s)`, ...Array(NC-1).fill("")],
+    [],
+    HEAD,
+    ...filas,
+  ];
+  const rTablaHdr=3, rItemsStart=4, rItemsEnd=4+filas.length-1;
+
+  const ws=XLSX.utils.aoa_to_sheet(rows);
+  ws["!cols"]=[{wch:11},{wch:9},{wch:14},{wch:9},{wch:16},{wch:16},{wch:14},{wch:14},{wch:32},{wch:14},{wch:11},{wch:11}];
+  ws["!merges"]=[{s:{r:0,c:0},e:{r:0,c:NC-1}},{s:{r:1,c:0},e:{r:1,c:NC-1}}];
+  Srow(ws,0,NC,sTitulo);
+  Srow(ws,1,NC,sMeta);
+  HEAD.forEach((_,c)=>S(ws,rTablaHdr,c,sHdr));
+  for(let r=rItemsStart;r<=rItemsEnd;r++){
+    const alt=(r-rItemsStart)%2===1;
+    HEAD.forEach((_,c)=>{
+      if(c===10||c===11) S(ws,r,c,sDataC(alt));
+      else S(ws,r,c,sDataL(alt));
+    });
+  }
+  if(filas.length===0) Srow(ws,rItemsStart,NC,sDataL(false));
+
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Cargas Inventario");
+  const buf=XLSX.write(wb,{bookType:"xlsx",type:"array"});
+  const blob=new Blob([buf],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
+  descargarArchivo(blob, `TH_Trazabilidad_Cargas_${hoy().replace(/\//g,"-")}.xlsx`);
+}
+
 function exportTodasCSV(ventas,mes,anio){
   const MK=mkKey(mes,anio);
   const rows=[["Marca","ID","Fecha","Hora","Código","Producto","Cant.","Precio","Subtotal","Pago"]];
@@ -2983,11 +3076,11 @@ function DesktopSidebar({tabs, active, onChange, user, logout, groups: customGro
   const GROUPS = customGroups || [
     {label:"Principal", ids:["inicio","pos","ventas"]},
     {label:"Gestión",   ids:["inventario","marcas","liquidaciones","giftcards"]},
-    {label:"Sistema",   ids:["auditoria","config"]},
+    {label:"Sistema",   ids:["auditoria","cargas","config"]},
   ];
   const DOT = customDot || {
     inicio:"#8A6418",pos:"#1A1714",ventas:"#1E3A5F",
-    inventario:"#166534",auditoria:"#7A1F1F",marcas:"#5B2D8E",liquidaciones:"#991B1B",
+    inventario:"#166534",auditoria:"#7A1F1F",cargas:"#1565C0",marcas:"#5B2D8E",liquidaciones:"#991B1B",
     giftcards:"#92400E",config:C.label3,
   };
   return (
@@ -6975,7 +7068,7 @@ function BrandVentaModal({venta, marca, onClose}){
   );
 }
 
-function BrandPortal({user, ventas, inv, logout}){
+function BrandPortal({user, ventas, inv, cargas, logout}){
   // ── TODOS los hooks ANTES de cualquier return condicional ──
   const isDesktop = useIsDesktop();
   const now = new Date();
@@ -7179,15 +7272,16 @@ function BrandPortal({user, ventas, inv, logout}){
     {id:"dashboard",  icon:"⊞", label:"Inicio"},
     {id:"ventas",     icon:"◈", label:"Ventas"},
     {id:"inventario", icon:"◫", label:"Inventario"},
+    {id:"cargas",     icon:"🧾", label:"Cargas"},
     {id:"liquidacion",icon:"◎", label:"Liquidar"},
   ];
   const BRAND_GROUPS=[
     {label:"Principal", ids:["dashboard","ventas"]},
-    {label:"Gestión",   ids:["inventario","liquidacion"]},
+    {label:"Gestión",   ids:["inventario","cargas","liquidacion"]},
   ];
   const BRAND_DOT={
     dashboard:"#8A6418", ventas:"#1E3A5F",
-    inventario:"#166534", liquidacion:"#991B1B",
+    inventario:"#166534", cargas:"#1565C0", liquidacion:"#991B1B",
   };
 
   const MesSel = (
@@ -7606,6 +7700,11 @@ function BrandPortal({user, ventas, inv, logout}){
                 ))
             }
           </div>
+        )}
+
+        {/* ══ CARGAS — trazabilidad de cargas a inventario de esta marca ══ */}
+        {tab==="cargas"&&(
+          <RegistroCargas cargas={cargas||[]} marcas={MARCAS} marcaId={mid}/>
         )}
 
         {/* ══ LIQUIDACIÓN ══ */}
@@ -9304,6 +9403,7 @@ function App(){
   const[generando,setGenerando]=useState(false);
   const[retiros,setRetiros]    =useState(()=>{ try{return JSON.parse(localStorage.getItem("th_retiros_v1")||"[]");}catch{return[];} });
   const[auditorias,setAuditorias]=useState(()=>{ try{return JSON.parse(localStorage.getItem("th_auditorias")||"[]");}catch{return[];} });
+  const[cargas,setCargas]=useState([]);
   const[ventaDetalle,setVentaDetalle]=useState(null);
   const[shImportarExcel,setShImportarExcel]=useState(false);
   const[modalNuevaMarca,setModalNuevaMarca]=useState(false);
@@ -9379,9 +9479,19 @@ function App(){
     sbCargarAuditorias().then(data=>{ if(data.length>0) setAuditorias(data); });
   },[]);
 
+  // Cargar trazabilidad de cargas a inventario desde Supabase al inicio
+  useEffect(()=>{
+    sbCargarCargas().then(data=>{ if(data.length>0) setCargas(data); });
+  },[]);
+
   function registrarAuditoria(aud){
     setAuditorias(prev=>[aud, ...prev]);
     sbGuardarAuditoria(aud);
+  }
+
+  function registrarCarga(carga){
+    setCargas(prev=>[carga, ...prev]);
+    sbGuardarCarga(carga);
   }
 
   function registrarRetiro(r){
@@ -9496,6 +9606,14 @@ function App(){
     setInv(p=>[...p,prod]);
     drive.syncProducto(prod);
     sbGuardarProducto(prod); // guardar en nube
+    registrarCarga(crearCarga("MANUAL", user, {
+      marcaId: prod.marcaId, marcaNombre: prod.marcaNombre,
+      resumen: `Carga manual: ${prod.nombre} (${prod.codigo})`,
+      totalItems:1, nuevos:1, actualizados:0,
+      items:[{tipo:"create", codigo:prod.codigo, nombre:prod.nombre,
+        marca:prod.marcaNombre, marcaId:prod.marcaId,
+        stock:prod.stock, precio:prod.precio, categoria:prod.categoria}],
+    }));
     setFInv({marcaId:"",nombre:"",categoria:"",precio:"",stock:"",fecha:hoy()});
     setShInv(false);
     setTimeout(()=>imprimirTicket(prod, marca?.nombre||"Toscana House"), 300);
@@ -9533,7 +9651,7 @@ function App(){
       if(prod) sbActualizarStock(prod.id, stockNuevo);
       // buffer audit
       _importBuf.current.items.push({tipo:"update", codigo, nombre:prod?.nombre||codigo,
-        marca:prod?.marcaNombre||"—", stockAntes, stockNuevo, stockSumado:stock});
+        marca:prod?.marcaNombre||"—", marcaId:prod?.marcaId??null, stockAntes, stockNuevo, stockSumado:stock});
     } else if(tipo==="create"){
       const localId = Date.now() * 1000 + Math.floor(Math.random()*999);
       const newProd = { id: localId, ...producto };
@@ -9545,7 +9663,7 @@ function App(){
       });
       // buffer audit
       _importBuf.current.items.push({tipo:"create", codigo:producto.codigo,
-        nombre:producto.nombre, marca:producto.marcaNombre||"—",
+        nombre:producto.nombre, marca:producto.marcaNombre||"—", marcaId:producto.marcaId??null,
         stock:producto.stock, precio:producto.precio, categoria:producto.categoria});
     }
     // Flush audit después de 800ms sin más llamadas (importación por lotes)
@@ -9556,6 +9674,7 @@ function App(){
       const nuevos = buf.filter(i=>i.tipo==="create").length;
       const actualizados = buf.filter(i=>i.tipo==="update").length;
       const marcas = [...new Set(buf.map(i=>i.marca).filter(Boolean))].join(", ");
+      const marcaIds = [...new Set(buf.map(i=>i.marcaId).filter(id=>id!=null))];
       logAudit("IMPORT", {
         resumen: `Importación: ${nuevos} nuevos + ${actualizados} actualizados · ${marcas}`,
         nuevos, actualizados,
@@ -9563,6 +9682,12 @@ function App(){
         marcas,
         items: buf,
       }, user);
+      registrarCarga(crearCarga("IMPORT", user, {
+        marcaId: marcaIds.length===1 ? marcaIds[0] : null,
+        marcaNombre: marcas,
+        resumen: `Importación: ${nuevos} nuevos + ${actualizados} actualizados · ${marcas}`,
+        nuevos, actualizados, totalItems: buf.length, items: buf,
+      }));
       _importBuf.current.items = [];
     }, 800);
   }
@@ -9665,6 +9790,7 @@ function App(){
     {id:"ventas",        icon:"◈", label:"Ventas"},
     {id:"inventario",    icon:"◫", label:"Inventario"},
     {id:"auditoria",     icon:"⌖", label:"Auditoría"},
+    {id:"cargas",        icon:"🧾", label:"Cargas"},
     {id:"marcas",        icon:"◆", label:"Marcas"},
     {id:"liquidaciones", icon:"◎", label:"Liquidar"},
     {id:"giftcards",     icon:"🎁", label:"Gift"},
@@ -9674,7 +9800,7 @@ function App(){
   const TABS = user?.rol==="caja"
     ? TABS_ALL.filter(t=>["inicio","pos","ventas"].includes(t.id))
     : user?.rol==="admin" ? TABS_ALL
-    : TABS_ALL.filter(t=>t.id!=="auditoria");
+    : TABS_ALL.filter(t=>t.id!=="auditoria"&&t.id!=="cargas");
 
   // Pantallas con vista de detalle (back button)
   const showingDetail = tab==="marcas" && marcaDetalle;
@@ -9684,7 +9810,7 @@ function App(){
   if (!user) return <LoginScreen onLogin={login}/>;
 
   // Portal de marca (lectura)
-  if (user.rol === "marca") return <BrandPortal user={user} ventas={ventas} inv={inv} logout={logout}/>;
+  if (user.rol === "marca") return <BrandPortal user={user} ventas={ventas} inv={inv} cargas={cargas} logout={logout}/>;
 
   // ── Liquidaciones: métricas pre-calculadas — mixto distribuido ─────────────
   const _liqPagos   = sumPagos(vMes);
@@ -9829,6 +9955,11 @@ function App(){
         {tab==="auditoria" && (
           <AuditoriaInventario inv={inv} ventas={ventas} mes={mes} anio={anio} MK={MK}
             auditorias={auditorias} onGuardarAuditoria={registrarAuditoria} user={user}/>
+        )}
+
+        {/* CARGAS — trazabilidad de cargas a inventario (manuales + importaciones) */}
+        {tab==="cargas" && (
+          <RegistroCargas cargas={cargas} marcas={MARCAS}/>
         )}
 
         {/* MARCAS — lista */}
@@ -11799,6 +11930,213 @@ function AuditoriaInventario({inv, ventas, mes, anio, MK, auditorias, onGuardarA
 }
 
 // ══════════════════════════════════════════════════════════
+// CARGAS — trazabilidad de cargas a inventario (manuales + importaciones)
+// ══════════════════════════════════════════════════════════
+function RegistroCargas({cargas, marcas, marcaId=null}){
+  const isDesktop = useIsDesktop();
+  const fijaMarca = marcaId!=null;
+  const[marcaSelec,setMarcaSelec]=useState(marcaId);
+  const[filTipo,setFilTipo]=useState("");
+  const[filUsuario,setFilUsuario]=useState("");
+  const[desde,setDesde]=useState("");
+  const[hasta,setHasta]=useState("");
+  const[abierta,setAbierta]=useState(null);
+  const[exportando,setExportando]=useState(false);
+
+  const usuarios = useMemo(()=>[...new Set(cargas.map(c=>c.nombre).filter(n=>n&&n!=="—"))].sort(),[cargas]);
+
+  function fechaKey(f){
+    const [d,m,y]=(f||"").split("/");
+    return (y&&m&&d) ? `${y}-${m.padStart(2,"0")}-${d.padStart(2,"0")}` : "";
+  }
+
+  const filtradas = useMemo(()=>cargas.filter(c=>{
+    if(marcaSelec!=null){
+      const enMarca = c.marcaId===marcaSelec || (c.items||[]).some(it=>it.marcaId===marcaSelec);
+      if(!enMarca) return false;
+    }
+    if(filTipo && c.tipo!==filTipo) return false;
+    if(filUsuario && c.nombre!==filUsuario) return false;
+    const fk=fechaKey(c.fecha);
+    if(desde && fk && fk<desde) return false;
+    if(hasta && fk && fk>hasta) return false;
+    return true;
+  }),[cargas,marcaSelec,filTipo,filUsuario,desde,hasta]);
+
+  function itemsDe(c){
+    return marcaSelec!=null ? (c.items||[]).filter(it=>it.marcaId===marcaSelec) : (c.items||[]);
+  }
+
+  const totalItems = useMemo(()=>filtradas.reduce((s,c)=>s+itemsDe(c).length,0),[filtradas,marcaSelec]);
+
+  async function exportar(){
+    setExportando(true);
+    try{
+      const data = filtradas.map(c=>({...c, items: itemsDe(c)}));
+      await exportCargasExcel(data, marcas);
+    } finally { setExportando(false); }
+  }
+
+  return (
+    <div>
+      {/* ── Encabezado ── */}
+      <div style={{background:C.bg1,borderRadius:16,padding:18,marginBottom:14,
+        border:`1px solid ${C.sep}`,boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}>
+        <div style={{fontSize:16,fontWeight:700,color:C.label,fontFamily:FONT,marginBottom:6,
+          display:"flex",alignItems:"center",gap:8}}>
+          <span style={{fontSize:20}}>🧾</span> Trazabilidad de Cargas
+        </div>
+        <div style={{fontSize:12.5,color:C.label3,fontFamily:FONT,lineHeight:1.5}}>
+          Registro de todas las cargas a inventario — individuales y por importación de Excel —
+          con fecha, hora, usuario y detalle de lo cargado.
+        </div>
+      </div>
+
+      {/* ── Stats ── */}
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:14}}>
+        <StatCard icon="📥" label="Cargas registradas" value={filtradas.length} color={C.indigo} compact={isDesktop}/>
+        <StatCard icon="📦" label="Ítems cargados" value={totalItems} color={C.blue} compact={isDesktop}/>
+      </div>
+
+      {/* ── Filtro por marca (solo si no está fijado por sesión de marca) ── */}
+      {!fijaMarca && (
+        <div style={{marginBottom:12}}>
+          <div style={{fontSize:10,fontWeight:600,color:C.label3,textTransform:"uppercase",
+            letterSpacing:.8,marginBottom:8,paddingLeft:2}}>Filtrar por marca</div>
+          <div style={{display:"flex",gap:6,overflowX:"auto",paddingBottom:6,
+            scrollbarWidth:"none",WebkitOverflowScrolling:"touch"}}>
+            <button onClick={()=>setMarcaSelec(null)} style={{
+              flexShrink:0,padding:"7px 14px",borderRadius:10,
+              border:`1.5px solid ${marcaSelec==null?C.label:C.sep}`,
+              background:marcaSelec==null?C.label:C.bg2,
+              color:marcaSelec==null?"#fff":C.label2,
+              cursor:"pointer",fontFamily:FONT,fontSize:11,fontWeight:600,
+              WebkitTapHighlightColor:"transparent",whiteSpace:"nowrap",
+              letterSpacing:"0.04em",textTransform:"uppercase",transition:"all .18s",
+            }}>TODAS</button>
+            {marcas.map(m=>{
+              const activa=m.id===marcaSelec;
+              return (
+                <button key={m.id} onClick={()=>setMarcaSelec(activa?null:m.id)} style={{
+                  flexShrink:0,padding:"6px 12px",borderRadius:10,
+                  border:`1.5px solid ${activa?m.color:C.sep}`,
+                  background:activa?`${m.color}22`:C.bg2,
+                  cursor:"pointer",fontFamily:FONT,
+                  WebkitTapHighlightColor:"transparent",
+                  display:"flex",alignItems:"center",gap:6,
+                  transition:"all .18s",
+                }}>
+                  <MarcaIcon marca={m} size={16} radius={4}/>
+                  <span style={{fontSize:11,fontWeight:activa?700:400,
+                    color:activa?m.color:C.label2,whiteSpace:"nowrap"}}>{m.nombre}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ── Otros filtros ── */}
+      <div style={{display:"flex",flexWrap:"wrap",gap:8,marginBottom:14}}>
+        <select value={filTipo} onChange={e=>setFilTipo(e.target.value)} style={{
+          flex:isDesktop?"0 0 auto":"1 1 140px",padding:"9px 12px",border:`1px solid ${C.sep}`,
+          borderRadius:9,background:C.bg1,fontSize:12.5,color:C.label,fontFamily:FONT,outline:"none"}}>
+          <option value="">Todos los tipos</option>
+          <option value="MANUAL">Carga manual</option>
+          <option value="IMPORT">Importación Excel</option>
+        </select>
+        <select value={filUsuario} onChange={e=>setFilUsuario(e.target.value)} style={{
+          flex:isDesktop?"0 0 auto":"1 1 140px",padding:"9px 12px",border:`1px solid ${C.sep}`,
+          borderRadius:9,background:C.bg1,fontSize:12.5,color:C.label,fontFamily:FONT,outline:"none"}}>
+          <option value="">Todos los usuarios</option>
+          {usuarios.map(u=><option key={u} value={u}>{u}</option>)}
+        </select>
+        <input type="date" value={desde} onChange={e=>setDesde(e.target.value)} style={{
+          flex:isDesktop?"0 0 auto":"1 1 140px",padding:"9px 12px",border:`1px solid ${C.sep}`,
+          borderRadius:9,background:C.bg1,fontSize:12.5,color:C.label,fontFamily:FONT,outline:"none"}}/>
+        <input type="date" value={hasta} onChange={e=>setHasta(e.target.value)} style={{
+          flex:isDesktop?"0 0 auto":"1 1 140px",padding:"9px 12px",border:`1px solid ${C.sep}`,
+          borderRadius:9,background:C.bg1,fontSize:12.5,color:C.label,fontFamily:FONT,outline:"none"}}/>
+      </div>
+
+      <div style={{marginBottom:14}}>
+        <IOSBtn onPress={exportar} full small icon="⬇" disabled={exportando||filtradas.length===0}>
+          {exportando?"Generando…":"Exportar Excel"}
+        </IOSBtn>
+      </div>
+
+      {/* ── Lista de cargas ── */}
+      {filtradas.length===0
+        ? <EmptyState icon="🧾" title="Sin cargas registradas"
+            sub="Cuando se agregue un producto manualmente o se importe un Excel, aparecerá aquí"/>
+        : <div style={{display:"flex",flexDirection:"column",gap:10}}>
+            {filtradas.map(c=>{
+              const abierto = abierta===c.id;
+              const items = itemsDe(c);
+              const tipoInfo = c.tipo==="IMPORT"
+                ? {label:"Importación Excel", icon:"📥", color:C.blue}
+                : {label:"Carga manual", icon:"✍️", color:C.green};
+              return (
+                <div key={c.id} style={{background:C.bg1,borderRadius:14,border:`1px solid ${C.sep}`,
+                  overflow:"hidden",boxShadow:"0 1px 3px rgba(0,0,0,.06)"}}>
+                  <div onClick={()=>setAbierta(abierto?null:c.id)} style={{padding:14,cursor:"pointer",
+                    display:"flex",justifyContent:"space-between",alignItems:"center",gap:10}}>
+                    <div style={{minWidth:0,flex:1}}>
+                      <div style={{fontSize:13,fontWeight:700,color:C.label,fontFamily:FONT,
+                        overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                        {c.resumen||"Carga de inventario"}
+                      </div>
+                      <div style={{fontSize:11,color:C.label3,fontFamily:FONT,marginTop:2}}>
+                        {c.fecha} · {c.hora} · {c.nombre} ({c.rol}) · {items.length} ítem{items.length!==1?"s":""}
+                      </div>
+                    </div>
+                    <Chip color={tipoInfo.color} small>{tipoInfo.icon} {tipoInfo.label}</Chip>
+                  </div>
+                  {abierto && (
+                    <div style={{padding:"0 14px 14px"}}>
+                      <div style={{borderTop:`1px solid ${C.sep}`,paddingTop:10,
+                        display:"flex",flexDirection:"column",gap:6,maxHeight:320,overflowY:"auto"}}>
+                        {items.length===0
+                          ? <div style={{fontSize:12,color:C.label3,fontFamily:FONT}}>Sin ítems para esta marca</div>
+                          : items.map((it,i)=>(
+                            <div key={i} style={{display:"flex",alignItems:"center",gap:8,
+                              padding:"6px 8px",borderRadius:8,background:i%2===0?C.bg2:"transparent"}}>
+                              <span style={{fontSize:10.5,fontWeight:700,
+                                color:it.tipo==="update"?C.blue:C.green,
+                                background:it.tipo==="update"?"#EEF2FF":C.greenBg,
+                                padding:"2px 6px",borderRadius:5,flexShrink:0}}>
+                                {it.tipo==="update"?"STOCK":"NUEVO"}
+                              </span>
+                              <div style={{flex:1,minWidth:0}}>
+                                <div style={{fontSize:12,fontWeight:600,color:C.label,fontFamily:FONT,
+                                  overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                                  {(it.nombre||"").toUpperCase()}
+                                </div>
+                                <div style={{fontSize:10,color:C.label3,fontFamily:FONT_MONO}}>
+                                  {it.codigo} · {it.marca||"—"}
+                                </div>
+                              </div>
+                              <div style={{fontSize:11,color:C.label2,fontFamily:FONT,textAlign:"right",flexShrink:0}}>
+                                {it.tipo==="update"
+                                  ? `${it.stockAntes} → ${it.stockNuevo} (+${it.stockSumado})`
+                                  : `Stock ${it.stock}${it.precio?` · ${$(it.precio)}`:""}`}
+                              </div>
+                            </div>
+                          ))
+                        }
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+      }
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════
 // INVENTARIO POR MARCA — pestaña con scroll horizontal
 // ══════════════════════════════════════════════════════════
 function InventarioPorMarca({inv, ventas, onRecibir, onBaja, onImportarExcel}){
@@ -12795,6 +13133,23 @@ const AUDIT_TIPOS = {
   LOGIN:      { label:"Acceso",       icono:"🔐",  color:"#546E7A" },
   CIERRE:     { label:"Cierre",       icono:"📊",  color:"#8A6418" },
 };
+
+// ── Registro de carga (trazabilidad de inventario) ────────────────────────
+function crearCarga(tipo, usuario, extra){
+  const now = new Date();
+  return {
+    id: "CRG_"+Date.now()+"_"+Math.random().toString(36).slice(2,6),
+    ts: Date.now(),
+    fecha: now.toLocaleDateString("es-BO"),
+    hora:  now.toLocaleTimeString("es-BO",{hour:"2-digit",minute:"2-digit",second:"2-digit"}),
+    tipo,
+    usuario: usuario?.usuario || usuario?.user || "—",
+    nombre:  usuario?.nombre || "—",
+    rol:     usuario?.rol    || "—",
+    marcaId: null, marcaNombre:"—", resumen:"", totalItems:0, nuevos:0, actualizados:0, items:[],
+    ...extra,
+  };
+}
 
 function logAudit(tipo, detalle, usuario){
   try{

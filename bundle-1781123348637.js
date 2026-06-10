@@ -21621,6 +21621,56 @@
       return [];
     }
   }
+  async function sbGuardarCarga(c) {
+    try {
+      const db = await getSupabase();
+      await db.from("cargas_inventario").insert({
+        id: c.id,
+        ts: c.ts,
+        fecha: c.fecha,
+        hora: c.hora,
+        tipo: c.tipo,
+        usuario: c.usuario,
+        nombre: c.nombre,
+        rol: c.rol,
+        marca_id: c.marcaId,
+        marca_nombre: c.marcaNombre,
+        resumen: c.resumen,
+        total_items: c.totalItems,
+        nuevos: c.nuevos || 0,
+        actualizados: c.actualizados || 0,
+        detalle: c.items || []
+      });
+    } catch (e) {
+      console.warn("Supabase carga (tabla puede no existir):", e.message);
+    }
+  }
+  async function sbCargarCargas() {
+    try {
+      const db = await getSupabase();
+      const { data } = await db.from("cargas_inventario").select("*").order("created_at", { ascending: false }).limit(500);
+      return (data || []).map((c) => ({
+        id: c.id,
+        ts: c.ts,
+        fecha: c.fecha,
+        hora: c.hora,
+        tipo: c.tipo,
+        usuario: c.usuario,
+        nombre: c.nombre,
+        rol: c.rol,
+        marcaId: c.marca_id,
+        marcaNombre: c.marca_nombre,
+        resumen: c.resumen,
+        totalItems: c.total_items,
+        nuevos: c.nuevos || 0,
+        actualizados: c.actualizados || 0,
+        items: c.detalle || []
+      }));
+    } catch (e) {
+      console.warn("Supabase load cargas:", e.message);
+      return [];
+    }
+  }
   async function sbGuardarAuditoria(aud) {
     try {
       const db = await getSupabase();
@@ -23798,6 +23848,73 @@
     const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
     descargarArchivo(blob, `TH_CierreInventario_${MESES[aud.mes]}_${aud.anio}_${aud.fecha.replace(/\//g, "-")}.xlsx`);
   }
+  async function exportCargasExcel(cargas, marcas) {
+    const XLSX = await loadXLSX();
+    const D = "1A1714", G = "9A7B4F", GL = "C4A57B", CR = "F5F0E8", CL = "FAF7F3", WH = "FFFFFF", BD = "D4C5A9", MT = "8B7355";
+    const bAll = (c = BD) => ({ top: { style: "thin", color: { rgb: c } }, bottom: { style: "thin", color: { rgb: c } }, left: { style: "thin", color: { rgb: c } }, right: { style: "thin", color: { rgb: c } } });
+    function S(ws2, r, c, st) {
+      const a = XLSX.utils.encode_cell({ r, c });
+      if (!ws2[a]) ws2[a] = { t: "z", v: "" };
+      ws2[a].s = st;
+    }
+    const Srow = (ws2, r, nc, st) => {
+      for (let c = 0; c < nc; c++) S(ws2, r, c, st);
+    };
+    const sTitulo = { font: { name: "Arial", sz: 18, bold: true, color: { rgb: WH } }, fill: { patternType: "solid", fgColor: { rgb: D } }, alignment: { horizontal: "center", vertical: "center" }, border: bAll("2A2420") };
+    const sMeta = { font: { name: "Arial", sz: 9, color: { rgb: MT } }, fill: { patternType: "solid", fgColor: { rgb: CR } }, alignment: { horizontal: "center", vertical: "center" }, border: bAll(BD) };
+    const sHdr = { font: { name: "Arial", sz: 10, bold: true, color: { rgb: WH } }, fill: { patternType: "solid", fgColor: { rgb: D } }, alignment: { horizontal: "center", vertical: "center", wrapText: true }, border: bAll("2A2420") };
+    const sDataL = (alt) => ({ font: { name: "Arial", sz: 10, color: { rgb: D } }, fill: { patternType: "solid", fgColor: { rgb: alt ? CL : WH } }, alignment: { horizontal: "left", vertical: "center", wrapText: true }, border: bAll(BD) });
+    const sDataC = (alt, bold, color) => ({ font: { name: "Arial", sz: 10, bold: !!bold, color: { rgb: color || D } }, fill: { patternType: "solid", fgColor: { rgb: alt ? CL : WH } }, alignment: { horizontal: "center", vertical: "center" }, border: bAll(BD) });
+    const HEAD = ["Fecha", "Hora", "Usuario", "Rol", "Tipo de carga", "Acci\xF3n", "Marca", "C\xF3digo", "Producto", "Categor\xEDa", "Stock/Cant.", "Precio (Bs.)"];
+    const NC = HEAD.length;
+    const filas = [];
+    cargas.forEach((c) => {
+      const items = c.items && c.items.length ? c.items : [{}];
+      items.forEach((it) => {
+        filas.push([
+          c.fecha,
+          c.hora,
+          c.nombre || c.usuario || "\u2014",
+          c.rol || "\u2014",
+          c.tipo === "IMPORT" ? "Importaci\xF3n Excel" : "Carga manual",
+          it.tipo === "update" ? "Actualizaci\xF3n stock" : "Producto nuevo",
+          it.marca || c.marcaNombre || "\u2014",
+          it.codigo || "",
+          it.nombre || "",
+          it.categoria || "",
+          it.tipo === "update" ? it.stockSumado ?? "" : it.stock ?? "",
+          it.precio ?? ""
+        ]);
+      });
+    });
+    const rows = [
+      ["TOSCANA HOUSE \u2014 TRAZABILIDAD DE CARGAS A INVENTARIO", ...Array(NC - 1).fill("")],
+      [`Generado: ${(/* @__PURE__ */ new Date()).toLocaleDateString("es-BO")} ${(/* @__PURE__ */ new Date()).toLocaleTimeString("es-BO", { hour: "2-digit", minute: "2-digit" })} \xB7 ${cargas.length} carga(s) \xB7 ${filas.length} \xEDtem(s)`, ...Array(NC - 1).fill("")],
+      [],
+      HEAD,
+      ...filas
+    ];
+    const rTablaHdr = 3, rItemsStart = 4, rItemsEnd = 4 + filas.length - 1;
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    ws["!cols"] = [{ wch: 11 }, { wch: 9 }, { wch: 14 }, { wch: 9 }, { wch: 16 }, { wch: 16 }, { wch: 14 }, { wch: 14 }, { wch: 32 }, { wch: 14 }, { wch: 11 }, { wch: 11 }];
+    ws["!merges"] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: NC - 1 } }, { s: { r: 1, c: 0 }, e: { r: 1, c: NC - 1 } }];
+    Srow(ws, 0, NC, sTitulo);
+    Srow(ws, 1, NC, sMeta);
+    HEAD.forEach((_, c) => S(ws, rTablaHdr, c, sHdr));
+    for (let r = rItemsStart; r <= rItemsEnd; r++) {
+      const alt = (r - rItemsStart) % 2 === 1;
+      HEAD.forEach((_, c) => {
+        if (c === 10 || c === 11) S(ws, r, c, sDataC(alt));
+        else S(ws, r, c, sDataL(alt));
+      });
+    }
+    if (filas.length === 0) Srow(ws, rItemsStart, NC, sDataL(false));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Cargas Inventario");
+    const buf = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+    const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+    descargarArchivo(blob, `TH_Trazabilidad_Cargas_${hoy().replace(/\//g, "-")}.xlsx`);
+  }
   function sendWA(venta) {
     const lines = venta.items.map((it) => {
       const m = MARCAS.find((x) => x.id === it.marcaId);
@@ -24526,7 +24643,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
     const GROUPS = customGroups || [
       { label: "Principal", ids: ["inicio", "pos", "ventas"] },
       { label: "Gesti\xF3n", ids: ["inventario", "marcas", "liquidaciones", "giftcards"] },
-      { label: "Sistema", ids: ["auditoria", "config"] }
+      { label: "Sistema", ids: ["auditoria", "cargas", "config"] }
     ];
     const DOT = customDot || {
       inicio: "#8A6418",
@@ -24534,6 +24651,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       ventas: "#1E3A5F",
       inventario: "#166534",
       auditoria: "#7A1F1F",
+      cargas: "#1565C0",
       marcas: "#5B2D8E",
       liquidaciones: "#991B1B",
       giftcards: "#92400E",
@@ -28658,7 +28776,7 @@ Fecha: ${venta.fecha}`);
       ))))))
     );
   }
-  function BrandPortal({ user, ventas, inv, logout }) {
+  function BrandPortal({ user, ventas, inv, cargas, logout }) {
     const isDesktop = useIsDesktop();
     const now = /* @__PURE__ */ new Date();
     const [mes, setMes] = (0, import_react.useState)(now.getMonth());
@@ -28833,16 +28951,18 @@ Fecha: ${venta.fecha}`);
       { id: "dashboard", icon: "\u229E", label: "Inicio" },
       { id: "ventas", icon: "\u25C8", label: "Ventas" },
       { id: "inventario", icon: "\u25EB", label: "Inventario" },
+      { id: "cargas", icon: "\u{1F9FE}", label: "Cargas" },
       { id: "liquidacion", icon: "\u25CE", label: "Liquidar" }
     ];
     const BRAND_GROUPS = [
       { label: "Principal", ids: ["dashboard", "ventas"] },
-      { label: "Gesti\xF3n", ids: ["inventario", "liquidacion"] }
+      { label: "Gesti\xF3n", ids: ["inventario", "cargas", "liquidacion"] }
     ];
     const BRAND_DOT = {
       dashboard: "#8A6418",
       ventas: "#1E3A5F",
       inventario: "#166534",
+      cargas: "#1565C0",
       liquidacion: "#991B1B"
     };
     const MesSel = /* @__PURE__ */ import_react.default.createElement(
@@ -29322,7 +29442,7 @@ Fecha: ${venta.fecha}`);
       borderRadius: 2,
       width: `${(p.stockInicial || p.stock) > 0 ? Math.round(p.stock / (p.stockInicial || p.stock) * 100) : 0}%`,
       transition: "width .3s"
-    } }))))))), tab === "liquidacion" && /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+    } }))))))), tab === "cargas" && /* @__PURE__ */ import_react.default.createElement(RegistroCargas, { cargas: cargas || [], marcas: MARCAS, marcaId: mid }), tab === "liquidacion" && /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: {
       background: `${marca.color}15`,
       borderRadius: 18,
       padding: 16,
@@ -31384,6 +31504,7 @@ Fecha: ${venta.fecha}`);
         return [];
       }
     });
+    const [cargas, setCargas] = (0, import_react.useState)([]);
     const [ventaDetalle, setVentaDetalle] = (0, import_react.useState)(null);
     const [shImportarExcel, setShImportarExcel] = (0, import_react.useState)(false);
     const [modalNuevaMarca, setModalNuevaMarca] = (0, import_react.useState)(false);
@@ -31479,9 +31600,18 @@ Fecha: ${venta.fecha}`);
         if (data.length > 0) setAuditorias(data);
       });
     }, []);
+    (0, import_react.useEffect)(() => {
+      sbCargarCargas().then((data) => {
+        if (data.length > 0) setCargas(data);
+      });
+    }, []);
     function registrarAuditoria(aud) {
       setAuditorias((prev) => [aud, ...prev]);
       sbGuardarAuditoria(aud);
+    }
+    function registrarCarga(carga) {
+      setCargas((prev) => [carga, ...prev]);
+      sbGuardarCarga(carga);
     }
     function registrarRetiro(r) {
       const updated = [...retiros, r];
@@ -31596,6 +31726,24 @@ Fecha: ${venta.fecha}`);
       setInv((p) => [...p, prod]);
       drive.syncProducto(prod);
       sbGuardarProducto(prod);
+      registrarCarga(crearCarga("MANUAL", user, {
+        marcaId: prod.marcaId,
+        marcaNombre: prod.marcaNombre,
+        resumen: `Carga manual: ${prod.nombre} (${prod.codigo})`,
+        totalItems: 1,
+        nuevos: 1,
+        actualizados: 0,
+        items: [{
+          tipo: "create",
+          codigo: prod.codigo,
+          nombre: prod.nombre,
+          marca: prod.marcaNombre,
+          marcaId: prod.marcaId,
+          stock: prod.stock,
+          precio: prod.precio,
+          categoria: prod.categoria
+        }]
+      }));
       setFInv({ marcaId: "", nombre: "", categoria: "", precio: "", stock: "", fecha: hoy() });
       setShInv(false);
       setTimeout(() => imprimirTicket(prod, marca?.nombre || "Toscana House"), 300);
@@ -31639,6 +31787,7 @@ Fecha: ${venta.fecha}`);
           codigo,
           nombre: prod?.nombre || codigo,
           marca: prod?.marcaNombre || "\u2014",
+          marcaId: prod?.marcaId ?? null,
           stockAntes,
           stockNuevo,
           stockSumado: stock
@@ -31657,6 +31806,7 @@ Fecha: ${venta.fecha}`);
           codigo: producto.codigo,
           nombre: producto.nombre,
           marca: producto.marcaNombre || "\u2014",
+          marcaId: producto.marcaId ?? null,
           stock: producto.stock,
           precio: producto.precio,
           categoria: producto.categoria
@@ -31669,6 +31819,7 @@ Fecha: ${venta.fecha}`);
         const nuevos = buf.filter((i) => i.tipo === "create").length;
         const actualizados = buf.filter((i) => i.tipo === "update").length;
         const marcas = [...new Set(buf.map((i) => i.marca).filter(Boolean))].join(", ");
+        const marcaIds = [...new Set(buf.map((i) => i.marcaId).filter((id) => id != null))];
         logAudit("IMPORT", {
           resumen: `Importaci\xF3n: ${nuevos} nuevos + ${actualizados} actualizados \xB7 ${marcas}`,
           nuevos,
@@ -31677,6 +31828,15 @@ Fecha: ${venta.fecha}`);
           marcas,
           items: buf
         }, user);
+        registrarCarga(crearCarga("IMPORT", user, {
+          marcaId: marcaIds.length === 1 ? marcaIds[0] : null,
+          marcaNombre: marcas,
+          resumen: `Importaci\xF3n: ${nuevos} nuevos + ${actualizados} actualizados \xB7 ${marcas}`,
+          nuevos,
+          actualizados,
+          totalItems: buf.length,
+          items: buf
+        }));
         _importBuf.current.items = [];
       }, 800);
     }
@@ -31776,15 +31936,16 @@ Fecha: ${venta.fecha}`);
       { id: "ventas", icon: "\u25C8", label: "Ventas" },
       { id: "inventario", icon: "\u25EB", label: "Inventario" },
       { id: "auditoria", icon: "\u2316", label: "Auditor\xEDa" },
+      { id: "cargas", icon: "\u{1F9FE}", label: "Cargas" },
       { id: "marcas", icon: "\u25C6", label: "Marcas" },
       { id: "liquidaciones", icon: "\u25CE", label: "Liquidar" },
       { id: "giftcards", icon: "\u{1F381}", label: "Gift" },
       { id: "config", icon: "\u2699", label: "Config" }
     ];
-    const TABS = user?.rol === "caja" ? TABS_ALL.filter((t) => ["inicio", "pos", "ventas"].includes(t.id)) : user?.rol === "admin" ? TABS_ALL : TABS_ALL.filter((t) => t.id !== "auditoria");
+    const TABS = user?.rol === "caja" ? TABS_ALL.filter((t) => ["inicio", "pos", "ventas"].includes(t.id)) : user?.rol === "admin" ? TABS_ALL : TABS_ALL.filter((t) => t.id !== "auditoria" && t.id !== "cargas");
     const showingDetail = tab === "marcas" && marcaDetalle;
     if (!user) return /* @__PURE__ */ import_react.default.createElement(LoginScreen, { onLogin: login });
-    if (user.rol === "marca") return /* @__PURE__ */ import_react.default.createElement(BrandPortal, { user, ventas, inv, logout });
+    if (user.rol === "marca") return /* @__PURE__ */ import_react.default.createElement(BrandPortal, { user, ventas, inv, cargas, logout });
     const _liqPagos = sumPagos(vMes);
     const liqEf = _liqPagos.efectivo;
     const liqQr = _liqPagos.qr;
@@ -31971,7 +32132,7 @@ Fecha: ${venta.fecha}`);
         onGuardarAuditoria: registrarAuditoria,
         user
       }
-    ), tab === "marcas" && !marcaDetalle && /* @__PURE__ */ import_react.default.createElement("div", null, marcasState.filter((m) => m.estado === "inactiva").length > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: {
+    ), tab === "cargas" && /* @__PURE__ */ import_react.default.createElement(RegistroCargas, { cargas, marcas: MARCAS }), tab === "marcas" && !marcaDetalle && /* @__PURE__ */ import_react.default.createElement("div", null, marcasState.filter((m) => m.estado === "inactiva").length > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: {
       fontSize: 13,
       fontWeight: 600,
       color: C.label3,
@@ -34161,6 +34322,220 @@ Confirmas que el conteo de ${r.contado} unidad(es) es correcto.`)) {
       } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.label2 } }, "Valor de sobrantes"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontWeight: 700, color: C.blue } }, "+", $(Math.round(a.valorSobrante || 0)))), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => exportAuditoriaExcel(a), full: true, small: true, icon: "\u2B07" }, "Exportar Excel")));
     }))));
   }
+  function RegistroCargas({ cargas, marcas, marcaId = null }) {
+    const isDesktop = useIsDesktop();
+    const fijaMarca = marcaId != null;
+    const [marcaSelec, setMarcaSelec] = (0, import_react.useState)(marcaId);
+    const [filTipo, setFilTipo] = (0, import_react.useState)("");
+    const [filUsuario, setFilUsuario] = (0, import_react.useState)("");
+    const [desde, setDesde] = (0, import_react.useState)("");
+    const [hasta, setHasta] = (0, import_react.useState)("");
+    const [abierta, setAbierta] = (0, import_react.useState)(null);
+    const [exportando, setExportando] = (0, import_react.useState)(false);
+    const usuarios = (0, import_react.useMemo)(() => [...new Set(cargas.map((c) => c.nombre).filter((n) => n && n !== "\u2014"))].sort(), [cargas]);
+    function fechaKey(f) {
+      const [d, m, y] = (f || "").split("/");
+      return y && m && d ? `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}` : "";
+    }
+    const filtradas = (0, import_react.useMemo)(() => cargas.filter((c) => {
+      if (marcaSelec != null) {
+        const enMarca = c.marcaId === marcaSelec || (c.items || []).some((it) => it.marcaId === marcaSelec);
+        if (!enMarca) return false;
+      }
+      if (filTipo && c.tipo !== filTipo) return false;
+      if (filUsuario && c.nombre !== filUsuario) return false;
+      const fk = fechaKey(c.fecha);
+      if (desde && fk && fk < desde) return false;
+      if (hasta && fk && fk > hasta) return false;
+      return true;
+    }), [cargas, marcaSelec, filTipo, filUsuario, desde, hasta]);
+    function itemsDe(c) {
+      return marcaSelec != null ? (c.items || []).filter((it) => it.marcaId === marcaSelec) : c.items || [];
+    }
+    const totalItems = (0, import_react.useMemo)(() => filtradas.reduce((s, c) => s + itemsDe(c).length, 0), [filtradas, marcaSelec]);
+    async function exportar() {
+      setExportando(true);
+      try {
+        const data = filtradas.map((c) => ({ ...c, items: itemsDe(c) }));
+        await exportCargasExcel(data, marcas);
+      } finally {
+        setExportando(false);
+      }
+    }
+    return /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      background: C.bg1,
+      borderRadius: 16,
+      padding: 18,
+      marginBottom: 14,
+      border: `1px solid ${C.sep}`,
+      boxShadow: "0 1px 4px rgba(0,0,0,0.06)"
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      fontSize: 16,
+      fontWeight: 700,
+      color: C.label,
+      fontFamily: FONT,
+      marginBottom: 6,
+      display: "flex",
+      alignItems: "center",
+      gap: 8
+    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 20 } }, "\u{1F9FE}"), " Trazabilidad de Cargas"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12.5, color: C.label3, fontFamily: FONT, lineHeight: 1.5 } }, "Registro de todas las cargas a inventario \u2014 individuales y por importaci\xF3n de Excel \u2014 con fecha, hora, usuario y detalle de lo cargado.")), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 14 } }, /* @__PURE__ */ import_react.default.createElement(StatCard, { icon: "\u{1F4E5}", label: "Cargas registradas", value: filtradas.length, color: C.indigo, compact: isDesktop }), /* @__PURE__ */ import_react.default.createElement(StatCard, { icon: "\u{1F4E6}", label: "\xCDtems cargados", value: totalItems, color: C.blue, compact: isDesktop })), !fijaMarca && /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 12 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      fontSize: 10,
+      fontWeight: 600,
+      color: C.label3,
+      textTransform: "uppercase",
+      letterSpacing: 0.8,
+      marginBottom: 8,
+      paddingLeft: 2
+    } }, "Filtrar por marca"), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      display: "flex",
+      gap: 6,
+      overflowX: "auto",
+      paddingBottom: 6,
+      scrollbarWidth: "none",
+      WebkitOverflowScrolling: "touch"
+    } }, /* @__PURE__ */ import_react.default.createElement("button", { onClick: () => setMarcaSelec(null), style: {
+      flexShrink: 0,
+      padding: "7px 14px",
+      borderRadius: 10,
+      border: `1.5px solid ${marcaSelec == null ? C.label : C.sep}`,
+      background: marcaSelec == null ? C.label : C.bg2,
+      color: marcaSelec == null ? "#fff" : C.label2,
+      cursor: "pointer",
+      fontFamily: FONT,
+      fontSize: 11,
+      fontWeight: 600,
+      WebkitTapHighlightColor: "transparent",
+      whiteSpace: "nowrap",
+      letterSpacing: "0.04em",
+      textTransform: "uppercase",
+      transition: "all .18s"
+    } }, "TODAS"), marcas.map((m) => {
+      const activa = m.id === marcaSelec;
+      return /* @__PURE__ */ import_react.default.createElement("button", { key: m.id, onClick: () => setMarcaSelec(activa ? null : m.id), style: {
+        flexShrink: 0,
+        padding: "6px 12px",
+        borderRadius: 10,
+        border: `1.5px solid ${activa ? m.color : C.sep}`,
+        background: activa ? `${m.color}22` : C.bg2,
+        cursor: "pointer",
+        fontFamily: FONT,
+        WebkitTapHighlightColor: "transparent",
+        display: "flex",
+        alignItems: "center",
+        gap: 6,
+        transition: "all .18s"
+      } }, /* @__PURE__ */ import_react.default.createElement(MarcaIcon, { marca: m, size: 16, radius: 4 }), /* @__PURE__ */ import_react.default.createElement("span", { style: {
+        fontSize: 11,
+        fontWeight: activa ? 700 : 400,
+        color: activa ? m.color : C.label2,
+        whiteSpace: "nowrap"
+      } }, m.nombre));
+    }))), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 14 } }, /* @__PURE__ */ import_react.default.createElement("select", { value: filTipo, onChange: (e) => setFilTipo(e.target.value), style: {
+      flex: isDesktop ? "0 0 auto" : "1 1 140px",
+      padding: "9px 12px",
+      border: `1px solid ${C.sep}`,
+      borderRadius: 9,
+      background: C.bg1,
+      fontSize: 12.5,
+      color: C.label,
+      fontFamily: FONT,
+      outline: "none"
+    } }, /* @__PURE__ */ import_react.default.createElement("option", { value: "" }, "Todos los tipos"), /* @__PURE__ */ import_react.default.createElement("option", { value: "MANUAL" }, "Carga manual"), /* @__PURE__ */ import_react.default.createElement("option", { value: "IMPORT" }, "Importaci\xF3n Excel")), /* @__PURE__ */ import_react.default.createElement("select", { value: filUsuario, onChange: (e) => setFilUsuario(e.target.value), style: {
+      flex: isDesktop ? "0 0 auto" : "1 1 140px",
+      padding: "9px 12px",
+      border: `1px solid ${C.sep}`,
+      borderRadius: 9,
+      background: C.bg1,
+      fontSize: 12.5,
+      color: C.label,
+      fontFamily: FONT,
+      outline: "none"
+    } }, /* @__PURE__ */ import_react.default.createElement("option", { value: "" }, "Todos los usuarios"), usuarios.map((u) => /* @__PURE__ */ import_react.default.createElement("option", { key: u, value: u }, u))), /* @__PURE__ */ import_react.default.createElement("input", { type: "date", value: desde, onChange: (e) => setDesde(e.target.value), style: {
+      flex: isDesktop ? "0 0 auto" : "1 1 140px",
+      padding: "9px 12px",
+      border: `1px solid ${C.sep}`,
+      borderRadius: 9,
+      background: C.bg1,
+      fontSize: 12.5,
+      color: C.label,
+      fontFamily: FONT,
+      outline: "none"
+    } }), /* @__PURE__ */ import_react.default.createElement("input", { type: "date", value: hasta, onChange: (e) => setHasta(e.target.value), style: {
+      flex: isDesktop ? "0 0 auto" : "1 1 140px",
+      padding: "9px 12px",
+      border: `1px solid ${C.sep}`,
+      borderRadius: 9,
+      background: C.bg1,
+      fontSize: 12.5,
+      color: C.label,
+      fontFamily: FONT,
+      outline: "none"
+    } })), /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 14 } }, /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: exportar, full: true, small: true, icon: "\u2B07", disabled: exportando || filtradas.length === 0 }, exportando ? "Generando\u2026" : "Exportar Excel")), filtradas.length === 0 ? /* @__PURE__ */ import_react.default.createElement(
+      EmptyState,
+      {
+        icon: "\u{1F9FE}",
+        title: "Sin cargas registradas",
+        sub: "Cuando se agregue un producto manualmente o se importe un Excel, aparecer\xE1 aqu\xED"
+      }
+    ) : /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 10 } }, filtradas.map((c) => {
+      const abierto = abierta === c.id;
+      const items = itemsDe(c);
+      const tipoInfo = c.tipo === "IMPORT" ? { label: "Importaci\xF3n Excel", icon: "\u{1F4E5}", color: C.blue } : { label: "Carga manual", icon: "\u270D\uFE0F", color: C.green };
+      return /* @__PURE__ */ import_react.default.createElement("div", { key: c.id, style: {
+        background: C.bg1,
+        borderRadius: 14,
+        border: `1px solid ${C.sep}`,
+        overflow: "hidden",
+        boxShadow: "0 1px 3px rgba(0,0,0,.06)"
+      } }, /* @__PURE__ */ import_react.default.createElement("div", { onClick: () => setAbierta(abierto ? null : c.id), style: {
+        padding: 14,
+        cursor: "pointer",
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        gap: 10
+      } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { minWidth: 0, flex: 1 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+        fontSize: 13,
+        fontWeight: 700,
+        color: C.label,
+        fontFamily: FONT,
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+        whiteSpace: "nowrap"
+      } }, c.resumen || "Carga de inventario"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT, marginTop: 2 } }, c.fecha, " \xB7 ", c.hora, " \xB7 ", c.nombre, " (", c.rol, ") \xB7 ", items.length, " \xEDtem", items.length !== 1 ? "s" : "")), /* @__PURE__ */ import_react.default.createElement(Chip, { color: tipoInfo.color, small: true }, tipoInfo.icon, " ", tipoInfo.label)), abierto && /* @__PURE__ */ import_react.default.createElement("div", { style: { padding: "0 14px 14px" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+        borderTop: `1px solid ${C.sep}`,
+        paddingTop: 10,
+        display: "flex",
+        flexDirection: "column",
+        gap: 6,
+        maxHeight: 320,
+        overflowY: "auto"
+      } }, items.length === 0 ? /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT } }, "Sin \xEDtems para esta marca") : items.map((it, i) => /* @__PURE__ */ import_react.default.createElement("div", { key: i, style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        padding: "6px 8px",
+        borderRadius: 8,
+        background: i % 2 === 0 ? C.bg2 : "transparent"
+      } }, /* @__PURE__ */ import_react.default.createElement("span", { style: {
+        fontSize: 10.5,
+        fontWeight: 700,
+        color: it.tipo === "update" ? C.blue : C.green,
+        background: it.tipo === "update" ? "#EEF2FF" : C.greenBg,
+        padding: "2px 6px",
+        borderRadius: 5,
+        flexShrink: 0
+      } }, it.tipo === "update" ? "STOCK" : "NUEVO"), /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+        fontSize: 12,
+        fontWeight: 600,
+        color: C.label,
+        fontFamily: FONT,
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+        whiteSpace: "nowrap"
+      } }, (it.nombre || "").toUpperCase()), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: C.label3, fontFamily: FONT_MONO } }, it.codigo, " \xB7 ", it.marca || "\u2014")), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label2, fontFamily: FONT, textAlign: "right", flexShrink: 0 } }, it.tipo === "update" ? `${it.stockAntes} \u2192 ${it.stockNuevo} (+${it.stockSumado})` : `Stock ${it.stock}${it.precio ? ` \xB7 ${$(it.precio)}` : ""}`))))));
+    })));
+  }
   function InventarioPorMarca({ inv, ventas, onRecibir, onBaja, onImportarExcel }) {
     const isDesktop = useIsDesktop();
     var _hN149 = (0, import_react.useState)(null);
@@ -35089,6 +35464,27 @@ Confirmas que el conteo de ${r.contado} unidad(es) es correcto.`)) {
     LOGIN: { label: "Acceso", icono: "\u{1F510}", color: "#546E7A" },
     CIERRE: { label: "Cierre", icono: "\u{1F4CA}", color: "#8A6418" }
   };
+  function crearCarga(tipo, usuario, extra) {
+    const now = /* @__PURE__ */ new Date();
+    return {
+      id: "CRG_" + Date.now() + "_" + Math.random().toString(36).slice(2, 6),
+      ts: Date.now(),
+      fecha: now.toLocaleDateString("es-BO"),
+      hora: now.toLocaleTimeString("es-BO", { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
+      tipo,
+      usuario: usuario?.usuario || usuario?.user || "\u2014",
+      nombre: usuario?.nombre || "\u2014",
+      rol: usuario?.rol || "\u2014",
+      marcaId: null,
+      marcaNombre: "\u2014",
+      resumen: "",
+      totalItems: 0,
+      nuevos: 0,
+      actualizados: 0,
+      items: [],
+      ...extra
+    };
+  }
   function logAudit(tipo, detalle, usuario) {
     try {
       const now = /* @__PURE__ */ new Date();
