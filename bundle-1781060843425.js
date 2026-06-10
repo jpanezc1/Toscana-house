@@ -35589,10 +35589,11 @@ Esta acci\xF3n no se puede deshacer.`,
     var marcaFiltro = _hN167[0];
     var setMarcaFiltro = _hN167[1];
     ;
+    const vMesActivas = (0, import_react.useMemo)(() => vMes.filter((v) => !v.anulada), [vMes]);
     const porMarca = (0, import_react.useMemo)(() => {
       return MARCAS.map((m) => {
         let efectivo = 0, qr = 0, tarjeta = 0, total = 0;
-        vMes.forEach((v) => {
+        vMesActivas.forEach((v) => {
           const brandSub = v.items.filter((i) => i.marcaId === m.id).reduce((s, i) => s + i.subtotal, 0);
           if (brandSub === 0) return;
           total += brandSub;
@@ -35602,11 +35603,11 @@ Esta acci\xF3n no se puede deshacer.`,
           qr += p.qr * pct;
           tarjeta += p.tarjeta * pct;
         });
-        const txs = vMes.filter((v) => v.items.some((i) => i.marcaId === m.id)).length;
+        const txs = vMesActivas.filter((v) => v.items.some((i) => i.marcaId === m.id)).length;
         return { marca: m, total, efectivo, qr, tarjeta, txs };
       }).filter((x) => x.total > 0).sort((a, b) => b.total - a.total);
-    }, [vMes]);
-    const _pagMes = sumPagos(vMes);
+    }, [vMesActivas]);
+    const _pagMes = sumPagos(vMesActivas);
     const totalEfectivo = _pagMes.efectivo;
     const totalQR = _pagMes.qr;
     const totalTarjeta = _pagMes.tarjeta;
@@ -35623,7 +35624,7 @@ Esta acci\xF3n no se puede deshacer.`,
       display: "flex",
       justifyContent: "space-between",
       alignItems: "center"
-    } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.7, marginBottom: 3 } }, "Total ", MESES[mes]), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: isDesktop ? 22 : 28, fontWeight: 700, color: C.label, fontFamily: FONT, lineHeight: 1 } }, $(totalVtas)), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT, marginTop: 3 } }, vMes.length, " transacciones \xB7 ", porMarca.length, " marcas activas")), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: isDesktop ? 28 : 36, opacity: 0.4 } }, "\u{1F4B0}")), [
+    } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.7, marginBottom: 3 } }, "Total ", MESES[mes]), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: isDesktop ? 22 : 28, fontWeight: 700, color: C.label, fontFamily: FONT, lineHeight: 1 } }, $(totalVtas)), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT, marginTop: 3 } }, vMesActivas.length, " transacciones \xB7 ", porMarca.length, " marcas activas")), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: isDesktop ? 28 : 36, opacity: 0.4 } }, "\u{1F4B0}")), [
       { icon: "\u{1F4B5}", label: "Efectivo", value: totalEfectivo, color: "#4A9B6F" },
       { icon: "\u{1F4F1}", label: "QR", value: totalQR, color: "#5B8DB8" },
       { icon: "\u{1F4B3}", label: "Tarjeta", value: totalTarjeta, color: "#C8922A" }
@@ -35679,7 +35680,7 @@ Esta acci\xF3n no se puede deshacer.`,
         alignItems: "center",
         justifyContent: "center",
         flexShrink: 0
-      } }, /* @__PURE__ */ import_react.default.createElement(MarcaIcon, { marca: x.marca, size: isDesktop ? 16 : 18, radius: 5 })), /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: isDesktop ? 13 : 14, fontWeight: 600, color: C.label, fontFamily: FONT } }, x.marca.nombre), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: C.label3, fontFamily: FONT, opacity: 0.65 } }, x.txs, " venta", x.txs !== 1 ? "s" : ""))), /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "right" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: isDesktop ? 15 : 17, fontWeight: 700, color: C.label, fontFamily: FONT, letterSpacing: "-0.01em" } }, $(x.total)), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: C.label3, fontFamily: FONT, opacity: 0.65 } }, Math.round(x.total / totalVtas * 100), "% del total"))),
+      } }, /* @__PURE__ */ import_react.default.createElement(MarcaIcon, { marca: x.marca, size: isDesktop ? 16 : 18, radius: 5 })), /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: isDesktop ? 13 : 14, fontWeight: 600, color: C.label, fontFamily: FONT } }, x.marca.nombre), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: C.label3, fontFamily: FONT, opacity: 0.65 } }, x.txs, " venta", x.txs !== 1 ? "s" : ""))), /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "right" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: isDesktop ? 15 : 17, fontWeight: 700, color: C.label, fontFamily: FONT, letterSpacing: "-0.01em" } }, $(x.total)), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: C.label3, fontFamily: FONT, opacity: 0.65 } }, Math.round(totalVtas > 0 ? x.total / totalVtas * 100 : 0), "% del total"))),
       /* @__PURE__ */ import_react.default.createElement("div", { style: { background: "rgba(0,0,0,0.05)", borderRadius: 4, height: isDesktop ? 3 : 4, marginBottom: isDesktop ? 5 : 8, overflow: "hidden" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
         width: `${x.total / maxVenta * 100}%`,
         background: x.marca.color,

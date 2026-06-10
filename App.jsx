@@ -13277,11 +13277,14 @@ function VentasTab({vMes, totalVtas, mes, anio, onVentaClick}){
   var _hN166 = useState("marcas"); var vistaActiva = _hN166[0]; var setVistaActiva = _hN166[1];; // "marcas" | "historial"
   var _hN167 = useState(null); var marcaFiltro = _hN167[0]; var setMarcaFiltro = _hN167[1];; // id marca o null = todas
 
+  // Ventas activas (excluye anuladas) — para totales, montos y desglose por marca
+  const vMesActivas = useMemo(()=>vMes.filter(v=>!v.anulada),[vMes]);
+
   // Calcular ventas por marca con desglose de método de pago — mixto distribuido
   const porMarca = useMemo(()=>{
     return MARCAS.map(m=>{
       let efectivo=0, qr=0, tarjeta=0, total=0;
-      vMes.forEach(v=>{
+      vMesActivas.forEach(v=>{
         const brandSub=v.items.filter(i=>i.marcaId===m.id).reduce((s,i)=>s+i.subtotal,0);
         if(brandSub===0) return;
         total+=brandSub;
@@ -13291,12 +13294,12 @@ function VentasTab({vMes, totalVtas, mes, anio, onVentaClick}){
         qr      +=p.qr*pct;
         tarjeta +=p.tarjeta*pct;
       });
-      const txs=vMes.filter(v=>v.items.some(i=>i.marcaId===m.id)).length;
+      const txs=vMesActivas.filter(v=>v.items.some(i=>i.marcaId===m.id)).length;
       return {marca:m, total, efectivo, qr, tarjeta, txs};
     }).filter(x=>x.total>0).sort((a,b)=>b.total-a.total);
-  },[vMes]);
+  },[vMesActivas]);
 
-  const _pagMes   = sumPagos(vMes);
+  const _pagMes   = sumPagos(vMesActivas);
   const totalEfectivo = _pagMes.efectivo;
   const totalQR       = _pagMes.qr;
   const totalTarjeta  = _pagMes.tarjeta;
@@ -13317,7 +13320,7 @@ function VentasTab({vMes, totalVtas, mes, anio, onVentaClick}){
           <div>
             <div style={{fontSize:11,color:C.label3,fontWeight:700,textTransform:"uppercase",letterSpacing:.7,marginBottom:3}}>Total {MESES[mes]}</div>
             <div style={{fontSize: isDesktop ? 22 : 28,fontWeight:700,color:C.label,fontFamily:FONT,lineHeight:1}}>{$(totalVtas)}</div>
-            <div style={{fontSize:12,color:C.label3,fontFamily:FONT,marginTop:3}}>{vMes.length} transacciones · {porMarca.length} marcas activas</div>
+            <div style={{fontSize:12,color:C.label3,fontFamily:FONT,marginTop:3}}>{vMesActivas.length} transacciones · {porMarca.length} marcas activas</div>
           </div>
           <div style={{fontSize: isDesktop ? 28 : 36,opacity:.4}}>💰</div>
         </div>
@@ -13374,7 +13377,7 @@ function VentasTab({vMes, totalVtas, mes, anio, onVentaClick}){
                     <div style={{textAlign:"right"}}>
                       <div style={{fontSize: isDesktop ? 15 : 17, fontWeight:700, color:C.label, fontFamily:FONT,letterSpacing:"-0.01em"}}>{$(x.total)}</div>
                       <div style={{fontSize:10,color:C.label3,fontFamily:FONT,opacity:.65}}>
-                        {Math.round((x.total/totalVtas)*100)}% del total
+                        {Math.round(totalVtas>0?(x.total/totalVtas)*100:0)}% del total
                       </div>
                     </div>
                   </div>
