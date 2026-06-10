@@ -4477,8 +4477,13 @@ function generarPlanillaAlquileres(ventas, mes, anio) {
     const totalDesc = alq.alquiler + comision;
     const liquido = bruto - totalDesc;
     
+    const img = getMarcaImg(m);
+    const icono = img
+      ? `<img src="${img}" style="width:18px;height:18px;border-radius:4px;object-fit:cover;vertical-align:middle;margin-right:6px"/>`
+      : `<span style="margin-right:6px">${m.emoji}</span>`;
+
     return `<tr style="border-bottom:1px solid #eee">
-      <td style="padding:8px 12px">${m.emoji} ${m.nombre}</td>
+      <td style="padding:8px 12px">${icono}${m.nombre}</td>
       <td style="padding:8px 12px;text-align:right">Bs ${bruto.toFixed(2)}</td>
       <td style="padding:8px 12px;text-align:right">Bs ${alq.alquiler.toFixed(2)}</td>
       <td style="padding:8px 12px;text-align:right">${alq.comision > 0 ? `${alq.comision}% = Bs ${comision.toFixed(2)}` : '—'}</td>
