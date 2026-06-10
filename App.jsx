@@ -11290,17 +11290,28 @@ function MarcaDetalle({marcaId,inv,ventas,vMes,mes,anio,MK,cierres,setCierres,ge
                 <span style={{fontSize:13,fontWeight:600,color:"#7C3AED",fontFamily:FONT}}>{$(gcTotal)}</span>
               </div>
             )}
+            <div style={{padding:"12px 16px",borderBottom:`1px solid ${C.sep}`}}>
+              <div style={{fontSize:11,fontWeight:700,color:C.label3,textTransform:"uppercase",
+                letterSpacing:.6,marginBottom:8,fontFamily:FONT}}>Desglose por método de pago</div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
+                {[
+                  {label:"Efectivo",val:liq.brutoEf,color:C.green},
+                  {label:"QR",val:liq.brutoQR,color:C.blue},
+                  {label:`Tarjeta (-${liq.cfg?.pctTarjeta ?? 0}%)`,val:liq.brutoTJ,color:C.amber},
+                ].map(s=>(
+                  <div key={s.label} style={{textAlign:"center",padding:"9px 8px",
+                    background:`${s.color}10`,borderRadius:12}}>
+                    <div style={{fontSize:14,fontWeight:700,color:C.label,fontFamily:FONT,letterSpacing:"-0.01em"}}>{$(Math.round(s.val))}</div>
+                    <div style={{fontSize:10,color:C.label3,fontFamily:FONT,marginTop:2,opacity:.7}}>{s.label}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
             {[
               ["Ventas brutas", $(liq.bruto), C.label, false],
-              liq.descTJ > 0
-                ? [`− Desc. Tarjeta (${liq.cfg?.pctTarjeta ?? 2.5}%)`, `-${$(liq.descTJ)}`, C.red, false]
-                : null,
-              liq.descTJ > 0
-                ? [`= Subtotal -${liq.cfg?.pctTarjeta ?? 2.5}%`, $(liq.subBanco), C.label2, false]
-                : null,
-              (liq.cfg?.pctComision > 0)
-                ? [`− Comisión ventas (${liq.cfg?.pctComision ?? 0}%)`, `-${$(liq.comision)}`, C.red, false]
-                : null,
+              [`− Desc. Tarjeta (${liq.cfg?.pctTarjeta ?? 0}%)`, `-${$(liq.descTJ)}`, C.red, false],
+              [`= Subtotal -${liq.cfg?.pctTarjeta ?? 0}%`, $(liq.subBanco), C.label2, false],
+              [`− Comisión ventas (${liq.cfg?.pctComision ?? 0}%)`, `-${$(liq.comision)}`, C.red, false],
               (liq.alquiler > 0)
                 ? [`− Alquiler`, `-${$(liq.alquiler)}`, C.amber, false]
                 : null,

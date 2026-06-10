@@ -33556,11 +33556,28 @@ Fecha: ${venta.fecha}`);
       padding: "10px 16px",
       background: "#7C3AED08",
       borderBottom: `1px solid ${C.sep}`
-    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, color: "#7C3AED", fontFamily: FONT } }, "\u{1F381} Gift Card (", gcVentas, " venta", gcVentas !== 1 ? "s" : "", ")"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, fontWeight: 600, color: "#7C3AED", fontFamily: FONT } }, $(gcTotal))), [
+    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, color: "#7C3AED", fontFamily: FONT } }, "\u{1F381} Gift Card (", gcVentas, " venta", gcVentas !== 1 ? "s" : "", ")"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, fontWeight: 600, color: "#7C3AED", fontFamily: FONT } }, $(gcTotal))), /* @__PURE__ */ import_react.default.createElement("div", { style: { padding: "12px 16px", borderBottom: `1px solid ${C.sep}` } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      fontSize: 11,
+      fontWeight: 700,
+      color: C.label3,
+      textTransform: "uppercase",
+      letterSpacing: 0.6,
+      marginBottom: 8,
+      fontFamily: FONT
+    } }, "Desglose por m\xE9todo de pago"), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 } }, [
+      { label: "Efectivo", val: liq.brutoEf, color: C.green },
+      { label: "QR", val: liq.brutoQR, color: C.blue },
+      { label: `Tarjeta (-${liq.cfg?.pctTarjeta ?? 0}%)`, val: liq.brutoTJ, color: C.amber }
+    ].map((s) => /* @__PURE__ */ import_react.default.createElement("div", { key: s.label, style: {
+      textAlign: "center",
+      padding: "9px 8px",
+      background: `${s.color}10`,
+      borderRadius: 12
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 14, fontWeight: 700, color: C.label, fontFamily: FONT, letterSpacing: "-0.01em" } }, $(Math.round(s.val))), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: C.label3, fontFamily: FONT, marginTop: 2, opacity: 0.7 } }, s.label))))), [
       ["Ventas brutas", $(liq.bruto), C.label, false],
-      liq.descTJ > 0 ? [`\u2212 Desc. Tarjeta (${liq.cfg?.pctTarjeta ?? 2.5}%)`, `-${$(liq.descTJ)}`, C.red, false] : null,
-      liq.descTJ > 0 ? [`= Subtotal -${liq.cfg?.pctTarjeta ?? 2.5}%`, $(liq.subBanco), C.label2, false] : null,
-      liq.cfg?.pctComision > 0 ? [`\u2212 Comisi\xF3n ventas (${liq.cfg?.pctComision ?? 0}%)`, `-${$(liq.comision)}`, C.red, false] : null,
+      [`\u2212 Desc. Tarjeta (${liq.cfg?.pctTarjeta ?? 0}%)`, `-${$(liq.descTJ)}`, C.red, false],
+      [`= Subtotal -${liq.cfg?.pctTarjeta ?? 0}%`, $(liq.subBanco), C.label2, false],
+      [`\u2212 Comisi\xF3n ventas (${liq.cfg?.pctComision ?? 0}%)`, `-${$(liq.comision)}`, C.red, false],
       liq.alquiler > 0 ? [`\u2212 Alquiler`, `-${$(liq.alquiler)}`, C.amber, false] : null,
       ...liq.gastos.filter((g) => g.desc || Number(g.monto) > 0).map(
         (g) => [`\u2212 ${g.desc || "Gasto extra"}`, `-${$(Math.round(Number(g.monto) || 0))}`, C.red, false]
