@@ -1720,7 +1720,7 @@ async function generarExcelMarca(marca, ventas, inventario, setGenerando) {
           [],
           ["","","","","","","","Ventas brutas",        +liqP.bruto.toFixed(2),"","",""],
           ["","","","","","","",`− Desc. Tarjeta (${liqP.cfg.pctTarjeta}%)`, -liqP.descTJ.toFixed(2),"","",""],
-          ["","","","","","","","Subtotal banco",        +liqP.subBanco.toFixed(2),"","",""],
+          ["","","","","","","",`Subtotal -${liqP.cfg.pctTarjeta}%`,+liqP.subBanco.toFixed(2),"","",""],
           ["","","","","","","",`− Comisión (${liqP.cfg.pctComision}%)`,  -liqP.comision.toFixed(2),"","",""],
           ["","","","","","","","− Alquiler",            -liqP.alquiler.toFixed(2),"","",""],
           ...liqP.gastos.filter(g=>g.desc||Number(g.monto)>0).map(g=>
@@ -1959,8 +1959,8 @@ async function exportExcelLiquidacion(marca,ventas,mes,anio){
     ["QR",                                        liq.brutoQR],
     ["Tarjeta",                                   liq.brutoTJ],
     ["Ventas brutas",                             liq.bruto],
-    [`Desc. banco Tarjeta (${liq.cfg.pctTarjeta}%)`, -liq.descTJ],
-    ["Subtotal sin banco",                        liq.subBanco],
+    [`Desc. Tarjeta (${liq.cfg.pctTarjeta}%)`,    -liq.descTJ],
+    [`Subtotal -${liq.cfg.pctTarjeta}%`,          liq.subBanco],
     [`Comisión ventas (${liq.cfg.pctComision}%)`, -liq.comision],
     ["Alquiler",                                  -liq.alquiler],
     ...liq.gastos.filter(g=>g.desc||Number(g.monto)>0).map(g=>
@@ -2091,8 +2091,8 @@ function construirMensajeLiquidacion(marca, mes, anio, datos){
     `💳 Tarjeta: ${$(Math.round(brutoTarjeta))}`,
     `*Ventas brutas: ${$(Math.round(bruto))}*`,
     ``,
-    `− Desc. banco Tarjeta (${pctTarjeta}%): -${$(Math.round(descTarjeta))}`,
-    `= Subtotal sin banco: ${$(Math.round(subtotalBanco))}`,
+    `− Desc. Tarjeta (${pctTarjeta}%): -${$(Math.round(descTarjeta))}`,
+    `= Subtotal -${pctTarjeta}%: ${$(Math.round(subtotalBanco))}`,
     `− Comisión ventas (${pctComision}%): -${$(Math.round(comision))}`,
   ];
   lines.push(`− Alquiler: -${$(alquiler)}`);
@@ -2114,8 +2114,8 @@ function imprimirLiquidacion(marca, mes, anio, liq){
 
   const filas = [
     ["Ventas brutas", $(liq.bruto), false],
-    liq.descTJ>0 ? [`− Desc. banco Tarjeta (${liq.cfg?.pctTarjeta ?? 0}%)`, `-${$(liq.descTJ)}`, false] : null,
-    liq.descTJ>0 ? ["= Subtotal sin banco", $(liq.subBanco), false] : null,
+    liq.descTJ>0 ? [`− Desc. Tarjeta (${liq.cfg?.pctTarjeta ?? 0}%)`, `-${$(liq.descTJ)}`, false] : null,
+    liq.descTJ>0 ? [`= Subtotal -${liq.cfg?.pctTarjeta ?? 0}%`, $(liq.subBanco), false] : null,
     (liq.cfg?.pctComision>0) ? [`− Comisión ventas (${liq.cfg?.pctComision ?? 0}%)`, `-${$(liq.comision)}`, false] : null,
     (liq.alquiler>0) ? ["− Alquiler", `-${$(liq.alquiler)}`, false] : null,
     ...liq.gastos.filter(g=>g.desc||Number(g.monto)>0).map(g=>
@@ -2180,8 +2180,8 @@ function construirImagenLiquidacion(marca, mes, anio, d){
     ["QR", $(Math.round(d.brutoQR)), false],
     ["Tarjeta", $(Math.round(d.brutoTarjeta)), false],
     ["Ventas brutas", $(Math.round(d.bruto)), false],
-    [`− Desc. banco Tarjeta (${d.pctTarjeta ?? 0}%)`, `-${$(Math.round(d.descTarjeta))}`, false],
-    ["= Subtotal sin banco", $(Math.round(d.subtotalBanco)), false],
+    [`− Desc. Tarjeta (${d.pctTarjeta ?? 0}%)`, `-${$(Math.round(d.descTarjeta))}`, false],
+    [`= Subtotal -${d.pctTarjeta ?? 0}%`, $(Math.round(d.subtotalBanco)), false],
     [`− Comisión ventas (${d.pctComision ?? 0}%)`, `-${$(Math.round(d.comision))}`, false],
     ["− Alquiler", `-${$(d.alquiler)}`, false],
     ...d.gastos.filter(g=>g.desc||Number(g.monto)>0).map(g=>
@@ -3417,8 +3417,8 @@ function LiqModal({marcaId,ventas,mes,anio,MK,cierres,setCierres,onClose,syncCie
         {/* Cálculo paso a paso */}
         {[
           ["Ventas brutas",$(Math.round(bruto)),C.label],
-          [`− Desc. banco Tarjeta (${pctTarjeta}%)`,`-${$(Math.round(descTarjeta))}`,C.red],
-          [`= Subtotal sin banco`,$(Math.round(subtotalBanco)),C.label2],
+          [`− Desc. Tarjeta (${pctTarjeta}%)`,`-${$(Math.round(descTarjeta))}`,C.red],
+          [`= Subtotal -${pctTarjeta}%`,$(Math.round(subtotalBanco)),C.label2],
           [`− Comisión ventas (${pctComision}%)`,`-${$(Math.round(comision))}`,C.red],
           alquiler>0?[`− Alquiler`,`-${$(alquiler)}`,C.amber]:null,
           ...gastos.filter(g=>g.desc||Number(g.monto)>0).map(g=>
@@ -7297,7 +7297,7 @@ function BrandPortal({user, ventas, inv, logout}){
                 {label:"Tarjeta",                                         value:liq.brutoTJ,    sign:"",  color:C.label3,bold:false,sub:true},
                 ...(gcMarca>0?[{label:"Gift Cards",                       value:gcMarca,        sign:"",  color:"#7C3AED",bold:false,sub:true}]:[]),
                 {label:`Desc. Tarjeta (${liq.cfg.pctTarjeta}%)`,         value:-liq.descTJ,    sign:"−", color:C.red,   bold:false},
-                {label:"Subtotal banco",                                  value:liq.subBanco,   sign:"",  color:C.blue,  bold:true},
+                {label:`Subtotal -${liq.cfg.pctTarjeta}%`,                value:liq.subBanco,   sign:"",  color:C.blue,  bold:true},
                 {label:`Comisión Toscana (${liq.cfg.pctComision}%)`,      value:-liq.comision,  sign:"−", color:C.red,   bold:false},
                 {label:"Alquiler",                                        value:-liq.alquiler,  sign:"−", color:C.red,   bold:false},
                 ...gastos.filter(g=>g.desc||Number(g.monto)>0).map(g=>(
@@ -11276,10 +11276,10 @@ function MarcaDetalle({marcaId,inv,ventas,vMes,mes,anio,MK,cierres,setCierres,ge
             {[
               ["Ventas brutas", $(liq.bruto), C.label, false],
               liq.descTJ > 0
-                ? [`− Desc. banco Tarjeta (${liq.cfg?.pctTarjeta ?? 2.5}%)`, `-${$(liq.descTJ)}`, C.red, false]
+                ? [`− Desc. Tarjeta (${liq.cfg?.pctTarjeta ?? 2.5}%)`, `-${$(liq.descTJ)}`, C.red, false]
                 : null,
               liq.descTJ > 0
-                ? [`= Subtotal sin banco`, $(liq.subBanco), C.label2, false]
+                ? [`= Subtotal -${liq.cfg?.pctTarjeta ?? 2.5}%`, $(liq.subBanco), C.label2, false]
                 : null,
               (liq.cfg?.pctComision > 0)
                 ? [`− Comisión ventas (${liq.cfg?.pctComision ?? 0}%)`, `-${$(liq.comision)}`, C.red, false]

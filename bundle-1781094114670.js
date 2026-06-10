@@ -23262,7 +23262,7 @@
             [],
             ["", "", "", "", "", "", "", "Ventas brutas", +liqP.bruto.toFixed(2), "", "", ""],
             ["", "", "", "", "", "", "", `\u2212 Desc. Tarjeta (${liqP.cfg.pctTarjeta}%)`, -liqP.descTJ.toFixed(2), "", "", ""],
-            ["", "", "", "", "", "", "", "Subtotal banco", +liqP.subBanco.toFixed(2), "", "", ""],
+            ["", "", "", "", "", "", "", `Subtotal -${liqP.cfg.pctTarjeta}%`, +liqP.subBanco.toFixed(2), "", "", ""],
             ["", "", "", "", "", "", "", `\u2212 Comisi\xF3n (${liqP.cfg.pctComision}%)`, -liqP.comision.toFixed(2), "", "", ""],
             ["", "", "", "", "", "", "", "\u2212 Alquiler", -liqP.alquiler.toFixed(2), "", "", ""],
             ...liqP.gastos.filter((g) => g.desc || Number(g.monto) > 0).map(
@@ -23489,8 +23489,8 @@
       ["QR", liq.brutoQR],
       ["Tarjeta", liq.brutoTJ],
       ["Ventas brutas", liq.bruto],
-      [`Desc. banco Tarjeta (${liq.cfg.pctTarjeta}%)`, -liq.descTJ],
-      ["Subtotal sin banco", liq.subBanco],
+      [`Desc. Tarjeta (${liq.cfg.pctTarjeta}%)`, -liq.descTJ],
+      [`Subtotal -${liq.cfg.pctTarjeta}%`, liq.subBanco],
       [`Comisi\xF3n ventas (${liq.cfg.pctComision}%)`, -liq.comision],
       ["Alquiler", -liq.alquiler],
       ...liq.gastos.filter((g) => g.desc || Number(g.monto) > 0).map(
@@ -23615,8 +23615,8 @@
       `\u{1F4B3} Tarjeta: ${$(Math.round(brutoTarjeta))}`,
       `*Ventas brutas: ${$(Math.round(bruto))}*`,
       ``,
-      `\u2212 Desc. banco Tarjeta (${pctTarjeta}%): -${$(Math.round(descTarjeta))}`,
-      `= Subtotal sin banco: ${$(Math.round(subtotalBanco))}`,
+      `\u2212 Desc. Tarjeta (${pctTarjeta}%): -${$(Math.round(descTarjeta))}`,
+      `= Subtotal -${pctTarjeta}%: ${$(Math.round(subtotalBanco))}`,
       `\u2212 Comisi\xF3n ventas (${pctComision}%): -${$(Math.round(comision))}`
     ];
     lines.push(`\u2212 Alquiler: -${$(alquiler)}`);
@@ -23638,8 +23638,8 @@
     const win = window.open("", "_blank", "width=800,height=900");
     const filas = [
       ["Ventas brutas", $(liq.bruto), false],
-      liq.descTJ > 0 ? [`\u2212 Desc. banco Tarjeta (${liq.cfg?.pctTarjeta ?? 0}%)`, `-${$(liq.descTJ)}`, false] : null,
-      liq.descTJ > 0 ? ["= Subtotal sin banco", $(liq.subBanco), false] : null,
+      liq.descTJ > 0 ? [`\u2212 Desc. Tarjeta (${liq.cfg?.pctTarjeta ?? 0}%)`, `-${$(liq.descTJ)}`, false] : null,
+      liq.descTJ > 0 ? [`= Subtotal -${liq.cfg?.pctTarjeta ?? 0}%`, $(liq.subBanco), false] : null,
       liq.cfg?.pctComision > 0 ? [`\u2212 Comisi\xF3n ventas (${liq.cfg?.pctComision ?? 0}%)`, `-${$(liq.comision)}`, false] : null,
       liq.alquiler > 0 ? ["\u2212 Alquiler", `-${$(liq.alquiler)}`, false] : null,
       ...liq.gastos.filter((g) => g.desc || Number(g.monto) > 0).map(
@@ -23699,8 +23699,8 @@
       ["QR", $(Math.round(d.brutoQR)), false],
       ["Tarjeta", $(Math.round(d.brutoTarjeta)), false],
       ["Ventas brutas", $(Math.round(d.bruto)), false],
-      [`\u2212 Desc. banco Tarjeta (${d.pctTarjeta ?? 0}%)`, `-${$(Math.round(d.descTarjeta))}`, false],
-      ["= Subtotal sin banco", $(Math.round(d.subtotalBanco)), false],
+      [`\u2212 Desc. Tarjeta (${d.pctTarjeta ?? 0}%)`, `-${$(Math.round(d.descTarjeta))}`, false],
+      [`= Subtotal -${d.pctTarjeta ?? 0}%`, $(Math.round(d.subtotalBanco)), false],
       [`\u2212 Comisi\xF3n ventas (${d.pctComision ?? 0}%)`, `-${$(Math.round(d.comision))}`, false],
       ["\u2212 Alquiler", `-${$(d.alquiler)}`, false],
       ...d.gastos.filter((g) => g.desc || Number(g.monto) > 0).map(
@@ -25064,8 +25064,8 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       borderRadius: 12
     } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 14, fontWeight: 700, color: C.label, fontFamily: FONT, letterSpacing: "-0.01em" } }, $(Math.round(s.val))), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: C.label3, fontFamily: FONT, marginTop: 2, opacity: 0.7 } }, s.label))))), [
       ["Ventas brutas", $(Math.round(bruto)), C.label],
-      [`\u2212 Desc. banco Tarjeta (${pctTarjeta}%)`, `-${$(Math.round(descTarjeta))}`, C.red],
-      [`= Subtotal sin banco`, $(Math.round(subtotalBanco)), C.label2],
+      [`\u2212 Desc. Tarjeta (${pctTarjeta}%)`, `-${$(Math.round(descTarjeta))}`, C.red],
+      [`= Subtotal -${pctTarjeta}%`, $(Math.round(subtotalBanco)), C.label2],
       [`\u2212 Comisi\xF3n ventas (${pctComision}%)`, `-${$(Math.round(comision))}`, C.red],
       alquiler > 0 ? [`\u2212 Alquiler`, `-${$(alquiler)}`, C.amber] : null,
       ...gastos.filter((g) => g.desc || Number(g.monto) > 0).map(
@@ -28972,7 +28972,7 @@ Fecha: ${venta.fecha}`);
       { label: "Tarjeta", value: liq.brutoTJ, sign: "", color: C.label3, bold: false, sub: true },
       ...gcMarca > 0 ? [{ label: "Gift Cards", value: gcMarca, sign: "", color: "#7C3AED", bold: false, sub: true }] : [],
       { label: `Desc. Tarjeta (${liq.cfg.pctTarjeta}%)`, value: -liq.descTJ, sign: "\u2212", color: C.red, bold: false },
-      { label: "Subtotal banco", value: liq.subBanco, sign: "", color: C.blue, bold: true },
+      { label: `Subtotal -${liq.cfg.pctTarjeta}%`, value: liq.subBanco, sign: "", color: C.blue, bold: true },
       { label: `Comisi\xF3n Toscana (${liq.cfg.pctComision}%)`, value: -liq.comision, sign: "\u2212", color: C.red, bold: false },
       { label: "Alquiler", value: -liq.alquiler, sign: "\u2212", color: C.red, bold: false },
       ...gastos.filter((g) => g.desc || Number(g.monto) > 0).map((g) => ({ label: g.desc || "Gasto extra", value: -(Number(g.monto) || 0), sign: "\u2212", color: C.red, bold: false, sub: true }))
@@ -33541,8 +33541,8 @@ Fecha: ${venta.fecha}`);
       borderBottom: `1px solid ${C.sep}`
     } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, color: "#7C3AED", fontFamily: FONT } }, "\u{1F381} Gift Card (", gcVentas, " venta", gcVentas !== 1 ? "s" : "", ")"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, fontWeight: 600, color: "#7C3AED", fontFamily: FONT } }, $(gcTotal))), [
       ["Ventas brutas", $(liq.bruto), C.label, false],
-      liq.descTJ > 0 ? [`\u2212 Desc. banco Tarjeta (${liq.cfg?.pctTarjeta ?? 2.5}%)`, `-${$(liq.descTJ)}`, C.red, false] : null,
-      liq.descTJ > 0 ? [`= Subtotal sin banco`, $(liq.subBanco), C.label2, false] : null,
+      liq.descTJ > 0 ? [`\u2212 Desc. Tarjeta (${liq.cfg?.pctTarjeta ?? 2.5}%)`, `-${$(liq.descTJ)}`, C.red, false] : null,
+      liq.descTJ > 0 ? [`= Subtotal -${liq.cfg?.pctTarjeta ?? 2.5}%`, $(liq.subBanco), C.label2, false] : null,
       liq.cfg?.pctComision > 0 ? [`\u2212 Comisi\xF3n ventas (${liq.cfg?.pctComision ?? 0}%)`, `-${$(liq.comision)}`, C.red, false] : null,
       liq.alquiler > 0 ? [`\u2212 Alquiler`, `-${$(liq.alquiler)}`, C.amber, false] : null,
       ...liq.gastos.filter((g) => g.desc || Number(g.monto) > 0).map(
