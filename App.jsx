@@ -917,7 +917,7 @@ const MESES = ["Enero","Febrero","Marzo","Abril","Mayo","Junio",
 const PAGOS = [
   {id:"efectivo", label:"Efectivo", icon:"💵", desc:0,   color:"#4A9B6F"},
   {id:"qr",       label:"QR",       icon:"📱", desc:0,   color:"#5B8DB8"},
-  {id:"tarjeta",  label:"Tarjeta",  icon:"💳", desc:2.5, color:"#C8922A"},
+  {id:"tarjeta",  label:"Tarjeta",  icon:"💳", desc:1.8, color:"#C8922A"},
 ];
 
 // ── Helpers pago ──────────────────────────────────────────
@@ -4359,7 +4359,7 @@ function imprimirComprobante(venta) {
     </tr>
   `).join('');
   
-  const metodos = {efectivo:'Efectivo',qr:'QR',tarjeta:'Tarjeta (+2.5%)'};
+  const metodos = {efectivo:'Efectivo',qr:'QR',tarjeta:'Tarjeta (+1.8%)'};
   
   win.document.write(`<!DOCTYPE html>
 <html>
@@ -9155,7 +9155,7 @@ function App(){
                   {[
                     {label:"Efectivo",val:liqEf,n:vMes.filter(v=>v.metodoPago==="efectivo").length,color:C.green,icon:"💵"},
                     {label:"QR",val:liqQr,n:vMes.filter(v=>v.metodoPago==="qr").length,color:C.blue,icon:"📱"},
-                    {label:"Tarjeta (+2.5%)",val:liqTj,n:vMes.filter(v=>v.metodoPago==="tarjeta").length,color:C.amber,icon:"💳"},
+                    {label:"Tarjeta (+1.8%)",val:liqTj,n:vMes.filter(v=>v.metodoPago==="tarjeta").length,color:C.amber,icon:"💳"},
                   ].map((p,i,arr)=>(
                     <div key={p.label} style={{display:"flex",justifyContent:"space-between",
                       alignItems:"center",padding:"10px 0",
@@ -10001,7 +10001,7 @@ function POS({inv,onVenta,onVerNota}){
             {pago==="tarjeta"&&(
               <div style={{padding:"12px 14px",background:`${C.amber}15`,borderRadius:12,
                 border:`1px solid ${C.amber}30`,marginBottom:16,fontSize:13,color:C.amber,fontFamily:FONT}}>
-                💳 Descuento 2.5% por tarjeta aplicado automáticamente
+                💳 Descuento 1.8% por tarjeta aplicado automáticamente
               </div>
             )}
           </div>
