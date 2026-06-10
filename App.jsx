@@ -12704,7 +12704,7 @@ create policy "allow all usuarios" on usuarios
               const open=menuAbierto===u.usuario;
               return (
                 <div key={u.usuario} style={{background:C.bg1,borderRadius:18,
-                  border:`1px solid ${C.sep}`,overflow:"hidden",
+                  border:`1px solid ${C.sep}`,overflow:"visible",
                   boxShadow:"0 1px 8px rgba(0,0,0,0.05)",
                   opacity:u.estado==="inactivo"?0.65:1}}>
                   <div style={{padding:"14px 16px",display:"flex",
