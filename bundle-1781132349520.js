@@ -33813,9 +33813,16 @@ Fecha: ${venta.fecha}`);
     );
     const itemsContados = Object.keys(conteo).length;
     const unidadesContadas = Object.values(conteo).reduce((s, v) => s + v, 0);
-    const faltantes = cruce.filter((r) => r.estado === "FALTANTE");
-    const sobrantes = cruce.filter((r) => r.estado === "SOBRANTE");
-    const okCount = cruce.filter((r) => r.estado === "OK").length;
+    const faltantesFinal = cruce.filter((r) => r.estado === "FALTANTE");
+    const sobrantesFinal = cruce.filter((r) => r.estado === "SOBRANTE");
+    const okFinal = cruce.filter((r) => r.estado === "OK").length;
+    const valorFugaFinal = faltantesFinal.reduce((s, r) => s + Math.abs(r.diferencia) * r.precio, 0);
+    const valorSobranteFinal = sobrantesFinal.reduce((s, r) => s + r.diferencia * r.precio, 0);
+    const cruceContados = (0, import_react.useMemo)(() => cruce.filter((r) => conteo[r.id] !== void 0), [cruce, conteo]);
+    const pendientes = (0, import_react.useMemo)(() => cruce.filter((r) => conteo[r.id] === void 0), [cruce, conteo]);
+    const faltantes = cruceContados.filter((r) => r.estado === "FALTANTE");
+    const sobrantes = cruceContados.filter((r) => r.estado === "SOBRANTE");
+    const okCount = cruceContados.filter((r) => r.estado === "OK").length;
     const valorFuga = faltantes.reduce((s, r) => s + Math.abs(r.diferencia) * r.precio, 0);
     const valorSobrante = sobrantes.reduce((s, r) => s + r.diferencia * r.precio, 0);
     const discrepancias = (0, import_react.useMemo)(() => cruce.filter((r) => r.estado !== "OK" && r.contado > 0), [cruce]);
@@ -33878,7 +33885,7 @@ Fecha: ${venta.fecha}`);
       }
       if (!window.confirm(`\xBFConfirmar el cierre de inventario de ${MESES[mes]} ${anio}?
 
-${cruce.length} productos auditados \xB7 ${faltantes.length} faltante(s) \xB7 ${sobrantes.length} sobrante(s)
+${cruce.length} productos auditados \xB7 ${faltantesFinal.length} faltante(s) \xB7 ${sobrantesFinal.length} sobrante(s)
 
 Base de inventario tomada: ${baseTs.toLocaleString("es-BO")}`)) return;
       const aud = {
@@ -33891,11 +33898,11 @@ Base de inventario tomada: ${baseTs.toLocaleString("es-BO")}`)) return;
         usuario: user?.nombre || "\u2014",
         marcaId: marcaSelec,
         totalProductos: cruce.length,
-        ok: okCount,
-        faltantes: faltantes.length,
-        sobrantes: sobrantes.length,
-        valorFuga,
-        valorSobrante,
+        ok: okFinal,
+        faltantes: faltantesFinal.length,
+        sobrantes: sobrantesFinal.length,
+        valorFuga: valorFugaFinal,
+        valorSobrante: valorSobranteFinal,
         detalle: cruce.map((r) => ({
           codigo: r.codigo,
           nombre: r.nombre,
@@ -34176,12 +34183,12 @@ Base de inventario tomada: ${baseTs.toLocaleString("es-BO")}`)) return;
         cursor: "pointer",
         WebkitTapHighlightColor: "transparent"
       } }, "+")));
-    })), itemsContados > 0 && /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: reiniciarConteo, variant: "danger", full: true, small: true, icon: "\u21BA" }, "Reiniciar conteo")), vista === "cruce" && /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "grid", gridTemplateColumns: isDesktop ? "1fr 1fr 1fr 1fr" : "1fr 1fr", gap: 8, marginBottom: 14 } }, /* @__PURE__ */ import_react.default.createElement(StatCard, { icon: "\u2713", label: "Coinciden", value: okCount, color: C.green, compact: isDesktop }), /* @__PURE__ */ import_react.default.createElement(StatCard, { icon: "\u26A0", label: "Faltantes", value: faltantes.length, color: C.red, compact: isDesktop }), /* @__PURE__ */ import_react.default.createElement(StatCard, { icon: "\u2191", label: "Sobrantes", value: sobrantes.length, color: C.blue, compact: isDesktop }), /* @__PURE__ */ import_react.default.createElement(StatCard, { icon: "\u{1F4B0}", label: "Valor en fuga", value: $(Math.round(valorFuga)), color: C.red, compact: isDesktop })), cruce.length === 0 ? /* @__PURE__ */ import_react.default.createElement(
+    })), itemsContados > 0 && /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: reiniciarConteo, variant: "danger", full: true, small: true, icon: "\u21BA" }, "Reiniciar conteo")), vista === "cruce" && /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "grid", gridTemplateColumns: isDesktop ? "1fr 1fr 1fr 1fr 1fr" : "1fr 1fr", gap: 8, marginBottom: 14 } }, /* @__PURE__ */ import_react.default.createElement(StatCard, { icon: "\u2713", label: "Coinciden", value: okCount, color: C.green, compact: isDesktop }), /* @__PURE__ */ import_react.default.createElement(StatCard, { icon: "\u26A0", label: "Faltantes", value: faltantes.length, color: C.red, compact: isDesktop }), /* @__PURE__ */ import_react.default.createElement(StatCard, { icon: "\u2191", label: "Sobrantes", value: sobrantes.length, color: C.blue, compact: isDesktop }), /* @__PURE__ */ import_react.default.createElement(StatCard, { icon: "\u{1F4B0}", label: "Valor en fuga", value: $(Math.round(valorFuga)), color: C.red, compact: isDesktop }), /* @__PURE__ */ import_react.default.createElement(StatCard, { icon: "\u23F3", label: "Sin contar", value: pendientes.length, color: C.label3, compact: isDesktop })), cruceContados.length === 0 ? /* @__PURE__ */ import_react.default.createElement(
       EmptyState,
       {
         icon: "\u{1F4CA}",
         title: "Nada que cruzar todav\xEDa",
-        sub: "Escanea productos en la pesta\xF1a \xABConteo\xBB para generar el cruce"
+        sub: "Escanea productos en la pesta\xF1a \xABConteo\xBB para generar el cruce. Los productos sin contar no se muestran como faltantes."
       }
     ) : /* @__PURE__ */ import_react.default.createElement("div", { style: {
       background: C.bg1,
@@ -34197,7 +34204,7 @@ Base de inventario tomada: ${baseTs.toLocaleString("es-BO")}`)) return;
       padding: "8px 14px",
       background: C.bg2,
       borderBottom: `1px solid ${C.sep}`
-    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 9, fontWeight: 700, color: C.label3, textTransform: "uppercase", letterSpacing: 0.8 } }, "Producto \xB7 C\xF3digo"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 9, fontWeight: 700, color: C.label3, textTransform: "uppercase", letterSpacing: 0.8, textAlign: "center" } }, "Sist."), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 9, fontWeight: 700, color: C.label3, textTransform: "uppercase", letterSpacing: 0.8, textAlign: "center" } }, "Cont."), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 9, fontWeight: 700, color: C.label3, textTransform: "uppercase", letterSpacing: 0.8, textAlign: "center" } }, "Dif."), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 9, fontWeight: 700, color: C.label3, textTransform: "uppercase", letterSpacing: 0.8, textAlign: "right" } }, "Estado")), cruce.map((r, i) => {
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 9, fontWeight: 700, color: C.label3, textTransform: "uppercase", letterSpacing: 0.8 } }, "Producto \xB7 C\xF3digo"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 9, fontWeight: 700, color: C.label3, textTransform: "uppercase", letterSpacing: 0.8, textAlign: "center" } }, "Sist."), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 9, fontWeight: 700, color: C.label3, textTransform: "uppercase", letterSpacing: 0.8, textAlign: "center" } }, "Cont."), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 9, fontWeight: 700, color: C.label3, textTransform: "uppercase", letterSpacing: 0.8, textAlign: "center" } }, "Dif."), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 9, fontWeight: 700, color: C.label3, textTransform: "uppercase", letterSpacing: 0.8, textAlign: "right" } }, "Estado")), cruceContados.map((r, i) => {
       const marcaP = MARCAS.find((m) => m.id === r.marcaId);
       const ei = ESTADO_INFO[r.estado];
       return /* @__PURE__ */ import_react.default.createElement("div", { key: r.id, style: {
@@ -34262,11 +34269,11 @@ Base de inventario tomada: ${baseTs.toLocaleString("es-BO")}`)) return;
       usuario: user?.nombre || "\u2014",
       marcaId: marcaSelec,
       totalProductos: cruce.length,
-      ok: okCount,
-      faltantes: faltantes.length,
-      sobrantes: sobrantes.length,
-      valorFuga,
-      valorSobrante,
+      ok: okFinal,
+      faltantes: faltantesFinal.length,
+      sobrantes: sobrantesFinal.length,
+      valorFuga: valorFugaFinal,
+      valorSobrante: valorSobranteFinal,
       detalle: cruce.map((r) => ({
         codigo: r.codigo,
         nombre: r.nombre,
@@ -34278,7 +34285,7 @@ Base de inventario tomada: ${baseTs.toLocaleString("es-BO")}`)) return;
         estado: r.estado,
         precio: r.precio
       }))
-    }), variant: "fill", full: true, icon: "\u2B07", disabled: cruce.length === 0 }, "Exportar Excel"), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: confirmarCierre, variant: "success", full: true, icon: "\u2713", disabled: itemsContados === 0 || !todoVerificado }, todoVerificado ? "Confirmar Cierre de Inventario" : `Verificar ${discrepancias.length - verificadosCount} discrepancia(s) primero`))), vista === "verificacion" && /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 14 } }, /* @__PURE__ */ import_react.default.createElement(StatCard, { icon: "\u{1F501}", label: "Discrepancias", value: discrepancias.length, color: C.red, compact: isDesktop }), /* @__PURE__ */ import_react.default.createElement(StatCard, { icon: "\u2713", label: "Verificadas", value: verificadosCount, color: C.green, compact: isDesktop })), discrepancias.length === 0 ? /* @__PURE__ */ import_react.default.createElement(
+    }), variant: "fill", full: true, icon: "\u2B07", disabled: cruceContados.length === 0 }, "Exportar Excel"), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: confirmarCierre, variant: "success", full: true, icon: "\u2713", disabled: itemsContados === 0 || !todoVerificado }, todoVerificado ? "Confirmar Cierre de Inventario" : `Verificar ${discrepancias.length - verificadosCount} discrepancia(s) primero`))), vista === "verificacion" && /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 14 } }, /* @__PURE__ */ import_react.default.createElement(StatCard, { icon: "\u{1F501}", label: "Discrepancias", value: discrepancias.length, color: C.red, compact: isDesktop }), /* @__PURE__ */ import_react.default.createElement(StatCard, { icon: "\u2713", label: "Verificadas", value: verificadosCount, color: C.green, compact: isDesktop })), discrepancias.length === 0 ? /* @__PURE__ */ import_react.default.createElement(
       EmptyState,
       {
         icon: "\u2713",

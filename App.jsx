@@ -11471,9 +11471,24 @@ function AuditoriaInventario({inv, ventas, mes, anio, MK, auditorias, onGuardarA
 
   const itemsContados   = Object.keys(conteo).length;
   const unidadesContadas= Object.values(conteo).reduce((s,v)=>s+v,0);
-  const faltantes = cruce.filter(r=>r.estado==="FALTANTE");
-  const sobrantes = cruce.filter(r=>r.estado==="SOBRANTE");
-  const okCount   = cruce.filter(r=>r.estado==="OK").length;
+
+  // ── Resultado FINAL del cierre: incluye TODO el inventario, tratando los
+  // productos aún no escaneados como "Faltante" (se asume que al confirmar
+  // el cierre, lo no encontrado físicamente ya no está en tienda) ─────────
+  const faltantesFinal = cruce.filter(r=>r.estado==="FALTANTE");
+  const sobrantesFinal = cruce.filter(r=>r.estado==="SOBRANTE");
+  const okFinal = cruce.filter(r=>r.estado==="OK").length;
+  const valorFugaFinal     = faltantesFinal.reduce((s,r)=>s+Math.abs(r.diferencia)*r.precio,0);
+  const valorSobranteFinal = sobrantesFinal.reduce((s,r)=>s+r.diferencia*r.precio,0);
+
+  // ── Cruce "en vivo": solo productos ya escaneados en este conteo ────────
+  // Evita mostrar miles de "faltantes" fantasma (Bs en fuga falsos) por
+  // productos que simplemente todavía no se han revisado.
+  const cruceContados = useMemo(()=> cruce.filter(r=> conteo[r.id]!==undefined), [cruce,conteo]);
+  const pendientes = useMemo(()=> cruce.filter(r=> conteo[r.id]===undefined), [cruce,conteo]);
+  const faltantes = cruceContados.filter(r=>r.estado==="FALTANTE");
+  const sobrantes = cruceContados.filter(r=>r.estado==="SOBRANTE");
+  const okCount   = cruceContados.filter(r=>r.estado==="OK").length;
   const valorFuga     = faltantes.reduce((s,r)=>s+Math.abs(r.diferencia)*r.precio,0);
   const valorSobrante = sobrantes.reduce((s,r)=>s+r.diferencia*r.precio,0);
 
@@ -11525,12 +11540,12 @@ function AuditoriaInventario({inv, ventas, mes, anio, MK, auditorias, onGuardarA
       setVista("verificacion");
       return;
     }
-    if(!window.confirm(`¿Confirmar el cierre de inventario de ${MESES[mes]} ${anio}?\n\n${cruce.length} productos auditados · ${faltantes.length} faltante(s) · ${sobrantes.length} sobrante(s)\n\nBase de inventario tomada: ${baseTs.toLocaleString("es-BO")}`)) return;
+    if(!window.confirm(`¿Confirmar el cierre de inventario de ${MESES[mes]} ${anio}?\n\n${cruce.length} productos auditados · ${faltantesFinal.length} faltante(s) · ${sobrantesFinal.length} sobrante(s)\n\nBase de inventario tomada: ${baseTs.toLocaleString("es-BO")}`)) return;
     const aud = {
       id:`AUD-${MK}-${Date.now()}`, mk:MK, mes, anio, fecha:hoy(), hora:hora(),
       usuario:user?.nombre||"—", marcaId:marcaSelec,
-      totalProductos:cruce.length, ok:okCount, faltantes:faltantes.length, sobrantes:sobrantes.length,
-      valorFuga, valorSobrante,
+      totalProductos:cruce.length, ok:okFinal, faltantes:faltantesFinal.length, sobrantes:sobrantesFinal.length,
+      valorFuga:valorFugaFinal, valorSobrante:valorSobranteFinal,
       detalle:cruce.map(r=>({
         codigo:r.codigo, nombre:r.nombre, marcaId:r.marcaId, marcaNombre:r.marcaNombre||MARCAS.find(m=>m.id===r.marcaId)?.nombre,
         sistema:r.sistema, contado:r.contado, diferencia:r.diferencia, estado:r.estado, precio:r.precio,
@@ -11770,16 +11785,17 @@ function AuditoriaInventario({inv, ventas, mes, anio, MK, auditorias, onGuardarA
       {/* ── CRUCE ── */}
       {vista==="cruce" && (
         <div>
-          <div style={{display:"grid",gridTemplateColumns: isDesktop?"1fr 1fr 1fr 1fr":"1fr 1fr",gap:8,marginBottom:14}}>
+          <div style={{display:"grid",gridTemplateColumns: isDesktop?"1fr 1fr 1fr 1fr 1fr":"1fr 1fr",gap:8,marginBottom:14}}>
             <StatCard icon="✓" label="Coinciden" value={okCount} color={C.green} compact={isDesktop}/>
             <StatCard icon="⚠" label="Faltantes" value={faltantes.length} color={C.red} compact={isDesktop}/>
             <StatCard icon="↑" label="Sobrantes" value={sobrantes.length} color={C.blue} compact={isDesktop}/>
             <StatCard icon="💰" label="Valor en fuga" value={$(Math.round(valorFuga))} color={C.red} compact={isDesktop}/>
+            <StatCard icon="⏳" label="Sin contar" value={pendientes.length} color={C.label3} compact={isDesktop}/>
           </div>
 
-          {cruce.length===0
+          {cruceContados.length===0
             ? <EmptyState icon="📊" title="Nada que cruzar todavía"
-                sub="Escanea productos en la pestaña «Conteo» para generar el cruce"/>
+                sub="Escanea productos en la pestaña «Conteo» para generar el cruce. Los productos sin contar no se muestran como faltantes."/>
             : <div style={{background:C.bg1,border:`1px solid ${C.sep}`,borderRadius:10,
                 overflow:"hidden",marginBottom:16,boxShadow:"0 1px 3px rgba(0,0,0,.06)"}}>
                 <div style={{display:"grid",gridTemplateColumns:"1fr 56px 56px 56px 90px",gap:0,
@@ -11790,7 +11806,7 @@ function AuditoriaInventario({inv, ventas, mes, anio, MK, auditorias, onGuardarA
                   <div style={{fontSize:9,fontWeight:700,color:C.label3,textTransform:"uppercase",letterSpacing:.8,textAlign:"center"}}>Dif.</div>
                   <div style={{fontSize:9,fontWeight:700,color:C.label3,textTransform:"uppercase",letterSpacing:.8,textAlign:"right"}}>Estado</div>
                 </div>
-                {cruce.map((r,i)=>{
+                {cruceContados.map((r,i)=>{
                   const marcaP = MARCAS.find(m=>m.id===r.marcaId);
                   const ei = ESTADO_INFO[r.estado];
                   return (
@@ -11856,12 +11872,12 @@ function AuditoriaInventario({inv, ventas, mes, anio, MK, auditorias, onGuardarA
             <IOSBtn onPress={()=>exportAuditoriaExcel({
               id:`AUD-${MK}-preview`, mk:MK, mes, anio, fecha:hoy(), hora:hora(),
               usuario:user?.nombre||"—", marcaId:marcaSelec,
-              totalProductos:cruce.length, ok:okCount, faltantes:faltantes.length, sobrantes:sobrantes.length,
-              valorFuga, valorSobrante,
+              totalProductos:cruce.length, ok:okFinal, faltantes:faltantesFinal.length, sobrantes:sobrantesFinal.length,
+              valorFuga:valorFugaFinal, valorSobrante:valorSobranteFinal,
               detalle:cruce.map(r=>({codigo:r.codigo,nombre:r.nombre,marcaId:r.marcaId,
                 marcaNombre:r.marcaNombre||MARCAS.find(m=>m.id===r.marcaId)?.nombre,
                 sistema:r.sistema,contado:r.contado,diferencia:r.diferencia,estado:r.estado,precio:r.precio})),
-            })} variant="fill" full icon="⬇" disabled={cruce.length===0}>Exportar Excel</IOSBtn>
+            })} variant="fill" full icon="⬇" disabled={cruceContados.length===0}>Exportar Excel</IOSBtn>
             <IOSBtn onPress={confirmarCierre} variant="success" full icon="✓" disabled={itemsContados===0||!todoVerificado}>
               {todoVerificado ? "Confirmar Cierre de Inventario" : `Verificar ${discrepancias.length-verificadosCount} discrepancia(s) primero`}
             </IOSBtn>
