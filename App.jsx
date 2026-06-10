@@ -2146,6 +2146,9 @@ function imprimirLiquidacion(marca, mes, anio, liq){
   </style>
 </head>
 <body>
+  <div style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);opacity:0.05;pointer-events:none">
+    ${logoSvgSized(420)}
+  </div>
   <div style="display:flex;align-items:center;gap:16px;margin-bottom:16px">
     ${logoSvgSized(140)}
     <div>
