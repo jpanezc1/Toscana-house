@@ -11486,6 +11486,7 @@ function AuditoriaInventario({inv, ventas, mes, anio, MK, auditorias, onGuardarA
   // productos que simplemente todavía no se han revisado.
   const cruceContados = useMemo(()=> cruce.filter(r=> conteo[r.id]!==undefined), [cruce,conteo]);
   const pendientes = useMemo(()=> cruce.filter(r=> conteo[r.id]===undefined), [cruce,conteo]);
+  const unidadesPendientes = useMemo(()=> pendientes.reduce((s,r)=>s+r.sistema,0), [pendientes]);
   const faltantes = cruceContados.filter(r=>r.estado==="FALTANTE");
   const sobrantes = cruceContados.filter(r=>r.estado==="SOBRANTE");
   const okCount   = cruceContados.filter(r=>r.estado==="OK").length;
@@ -11790,7 +11791,7 @@ function AuditoriaInventario({inv, ventas, mes, anio, MK, auditorias, onGuardarA
             <StatCard icon="⚠" label="Faltantes" value={faltantes.length} color={C.red} compact={isDesktop}/>
             <StatCard icon="↑" label="Sobrantes" value={sobrantes.length} color={C.blue} compact={isDesktop}/>
             <StatCard icon="💰" label="Valor en fuga" value={$(Math.round(valorFuga))} color={C.red} compact={isDesktop}/>
-            <StatCard icon="⏳" label="Sin contar" value={pendientes.length} color={C.label3} compact={isDesktop}/>
+            <StatCard icon="⏳" label="Unidades sin contar" value={unidadesPendientes} sub={`${pendientes.length} prod.`} color={C.label3} compact={isDesktop}/>
           </div>
 
           {cruceContados.length===0
