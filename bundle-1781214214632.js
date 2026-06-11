@@ -22063,44 +22063,44 @@
     win.document.write(`<!DOCTYPE html>
 <html>
 <head>
-  <title>Ticket \u2014 ${producto.nombre}</title>
+  <title>Etiqueta \u2014 ${producto.nombre}</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.5/JsBarcode.all.min.js"><\/script>
   <style>
-    @page { size: 58mm auto; margin: 0; }
+    @page { size: 50mm 25mm; margin: 0; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family:'Courier New',monospace; width:58mm; padding:4mm; background:white; color:black; }
-    .header { text-align:center; border-bottom:1px dashed #333; padding-bottom:3mm; margin-bottom:3mm; }
-    .brand { font-size:14px; font-weight:900; letter-spacing:3px; text-transform:uppercase; }
-    .sub { font-size:8px; letter-spacing:4px; color:#555; margin-top:1mm; }
-    .producto { font-size:11px; font-weight:bold; text-align:center; margin:2mm 0; text-transform:uppercase; }
-    .marca { font-size:9px; text-align:center; color:#444; margin-bottom:2mm; }
-    .barcode-wrap { display:flex; flex-direction:column; align-items:center; margin:3mm 0; }
-    .barcode-wrap svg { width:50mm!important; }
-    .codigo { text-align:center; font-size:8px; color:#555; font-family:monospace; margin:1mm 0 2mm; word-break:break-all; }
-    .precio { text-align:center; font-size:18px; font-weight:900; margin:2mm 0; }
-    .footer { border-top:1px dashed #333; padding-top:2mm; text-align:center; font-size:8px; color:#777; letter-spacing:1px; }
+    html, body { width:50mm; height:25mm; }
+    body { font-family:'Courier New',monospace; padding:1mm 2mm; background:white; color:black;
+      overflow:hidden; display:flex; flex-direction:column; align-items:center; justify-content:center; }
+    .top { display:flex; justify-content:space-between; align-items:center; width:100%;
+      font-size:6px; letter-spacing:0.5px; text-transform:uppercase; color:#333; }
+    .producto { font-size:7.5px; font-weight:bold; text-align:center; width:100%;
+      text-transform:uppercase; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+      margin:0.6mm 0; }
+    .barcode-wrap { width:100%; display:flex; justify-content:center; }
+    .barcode-wrap svg { width:44mm!important; height:9mm!important; }
+    .bottom-row { display:flex; justify-content:space-between; align-items:center; width:100%;
+      margin-top:0.6mm; }
+    .codigo { font-size:6px; color:#333; font-family:monospace; }
+    .precio { font-size:11px; font-weight:900; }
     @media print { body { print-color-adjust:exact; -webkit-print-color-adjust:exact; } }
   </style>
 </head>
 <body>
-  <div class="header">
-    <div class="brand">TOSCANA HOUSE</div>
-    <div class="sub">CASA DE MODA</div>
-  </div>
+  <div class="top"><span>${marcaNombre}</span><span>TOSCANA HOUSE</span></div>
   <div class="producto">${producto.nombre}</div>
-  <div class="marca">${marcaNombre}</div>
   <div class="barcode-wrap">
     <svg id="barcode"></svg>
   </div>
-  <div class="codigo">${producto.codigo}</div>
-  <div class="precio">Bs ${Number(producto.precio).toLocaleString("es-BO")}</div>
-  <div class="footer">Toscana House \xB7 ${(/* @__PURE__ */ new Date()).toLocaleDateString("es-BO")}</div>
+  <div class="bottom-row">
+    <span class="codigo">${producto.codigo}</span>
+    <span class="precio">Bs ${Number(producto.precio).toLocaleString("es-BO")}</span>
+  </div>
   <script>
     window.onload = function() {
       try {
         JsBarcode("#barcode", "${producto.codigo}", {
           format: "CODE128",
-          width: 2, height: 50,
+          width: 1.3, height: 32,
           displayValue: false,
           margin: 0
         });
@@ -22126,19 +22126,19 @@
       const marca = it.marcaNombre || it.marca || "";
       return `
       <div class="label">
-        <div class="brand">TOSCANA HOUSE</div>
-        <div class="marca">${marca.toUpperCase()}</div>
+        <div class="top"><span>${marca.toUpperCase()}</span><span>TOSCANA HOUSE</span></div>
         <div class="producto">${nombre}</div>
         <div class="barcode-wrap"><svg id="bc-${codigo.replace(/[^a-z0-9]/gi, "_")}"></svg></div>
-        <div class="codigo">${codigo}</div>
-        <div class="precio">Bs ${precio}</div>
-        <div class="footer">CASA DE MODA \xB7 BOLIVIA</div>
+        <div class="bottom-row">
+          <span class="codigo">${codigo}</span>
+          <span class="precio">Bs ${precio}</span>
+        </div>
       </div>`;
     }).join("");
     const barcodeScripts = items.map((it) => {
       const codigo = (it.codigo || it.sku || "").toUpperCase();
       const safeId = codigo.replace(/[^a-z0-9]/gi, "_");
-      return `try{JsBarcode("#bc-${safeId}","${codigo}",{format:"CODE128",width:2,height:45,displayValue:false,margin:0});}catch(e){}`;
+      return `try{JsBarcode("#bc-${safeId}","${codigo}",{format:"CODE128",width:1.3,height:32,displayValue:false,margin:0});}catch(e){}`;
     }).join("\n");
     win.document.write(`<!DOCTYPE html>
 <html>
@@ -22147,7 +22147,7 @@
   <title>Etiquetas \u2014 ${items.length} items</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.5/JsBarcode.all.min.js"><\/script>
   <style>
-    @page { size: 58mm auto; margin: 0; }
+    @page { size: 50mm 25mm; margin: 0; }
     * { box-sizing:border-box; margin:0; padding:0; }
     body { font-family:'Courier New',monospace; background:#fff; }
     .controls { padding:16px; background:#f5f3ee; display:flex; gap:12px; align-items:center;
@@ -22156,29 +22156,34 @@
       border-radius:8px; font-size:14px; font-weight:700; cursor:pointer; }
     .btn-print:hover { background:#333; }
     .info { font-family:sans-serif; font-size:13px; color:#57534e; }
-    .labels-grid { display:flex; flex-wrap:wrap; gap:4mm; padding:8mm; }
-    .label { width:58mm; border:1px dashed #ccc; padding:4mm; text-align:center;
-      page-break-inside:avoid; background:#fff; }
-    .brand { font-size:11px; font-weight:900; letter-spacing:3px; text-transform:uppercase; }
-    .marca { font-size:8px; letter-spacing:2px; color:#444; margin:1mm 0; text-transform:uppercase; }
-    .producto { font-size:9px; font-weight:bold; margin:2mm 0; text-transform:uppercase;
-      line-height:1.3; min-height:20px; }
-    .barcode-wrap { display:flex; justify-content:center; margin:2mm 0; }
-    .barcode-wrap svg { width:50mm!important; }
-    .codigo { font-size:7px; color:#555; font-family:monospace; margin:1mm 0; word-break:break-all; }
-    .precio { font-size:18px; font-weight:900; margin:2mm 0; }
-    .footer { font-size:7px; color:#888; letter-spacing:1px; border-top:1px dashed #ccc; padding-top:1mm; }
+    .labels-grid { display:flex; flex-direction:column; gap:4mm; padding:8mm; }
+    .label { width:50mm; height:25mm; border:1px dashed #ccc; padding:1mm 2mm;
+      overflow:hidden; background:#fff;
+      display:flex; flex-direction:column; align-items:center; justify-content:center; }
+    .top { display:flex; justify-content:space-between; align-items:center; width:100%;
+      font-size:6px; letter-spacing:0.5px; text-transform:uppercase; color:#333; }
+    .producto { font-size:7.5px; font-weight:bold; text-align:center; width:100%;
+      text-transform:uppercase; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+      margin:0.6mm 0; }
+    .barcode-wrap { width:100%; display:flex; justify-content:center; }
+    .barcode-wrap svg { width:44mm!important; height:9mm!important; }
+    .bottom-row { display:flex; justify-content:space-between; align-items:center; width:100%;
+      margin-top:0.6mm; }
+    .codigo { font-size:6px; color:#333; font-family:monospace; }
+    .precio { font-size:11px; font-weight:900; }
     @media print {
       .controls { display:none!important; }
       body { padding:0; }
-      .labels-grid { gap:2mm; padding:4mm; }
+      .labels-grid { gap:0; padding:0; }
+      .label { border:none; page-break-after:always; }
+      .label:last-child { page-break-after:auto; }
     }
   </style>
 </head>
 <body>
   <div class="controls">
     <button class="btn-print" onclick="window.print()">\u{1F5A8} Imprimir ${items.length} etiqueta${items.length !== 1 ? "s" : ""}</button>
-    <span class="info">${items.length} etiqueta${items.length !== 1 ? "s" : ""} generadas \xB7 C\xF3digos de barra</span>
+    <span class="info">${items.length} etiqueta${items.length !== 1 ? "s" : ""} generadas \xB7 50x25mm</span>
   </div>
   <div class="labels-grid">${etiquetas}</div>
   <script>
