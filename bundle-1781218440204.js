@@ -22156,6 +22156,8 @@
       border-radius:8px; font-size:14px; font-weight:700; cursor:pointer; }
     .btn-print:hover { background:#333; }
     .info { font-family:sans-serif; font-size:13px; color:#57534e; }
+    .print-note { font-family:sans-serif; font-size:13px; color:#8a5a00; background:#fff7e6;
+      border:1px solid #ffe0a3; border-radius:8px; padding:10px 16px; margin:0 16px 16px; line-height:1.5; }
     .labels-grid { display:flex; flex-direction:column; gap:4mm; padding:8mm; }
     .label { width:50mm; height:25mm; border:1px dashed #ccc; padding:1mm 2mm; box-sizing:border-box;
       overflow:hidden; background:#fff; display:flex; flex-direction:column; align-items:center; justify-content:center; }
@@ -22172,6 +22174,7 @@
     .precio { font-size:11px; font-weight:900; }
     @media print {
       .controls { display:none!important; }
+      .print-note { display:none!important; }
       body { padding:0; }
       .labels-grid { gap:0; padding:0; }
       .label { border:none; page-break-after:always; }
@@ -22183,6 +22186,11 @@
   <div class="controls">
     <button class="btn-print" onclick="window.print()">\u{1F5A8} Imprimir ${items.length} etiqueta${items.length !== 1 ? "s" : ""}</button>
     <span class="info">${items.length} etiqueta${items.length !== 1 ? "s" : ""} generadas \xB7 50x25mm</span>
+  </div>
+  <div class="print-note">
+    \u26A0\uFE0F Para que la etiqueta salga correcta: en la ventana de impresi\xF3n, hac\xE9 clic en
+    <strong>"M\xE1s ajustes"</strong> y luego en <strong>"Imprimir usando el cuadro de di\xE1logo del sistema"</strong>
+    (ah\xED queda el preajuste "TOSCANA" con tama\xF1o y orientaci\xF3n correctos).
   </div>
   <div class="labels-grid">${etiquetas}</div>
   <script>

@@ -643,6 +643,8 @@ function imprimirEtiquetasLote(items) {
       border-radius:8px; font-size:14px; font-weight:700; cursor:pointer; }
     .btn-print:hover { background:#333; }
     .info { font-family:sans-serif; font-size:13px; color:#57534e; }
+    .print-note { font-family:sans-serif; font-size:13px; color:#8a5a00; background:#fff7e6;
+      border:1px solid #ffe0a3; border-radius:8px; padding:10px 16px; margin:0 16px 16px; line-height:1.5; }
     .labels-grid { display:flex; flex-direction:column; gap:4mm; padding:8mm; }
     .label { width:50mm; height:25mm; border:1px dashed #ccc; padding:1mm 2mm; box-sizing:border-box;
       overflow:hidden; background:#fff; display:flex; flex-direction:column; align-items:center; justify-content:center; }
@@ -659,6 +661,7 @@ function imprimirEtiquetasLote(items) {
     .precio { font-size:11px; font-weight:900; }
     @media print {
       .controls { display:none!important; }
+      .print-note { display:none!important; }
       body { padding:0; }
       .labels-grid { gap:0; padding:0; }
       .label { border:none; page-break-after:always; }
@@ -670,6 +673,11 @@ function imprimirEtiquetasLote(items) {
   <div class="controls">
     <button class="btn-print" onclick="window.print()">🖨 Imprimir ${items.length} etiqueta${items.length!==1?'s':''}</button>
     <span class="info">${items.length} etiqueta${items.length!==1?'s':''} generadas · 50x25mm</span>
+  </div>
+  <div class="print-note">
+    ⚠️ Para que la etiqueta salga correcta: en la ventana de impresión, hacé clic en
+    <strong>"Más ajustes"</strong> y luego en <strong>"Imprimir usando el cuadro de diálogo del sistema"</strong>
+    (ahí queda el preajuste "TOSCANA" con tamaño y orientación correctos).
   </div>
   <div class="labels-grid">${etiquetas}</div>
   <script>
