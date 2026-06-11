@@ -24636,7 +24636,10 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       marginTop: 1,
       letterSpacing: "0.07em",
       textTransform: "uppercase",
-      fontWeight: 500
+      fontWeight: 500,
+      overflow: "hidden",
+      textOverflow: "ellipsis",
+      whiteSpace: "nowrap"
     } }, subtitle)), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 8, flexShrink: 0 } }, right));
   }
   function DesktopSidebar({ tabs, active, onChange, user, logout, groups: customGroups, dotColors: customDot }) {
@@ -24753,10 +24756,17 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       alignItems: "stretch",
       paddingBottom: "env(safe-area-inset-bottom,6px)",
       boxShadow: "0 -1px 0 rgba(0,0,0,0.04), 0 -4px 20px rgba(0,0,0,0.03)"
-    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", width: "100%", maxWidth: 560 } }, tabs.map((t) => {
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      display: "flex",
+      width: "100%",
+      maxWidth: 560,
+      overflowX: "auto",
+      WebkitOverflowScrolling: "touch",
+      scrollbarWidth: "none"
+    } }, tabs.map((t) => {
       const isActive = active === t.id;
       return /* @__PURE__ */ import_react.default.createElement("button", { key: t.id, onClick: () => onChange(t.id), style: {
-        flex: 1,
+        flex: "1 0 56px",
         border: "none",
         background: "transparent",
         display: "flex",
@@ -24797,9 +24807,13 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
         fontWeight: isActive ? 600 : 400,
         color: isActive ? C.gold : C.label3,
         transition: "color .18s",
-        letterSpacing: "0.06em",
+        letterSpacing: "0.02em",
         whiteSpace: "nowrap",
-        textTransform: "uppercase"
+        textTransform: "uppercase",
+        maxWidth: "100%",
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+        display: "block"
       } }, t.label));
     })));
   }
@@ -24984,10 +24998,15 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       padding: 3,
       display: "flex",
       gap: 2,
-      border: `1px solid ${C.sep}`
+      border: `1px solid ${C.sep}`,
+      overflowX: "auto",
+      WebkitOverflowScrolling: "touch",
+      scrollbarWidth: "none"
     } }, options.map((o) => /* @__PURE__ */ import_react.default.createElement("button", { key: o.value, onClick: () => onChange(o.value), style: {
-      flex: 1,
-      padding: "7px 0",
+      flex: "1 0 auto",
+      minWidth: 0,
+      whiteSpace: "nowrap",
+      padding: "7px 10px",
       borderRadius: 8,
       border: "none",
       background: value === o.value ? C.bg1 : "transparent",
@@ -36188,14 +36207,15 @@ Confirmas que el conteo de ${r.contado} unidad(es) es correcto.`)) {
         fontFamily: FONT,
         marginLeft: 4
       } }, s.extra)
-    ))), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 8, marginBottom: 12 } }, /* @__PURE__ */ import_react.default.createElement(
+    ))), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" } }, /* @__PURE__ */ import_react.default.createElement(
       "input",
       {
         value: busqueda,
         onChange: (e) => setBusqueda(e.target.value),
         placeholder: "\u{1F50D} Buscar c\xF3digo, marca, usuario...",
         style: {
-          flex: 1,
+          flex: "1 1 180px",
+          minWidth: 0,
           padding: "10px 14px",
           borderRadius: 12,
           border: `1.5px solid ${C.sep}`,

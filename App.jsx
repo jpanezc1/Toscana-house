@@ -3062,6 +3062,7 @@ function NavBar({title, subtitle, back, onBack, right}){
         {subtitle&&<div style={{
           fontSize:10,color:C.label3,fontFamily:FONT,marginTop:1,
           letterSpacing:"0.07em",textTransform:"uppercase",fontWeight:500,
+          overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",
         }}>{subtitle}</div>}
       </div>
       <div style={{display:"flex",justifyContent:"flex-end",alignItems:"center",gap:8,flexShrink:0}}>
@@ -3174,12 +3175,13 @@ function TabBar({tabs, active, onChange}){
       paddingBottom:"env(safe-area-inset-bottom,6px)",
       boxShadow:"0 -1px 0 rgba(0,0,0,0.04), 0 -4px 20px rgba(0,0,0,0.03)",
     }}>
-      <div style={{display:"flex",width:"100%",maxWidth:560}}>
+      <div style={{display:"flex",width:"100%",maxWidth:560,
+        overflowX:"auto",WebkitOverflowScrolling:"touch",scrollbarWidth:"none"}}>
         {tabs.map(t=>{
           const isActive=active===t.id;
           return (
             <button key={t.id} onClick={()=>onChange(t.id)} style={{
-              flex:1,border:"none",
+              flex:"1 0 56px",border:"none",
               background:"transparent",
               display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",
               padding:"7px 2px 5px",
@@ -3213,8 +3215,10 @@ function TabBar({tabs, active, onChange}){
                 fontWeight: isActive ? 600 : 400,
                 color: isActive ? C.gold : C.label3,
                 transition:"color .18s",
-                letterSpacing:"0.06em",
+                letterSpacing:"0.02em",
                 whiteSpace:"nowrap",textTransform:"uppercase",
+                maxWidth:"100%",overflow:"hidden",textOverflow:"ellipsis",
+                display:"block",
               }}>{t.label}</span>
             </button>
           );
@@ -3364,10 +3368,13 @@ function SegControl({options,value,onChange}){
     <div style={{
       background:C.bg2,borderRadius:10,padding:3,
       display:"flex",gap:2,border:`1px solid ${C.sep}`,
+      overflowX:"auto",WebkitOverflowScrolling:"touch",
+      scrollbarWidth:"none",
     }}>
       {options.map(o=>(
         <button key={o.value} onClick={()=>onChange(o.value)} style={{
-          flex:1,padding:"7px 0",borderRadius:8,border:"none",
+          flex:"1 0 auto",minWidth:0,whiteSpace:"nowrap",
+          padding:"7px 10px",borderRadius:8,border:"none",
           background:value===o.value?C.bg1:"transparent",
           color:value===o.value?C.label:C.label3,
           fontFamily:FONT,fontSize:12,fontWeight:value===o.value?600:400,
@@ -13702,10 +13709,10 @@ function AuditoriaTab({auditLog, setAuditLog}){
       </div>
 
       {/* ── Controles: búsqueda + vista ── */}
-      <div style={{display:"flex",gap:8,marginBottom:12}}>
+      <div style={{display:"flex",gap:8,marginBottom:12,flexWrap:"wrap"}}>
         <input value={busqueda} onChange={e=>setBusqueda(e.target.value)}
           placeholder="🔍 Buscar código, marca, usuario..."
-          style={{flex:1,padding:"10px 14px",borderRadius:12,border:`1.5px solid ${C.sep}`,
+          style={{flex:"1 1 180px",minWidth:0,padding:"10px 14px",borderRadius:12,border:`1.5px solid ${C.sep}`,
             background:C.bg1,fontSize:13,fontFamily:FONT,color:C.label,outline:"none"}}/>
         <button onClick={()=>setVista(v=>v==="timeline"?"trazabilidad":"timeline")}
           style={{padding:"10px 14px",borderRadius:12,border:`1.5px solid ${C.sep}`,
