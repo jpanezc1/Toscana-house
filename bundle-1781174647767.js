@@ -22722,6 +22722,55 @@
     a.click();
     URL.revokeObjectURL(url);
   }
+  var _QRPromise = null;
+  function loadQR() {
+    if (_QRPromise) return _QRPromise;
+    _QRPromise = new Promise((resolve, reject) => {
+      if (window.qrcode) {
+        resolve(window.qrcode);
+        return;
+      }
+      const s = document.createElement("script");
+      s.src = "https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js";
+      s.onload = () => resolve(window.qrcode);
+      s.onerror = () => reject(new Error("No se pudo cargar qrcode-generator"));
+      document.head.appendChild(s);
+    });
+    return _QRPromise;
+  }
+  var cargarQRBanco = () => {
+    try {
+      return localStorage.getItem("th_qr_banco") || null;
+    } catch {
+      return null;
+    }
+  };
+  var guardarQRBanco = (dataUrl) => {
+    try {
+      dataUrl ? localStorage.setItem("th_qr_banco", dataUrl) : localStorage.removeItem("th_qr_banco");
+    } catch {
+    }
+  };
+  function playPagoSound() {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      [[1318.5, 0], [1975.5, 0.14]].forEach(([freq, delay]) => {
+        const o = ctx.createOscillator();
+        const g = ctx.createGain();
+        o.type = "sine";
+        o.frequency.value = freq;
+        g.gain.setValueAtTime(1e-4, ctx.currentTime + delay);
+        g.gain.exponentialRampToValueAtTime(0.4, ctx.currentTime + delay + 0.02);
+        g.gain.exponentialRampToValueAtTime(1e-4, ctx.currentTime + delay + 0.55);
+        o.connect(g);
+        g.connect(ctx.destination);
+        o.start(ctx.currentTime + delay);
+        o.stop(ctx.currentTime + delay + 0.6);
+      });
+      setTimeout(() => ctx.close(), 1e3);
+    } catch {
+    }
+  }
   async function generarPlantillaXLSX() {
     const XLSX = await loadXLSX();
     const wb = XLSX.utils.book_new();
@@ -32729,6 +32778,98 @@ Fecha: ${venta.fecha}`);
       WebkitTapHighlightColor: "transparent"
     } }, t.label))), subTab === "venta" ? /* @__PURE__ */ import_react.default.createElement(POS, { inv, onVenta, onVerNota }) : /* @__PURE__ */ import_react.default.createElement(RetirosTab, { inv, retiros, onRetiro }));
   }
+  function QRPagoPanel({ total, refVenta }) {
+    const [qrBanco, setQrBanco] = (0, import_react.useState)(cargarQRBanco);
+    const [qrGen, setQrGen] = (0, import_react.useState)(null);
+    const fileRef = (0, import_react.useRef)();
+    (0, import_react.useEffect)(() => {
+      if (qrBanco) {
+        setQrGen(null);
+        return;
+      }
+      let on = true;
+      loadQR().then((qrcode) => {
+        if (!on) return;
+        const qr = qrcode(0, "M");
+        qr.addData(`TOSCANA HOUSE|COBRO|BS:${total.toFixed(2)}|REF:${refVenta}`);
+        qr.make();
+        setQrGen(qr.createDataURL(7, 10));
+      }).catch(() => {
+      });
+      return () => {
+        on = false;
+      };
+    }, [total, refVenta, qrBanco]);
+    function subirQRBanco(e) {
+      const f = e.target.files?.[0];
+      if (!f) return;
+      e.target.value = "";
+      const r = new FileReader();
+      r.onload = (ev) => {
+        guardarQRBanco(ev.target.result);
+        setQrBanco(ev.target.result);
+      };
+      r.readAsDataURL(f);
+    }
+    const img = qrBanco || qrGen;
+    return /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      background: C.bg2,
+      borderRadius: 16,
+      padding: 18,
+      marginBottom: 16,
+      border: `2px solid ${C.blue}30`,
+      textAlign: "center"
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      fontSize: 11,
+      fontWeight: 700,
+      color: C.blue,
+      fontFamily: FONT,
+      textTransform: "uppercase",
+      letterSpacing: "0.1em",
+      marginBottom: 12
+    } }, "\u{1F4F1} ", qrBanco ? "QR de cobro \xB7 banco" : "QR de cobro autogenerado"), img ? /* @__PURE__ */ import_react.default.createElement("img", { src: img, alt: "QR de cobro", style: {
+      width: 210,
+      height: 210,
+      objectFit: "contain",
+      borderRadius: 14,
+      background: "#fff",
+      padding: 10,
+      border: `1px solid ${C.sep}`
+    } }) : /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      width: 210,
+      height: 210,
+      margin: "0 auto",
+      borderRadius: 14,
+      background: C.bg1,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      color: C.label3,
+      fontSize: 13,
+      fontFamily: FONT
+    } }, "Generando QR\u2026"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 26, fontWeight: 800, color: C.label, fontFamily: FONT, marginTop: 12 } }, $(total)), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11.5, color: C.label3, fontFamily: FONT, marginTop: 4, lineHeight: 1.5 } }, "El cliente escanea y paga desde su app bancaria.", /* @__PURE__ */ import_react.default.createElement("br", null), "Cuando llegue la notificaci\xF3n del banco, presiona ", /* @__PURE__ */ import_react.default.createElement("b", null, "Verificar pago"), "."), /* @__PURE__ */ import_react.default.createElement("div", { style: { marginTop: 10, display: "flex", justifyContent: "center", gap: 14 } }, /* @__PURE__ */ import_react.default.createElement("button", { onClick: () => fileRef.current?.click(), style: {
+      background: "none",
+      border: "none",
+      fontSize: 11,
+      color: C.blue,
+      fontFamily: FONT,
+      cursor: "pointer",
+      textDecoration: "underline",
+      WebkitTapHighlightColor: "transparent"
+    } }, qrBanco ? "Cambiar QR del banco" : "Usar el QR de mi banco"), qrBanco && /* @__PURE__ */ import_react.default.createElement("button", { onClick: () => {
+      guardarQRBanco(null);
+      setQrBanco(null);
+    }, style: {
+      background: "none",
+      border: "none",
+      fontSize: 11,
+      color: C.label3,
+      fontFamily: FONT,
+      cursor: "pointer",
+      textDecoration: "underline",
+      WebkitTapHighlightColor: "transparent"
+    } }, "Quitar")), /* @__PURE__ */ import_react.default.createElement("input", { ref: fileRef, type: "file", accept: "image/*", onChange: subirQRBanco, style: { display: "none" } }));
+  }
   function POS({ inv, onVenta, onVerNota }) {
     var _hN135 = (0, import_react.useState)([]);
     var carrito = _hN135[0];
@@ -32773,6 +32914,10 @@ Fecha: ${venta.fecha}`);
     var _hN143 = (0, import_react.useState)(false);
     var showPago = _hN143[0];
     var setShowPago = _hN143[1];
+    var _hNqr = (0, import_react.useState)(false);
+    var qrVerificando = _hNqr[0];
+    var setQrVerificando = _hNqr[1];
+    const qrRefVenta = (0, import_react.useMemo)(() => "TH" + Date.now().toString(36).toUpperCase(), [showPago]);
     var _hNm1 = (0, import_react.useState)(false);
     var pagoMixto = _hNm1[0];
     var setPagoMixto = _hNm1[1];
@@ -33003,6 +33148,23 @@ Fecha: ${venta.fecha}`);
       setCliente("");
       setPagoMixto(false);
       setMontosMixtos({ efectivo: "", qr: "", tarjeta: "" });
+    }
+    const esPagoQR = !pagoGC && (!pagoMixto && pago === "qr" || pagoMixto && (parseFloat(montosMixtos.qr) || 0) > 0);
+    function verificarPagoQR() {
+      if (!carrito.length || qrVerificando) return;
+      if (pagoMixto) {
+        const suma = (parseFloat(montosMixtos.efectivo) || 0) + (parseFloat(montosMixtos.qr) || 0) + (parseFloat(montosMixtos.tarjeta) || 0);
+        if (Math.abs(suma - total) > 0.01) {
+          alert(`Los montos (${$(suma)}) no cuadran con el total (${$(total)})`);
+          return;
+        }
+      }
+      playPagoSound();
+      setQrVerificando(true);
+      setTimeout(() => {
+        setQrVerificando(false);
+        cobrar();
+      }, 1500);
     }
     const gcUsadoUI = +Math.min(gcEncontrado?.saldo || 0, total, parseFloat(gcMontoUsar) || 0).toFixed(2);
     const extraMontoUI = gcEncontrado ? +(total - gcUsadoUI).toFixed(2) : 0;
@@ -33349,7 +33511,7 @@ Fecha: ${venta.fecha}`);
       fontSize: 13,
       color: C.amber,
       fontFamily: FONT
-    } }, "\u{1F4B3} Descuento 1.8% por tarjeta aplicado autom\xE1ticamente")), pagoMixto && !pagoGC && /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 16 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { background: C.bg2, borderRadius: 14, padding: 16, border: `1px solid ${C.sep}`, marginBottom: 10 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT, marginBottom: 12, textAlign: "center" } }, "Total a cobrar: ", /* @__PURE__ */ import_react.default.createElement("strong", { style: { color: C.label } }, $(total)), " \u2014 distribuye entre los m\xE9todos"), PAGOS.map(function(p) {
+    } }, "\u{1F4B3} Descuento 1.8% por tarjeta aplicado autom\xE1ticamente"), pago === "qr" && total > 0 && /* @__PURE__ */ import_react.default.createElement(QRPagoPanel, { total, refVenta: qrRefVenta })), pagoMixto && !pagoGC && /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 16 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { background: C.bg2, borderRadius: 14, padding: 16, border: `1px solid ${C.sep}`, marginBottom: 10 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT, marginBottom: 12, textAlign: "center" } }, "Total a cobrar: ", /* @__PURE__ */ import_react.default.createElement("strong", { style: { color: C.label } }, $(total)), " \u2014 distribuye entre los m\xE9todos"), PAGOS.map(function(p) {
       var val = montosMixtos[p.id] || "";
       return /* @__PURE__ */ import_react.default.createElement("div", { key: p.id, style: { marginBottom: 12 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10, marginBottom: 6 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 20 } }, p.icon), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 14, fontWeight: 600, color: C.label, fontFamily: FONT } }, p.label)), /* @__PURE__ */ import_react.default.createElement("div", { style: { position: "relative" } }, /* @__PURE__ */ import_react.default.createElement("span", { style: {
         position: "absolute",
@@ -33558,15 +33720,50 @@ Fecha: ${venta.fecha}`);
     } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 16 } }, d.emoji), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 15, color: C.label, fontFamily: FONT } }, d.nombre), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 12, color: C.label3 } }, d.uds, " uds")), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 15, fontWeight: 600, color: d.color, fontFamily: FONT } }, $(d.total * (1 - descPct / 100))))))), /* @__PURE__ */ import_react.default.createElement(
       IOSBtn,
       {
-        onPress: cobrar,
+        onPress: esPagoQR ? verificarPagoQR : cobrar,
         full: true,
-        variant: "primary",
-        disabled: pagoGC && !gcEncontrado,
+        variant: esPagoQR ? "success" : "primary",
+        disabled: pagoGC && !gcEncontrado || qrVerificando,
         style: { fontSize: 18, padding: "17px" },
-        icon: pagoGC ? "\u{1F381}" : "\u{1F4B3}"
+        icon: pagoGC ? "\u{1F381}" : esPagoQR ? "\u2713" : "\u{1F4B3}"
       },
-      pagoGC ? gcEncontrado ? `Confirmar \u2014 ${$(total)}` : "Busca la Gift Card" : `Cobrar ${$(total)}`
-    )));
+      pagoGC ? gcEncontrado ? `Confirmar \u2014 ${$(total)}` : "Busca la Gift Card" : esPagoQR ? `Verificar pago QR \u2014 ${$(total)}` : `Cobrar ${$(total)}`
+    )), qrVerificando && /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      position: "fixed",
+      inset: 0,
+      zIndex: 9999,
+      background: "rgba(22,101,52,0.96)",
+      backdropFilter: "blur(8px)",
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      justifyContent: "center",
+      animation: "thFadeIn .25s ease"
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      width: 110,
+      height: 110,
+      borderRadius: "50%",
+      background: "rgba(255,255,255,0.18)",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      animation: "thPop .45s cubic-bezier(.34,1.56,.64,1)"
+    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 60, color: "#fff", lineHeight: 1 } }, "\u2713")), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      marginTop: 24,
+      fontSize: 22,
+      fontWeight: 800,
+      color: "#fff",
+      fontFamily: FONT,
+      letterSpacing: "-0.01em"
+    } }, "Pago verificado"), /* @__PURE__ */ import_react.default.createElement("div", { style: { marginTop: 6, fontSize: 30, fontWeight: 800, color: "#fff", fontFamily: FONT } }, $(total)), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      marginTop: 10,
+      fontSize: 12,
+      color: "rgba(255,255,255,0.75)",
+      fontFamily: FONT,
+      textTransform: "uppercase",
+      letterSpacing: "0.15em"
+    } }, "Pago QR \xB7 ", qrRefVenta), /* @__PURE__ */ import_react.default.createElement("style", null, `@keyframes thFadeIn{from{opacity:0}to{opacity:1}}
+            @keyframes thPop{from{transform:scale(.4);opacity:0}to{transform:scale(1);opacity:1}}`)));
   }
   function SheetRecibir({ open, onClose, inv, onAdd, fInv, setFInv }) {
     var _hN146 = (0, import_react.useState)("");

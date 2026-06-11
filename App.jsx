@@ -1130,6 +1130,48 @@ function descargarArchivo(blob, nombre) {
 }
 
 // ══════════════════════════════════════════════════════════════
+// PAGO QR — generación de QR de cobro + verificación con sonido
+// ══════════════════════════════════════════════════════════════
+
+// Carga qrcode-generator (UMD, global `qrcode`) bajo demanda
+let _QRPromise = null;
+function loadQR() {
+  if (_QRPromise) return _QRPromise;
+  _QRPromise = new Promise((resolve, reject) => {
+    if (window.qrcode) { resolve(window.qrcode); return; }
+    const s = document.createElement("script");
+    s.src = "https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js";
+    s.onload  = () => resolve(window.qrcode);
+    s.onerror = () => reject(new Error("No se pudo cargar qrcode-generator"));
+    document.head.appendChild(s);
+  });
+  return _QRPromise;
+}
+
+// QR estático del banco de la tienda (imagen subida una vez por admin)
+const cargarQRBanco  = () => { try { return localStorage.getItem("th_qr_banco") || null; } catch { return null; } };
+const guardarQRBanco = (dataUrl) => { try { dataUrl ? localStorage.setItem("th_qr_banco", dataUrl) : localStorage.removeItem("th_qr_banco"); } catch {} };
+
+// Sonido de pago verificado — campanilla de dos tonos (Web Audio, sin assets)
+function playPagoSound(){
+  try{
+    const ctx = new (window.AudioContext||window.webkitAudioContext)();
+    [[1318.5, 0], [1975.5, 0.14]].forEach(([freq, delay])=>{
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.type = "sine"; o.frequency.value = freq;
+      g.gain.setValueAtTime(0.0001, ctx.currentTime + delay);
+      g.gain.exponentialRampToValueAtTime(0.4,    ctx.currentTime + delay + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + delay + 0.55);
+      o.connect(g); g.connect(ctx.destination);
+      o.start(ctx.currentTime + delay);
+      o.stop(ctx.currentTime + delay + 0.6);
+    });
+    setTimeout(()=>ctx.close(), 1000);
+  }catch{}
+}
+
+// ══════════════════════════════════════════════════════════════
 // GENERADOR DE PLANTILLA EXCEL — Toscana House editorial style
 // Usa xlsx-js-style: fork de SheetJS con soporte REAL de estilos
 // (colores de fondo, fuentes, bordes — sin licencia Pro)
@@ -10530,6 +10572,74 @@ function POSContainer({inv,onVenta,retiros,onRetiro,onVerNota}){
   );
 }
 
+// ══════════════════════════════════════════════════════════
+// QR PAGO PANEL — QR de cobro autogenerado (o QR del banco)
+// ══════════════════════════════════════════════════════════
+function QRPagoPanel({total, refVenta}){
+  const [qrBanco, setQrBanco] = useState(cargarQRBanco);
+  const [qrGen,   setQrGen]   = useState(null);
+  const fileRef = useRef();
+
+  useEffect(()=>{
+    if(qrBanco){ setQrGen(null); return; }
+    let on = true;
+    loadQR().then(qrcode=>{
+      if(!on) return;
+      const qr = qrcode(0, "M");
+      qr.addData(`TOSCANA HOUSE|COBRO|BS:${total.toFixed(2)}|REF:${refVenta}`);
+      qr.make();
+      setQrGen(qr.createDataURL(7, 10));
+    }).catch(()=>{});
+    return ()=>{ on = false; };
+  },[total, refVenta, qrBanco]);
+
+  function subirQRBanco(e){
+    const f = e.target.files?.[0];
+    if(!f) return;
+    e.target.value = "";
+    const r = new FileReader();
+    r.onload = ev => { guardarQRBanco(ev.target.result); setQrBanco(ev.target.result); };
+    r.readAsDataURL(f);
+  }
+
+  const img = qrBanco || qrGen;
+  return (
+    <div style={{background:C.bg2,borderRadius:16,padding:18,marginBottom:16,
+      border:`2px solid ${C.blue}30`,textAlign:"center"}}>
+      <div style={{fontSize:11,fontWeight:700,color:C.blue,fontFamily:FONT,
+        textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:12}}>
+        📱 {qrBanco ? "QR de cobro · banco" : "QR de cobro autogenerado"}
+      </div>
+      {img
+        ? <img src={img} alt="QR de cobro" style={{width:210,height:210,objectFit:"contain",
+            borderRadius:14,background:"#fff",padding:10,border:`1px solid ${C.sep}`}}/>
+        : <div style={{width:210,height:210,margin:"0 auto",borderRadius:14,background:C.bg1,
+            display:"flex",alignItems:"center",justifyContent:"center",
+            color:C.label3,fontSize:13,fontFamily:FONT}}>Generando QR…</div>}
+      <div style={{fontSize:26,fontWeight:800,color:C.label,fontFamily:FONT,marginTop:12}}>{$(total)}</div>
+      <div style={{fontSize:11.5,color:C.label3,fontFamily:FONT,marginTop:4,lineHeight:1.5}}>
+        El cliente escanea y paga desde su app bancaria.<br/>
+        Cuando llegue la notificación del banco, presiona <b>Verificar pago</b>.
+      </div>
+      <div style={{marginTop:10,display:"flex",justifyContent:"center",gap:14}}>
+        <button onClick={()=>fileRef.current?.click()} style={{background:"none",border:"none",
+          fontSize:11,color:C.blue,fontFamily:FONT,cursor:"pointer",textDecoration:"underline",
+          WebkitTapHighlightColor:"transparent"}}>
+          {qrBanco ? "Cambiar QR del banco" : "Usar el QR de mi banco"}
+        </button>
+        {qrBanco&&(
+          <button onClick={()=>{ guardarQRBanco(null); setQrBanco(null); }} style={{background:"none",
+            border:"none",fontSize:11,color:C.label3,fontFamily:FONT,cursor:"pointer",
+            textDecoration:"underline",WebkitTapHighlightColor:"transparent"}}>
+            Quitar
+          </button>
+        )}
+      </div>
+      <input ref={fileRef} type="file" accept="image/*" onChange={subirQRBanco} style={{display:"none"}}/>
+    </div>
+  );
+}
+
 // POS — Caja de ventas
 // ══════════════════════════════════════════════════════════
 function POS({inv,onVenta,onVerNota}){
@@ -10544,6 +10654,8 @@ function POS({inv,onVenta,onVerNota}){
   var _hN142 = useState(false); var showOk = _hN142[0]; var setShowOk = _hN142[1];;
   var _hN142b = useState(false); var showFacPOS = _hN142b[0]; var setShowFacPOS = _hN142b[1];;
   var _hN143 = useState(false); var showPago = _hN143[0]; var setShowPago = _hN143[1];
+  var _hNqr = useState(false); var qrVerificando = _hNqr[0]; var setQrVerificando = _hNqr[1];
+  const qrRefVenta = useMemo(()=>"TH"+Date.now().toString(36).toUpperCase(), [showPago]);
   var _hNm1 = useState(false); var pagoMixto = _hNm1[0]; var setPagoMixto = _hNm1[1];
   var _hNm2 = useState({efectivo:"", qr:"", tarjeta:""}); var montosMixtos = _hNm2[0]; var setMontosMixtos = _hNm2[1];
   // Gift Card payment state
@@ -10723,6 +10835,24 @@ function POS({inv,onVenta,onVerNota}){
     setUltima(vf);setShowOk(true);setShowPago(false);
     setCarrito([]);setDescExtra(0);setBusq("");setEtiqueta(null);setCliente("");
     setPagoMixto(false);setMontosMixtos({efectivo:"",qr:"",tarjeta:""});
+  }
+
+  // ── Pago QR: verificación con sonido + confirmación visual ──
+  // El cajero presiona al recibir la notificación del banco: suena la
+  // campanilla, se muestra el check verde y la venta se registra.
+  const esPagoQR = !pagoGC && (
+    (!pagoMixto && pago==="qr") ||
+    (pagoMixto && (parseFloat(montosMixtos.qr)||0) > 0)
+  );
+  function verificarPagoQR(){
+    if(!carrito.length || qrVerificando) return;
+    if(pagoMixto){
+      const suma=(parseFloat(montosMixtos.efectivo)||0)+(parseFloat(montosMixtos.qr)||0)+(parseFloat(montosMixtos.tarjeta)||0);
+      if(Math.abs(suma-total)>0.01){alert(`Los montos (${$(suma)}) no cuadran con el total (${$(total)})`);return;}
+    }
+    playPagoSound();
+    setQrVerificando(true);
+    setTimeout(()=>{ setQrVerificando(false); cobrar(); }, 1500);
   }
 
   // ── Gift Card display computations (evita IIFEs en JSX) ─────────────────
@@ -11028,6 +11158,9 @@ function POS({inv,onVenta,onVerNota}){
                 💳 Descuento 1.8% por tarjeta aplicado automáticamente
               </div>
             )}
+            {pago==="qr"&&total>0&&(
+              <QRPagoPanel total={total} refVenta={qrRefVenta}/>
+            )}
           </div>
         )}
 
@@ -11239,15 +11372,39 @@ function POS({inv,onVenta,onVerNota}){
           </div>
         )}
 
-        <IOSBtn onPress={cobrar} full variant="primary"
-          disabled={pagoGC&&(!gcEncontrado)}
+        <IOSBtn onPress={esPagoQR ? verificarPagoQR : cobrar} full
+          variant={esPagoQR ? "success" : "primary"}
+          disabled={(pagoGC&&(!gcEncontrado))||qrVerificando}
           style={{fontSize:18,padding:"17px"}}
-          icon={pagoGC?"🎁":"💳"}>
+          icon={pagoGC?"🎁":esPagoQR?"✓":"💳"}>
           {pagoGC
             ? (gcEncontrado ? `Confirmar — ${$(total)}` : "Busca la Gift Card")
+            : esPagoQR
+            ? `Verificar pago QR — ${$(total)}`
             : `Cobrar ${$(total)}`}
         </IOSBtn>
       </Sheet>
+
+      {/* ── Overlay: pago QR verificado ── */}
+      {qrVerificando&&(
+        <div style={{position:"fixed",inset:0,zIndex:9999,
+          background:"rgba(22,101,52,0.96)",backdropFilter:"blur(8px)",
+          display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",
+          animation:"thFadeIn .25s ease"}}>
+          <div style={{width:110,height:110,borderRadius:"50%",background:"rgba(255,255,255,0.18)",
+            display:"flex",alignItems:"center",justifyContent:"center",
+            animation:"thPop .45s cubic-bezier(.34,1.56,.64,1)"}}>
+            <span style={{fontSize:60,color:"#fff",lineHeight:1}}>✓</span>
+          </div>
+          <div style={{marginTop:24,fontSize:22,fontWeight:800,color:"#fff",fontFamily:FONT,
+            letterSpacing:"-0.01em"}}>Pago verificado</div>
+          <div style={{marginTop:6,fontSize:30,fontWeight:800,color:"#fff",fontFamily:FONT}}>{$(total)}</div>
+          <div style={{marginTop:10,fontSize:12,color:"rgba(255,255,255,0.75)",fontFamily:FONT,
+            textTransform:"uppercase",letterSpacing:"0.15em"}}>Pago QR · {qrRefVenta}</div>
+          <style>{`@keyframes thFadeIn{from{opacity:0}to{opacity:1}}
+            @keyframes thPop{from{transform:scale(.4);opacity:0}to{transform:scale(1);opacity:1}}`}</style>
+        </div>
+      )}
     </div>
   );
 }
