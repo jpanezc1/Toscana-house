@@ -550,7 +550,7 @@ async function imprimirTicket(producto, marcaNombre) {
   <title>Etiqueta — ${producto.nombre}</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.5/JsBarcode.all.min.js"><\/script>
   <style>
-    @page { size: 50mm 25mm landscape; margin: 0; }
+    @page { size: 50mm 25mm; margin: 0; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     html, body { width:50mm; height:25mm; }
     body { font-family:'Courier New',monospace; padding:1mm 2mm; background:white; color:black;
@@ -634,7 +634,7 @@ function imprimirEtiquetasLote(items) {
   <title>Etiquetas — ${items.length} items</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.5/JsBarcode.all.min.js"><\/script>
   <style>
-    @page { size: 50mm 25mm landscape; margin: 0; }
+    @page { size: 50mm 25mm; margin: 0; }
     * { box-sizing:border-box; margin:0; padding:0; }
     body { font-family:'Courier New',monospace; background:#fff; }
     .controls { padding:16px; background:#f5f3ee; display:flex; gap:12px; align-items:center;
