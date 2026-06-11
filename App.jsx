@@ -564,7 +564,7 @@ async function imprimirTicket(producto, marcaNombre) {
     .barcode-wrap svg { width:45mm!important; height:10.8mm!important; }
     .bottom-row { display:flex; justify-content:space-between; align-items:center; width:100%;
       margin-top:0.6mm; }
-    .codigo { font-size:7.2px; color:#333; font-family:monospace; }
+    .codigo { font-size:8.64px; color:#333; font-family:monospace; }
     .precio { font-size:13.2px; font-weight:900; }
     @media print { body { print-color-adjust:exact; -webkit-print-color-adjust:exact; } }
   </style>
@@ -657,7 +657,7 @@ function imprimirEtiquetasLote(items) {
     .barcode-wrap svg { width:45mm!important; height:10.8mm!important; }
     .bottom-row { display:flex; justify-content:space-between; align-items:center; width:100%;
       margin-top:0.6mm; }
-    .codigo { font-size:7.2px; color:#333; font-family:monospace; }
+    .codigo { font-size:8.64px; color:#333; font-family:monospace; }
     .precio { font-size:13.2px; font-weight:900; }
     @media print {
       .controls { display:none!important; }
