@@ -22066,9 +22066,9 @@
   <title>Etiqueta \u2014 ${producto.nombre}</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.5/JsBarcode.all.min.js"><\/script>
   <style>
-    @page { size: 2in 1in; margin: 0; }
+    @page { size: 50mm 25mm; margin: 0; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    html, body { width:50.8mm; height:25.4mm; }
+    html, body { width:50mm; height:25mm; }
     body { font-family:'Courier New',monospace; padding:1mm 2mm; background:white; color:black;
       overflow:hidden; display:flex; flex-direction:column; align-items:center; justify-content:center; }
     .top { display:flex; justify-content:space-between; align-items:center; width:100%;
@@ -22147,7 +22147,7 @@
   <title>Etiquetas \u2014 ${items.length} items</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.5/JsBarcode.all.min.js"><\/script>
   <style>
-    @page { size: 2in 1in; margin: 0; }
+    @page { size: 50mm 25mm; margin: 0; }
     * { box-sizing:border-box; margin:0; padding:0; }
     body { font-family:'Courier New',monospace; background:#fff; }
     .controls { padding:16px; background:#f5f3ee; display:flex; gap:12px; align-items:center;
@@ -22157,7 +22157,7 @@
     .btn-print:hover { background:#333; }
     .info { font-family:sans-serif; font-size:13px; color:#57534e; }
     .labels-grid { display:flex; flex-direction:column; gap:4mm; padding:8mm; }
-    .label { width:50.8mm; height:25.4mm; border:1px dashed #ccc; padding:1mm 2mm; box-sizing:border-box;
+    .label { width:50mm; height:25mm; border:1px dashed #ccc; padding:1mm 2mm; box-sizing:border-box;
       overflow:hidden; background:#fff; display:flex; flex-direction:column; align-items:center; justify-content:center; }
     .top { display:flex; justify-content:space-between; align-items:center; width:100%;
       font-size:6px; letter-spacing:0.5px; text-transform:uppercase; color:#333; }
