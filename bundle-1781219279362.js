@@ -22072,7 +22072,7 @@
     body { font-family:'Courier New',monospace; padding:1mm 2mm; background:white; color:black;
       overflow:hidden; display:flex; flex-direction:column; align-items:center; justify-content:center; }
     .top { display:flex; justify-content:space-between; align-items:center; width:100%;
-      font-size:7.2px; letter-spacing:0.5px; text-transform:uppercase; color:#333; }
+      font-size:8.64px; letter-spacing:0.5px; text-transform:uppercase; color:#333; }
     .producto { font-size:9px; font-weight:bold; text-align:center; width:100%;
       text-transform:uppercase; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
       margin:0.6mm 0; }
@@ -22086,7 +22086,7 @@
   </style>
 </head>
 <body>
-  <div class="top"><span>${marcaNombre}</span><span>TOSCANA HOUSE</span></div>
+  <div class="top"><span>${marcaNombre}</span><span style="font-weight:bold">TOSCANA HOUSE</span></div>
   <div class="producto">${producto.nombre}</div>
   <div class="barcode-wrap">
     <svg id="barcode"></svg>
@@ -22126,7 +22126,7 @@
       const marca = it.marcaNombre || it.marca || "";
       return `
       <div class="label">
-        <div class="top"><span>${marca.toUpperCase()}</span><span>TOSCANA HOUSE</span></div>
+        <div class="top"><span>${marca.toUpperCase()}</span><span style="font-weight:bold">TOSCANA HOUSE</span></div>
         <div class="producto">${nombre}</div>
         <div class="barcode-wrap"><svg id="bc-${codigo.replace(/[^a-z0-9]/gi, "_")}"></svg></div>
         <div class="bottom-row">
@@ -22162,7 +22162,7 @@
     .label { width:50mm; height:25mm; border:1px dashed #ccc; padding:1mm 2mm; box-sizing:border-box;
       overflow:hidden; background:#fff; display:flex; flex-direction:column; align-items:center; justify-content:center; }
     .top { display:flex; justify-content:space-between; align-items:center; width:100%;
-      font-size:7.2px; letter-spacing:0.5px; text-transform:uppercase; color:#333; }
+      font-size:8.64px; letter-spacing:0.5px; text-transform:uppercase; color:#333; }
     .producto { font-size:9px; font-weight:bold; text-align:center; width:100%;
       text-transform:uppercase; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
       margin:0.6mm 0; }
