@@ -550,11 +550,14 @@ async function imprimirTicket(producto, marcaNombre) {
   <title>Etiqueta — ${producto.nombre}</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.5/JsBarcode.all.min.js"><\/script>
   <style>
-    @page { size: 2in 1in; margin: 0; }
+    @page { size: 1in 2in; margin: 0; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    html, body { width:2in; height:1in; }
-    body { font-family:'Courier New',monospace; padding:1mm 2mm; background:white; color:black;
-      overflow:hidden; display:flex; flex-direction:column; align-items:center; justify-content:center; }
+    html, body { width:25.4mm; height:50.8mm; overflow:hidden; position:relative; }
+    body { font-family:'Courier New',monospace; background:white; color:black; }
+    .label-content { position:absolute; top:25.4mm; left:0; width:50.8mm; height:25.4mm;
+      transform-origin: top left; transform: rotate(-90deg);
+      padding:1mm 2mm; box-sizing:border-box;
+      display:flex; flex-direction:column; align-items:center; justify-content:center; }
     .top { display:flex; justify-content:space-between; align-items:center; width:100%;
       font-size:6px; letter-spacing:0.5px; text-transform:uppercase; color:#333; }
     .producto { font-size:7.5px; font-weight:bold; text-align:center; width:100%;
@@ -570,14 +573,16 @@ async function imprimirTicket(producto, marcaNombre) {
   </style>
 </head>
 <body>
-  <div class="top"><span>${marcaNombre}</span><span>TOSCANA HOUSE</span></div>
-  <div class="producto">${producto.nombre}</div>
-  <div class="barcode-wrap">
-    <svg id="barcode"></svg>
-  </div>
-  <div class="bottom-row">
-    <span class="codigo">${producto.codigo}</span>
-    <span class="precio">Bs ${Number(producto.precio).toLocaleString("es-BO")}</span>
+  <div class="label-content">
+    <div class="top"><span>${marcaNombre}</span><span>TOSCANA HOUSE</span></div>
+    <div class="producto">${producto.nombre}</div>
+    <div class="barcode-wrap">
+      <svg id="barcode"></svg>
+    </div>
+    <div class="bottom-row">
+      <span class="codigo">${producto.codigo}</span>
+      <span class="precio">Bs ${Number(producto.precio).toLocaleString("es-BO")}</span>
+    </div>
   </div>
   <script>
     window.onload = function() {
@@ -611,12 +616,14 @@ function imprimirEtiquetasLote(items) {
     const marca   = it.marcaNombre || it.marca || "";
     return `
       <div class="label">
-        <div class="top"><span>${marca.toUpperCase()}</span><span>TOSCANA HOUSE</span></div>
-        <div class="producto">${nombre}</div>
-        <div class="barcode-wrap"><svg id="bc-${codigo.replace(/[^a-z0-9]/gi,'_')}"></svg></div>
-        <div class="bottom-row">
-          <span class="codigo">${codigo}</span>
-          <span class="precio">Bs ${precio}</span>
+        <div class="label-content">
+          <div class="top"><span>${marca.toUpperCase()}</span><span>TOSCANA HOUSE</span></div>
+          <div class="producto">${nombre}</div>
+          <div class="barcode-wrap"><svg id="bc-${codigo.replace(/[^a-z0-9]/gi,'_')}"></svg></div>
+          <div class="bottom-row">
+            <span class="codigo">${codigo}</span>
+            <span class="precio">Bs ${precio}</span>
+          </div>
         </div>
       </div>`;
   }).join('');
@@ -634,7 +641,7 @@ function imprimirEtiquetasLote(items) {
   <title>Etiquetas — ${items.length} items</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.5/JsBarcode.all.min.js"><\/script>
   <style>
-    @page { size: 2in 1in; margin: 0; }
+    @page { size: 1in 2in; margin: 0; }
     * { box-sizing:border-box; margin:0; padding:0; }
     body { font-family:'Courier New',monospace; background:#fff; }
     .controls { padding:16px; background:#f5f3ee; display:flex; gap:12px; align-items:center;
@@ -644,8 +651,8 @@ function imprimirEtiquetasLote(items) {
     .btn-print:hover { background:#333; }
     .info { font-family:sans-serif; font-size:13px; color:#57534e; }
     .labels-grid { display:flex; flex-direction:column; gap:4mm; padding:8mm; }
-    .label { width:2in; height:1in; border:1px dashed #ccc; padding:1mm 2mm;
-      overflow:hidden; background:#fff;
+    .label { width:2in; height:1in; border:1px dashed #ccc; overflow:hidden; background:#fff; }
+    .label-content { width:100%; height:100%; padding:1mm 2mm; box-sizing:border-box;
       display:flex; flex-direction:column; align-items:center; justify-content:center; }
     .top { display:flex; justify-content:space-between; align-items:center; width:100%;
       font-size:6px; letter-spacing:0.5px; text-transform:uppercase; color:#333; }
@@ -662,8 +669,11 @@ function imprimirEtiquetasLote(items) {
       .controls { display:none!important; }
       body { padding:0; }
       .labels-grid { gap:0; padding:0; }
-      .label { border:none; page-break-after:always; }
+      .label { width:25.4mm; height:50.8mm; border:none; position:relative;
+        page-break-after:always; }
       .label:last-child { page-break-after:auto; }
+      .label-content { position:absolute; top:25.4mm; left:0; width:50.8mm; height:25.4mm;
+        transform-origin: top left; transform: rotate(-90deg); }
     }
   </style>
 </head>
