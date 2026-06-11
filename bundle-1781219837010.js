@@ -22054,6 +22054,47 @@
       wordBreak: "break-all"
     } }, codigo));
   }
+  function abreviarNombre(nombre, maxLen = 26) {
+    if (!nombre) return "";
+    let n = nombre.trim();
+    if (n.length <= maxLen) return n;
+    const abreviaciones = {
+      "MANGA LARGA": "M.LARGA",
+      "MANGA CORTA": "M.CORTA",
+      "SIN MANGA": "S/MANGA",
+      "PANTALON": "PANT.",
+      "PANTAL\xD3N": "PANT.",
+      "CHAQUETA": "CHAQ.",
+      "CHAMARRA": "CHAM.",
+      "VESTIDO": "VEST.",
+      "CAMISA": "CAM.",
+      "CHALECO": "CHAL.",
+      "ASIMETRICO": "ASIM.",
+      "ASIM\xC9TRICO": "ASIM.",
+      "ESTAMPADO": "EST.",
+      "BORDADO": "BORD.",
+      "ESTRELLA": "ESTR.",
+      "CUELLO": "CLLO.",
+      "BOTONES": "BOT.",
+      "BOLSILLOS": "BOLS.",
+      "TRANSPARENTE": "TRANSP.",
+      "DEPORTIVO": "DEP.",
+      "DEPORTIVA": "DEP."
+    };
+    for (const [full, short] of Object.entries(abreviaciones)) {
+      n = n.replace(new RegExp(full, "g"), short);
+    }
+    if (n.length <= maxLen) return n;
+    return n.slice(0, maxLen - 1).trim() + "\u2026";
+  }
+  function expandirPorStock(items) {
+    const out = [];
+    for (const it of items) {
+      const n = Math.max(1, Number(it.stock) || 1);
+      for (let i = 0; i < n; i++) out.push(it);
+    }
+    return out;
+  }
   async function imprimirTicket(producto, marcaNombre) {
     const win = window.open("", "_blank", "width=400,height=500");
     if (!win) {
@@ -22087,7 +22128,7 @@
 </head>
 <body>
   <div class="top"><span>${marcaNombre}</span><span style="font-weight:bold">TOSCANA HOUSE</span></div>
-  <div class="producto">${producto.nombre}</div>
+  <div class="producto">${abreviarNombre(producto.nombre)}</div>
   <div class="barcode-wrap">
     <svg id="barcode"></svg>
   </div>
@@ -22119,8 +22160,8 @@
       alert("Activ\xE1 las ventanas emergentes para imprimir");
       return;
     }
-    const etiquetas = items.map((it) => {
-      const nombre = (it.nombre || it.desc || "").toUpperCase();
+    const etiquetas = items.map((it, idx) => {
+      const nombre = abreviarNombre((it.nombre || it.desc || "").toUpperCase());
       const codigo = (it.codigo || it.sku || "").toUpperCase();
       const precio = it.precio || 0;
       const marca = it.marcaNombre || it.marca || "";
@@ -22128,17 +22169,16 @@
       <div class="label">
         <div class="top"><span>${marca.toUpperCase()}</span><span style="font-weight:bold">TOSCANA HOUSE</span></div>
         <div class="producto">${nombre}</div>
-        <div class="barcode-wrap"><svg id="bc-${codigo.replace(/[^a-z0-9]/gi, "_")}"></svg></div>
+        <div class="barcode-wrap"><svg id="bc-${idx}"></svg></div>
         <div class="bottom-row">
           <span class="codigo">${codigo}</span>
           <span class="precio">Bs ${precio}</span>
         </div>
       </div>`;
     }).join("");
-    const barcodeScripts = items.map((it) => {
+    const barcodeScripts = items.map((it, idx) => {
       const codigo = (it.codigo || it.sku || "").toUpperCase();
-      const safeId = codigo.replace(/[^a-z0-9]/gi, "_");
-      return `try{JsBarcode("#bc-${safeId}","${codigo}",{format:"CODE128",width:1.56,height:38.4,displayValue:false,margin:0});}catch(e){}`;
+      return `try{JsBarcode("#bc-${idx}","${codigo}",{format:"CODE128",width:1.56,height:38.4,displayValue:false,margin:0});}catch(e){}`;
     }).join("\n");
     win.document.write(`<!DOCTYPE html>
 <html>
@@ -28181,42 +28221,47 @@ Fecha: ${venta.fecha}`);
       padding: "14px 10px",
       textAlign: "center",
       border: `1px solid ${s.c}25`
-    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 28, fontWeight: 700, color: s.c, fontFamily: FONT_UI } }, s.v), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT_UI, textTransform: "uppercase", letterSpacing: 0.5, marginTop: 2 } }, s.l)))), stats.ok > 0 && /* @__PURE__ */ import_react.default.createElement(
-      "button",
-      {
-        onClick: () => {
-          const importados = preview.filter((f) => f.desc && f.marcaId && f.precio > 0 && f._errs.length === 0 && !f._dup).map((f) => ({
-            nombre: (f.desc || "").toUpperCase(),
-            codigo: f.sku.toUpperCase(),
-            precio: f.precio,
-            marcaNombre: f.marcaNombre
-          }));
-          imprimirEtiquetasLote(importados);
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 28, fontWeight: 700, color: s.c, fontFamily: FONT_UI } }, s.v), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT_UI, textTransform: "uppercase", letterSpacing: 0.5, marginTop: 2 } }, s.l)))), stats.ok > 0 && (() => {
+      const importables = preview.filter((f) => f.desc && f.marcaId && f.precio > 0 && f._errs.length === 0 && !f._dup);
+      const totalEtiquetas = importables.reduce((acc, f) => acc + Math.max(1, Number(f.stock) || 1), 0);
+      return /* @__PURE__ */ import_react.default.createElement(
+        "button",
+        {
+          onClick: () => {
+            const importados = importables.map((f) => ({
+              nombre: (f.desc || "").toUpperCase(),
+              codigo: f.sku.toUpperCase(),
+              precio: f.precio,
+              marcaNombre: f.marcaNombre,
+              stock: f.stock
+            }));
+            imprimirEtiquetasLote(expandirPorStock(importados));
+          },
+          style: {
+            width: "100%",
+            background: `${C.gold}14`,
+            border: `1.5px solid ${C.gold}`,
+            borderRadius: 12,
+            padding: "13px",
+            fontSize: 14,
+            fontWeight: 700,
+            color: C.gold,
+            cursor: "pointer",
+            fontFamily: FONT_UI,
+            marginBottom: 10,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 8
+          }
         },
-        style: {
-          width: "100%",
-          background: `${C.gold}14`,
-          border: `1.5px solid ${C.gold}`,
-          borderRadius: 12,
-          padding: "13px",
-          fontSize: 14,
-          fontWeight: 700,
-          color: C.gold,
-          cursor: "pointer",
-          fontFamily: FONT_UI,
-          marginBottom: 10,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          gap: 8
-        }
-      },
-      "\u{1F3F7} Imprimir ",
-      stats.ok,
-      " etiqueta",
-      stats.ok !== 1 ? "s" : "",
-      " del cargamento"
-    ), /* @__PURE__ */ import_react.default.createElement("button", { onClick: onClose, style: {
+        "\u{1F3F7} Imprimir ",
+        totalEtiquetas,
+        " etiqueta",
+        totalEtiquetas !== 1 ? "s" : "",
+        " del cargamento"
+      );
+    })(), /* @__PURE__ */ import_react.default.createElement("button", { onClick: onClose, style: {
       width: "100%",
       background: C.label,
       border: "none",
@@ -35198,13 +35243,13 @@ Confirmas que el conteo de ${r.contado} unidad(es) es correcto.`)) {
             alert("No hay productos para imprimir");
             return;
           }
-          imprimirEtiquetasLote(productos);
+          imprimirEtiquetasLote(expandirPorStock(productos));
         },
         full: true,
         small: true,
         icon: "\u{1F3F7}"
       },
-      `Imprimir ${productos.length} etiqueta${productos.length !== 1 ? "s" : ""} (c\xF3digo de barras)`
+      `Imprimir ${productos.reduce((acc, p) => acc + Math.max(1, Number(p.stock) || 1), 0)} etiqueta${productos.length !== 1 ? "s" : ""} (c\xF3digo de barras)`
     ))));
   }
   function MarcaDetalle({ marcaId, inv, ventas, vMes, mes, anio, MK, cierres, setCierres, getHist, getLiq }) {

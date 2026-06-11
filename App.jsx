@@ -539,6 +539,36 @@ function BarcodeDisplay({ codigo, small }) {
   );
 }
 
+// Abrevia nombres largos de productos para que entren en la etiqueta
+function abreviarNombre(nombre, maxLen = 26) {
+  if (!nombre) return "";
+  let n = nombre.trim();
+  if (n.length <= maxLen) return n;
+  const abreviaciones = {
+    "MANGA LARGA":"M.LARGA", "MANGA CORTA":"M.CORTA", "SIN MANGA":"S/MANGA",
+    "PANTALON":"PANT.", "PANTALÓN":"PANT.", "CHAQUETA":"CHAQ.", "CHAMARRA":"CHAM.",
+    "VESTIDO":"VEST.", "CAMISA":"CAM.", "CHALECO":"CHAL.", "ASIMETRICO":"ASIM.",
+    "ASIMÉTRICO":"ASIM.", "ESTAMPADO":"EST.", "BORDADO":"BORD.", "ESTRELLA":"ESTR.",
+    "CUELLO":"CLLO.", "BOTONES":"BOT.", "BOLSILLOS":"BOLS.", "TRANSPARENTE":"TRANSP.",
+    "DEPORTIVO":"DEP.", "DEPORTIVA":"DEP.",
+  };
+  for (const [full, short] of Object.entries(abreviaciones)) {
+    n = n.replace(new RegExp(full, "g"), short);
+  }
+  if (n.length <= maxLen) return n;
+  return n.slice(0, maxLen - 1).trim() + "…";
+}
+
+// Repite cada item según su stock, para imprimir una etiqueta por unidad física
+function expandirPorStock(items) {
+  const out = [];
+  for (const it of items) {
+    const n = Math.max(1, Number(it.stock) || 1);
+    for (let i = 0; i < n; i++) out.push(it);
+  }
+  return out;
+}
+
 // Función de impresión de ticket con código QR
 async function imprimirTicket(producto, marcaNombre) {
   const win = window.open("","_blank","width=400,height=500");
@@ -571,7 +601,7 @@ async function imprimirTicket(producto, marcaNombre) {
 </head>
 <body>
   <div class="top"><span>${marcaNombre}</span><span style="font-weight:bold">TOSCANA HOUSE</span></div>
-  <div class="producto">${producto.nombre}</div>
+  <div class="producto">${abreviarNombre(producto.nombre)}</div>
   <div class="barcode-wrap">
     <svg id="barcode"></svg>
   </div>
@@ -604,8 +634,8 @@ function imprimirEtiquetasLote(items) {
   const win = window.open("", "_blank", "width=900,height=700");
   if (!win) { alert("Activá las ventanas emergentes para imprimir"); return; }
 
-  const etiquetas = items.map(it => {
-    const nombre  = (it.nombre || it.desc || "").toUpperCase();
+  const etiquetas = items.map((it, idx) => {
+    const nombre  = abreviarNombre((it.nombre || it.desc || "").toUpperCase());
     const codigo  = (it.codigo || it.sku || "").toUpperCase();
     const precio  = it.precio || 0;
     const marca   = it.marcaNombre || it.marca || "";
@@ -613,7 +643,7 @@ function imprimirEtiquetasLote(items) {
       <div class="label">
         <div class="top"><span>${marca.toUpperCase()}</span><span style="font-weight:bold">TOSCANA HOUSE</span></div>
         <div class="producto">${nombre}</div>
-        <div class="barcode-wrap"><svg id="bc-${codigo.replace(/[^a-z0-9]/gi,'_')}"></svg></div>
+        <div class="barcode-wrap"><svg id="bc-${idx}"></svg></div>
         <div class="bottom-row">
           <span class="codigo">${codigo}</span>
           <span class="precio">Bs ${precio}</span>
@@ -621,10 +651,9 @@ function imprimirEtiquetasLote(items) {
       </div>`;
   }).join('');
 
-  const barcodeScripts = items.map(it => {
+  const barcodeScripts = items.map((it, idx) => {
     const codigo = (it.codigo || it.sku || "").toUpperCase();
-    const safeId = codigo.replace(/[^a-z0-9]/gi,'_');
-    return `try{JsBarcode("#bc-${safeId}","${codigo}",{format:"CODE128",width:1.56,height:38.4,displayValue:false,margin:0});}catch(e){}`;
+    return `try{JsBarcode("#bc-${idx}","${codigo}",{format:"CODE128",width:1.56,height:38.4,displayValue:false,margin:0});}catch(e){}`;
   }).join('\n');
 
   win.document.write(`<!DOCTYPE html>
@@ -6472,27 +6501,30 @@ function ImportarExcelModal({inv, onImportar, onClose}){
               </div>
             ))}
           </div>
-          {/* Imprimir etiquetas de todo el cargamento */}
-          {stats.ok > 0 && (
+          {/* Imprimir etiquetas de todo el cargamento (una por unidad de stock) */}
+          {stats.ok > 0 && (()=>{
+            const importables = preview.filter(f=>f.desc&&f.marcaId&&f.precio>0&&f._errs.length===0&&!f._dup);
+            const totalEtiquetas = importables.reduce((acc,f)=>acc+Math.max(1,Number(f.stock)||1),0);
+            return (
             <button
               onClick={()=>{
-                const importados = preview
-                  .filter(f=>f.desc&&f.marcaId&&f.precio>0&&f._errs.length===0&&!f._dup)
-                  .map(f=>({
+                const importados = importables.map(f=>({
                     nombre: (f.desc||"").toUpperCase(),
                     codigo: f.sku.toUpperCase(),
                     precio: f.precio,
                     marcaNombre: f.marcaNombre,
+                    stock: f.stock,
                   }));
-                imprimirEtiquetasLote(importados);
+                imprimirEtiquetasLote(expandirPorStock(importados));
               }}
               style={{width:"100%",background:`${C.gold}14`,border:`1.5px solid ${C.gold}`,
                 borderRadius:12,padding:"13px",fontSize:14,fontWeight:700,
                 color:C.gold,cursor:"pointer",fontFamily:FONT_UI,marginBottom:10,
                 display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
-              🏷 Imprimir {stats.ok} etiqueta{stats.ok!==1?"s":""} del cargamento
+              🏷 Imprimir {totalEtiquetas} etiqueta{totalEtiquetas!==1?"s":""} del cargamento
             </button>
-          )}
+            );
+          })()}
           <button onClick={onClose} style={{width:"100%",background:C.label,border:"none",
             borderRadius:12,padding:"14px",fontSize:15,fontWeight:700,
             color:C.bg0,cursor:"pointer",fontFamily:FONT_UI}}>
@@ -12684,9 +12716,9 @@ function InventarioPorMarca({inv, ventas, onRecibir, onBaja, onImportarExcel}){
         <div style={{display:"flex",gap:8,marginTop:8}}>
           <IOSBtn onPress={()=>{
               if(productos.length===0){ alert("No hay productos para imprimir"); return; }
-              imprimirEtiquetasLote(productos);
+              imprimirEtiquetasLote(expandirPorStock(productos));
             }}
-            full small icon="🏷">{`Imprimir ${productos.length} etiqueta${productos.length!==1?'s':''} (código de barras)`}</IOSBtn>
+            full small icon="🏷">{`Imprimir ${productos.reduce((acc,p)=>acc+Math.max(1,Number(p.stock)||1),0)} etiqueta${productos.length!==1?'s':''} (código de barras)`}</IOSBtn>
         </div>
       </div>
     </div>
