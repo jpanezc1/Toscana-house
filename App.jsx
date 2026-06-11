@@ -556,16 +556,16 @@ async function imprimirTicket(producto, marcaNombre) {
     body { font-family:'Courier New',monospace; padding:1mm 2mm; background:white; color:black;
       overflow:hidden; display:flex; flex-direction:column; align-items:center; justify-content:center; }
     .top { display:flex; justify-content:space-between; align-items:center; width:100%;
-      font-size:6px; letter-spacing:0.5px; text-transform:uppercase; color:#333; }
-    .producto { font-size:7.5px; font-weight:bold; text-align:center; width:100%;
+      font-size:7.2px; letter-spacing:0.5px; text-transform:uppercase; color:#333; }
+    .producto { font-size:9px; font-weight:bold; text-align:center; width:100%;
       text-transform:uppercase; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
       margin:0.6mm 0; }
     .barcode-wrap { width:100%; display:flex; justify-content:center; }
-    .barcode-wrap svg { width:44mm!important; height:9mm!important; }
+    .barcode-wrap svg { width:46mm!important; height:10.8mm!important; }
     .bottom-row { display:flex; justify-content:space-between; align-items:center; width:100%;
       margin-top:0.6mm; }
-    .codigo { font-size:6px; color:#333; font-family:monospace; }
-    .precio { font-size:11px; font-weight:900; }
+    .codigo { font-size:7.2px; color:#333; font-family:monospace; }
+    .precio { font-size:13.2px; font-weight:900; }
     @media print { body { print-color-adjust:exact; -webkit-print-color-adjust:exact; } }
   </style>
 </head>
@@ -584,7 +584,7 @@ async function imprimirTicket(producto, marcaNombre) {
       try {
         JsBarcode("#barcode", "${producto.codigo}", {
           format: "CODE128",
-          width: 1.3, height: 32,
+          width: 1.56, height: 38.4,
           displayValue: false,
           margin: 0
         });
@@ -624,7 +624,7 @@ function imprimirEtiquetasLote(items) {
   const barcodeScripts = items.map(it => {
     const codigo = (it.codigo || it.sku || "").toUpperCase();
     const safeId = codigo.replace(/[^a-z0-9]/gi,'_');
-    return `try{JsBarcode("#bc-${safeId}","${codigo}",{format:"CODE128",width:1.3,height:32,displayValue:false,margin:0});}catch(e){}`;
+    return `try{JsBarcode("#bc-${safeId}","${codigo}",{format:"CODE128",width:1.56,height:38.4,displayValue:false,margin:0});}catch(e){}`;
   }).join('\n');
 
   win.document.write(`<!DOCTYPE html>
@@ -649,16 +649,16 @@ function imprimirEtiquetasLote(items) {
     .label { width:50mm; height:25mm; border:1px dashed #ccc; padding:1mm 2mm; box-sizing:border-box;
       overflow:hidden; background:#fff; display:flex; flex-direction:column; align-items:center; justify-content:center; }
     .top { display:flex; justify-content:space-between; align-items:center; width:100%;
-      font-size:6px; letter-spacing:0.5px; text-transform:uppercase; color:#333; }
-    .producto { font-size:7.5px; font-weight:bold; text-align:center; width:100%;
+      font-size:7.2px; letter-spacing:0.5px; text-transform:uppercase; color:#333; }
+    .producto { font-size:9px; font-weight:bold; text-align:center; width:100%;
       text-transform:uppercase; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
       margin:0.6mm 0; }
     .barcode-wrap { width:100%; display:flex; justify-content:center; }
-    .barcode-wrap svg { width:44mm!important; height:9mm!important; }
+    .barcode-wrap svg { width:46mm!important; height:10.8mm!important; }
     .bottom-row { display:flex; justify-content:space-between; align-items:center; width:100%;
       margin-top:0.6mm; }
-    .codigo { font-size:6px; color:#333; font-family:monospace; }
-    .precio { font-size:11px; font-weight:900; }
+    .codigo { font-size:7.2px; color:#333; font-family:monospace; }
+    .precio { font-size:13.2px; font-weight:900; }
     @media print {
       .controls { display:none!important; }
       .print-note { display:none!important; }
