@@ -418,18 +418,6 @@ function loadQRCode() {
   });
 }
 
-// También carga JsBarcode como fallback para impresión
-let _JsBarcodeLoaded = false;
-function loadJsBarcode() {
-  return new Promise(res => {
-    if (window.JsBarcode || _JsBarcodeLoaded) { res(true); return; }
-    const s = document.createElement("script");
-    s.src = "https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.5/JsBarcode.all.min.js";
-    s.onload = () => { _JsBarcodeLoaded = true; res(true); };
-    s.onerror = () => res(false);
-    document.head.appendChild(s);
-  });
-}
 
 // Carga ZXing para leer códigos desde imagen
 let _ZXingLoaded = false;
@@ -560,7 +548,7 @@ async function imprimirTicket(producto, marcaNombre) {
 <html>
 <head>
   <title>Ticket — ${producto.nombre}</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><\/script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.5/JsBarcode.all.min.js"><\/script>
   <style>
     @page { size: 58mm auto; margin: 0; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -570,8 +558,8 @@ async function imprimirTicket(producto, marcaNombre) {
     .sub { font-size:8px; letter-spacing:4px; color:#555; margin-top:1mm; }
     .producto { font-size:11px; font-weight:bold; text-align:center; margin:2mm 0; text-transform:uppercase; }
     .marca { font-size:9px; text-align:center; color:#444; margin-bottom:2mm; }
-    .qr-wrap { display:flex; flex-direction:column; align-items:center; margin:3mm 0; }
-    .qr-wrap canvas, .qr-wrap img { width:38mm!important; height:38mm!important; }
+    .barcode-wrap { display:flex; flex-direction:column; align-items:center; margin:3mm 0; }
+    .barcode-wrap svg { width:50mm!important; }
     .codigo { text-align:center; font-size:8px; color:#555; font-family:monospace; margin:1mm 0 2mm; word-break:break-all; }
     .precio { text-align:center; font-size:18px; font-weight:900; margin:2mm 0; }
     .footer { border-top:1px dashed #333; padding-top:2mm; text-align:center; font-size:8px; color:#777; letter-spacing:1px; }
@@ -585,8 +573,8 @@ async function imprimirTicket(producto, marcaNombre) {
   </div>
   <div class="producto">${producto.nombre}</div>
   <div class="marca">${marcaNombre}</div>
-  <div class="qr-wrap">
-    <div id="qr"></div>
+  <div class="barcode-wrap">
+    <svg id="barcode"></svg>
   </div>
   <div class="codigo">${producto.codigo}</div>
   <div class="precio">Bs ${Number(producto.precio).toLocaleString("es-BO")}</div>
@@ -594,12 +582,11 @@ async function imprimirTicket(producto, marcaNombre) {
   <script>
     window.onload = function() {
       try {
-        new QRCode(document.getElementById("qr"), {
-          text: "${producto.codigo}",
-          width: 144, height: 144,
-          colorDark: "#000000",
-          colorLight: "#ffffff",
-          correctLevel: QRCode.CorrectLevel.M
+        JsBarcode("#barcode", "${producto.codigo}", {
+          format: "CODE128",
+          width: 2, height: 50,
+          displayValue: false,
+          margin: 0
         });
       } catch(e) {}
       setTimeout(function() { window.print(); }, 800);
@@ -627,17 +614,17 @@ function imprimirEtiquetasLote(items) {
         <div class="brand">TOSCANA HOUSE</div>
         <div class="marca">${marca.toUpperCase()}</div>
         <div class="producto">${nombre}</div>
-        <div class="qr-wrap" id="qr-${codigo.replace(/[^a-z0-9]/gi,'_')}"></div>
+        <div class="barcode-wrap"><svg id="bc-${codigo.replace(/[^a-z0-9]/gi,'_')}"></svg></div>
         <div class="codigo">${codigo}</div>
         <div class="precio">Bs ${precio}</div>
         <div class="footer">CASA DE MODA · BOLIVIA</div>
       </div>`;
   }).join('');
 
-  const qrScripts = items.map(it => {
+  const barcodeScripts = items.map(it => {
     const codigo = (it.codigo || it.sku || "").toUpperCase();
     const safeId = codigo.replace(/[^a-z0-9]/gi,'_');
-    return `new QRCode(document.getElementById("qr-${safeId}"),{text:"${codigo}",width:120,height:120,correctLevel:QRCode.CorrectLevel.M});`;
+    return `try{JsBarcode("#bc-${safeId}","${codigo}",{format:"CODE128",width:2,height:45,displayValue:false,margin:0});}catch(e){}`;
   }).join('\n');
 
   win.document.write(`<!DOCTYPE html>
@@ -645,7 +632,7 @@ function imprimirEtiquetasLote(items) {
 <head>
   <meta charset="UTF-8">
   <title>Etiquetas — ${items.length} items</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><\/script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.5/JsBarcode.all.min.js"><\/script>
   <style>
     @page { size: 58mm auto; margin: 0; }
     * { box-sizing:border-box; margin:0; padding:0; }
@@ -663,8 +650,8 @@ function imprimirEtiquetasLote(items) {
     .marca { font-size:8px; letter-spacing:2px; color:#444; margin:1mm 0; text-transform:uppercase; }
     .producto { font-size:9px; font-weight:bold; margin:2mm 0; text-transform:uppercase;
       line-height:1.3; min-height:20px; }
-    .qr-wrap { display:flex; justify-content:center; margin:2mm 0; }
-    .qr-wrap canvas, .qr-wrap img { width:38mm!important; height:38mm!important; }
+    .barcode-wrap { display:flex; justify-content:center; margin:2mm 0; }
+    .barcode-wrap svg { width:50mm!important; }
     .codigo { font-size:7px; color:#555; font-family:monospace; margin:1mm 0; word-break:break-all; }
     .precio { font-size:18px; font-weight:900; margin:2mm 0; }
     .footer { font-size:7px; color:#888; letter-spacing:1px; border-top:1px dashed #ccc; padding-top:1mm; }
@@ -678,12 +665,12 @@ function imprimirEtiquetasLote(items) {
 <body>
   <div class="controls">
     <button class="btn-print" onclick="window.print()">🖨 Imprimir ${items.length} etiqueta${items.length!==1?'s':''}</button>
-    <span class="info">${items.length} etiqueta${items.length!==1?'s':''} generadas · Cargamento completo</span>
+    <span class="info">${items.length} etiqueta${items.length!==1?'s':''} generadas · Códigos de barra</span>
   </div>
   <div class="labels-grid">${etiquetas}</div>
   <script>
     window.onload = function(){
-      ${qrScripts}
+      ${barcodeScripts}
       setTimeout(()=>{ if(confirm('¿Imprimir ahora?')) window.print(); }, 800);
     };
   <\/script>
@@ -12518,7 +12505,7 @@ function InventarioPorMarca({inv, ventas, onRecibir, onBaja, onImportarExcel}){
           <input
             value={invBusq}
             onChange={e=>setInvBusq(e.target.value.toUpperCase())}
-            placeholder="Buscar código QR, nombre o categoría en TODAS las marcas…"
+            placeholder="Buscar código de barras, nombre o categoría en TODAS las marcas…"
             style={{width:"100%",padding:"10px 12px 10px 32px",border:`1px solid ${invBusq?C.gold:C.sep}`,
               borderRadius:9,background:C.bg1,fontSize:13,color:C.label,
               fontFamily:FONT_UI,outline:"none",boxSizing:"border-box",
@@ -12681,6 +12668,13 @@ function InventarioPorMarca({inv, ventas, onRecibir, onBaja, onImportarExcel}){
           <IOSBtn onPress={onImportarExcel} variant="fill" full small icon="📥">Importar Excel</IOSBtn>
           <IOSBtn onPress={async()=>{ try{await generarPlantillaXLSX();}catch(e){alert("Error: "+e.message);} }}
             full small icon="📋">Plantilla</IOSBtn>
+        </div>
+        <div style={{display:"flex",gap:8,marginTop:8}}>
+          <IOSBtn onPress={()=>{
+              if(productos.length===0){ alert("No hay productos para imprimir"); return; }
+              imprimirEtiquetasLote(productos);
+            }}
+            full small icon="🏷">{`Imprimir ${productos.length} etiqueta${productos.length!==1?'s':''} (código de barras)`}</IOSBtn>
         </div>
       </div>
     </div>
