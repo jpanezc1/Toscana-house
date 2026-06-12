@@ -33000,7 +33000,8 @@ Fecha: ${venta.fecha}`);
     const resultados = (0, import_react.useMemo)(() => {
       if (!busq.trim()) return [];
       const q = busq.toLowerCase().replace(/'/g, "-");
-      return inv.filter((i) => i.stock > 0 && (i.nombre.toLowerCase().includes(q) || i.codigo.toLowerCase().includes(q) || (i.categoria || "").toLowerCase().includes(q))).slice(0, 6);
+      const qAlnum = q.replace(/[^a-z0-9]/g, "");
+      return inv.filter((i) => i.stock > 0 && (i.nombre.toLowerCase().includes(q) || i.codigo.toLowerCase().includes(q) || (i.categoria || "").toLowerCase().includes(q) || qAlnum.length >= 3 && i.codigo.toLowerCase().replace(/[^a-z0-9]/g, "").includes(qAlnum))).slice(0, 6);
     }, [inv, busq]);
     const pagoInfo = PAGOS.find((p) => p.id === pago) || PAGOS[0];
     const subtotal = carrito.reduce((s, it) => s + it.precio * it.cantidad, 0);
@@ -34015,7 +34016,8 @@ Fecha: ${venta.fecha}`);
     function buscarYAgregar(codigo) {
       const c = (codigo || "").trim().toUpperCase().replace(/'/g, "-");
       if (!c) return;
-      const p = baseInv.find((i) => i.codigo.toUpperCase() === c);
+      const cAlnum = c.replace(/[^A-Z0-9]/g, "");
+      const p = baseInv.find((i) => i.codigo.toUpperCase() === c) || baseInv.find((i) => i.codigo.toUpperCase().replace(/[^A-Z0-9]/g, "") === cAlnum);
       if (!p) {
         flash(false, `C\xF3digo "${c}" no encontrado en inventario`);
         return;

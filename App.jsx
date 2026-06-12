@@ -10705,7 +10705,8 @@ function POS({inv,onVenta,onVerNota}){
   const resultados=useMemo(()=>{
     if(!busq.trim())return[];
     const q=busq.toLowerCase().replace(/'/g,"-");
-    return inv.filter(i=>i.stock>0&&(i.nombre.toLowerCase().includes(q)||i.codigo.toLowerCase().includes(q)||(i.categoria||"").toLowerCase().includes(q))).slice(0,6);
+    const qAlnum=q.replace(/[^a-z0-9]/g,"");
+    return inv.filter(i=>i.stock>0&&(i.nombre.toLowerCase().includes(q)||i.codigo.toLowerCase().includes(q)||(i.categoria||"").toLowerCase().includes(q)||(qAlnum.length>=3&&i.codigo.toLowerCase().replace(/[^a-z0-9]/g,"").includes(qAlnum)))).slice(0,6);
   },[inv,busq]);
 
   const pagoInfo=PAGOS.find(p=>p.id===pago)||PAGOS[0];
@@ -11599,7 +11600,8 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
   function buscarYAgregar(codigo){
     const c=(codigo||"").trim().toUpperCase().replace(/'/g,"-");
     if(!c) return;
-    const p=baseInv.find(i=>i.codigo.toUpperCase()===c);
+    const cAlnum=c.replace(/[^A-Z0-9]/g,"");
+    const p=baseInv.find(i=>i.codigo.toUpperCase()===c) || baseInv.find(i=>i.codigo.toUpperCase().replace(/[^A-Z0-9]/g,"")===cAlnum);
     if(!p){ flash(false, `Código "${c}" no encontrado en inventario`); return; }
     agregar(p,1);
     setCodManual("");
