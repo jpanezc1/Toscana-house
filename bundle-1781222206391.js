@@ -32999,7 +32999,7 @@ Fecha: ${venta.fecha}`);
     const fileRef = (0, import_react.useRef)();
     const resultados = (0, import_react.useMemo)(() => {
       if (!busq.trim()) return [];
-      const q = busq.toLowerCase();
+      const q = busq.toLowerCase().replace(/'/g, "-");
       return inv.filter((i) => i.stock > 0 && (i.nombre.toLowerCase().includes(q) || i.codigo.toLowerCase().includes(q) || (i.categoria || "").toLowerCase().includes(q))).slice(0, 6);
     }, [inv, busq]);
     const pagoInfo = PAGOS.find((p) => p.id === pago) || PAGOS[0];
@@ -34013,7 +34013,7 @@ Fecha: ${venta.fecha}`);
       if (cant > 0) flash(true, `+${cant} \xB7 ${(prod.nombre || "").toUpperCase()} (${prod.codigo})`);
     }
     function buscarYAgregar(codigo) {
-      const c = (codigo || "").trim().toUpperCase();
+      const c = (codigo || "").trim().toUpperCase().replace(/'/g, "-");
       if (!c) return;
       const p = baseInv.find((i) => i.codigo.toUpperCase() === c);
       if (!p) {

@@ -10704,7 +10704,7 @@ function POS({inv,onVenta,onVerNota}){
 
   const resultados=useMemo(()=>{
     if(!busq.trim())return[];
-    const q=busq.toLowerCase();
+    const q=busq.toLowerCase().replace(/'/g,"-");
     return inv.filter(i=>i.stock>0&&(i.nombre.toLowerCase().includes(q)||i.codigo.toLowerCase().includes(q)||(i.categoria||"").toLowerCase().includes(q))).slice(0,6);
   },[inv,busq]);
 
@@ -11597,7 +11597,7 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
   }
 
   function buscarYAgregar(codigo){
-    const c=(codigo||"").trim().toUpperCase();
+    const c=(codigo||"").trim().toUpperCase().replace(/'/g,"-");
     if(!c) return;
     const p=baseInv.find(i=>i.codigo.toUpperCase()===c);
     if(!p){ flash(false, `Código "${c}" no encontrado en inventario`); return; }
