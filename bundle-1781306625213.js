@@ -31588,7 +31588,7 @@ Fecha: ${venta.fecha}`);
     const [shExcel, setShExcel] = (0, import_react.useState)(false);
     const [sheetDrive, setShDrive] = (0, import_react.useState)(false);
     const [mLiq, setMLiq] = (0, import_react.useState)(null);
-    const [fInv, setFInv] = (0, import_react.useState)({ marcaId: "", nombre: "", categoria: "", descripcion: "", subcat: "", precio: "", stock: "", fecha: hoy() });
+    const [fInv, setFInv] = (0, import_react.useState)({ marcaId: "", nombre: "", categoria: "", descripcion: "", subcat: "", precio: "", stock: "", fecha: hoy(), codigoManual: "" });
     const [bajaCod, setBajaCod] = (0, import_react.useState)("");
     const [bajaMsg, setBajaMsg] = (0, import_react.useState)(null);
     const [bajasLista, setBajasLista] = (0, import_react.useState)([]);
@@ -31873,9 +31873,15 @@ Fecha: ${venta.fecha}`);
       }
       const idx = inv.length + 1;
       const marca = MARCAS.find((m) => m.id === Number(fInv.marcaId));
+      const codManual = (fInv.codigoManual || "").trim().toUpperCase();
+      if (codManual && inv.some((i) => i.codigo.toUpperCase() === codManual)) {
+        alert(`El c\xF3digo "${codManual}" ya existe en el inventario. Usa otro o d\xE9jalo vac\xEDo para generar uno autom\xE1tico.`);
+        return;
+      }
+      const codigo = codManual || genCod(Number(fInv.marcaId), fInv.nombre, idx);
       const prod = {
         id: Date.now(),
-        codigo: genCod(Number(fInv.marcaId), fInv.nombre, idx),
+        codigo,
         marcaId: Number(fInv.marcaId),
         nombre: fInv.nombre,
         categoria: fInv.categoria || "General",
@@ -31906,7 +31912,7 @@ Fecha: ${venta.fecha}`);
           categoria: prod.categoria
         }]
       }));
-      setFInv({ marcaId: "", nombre: "", categoria: "", precio: "", stock: "", fecha: hoy() });
+      setFInv({ marcaId: "", nombre: "", categoria: "", precio: "", stock: "", fecha: hoy(), codigoManual: "" });
       setShInv(false);
       setTimeout(() => imprimirTicket(prod, marca?.nombre || "Toscana House"), 300);
     }
@@ -33824,7 +33830,10 @@ Fecha: ${venta.fecha}`);
     var setBarcodeReady = _hN148[1];
     ;
     const scanInvRef = (0, import_react.useRef)(null);
-    const codigoGenerado = fInv.marcaId && fInv.nombre ? genCod(Number(fInv.marcaId), fInv.nombre, inv.length + 1) : "";
+    const codigoAuto = fInv.marcaId && fInv.nombre ? genCod(Number(fInv.marcaId), fInv.nombre, inv.length + 1) : "";
+    const codManual = (fInv.codigoManual || "").trim().toUpperCase();
+    const codigoGenerado = codManual || codigoAuto;
+    const codManualDup = codManual && inv.some((i) => i.codigo.toUpperCase() === codManual);
     (0, import_react.useEffect)(() => {
       if (codigoGenerado) setBarcodeReady(true);
     }, [codigoGenerado]);
@@ -33842,7 +33851,8 @@ Fecha: ${venta.fecha}`);
           setFInv((p) => ({
             ...p,
             nombre: p.nombre || nombre,
-            categoria: p.categoria || categoria
+            categoria: p.categoria || categoria,
+            codigoManual: p.codigoManual || codigo.toUpperCase()
           }));
           setScanInvStatus("ok");
           setScanInvMsg(`\u2713 C\xF3digo le\xEDdo: ${codigo}`);
@@ -33947,11 +33957,25 @@ Fecha: ${venta.fecha}`);
         value: fInv.fecha,
         onChange: (e) => setFInv((p) => ({ ...p, fecha: e.target.value }))
       }
-    ), codigoGenerado && /* @__PURE__ */ import_react.default.createElement("div", { style: {
+    ), /* @__PURE__ */ import_react.default.createElement(
+      IOSInput,
+      {
+        label: "C\xF3digo (opcional)",
+        value: fInv.codigoManual,
+        onChange: (e) => setFInv((p) => ({ ...p, codigoManual: e.target.value.toUpperCase() })),
+        placeholder: "Dejar vac\xEDo = generar autom\xE1tico"
+      }
+    ), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      fontSize: 11,
+      color: codManualDup ? C.red : C.label3,
+      fontFamily: FONT,
+      margin: "-6px 2px 14px",
+      lineHeight: 1.4
+    } }, codManualDup ? `\u26A0 El c\xF3digo "${codManual}" ya existe en el inventario` : codManual ? `Se usar\xE1 el c\xF3digo ingresado: ${codManual}` : "Escribe un c\xF3digo propio o d\xE9jalo vac\xEDo para que el sistema lo genere"), codigoGenerado && /* @__PURE__ */ import_react.default.createElement("div", { style: {
       padding: "14px",
       background: "#FFFFFF",
       borderRadius: 14,
-      border: `1px solid ${C.sep}`,
+      border: `1px solid ${codManualDup ? C.red : C.sep}`,
       marginBottom: 14,
       textAlign: "center"
     } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
@@ -33961,7 +33985,7 @@ Fecha: ${venta.fecha}`);
       textTransform: "uppercase",
       letterSpacing: 0.8,
       marginBottom: 8
-    } }, "C\xF3digo generado para esta prenda"), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+    } }, codManual ? "C\xF3digo ingresado para esta prenda" : "C\xF3digo generado para esta prenda"), /* @__PURE__ */ import_react.default.createElement("div", { style: {
       fontSize: 14,
       fontFamily: "monospace",
       fontWeight: 700,

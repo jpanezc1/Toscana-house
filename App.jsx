@@ -9458,7 +9458,7 @@ function App(){
   const[shExcel,setShExcel]=useState(false);
   const[sheetDrive,setShDrive]=useState(false);
   const[mLiq,setMLiq]       =useState(null);
-  const[fInv,setFInv]       =useState({marcaId:"",nombre:"",categoria:"",descripcion:"",subcat:"",precio:"",stock:"",fecha:hoy()});
+  const[fInv,setFInv]       =useState({marcaId:"",nombre:"",categoria:"",descripcion:"",subcat:"",precio:"",stock:"",fecha:hoy(),codigoManual:""});
   const[bajaCod,setBajaCod] =useState("");
   const[bajaMsg,setBajaMsg] =useState(null);
   const[bajasLista,setBajasLista]=useState([]);
@@ -9704,7 +9704,14 @@ function App(){
     if(!fInv.marcaId||!fInv.nombre||!fInv.precio||!fInv.stock){alert("Completa todos los campos");return;}
     const idx=inv.length+1;
     const marca=MARCAS.find(m=>m.id===Number(fInv.marcaId));
-    const prod={id:Date.now(),codigo:genCod(Number(fInv.marcaId),fInv.nombre,idx),
+    // Código: manual si se ingresó, sino autogenerado
+    const codManual=(fInv.codigoManual||"").trim().toUpperCase();
+    if(codManual && inv.some(i=>i.codigo.toUpperCase()===codManual)){
+      alert(`El código "${codManual}" ya existe en el inventario. Usa otro o déjalo vacío para generar uno automático.`);
+      return;
+    }
+    const codigo=codManual||genCod(Number(fInv.marcaId),fInv.nombre,idx);
+    const prod={id:Date.now(),codigo,
       marcaId:Number(fInv.marcaId),nombre:fInv.nombre,categoria:fInv.categoria||"General",
       precio:Number(fInv.precio),stock:Number(fInv.stock),stockInicial:Number(fInv.stock),fecha:fInv.fecha,
       marcaNombre:marca?.nombre||""};
@@ -9719,7 +9726,7 @@ function App(){
         marca:prod.marcaNombre, marcaId:prod.marcaId,
         stock:prod.stock, precio:prod.precio, categoria:prod.categoria}],
     }));
-    setFInv({marcaId:"",nombre:"",categoria:"",precio:"",stock:"",fecha:hoy()});
+    setFInv({marcaId:"",nombre:"",categoria:"",precio:"",stock:"",fecha:hoy(),codigoManual:""});
     setShInv(false);
     setTimeout(()=>imprimirTicket(prod, marca?.nombre||"Toscana House"), 300);
   }
@@ -11437,9 +11444,14 @@ function SheetRecibir({open, onClose, inv, onAdd, fInv, setFInv}){
   var _hN148 = useState(false); var barcodeReady = _hN148[0]; var setBarcodeReady = _hN148[1];;
   const scanInvRef = useRef(null);
   
-  const codigoGenerado = fInv.marcaId && fInv.nombre
+  const codigoAuto = fInv.marcaId && fInv.nombre
     ? genCod(Number(fInv.marcaId), fInv.nombre, inv.length+1)
     : "";
+  const codManual = (fInv.codigoManual||"").trim().toUpperCase();
+  // Código efectivo: el manual tiene prioridad; sino el autogenerado
+  const codigoGenerado = codManual || codigoAuto;
+  // ¿el código manual choca con uno existente?
+  const codManualDup = codManual && inv.some(i=>i.codigo.toUpperCase()===codManual);
 
   useEffect(()=>{
     if(codigoGenerado) setBarcodeReady(true);
@@ -11460,6 +11472,7 @@ function SheetRecibir({open, onClose, inv, onAdd, fInv, setFInv}){
         setFInv(p=>({...p,
           nombre: p.nombre || nombre,
           categoria: p.categoria || categoria,
+          codigoManual: p.codigoManual || codigo.toUpperCase(),
         }));
         setScanInvStatus("ok");
         setScanInvMsg(`✓ Código leído: ${codigo}`);
@@ -11525,12 +11538,25 @@ function SheetRecibir({open, onClose, inv, onAdd, fInv, setFInv}){
       <IOSInput label="Fecha de ingreso" type="date" value={fInv.fecha}
         onChange={e=>setFInv(p=>({...p,fecha:e.target.value}))}/>
 
-      {/* Código de barras generado */}
+      {/* Código manual (opcional) */}
+      <IOSInput label="Código (opcional)" value={fInv.codigoManual}
+        onChange={e=>setFInv(p=>({...p,codigoManual:e.target.value.toUpperCase()}))}
+        placeholder="Dejar vacío = generar automático"/>
+      <div style={{fontSize:11,color:codManualDup?C.red:C.label3,fontFamily:FONT,
+        margin:"-6px 2px 14px",lineHeight:1.4}}>
+        {codManualDup
+          ? `⚠ El código "${codManual}" ya existe en el inventario`
+          : codManual
+            ? `Se usará el código ingresado: ${codManual}`
+            : "Escribe un código propio o déjalo vacío para que el sistema lo genere"}
+      </div>
+
+      {/* Código de barras (manual o generado) */}
       {codigoGenerado&&(
         <div style={{padding:"14px",background:"#FFFFFF",borderRadius:14,
-          border:`1px solid ${C.sep}`,marginBottom:14,textAlign:"center"}}>
+          border:`1px solid ${codManualDup?C.red:C.sep}`,marginBottom:14,textAlign:"center"}}>
           <div style={{fontSize:11,fontWeight:700,color:C.label3,textTransform:"uppercase",
-            letterSpacing:.8,marginBottom:8}}>Código generado para esta prenda</div>
+            letterSpacing:.8,marginBottom:8}}>{codManual?"Código ingresado para esta prenda":"Código generado para esta prenda"}</div>
           <div style={{fontSize:14,fontFamily:"monospace",fontWeight:700,
             color:C.gold,marginBottom:10}}>{codigoGenerado}</div>
           <BarcodeDisplay codigo={codigoGenerado}/>
