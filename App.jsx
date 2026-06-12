@@ -400,20 +400,18 @@ function useSupabaseStatus() {
 
 
 // ════════════════════════════════════════════════════════════
-// MOTOR DE CÓDIGOS QR — QRCode.js + ZXing Scanner
+// MOTOR DE CÓDIGOS DE BARRAS — JsBarcode + ZXing Scanner
 // ════════════════════════════════════════════════════════════
 
-// Carga QRCode.js desde CDN (genera QR codes)
-let _QRLoaded = false;
-let _QRLib = null;
-function loadQRCode() {
+// Carga JsBarcode desde CDN (genera códigos CODE128)
+let _JsBarcodeLoaded = false;
+function loadJsBarcode() {
   return new Promise(res => {
-    if (_QRLib) { res(_QRLib); return; }
-    if (window.QRCode) { _QRLib = window.QRCode; res(_QRLib); return; }
+    if (window.JsBarcode || _JsBarcodeLoaded) { res(true); return; }
     const s = document.createElement("script");
-    s.src = "https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js";
-    s.onload = () => { _QRLib = window.QRCode; _QRLoaded = true; res(_QRLib); };
-    s.onerror = () => res(null);
+    s.src = "https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.5/JsBarcode.all.min.js";
+    s.onload = () => { _JsBarcodeLoaded = true; res(true); };
+    s.onerror = () => res(false);
     document.head.appendChild(s);
   });
 }
@@ -468,56 +466,43 @@ async function leerCodigoDeImagen(file) {
   }
 }
 
-// Genera QR code como Data URL (imagen PNG)
+// Genera código de barras CODE128 como SVG (string)
 async function generarSVGBarcode(codigo) {
   try {
-    const QRCode = await loadQRCode();
-    if (!QRCode) return null;
-    // Crear contenedor temporal
-    const div = document.createElement("div");
-    div.style.display = "none";
-    document.body.appendChild(div);
-    const qr = new QRCode(div, {
-      text: codigo,
-      width: 160, height: 160,
-      colorDark: "#1A2E1A",
-      colorLight: "#ffffff",
-      correctLevel: QRCode.CorrectLevel.M,
+    const ok = await loadJsBarcode();
+    if (!ok || !window.JsBarcode) return null;
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    window.JsBarcode(svg, codigo, {
+      format: "CODE128",
+      width: 2, height: 70,
+      displayValue: false,
+      margin: 0,
+      background: "#ffffff",
+      lineColor: "#1A2E1A",
     });
-    // Esperar que se genere
-    await new Promise(r => setTimeout(r, 100));
-    const canvas = div.querySelector("canvas");
-    const img = div.querySelector("img");
-    let dataUrl = null;
-    if (canvas) dataUrl = canvas.toDataURL("image/png");
-    else if (img) dataUrl = img.src;
-    document.body.removeChild(div);
-    // Devolver como img tag HTML para BarcodeDisplay
-    return dataUrl ? `<img src="${dataUrl}" style="width:160px;height:160px;" alt="QR ${codigo}"/>` : null;
+    return `<div style="display:flex;justify-content:center">${svg.outerHTML}</div>`;
   } catch(e) {
     return null;
   }
 }
 
-// Componente: muestra QR code inline
+// Componente: muestra código de barras CODE128 inline
 function BarcodeDisplay({ codigo, small }) {
-  const containerRef = useRef(null);
-  var _hN101 = useState(""); var qrDataUrl = _hN101[0]; var setQrDataUrl = _hN101[1];;
+  const svgRef = useRef(null);
 
   useEffect(() => {
-    if (!codigo || !containerRef.current) return;
-    setQrDataUrl("");
-    loadQRCode().then(QRCode => {
-      if (!QRCode || !containerRef.current) return;
-      containerRef.current.innerHTML = "";
+    if (!codigo || !svgRef.current) return;
+    loadJsBarcode().then(ok => {
+      if (!ok || !window.JsBarcode || !svgRef.current) return;
       try {
-        new QRCode(containerRef.current, {
-          text: codigo,
-          width: small ? 100 : 140,
-          height: small ? 100 : 140,
-          colorDark: "#1A2E1A",
-          colorLight: "#ffffff",
-          correctLevel: QRCode.CorrectLevel.M,
+        window.JsBarcode(svgRef.current, codigo, {
+          format: "CODE128",
+          width: small ? 1.4 : 2,
+          height: small ? 50 : 70,
+          displayValue: false,
+          margin: 4,
+          background: "#ffffff",
+          lineColor: "#1A2E1A",
         });
       } catch(e) {}
     });
@@ -525,15 +510,15 @@ function BarcodeDisplay({ codigo, small }) {
 
   return (
     <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:6}}>
-      <div ref={containerRef} style={{
-        width:small?100:140, height:small?100:140,
+      <div style={{
+        width:small?140:200, height:small?60:84,
         background:"#fff", borderRadius:8, overflow:"hidden",
         display:"flex",alignItems:"center",justifyContent:"center",
       }}>
-        {!codigo&&<span style={{fontSize:11,color:"#aaa"}}>QR</span>}
+        {codigo ? <svg ref={svgRef}/> : <span style={{fontSize:11,color:"#aaa"}}>—</span>}
       </div>
       <div style={{fontFamily:"monospace",fontSize:10,color:"#5C8A5C",
-        letterSpacing:1,textAlign:"center",maxWidth:small?100:140,
+        letterSpacing:1,textAlign:"center",maxWidth:small?140:200,
         wordBreak:"break-all"}}>{codigo}</div>
     </div>
   );
@@ -9103,11 +9088,11 @@ function SheetDetalleGC({ gc: gcProp, onClose }) {
           </div>
           <div style={{flex:1,minWidth:0}}>
             <div style={{fontSize:11,fontWeight:700,color:C.label3,textTransform:"uppercase",
-              letterSpacing:.6,marginBottom:6,fontFamily:FONT_UI}}>Código QR</div>
+              letterSpacing:.6,marginBottom:6,fontFamily:FONT_UI}}>Código de barras</div>
             <div style={{fontSize:13,fontFamily:"monospace",fontWeight:700,color:C.gold,
               marginBottom:8,wordBreak:"break-all"}}>{gc.codigo}</div>
             <div style={{fontSize:11,color:C.label3,fontFamily:FONT_UI,lineHeight:1.5}}>
-              Mostrá este QR en caja para usar la Gift Card
+              Mostrá este código en caja para usar la Gift Card
             </div>
             <button onClick={()=>{
               const w=window.open("","_blank","width=400,height=480");
@@ -9116,23 +9101,23 @@ function SheetDetalleGC({ gc: gcProp, onClose }) {
               h2{font-size:18px;margin-bottom:4px}p{color:#888;font-size:12px;margin:4px 0}
               .cod{font-size:13px;font-weight:700;color:#9A7B4F;margin:12px 0;letter-spacing:1px}
               .saldo{font-size:28px;font-weight:700;color:#1A1714;margin:8px 0}
-              #qr{margin:16px auto;display:inline-block}
+              #bc{margin:16px auto;display:inline-block}
               </style></head><body>
-              <h2>🎁 Gift Card</h2>
+              <h2>Gift Card</h2>
               <div class="cod">${gc.codigo}</div>
               <div class="saldo">Bs ${gc.saldo}</div>
               <p>Saldo disponible</p>
-              <div id="qr"></div>
+              <svg id="bc"></svg>
               <p style="margin-top:16px;font-size:11px;color:#bbb">Toscana House</p>
-              <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><\/script>
-              <script>new QRCode(document.getElementById('qr'),{text:'${gc.codigo}',width:160,height:160,colorDark:'#1A2E1A'});<\/script>
+              <script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.5/JsBarcode.all.min.js"><\/script>
+              <script>try{JsBarcode("#bc","${gc.codigo}",{format:"CODE128",width:2,height:70,displayValue:true,margin:10,lineColor:"#1A2E1A"});}catch(e){}<\/script>
               </body></html>`);
               w.document.close();
               setTimeout(()=>w.print(),800);
             }} style={{marginTop:8,padding:"7px 14px",borderRadius:10,border:"none",
               background:C.gold,color:"#fff",fontSize:12,fontWeight:700,fontFamily:FONT_UI,
               cursor:"pointer",display:"inline-flex",alignItems:"center",gap:6}}>
-              🖨 Imprimir QR
+              🖨 Imprimir código
             </button>
           </div>
         </div>

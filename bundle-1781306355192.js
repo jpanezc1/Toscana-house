@@ -21930,27 +21930,20 @@
       };
     }, []);
   }
-  var _QRLoaded = false;
-  var _QRLib = null;
-  function loadQRCode() {
+  var _JsBarcodeLoaded = false;
+  function loadJsBarcode() {
     return new Promise((res) => {
-      if (_QRLib) {
-        res(_QRLib);
-        return;
-      }
-      if (window.QRCode) {
-        _QRLib = window.QRCode;
-        res(_QRLib);
+      if (window.JsBarcode || _JsBarcodeLoaded) {
+        res(true);
         return;
       }
       const s = document.createElement("script");
-      s.src = "https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js";
+      s.src = "https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.5/JsBarcode.all.min.js";
       s.onload = () => {
-        _QRLib = window.QRCode;
-        _QRLoaded = true;
-        res(_QRLib);
+        _JsBarcodeLoaded = true;
+        res(true);
       };
-      s.onerror = () => res(null);
+      s.onerror = () => res(false);
       document.head.appendChild(s);
     });
   }
@@ -22011,46 +22004,41 @@
     }
   }
   function BarcodeDisplay({ codigo, small }) {
-    const containerRef = (0, import_react.useRef)(null);
-    var _hN101 = (0, import_react.useState)("");
-    var qrDataUrl = _hN101[0];
-    var setQrDataUrl = _hN101[1];
-    ;
+    const svgRef = (0, import_react.useRef)(null);
     (0, import_react.useEffect)(() => {
-      if (!codigo || !containerRef.current) return;
-      setQrDataUrl("");
-      loadQRCode().then((QRCode) => {
-        if (!QRCode || !containerRef.current) return;
-        containerRef.current.innerHTML = "";
+      if (!codigo || !svgRef.current) return;
+      loadJsBarcode().then((ok) => {
+        if (!ok || !window.JsBarcode || !svgRef.current) return;
         try {
-          new QRCode(containerRef.current, {
-            text: codigo,
-            width: small ? 100 : 140,
-            height: small ? 100 : 140,
-            colorDark: "#1A2E1A",
-            colorLight: "#ffffff",
-            correctLevel: QRCode.CorrectLevel.M
+          window.JsBarcode(svgRef.current, codigo, {
+            format: "CODE128",
+            width: small ? 1.4 : 2,
+            height: small ? 50 : 70,
+            displayValue: false,
+            margin: 4,
+            background: "#ffffff",
+            lineColor: "#1A2E1A"
           });
         } catch (e) {
         }
       });
     }, [codigo, small]);
-    return /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", flexDirection: "column", alignItems: "center", gap: 6 } }, /* @__PURE__ */ import_react.default.createElement("div", { ref: containerRef, style: {
-      width: small ? 100 : 140,
-      height: small ? 100 : 140,
+    return /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", flexDirection: "column", alignItems: "center", gap: 6 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      width: small ? 140 : 200,
+      height: small ? 60 : 84,
       background: "#fff",
       borderRadius: 8,
       overflow: "hidden",
       display: "flex",
       alignItems: "center",
       justifyContent: "center"
-    } }, !codigo && /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 11, color: "#aaa" } }, "QR")), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+    } }, codigo ? /* @__PURE__ */ import_react.default.createElement("svg", { ref: svgRef }) : /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 11, color: "#aaa" } }, "\u2014")), /* @__PURE__ */ import_react.default.createElement("div", { style: {
       fontFamily: "monospace",
       fontSize: 10,
       color: "#5C8A5C",
       letterSpacing: 1,
       textAlign: "center",
-      maxWidth: small ? 100 : 140,
+      maxWidth: small ? 140 : 200,
       wordBreak: "break-all"
     } }, codigo));
   }
@@ -31185,30 +31173,30 @@ Fecha: ${venta.fecha}`);
       letterSpacing: 0.6,
       marginBottom: 6,
       fontFamily: FONT_UI
-    } }, "C\xF3digo QR"), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+    } }, "C\xF3digo de barras"), /* @__PURE__ */ import_react.default.createElement("div", { style: {
       fontSize: 13,
       fontFamily: "monospace",
       fontWeight: 700,
       color: C.gold,
       marginBottom: 8,
       wordBreak: "break-all"
-    } }, gc.codigo), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT_UI, lineHeight: 1.5 } }, "Mostr\xE1 este QR en caja para usar la Gift Card"), /* @__PURE__ */ import_react.default.createElement("button", { onClick: () => {
+    } }, gc.codigo), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT_UI, lineHeight: 1.5 } }, "Mostr\xE1 este c\xF3digo en caja para usar la Gift Card"), /* @__PURE__ */ import_react.default.createElement("button", { onClick: () => {
       const w = window.open("", "_blank", "width=400,height=480");
       w.document.write(`<!DOCTYPE html><html><head><title>Gift Card ${gc.codigo}</title>
               <style>body{font-family:sans-serif;text-align:center;padding:30px;background:#fff}
               h2{font-size:18px;margin-bottom:4px}p{color:#888;font-size:12px;margin:4px 0}
               .cod{font-size:13px;font-weight:700;color:#9A7B4F;margin:12px 0;letter-spacing:1px}
               .saldo{font-size:28px;font-weight:700;color:#1A1714;margin:8px 0}
-              #qr{margin:16px auto;display:inline-block}
+              #bc{margin:16px auto;display:inline-block}
               </style></head><body>
-              <h2>\u{1F381} Gift Card</h2>
+              <h2>Gift Card</h2>
               <div class="cod">${gc.codigo}</div>
               <div class="saldo">Bs ${gc.saldo}</div>
               <p>Saldo disponible</p>
-              <div id="qr"></div>
+              <svg id="bc"></svg>
               <p style="margin-top:16px;font-size:11px;color:#bbb">Toscana House</p>
-              <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><\/script>
-              <script>new QRCode(document.getElementById('qr'),{text:'${gc.codigo}',width:160,height:160,colorDark:'#1A2E1A'});<\/script>
+              <script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.5/JsBarcode.all.min.js"><\/script>
+              <script>try{JsBarcode("#bc","${gc.codigo}",{format:"CODE128",width:2,height:70,displayValue:true,margin:10,lineColor:"#1A2E1A"});}catch(e){}<\/script>
               </body></html>`);
       w.document.close();
       setTimeout(() => w.print(), 800);
@@ -31226,7 +31214,7 @@ Fecha: ${venta.fecha}`);
       display: "inline-flex",
       alignItems: "center",
       gap: 6
-    } }, "\u{1F5A8} Imprimir QR"))), /* @__PURE__ */ import_react.default.createElement("div", { style: { background: C.bg2, borderRadius: 14, border: `1px solid ${C.sep}`, padding: "14px 16px", marginBottom: 20 } }, [
+    } }, "\u{1F5A8} Imprimir c\xF3digo"))), /* @__PURE__ */ import_react.default.createElement("div", { style: { background: C.bg2, borderRadius: 14, border: `1px solid ${C.sep}`, padding: "14px 16px", marginBottom: 20 } }, [
       ["Fecha de emisi\xF3n", gc.emision],
       ["Vencimiento", gc.vencimiento || "Sin vencimiento"],
       ["\xDAltimo uso", gc.ultimoUso || "No utilizada"],
