@@ -4500,10 +4500,16 @@ function RetirosTab({inv, retiros, onRetiro}){
                     </div>
                     <div style={{fontSize:11,color:C.label3,fontFamily:FONT}}>{r.hora}</div>
                     <div style={{marginTop:4}}>
-                      <span style={{background:`${C.amber}18`,color:C.amber,
-                        fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:20,fontFamily:FONT}}>
-                        RETIRADO
-                      </span>
+                      {r.motivo==="Baja"
+                        ? <span style={{background:`${C.red}18`,color:C.red,
+                            fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:20,fontFamily:FONT}}>
+                            DADO DE BAJA
+                          </span>
+                        : <span style={{background:`${C.amber}18`,color:C.amber,
+                            fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:20,fontFamily:FONT}}>
+                            RETIRADO
+                          </span>
+                      }
                     </div>
                   </div>
                 </div>
