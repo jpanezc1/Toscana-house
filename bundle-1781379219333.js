@@ -27327,7 +27327,7 @@ Fecha: ${venta.fecha}`);
       try {
         const codigo = await leerCodigoDeImagen(f);
         if (codigo) {
-          beep();
+          beep2();
           onDetect(codigo);
           setModo(continuous ? "foto" : "leyendo");
         } else {
@@ -27383,7 +27383,7 @@ Fecha: ${venta.fecha}`);
             );
             if (res && !firedRef.current) {
               firedRef.current = true;
-              beep();
+              beep2();
               onDetect(res.getText());
               if (continuous) {
                 cooldownRef.current = setTimeout(() => {
@@ -27411,7 +27411,7 @@ Fecha: ${venta.fecha}`);
         streamRef.current = null;
       }
     }
-    function beep() {
+    function beep2() {
       try {
         navigator.vibrate && navigator.vibrate(180);
       } catch (_) {
@@ -27637,6 +27637,20 @@ Fecha: ${venta.fecha}`);
         }
       `));
   }
+  function beep(remoto) {
+    try {
+      const ac = new (window.AudioContext || window.webkitAudioContext)();
+      const o = ac.createOscillator(), g = ac.createGain();
+      o.connect(g);
+      g.connect(ac.destination);
+      o.frequency.value = remoto ? 1568 : 1046;
+      g.gain.value = 0.22;
+      o.start();
+      o.stop(ac.currentTime + 0.1);
+      setTimeout(() => ac.close(), 400);
+    } catch (_) {
+    }
+  }
   function LectorHID({ onDetect, onClose, feedback, stats, rows, marcaNombre }) {
     const inputRef = (0, import_react.useRef)(null);
     const idleRef = (0, import_react.useRef)(null);
@@ -27676,20 +27690,6 @@ Fecha: ${venta.fecha}`);
       if (r.sistema > 0 && r.contado >= r.sistema) return { lbl: "Completo", col: "#22C55E", bg: "rgba(34,197,94,0.14)" };
       if (r.contado > 0) return { lbl: `Parcial ${r.contado}/${r.sistema}`, col: "#F59E0B", bg: "rgba(245,158,11,0.14)" };
       return { lbl: "Pendiente", col: "rgba(255,255,255,0.45)", bg: "rgba(255,255,255,0.05)" };
-    }
-    function beep() {
-      try {
-        const ac = new (window.AudioContext || window.webkitAudioContext)();
-        const o = ac.createOscillator(), g = ac.createGain();
-        o.connect(g);
-        g.connect(ac.destination);
-        o.frequency.value = 1046;
-        g.gain.value = 0.22;
-        o.start();
-        o.stop(ac.currentTime + 0.1);
-        setTimeout(() => ac.close(), 400);
-      } catch (_) {
-      }
     }
     function submit(valor) {
       const code = (valor !== void 0 ? valor : buf).trim();
@@ -34278,8 +34278,10 @@ Fecha: ${venta.fecha}`);
       });
       getSupabase().then((db) => {
         if (!mounted) return;
-        channel = db.channel(`verif-${sesionId}`).on("broadcast", { event: "conteo" }, (payload) => {
-          if (mounted) mergeRemoteConteo(payload.payload?.conteo);
+        channel = db.channel(`verif-${sesionId}`, { config: { broadcast: { self: false } } }).on("broadcast", { event: "conteo" }, (payload) => {
+          if (!mounted) return;
+          mergeRemoteConteo(payload.payload?.conteo);
+          beep(true);
         }).on(
           "postgres_changes",
           { event: "UPDATE", schema: "public", table: "th_verif_sesion", filter: `id=eq.${sesionId}` },

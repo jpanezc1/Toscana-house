@@ -5868,6 +5868,19 @@ function CameraScanner({onDetect, onClose, continuous, feedback, stats}){
   );
 }
 
+// Beep de confirmación de lectura. `remoto:true` = lo disparó otro
+// dispositivo (escaneo recibido por broadcast) → tono distinto.
+function beep(remoto){
+  try{
+    const ac=new(window.AudioContext||window.webkitAudioContext)();
+    const o=ac.createOscillator(),g=ac.createGain();
+    o.connect(g);g.connect(ac.destination);
+    o.frequency.value=remoto?1568:1046;g.gain.value=0.22;
+    o.start();o.stop(ac.currentTime+0.10);
+    setTimeout(()=>ac.close(),400);
+  }catch(_){}
+}
+
 // ══════════════════════════════════════════════════════════
 // LectorHID — Verificación rápida con lector de código de barras
 // conectado a la computadora (USB/HID). El lector "teclea" el código
@@ -5910,17 +5923,6 @@ function LectorHID({onDetect, onClose, feedback, stats, rows, marcaNombre}){
     if(r.sistema>0 && r.contado>=r.sistema) return {lbl:"Completo", col:"#22C55E", bg:"rgba(34,197,94,0.14)"};
     if(r.contado>0) return {lbl:`Parcial ${r.contado}/${r.sistema}`, col:"#F59E0B", bg:"rgba(245,158,11,0.14)"};
     return {lbl:"Pendiente", col:"rgba(255,255,255,0.45)", bg:"rgba(255,255,255,0.05)"};
-  }
-
-  function beep(){
-    try{
-      const ac=new(window.AudioContext||window.webkitAudioContext)();
-      const o=ac.createOscillator(),g=ac.createGain();
-      o.connect(g);g.connect(ac.destination);
-      o.frequency.value=1046;g.gain.value=0.22;
-      o.start();o.stop(ac.currentTime+0.10);
-      setTimeout(()=>ac.close(),400);
-    }catch(_){}
   }
 
   function submit(valor){
@@ -11839,11 +11841,14 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
       .then(sesion=>{ if(mounted && sesion) mergeRemoteConteo(sesion.conteo); });
     getSupabase().then(db=>{
       if(!mounted) return;
-      channel = db.channel(`verif-${sesionId}`)
+      channel = db.channel(`verif-${sesionId}`, { config:{ broadcast:{ self:false } } })
         // Broadcast por WebSocket: aviso inmediato (<100ms) a otros dispositivos
-        // sin esperar la replicación de la base de datos.
+        // sin esperar la replicación de la base de datos. Suena un beep para
+        // avisar que llegó un escaneo desde otro dispositivo.
         .on("broadcast", { event:"conteo" }, payload=>{
-          if(mounted) mergeRemoteConteo(payload.payload?.conteo);
+          if(!mounted) return;
+          mergeRemoteConteo(payload.payload?.conteo);
+          beep(true);
         })
         // postgres_changes: respaldo por si un dispositivo se reconecta o
         // se perdió un broadcast (la BD sigue siendo la fuente de verdad).
