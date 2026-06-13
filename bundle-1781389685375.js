@@ -31993,6 +31993,40 @@ Fecha: ${venta.fecha}`);
         if (data.length > 0) setCargas(data);
       });
     }, []);
+    (0, import_react.useEffect)(() => {
+      let channel = null, mounted = true;
+      getSupabase().then((db) => {
+        if (!mounted) return;
+        channel = db.channel("toscana-cargas-v1").on("postgres_changes", { event: "INSERT", schema: "public", table: "cargas_inventario" }, (payload) => {
+          const c = payload.new;
+          const carga = {
+            id: c.id,
+            ts: c.ts,
+            fecha: c.fecha,
+            hora: c.hora,
+            tipo: c.tipo,
+            usuario: c.usuario,
+            nombre: c.nombre,
+            rol: c.rol,
+            marcaId: c.marca_id,
+            marcaNombre: c.marca_nombre,
+            resumen: c.resumen,
+            totalItems: c.total_items,
+            nuevos: c.nuevos || 0,
+            actualizados: c.actualizados || 0,
+            items: c.detalle || []
+          };
+          if (!mounted) return;
+          setCargas((prev) => prev.some((x) => x.id === carga.id) ? prev : [carga, ...prev]);
+        }).subscribe();
+      }).catch(() => {
+      });
+      return () => {
+        mounted = false;
+        if (channel) getSupabase().then((db) => db.removeChannel(channel)).catch(() => {
+        });
+      };
+    }, []);
     const cargasCompletas = (0, import_react.useMemo)(() => {
       const yaRegistrados = /* @__PURE__ */ new Set();
       cargas.forEach((c) => (c.items || []).forEach((it) => {
