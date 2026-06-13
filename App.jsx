@@ -11589,6 +11589,7 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
   const[scanMsg,setScanMsg]=useState(null); // {ok,txt}
   const[codManual,setCodManual]=useState("");
   const[auditoriaAbierta,setAuditoriaAbierta]=useState(null);
+  const[cruceVerTodo,setCruceVerTodo]=useState(false); // mostrar todo el inventario en Cruce (incluye no contados como faltante)
 
   // ── Inventario base congelado al abrir el cierre ────────────────────
   // Garantiza que "sistema" no cambie a mitad del conteo si entran ventas
@@ -11792,8 +11793,11 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
       })),
     };
     onGuardarAuditoria(aud);
+    // Generar automáticamente el Excel del cierre (todo lo inventariado:
+    // sistema vs escaneado, con faltantes/sobrantes marcados)
+    try{ exportAuditoriaExcel(aud); }catch(e){ console.error("Export cierre:",e); }
     setConteo({}); setVerifConteo({}); setManualVerif({});
-    flash(true,"✓ Cierre de inventario guardado");
+    flash(true,"✓ Cierre guardado · Excel generado");
     setVista("historial");
   }
 
@@ -12054,9 +12058,25 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
             <StatCard icon="⏳" label="Unidades sin contar" value={unidadesPendientes} sub={`${pendientes.length} prod.`} color={C.label3} compact={isDesktop}/>
           </div>
 
-          {cruceContados.length===0
+          {/* Toggle: solo escaneados vs todo el inventario (no contados = faltante) */}
+          <div style={{display:"flex",gap:6,marginBottom:12}}>
+            <button onClick={()=>setCruceVerTodo(false)} style={{
+              flex:1,padding:"8px 10px",borderRadius:9,cursor:"pointer",fontFamily:FONT,
+              fontSize:11.5,fontWeight:700,WebkitTapHighlightColor:"transparent",
+              border:`1.5px solid ${!cruceVerTodo?C.label:C.sep}`,
+              background:!cruceVerTodo?C.label:C.bg2,color:!cruceVerTodo?"#fff":C.label2,
+            }}>Solo escaneados ({cruceContados.length})</button>
+            <button onClick={()=>setCruceVerTodo(true)} style={{
+              flex:1,padding:"8px 10px",borderRadius:9,cursor:"pointer",fontFamily:FONT,
+              fontSize:11.5,fontWeight:700,WebkitTapHighlightColor:"transparent",
+              border:`1.5px solid ${cruceVerTodo?C.label:C.sep}`,
+              background:cruceVerTodo?C.label:C.bg2,color:cruceVerTodo?"#fff":C.label2,
+            }}>Todo el inventario ({cruce.length})</button>
+          </div>
+
+          {(cruceVerTodo?cruce:cruceContados).length===0
             ? <EmptyState icon="📊" title="Nada que cruzar todavía"
-                sub="Escanea productos en la pestaña «Conteo» para generar el cruce. Los productos sin contar no se muestran como faltantes."/>
+                sub="Escanea productos en la pestaña «Conteo» para generar el cruce."/>
             : <div style={{background:C.bg1,border:`1px solid ${C.sep}`,borderRadius:10,
                 overflow:"hidden",marginBottom:16,boxShadow:"0 1px 3px rgba(0,0,0,.06)"}}>
                 <div style={{display:"grid",gridTemplateColumns:"1fr 56px 56px 56px 90px",gap:0,
@@ -12067,7 +12087,7 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
                   <div style={{fontSize:9,fontWeight:700,color:C.label3,textTransform:"uppercase",letterSpacing:.8,textAlign:"center"}}>Dif.</div>
                   <div style={{fontSize:9,fontWeight:700,color:C.label3,textTransform:"uppercase",letterSpacing:.8,textAlign:"right"}}>Estado</div>
                 </div>
-                {cruceContados.map((r,i)=>{
+                {(cruceVerTodo?cruce:cruceContados).map((r,i)=>{
                   const marcaP = MARCAS.find(m=>m.id===r.marcaId);
                   const ei = ESTADO_INFO[r.estado];
                   return (

@@ -34007,6 +34007,7 @@ Fecha: ${venta.fecha}`);
     const [scanMsg, setScanMsg] = (0, import_react.useState)(null);
     const [codManual, setCodManual] = (0, import_react.useState)("");
     const [auditoriaAbierta, setAuditoriaAbierta] = (0, import_react.useState)(null);
+    const [cruceVerTodo, setCruceVerTodo] = (0, import_react.useState)(false);
     const [baseInv] = (0, import_react.useState)(() => inv.map((p) => ({ ...p })));
     const [baseTs] = (0, import_react.useState)(() => /* @__PURE__ */ new Date());
     const productos = (0, import_react.useMemo)(() => marcaSelec ? baseInv.filter((p) => p.marcaId === marcaSelec) : baseInv, [baseInv, marcaSelec]);
@@ -34234,10 +34235,15 @@ Base de inventario tomada: ${baseTs.toLocaleString("es-BO")}`)) return;
         }))
       };
       onGuardarAuditoria(aud);
+      try {
+        exportAuditoriaExcel(aud);
+      } catch (e) {
+        console.error("Export cierre:", e);
+      }
       setConteo({});
       setVerifConteo({});
       setManualVerif({});
-      flash(true, "\u2713 Cierre de inventario guardado");
+      flash(true, "\u2713 Cierre guardado \xB7 Excel generado");
       setVista("historial");
     }
     const ESTADO_INFO = {
@@ -34517,12 +34523,36 @@ Base de inventario tomada: ${baseTs.toLocaleString("es-BO")}`)) return;
         cursor: "pointer",
         WebkitTapHighlightColor: "transparent"
       } }, "+")));
-    })), itemsContados > 0 && /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: reiniciarConteo, variant: "danger", full: true, small: true, icon: "\u21BA" }, "Reiniciar conteo")), vista === "cruce" && /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "grid", gridTemplateColumns: isDesktop ? "1fr 1fr 1fr 1fr 1fr" : "1fr 1fr", gap: 8, marginBottom: 14 } }, /* @__PURE__ */ import_react.default.createElement(StatCard, { icon: "\u2713", label: "Coinciden", value: okCount, color: C.green, compact: isDesktop }), /* @__PURE__ */ import_react.default.createElement(StatCard, { icon: "\u26A0", label: "Faltantes", value: faltantes.length, color: C.red, compact: isDesktop }), /* @__PURE__ */ import_react.default.createElement(StatCard, { icon: "\u2191", label: "Sobrantes", value: sobrantes.length, color: C.blue, compact: isDesktop }), /* @__PURE__ */ import_react.default.createElement(StatCard, { icon: "\u{1F4B0}", label: "Valor en fuga", value: $(Math.round(valorFuga)), color: C.red, compact: isDesktop }), /* @__PURE__ */ import_react.default.createElement(StatCard, { icon: "\u23F3", label: "Unidades sin contar", value: unidadesPendientes, sub: `${pendientes.length} prod.`, color: C.label3, compact: isDesktop })), cruceContados.length === 0 ? /* @__PURE__ */ import_react.default.createElement(
+    })), itemsContados > 0 && /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: reiniciarConteo, variant: "danger", full: true, small: true, icon: "\u21BA" }, "Reiniciar conteo")), vista === "cruce" && /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "grid", gridTemplateColumns: isDesktop ? "1fr 1fr 1fr 1fr 1fr" : "1fr 1fr", gap: 8, marginBottom: 14 } }, /* @__PURE__ */ import_react.default.createElement(StatCard, { icon: "\u2713", label: "Coinciden", value: okCount, color: C.green, compact: isDesktop }), /* @__PURE__ */ import_react.default.createElement(StatCard, { icon: "\u26A0", label: "Faltantes", value: faltantes.length, color: C.red, compact: isDesktop }), /* @__PURE__ */ import_react.default.createElement(StatCard, { icon: "\u2191", label: "Sobrantes", value: sobrantes.length, color: C.blue, compact: isDesktop }), /* @__PURE__ */ import_react.default.createElement(StatCard, { icon: "\u{1F4B0}", label: "Valor en fuga", value: $(Math.round(valorFuga)), color: C.red, compact: isDesktop }), /* @__PURE__ */ import_react.default.createElement(StatCard, { icon: "\u23F3", label: "Unidades sin contar", value: unidadesPendientes, sub: `${pendientes.length} prod.`, color: C.label3, compact: isDesktop })), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 6, marginBottom: 12 } }, /* @__PURE__ */ import_react.default.createElement("button", { onClick: () => setCruceVerTodo(false), style: {
+      flex: 1,
+      padding: "8px 10px",
+      borderRadius: 9,
+      cursor: "pointer",
+      fontFamily: FONT,
+      fontSize: 11.5,
+      fontWeight: 700,
+      WebkitTapHighlightColor: "transparent",
+      border: `1.5px solid ${!cruceVerTodo ? C.label : C.sep}`,
+      background: !cruceVerTodo ? C.label : C.bg2,
+      color: !cruceVerTodo ? "#fff" : C.label2
+    } }, "Solo escaneados (", cruceContados.length, ")"), /* @__PURE__ */ import_react.default.createElement("button", { onClick: () => setCruceVerTodo(true), style: {
+      flex: 1,
+      padding: "8px 10px",
+      borderRadius: 9,
+      cursor: "pointer",
+      fontFamily: FONT,
+      fontSize: 11.5,
+      fontWeight: 700,
+      WebkitTapHighlightColor: "transparent",
+      border: `1.5px solid ${cruceVerTodo ? C.label : C.sep}`,
+      background: cruceVerTodo ? C.label : C.bg2,
+      color: cruceVerTodo ? "#fff" : C.label2
+    } }, "Todo el inventario (", cruce.length, ")")), (cruceVerTodo ? cruce : cruceContados).length === 0 ? /* @__PURE__ */ import_react.default.createElement(
       EmptyState,
       {
         icon: "\u{1F4CA}",
         title: "Nada que cruzar todav\xEDa",
-        sub: "Escanea productos en la pesta\xF1a \xABConteo\xBB para generar el cruce. Los productos sin contar no se muestran como faltantes."
+        sub: "Escanea productos en la pesta\xF1a \xABConteo\xBB para generar el cruce."
       }
     ) : /* @__PURE__ */ import_react.default.createElement("div", { style: {
       background: C.bg1,
@@ -34538,7 +34568,7 @@ Base de inventario tomada: ${baseTs.toLocaleString("es-BO")}`)) return;
       padding: "8px 14px",
       background: C.bg2,
       borderBottom: `1px solid ${C.sep}`
-    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 9, fontWeight: 700, color: C.label3, textTransform: "uppercase", letterSpacing: 0.8 } }, "Producto \xB7 C\xF3digo"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 9, fontWeight: 700, color: C.label3, textTransform: "uppercase", letterSpacing: 0.8, textAlign: "center" } }, "Sist."), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 9, fontWeight: 700, color: C.label3, textTransform: "uppercase", letterSpacing: 0.8, textAlign: "center" } }, "Cont."), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 9, fontWeight: 700, color: C.label3, textTransform: "uppercase", letterSpacing: 0.8, textAlign: "center" } }, "Dif."), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 9, fontWeight: 700, color: C.label3, textTransform: "uppercase", letterSpacing: 0.8, textAlign: "right" } }, "Estado")), cruceContados.map((r, i) => {
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 9, fontWeight: 700, color: C.label3, textTransform: "uppercase", letterSpacing: 0.8 } }, "Producto \xB7 C\xF3digo"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 9, fontWeight: 700, color: C.label3, textTransform: "uppercase", letterSpacing: 0.8, textAlign: "center" } }, "Sist."), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 9, fontWeight: 700, color: C.label3, textTransform: "uppercase", letterSpacing: 0.8, textAlign: "center" } }, "Cont."), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 9, fontWeight: 700, color: C.label3, textTransform: "uppercase", letterSpacing: 0.8, textAlign: "center" } }, "Dif."), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 9, fontWeight: 700, color: C.label3, textTransform: "uppercase", letterSpacing: 0.8, textAlign: "right" } }, "Estado")), (cruceVerTodo ? cruce : cruceContados).map((r, i) => {
       const marcaP = MARCAS.find((m) => m.id === r.marcaId);
       const ei = ESTADO_INFO[r.estado];
       return /* @__PURE__ */ import_react.default.createElement("div", { key: r.id, style: {
