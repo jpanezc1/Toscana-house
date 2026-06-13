@@ -21579,6 +21579,39 @@
       console.warn("Supabase save cierre:", e.message);
     }
   }
+  async function sbObtenerSesionVerif(id) {
+    try {
+      const db = await getSupabase();
+      const { data, error } = await db.from("th_verif_sesion").select("*").eq("id", id).maybeSingle();
+      if (error) throw error;
+      return data;
+    } catch (e) {
+      console.warn("Supabase obtener sesi\xF3n verif:", e.message);
+      return null;
+    }
+  }
+  async function sbCrearSesionVerif(id, mk, marcaId, baseTs) {
+    try {
+      const db = await getSupabase();
+      await db.from("th_verif_sesion").upsert(
+        { id, mk, marca_id: marcaId, base_ts: baseTs.toISOString(), conteo: {} },
+        { onConflict: "id", ignoreDuplicates: true }
+      );
+    } catch (e) {
+      console.warn("Supabase crear sesi\xF3n verif:", e.message);
+    }
+  }
+  async function sbIncrementarConteoVerif(id, codigo) {
+    try {
+      const db = await getSupabase();
+      const { data, error } = await db.rpc("incrementar_conteo_verif", { p_id: id, p_codigo: codigo });
+      if (error) throw error;
+      return data;
+    } catch (e) {
+      console.warn("Supabase incrementar conteo verif:", e.message);
+      return null;
+    }
+  }
   async function sbGuardarRetiro(retiro) {
     try {
       const db = await getSupabase();
@@ -34218,6 +34251,45 @@ Fecha: ${venta.fecha}`);
     const productos = (0, import_react.useMemo)(() => marcaSelec ? baseInv.filter((p) => p.marcaId === marcaSelec) : baseInv, [baseInv, marcaSelec]);
     const marcaSelNombre = marcaSelec ? MARCAS.find((m) => m.id === marcaSelec)?.nombre || "" : "";
     const enAlcance = (p) => !marcaSelec || p?.marcaId === marcaSelec;
+    const codigoToId = (0, import_react.useMemo)(() => {
+      const m = {};
+      baseInv.forEach((p) => {
+        m[(p.codigo || "").toUpperCase()] = p.id;
+      });
+      return m;
+    }, [baseInv]);
+    function mergeRemoteConteo(remoteConteo) {
+      if (!remoteConteo) return;
+      setConteo((prev) => {
+        const next = { ...prev };
+        Object.entries(remoteConteo).forEach(([codigo, cant]) => {
+          const id = codigoToId[codigo.toUpperCase()];
+          if (id != null) next[id] = cant;
+        });
+        return next;
+      });
+    }
+    const sesionId = `VERIF-${MK}-${marcaSelec || "ALL"}`;
+    (0, import_react.useEffect)(() => {
+      let channel = null, mounted = true;
+      sbCrearSesionVerif(sesionId, MK, marcaSelec, baseTs).then(() => sbObtenerSesionVerif(sesionId)).then((sesion) => {
+        if (mounted && sesion) mergeRemoteConteo(sesion.conteo);
+      });
+      getSupabase().then((db) => {
+        if (!mounted) return;
+        channel = db.channel(`verif-${sesionId}`).on(
+          "postgres_changes",
+          { event: "UPDATE", schema: "public", table: "th_verif_sesion", filter: `id=eq.${sesionId}` },
+          (payload) => {
+            if (mounted) mergeRemoteConteo(payload.new.conteo);
+          }
+        ).subscribe();
+      });
+      return () => {
+        mounted = false;
+        if (channel) channel.unsubscribe();
+      };
+    }, [sesionId]);
     function flash(ok, txt) {
       setScanMsg({ ok, txt });
       setTimeout(() => setScanMsg(null), 2500);
@@ -34248,6 +34320,9 @@ Fecha: ${venta.fecha}`);
         res = { ok: true, sistemaP, cantNueva: ya + 1, repetido: ya > 0 };
         return { ...prev, [p.id]: ya + 1 };
       });
+      if (res.ok) {
+        sbIncrementarConteoVerif(sesionId, p.codigo).then(mergeRemoteConteo);
+      }
       return res;
     }
     function buscarYAgregar(codigo) {
