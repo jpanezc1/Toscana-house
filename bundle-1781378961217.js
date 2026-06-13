@@ -34270,6 +34270,7 @@ Fecha: ${venta.fecha}`);
       });
     }
     const sesionId = `VERIF-${MK}-${marcaSelec || "ALL"}`;
+    const channelRef = (0, import_react.useRef)(null);
     (0, import_react.useEffect)(() => {
       let channel = null, mounted = true;
       sbCrearSesionVerif(sesionId, MK, marcaSelec, baseTs).then(() => sbObtenerSesionVerif(sesionId)).then((sesion) => {
@@ -34277,16 +34278,20 @@ Fecha: ${venta.fecha}`);
       });
       getSupabase().then((db) => {
         if (!mounted) return;
-        channel = db.channel(`verif-${sesionId}`).on(
+        channel = db.channel(`verif-${sesionId}`).on("broadcast", { event: "conteo" }, (payload) => {
+          if (mounted) mergeRemoteConteo(payload.payload?.conteo);
+        }).on(
           "postgres_changes",
           { event: "UPDATE", schema: "public", table: "th_verif_sesion", filter: `id=eq.${sesionId}` },
           (payload) => {
             if (mounted) mergeRemoteConteo(payload.new.conteo);
           }
         ).subscribe();
+        channelRef.current = channel;
       });
       return () => {
         mounted = false;
+        channelRef.current = null;
         if (channel) channel.unsubscribe();
       };
     }, [sesionId]);
@@ -34321,6 +34326,7 @@ Fecha: ${venta.fecha}`);
         return { ...prev, [p.id]: ya + 1 };
       });
       if (res.ok) {
+        channelRef.current?.send({ type: "broadcast", event: "conteo", payload: { conteo: { [p.codigo]: res.cantNueva } } });
         sbIncrementarConteoVerif(sesionId, p.codigo).then(mergeRemoteConteo);
       }
       return res;

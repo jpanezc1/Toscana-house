@@ -11830,6 +11830,7 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
   }
 
   const sesionId = `VERIF-${MK}-${marcaSelec||"ALL"}`;
+  const channelRef = useRef(null);
 
   useEffect(()=>{
     let channel=null, mounted=true;
@@ -11839,13 +11840,21 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
     getSupabase().then(db=>{
       if(!mounted) return;
       channel = db.channel(`verif-${sesionId}`)
+        // Broadcast por WebSocket: aviso inmediato (<100ms) a otros dispositivos
+        // sin esperar la replicación de la base de datos.
+        .on("broadcast", { event:"conteo" }, payload=>{
+          if(mounted) mergeRemoteConteo(payload.payload?.conteo);
+        })
+        // postgres_changes: respaldo por si un dispositivo se reconecta o
+        // se perdió un broadcast (la BD sigue siendo la fuente de verdad).
         .on("postgres_changes",
           { event:"UPDATE", schema:"public", table:"th_verif_sesion", filter:`id=eq.${sesionId}` },
           payload=>{ if(mounted) mergeRemoteConteo(payload.new.conteo); }
         )
         .subscribe();
+      channelRef.current = channel;
     });
-    return ()=>{ mounted=false; if(channel) channel.unsubscribe(); };
+    return ()=>{ mounted=false; channelRef.current=null; if(channel) channel.unsubscribe(); };
   },[sesionId]);
 
   function flash(ok,txt){ setScanMsg({ok,txt}); setTimeout(()=>setScanMsg(null),2500); }
@@ -11876,6 +11885,9 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
       return {...prev,[p.id]:ya+1};
     });
     if(res.ok){
+      // Aviso inmediato a otros dispositivos (no espera la base de datos)
+      channelRef.current?.send({type:"broadcast", event:"conteo", payload:{conteo:{[p.codigo]:res.cantNueva}}});
+      // Persiste en Supabase (fuente de verdad / resolución de carreras)
       sbIncrementarConteoVerif(sesionId,p.codigo).then(mergeRemoteConteo);
     }
     return res;
