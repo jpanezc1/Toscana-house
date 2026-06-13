@@ -11596,6 +11596,9 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
   const[baseTs] =useState(()=> new Date());
 
   const productos = useMemo(()=> marcaSelec ? baseInv.filter(p=>p.marcaId===marcaSelec) : baseInv, [baseInv,marcaSelec]);
+  const marcaSelNombre = marcaSelec ? (MARCAS.find(m=>m.id===marcaSelec)?.nombre||"") : "";
+  // ¿el producto está dentro del alcance del cierre? (todas las marcas o la marca elegida)
+  const enAlcance = (p)=> !marcaSelec || p?.marcaId===marcaSelec;
 
   function flash(ok,txt){ setScanMsg({ok,txt}); setTimeout(()=>setScanMsg(null),2500); }
 
@@ -11614,6 +11617,7 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
     const cAlnum=c.replace(/[^A-Z0-9]/g,"");
     const p=baseInv.find(i=>i.codigo.toUpperCase()===c) || baseInv.find(i=>i.codigo.toUpperCase().replace(/[^A-Z0-9]/g,"")===cAlnum);
     if(!p){ flash(false, `Código "${c}" no encontrado en inventario`); return; }
+    if(!enAlcance(p)){ flash(false, `"${p.codigo}" es de ${p.marcaNombre||"otra marca"} — el cierre está filtrado por ${marcaSelNombre}`); return; }
     agregar(p,1);
     setCodManual("");
   }
@@ -11624,6 +11628,10 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
     const p=baseInv.find(i=>i.codigo.toUpperCase()===c);
     if(!p){
       setLiveFeedback({ts:Date.now(),ok:false,title:"Código no encontrado",sub:c});
+      return;
+    }
+    if(!enAlcance(p)){
+      setLiveFeedback({ts:Date.now(),ok:false,title:`Otra marca — fuera del cierre de ${marcaSelNombre}`,sub:`${p.codigo} · ${p.marcaNombre||""}`});
       return;
     }
     let cantNueva=1;
@@ -11771,7 +11779,7 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
       setVista("verificacion");
       return;
     }
-    if(!window.confirm(`¿Confirmar el cierre de inventario de ${MESES[mes]} ${anio}?\n\n${cruce.length} productos auditados · ${faltantesFinal.length} faltante(s) · ${sobrantesFinal.length} sobrante(s)\n\nBase de inventario tomada: ${baseTs.toLocaleString("es-BO")}`)) return;
+    if(!window.confirm(`¿Confirmar el cierre de inventario de ${MESES[mes]} ${anio}?\n\nAlcance: ${marcaSelec?`Solo ${marcaSelNombre}`:"Todas las marcas"}\n${cruce.length} productos auditados · ${faltantesFinal.length} faltante(s) · ${sobrantesFinal.length} sobrante(s)\n\nBase de inventario tomada: ${baseTs.toLocaleString("es-BO")}`)) return;
     const aud = {
       id:`AUD-${MK}-${Date.now()}`, mk:MK, mes, anio, fecha:hoy(), hora:hora(),
       usuario:user?.nombre||"—", marcaId:marcaSelec,
@@ -11802,7 +11810,7 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
         border:`1px solid ${C.sep}`,boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}>
         <div style={{fontSize:16,fontWeight:700,color:C.label,fontFamily:FONT,marginBottom:6,
           display:"flex",alignItems:"center",gap:8}}>
-          <span style={{fontSize:20}}>⌖</span> Cierre de Inventario · {MESES[mes]} {anio}
+          <span style={{fontSize:20}}>⌖</span> Cierre de Inventario · {MESES[mes]} {anio}{marcaSelec?` · Solo ${marcaSelNombre}`:""}
         </div>
         <div style={{fontSize:12.5,color:C.label3,fontFamily:FONT,lineHeight:1.5}}>
           Escanea (o ingresa el código de) cada producto físico en tienda. La app cruza el conteo
@@ -11835,6 +11843,54 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
               {totalAjustePorCargas} unidad{totalAjustePorCargas!==1?"es":""} recibida{totalAjustePorCargas!==1?"s":""} durante este conteo —
               ya sumada{totalAjustePorCargas!==1?"s":""} al stock del sistema en el cruce
             </span>
+          </div>
+        )}
+      </div>
+
+      {/* ── Alcance del cierre: todas las marcas o solo una ── */}
+      <div style={{background:C.bg1,borderRadius:14,padding:"12px 14px",marginBottom:14,
+        border:`1px solid ${marcaSelec?MARCAS.find(m=>m.id===marcaSelec)?.color+"66":C.sep}`}}>
+        <div style={{fontSize:10,fontWeight:700,color:C.label3,textTransform:"uppercase",
+          letterSpacing:.8,marginBottom:8,paddingLeft:2,display:"flex",justifyContent:"space-between"}}>
+          <span>Alcance del cierre</span>
+          <span style={{color:marcaSelec?MARCAS.find(m=>m.id===marcaSelec)?.color:C.label2,fontWeight:800}}>
+            {marcaSelec?`Solo ${marcaSelNombre}`:"Todas las marcas"}
+          </span>
+        </div>
+        <div style={{display:"flex",gap:6,overflowX:"auto",paddingBottom:6,
+          scrollbarWidth:"none",WebkitOverflowScrolling:"touch"}}>
+          <button onClick={()=>setMarcaSelec(null)} style={{
+            flexShrink:0,padding:"7px 14px",borderRadius:10,
+            border:`1.5px solid ${!marcaSelec?C.label:C.sep}`,
+            background:!marcaSelec?C.label:C.bg2,
+            color:!marcaSelec?"#fff":C.label2,
+            cursor:"pointer",fontFamily:FONT,fontSize:11,fontWeight:600,
+            WebkitTapHighlightColor:"transparent",whiteSpace:"nowrap",
+            letterSpacing:"0.04em",textTransform:"uppercase",transition:"all .18s",
+          }}>TODAS</button>
+          {MARCAS.map(m=>{
+            const activa=m.id===marcaSelec;
+            return (
+              <button key={m.id} onClick={()=>setMarcaSelec(activa?null:m.id)} style={{
+                flexShrink:0,padding:"6px 12px",borderRadius:10,
+                border:`1.5px solid ${activa?m.color:C.sep}`,
+                background:activa?`${m.color}22`:C.bg2,
+                cursor:"pointer",fontFamily:FONT,
+                WebkitTapHighlightColor:"transparent",
+                display:"flex",alignItems:"center",gap:6,
+                transition:"all .18s",
+              }}>
+                <MarcaIcon marca={m} size={16} radius={4}/>
+                <span style={{fontSize:11,fontWeight:activa?700:400,
+                  color:activa?m.color:C.label2,whiteSpace:"nowrap"}}>{m.nombre}</span>
+              </button>
+            );
+          })}
+        </div>
+        {marcaSelec&&(
+          <div style={{fontSize:11,color:C.label3,fontFamily:FONT,marginTop:8,lineHeight:1.4,paddingLeft:2}}>
+            Solo se contarán y cruzarán productos de <b style={{color:C.label2}}>{marcaSelNombre}</b>.
+            Los códigos de otras marcas se rechazan durante el escaneo.
           </div>
         )}
       </div>
@@ -11897,42 +11953,6 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
       {/* ── CONTEO ── */}
       {vista==="conteo" && (
         <div>
-          {/* Filtro por marca */}
-          <div style={{marginBottom:14}}>
-            <div style={{fontSize:10,fontWeight:600,color:C.label3,textTransform:"uppercase",
-              letterSpacing:.8,marginBottom:8,paddingLeft:2}}>Filtrar por marca</div>
-            <div style={{display:"flex",gap:6,overflowX:"auto",paddingBottom:6,
-              scrollbarWidth:"none",WebkitOverflowScrolling:"touch"}}>
-              <button onClick={()=>setMarcaSelec(null)} style={{
-                flexShrink:0,padding:"7px 14px",borderRadius:10,
-                border:`1.5px solid ${!marcaSelec?C.label:C.sep}`,
-                background:!marcaSelec?C.label:C.bg2,
-                color:!marcaSelec?"#fff":C.label2,
-                cursor:"pointer",fontFamily:FONT,fontSize:11,fontWeight:600,
-                WebkitTapHighlightColor:"transparent",whiteSpace:"nowrap",
-                letterSpacing:"0.04em",textTransform:"uppercase",transition:"all .18s",
-              }}>TODAS</button>
-              {MARCAS.map(m=>{
-                const activa=m.id===marcaSelec;
-                return (
-                  <button key={m.id} onClick={()=>setMarcaSelec(activa?null:m.id)} style={{
-                    flexShrink:0,padding:"6px 12px",borderRadius:10,
-                    border:`1.5px solid ${activa?m.color:C.sep}`,
-                    background:activa?`${m.color}22`:C.bg2,
-                    cursor:"pointer",fontFamily:FONT,
-                    WebkitTapHighlightColor:"transparent",
-                    display:"flex",alignItems:"center",gap:6,
-                    transition:"all .18s",
-                  }}>
-                    <MarcaIcon marca={m} size={16} radius={4}/>
-                    <span style={{fontSize:11,fontWeight:activa?700:400,
-                      color:activa?m.color:C.label2,whiteSpace:"nowrap"}}>{m.nombre}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
           {/* Scanner */}
           {showScanner && <CameraScanner onDetect={(codigo)=>{
             setShowScanner(false);

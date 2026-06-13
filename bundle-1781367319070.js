@@ -34010,6 +34010,8 @@ Fecha: ${venta.fecha}`);
     const [baseInv] = (0, import_react.useState)(() => inv.map((p) => ({ ...p })));
     const [baseTs] = (0, import_react.useState)(() => /* @__PURE__ */ new Date());
     const productos = (0, import_react.useMemo)(() => marcaSelec ? baseInv.filter((p) => p.marcaId === marcaSelec) : baseInv, [baseInv, marcaSelec]);
+    const marcaSelNombre = marcaSelec ? MARCAS.find((m) => m.id === marcaSelec)?.nombre || "" : "";
+    const enAlcance = (p) => !marcaSelec || p?.marcaId === marcaSelec;
     function flash(ok, txt) {
       setScanMsg({ ok, txt });
       setTimeout(() => setScanMsg(null), 2500);
@@ -34034,6 +34036,10 @@ Fecha: ${venta.fecha}`);
         flash(false, `C\xF3digo "${c}" no encontrado en inventario`);
         return;
       }
+      if (!enAlcance(p)) {
+        flash(false, `"${p.codigo}" es de ${p.marcaNombre || "otra marca"} \u2014 el cierre est\xE1 filtrado por ${marcaSelNombre}`);
+        return;
+      }
       agregar(p, 1);
       setCodManual("");
     }
@@ -34042,6 +34048,10 @@ Fecha: ${venta.fecha}`);
       const p = baseInv.find((i) => i.codigo.toUpperCase() === c);
       if (!p) {
         setLiveFeedback({ ts: Date.now(), ok: false, title: "C\xF3digo no encontrado", sub: c });
+        return;
+      }
+      if (!enAlcance(p)) {
+        setLiveFeedback({ ts: Date.now(), ok: false, title: `Otra marca \u2014 fuera del cierre de ${marcaSelNombre}`, sub: `${p.codigo} \xB7 ${p.marcaNombre || ""}` });
         return;
       }
       let cantNueva = 1;
@@ -34191,6 +34201,7 @@ Fecha: ${venta.fecha}`);
       }
       if (!window.confirm(`\xBFConfirmar el cierre de inventario de ${MESES[mes]} ${anio}?
 
+Alcance: ${marcaSelec ? `Solo ${marcaSelNombre}` : "Todas las marcas"}
 ${cruce.length} productos auditados \xB7 ${faltantesFinal.length} faltante(s) \xB7 ${sobrantesFinal.length} sobrante(s)
 
 Base de inventario tomada: ${baseTs.toLocaleString("es-BO")}`)) return;
@@ -34250,7 +34261,7 @@ Base de inventario tomada: ${baseTs.toLocaleString("es-BO")}`)) return;
       display: "flex",
       alignItems: "center",
       gap: 8
-    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 20 } }, "\u2316"), " Cierre de Inventario \xB7 ", MESES[mes], " ", anio), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12.5, color: C.label3, fontFamily: FONT, lineHeight: 1.5 } }, "Escanea (o ingresa el c\xF3digo de) cada producto f\xEDsico en tienda. La app cruza el conteo con el stock del sistema y se\xF1ala faltantes (posible fuga) o sobrantes."), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 20 } }, "\u2316"), " Cierre de Inventario \xB7 ", MESES[mes], " ", anio, marcaSelec ? ` \xB7 Solo ${marcaSelNombre}` : ""), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12.5, color: C.label3, fontFamily: FONT, lineHeight: 1.5 } }, "Escanea (o ingresa el c\xF3digo de) cada producto f\xEDsico en tienda. La app cruza el conteo con el stock del sistema y se\xF1ala faltantes (posible fuga) o sobrantes."), /* @__PURE__ */ import_react.default.createElement("div", { style: {
       marginTop: 10,
       display: "flex",
       alignItems: "center",
@@ -34277,7 +34288,67 @@ Base de inventario tomada: ${baseTs.toLocaleString("es-BO")}`)) return;
       borderRadius: 10,
       background: C.greenBg,
       border: `1px solid ${C.green}33`
-    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13 } }, "\u{1F4E6}"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 11, color: C.green, fontFamily: FONT, lineHeight: 1.4, fontWeight: 600 } }, totalAjustePorCargas, " unidad", totalAjustePorCargas !== 1 ? "es" : "", " recibida", totalAjustePorCargas !== 1 ? "s" : "", " durante este conteo \u2014 ya sumada", totalAjustePorCargas !== 1 ? "s" : "", " al stock del sistema en el cruce"))), /* @__PURE__ */ import_react.default.createElement("button", { onClick: () => setModoCierre(true), style: {
+    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13 } }, "\u{1F4E6}"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 11, color: C.green, fontFamily: FONT, lineHeight: 1.4, fontWeight: 600 } }, totalAjustePorCargas, " unidad", totalAjustePorCargas !== 1 ? "es" : "", " recibida", totalAjustePorCargas !== 1 ? "s" : "", " durante este conteo \u2014 ya sumada", totalAjustePorCargas !== 1 ? "s" : "", " al stock del sistema en el cruce"))), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      background: C.bg1,
+      borderRadius: 14,
+      padding: "12px 14px",
+      marginBottom: 14,
+      border: `1px solid ${marcaSelec ? MARCAS.find((m) => m.id === marcaSelec)?.color + "66" : C.sep}`
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      fontSize: 10,
+      fontWeight: 700,
+      color: C.label3,
+      textTransform: "uppercase",
+      letterSpacing: 0.8,
+      marginBottom: 8,
+      paddingLeft: 2,
+      display: "flex",
+      justifyContent: "space-between"
+    } }, /* @__PURE__ */ import_react.default.createElement("span", null, "Alcance del cierre"), /* @__PURE__ */ import_react.default.createElement("span", { style: { color: marcaSelec ? MARCAS.find((m) => m.id === marcaSelec)?.color : C.label2, fontWeight: 800 } }, marcaSelec ? `Solo ${marcaSelNombre}` : "Todas las marcas")), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      display: "flex",
+      gap: 6,
+      overflowX: "auto",
+      paddingBottom: 6,
+      scrollbarWidth: "none",
+      WebkitOverflowScrolling: "touch"
+    } }, /* @__PURE__ */ import_react.default.createElement("button", { onClick: () => setMarcaSelec(null), style: {
+      flexShrink: 0,
+      padding: "7px 14px",
+      borderRadius: 10,
+      border: `1.5px solid ${!marcaSelec ? C.label : C.sep}`,
+      background: !marcaSelec ? C.label : C.bg2,
+      color: !marcaSelec ? "#fff" : C.label2,
+      cursor: "pointer",
+      fontFamily: FONT,
+      fontSize: 11,
+      fontWeight: 600,
+      WebkitTapHighlightColor: "transparent",
+      whiteSpace: "nowrap",
+      letterSpacing: "0.04em",
+      textTransform: "uppercase",
+      transition: "all .18s"
+    } }, "TODAS"), MARCAS.map((m) => {
+      const activa = m.id === marcaSelec;
+      return /* @__PURE__ */ import_react.default.createElement("button", { key: m.id, onClick: () => setMarcaSelec(activa ? null : m.id), style: {
+        flexShrink: 0,
+        padding: "6px 12px",
+        borderRadius: 10,
+        border: `1.5px solid ${activa ? m.color : C.sep}`,
+        background: activa ? `${m.color}22` : C.bg2,
+        cursor: "pointer",
+        fontFamily: FONT,
+        WebkitTapHighlightColor: "transparent",
+        display: "flex",
+        alignItems: "center",
+        gap: 6,
+        transition: "all .18s"
+      } }, /* @__PURE__ */ import_react.default.createElement(MarcaIcon, { marca: m, size: 16, radius: 4 }), /* @__PURE__ */ import_react.default.createElement("span", { style: {
+        fontSize: 11,
+        fontWeight: activa ? 700 : 400,
+        color: activa ? m.color : C.label2,
+        whiteSpace: "nowrap"
+      } }, m.nombre));
+    })), marcaSelec && /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT, marginTop: 8, lineHeight: 1.4, paddingLeft: 2 } }, "Solo se contar\xE1n y cruzar\xE1n productos de ", /* @__PURE__ */ import_react.default.createElement("b", { style: { color: C.label2 } }, marcaSelNombre), ". Los c\xF3digos de otras marcas se rechazan durante el escaneo.")), /* @__PURE__ */ import_react.default.createElement("button", { onClick: () => setModoCierre(true), style: {
       width: "100%",
       border: "none",
       borderRadius: 16,
@@ -34332,59 +34403,7 @@ Base de inventario tomada: ${baseTs.toLocaleString("es-BO")}`)) return;
         value: vista,
         onChange: setVista
       }
-    )), vista === "conteo" && /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 14 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      fontSize: 10,
-      fontWeight: 600,
-      color: C.label3,
-      textTransform: "uppercase",
-      letterSpacing: 0.8,
-      marginBottom: 8,
-      paddingLeft: 2
-    } }, "Filtrar por marca"), /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      display: "flex",
-      gap: 6,
-      overflowX: "auto",
-      paddingBottom: 6,
-      scrollbarWidth: "none",
-      WebkitOverflowScrolling: "touch"
-    } }, /* @__PURE__ */ import_react.default.createElement("button", { onClick: () => setMarcaSelec(null), style: {
-      flexShrink: 0,
-      padding: "7px 14px",
-      borderRadius: 10,
-      border: `1.5px solid ${!marcaSelec ? C.label : C.sep}`,
-      background: !marcaSelec ? C.label : C.bg2,
-      color: !marcaSelec ? "#fff" : C.label2,
-      cursor: "pointer",
-      fontFamily: FONT,
-      fontSize: 11,
-      fontWeight: 600,
-      WebkitTapHighlightColor: "transparent",
-      whiteSpace: "nowrap",
-      letterSpacing: "0.04em",
-      textTransform: "uppercase",
-      transition: "all .18s"
-    } }, "TODAS"), MARCAS.map((m) => {
-      const activa = m.id === marcaSelec;
-      return /* @__PURE__ */ import_react.default.createElement("button", { key: m.id, onClick: () => setMarcaSelec(activa ? null : m.id), style: {
-        flexShrink: 0,
-        padding: "6px 12px",
-        borderRadius: 10,
-        border: `1.5px solid ${activa ? m.color : C.sep}`,
-        background: activa ? `${m.color}22` : C.bg2,
-        cursor: "pointer",
-        fontFamily: FONT,
-        WebkitTapHighlightColor: "transparent",
-        display: "flex",
-        alignItems: "center",
-        gap: 6,
-        transition: "all .18s"
-      } }, /* @__PURE__ */ import_react.default.createElement(MarcaIcon, { marca: m, size: 16, radius: 4 }), /* @__PURE__ */ import_react.default.createElement("span", { style: {
-        fontSize: 11,
-        fontWeight: activa ? 700 : 400,
-        color: activa ? m.color : C.label2,
-        whiteSpace: "nowrap"
-      } }, m.nombre));
-    }))), showScanner && /* @__PURE__ */ import_react.default.createElement(CameraScanner, { onDetect: (codigo) => {
+    )), vista === "conteo" && /* @__PURE__ */ import_react.default.createElement("div", null, showScanner && /* @__PURE__ */ import_react.default.createElement(CameraScanner, { onDetect: (codigo) => {
       setShowScanner(false);
       buscarYAgregar(codigo);
     }, onClose: () => setShowScanner(false) }), /* @__PURE__ */ import_react.default.createElement("div", { onClick: () => setShowScanner(true), style: {
