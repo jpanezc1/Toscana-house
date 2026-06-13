@@ -22075,7 +22075,7 @@
       wordBreak: "break-all"
     } }, codigo));
   }
-  function abreviarNombre(nombre, maxLen = 26) {
+  function abreviarNombre(nombre, maxLen = 60) {
     if (!nombre) return "";
     let n = nombre.trim();
     if (n.length <= maxLen) return n;
@@ -22135,13 +22135,14 @@
       overflow:hidden; display:flex; flex-direction:column; align-items:center; justify-content:center; }
     .top { display:flex; justify-content:space-between; align-items:center; width:100%;
       font-size:8.64px; letter-spacing:0.5px; text-transform:uppercase; color:#333; }
-    .producto { font-size:9px; font-weight:bold; text-align:center; width:100%;
-      text-transform:uppercase; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
-      margin:0.6mm 0; }
+    .producto { font-size:8px; font-weight:bold; text-align:center; width:100%;
+      text-transform:uppercase; line-height:1.1; margin:0.3mm 0;
+      display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2;
+      overflow:hidden; text-overflow:ellipsis; }
     .barcode-wrap { width:100%; display:flex; justify-content:center; }
-    .barcode-wrap svg { width:45mm!important; height:10.8mm!important; }
+    .barcode-wrap svg { width:45mm!important; height:9mm!important; }
     .bottom-row { display:flex; justify-content:space-between; align-items:center; width:100%;
-      margin-top:0.6mm; }
+      margin-top:0.3mm; }
     .codigo { font-size:8.64px; color:#333; font-family:monospace; }
     .precio { font-size:13.2px; font-weight:900; }
     @media print { body { print-color-adjust:exact; -webkit-print-color-adjust:exact; } }
@@ -22224,13 +22225,14 @@
       overflow:hidden; background:#fff; display:flex; flex-direction:column; align-items:center; justify-content:center; }
     .top { display:flex; justify-content:space-between; align-items:center; width:100%;
       font-size:8.64px; letter-spacing:0.5px; text-transform:uppercase; color:#333; }
-    .producto { font-size:9px; font-weight:bold; text-align:center; width:100%;
-      text-transform:uppercase; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
-      margin:0.6mm 0; }
+    .producto { font-size:8px; font-weight:bold; text-align:center; width:100%;
+      text-transform:uppercase; line-height:1.1; margin:0.3mm 0;
+      display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2;
+      overflow:hidden; text-overflow:ellipsis; }
     .barcode-wrap { width:100%; display:flex; justify-content:center; }
-    .barcode-wrap svg { width:45mm!important; height:10.8mm!important; }
+    .barcode-wrap svg { width:45mm!important; height:9mm!important; }
     .bottom-row { display:flex; justify-content:space-between; align-items:center; width:100%;
-      margin-top:0.6mm; }
+      margin-top:0.3mm; }
     .codigo { font-size:8.64px; color:#333; font-family:monospace; }
     .precio { font-size:13.2px; font-weight:900; }
     @media print {
@@ -35561,9 +35563,8 @@ Confirmas que el conteo de ${r.contado} unidad(es) es correcto.`)) {
         fontFamily: FONT,
         letterSpacing: "0.01em",
         lineHeight: 1.3,
-        overflow: "hidden",
-        textOverflow: "ellipsis",
-        whiteSpace: "nowrap"
+        whiteSpace: "normal",
+        wordBreak: "break-word"
       } }, (prod.nombre || "").toUpperCase()), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6, marginTop: 3, flexWrap: "wrap" } }, /* @__PURE__ */ import_react.default.createElement("span", { style: {
         fontFamily: FONT_MONO,
         fontSize: 10,
