@@ -4500,16 +4500,10 @@ function RetirosTab({inv, retiros, onRetiro}){
                     </div>
                     <div style={{fontSize:11,color:C.label3,fontFamily:FONT}}>{r.hora}</div>
                     <div style={{marginTop:4}}>
-                      {r.motivo==="Baja"
-                        ? <span style={{background:`${C.red}18`,color:C.red,
-                            fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:20,fontFamily:FONT}}>
-                            DADO DE BAJA
-                          </span>
-                        : <span style={{background:`${C.amber}18`,color:C.amber,
-                            fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:20,fontFamily:FONT}}>
-                            RETIRADO
-                          </span>
-                      }
+                      <span style={{background:`${C.amber}18`,color:C.amber,
+                        fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:20,fontFamily:FONT}}>
+                        RETIRADO
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -9835,25 +9829,15 @@ function App(){
     sbActualizarStock(r.prodId, stockDespues);
     sbGuardarRetiro(r);
     // ── Audit forense ─────────────────────────────────────────────
-    if(r.motivo==="Baja"){
-      logAudit("BAJA", {
-        resumen: `Baja: ${prod?.nombre||r.codigo} · stock ${stockAntes}→0`,
-        codigo: r.codigo, nombre: prod?.nombre||r.codigo,
-        marca: prod?.marcaNombre||"—",
-        precio: prod?.precio||0,
-        stockAntes, stockDespues,
-      }, user);
-    } else {
-      logAudit("RETIRO", {
-        resumen: `Retiro: ${prod?.nombre||r.codigo} × ${r.cantidad} u.`,
-        codigo: r.codigo, nombre: prod?.nombre||r.codigo,
-        marca: prod?.marcaNombre||"—",
-        cantidad: r.cantidad,
-        destinatario: r.destinatario||"—",
-        motivo: r.motivo||"—",
-        stockAntes, stockDespues,
-      }, user);
-    }
+    logAudit("RETIRO", {
+      resumen: `Retiro: ${prod?.nombre||r.codigo} × ${r.cantidad} u.`,
+      codigo: r.codigo, nombre: prod?.nombre||r.codigo,
+      marca: prod?.marcaNombre||"—",
+      cantidad: r.cantidad,
+      destinatario: r.destinatario||"—",
+      motivo: r.motivo||"—",
+      stockAntes, stockDespues,
+    }, user);
   }
 
   // Cargar datos desde Supabase al inicio — merge inteligente con localStorage
@@ -9975,17 +9959,22 @@ function App(){
     if(!window.confirm(`¿Confirmar baja de "${prod.nombre}" (${cod})?\nStock actual: ${stockAntes} → 0`)){
       return;
     }
-    const ahora=new Date();
-    const retiro={
-      id: Date.now(), prodId: prod.id, codigo: cod, nombre: prod.nombre,
-      marcaId: prod.marcaId, marcaNombre: prod.marcaNombre||"—",
-      cantidad: stockAntes, destinatario: "Baja de inventario", motivo: "Baja",
-      fecha: ahora.toLocaleDateString("es-BO"),
-      hora: ahora.toLocaleTimeString("es-BO",{hour:"2-digit",minute:"2-digit"}),
-    };
-    registrarRetiro(retiro);
+    registrarBaja(prod, stockAntes);
     setBajaMsg({ok:true,msg:`✓ "${prod.nombre}" dado de baja`});
     setBajaCod("");
+  }
+
+  // Dar de baja — SOLO Inventario. No genera retiro (eso es exclusivo de Caja).
+  function registrarBaja(prod, stockAntes){
+    setInv(p=>p.map(i=>i.id===prod.id?{...i,stock:0}:i));
+    sbActualizarStock(prod.id, 0);
+    logAudit("BAJA", {
+      resumen: `Baja: ${prod.nombre} · stock ${stockAntes}→0`,
+      codigo: prod.codigo, nombre: prod.nombre,
+      marca: prod.marcaNombre||"—",
+      precio: prod.precio||0,
+      stockAntes, stockDespues: 0,
+    }, user);
   }
 
   // Buffer de importación para consolidar en un solo evento de auditoría

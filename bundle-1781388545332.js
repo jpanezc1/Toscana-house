@@ -26417,15 +26417,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       justifyContent: "space-between",
       alignItems: "flex-start",
       gap: 12
-    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 14, fontWeight: 600, color: C.label, fontFamily: FONT } }, r.nombre), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT, marginTop: 2 } }, r.codigo, " \xB7 x", r.cantidad), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.blue, fontFamily: FONT, marginTop: 3, fontWeight: 500 } }, "Para: ", r.destinatario), r.motivo && /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT, marginTop: 2, fontStyle: "italic" } }, r.motivo)), /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "right", flexShrink: 0 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, fontFamily: "monospace", color: C.amber, fontWeight: 600 } }, r.fecha), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT } }, r.hora), /* @__PURE__ */ import_react.default.createElement("div", { style: { marginTop: 4 } }, r.motivo === "Baja" ? /* @__PURE__ */ import_react.default.createElement("span", { style: {
-      background: `${C.red}18`,
-      color: C.red,
-      fontSize: 10,
-      fontWeight: 700,
-      padding: "2px 8px",
-      borderRadius: 20,
-      fontFamily: FONT
-    } }, "DADO DE BAJA") : /* @__PURE__ */ import_react.default.createElement("span", { style: {
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 14, fontWeight: 600, color: C.label, fontFamily: FONT } }, r.nombre), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT, marginTop: 2 } }, r.codigo, " \xB7 x", r.cantidad), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.blue, fontFamily: FONT, marginTop: 3, fontWeight: 500 } }, "Para: ", r.destinatario), r.motivo && /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT, marginTop: 2, fontStyle: "italic" } }, r.motivo)), /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "right", flexShrink: 0 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, fontFamily: "monospace", color: C.amber, fontWeight: 600 } }, r.fecha), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT } }, r.hora), /* @__PURE__ */ import_react.default.createElement("div", { style: { marginTop: 4 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: {
       background: `${C.amber}18`,
       color: C.amber,
       fontSize: 10,
@@ -32042,29 +32034,17 @@ Fecha: ${venta.fecha}`);
       setInv((p) => p.map((i) => i.id === r.prodId ? { ...i, stock: stockDespues } : i));
       sbActualizarStock(r.prodId, stockDespues);
       sbGuardarRetiro(r);
-      if (r.motivo === "Baja") {
-        logAudit("BAJA", {
-          resumen: `Baja: ${prod?.nombre || r.codigo} \xB7 stock ${stockAntes}\u21920`,
-          codigo: r.codigo,
-          nombre: prod?.nombre || r.codigo,
-          marca: prod?.marcaNombre || "\u2014",
-          precio: prod?.precio || 0,
-          stockAntes,
-          stockDespues
-        }, user);
-      } else {
-        logAudit("RETIRO", {
-          resumen: `Retiro: ${prod?.nombre || r.codigo} \xD7 ${r.cantidad} u.`,
-          codigo: r.codigo,
-          nombre: prod?.nombre || r.codigo,
-          marca: prod?.marcaNombre || "\u2014",
-          cantidad: r.cantidad,
-          destinatario: r.destinatario || "\u2014",
-          motivo: r.motivo || "\u2014",
-          stockAntes,
-          stockDespues
-        }, user);
-      }
+      logAudit("RETIRO", {
+        resumen: `Retiro: ${prod?.nombre || r.codigo} \xD7 ${r.cantidad} u.`,
+        codigo: r.codigo,
+        nombre: prod?.nombre || r.codigo,
+        marca: prod?.marcaNombre || "\u2014",
+        cantidad: r.cantidad,
+        destinatario: r.destinatario || "\u2014",
+        motivo: r.motivo || "\u2014",
+        stockAntes,
+        stockDespues
+      }, user);
     }
     (0, import_react.useEffect)(() => {
       setDbStatus("connecting");
@@ -32198,23 +32178,22 @@ Fecha: ${venta.fecha}`);
 Stock actual: ${stockAntes} \u2192 0`)) {
         return;
       }
-      const ahora = /* @__PURE__ */ new Date();
-      const retiro = {
-        id: Date.now(),
-        prodId: prod.id,
-        codigo: cod,
-        nombre: prod.nombre,
-        marcaId: prod.marcaId,
-        marcaNombre: prod.marcaNombre || "\u2014",
-        cantidad: stockAntes,
-        destinatario: "Baja de inventario",
-        motivo: "Baja",
-        fecha: ahora.toLocaleDateString("es-BO"),
-        hora: ahora.toLocaleTimeString("es-BO", { hour: "2-digit", minute: "2-digit" })
-      };
-      registrarRetiro(retiro);
+      registrarBaja(prod, stockAntes);
       setBajaMsg({ ok: true, msg: `\u2713 "${prod.nombre}" dado de baja` });
       setBajaCod("");
+    }
+    function registrarBaja(prod, stockAntes) {
+      setInv((p) => p.map((i) => i.id === prod.id ? { ...i, stock: 0 } : i));
+      sbActualizarStock(prod.id, 0);
+      logAudit("BAJA", {
+        resumen: `Baja: ${prod.nombre} \xB7 stock ${stockAntes}\u21920`,
+        codigo: prod.codigo,
+        nombre: prod.nombre,
+        marca: prod.marcaNombre || "\u2014",
+        precio: prod.precio || 0,
+        stockAntes,
+        stockDespues: 0
+      }, user);
     }
     const _importBuf = (0, import_react.useRef)({ items: [], ts: 0, timer: null });
     function handleImportarExcel({ tipo, codigo, stock, producto }) {
