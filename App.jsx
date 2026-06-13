@@ -5875,6 +5875,7 @@ function LectorHID({onDetect, onClose, feedback, stats, rows, marcaNombre}){
   const lista = (rows||[]).slice().sort((a,b)=>(a.codigo||"").localeCompare(b.codigo||""));
   const completos = lista.filter(r=>r.sistema>0 && r.contado>=r.sistema).length;
   const pendientes = lista.filter(r=>r.contado<r.sistema).length;
+  const unidadesPendientes = lista.reduce((s,r)=> s + Math.max(0,r.sistema-r.contado), 0);
   function estadoFila(r){
     if(r.contado>r.sistema) return {lbl:"Sobrante", col:"#3B82F6", bg:"rgba(59,130,246,0.14)"};
     if(r.sistema>0 && r.contado>=r.sistema) return {lbl:"Completo", col:"#22C55E", bg:"rgba(34,197,94,0.14)"};
@@ -5951,7 +5952,7 @@ function LectorHID({onDetect, onClose, feedback, stats, rows, marcaNombre}){
             <span style={{color:"rgba(255,255,255,0.4)"}}>/</span>
             <span style={{color:"rgba(255,255,255,0.85)",fontSize:13}}>{lista.length}</span>
             <span style={{color:"rgba(255,255,255,0.35)"}}>·</span>
-            <span style={{color:"#F59E0B",fontSize:13}}>{pendientes} pend.</span>
+            <span style={{color:"#F59E0B",fontSize:13}}>{pendientes} SKUs · {unidadesPendientes} uds pend.</span>
           </div>
         )}
       </div>

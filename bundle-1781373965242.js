@@ -27637,6 +27637,7 @@ Fecha: ${venta.fecha}`);
     const lista = (rows || []).slice().sort((a, b) => (a.codigo || "").localeCompare(b.codigo || ""));
     const completos = lista.filter((r) => r.sistema > 0 && r.contado >= r.sistema).length;
     const pendientes = lista.filter((r) => r.contado < r.sistema).length;
+    const unidadesPendientes = lista.reduce((s, r) => s + Math.max(0, r.sistema - r.contado), 0);
     function estadoFila(r) {
       if (r.contado > r.sistema) return { lbl: "Sobrante", col: "#3B82F6", bg: "rgba(59,130,246,0.14)" };
       if (r.sistema > 0 && r.contado >= r.sistema) return { lbl: "Completo", col: "#22C55E", bg: "rgba(34,197,94,0.14)" };
@@ -27742,7 +27743,7 @@ Fecha: ${venta.fecha}`);
       borderRadius: 999,
       padding: "8px 14px",
       flexShrink: 0
-    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { color: "#22C55E", fontSize: 13, fontWeight: 800 } }, completos), /* @__PURE__ */ import_react.default.createElement("span", { style: { color: "rgba(255,255,255,0.4)" } }, "/"), /* @__PURE__ */ import_react.default.createElement("span", { style: { color: "rgba(255,255,255,0.85)", fontSize: 13 } }, lista.length), /* @__PURE__ */ import_react.default.createElement("span", { style: { color: "rgba(255,255,255,0.35)" } }, "\xB7"), /* @__PURE__ */ import_react.default.createElement("span", { style: { color: "#F59E0B", fontSize: 13 } }, pendientes, " pend."))), flash && /* @__PURE__ */ import_react.default.createElement("div", { style: {
+    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { color: "#22C55E", fontSize: 13, fontWeight: 800 } }, completos), /* @__PURE__ */ import_react.default.createElement("span", { style: { color: "rgba(255,255,255,0.4)" } }, "/"), /* @__PURE__ */ import_react.default.createElement("span", { style: { color: "rgba(255,255,255,0.85)", fontSize: 13 } }, lista.length), /* @__PURE__ */ import_react.default.createElement("span", { style: { color: "rgba(255,255,255,0.35)" } }, "\xB7"), /* @__PURE__ */ import_react.default.createElement("span", { style: { color: "#F59E0B", fontSize: 13 } }, pendientes, " SKUs \xB7 ", unidadesPendientes, " uds pend."))), flash && /* @__PURE__ */ import_react.default.createElement("div", { style: {
       flexShrink: 0,
       margin: "0 16px 8px",
       padding: "10px 14px",
