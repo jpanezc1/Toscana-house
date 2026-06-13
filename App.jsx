@@ -9959,6 +9959,14 @@ function App(){
     setInv(p=>[...p,prod]);
     drive.syncProducto(prod);
     sbGuardarProducto(prod); // guardar en nube
+    logAudit("IMPORT", {
+      resumen: `Importación: 1 nuevos + 0 actualizados · ${prod.marcaNombre||"—"}`,
+      nuevos:1, actualizados:0, totalItems:1,
+      marcas: prod.marcaNombre||"—",
+      items:[{tipo:"create", codigo:prod.codigo, nombre:prod.nombre,
+        marca:prod.marcaNombre, marcaId:prod.marcaId,
+        stock:prod.stock, precio:prod.precio, categoria:prod.categoria}],
+    }, user);
     registrarCarga(crearCarga("MANUAL", user, {
       marcaId: prod.marcaId, marcaNombre: prod.marcaNombre,
       resumen: `Carga manual: ${prod.nombre} (${prod.codigo})`,

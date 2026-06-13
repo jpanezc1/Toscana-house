@@ -32170,6 +32170,23 @@ Fecha: ${venta.fecha}`);
       setInv((p) => [...p, prod]);
       drive.syncProducto(prod);
       sbGuardarProducto(prod);
+      logAudit("IMPORT", {
+        resumen: `Importaci\xF3n: 1 nuevos + 0 actualizados \xB7 ${prod.marcaNombre || "\u2014"}`,
+        nuevos: 1,
+        actualizados: 0,
+        totalItems: 1,
+        marcas: prod.marcaNombre || "\u2014",
+        items: [{
+          tipo: "create",
+          codigo: prod.codigo,
+          nombre: prod.nombre,
+          marca: prod.marcaNombre,
+          marcaId: prod.marcaId,
+          stock: prod.stock,
+          precio: prod.precio,
+          categoria: prod.categoria
+        }]
+      }, user);
       registrarCarga(crearCarga("MANUAL", user, {
         marcaId: prod.marcaId,
         marcaNombre: prod.marcaNombre,
