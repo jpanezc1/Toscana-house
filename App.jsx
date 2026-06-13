@@ -5844,9 +5844,10 @@ function CameraScanner({onDetect, onClose, continuous, feedback, stats}){
 // conectado a la computadora (USB/HID). El lector "teclea" el código
 // y termina con Enter; aquí se captura y se cuenta automáticamente.
 // ══════════════════════════════════════════════════════════
-function LectorHID({onDetect, onClose, feedback, stats}){
+function LectorHID({onDetect, onClose, feedback, stats, rows, marcaNombre}){
   const inputRef = useRef(null);
   const idleRef  = useRef(null);
+  const rowRefs  = useRef({});
   const [buf, setBuf]   = useState("");
   const [flash, setFlash] = useState(null);
 
@@ -5858,13 +5859,28 @@ function LectorHID({onDetect, onClose, feedback, stats}){
     return ()=>clearInterval(t);
   },[]);
 
-  // Mostrar feedback de cada lectura
+  // Mostrar feedback de cada lectura + auto-scroll a la fila escaneada
   useEffect(()=>{
     if(!feedback) return;
     setFlash(feedback);
-    const t=setTimeout(()=>setFlash(null),1100);
+    if(feedback.code){
+      const el=rowRefs.current[feedback.code];
+      if(el) try{ el.scrollIntoView({block:"nearest",behavior:"smooth"}); }catch(_){}
+    }
+    const t=setTimeout(()=>setFlash(null),2200);
     return ()=>clearTimeout(t);
   },[feedback?.ts]);
+
+  // Orden estable por código + estado de avance por fila
+  const lista = (rows||[]).slice().sort((a,b)=>(a.codigo||"").localeCompare(b.codigo||""));
+  const completos = lista.filter(r=>r.sistema>0 && r.contado>=r.sistema).length;
+  const pendientes = lista.filter(r=>r.contado<r.sistema).length;
+  function estadoFila(r){
+    if(r.contado>r.sistema) return {lbl:"Sobrante", col:"#3B82F6", bg:"rgba(59,130,246,0.14)"};
+    if(r.sistema>0 && r.contado>=r.sistema) return {lbl:"Completo", col:"#22C55E", bg:"rgba(34,197,94,0.14)"};
+    if(r.contado>0) return {lbl:`Parcial ${r.contado}/${r.sistema}`, col:"#F59E0B", bg:"rgba(245,158,11,0.14)"};
+    return {lbl:"Pendiente", col:"rgba(255,255,255,0.45)", bg:"rgba(255,255,255,0.05)"};
+  }
 
   function beep(){
     try{
@@ -5909,72 +5925,93 @@ function LectorHID({onDetect, onClose, feedback, stats}){
       {/* Barra superior */}
       <div style={{flexShrink:0,display:"flex",alignItems:"center",justifyContent:"space-between",
         padding:"calc(env(safe-area-inset-top,0px) + 12px) 18px 12px",background:"rgba(0,0,0,0.35)"}}>
-        <span style={{fontSize:15,fontWeight:700,color:"#fff"}}>⚡ Verificación rápida — lector USB</span>
+        <div>
+          <div style={{fontSize:15,fontWeight:700,color:"#fff"}}>⚡ Verificación rápida — lector USB</div>
+          <div style={{fontSize:11,color:"rgba(255,255,255,0.55)",marginTop:1}}>{marcaNombre||"Todas las marcas"}</div>
+        </div>
         <button onClick={onClose} style={{
           background:"rgba(34,197,94,0.25)",border:"1px solid rgba(74,222,128,0.5)",
           borderRadius:9,padding:"7px 16px",color:"#fff",fontSize:14,fontWeight:700,
           cursor:"pointer"}}>✓ Finalizar</button>
       </div>
 
-      {/* HUD de progreso */}
-      {stats&&(
-        <div style={{display:"flex",justifyContent:"center",marginTop:14}}>
-          <div style={{display:"flex",gap:10,background:"rgba(0,0,0,0.4)",
-            border:"1px solid rgba(255,255,255,0.15)",borderRadius:999,padding:"7px 18px"}}>
-            <span style={{color:"#fff",fontSize:13,fontWeight:700}}>📦 {stats.unidades}</span>
-            <span style={{color:"rgba(255,255,255,0.35)"}}>·</span>
-            <span style={{color:"rgba(255,255,255,0.85)",fontSize:13}}>{stats.productos} producto{stats.productos!==1?"s":""}</span>
-          </div>
-        </div>
-      )}
-
-      {/* Zona central: input enfocado + estado */}
-      <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",
-        justifyContent:"center",padding:28,gap:22}}>
-        <div style={{fontSize:52}}>🔌</div>
-        <div style={{textAlign:"center",maxWidth:420}}>
-          <div style={{color:"#fff",fontSize:18,fontWeight:800,marginBottom:8}}>
-            Escanea con el lector conectado
-          </div>
-          <div style={{color:"rgba(255,255,255,0.6)",fontSize:13,lineHeight:1.5}}>
-            Apunta el lector de código de barras a cada prenda. Cada lectura suma 1 unidad
-            automáticamente. No necesitas tocar la pantalla.
-          </div>
-        </div>
-
+      {/* Input enfocado (captura el lector) + HUD */}
+      <div style={{flexShrink:0,padding:"12px 16px 10px",display:"flex",gap:10,alignItems:"center",
+        background:"rgba(0,0,0,0.2)"}}>
         <input ref={inputRef} value={buf} onChange={onChange} onKeyDown={onKeyDown}
           autoFocus inputMode="none" autoComplete="off" spellCheck={false}
-          placeholder="Esperando lectura…"
-          style={{width:"100%",maxWidth:420,padding:"16px 18px",borderRadius:14,
+          placeholder="🔌 Escanea con el lector…"
+          style={{flex:1,padding:"12px 14px",borderRadius:11,
             border:"1.5px solid rgba(255,255,255,0.25)",background:"rgba(255,255,255,0.06)",
-            color:"#fff",fontSize:17,fontFamily:"monospace",letterSpacing:1,textAlign:"center",
-            outline:"none"}}/>
-        <div style={{color:"rgba(255,255,255,0.4)",fontSize:11.5}}>
-          ¿No lee? Haz clic en el campo y vuelve a escanear. También puedes teclear el código y Enter.
-        </div>
+            color:"#fff",fontSize:15,fontFamily:"monospace",letterSpacing:1,outline:"none"}}/>
+        {stats&&(
+          <div style={{display:"flex",gap:8,background:"rgba(0,0,0,0.4)",
+            border:"1px solid rgba(255,255,255,0.15)",borderRadius:999,padding:"8px 14px",flexShrink:0}}>
+            <span style={{color:"#22C55E",fontSize:13,fontWeight:800}}>{completos}</span>
+            <span style={{color:"rgba(255,255,255,0.4)"}}>/</span>
+            <span style={{color:"rgba(255,255,255,0.85)",fontSize:13}}>{lista.length}</span>
+            <span style={{color:"rgba(255,255,255,0.35)"}}>·</span>
+            <span style={{color:"#F59E0B",fontSize:13}}>{pendientes} pend.</span>
+          </div>
+        )}
       </div>
 
-      {/* Flash de feedback */}
+      {/* Toast de feedback (no bloquea la lista) */}
       {flash&&(
-        <div style={{position:"absolute",inset:0,zIndex:9520,display:"flex",flexDirection:"column",
-          alignItems:"center",justifyContent:"center",gap:10,pointerEvents:"none",
-          background: flash.ok?"rgba(22,163,74,0.32)":"rgba(220,38,38,0.32)",
-          animation:"thFlashFade 1.1s ease-out forwards"}}>
-          <div style={{width:84,height:84,borderRadius:"50%",
-            background: flash.ok?"#16A34A":"#DC2626",display:"flex",alignItems:"center",
-            justifyContent:"center",fontSize:42,color:"#fff",boxShadow:"0 8px 28px rgba(0,0,0,0.35)",
-            animation:"thFlashPop .35s cubic-bezier(.34,1.56,.64,1)"}}>
-            {flash.ok?"✓":"✕"}
+        <div style={{flexShrink:0,margin:"0 16px 8px",padding:"10px 14px",borderRadius:11,
+          display:"flex",alignItems:"center",gap:10,
+          background: flash.ok?(flash.repetido?"rgba(245,158,11,0.18)":"rgba(34,197,94,0.18)"):"rgba(220,38,38,0.20)",
+          border:`1px solid ${flash.ok?(flash.repetido?"rgba(245,158,11,0.5)":"rgba(34,197,94,0.5)"):"rgba(220,38,38,0.5)"}`}}>
+          <span style={{fontSize:18}}>{flash.ok?(flash.repetido?"⚠":"✓"):"✕"}</span>
+          <div style={{minWidth:0}}>
+            <div style={{color:"#fff",fontSize:13.5,fontWeight:800,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{flash.title}</div>
+            {flash.sub&&<div style={{color:"rgba(255,255,255,0.8)",fontSize:11.5,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{flash.sub}</div>}
           </div>
-          <div style={{color:"#fff",fontSize:16,fontWeight:800,textAlign:"center",padding:"0 32px"}}>{flash.title}</div>
-          {flash.sub&&<div style={{color:"rgba(255,255,255,0.85)",fontSize:13,textAlign:"center",padding:"0 32px"}}>{flash.sub}</div>}
         </div>
       )}
 
-      <style>{`
-        @keyframes thFlashFade{0%{opacity:0} 12%{opacity:1} 70%{opacity:1} 100%{opacity:0}}
-        @keyframes thFlashPop{0%{transform:scale(.4);opacity:0} 60%{transform:scale(1.12);opacity:1} 100%{transform:scale(1)}}
-      `}</style>
+      {/* Lista de ítems de la marca — cruce en vivo */}
+      <div style={{flex:1,overflowY:"auto",padding:"0 12px 16px",WebkitOverflowScrolling:"touch"}}>
+        {lista.length===0
+          ? <div style={{color:"rgba(255,255,255,0.5)",fontSize:13,textAlign:"center",padding:"40px 20px"}}>
+              No hay productos con stock en sistema para esta selección.
+            </div>
+          : <div style={{display:"flex",flexDirection:"column",gap:6}}>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 44px 44px 96px",gap:0,padding:"4px 10px",
+                position:"sticky",top:0}}>
+                <span style={{fontSize:9,fontWeight:700,color:"rgba(255,255,255,0.4)",textTransform:"uppercase",letterSpacing:.8}}>Producto · Código</span>
+                <span style={{fontSize:9,fontWeight:700,color:"rgba(255,255,255,0.4)",textTransform:"uppercase",letterSpacing:.8,textAlign:"center"}}>Sist</span>
+                <span style={{fontSize:9,fontWeight:700,color:"rgba(255,255,255,0.4)",textTransform:"uppercase",letterSpacing:.8,textAlign:"center"}}>Cont</span>
+                <span style={{fontSize:9,fontWeight:700,color:"rgba(255,255,255,0.4)",textTransform:"uppercase",letterSpacing:.8,textAlign:"right"}}>Estado</span>
+              </div>
+              {lista.map(r=>{
+                const ef=estadoFila(r);
+                const hl=flash&&flash.code&&r.codigo===flash.code;
+                return (
+                  <div key={r.id} ref={el=>{ if(el) rowRefs.current[r.codigo]=el; }}
+                    style={{display:"grid",gridTemplateColumns:"1fr 44px 44px 96px",gap:0,alignItems:"center",
+                      padding:"9px 10px",borderRadius:10,
+                      background: hl?"rgba(255,255,255,0.16)":"rgba(255,255,255,0.04)",
+                      border:`1px solid ${hl?"rgba(255,255,255,0.4)":"rgba(255,255,255,0.07)"}`,
+                      transition:"background .25s"}}>
+                    <div style={{minWidth:0,paddingRight:8}}>
+                      <div style={{fontSize:12.5,fontWeight:700,color:"#fff",overflow:"hidden",
+                        textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{(r.nombre||"").toUpperCase()}</div>
+                      <div style={{fontFamily:"monospace",fontSize:10,color:"#C4A57B"}}>{r.codigo}</div>
+                    </div>
+                    <div style={{textAlign:"center",fontSize:14,color:"rgba(255,255,255,0.85)"}}>{r.sistema}</div>
+                    <div style={{textAlign:"center",fontSize:14,fontWeight:700,
+                      color: r.contado===0?"rgba(255,255,255,0.35)":"#fff"}}>{r.contado}</div>
+                    <div style={{textAlign:"right"}}>
+                      <span style={{display:"inline-block",fontSize:10,fontWeight:700,padding:"3px 8px",
+                        borderRadius:6,color:ef.col,background:ef.bg}}>{ef.lbl}</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+        }
+      </div>
     </div>
   );
 }
@@ -11752,18 +11789,46 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
     if(cant>0) flash(true, `+${cant} · ${(prod.nombre||"").toUpperCase()} (${prod.codigo})`);
   }
 
+  // Stock del sistema para un producto (base congelada + ajustes en curso)
+  function sistemaDe(p){
+    return Math.max(0,(p.stock||0)+(ventasAjuste[p.id]||0)+(cargasAjuste[p.id]||0));
+  }
+  // Suma 1 unidad respetando el stock del sistema. Si el mismo código se
+  // escanea más veces de las unidades que existen, NO suma (devuelve ok:false)
+  // para avisar "repetido sin más stock". `repetido` = ya se había escaneado.
+  function intentarContar(p){
+    const sistemaP=sistemaDe(p);
+    let res={ok:false,sistemaP,cantNueva:0,repetido:false};
+    setConteo(prev=>{
+      const ya=prev[p.id]||0;
+      if(ya+1>sistemaP){ res={ok:false,sistemaP,cantNueva:ya,repetido:ya>0}; return prev; }
+      res={ok:true,sistemaP,cantNueva:ya+1,repetido:ya>0};
+      return {...prev,[p.id]:ya+1};
+    });
+    return res;
+  }
+
   function buscarYAgregar(codigo){
     const c=(codigo||"").trim().toUpperCase().replace(/'/g,"-");
     if(!c) return;
     const cAlnum=c.replace(/[^A-Z0-9]/g,"");
     const p=baseInv.find(i=>i.codigo.toUpperCase()===c) || baseInv.find(i=>i.codigo.toUpperCase().replace(/[^A-Z0-9]/g,"")===cAlnum);
     if(!p){ flash(false, `Código "${c}" no encontrado en inventario`); return; }
-    if(!enAlcance(p)){ flash(false, `"${p.codigo}" es de ${p.marcaNombre||"otra marca"} — el cierre está filtrado por ${marcaSelNombre}`); return; }
-    agregar(p,1);
+    if(!enAlcance(p)){ flash(false, `"${p.codigo}" es de ${p.marcaNombre||"otra marca"} — la verificación está filtrada por ${marcaSelNombre}`); setCodManual(""); return; }
+    const r=intentarContar(p);
+    if(!r.ok){
+      flash(false, r.sistemaP<=1
+        ? `${p.codigo}: repetido · solo ${r.sistemaP} en sistema, ya escaneado (no se suma)`
+        : `${p.codigo}: repetido · ya contaste las ${r.sistemaP} unidades (no se suma)`);
+    } else {
+      flash(true, r.repetido
+        ? `Repetido OK · unidad ${r.cantNueva}/${r.sistemaP} · ${(p.nombre||"").toUpperCase()}`
+        : `+1 · ${(p.nombre||"").toUpperCase()} (${p.codigo})`);
+    }
     setCodManual("");
   }
 
-  // ── Cierre rápido: escaneo continuo, sin confirmaciones manuales ──
+  // ── Verificación rápida: escaneo continuo con lector USB ──
   function onDetectCierreRapido(codigo){
     const c=(codigo||"").trim().toUpperCase();
     const p=baseInv.find(i=>i.codigo.toUpperCase()===c);
@@ -11775,14 +11840,23 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
       setLiveFeedback({ts:Date.now(),ok:false,title:`Otra marca — fuera de la verificación de ${marcaSelNombre}`,sub:`${p.codigo} · ${p.marcaNombre||""}`});
       return;
     }
-    let cantNueva=1;
-    setConteo(prev=>{
-      cantNueva=(prev[p.id]||0)+1;
-      return {...prev,[p.id]:cantNueva};
-    });
-    setLiveFeedback({ts:Date.now(),ok:true,
+    const r=intentarContar(p);
+    if(!r.ok){
+      // Escaneo repetido sin más unidades en sistema → avisa y NO contabiliza
+      const motivo = r.sistemaP===0
+        ? "no figura con stock en sistema — no se contabiliza"
+        : r.sistemaP===1
+          ? "solo hay 1 unidad y ya fue escaneada — no se cuenta de nuevo"
+          : `ya contaste las ${r.sistemaP} unidades — repetido no contabilizado`;
+      setLiveFeedback({ts:Date.now(),ok:false,code:p.codigo,repetido:true,
+        title:`Repetido · ${(p.nombre||"").toUpperCase()}`, sub:`${p.codigo} · ${motivo}`});
+      return;
+    }
+    setLiveFeedback({ts:Date.now(),ok:true,code:p.codigo,repetido:r.repetido,
       title:(p.nombre||"").toUpperCase(),
-      sub:`${p.codigo} · contabilizado ×${cantNueva}`});
+      sub: r.repetido
+        ? `Repetido OK · unidad ${r.cantNueva} de ${r.sistemaP}`
+        : `${p.codigo} · contabilizado (1 de ${r.sistemaP})`});
   }
 
   function reiniciarConteo(){
@@ -11899,15 +11973,15 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
       return {...prev,[r.id]:nuevo};
     });
     if(nuevo===r.contado){
-      setLiveFeedback({ts:Date.now(),ok:true,
+      setLiveFeedback({ts:Date.now(),ok:true,code:r.codigo,
         title:`✓ Verificado · ${(r.nombre||"").toUpperCase()}`,
         sub:`Doble conteo coincide: ${nuevo} unidad${nuevo!==1?"es":""}`});
     }else if(nuevo>r.contado){
-      setLiveFeedback({ts:Date.now(),ok:false,
+      setLiveFeedback({ts:Date.now(),ok:false,code:r.codigo,repetido:true,
         title:`⚠ No coincide · ${(r.nombre||"").toUpperCase()}`,
         sub:`1ra pasada: ${r.contado} · 2da pasada: ${nuevo} — recontar`});
     }else{
-      setLiveFeedback({ts:Date.now(),ok:true,
+      setLiveFeedback({ts:Date.now(),ok:true,code:r.codigo,
         title:(r.nombre||"").toUpperCase(),
         sub:`Verificando… ${nuevo} de ${r.contado}`});
     }
@@ -12062,22 +12136,26 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
         <div style={{fontSize:13,color:"#C4A57B",fontWeight:700,fontFamily:FONT,flexShrink:0}}>→</div>
       </button>
 
-      {/* Overlay de escaneo continuo */}
+      {/* Overlay de verificación rápida (lector USB) — con lista de la marca y cruce en vivo */}
       {modoCierre && (
         <LectorHID
           onDetect={onDetectCierreRapido}
           feedback={liveFeedback}
           stats={{productos:itemsContados, unidades:unidadesContadas}}
+          rows={cruce}
+          marcaNombre={marcaSelec?`Solo ${marcaSelNombre}`:"Todas las marcas"}
           onClose={()=>setModoCierre(false)}
         />
       )}
 
-      {/* Overlay de verificación (2da pasada / doble conteo) — lector USB */}
+      {/* Overlay de doble conteo (2da pasada) — lector USB, solo discrepancias */}
       {modoVerif && (
         <LectorHID
           onDetect={onDetectVerificacion}
           feedback={liveFeedback}
           stats={{productos:verificadosCount, unidades:discrepancias.length}}
+          rows={discrepancias.map(d=>({id:d.id,codigo:d.codigo,nombre:d.nombre,sistema:d.contado,contado:verifConteo[d.id]||0}))}
+          marcaNombre={`Doble conteo${marcaSelec?` · ${marcaSelNombre}`:""}`}
           onClose={()=>setModoVerif(false)}
         />
       )}

@@ -27604,9 +27604,10 @@ Fecha: ${venta.fecha}`);
         }
       `));
   }
-  function LectorHID({ onDetect, onClose, feedback, stats }) {
+  function LectorHID({ onDetect, onClose, feedback, stats, rows, marcaNombre }) {
     const inputRef = (0, import_react.useRef)(null);
     const idleRef = (0, import_react.useRef)(null);
+    const rowRefs = (0, import_react.useRef)({});
     const [buf, setBuf] = (0, import_react.useState)("");
     const [flash, setFlash] = (0, import_react.useState)(null);
     (0, import_react.useEffect)(() => {
@@ -27623,9 +27624,25 @@ Fecha: ${venta.fecha}`);
     (0, import_react.useEffect)(() => {
       if (!feedback) return;
       setFlash(feedback);
-      const t = setTimeout(() => setFlash(null), 1100);
+      if (feedback.code) {
+        const el = rowRefs.current[feedback.code];
+        if (el) try {
+          el.scrollIntoView({ block: "nearest", behavior: "smooth" });
+        } catch (_) {
+        }
+      }
+      const t = setTimeout(() => setFlash(null), 2200);
       return () => clearTimeout(t);
     }, [feedback?.ts]);
+    const lista = (rows || []).slice().sort((a, b) => (a.codigo || "").localeCompare(b.codigo || ""));
+    const completos = lista.filter((r) => r.sistema > 0 && r.contado >= r.sistema).length;
+    const pendientes = lista.filter((r) => r.contado < r.sistema).length;
+    function estadoFila(r) {
+      if (r.contado > r.sistema) return { lbl: "Sobrante", col: "#3B82F6", bg: "rgba(59,130,246,0.14)" };
+      if (r.sistema > 0 && r.contado >= r.sistema) return { lbl: "Completo", col: "#22C55E", bg: "rgba(34,197,94,0.14)" };
+      if (r.contado > 0) return { lbl: `Parcial ${r.contado}/${r.sistema}`, col: "#F59E0B", bg: "rgba(245,158,11,0.14)" };
+      return { lbl: "Pendiente", col: "rgba(255,255,255,0.45)", bg: "rgba(255,255,255,0.05)" };
+    }
     function beep() {
       try {
         const ac = new (window.AudioContext || window.webkitAudioContext)();
@@ -27676,7 +27693,7 @@ Fecha: ${venta.fecha}`);
       justifyContent: "space-between",
       padding: "calc(env(safe-area-inset-top,0px) + 12px) 18px 12px",
       background: "rgba(0,0,0,0.35)"
-    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 15, fontWeight: 700, color: "#fff" } }, "\u26A1 Verificaci\xF3n r\xE1pida \u2014 lector USB"), /* @__PURE__ */ import_react.default.createElement("button", { onClick: onClose, style: {
+    } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 15, fontWeight: 700, color: "#fff" } }, "\u26A1 Verificaci\xF3n r\xE1pida \u2014 lector USB"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: "rgba(255,255,255,0.55)", marginTop: 1 } }, marcaNombre || "Todas las marcas")), /* @__PURE__ */ import_react.default.createElement("button", { onClick: onClose, style: {
       background: "rgba(34,197,94,0.25)",
       border: "1px solid rgba(74,222,128,0.5)",
       borderRadius: 9,
@@ -27685,22 +27702,14 @@ Fecha: ${venta.fecha}`);
       fontSize: 14,
       fontWeight: 700,
       cursor: "pointer"
-    } }, "\u2713 Finalizar")), stats && /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "center", marginTop: 14 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+    } }, "\u2713 Finalizar")), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      flexShrink: 0,
+      padding: "12px 16px 10px",
       display: "flex",
       gap: 10,
-      background: "rgba(0,0,0,0.4)",
-      border: "1px solid rgba(255,255,255,0.15)",
-      borderRadius: 999,
-      padding: "7px 18px"
-    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { color: "#fff", fontSize: 13, fontWeight: 700 } }, "\u{1F4E6} ", stats.unidades), /* @__PURE__ */ import_react.default.createElement("span", { style: { color: "rgba(255,255,255,0.35)" } }, "\xB7"), /* @__PURE__ */ import_react.default.createElement("span", { style: { color: "rgba(255,255,255,0.85)", fontSize: 13 } }, stats.productos, " producto", stats.productos !== 1 ? "s" : ""))), /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      flex: 1,
-      display: "flex",
-      flexDirection: "column",
       alignItems: "center",
-      justifyContent: "center",
-      padding: 28,
-      gap: 22
-    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 52 } }, "\u{1F50C}"), /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center", maxWidth: 420 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { color: "#fff", fontSize: 18, fontWeight: 800, marginBottom: 8 } }, "Escanea con el lector conectado"), /* @__PURE__ */ import_react.default.createElement("div", { style: { color: "rgba(255,255,255,0.6)", fontSize: 13, lineHeight: 1.5 } }, "Apunta el lector de c\xF3digo de barras a cada prenda. Cada lectura suma 1 unidad autom\xE1ticamente. No necesitas tocar la pantalla.")), /* @__PURE__ */ import_react.default.createElement(
+      background: "rgba(0,0,0,0.2)"
+    } }, /* @__PURE__ */ import_react.default.createElement(
       "input",
       {
         ref: inputRef,
@@ -27711,50 +27720,93 @@ Fecha: ${venta.fecha}`);
         inputMode: "none",
         autoComplete: "off",
         spellCheck: false,
-        placeholder: "Esperando lectura\u2026",
+        placeholder: "\u{1F50C} Escanea con el lector\u2026",
         style: {
-          width: "100%",
-          maxWidth: 420,
-          padding: "16px 18px",
-          borderRadius: 14,
+          flex: 1,
+          padding: "12px 14px",
+          borderRadius: 11,
           border: "1.5px solid rgba(255,255,255,0.25)",
           background: "rgba(255,255,255,0.06)",
           color: "#fff",
-          fontSize: 17,
+          fontSize: 15,
           fontFamily: "monospace",
           letterSpacing: 1,
-          textAlign: "center",
           outline: "none"
         }
       }
-    ), /* @__PURE__ */ import_react.default.createElement("div", { style: { color: "rgba(255,255,255,0.4)", fontSize: 11.5 } }, "\xBFNo lee? Haz clic en el campo y vuelve a escanear. Tambi\xE9n puedes teclear el c\xF3digo y Enter.")), flash && /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      position: "absolute",
-      inset: 0,
-      zIndex: 9520,
+    ), stats && /* @__PURE__ */ import_react.default.createElement("div", { style: {
       display: "flex",
-      flexDirection: "column",
+      gap: 8,
+      background: "rgba(0,0,0,0.4)",
+      border: "1px solid rgba(255,255,255,0.15)",
+      borderRadius: 999,
+      padding: "8px 14px",
+      flexShrink: 0
+    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { color: "#22C55E", fontSize: 13, fontWeight: 800 } }, completos), /* @__PURE__ */ import_react.default.createElement("span", { style: { color: "rgba(255,255,255,0.4)" } }, "/"), /* @__PURE__ */ import_react.default.createElement("span", { style: { color: "rgba(255,255,255,0.85)", fontSize: 13 } }, lista.length), /* @__PURE__ */ import_react.default.createElement("span", { style: { color: "rgba(255,255,255,0.35)" } }, "\xB7"), /* @__PURE__ */ import_react.default.createElement("span", { style: { color: "#F59E0B", fontSize: 13 } }, pendientes, " pend."))), flash && /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      flexShrink: 0,
+      margin: "0 16px 8px",
+      padding: "10px 14px",
+      borderRadius: 11,
+      display: "flex",
       alignItems: "center",
-      justifyContent: "center",
       gap: 10,
-      pointerEvents: "none",
-      background: flash.ok ? "rgba(22,163,74,0.32)" : "rgba(220,38,38,0.32)",
-      animation: "thFlashFade 1.1s ease-out forwards"
-    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      width: 84,
-      height: 84,
-      borderRadius: "50%",
-      background: flash.ok ? "#16A34A" : "#DC2626",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      fontSize: 42,
-      color: "#fff",
-      boxShadow: "0 8px 28px rgba(0,0,0,0.35)",
-      animation: "thFlashPop .35s cubic-bezier(.34,1.56,.64,1)"
-    } }, flash.ok ? "\u2713" : "\u2715"), /* @__PURE__ */ import_react.default.createElement("div", { style: { color: "#fff", fontSize: 16, fontWeight: 800, textAlign: "center", padding: "0 32px" } }, flash.title), flash.sub && /* @__PURE__ */ import_react.default.createElement("div", { style: { color: "rgba(255,255,255,0.85)", fontSize: 13, textAlign: "center", padding: "0 32px" } }, flash.sub)), /* @__PURE__ */ import_react.default.createElement("style", null, `
-        @keyframes thFlashFade{0%{opacity:0} 12%{opacity:1} 70%{opacity:1} 100%{opacity:0}}
-        @keyframes thFlashPop{0%{transform:scale(.4);opacity:0} 60%{transform:scale(1.12);opacity:1} 100%{transform:scale(1)}}
-      `));
+      background: flash.ok ? flash.repetido ? "rgba(245,158,11,0.18)" : "rgba(34,197,94,0.18)" : "rgba(220,38,38,0.20)",
+      border: `1px solid ${flash.ok ? flash.repetido ? "rgba(245,158,11,0.5)" : "rgba(34,197,94,0.5)" : "rgba(220,38,38,0.5)"}`
+    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 18 } }, flash.ok ? flash.repetido ? "\u26A0" : "\u2713" : "\u2715"), /* @__PURE__ */ import_react.default.createElement("div", { style: { minWidth: 0 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { color: "#fff", fontSize: 13.5, fontWeight: 800, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, flash.title), flash.sub && /* @__PURE__ */ import_react.default.createElement("div", { style: { color: "rgba(255,255,255,0.8)", fontSize: 11.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, flash.sub))), /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1, overflowY: "auto", padding: "0 12px 16px", WebkitOverflowScrolling: "touch" } }, lista.length === 0 ? /* @__PURE__ */ import_react.default.createElement("div", { style: { color: "rgba(255,255,255,0.5)", fontSize: 13, textAlign: "center", padding: "40px 20px" } }, "No hay productos con stock en sistema para esta selecci\xF3n.") : /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      display: "grid",
+      gridTemplateColumns: "1fr 44px 44px 96px",
+      gap: 0,
+      padding: "4px 10px",
+      position: "sticky",
+      top: 0
+    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 9, fontWeight: 700, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", letterSpacing: 0.8 } }, "Producto \xB7 C\xF3digo"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 9, fontWeight: 700, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", letterSpacing: 0.8, textAlign: "center" } }, "Sist"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 9, fontWeight: 700, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", letterSpacing: 0.8, textAlign: "center" } }, "Cont"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 9, fontWeight: 700, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", letterSpacing: 0.8, textAlign: "right" } }, "Estado")), lista.map((r) => {
+      const ef = estadoFila(r);
+      const hl = flash && flash.code && r.codigo === flash.code;
+      return /* @__PURE__ */ import_react.default.createElement(
+        "div",
+        {
+          key: r.id,
+          ref: (el) => {
+            if (el) rowRefs.current[r.codigo] = el;
+          },
+          style: {
+            display: "grid",
+            gridTemplateColumns: "1fr 44px 44px 96px",
+            gap: 0,
+            alignItems: "center",
+            padding: "9px 10px",
+            borderRadius: 10,
+            background: hl ? "rgba(255,255,255,0.16)" : "rgba(255,255,255,0.04)",
+            border: `1px solid ${hl ? "rgba(255,255,255,0.4)" : "rgba(255,255,255,0.07)"}`,
+            transition: "background .25s"
+          }
+        },
+        /* @__PURE__ */ import_react.default.createElement("div", { style: { minWidth: 0, paddingRight: 8 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+          fontSize: 12.5,
+          fontWeight: 700,
+          color: "#fff",
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          whiteSpace: "nowrap"
+        } }, (r.nombre || "").toUpperCase()), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontFamily: "monospace", fontSize: 10, color: "#C4A57B" } }, r.codigo)),
+        /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center", fontSize: 14, color: "rgba(255,255,255,0.85)" } }, r.sistema),
+        /* @__PURE__ */ import_react.default.createElement("div", { style: {
+          textAlign: "center",
+          fontSize: 14,
+          fontWeight: 700,
+          color: r.contado === 0 ? "rgba(255,255,255,0.35)" : "#fff"
+        } }, r.contado),
+        /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "right" } }, /* @__PURE__ */ import_react.default.createElement("span", { style: {
+          display: "inline-block",
+          fontSize: 10,
+          fontWeight: 700,
+          padding: "3px 8px",
+          borderRadius: 6,
+          color: ef.col,
+          background: ef.bg
+        } }, ef.lbl))
+      );
+    }))));
   }
   function ImportarExcelModal({ inv, onImportar, onClose }) {
     const isDesktop = useIsDesktop();
@@ -34180,6 +34232,23 @@ Fecha: ${venta.fecha}`);
       });
       if (cant > 0) flash(true, `+${cant} \xB7 ${(prod.nombre || "").toUpperCase()} (${prod.codigo})`);
     }
+    function sistemaDe(p) {
+      return Math.max(0, (p.stock || 0) + (ventasAjuste[p.id] || 0) + (cargasAjuste[p.id] || 0));
+    }
+    function intentarContar(p) {
+      const sistemaP = sistemaDe(p);
+      let res = { ok: false, sistemaP, cantNueva: 0, repetido: false };
+      setConteo((prev) => {
+        const ya = prev[p.id] || 0;
+        if (ya + 1 > sistemaP) {
+          res = { ok: false, sistemaP, cantNueva: ya, repetido: ya > 0 };
+          return prev;
+        }
+        res = { ok: true, sistemaP, cantNueva: ya + 1, repetido: ya > 0 };
+        return { ...prev, [p.id]: ya + 1 };
+      });
+      return res;
+    }
     function buscarYAgregar(codigo) {
       const c = (codigo || "").trim().toUpperCase().replace(/'/g, "-");
       if (!c) return;
@@ -34190,10 +34259,16 @@ Fecha: ${venta.fecha}`);
         return;
       }
       if (!enAlcance(p)) {
-        flash(false, `"${p.codigo}" es de ${p.marcaNombre || "otra marca"} \u2014 el cierre est\xE1 filtrado por ${marcaSelNombre}`);
+        flash(false, `"${p.codigo}" es de ${p.marcaNombre || "otra marca"} \u2014 la verificaci\xF3n est\xE1 filtrada por ${marcaSelNombre}`);
+        setCodManual("");
         return;
       }
-      agregar(p, 1);
+      const r = intentarContar(p);
+      if (!r.ok) {
+        flash(false, r.sistemaP <= 1 ? `${p.codigo}: repetido \xB7 solo ${r.sistemaP} en sistema, ya escaneado (no se suma)` : `${p.codigo}: repetido \xB7 ya contaste las ${r.sistemaP} unidades (no se suma)`);
+      } else {
+        flash(true, r.repetido ? `Repetido OK \xB7 unidad ${r.cantNueva}/${r.sistemaP} \xB7 ${(p.nombre || "").toUpperCase()}` : `+1 \xB7 ${(p.nombre || "").toUpperCase()} (${p.codigo})`);
+      }
       setCodManual("");
     }
     function onDetectCierreRapido(codigo) {
@@ -34207,16 +34282,26 @@ Fecha: ${venta.fecha}`);
         setLiveFeedback({ ts: Date.now(), ok: false, title: `Otra marca \u2014 fuera de la verificaci\xF3n de ${marcaSelNombre}`, sub: `${p.codigo} \xB7 ${p.marcaNombre || ""}` });
         return;
       }
-      let cantNueva = 1;
-      setConteo((prev) => {
-        cantNueva = (prev[p.id] || 0) + 1;
-        return { ...prev, [p.id]: cantNueva };
-      });
+      const r = intentarContar(p);
+      if (!r.ok) {
+        const motivo = r.sistemaP === 0 ? "no figura con stock en sistema \u2014 no se contabiliza" : r.sistemaP === 1 ? "solo hay 1 unidad y ya fue escaneada \u2014 no se cuenta de nuevo" : `ya contaste las ${r.sistemaP} unidades \u2014 repetido no contabilizado`;
+        setLiveFeedback({
+          ts: Date.now(),
+          ok: false,
+          code: p.codigo,
+          repetido: true,
+          title: `Repetido \xB7 ${(p.nombre || "").toUpperCase()}`,
+          sub: `${p.codigo} \xB7 ${motivo}`
+        });
+        return;
+      }
       setLiveFeedback({
         ts: Date.now(),
         ok: true,
+        code: p.codigo,
+        repetido: r.repetido,
         title: (p.nombre || "").toUpperCase(),
-        sub: `${p.codigo} \xB7 contabilizado \xD7${cantNueva}`
+        sub: r.repetido ? `Repetido OK \xB7 unidad ${r.cantNueva} de ${r.sistemaP}` : `${p.codigo} \xB7 contabilizado (1 de ${r.sistemaP})`
       });
     }
     function reiniciarConteo() {
@@ -34323,6 +34408,7 @@ Fecha: ${venta.fecha}`);
         setLiveFeedback({
           ts: Date.now(),
           ok: true,
+          code: r.codigo,
           title: `\u2713 Verificado \xB7 ${(r.nombre || "").toUpperCase()}`,
           sub: `Doble conteo coincide: ${nuevo} unidad${nuevo !== 1 ? "es" : ""}`
         });
@@ -34330,6 +34416,8 @@ Fecha: ${venta.fecha}`);
         setLiveFeedback({
           ts: Date.now(),
           ok: false,
+          code: r.codigo,
+          repetido: true,
           title: `\u26A0 No coincide \xB7 ${(r.nombre || "").toUpperCase()}`,
           sub: `1ra pasada: ${r.contado} \xB7 2da pasada: ${nuevo} \u2014 recontar`
         });
@@ -34337,6 +34425,7 @@ Fecha: ${venta.fecha}`);
         setLiveFeedback({
           ts: Date.now(),
           ok: true,
+          code: r.codigo,
           title: (r.nombre || "").toUpperCase(),
           sub: `Verificando\u2026 ${nuevo} de ${r.contado}`
         });
@@ -34538,6 +34627,8 @@ Base de inventario tomada: ${baseTs.toLocaleString("es-BO")}`)) return;
         onDetect: onDetectCierreRapido,
         feedback: liveFeedback,
         stats: { productos: itemsContados, unidades: unidadesContadas },
+        rows: cruce,
+        marcaNombre: marcaSelec ? `Solo ${marcaSelNombre}` : "Todas las marcas",
         onClose: () => setModoCierre(false)
       }
     ), modoVerif && /* @__PURE__ */ import_react.default.createElement(
@@ -34546,6 +34637,8 @@ Base de inventario tomada: ${baseTs.toLocaleString("es-BO")}`)) return;
         onDetect: onDetectVerificacion,
         feedback: liveFeedback,
         stats: { productos: verificadosCount, unidades: discrepancias.length },
+        rows: discrepancias.map((d) => ({ id: d.id, codigo: d.codigo, nombre: d.nombre, sistema: d.contado, contado: verifConteo[d.id] || 0 })),
+        marcaNombre: `Doble conteo${marcaSelec ? ` \xB7 ${marcaSelNombre}` : ""}`,
         onClose: () => setModoVerif(false)
       }
     ), /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 16 } }, /* @__PURE__ */ import_react.default.createElement(
