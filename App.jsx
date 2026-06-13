@@ -12985,10 +12985,10 @@ function InventarioPorMarca({inv, ventas, onRecibir, onBaja, onImportarExcel}){
             value={invBusq}
             onChange={e=>{
               const val=e.target.value.toUpperCase();
-              const ahora=Date.now();
-              const gap=ahora-(invBusqRef.current?._ultimoTs||0);
-              invBusqRef.current._ultimoTs=ahora;
-              if(invBusq && gap>500 && val.startsWith(invBusq)){
+              const added = val.length - invBusq.length;
+              // Lector de código de barras: pega varios caracteres de golpe
+              // sobre un valor previo -> reemplaza en vez de concatenar.
+              if(invBusq && added>1 && val.startsWith(invBusq)){
                 setInvBusq(val.slice(invBusq.length));
               } else {
                 setInvBusq(val);

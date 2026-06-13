@@ -35520,10 +35520,8 @@ Confirmas que el conteo de ${r.contado} unidad(es) es correcto.`)) {
         value: invBusq,
         onChange: (e) => {
           const val = e.target.value.toUpperCase();
-          const ahora = Date.now();
-          const gap = ahora - (invBusqRef.current?._ultimoTs || 0);
-          invBusqRef.current._ultimoTs = ahora;
-          if (invBusq && gap > 500 && val.startsWith(invBusq)) {
+          const added = val.length - invBusq.length;
+          if (invBusq && added > 1 && val.startsWith(invBusq)) {
             setInvBusq(val.slice(invBusq.length));
           } else {
             setInvBusq(val);
