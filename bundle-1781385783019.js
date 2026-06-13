@@ -35430,6 +35430,7 @@ Confirmas que el conteo de ${r.contado} unidad(es) es correcto.`)) {
       "input",
       {
         ref: invBusqRef,
+        autoFocus: true,
         value: invBusq,
         onChange: (e) => {
           const val = e.target.value.toUpperCase();

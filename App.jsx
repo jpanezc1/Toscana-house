@@ -12915,6 +12915,7 @@ function InventarioPorMarca({inv, ventas, onRecibir, onBaja, onImportarExcel}){
           <span style={{position:"absolute",left:11,top:"50%",transform:"translateY(-50%)",fontSize:13,color:C.label3}}>⌕</span>
           <input
             ref={invBusqRef}
+            autoFocus
             value={invBusq}
             onChange={e=>{
               const val=e.target.value.toUpperCase();
