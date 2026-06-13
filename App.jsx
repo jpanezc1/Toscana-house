@@ -12829,6 +12829,7 @@ function InventarioPorMarca({inv, ventas, onRecibir, onBaja, onImportarExcel}){
   // null = "TODOS"
   var _hN149 = useState(null); var marcaSelec = _hN149[0]; var setMarcaSelec = _hN149[1];;
   var _hInvBq = useState(""); var invBusq = _hInvBq[0]; var setInvBusq = _hInvBq[1];;
+  const invBusqRef = useRef(null);
   var _hInvFd = useState(""); var invFechaDesde = _hInvFd[0]; var setInvFechaDesde = _hInvFd[1];;
   var _hInvFh = useState(""); var invFechaHasta = _hInvFh[0]; var setInvFechaHasta = _hInvFh[1];;
   const marca = marcaSelec ? MARCAS.find(m=>m.id===marcaSelec) : null;
@@ -12913,6 +12914,7 @@ function InventarioPorMarca({inv, ventas, onRecibir, onBaja, onImportarExcel}){
         <div style={{flex:2,minWidth:180,position:"relative"}}>
           <span style={{position:"absolute",left:11,top:"50%",transform:"translateY(-50%)",fontSize:13,color:C.label3}}>⌕</span>
           <input
+            ref={invBusqRef}
             value={invBusq}
             onChange={e=>setInvBusq(e.target.value.toUpperCase())}
             placeholder="Buscar código de barras, nombre o categoría en TODAS las marcas…"
@@ -12923,7 +12925,7 @@ function InventarioPorMarca({inv, ventas, onRecibir, onBaja, onImportarExcel}){
               transition:"border-color .15s,box-shadow .15s"}}
           />
           {invBusq&&(
-            <button onClick={()=>setInvBusq("")} title="Borrar búsqueda"
+            <button onClick={()=>{setInvBusq("");invBusqRef.current?.focus();}} title="Borrar búsqueda"
               style={{position:"absolute",right:8,top:"50%",transform:"translateY(-50%)",
                 width:22,height:22,borderRadius:"50%",border:"none",cursor:"pointer",
                 background:C.sep,color:C.label2,fontSize:13,lineHeight:1,

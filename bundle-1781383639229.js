@@ -35334,6 +35334,7 @@ Confirmas que el conteo de ${r.contado} unidad(es) es correcto.`)) {
     var invBusq = _hInvBq[0];
     var setInvBusq = _hInvBq[1];
     ;
+    const invBusqRef = (0, import_react.useRef)(null);
     var _hInvFd = (0, import_react.useState)("");
     var invFechaDesde = _hInvFd[0];
     var setInvFechaDesde = _hInvFd[1];
@@ -35428,6 +35429,7 @@ Confirmas que el conteo de ${r.contado} unidad(es) es correcto.`)) {
     }))), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 2, minWidth: 180, position: "relative" } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { position: "absolute", left: 11, top: "50%", transform: "translateY(-50%)", fontSize: 13, color: C.label3 } }, "\u2315"), /* @__PURE__ */ import_react.default.createElement(
       "input",
       {
+        ref: invBusqRef,
         value: invBusq,
         onChange: (e) => setInvBusq(e.target.value.toUpperCase()),
         placeholder: "Buscar c\xF3digo de barras, nombre o categor\xEDa en TODAS las marcas\u2026",
@@ -35449,7 +35451,10 @@ Confirmas que el conteo de ${r.contado} unidad(es) es correcto.`)) {
     ), invBusq && /* @__PURE__ */ import_react.default.createElement(
       "button",
       {
-        onClick: () => setInvBusq(""),
+        onClick: () => {
+          setInvBusq("");
+          invBusqRef.current?.focus();
+        },
         title: "Borrar b\xFAsqueda",
         style: {
           position: "absolute",
