@@ -12914,12 +12914,19 @@ function InventarioPorMarca({inv, ventas, onRecibir, onBaja, onImportarExcel}){
             value={invBusq}
             onChange={e=>setInvBusq(e.target.value.toUpperCase())}
             placeholder="Buscar código de barras, nombre o categoría en TODAS las marcas…"
-            style={{width:"100%",padding:"10px 12px 10px 32px",border:`1px solid ${invBusq?C.gold:C.sep}`,
+            style={{width:"100%",padding:`10px ${invBusq?32:12}px 10px 32px`,border:`1px solid ${invBusq?C.gold:C.sep}`,
               borderRadius:9,background:C.bg1,fontSize:13,color:C.label,
               fontFamily:FONT_UI,outline:"none",boxSizing:"border-box",
               boxShadow:invBusq?`0 0 0 3px ${C.gold}14`:"none",
               transition:"border-color .15s,box-shadow .15s"}}
           />
+          {invBusq&&(
+            <button onClick={()=>setInvBusq("")} title="Borrar búsqueda"
+              style={{position:"absolute",right:8,top:"50%",transform:"translateY(-50%)",
+                width:22,height:22,borderRadius:"50%",border:"none",cursor:"pointer",
+                background:C.sep,color:C.label2,fontSize:13,lineHeight:1,
+                display:"flex",alignItems:"center",justifyContent:"center",padding:0}}>✕</button>
+          )}
         </div>
         <input type="date" value={invFechaDesde} onChange={e=>setInvFechaDesde(e.target.value)}
           title="Desde"
