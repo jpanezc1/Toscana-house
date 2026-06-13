@@ -2239,7 +2239,7 @@ async function exportAuditoriaExcel(aud){
   const marcaNombre = aud.marcaId ? (MARCAS.find(m=>m.id===aud.marcaId)?.nombre || "—") : "Todas las marcas";
 
   const rows = [
-    [`TOSCANA HOUSE — CIERRE DE INVENTARIO`, ...Array(NC-1).fill("")],
+    [`TOSCANA HOUSE — VERIFICACIÓN DE INVENTARIO`, ...Array(NC-1).fill("")],
     [`${MESES[aud.mes]} ${aud.anio} · ${marcaNombre}`, ...Array(NC-1).fill("")],
     [`Generado: ${aud.fecha} ${aud.hora||""} · Responsable: ${aud.usuario||"—"}`, ...Array(NC-1).fill("")],
     [],
@@ -2253,10 +2253,10 @@ async function exportAuditoriaExcel(aud){
 
   // ── Resumen ───────────────────────────────────────────────────
   const rSeccionResumen = rows.length;
-  rows.push(["RESUMEN DEL CIERRE", ...Array(NC-1).fill("")]);
+  rows.push(["RESUMEN DE LA VERIFICACIÓN", ...Array(NC-1).fill("")]);
 
   const resumen = [
-    ["Productos auditados",            aud.totalProductos],
+    ["Productos verificados",          aud.totalProductos],
     ["Coinciden",                      aud.ok],
     ["Faltantes (posible fuga)",       aud.faltantes],
     ["Sobrantes",                      aud.sobrantes],
@@ -2317,10 +2317,10 @@ async function exportAuditoriaExcel(aud){
   S(ws,rValorSobrante,NC-1,sNeto("1E5C3A",GRBG));
 
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "Cierre Inventario");
+  XLSX.utils.book_append_sheet(wb, ws, "Verificacion Inventario");
   const buf  = XLSX.write(wb, {bookType:"xlsx", type:"array"});
   const blob = new Blob([buf], {type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
-  descargarArchivo(blob, `TH_CierreInventario_${MESES[aud.mes]}_${aud.anio}_${aud.fecha.replace(/\//g,"-")}.xlsx`);
+  descargarArchivo(blob, `TH_VerificacionInventario_${marcaNombre.replace(/[^A-Za-z0-9]/g,"")}_${MESES[aud.mes]}_${aud.anio}_${aud.fecha.replace(/\//g,"-")}.xlsx`);
 }
 
 // ── Exportar trazabilidad de cargas a inventario ──────────────────────────
@@ -5651,7 +5651,7 @@ function CameraScanner({onDetect, onClose, continuous, feedback, stats}){
         padding:"calc(env(safe-area-inset-top,0px) + 10px) 16px 10px",
         background:"rgba(0,0,0,0.85)"}}>
         <span style={{fontSize:15,fontWeight:700,color:"#fff"}}>
-          {continuous?"⚡ Cierre rápido — escaneo continuo"
+          {continuous?"⚡ Verificación rápida — escaneo continuo"
            :modo==="live"&&liveStatus==="activo"?"📷 Apunta al código"
            :modo==="leyendo"?"⏳ Leyendo…"
            :"📷 Escanear código"}
@@ -9901,7 +9901,7 @@ function App(){
     {id:"pos",           icon:"⊕", label:"Caja"},
     {id:"ventas",        icon:"◈", label:"Ventas"},
     {id:"inventario",    icon:"◫", label:"Inventario"},
-    {id:"auditoria",     icon:"⌖", label:"Auditoría"},
+    {id:"auditoria",     icon:"⌖", label:"Verificación"},
     {id:"cargas",        icon:"🧾", label:"Cargas"},
     {id:"marcas",        icon:"◆", label:"Marcas"},
     {id:"liquidaciones", icon:"◎", label:"Liquidar"},
@@ -11632,7 +11632,7 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
       return;
     }
     if(!enAlcance(p)){
-      setLiveFeedback({ts:Date.now(),ok:false,title:`Otra marca — fuera del cierre de ${marcaSelNombre}`,sub:`${p.codigo} · ${p.marcaNombre||""}`});
+      setLiveFeedback({ts:Date.now(),ok:false,title:`Otra marca — fuera de la verificación de ${marcaSelNombre}`,sub:`${p.codigo} · ${p.marcaNombre||""}`});
       return;
     }
     let cantNueva=1;
@@ -11780,7 +11780,7 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
       setVista("verificacion");
       return;
     }
-    if(!window.confirm(`¿Confirmar el cierre de inventario de ${MESES[mes]} ${anio}?\n\nAlcance: ${marcaSelec?`Solo ${marcaSelNombre}`:"Todas las marcas"}\n${cruce.length} productos auditados · ${faltantesFinal.length} faltante(s) · ${sobrantesFinal.length} sobrante(s)\n\nBase de inventario tomada: ${baseTs.toLocaleString("es-BO")}`)) return;
+    if(!window.confirm(`¿Guardar esta verificación de inventario de ${MESES[mes]} ${anio}?\n\nAlcance: ${marcaSelec?`Solo ${marcaSelNombre}`:"Todas las marcas"}\n${cruce.length} productos verificados · ${faltantesFinal.length} faltante(s) · ${sobrantesFinal.length} sobrante(s)\n\nEs solo un cruce de control: NO modifica el stock ni cierra contabilidad.\nBase de inventario tomada: ${baseTs.toLocaleString("es-BO")}`)) return;
     const aud = {
       id:`AUD-${MK}-${Date.now()}`, mk:MK, mes, anio, fecha:hoy(), hora:hora(),
       usuario:user?.nombre||"—", marcaId:marcaSelec,
@@ -11797,7 +11797,7 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
     // sistema vs escaneado, con faltantes/sobrantes marcados)
     try{ exportAuditoriaExcel(aud); }catch(e){ console.error("Export cierre:",e); }
     setConteo({}); setVerifConteo({}); setManualVerif({});
-    flash(true,"✓ Cierre guardado · Excel generado");
+    flash(true,"✓ Verificación guardada · Excel generado");
     setVista("historial");
   }
 
@@ -11814,11 +11814,12 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
         border:`1px solid ${C.sep}`,boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}>
         <div style={{fontSize:16,fontWeight:700,color:C.label,fontFamily:FONT,marginBottom:6,
           display:"flex",alignItems:"center",gap:8}}>
-          <span style={{fontSize:20}}>⌖</span> Cierre de Inventario · {MESES[mes]} {anio}{marcaSelec?` · Solo ${marcaSelNombre}`:""}
+          <span style={{fontSize:20}}>⌖</span> Verificación de Inventario · {MESES[mes]} {anio}{marcaSelec?` · Solo ${marcaSelNombre}`:""}
         </div>
         <div style={{fontSize:12.5,color:C.label3,fontFamily:FONT,lineHeight:1.5}}>
-          Escanea (o ingresa el código de) cada producto físico en tienda. La app cruza el conteo
-          con el stock del sistema y señala faltantes (posible fuga) o sobrantes.
+          Herramienta de verificación: escanea (o ingresa el código de) cada producto físico y la app
+          lo cruza con el stock del sistema para detectar faltantes (posible fuga) o sobrantes.
+          Es un simulador de control — <b style={{color:C.label2}}>no cierra contabilidad ni modifica el stock</b>.
         </div>
         <div style={{marginTop:10,display:"flex",alignItems:"center",gap:6,
           padding:"7px 10px",borderRadius:10,background:C.bg2,border:`1px solid ${C.sep}`}}>
@@ -11856,7 +11857,7 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
         border:`1px solid ${marcaSelec?MARCAS.find(m=>m.id===marcaSelec)?.color+"66":C.sep}`}}>
         <div style={{fontSize:10,fontWeight:700,color:C.label3,textTransform:"uppercase",
           letterSpacing:.8,marginBottom:8,paddingLeft:2,display:"flex",justifyContent:"space-between"}}>
-          <span>Alcance del cierre</span>
+          <span>Alcance de la verificación</span>
           <span style={{color:marcaSelec?MARCAS.find(m=>m.id===marcaSelec)?.color:C.label2,fontWeight:800}}>
             {marcaSelec?`Solo ${marcaSelNombre}`:"Todas las marcas"}
           </span>
@@ -11912,7 +11913,7 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
           display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>⚡</div>
         <div style={{flex:1,minWidth:0}}>
           <div style={{fontSize:14.5,fontWeight:800,color:"#fff",fontFamily:FONT,letterSpacing:".01em"}}>
-            Iniciar Cierre Rápido
+            Iniciar Verificación Rápida
           </div>
           <div style={{fontSize:11.5,color:"rgba(255,255,255,0.65)",fontFamily:FONT,marginTop:2}}>
             Escaneo continuo — apunta y sigue, sin tocar la pantalla
@@ -11947,7 +11948,7 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
           options={[
             {value:"conteo",   label:`Conteo${itemsContados?` (${itemsContados})`:""}`},
             {value:"cruce",    label:"Cruce"},
-            {value:"verificacion", label:`Verificación${discrepancias.length?` (${verificadosCount}/${discrepancias.length})`:""}`},
+            {value:"verificacion", label:`Doble conteo${discrepancias.length?` (${verificadosCount}/${discrepancias.length})`:""}`},
             {value:"historial",label:`Historial${auditorias.length?` (${auditorias.length})`:""}`},
           ]}
           value={vista} onChange={setVista}
@@ -12160,7 +12161,7 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
                 sistema:r.sistema,contado:r.contado,diferencia:r.diferencia,estado:r.estado,precio:r.precio})),
             })} variant="fill" full icon="⬇" disabled={cruceContados.length===0}>Exportar Excel</IOSBtn>
             <IOSBtn onPress={confirmarCierre} variant="success" full icon="✓" disabled={itemsContados===0||!todoVerificado}>
-              {todoVerificado ? "Confirmar Cierre de Inventario" : `Verificar ${discrepancias.length-verificadosCount} discrepancia(s) primero`}
+              {todoVerificado ? "Guardar Verificación y Generar Excel" : `Revisa ${discrepancias.length-verificadosCount} discrepancia(s) primero`}
             </IOSBtn>
           </div>
         </div>
@@ -12249,8 +12250,8 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
       {/* ── HISTORIAL ── */}
       {vista==="historial" && (
         auditorias.length===0
-          ? <EmptyState icon="🗂" title="Sin cierres de inventario registrados"
-              sub="Cuando confirmes un cierre, aparecerá aquí con su resumen"/>
+          ? <EmptyState icon="🗂" title="Sin verificaciones de inventario registradas"
+              sub="Cuando guardes una verificación, aparecerá aquí con su resumen"/>
           : <div style={{display:"flex",flexDirection:"column",gap:10}}>
               {auditorias.map(a=>{
                 const marcaNombre = a.marcaId ? (MARCAS.find(m=>m.id===a.marcaId)?.nombre||"—") : "Todas las marcas";

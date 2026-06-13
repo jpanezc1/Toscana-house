@@ -23855,7 +23855,7 @@
     const HEAD = ["C\xF3digo", "Producto", "Marca", "Sistema", "Contado", "Diferencia", "Estado"];
     const marcaNombre = aud.marcaId ? MARCAS.find((m) => m.id === aud.marcaId)?.nombre || "\u2014" : "Todas las marcas";
     const rows = [
-      [`TOSCANA HOUSE \u2014 CIERRE DE INVENTARIO`, ...Array(NC - 1).fill("")],
+      [`TOSCANA HOUSE \u2014 VERIFICACI\xD3N DE INVENTARIO`, ...Array(NC - 1).fill("")],
       [`${MESES[aud.mes]} ${aud.anio} \xB7 ${marcaNombre}`, ...Array(NC - 1).fill("")],
       [`Generado: ${aud.fecha} ${aud.hora || ""} \xB7 Responsable: ${aud.usuario || "\u2014"}`, ...Array(NC - 1).fill("")],
       [],
@@ -23867,9 +23867,9 @@
     const rItemsStart = 5;
     const rItemsEnd = rItemsStart + aud.detalle.length - 1;
     const rSeccionResumen = rows.length;
-    rows.push(["RESUMEN DEL CIERRE", ...Array(NC - 1).fill("")]);
+    rows.push(["RESUMEN DE LA VERIFICACI\xD3N", ...Array(NC - 1).fill("")]);
     const resumen = [
-      ["Productos auditados", aud.totalProductos],
+      ["Productos verificados", aud.totalProductos],
       ["Coinciden", aud.ok],
       ["Faltantes (posible fuga)", aud.faltantes],
       ["Sobrantes", aud.sobrantes]
@@ -23931,10 +23931,10 @@
     S(ws, rValorSobrante, 0, sNetoLabel(GRBG));
     S(ws, rValorSobrante, NC - 1, sNeto("1E5C3A", GRBG));
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Cierre Inventario");
+    XLSX.utils.book_append_sheet(wb, ws, "Verificacion Inventario");
     const buf = XLSX.write(wb, { bookType: "xlsx", type: "array" });
     const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
-    descargarArchivo(blob, `TH_CierreInventario_${MESES[aud.mes]}_${aud.anio}_${aud.fecha.replace(/\//g, "-")}.xlsx`);
+    descargarArchivo(blob, `TH_VerificacionInventario_${marcaNombre.replace(/[^A-Za-z0-9]/g, "")}_${MESES[aud.mes]}_${aud.anio}_${aud.fecha.replace(/\//g, "-")}.xlsx`);
   }
   async function exportCargasExcel(cargas, marcas) {
     const XLSX = await loadXLSX();
@@ -27415,7 +27415,7 @@ Fecha: ${venta.fecha}`);
       justifyContent: "space-between",
       padding: "calc(env(safe-area-inset-top,0px) + 10px) 16px 10px",
       background: "rgba(0,0,0,0.85)"
-    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 15, fontWeight: 700, color: "#fff" } }, continuous ? "\u26A1 Cierre r\xE1pido \u2014 escaneo continuo" : modo === "live" && liveStatus === "activo" ? "\u{1F4F7} Apunta al c\xF3digo" : modo === "leyendo" ? "\u23F3 Leyendo\u2026" : "\u{1F4F7} Escanear c\xF3digo"), /* @__PURE__ */ import_react.default.createElement("button", { onClick: cerrar, style: {
+    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 15, fontWeight: 700, color: "#fff" } }, continuous ? "\u26A1 Verificaci\xF3n r\xE1pida \u2014 escaneo continuo" : modo === "live" && liveStatus === "activo" ? "\u{1F4F7} Apunta al c\xF3digo" : modo === "leyendo" ? "\u23F3 Leyendo\u2026" : "\u{1F4F7} Escanear c\xF3digo"), /* @__PURE__ */ import_react.default.createElement("button", { onClick: cerrar, style: {
       background: continuous ? "rgba(34,197,94,0.25)" : "rgba(255,255,255,0.15)",
       border: continuous ? "1px solid rgba(74,222,128,0.5)" : "1px solid rgba(255,255,255,0.3)",
       borderRadius: 9,
@@ -32103,7 +32103,7 @@ Fecha: ${venta.fecha}`);
       { id: "pos", icon: "\u2295", label: "Caja" },
       { id: "ventas", icon: "\u25C8", label: "Ventas" },
       { id: "inventario", icon: "\u25EB", label: "Inventario" },
-      { id: "auditoria", icon: "\u2316", label: "Auditor\xEDa" },
+      { id: "auditoria", icon: "\u2316", label: "Verificaci\xF3n" },
       { id: "cargas", icon: "\u{1F9FE}", label: "Cargas" },
       { id: "marcas", icon: "\u25C6", label: "Marcas" },
       { id: "liquidaciones", icon: "\u25CE", label: "Liquidar" },
@@ -34052,7 +34052,7 @@ Fecha: ${venta.fecha}`);
         return;
       }
       if (!enAlcance(p)) {
-        setLiveFeedback({ ts: Date.now(), ok: false, title: `Otra marca \u2014 fuera del cierre de ${marcaSelNombre}`, sub: `${p.codigo} \xB7 ${p.marcaNombre || ""}` });
+        setLiveFeedback({ ts: Date.now(), ok: false, title: `Otra marca \u2014 fuera de la verificaci\xF3n de ${marcaSelNombre}`, sub: `${p.codigo} \xB7 ${p.marcaNombre || ""}` });
         return;
       }
       let cantNueva = 1;
@@ -34200,11 +34200,12 @@ Fecha: ${venta.fecha}`);
         setVista("verificacion");
         return;
       }
-      if (!window.confirm(`\xBFConfirmar el cierre de inventario de ${MESES[mes]} ${anio}?
+      if (!window.confirm(`\xBFGuardar esta verificaci\xF3n de inventario de ${MESES[mes]} ${anio}?
 
 Alcance: ${marcaSelec ? `Solo ${marcaSelNombre}` : "Todas las marcas"}
-${cruce.length} productos auditados \xB7 ${faltantesFinal.length} faltante(s) \xB7 ${sobrantesFinal.length} sobrante(s)
+${cruce.length} productos verificados \xB7 ${faltantesFinal.length} faltante(s) \xB7 ${sobrantesFinal.length} sobrante(s)
 
+Es solo un cruce de control: NO modifica el stock ni cierra contabilidad.
 Base de inventario tomada: ${baseTs.toLocaleString("es-BO")}`)) return;
       const aud = {
         id: `AUD-${MK}-${Date.now()}`,
@@ -34243,7 +34244,7 @@ Base de inventario tomada: ${baseTs.toLocaleString("es-BO")}`)) return;
       setConteo({});
       setVerifConteo({});
       setManualVerif({});
-      flash(true, "\u2713 Cierre guardado \xB7 Excel generado");
+      flash(true, "\u2713 Verificaci\xF3n guardada \xB7 Excel generado");
       setVista("historial");
     }
     const ESTADO_INFO = {
@@ -34267,7 +34268,7 @@ Base de inventario tomada: ${baseTs.toLocaleString("es-BO")}`)) return;
       display: "flex",
       alignItems: "center",
       gap: 8
-    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 20 } }, "\u2316"), " Cierre de Inventario \xB7 ", MESES[mes], " ", anio, marcaSelec ? ` \xB7 Solo ${marcaSelNombre}` : ""), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12.5, color: C.label3, fontFamily: FONT, lineHeight: 1.5 } }, "Escanea (o ingresa el c\xF3digo de) cada producto f\xEDsico en tienda. La app cruza el conteo con el stock del sistema y se\xF1ala faltantes (posible fuga) o sobrantes."), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 20 } }, "\u2316"), " Verificaci\xF3n de Inventario \xB7 ", MESES[mes], " ", anio, marcaSelec ? ` \xB7 Solo ${marcaSelNombre}` : ""), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12.5, color: C.label3, fontFamily: FONT, lineHeight: 1.5 } }, "Herramienta de verificaci\xF3n: escanea (o ingresa el c\xF3digo de) cada producto f\xEDsico y la app lo cruza con el stock del sistema para detectar faltantes (posible fuga) o sobrantes. Es un simulador de control \u2014 ", /* @__PURE__ */ import_react.default.createElement("b", { style: { color: C.label2 } }, "no cierra contabilidad ni modifica el stock"), "."), /* @__PURE__ */ import_react.default.createElement("div", { style: {
       marginTop: 10,
       display: "flex",
       alignItems: "center",
@@ -34310,7 +34311,7 @@ Base de inventario tomada: ${baseTs.toLocaleString("es-BO")}`)) return;
       paddingLeft: 2,
       display: "flex",
       justifyContent: "space-between"
-    } }, /* @__PURE__ */ import_react.default.createElement("span", null, "Alcance del cierre"), /* @__PURE__ */ import_react.default.createElement("span", { style: { color: marcaSelec ? MARCAS.find((m) => m.id === marcaSelec)?.color : C.label2, fontWeight: 800 } }, marcaSelec ? `Solo ${marcaSelNombre}` : "Todas las marcas")), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+    } }, /* @__PURE__ */ import_react.default.createElement("span", null, "Alcance de la verificaci\xF3n"), /* @__PURE__ */ import_react.default.createElement("span", { style: { color: marcaSelec ? MARCAS.find((m) => m.id === marcaSelec)?.color : C.label2, fontWeight: 800 } }, marcaSelec ? `Solo ${marcaSelNombre}` : "Todas las marcas")), /* @__PURE__ */ import_react.default.createElement("div", { style: {
       display: "flex",
       gap: 6,
       overflowX: "auto",
@@ -34379,7 +34380,7 @@ Base de inventario tomada: ${baseTs.toLocaleString("es-BO")}`)) return;
       alignItems: "center",
       justifyContent: "center",
       fontSize: 22
-    } }, "\u26A1"), /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 14.5, fontWeight: 800, color: "#fff", fontFamily: FONT, letterSpacing: ".01em" } }, "Iniciar Cierre R\xE1pido"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11.5, color: "rgba(255,255,255,0.65)", fontFamily: FONT, marginTop: 2 } }, "Escaneo continuo \u2014 apunta y sigue, sin tocar la pantalla")), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: "#C4A57B", fontWeight: 700, fontFamily: FONT, flexShrink: 0 } }, "\u2192")), modoCierre && /* @__PURE__ */ import_react.default.createElement(
+    } }, "\u26A1"), /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 14.5, fontWeight: 800, color: "#fff", fontFamily: FONT, letterSpacing: ".01em" } }, "Iniciar Verificaci\xF3n R\xE1pida"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11.5, color: "rgba(255,255,255,0.65)", fontFamily: FONT, marginTop: 2 } }, "Escaneo continuo \u2014 apunta y sigue, sin tocar la pantalla")), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: "#C4A57B", fontWeight: 700, fontFamily: FONT, flexShrink: 0 } }, "\u2192")), modoCierre && /* @__PURE__ */ import_react.default.createElement(
       CameraScanner,
       {
         continuous: true,
@@ -34403,7 +34404,7 @@ Base de inventario tomada: ${baseTs.toLocaleString("es-BO")}`)) return;
         options: [
           { value: "conteo", label: `Conteo${itemsContados ? ` (${itemsContados})` : ""}` },
           { value: "cruce", label: "Cruce" },
-          { value: "verificacion", label: `Verificaci\xF3n${discrepancias.length ? ` (${verificadosCount}/${discrepancias.length})` : ""}` },
+          { value: "verificacion", label: `Doble conteo${discrepancias.length ? ` (${verificadosCount}/${discrepancias.length})` : ""}` },
           { value: "historial", label: `Historial${auditorias.length ? ` (${auditorias.length})` : ""}` }
         ],
         value: vista,
@@ -34649,7 +34650,7 @@ Base de inventario tomada: ${baseTs.toLocaleString("es-BO")}`)) return;
         estado: r.estado,
         precio: r.precio
       }))
-    }), variant: "fill", full: true, icon: "\u2B07", disabled: cruceContados.length === 0 }, "Exportar Excel"), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: confirmarCierre, variant: "success", full: true, icon: "\u2713", disabled: itemsContados === 0 || !todoVerificado }, todoVerificado ? "Confirmar Cierre de Inventario" : `Verificar ${discrepancias.length - verificadosCount} discrepancia(s) primero`))), vista === "verificacion" && /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 14 } }, /* @__PURE__ */ import_react.default.createElement(StatCard, { icon: "\u{1F501}", label: "Discrepancias", value: discrepancias.length, color: C.red, compact: isDesktop }), /* @__PURE__ */ import_react.default.createElement(StatCard, { icon: "\u2713", label: "Verificadas", value: verificadosCount, color: C.green, compact: isDesktop })), discrepancias.length === 0 ? /* @__PURE__ */ import_react.default.createElement(
+    }), variant: "fill", full: true, icon: "\u2B07", disabled: cruceContados.length === 0 }, "Exportar Excel"), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: confirmarCierre, variant: "success", full: true, icon: "\u2713", disabled: itemsContados === 0 || !todoVerificado }, todoVerificado ? "Guardar Verificaci\xF3n y Generar Excel" : `Revisa ${discrepancias.length - verificadosCount} discrepancia(s) primero`))), vista === "verificacion" && /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 14 } }, /* @__PURE__ */ import_react.default.createElement(StatCard, { icon: "\u{1F501}", label: "Discrepancias", value: discrepancias.length, color: C.red, compact: isDesktop }), /* @__PURE__ */ import_react.default.createElement(StatCard, { icon: "\u2713", label: "Verificadas", value: verificadosCount, color: C.green, compact: isDesktop })), discrepancias.length === 0 ? /* @__PURE__ */ import_react.default.createElement(
       EmptyState,
       {
         icon: "\u2713",
@@ -34737,8 +34738,8 @@ Confirmas que el conteo de ${r.contado} unidad(es) es correcto.`)) {
       EmptyState,
       {
         icon: "\u{1F5C2}",
-        title: "Sin cierres de inventario registrados",
-        sub: "Cuando confirmes un cierre, aparecer\xE1 aqu\xED con su resumen"
+        title: "Sin verificaciones de inventario registradas",
+        sub: "Cuando guardes una verificaci\xF3n, aparecer\xE1 aqu\xED con su resumen"
       }
     ) : /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 10 } }, auditorias.map((a) => {
       const marcaNombre = a.marcaId ? MARCAS.find((m) => m.id === a.marcaId)?.nombre || "\u2014" : "Todas las marcas";
