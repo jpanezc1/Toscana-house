@@ -12916,7 +12916,17 @@ function InventarioPorMarca({inv, ventas, onRecibir, onBaja, onImportarExcel}){
           <input
             ref={invBusqRef}
             value={invBusq}
-            onChange={e=>setInvBusq(e.target.value.toUpperCase())}
+            onChange={e=>{
+              const val=e.target.value.toUpperCase();
+              const ahora=Date.now();
+              const gap=ahora-(invBusqRef.current?._ultimoTs||0);
+              invBusqRef.current._ultimoTs=ahora;
+              if(invBusq && gap>500 && val.startsWith(invBusq)){
+                setInvBusq(val.slice(invBusq.length));
+              } else {
+                setInvBusq(val);
+              }
+            }}
             placeholder="Buscar código de barras, nombre o categoría en TODAS las marcas…"
             style={{width:"100%",padding:`10px ${invBusq?32:12}px 10px 32px`,border:`1px solid ${invBusq?C.gold:C.sep}`,
               borderRadius:9,background:C.bg1,fontSize:13,color:C.label,

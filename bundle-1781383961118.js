@@ -35431,7 +35431,17 @@ Confirmas que el conteo de ${r.contado} unidad(es) es correcto.`)) {
       {
         ref: invBusqRef,
         value: invBusq,
-        onChange: (e) => setInvBusq(e.target.value.toUpperCase()),
+        onChange: (e) => {
+          const val = e.target.value.toUpperCase();
+          const ahora = Date.now();
+          const gap = ahora - (invBusqRef.current?._ultimoTs || 0);
+          invBusqRef.current._ultimoTs = ahora;
+          if (invBusq && gap > 500 && val.startsWith(invBusq)) {
+            setInvBusq(val.slice(invBusq.length));
+          } else {
+            setInvBusq(val);
+          }
+        },
         placeholder: "Buscar c\xF3digo de barras, nombre o categor\xEDa en TODAS las marcas\u2026",
         style: {
           width: "100%",
