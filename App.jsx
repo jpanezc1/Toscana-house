@@ -9694,6 +9694,10 @@ function App(){
   const[fInv,setFInv]       =useState({marcaId:"",nombre:"",categoria:"",descripcion:"",subcat:"",precio:"",stock:"",fecha:hoy(),codigoManual:""});
   const[bajaCod,setBajaCod] =useState("");
   const[bajaMsg,setBajaMsg] =useState(null);
+  const[sheetReponer,setShReponer]=useState(false);
+  const[repCod,setRepCod]   =useState("");
+  const[repCant,setRepCant] =useState("");
+  const[repMsg,setRepMsg]   =useState(null);
   const[bajasLista,setBajasLista]=useState([]);
   const[busqInv,setBusqInv] =useState("");
   const[filInvM,setFilInvM] =useState("");
@@ -10033,6 +10037,28 @@ function App(){
     }, user);
   }
 
+  // Reposición de stock — para etiquetas/códigos ya existentes (no crea
+  // un producto nuevo ni una etiqueta nueva, solo suma unidades).
+  function reponerStock(){
+    const cod=repCod.trim().toUpperCase();
+    const prod=inv.find(i=>i.codigo.toUpperCase()===cod);
+    if(!prod){setRepMsg({ok:false,msg:`"${cod}" no encontrado`});return;}
+    const cant=Number(repCant);
+    if(!cant||cant<=0){setRepMsg({ok:false,msg:"Ingresa una cantidad válida"});return;}
+    const stockAntes=prod.stock||0;
+    const stockDespues=stockAntes+cant;
+    setInv(p=>p.map(i=>i.id===prod.id?{...i,stock:stockDespues}:i));
+    sbActualizarStock(prod.id, stockDespues);
+    logAudit("STOCK_ADD", {
+      resumen: `Entrada de stock: ${prod.nombre} (${prod.codigo}) +${cant} · stock ${stockAntes}→${stockDespues}`,
+      codigo: prod.codigo, nombre: prod.nombre,
+      marca: prod.marcaNombre||"—",
+      cantidad: cant, stockAntes, stockDespues,
+    }, user);
+    setRepMsg({ok:true,msg:`✓ "${prod.nombre}": stock ${stockAntes} → ${stockDespues}`});
+    setRepCod(""); setRepCant("");
+  }
+
   // Buffer de importación para consolidar en un solo evento de auditoría
   const _importBuf = useRef({items:[], ts:0, timer:null});
 
@@ -10342,7 +10368,7 @@ function App(){
 
         {/* INVENTARIO — por marca */}
         {tab==="inventario" && (
-          <InventarioPorMarca inv={inv} ventas={ventas} onRecibir={()=>setShInv(true)} onBaja={()=>{setShBaja(true);setBajaMsg(null);setBajaCod("");}} onImportarExcel={()=>setShImportarExcel(true)}/>
+          <InventarioPorMarca inv={inv} ventas={ventas} onRecibir={()=>setShInv(true)} onBaja={()=>{setShBaja(true);setBajaMsg(null);setBajaCod("");}} onImportarExcel={()=>setShImportarExcel(true)} onReponer={()=>{setShReponer(true);setRepMsg(null);setRepCod("");setRepCant("");}}/>
         )}
 
         {/* AUDITORÍA — cierre de inventario mensual (conteo físico vs sistema) */}
@@ -10728,6 +10754,26 @@ function App(){
             color:bajaMsg.ok?C.green:C.red,fontSize:14,fontFamily:FONT}}>{bajaMsg.msg}</div>
         )}
         <IOSBtn onPress={darBaja} variant="danger" full disabled={!bajaCod.trim()}>Dar de Baja</IOSBtn>
+      </Sheet>
+
+      {/* Sheet: Reponer Stock (etiquetas existentes) */}
+      <Sheet open={sheetReponer} onClose={()=>setShReponer(false)} title="Reponer Stock">
+        <p style={{color:C.label2,fontFamily:FONT,fontSize:15,margin:"0 0 16px"}}>
+          Suma unidades a un producto que ya tiene etiqueta/código generado — sin crear un producto nuevo.
+        </p>
+        <IOSInput label="Código del producto" value={repCod}
+          onChange={e=>{setRepCod(e.target.value.toUpperCase());setRepMsg(null);}}
+          placeholder="Ej: RAM-39-08283"
+          style={{fontFamily:"monospace",textTransform:"uppercase"}}/>
+        <IOSInput label="Unidades a agregar" type="number" value={repCant}
+          onChange={e=>{setRepCant(e.target.value);setRepMsg(null);}} placeholder="0"/>
+        {repMsg&&(
+          <div style={{padding:"12px 14px",borderRadius:12,marginBottom:12,
+            background:repMsg.ok?`${C.green}15`:`${C.red}15`,
+            border:`1px solid ${(repMsg.ok?C.green:C.red)}40`,
+            color:repMsg.ok?C.green:C.red,fontSize:14,fontFamily:FONT}}>{repMsg.msg}</div>
+        )}
+        <IOSBtn onPress={reponerStock} variant="primary" full disabled={!repCod.trim()||!repCant}>Reponer Stock</IOSBtn>
       </Sheet>
 
       {/* ══ DRIVE CONFIG SHEET ══ */}
@@ -12893,7 +12939,7 @@ function RegistroCargas({cargas, marcas, marcaId=null}){
 // ══════════════════════════════════════════════════════════
 // INVENTARIO POR MARCA — pestaña con scroll horizontal
 // ══════════════════════════════════════════════════════════
-function InventarioPorMarca({inv, ventas, onRecibir, onBaja, onImportarExcel}){
+function InventarioPorMarca({inv, ventas, onRecibir, onBaja, onImportarExcel, onReponer}){
   const isDesktop = useIsDesktop();
   // null = "TODOS"
   var _hN149 = useState(null); var marcaSelec = _hN149[0]; var setMarcaSelec = _hN149[1];;
@@ -13162,6 +13208,9 @@ function InventarioPorMarca({inv, ventas, onRecibir, onBaja, onImportarExcel}){
         <div style={{display:"flex",gap:8,marginBottom:8}}>
           <IOSBtn onPress={onBaja}    variant="fill" full small icon="🗑">Dar de Baja</IOSBtn>
           <IOSBtn onPress={onRecibir} full small icon="+">Recibir</IOSBtn>
+        </div>
+        <div style={{display:"flex",gap:8,marginBottom:8}}>
+          <IOSBtn onPress={onReponer} variant="fill" full small icon="📦">Reponer Stock</IOSBtn>
         </div>
         <div style={{display:"flex",gap:8}}>
           <IOSBtn onPress={onImportarExcel} variant="fill" full small icon="📥">Importar Excel</IOSBtn>
@@ -14287,7 +14336,7 @@ function AuditoriaTab({auditLog, setAuditLog}){
 
   // ── Stats rápidas ────────────────────────────────────────────────
   const stats = useMemo(()=>{
-    const s = {VENTA:0, ANULACION:0, RETIRO:0, BAJA:0, IMPORT:0, USUARIO:0, RESET:0};
+    const s = {VENTA:0, ANULACION:0, RETIRO:0, BAJA:0, IMPORT:0, STOCK_ADD:0, USUARIO:0, RESET:0};
     auditLog.forEach(e=>{ if(s[e.tipo]!==undefined) s[e.tipo]++; });
     const totalVentas = auditLog.filter(e=>e.tipo==="VENTA").reduce((a,e)=>a+(e.total||0),0);
     return {...s, totalVentas};
@@ -14343,6 +14392,7 @@ function AuditoriaTab({auditLog, setAuditLog}){
           {k:"RETIRO",   label:`${stats.RETIRO} retiros`},
           {k:"BAJA",     label:`${stats.BAJA} bajas`},
           {k:"IMPORT",   label:`${stats.IMPORT} imports`},
+          {k:"STOCK_ADD",label:`${stats.STOCK_ADD} entradas`},
         ].map(s=>(
           <div key={s.k} onClick={()=>setFiltroTipo(filtroTipo===s.k?"TODOS":s.k)}
             style={{padding:"6px 12px",borderRadius:20,cursor:"pointer",

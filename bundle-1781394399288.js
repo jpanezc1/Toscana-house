@@ -31861,6 +31861,10 @@ Fecha: ${venta.fecha}`);
     const [fInv, setFInv] = (0, import_react.useState)({ marcaId: "", nombre: "", categoria: "", descripcion: "", subcat: "", precio: "", stock: "", fecha: hoy(), codigoManual: "" });
     const [bajaCod, setBajaCod] = (0, import_react.useState)("");
     const [bajaMsg, setBajaMsg] = (0, import_react.useState)(null);
+    const [sheetReponer, setShReponer] = (0, import_react.useState)(false);
+    const [repCod, setRepCod] = (0, import_react.useState)("");
+    const [repCant, setRepCant] = (0, import_react.useState)("");
+    const [repMsg, setRepMsg] = (0, import_react.useState)(null);
     const [bajasLista, setBajasLista] = (0, import_react.useState)([]);
     const [busqInv, setBusqInv] = (0, import_react.useState)("");
     const [filInvM, setFilInvM] = (0, import_react.useState)("");
@@ -32277,6 +32281,35 @@ Stock actual: ${stockAntes} \u2192 0`)) {
         stockDespues: 0
       }, user);
     }
+    function reponerStock() {
+      const cod = repCod.trim().toUpperCase();
+      const prod = inv.find((i) => i.codigo.toUpperCase() === cod);
+      if (!prod) {
+        setRepMsg({ ok: false, msg: `"${cod}" no encontrado` });
+        return;
+      }
+      const cant = Number(repCant);
+      if (!cant || cant <= 0) {
+        setRepMsg({ ok: false, msg: "Ingresa una cantidad v\xE1lida" });
+        return;
+      }
+      const stockAntes = prod.stock || 0;
+      const stockDespues = stockAntes + cant;
+      setInv((p) => p.map((i) => i.id === prod.id ? { ...i, stock: stockDespues } : i));
+      sbActualizarStock(prod.id, stockDespues);
+      logAudit("STOCK_ADD", {
+        resumen: `Entrada de stock: ${prod.nombre} (${prod.codigo}) +${cant} \xB7 stock ${stockAntes}\u2192${stockDespues}`,
+        codigo: prod.codigo,
+        nombre: prod.nombre,
+        marca: prod.marcaNombre || "\u2014",
+        cantidad: cant,
+        stockAntes,
+        stockDespues
+      }, user);
+      setRepMsg({ ok: true, msg: `\u2713 "${prod.nombre}": stock ${stockAntes} \u2192 ${stockDespues}` });
+      setRepCod("");
+      setRepCant("");
+    }
     const _importBuf = (0, import_react.useRef)({ items: [], ts: 0, timer: null });
     function handleImportarExcel({ tipo, codigo, stock, producto }) {
       if (tipo === "update") {
@@ -32623,7 +32656,12 @@ Stock actual: ${stockAntes} \u2192 0`)) {
       setShBaja(true);
       setBajaMsg(null);
       setBajaCod("");
-    }, onImportarExcel: () => setShImportarExcel(true) }), tab === "auditoria" && /* @__PURE__ */ import_react.default.createElement(
+    }, onImportarExcel: () => setShImportarExcel(true), onReponer: () => {
+      setShReponer(true);
+      setRepMsg(null);
+      setRepCod("");
+      setRepCant("");
+    } }), tab === "auditoria" && /* @__PURE__ */ import_react.default.createElement(
       AuditoriaInventario,
       {
         inv,
@@ -33022,7 +33060,40 @@ Stock actual: ${stockAntes} \u2192 0`)) {
       color: bajaMsg.ok ? C.green : C.red,
       fontSize: 14,
       fontFamily: FONT
-    } }, bajaMsg.msg), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: darBaja, variant: "danger", full: true, disabled: !bajaCod.trim() }, "Dar de Baja")), /* @__PURE__ */ import_react.default.createElement(Sheet, { open: sheetDrive, onClose: () => setShDrive(false), title: "\u2601 Google Drive", tall: true }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+    } }, bajaMsg.msg), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: darBaja, variant: "danger", full: true, disabled: !bajaCod.trim() }, "Dar de Baja")), /* @__PURE__ */ import_react.default.createElement(Sheet, { open: sheetReponer, onClose: () => setShReponer(false), title: "Reponer Stock" }, /* @__PURE__ */ import_react.default.createElement("p", { style: { color: C.label2, fontFamily: FONT, fontSize: 15, margin: "0 0 16px" } }, "Suma unidades a un producto que ya tiene etiqueta/c\xF3digo generado \u2014 sin crear un producto nuevo."), /* @__PURE__ */ import_react.default.createElement(
+      IOSInput,
+      {
+        label: "C\xF3digo del producto",
+        value: repCod,
+        onChange: (e) => {
+          setRepCod(e.target.value.toUpperCase());
+          setRepMsg(null);
+        },
+        placeholder: "Ej: RAM-39-08283",
+        style: { fontFamily: "monospace", textTransform: "uppercase" }
+      }
+    ), /* @__PURE__ */ import_react.default.createElement(
+      IOSInput,
+      {
+        label: "Unidades a agregar",
+        type: "number",
+        value: repCant,
+        onChange: (e) => {
+          setRepCant(e.target.value);
+          setRepMsg(null);
+        },
+        placeholder: "0"
+      }
+    ), repMsg && /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      padding: "12px 14px",
+      borderRadius: 12,
+      marginBottom: 12,
+      background: repMsg.ok ? `${C.green}15` : `${C.red}15`,
+      border: `1px solid ${repMsg.ok ? C.green : C.red}40`,
+      color: repMsg.ok ? C.green : C.red,
+      fontSize: 14,
+      fontFamily: FONT
+    } }, repMsg.msg), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: reponerStock, variant: "primary", full: true, disabled: !repCod.trim() || !repCant }, "Reponer Stock")), /* @__PURE__ */ import_react.default.createElement(Sheet, { open: sheetDrive, onClose: () => setShDrive(false), title: "\u2601 Google Drive", tall: true }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
       background: drive.url ? `${C.green}15` : `${C.label3}10`,
       borderRadius: 16,
       padding: "16px",
@@ -35411,7 +35482,7 @@ Confirmas que el conteo de ${r.contado} unidad(es) es correcto.`)) {
       } }, (it.nombre || "").toUpperCase()), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: C.label3, fontFamily: FONT_MONO } }, it.codigo, " \xB7 ", it.marca || "\u2014")), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label2, fontFamily: FONT, textAlign: "right", flexShrink: 0 } }, it.tipo === "update" ? `${it.stockAntes} \u2192 ${it.stockNuevo} (+${it.stockSumado})` : `Stock ${it.stock}${it.precio ? ` \xB7 ${$(it.precio)}` : ""}`))))));
     })));
   }
-  function InventarioPorMarca({ inv, ventas, onRecibir, onBaja, onImportarExcel }) {
+  function InventarioPorMarca({ inv, ventas, onRecibir, onBaja, onImportarExcel, onReponer }) {
     const isDesktop = useIsDesktop();
     var _hN149 = (0, import_react.useState)(null);
     var marcaSelec = _hN149[0];
@@ -35747,7 +35818,7 @@ Confirmas que el conteo de ${r.contado} unidad(es) es correcto.`)) {
       padding: "12px 0 4px",
       marginTop: 8,
       boxShadow: "0 -4px 16px rgba(0,0,0,0.06)"
-    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 8, marginBottom: 8 } }, /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: onBaja, variant: "fill", full: true, small: true, icon: "\u{1F5D1}" }, "Dar de Baja"), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: onRecibir, full: true, small: true, icon: "+" }, "Recibir")), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 8 } }, /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: onImportarExcel, variant: "fill", full: true, small: true, icon: "\u{1F4E5}" }, "Importar Excel"), /* @__PURE__ */ import_react.default.createElement(
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 8, marginBottom: 8 } }, /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: onBaja, variant: "fill", full: true, small: true, icon: "\u{1F5D1}" }, "Dar de Baja"), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: onRecibir, full: true, small: true, icon: "+" }, "Recibir")), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 8, marginBottom: 8 } }, /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: onReponer, variant: "fill", full: true, small: true, icon: "\u{1F4E6}" }, "Reponer Stock")), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 8 } }, /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: onImportarExcel, variant: "fill", full: true, small: true, icon: "\u{1F4E5}" }, "Importar Excel"), /* @__PURE__ */ import_react.default.createElement(
       IOSBtn,
       {
         onPress: async () => {
@@ -36927,7 +36998,7 @@ Confirmas que el conteo de ${r.contado} unidad(es) es correcto.`)) {
       });
     }, [auditLog, filtroTipo, busqueda, filtroMarca]);
     const stats = (0, import_react.useMemo)(() => {
-      const s = { VENTA: 0, ANULACION: 0, RETIRO: 0, BAJA: 0, IMPORT: 0, USUARIO: 0, RESET: 0 };
+      const s = { VENTA: 0, ANULACION: 0, RETIRO: 0, BAJA: 0, IMPORT: 0, STOCK_ADD: 0, USUARIO: 0, RESET: 0 };
       auditLog.forEach((e) => {
         if (s[e.tipo] !== void 0) s[e.tipo]++;
       });
@@ -36976,7 +37047,8 @@ Confirmas que el conteo de ${r.contado} unidad(es) es correcto.`)) {
       { k: "ANULACION", label: `${stats.ANULACION} anulac.` },
       { k: "RETIRO", label: `${stats.RETIRO} retiros` },
       { k: "BAJA", label: `${stats.BAJA} bajas` },
-      { k: "IMPORT", label: `${stats.IMPORT} imports` }
+      { k: "IMPORT", label: `${stats.IMPORT} imports` },
+      { k: "STOCK_ADD", label: `${stats.STOCK_ADD} entradas` }
     ].map((s) => /* @__PURE__ */ import_react.default.createElement(
       "div",
       {
