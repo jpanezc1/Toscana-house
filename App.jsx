@@ -323,6 +323,28 @@ async function sbCargarTodo() {
   }
 }
 
+// ── Auditoría forense en la nube (sync en tiempo real entre dispositivos) ──
+async function sbGuardarAuditLog(evento) {
+  try {
+    const db = await getSupabase();
+    const {id, ts, fecha, hora, tipo, usuario, nombre, rol, ...detalle} = evento;
+    await db.from("audit_log").upsert({id, ts, fecha, hora, tipo, usuario, nombre, rol, detalle});
+  } catch(e) { console.warn("Supabase save audit_log:", e.message); }
+}
+
+async function sbCargarAuditLog() {
+  try {
+    const db = await getSupabase();
+    const { data, error } = await db.from("audit_log").select("*").order("ts",{ascending:false}).limit(1000);
+    if (error) throw error;
+    return (data||[]).map(a=>({
+      id:a.id, ts:a.ts, fecha:a.fecha, hora:a.hora,
+      tipo:a.tipo, usuario:a.usuario, nombre:a.nombre, rol:a.rol,
+      ...(a.detalle||{}),
+    }));
+  } catch(e) { console.warn("Supabase load audit_log:", e.message); return null; }
+}
+
 // ── Realtime sync — escucha cambios en Supabase y actualiza estado local ────
 // Activa canales en: ventas (INSERT/UPDATE) + inventario (INSERT/UPDATE)
 // Deduplicación: si la fila ya existe (optimistic update local), no se agrega.
@@ -13893,6 +13915,7 @@ function logAudit(tipo, detalle, usuario){
     const logs = JSON.parse(localStorage.getItem(AUDIT_KEY)||"[]");
     logs.unshift(evento);
     localStorage.setItem(AUDIT_KEY, JSON.stringify(logs.slice(0,1000)));
+    sbGuardarAuditLog(evento);
   }catch{}
 }
 
@@ -14975,6 +14998,45 @@ function ConfigTab({user, logout}){
     try{return JSON.parse(localStorage.getItem(AUDIT_KEY)||"[]");}
     catch{return [];}
   });
+
+  // ── Cargar auditoría desde Supabase al entrar — merge con local ──
+  useEffect(()=>{
+    sbCargarAuditLog().then(data=>{
+      if(!data) return;
+      setAuditLog(prev=>{
+        const sbIds = new Set(data.map(e=>e.id));
+        const pendientes = prev.filter(e=>!sbIds.has(e.id));
+        pendientes.forEach(e=>sbGuardarAuditLog(e));
+        const merged = [...pendientes, ...data].sort((a,b)=>(b.ts||0)-(a.ts||0)).slice(0,1000);
+        try{localStorage.setItem(AUDIT_KEY, JSON.stringify(merged));}catch{}
+        return merged;
+      });
+    });
+  },[]);
+
+  // ── Realtime: eventos de auditoría creados en otros dispositivos ──
+  useEffect(()=>{
+    let channel=null, mounted=true;
+    getSupabase().then(db=>{
+      if(!mounted) return;
+      channel = db.channel("toscana-audit-v1")
+        .on("postgres_changes", {event:"INSERT", schema:"public", table:"audit_log"}, payload=>{
+          const a = payload.new;
+          const evento = {id:a.id, ts:a.ts, fecha:a.fecha, hora:a.hora, tipo:a.tipo,
+            usuario:a.usuario, nombre:a.nombre, rol:a.rol, ...(a.detalle||{})};
+          if(!mounted) return;
+          setAuditLog(prev=>{
+            if(prev.some(e=>e.id===evento.id)) return prev;
+            const merged=[evento,...prev].sort((a,b)=>(b.ts||0)-(a.ts||0)).slice(0,1000);
+            try{localStorage.setItem(AUDIT_KEY, JSON.stringify(merged));}catch{}
+            return merged;
+          });
+        })
+        .subscribe();
+    }).catch(()=>{});
+    return ()=>{ mounted=false; if(channel) getSupabase().then(db=>db.removeChannel(channel)).catch(()=>{}); };
+  },[]);
+
   const {toasts, addToast} = useToast();
 
   function guardarUsuarios(u, accion, afectado, toastMsg){

@@ -21855,6 +21855,36 @@
       return null;
     }
   }
+  async function sbGuardarAuditLog(evento) {
+    try {
+      const db = await getSupabase();
+      const { id, ts, fecha, hora: hora2, tipo, usuario, nombre, rol, ...detalle } = evento;
+      await db.from("audit_log").upsert({ id, ts, fecha, hora: hora2, tipo, usuario, nombre, rol, detalle });
+    } catch (e) {
+      console.warn("Supabase save audit_log:", e.message);
+    }
+  }
+  async function sbCargarAuditLog() {
+    try {
+      const db = await getSupabase();
+      const { data, error } = await db.from("audit_log").select("*").order("ts", { ascending: false }).limit(1e3);
+      if (error) throw error;
+      return (data || []).map((a) => ({
+        id: a.id,
+        ts: a.ts,
+        fecha: a.fecha,
+        hora: a.hora,
+        tipo: a.tipo,
+        usuario: a.usuario,
+        nombre: a.nombre,
+        rol: a.rol,
+        ...a.detalle || {}
+      }));
+    } catch (e) {
+      console.warn("Supabase load audit_log:", e.message);
+      return null;
+    }
+  }
   function useRealtimeSync(setVentas, setInv, setRetiros) {
     (0, import_react.useEffect)(() => {
       let channel = null;
@@ -36351,6 +36381,7 @@ Confirmas que el conteo de ${r.contado} unidad(es) es correcto.`)) {
       const logs = JSON.parse(localStorage.getItem(AUDIT_KEY) || "[]");
       logs.unshift(evento);
       localStorage.setItem(AUDIT_KEY, JSON.stringify(logs.slice(0, 1e3)));
+      sbGuardarAuditLog(evento);
     } catch {
     }
   }
@@ -37579,6 +37610,58 @@ Confirmas que el conteo de ${r.contado} unidad(es) es correcto.`)) {
         return [];
       }
     });
+    (0, import_react.useEffect)(() => {
+      sbCargarAuditLog().then((data) => {
+        if (!data) return;
+        setAuditLog((prev) => {
+          const sbIds = new Set(data.map((e) => e.id));
+          const pendientes = prev.filter((e) => !sbIds.has(e.id));
+          pendientes.forEach((e) => sbGuardarAuditLog(e));
+          const merged = [...pendientes, ...data].sort((a, b) => (b.ts || 0) - (a.ts || 0)).slice(0, 1e3);
+          try {
+            localStorage.setItem(AUDIT_KEY, JSON.stringify(merged));
+          } catch {
+          }
+          return merged;
+        });
+      });
+    }, []);
+    (0, import_react.useEffect)(() => {
+      let channel = null, mounted = true;
+      getSupabase().then((db) => {
+        if (!mounted) return;
+        channel = db.channel("toscana-audit-v1").on("postgres_changes", { event: "INSERT", schema: "public", table: "audit_log" }, (payload) => {
+          const a = payload.new;
+          const evento = {
+            id: a.id,
+            ts: a.ts,
+            fecha: a.fecha,
+            hora: a.hora,
+            tipo: a.tipo,
+            usuario: a.usuario,
+            nombre: a.nombre,
+            rol: a.rol,
+            ...a.detalle || {}
+          };
+          if (!mounted) return;
+          setAuditLog((prev) => {
+            if (prev.some((e) => e.id === evento.id)) return prev;
+            const merged = [evento, ...prev].sort((a2, b) => (b.ts || 0) - (a2.ts || 0)).slice(0, 1e3);
+            try {
+              localStorage.setItem(AUDIT_KEY, JSON.stringify(merged));
+            } catch {
+            }
+            return merged;
+          });
+        }).subscribe();
+      }).catch(() => {
+      });
+      return () => {
+        mounted = false;
+        if (channel) getSupabase().then((db) => db.removeChannel(channel)).catch(() => {
+        });
+      };
+    }, []);
     const { toasts, addToast } = useToast();
     function guardarUsuarios(u, accion, afectado, toastMsg) {
       setUsuarios(u);
