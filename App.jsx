@@ -5840,6 +5840,146 @@ function CameraScanner({onDetect, onClose, continuous, feedback, stats}){
 }
 
 // ══════════════════════════════════════════════════════════
+// LectorHID — Verificación rápida con lector de código de barras
+// conectado a la computadora (USB/HID). El lector "teclea" el código
+// y termina con Enter; aquí se captura y se cuenta automáticamente.
+// ══════════════════════════════════════════════════════════
+function LectorHID({onDetect, onClose, feedback, stats}){
+  const inputRef = useRef(null);
+  const idleRef  = useRef(null);
+  const [buf, setBuf]   = useState("");
+  const [flash, setFlash] = useState(null);
+
+  // Mantener el foco en el input para no perder ninguna lectura del lector
+  useEffect(()=>{
+    const f=()=>{ try{ inputRef.current && inputRef.current.focus(); }catch(_){} };
+    f();
+    const t=setInterval(f,400);
+    return ()=>clearInterval(t);
+  },[]);
+
+  // Mostrar feedback de cada lectura
+  useEffect(()=>{
+    if(!feedback) return;
+    setFlash(feedback);
+    const t=setTimeout(()=>setFlash(null),1100);
+    return ()=>clearTimeout(t);
+  },[feedback?.ts]);
+
+  function beep(){
+    try{
+      const ac=new(window.AudioContext||window.webkitAudioContext)();
+      const o=ac.createOscillator(),g=ac.createGain();
+      o.connect(g);g.connect(ac.destination);
+      o.frequency.value=1046;g.gain.value=0.22;
+      o.start();o.stop(ac.currentTime+0.10);
+      setTimeout(()=>ac.close(),400);
+    }catch(_){}
+  }
+
+  function submit(valor){
+    const code=(valor!==undefined?valor:buf).trim();
+    setBuf("");
+    if(idleRef.current) clearTimeout(idleRef.current);
+    if(code.length<2) return; // ignora ruido / Enter vacío
+    beep();
+    onDetect(code);
+  }
+
+  function onChange(e){
+    const v=e.target.value;
+    setBuf(v);
+    // Respaldo: la mayoría de lectores envían Enter al final, pero si no,
+    // se procesa al detenerse el ingreso (ráfaga rápida del lector HID).
+    if(idleRef.current) clearTimeout(idleRef.current);
+    if(v.trim().length>=3){
+      idleRef.current=setTimeout(()=>submit(v), 140);
+    }
+  }
+
+  function onKeyDown(e){
+    if(e.key==="Enter"||e.key==="Tab"){ e.preventDefault(); submit(); }
+  }
+
+  return (
+    <div style={{position:"fixed",inset:0,zIndex:9500,
+      background:"linear-gradient(160deg,#14110E,#1F1A15)",
+      display:"flex",flexDirection:"column"}}>
+
+      {/* Barra superior */}
+      <div style={{flexShrink:0,display:"flex",alignItems:"center",justifyContent:"space-between",
+        padding:"calc(env(safe-area-inset-top,0px) + 12px) 18px 12px",background:"rgba(0,0,0,0.35)"}}>
+        <span style={{fontSize:15,fontWeight:700,color:"#fff"}}>⚡ Verificación rápida — lector USB</span>
+        <button onClick={onClose} style={{
+          background:"rgba(34,197,94,0.25)",border:"1px solid rgba(74,222,128,0.5)",
+          borderRadius:9,padding:"7px 16px",color:"#fff",fontSize:14,fontWeight:700,
+          cursor:"pointer"}}>✓ Finalizar</button>
+      </div>
+
+      {/* HUD de progreso */}
+      {stats&&(
+        <div style={{display:"flex",justifyContent:"center",marginTop:14}}>
+          <div style={{display:"flex",gap:10,background:"rgba(0,0,0,0.4)",
+            border:"1px solid rgba(255,255,255,0.15)",borderRadius:999,padding:"7px 18px"}}>
+            <span style={{color:"#fff",fontSize:13,fontWeight:700}}>📦 {stats.unidades}</span>
+            <span style={{color:"rgba(255,255,255,0.35)"}}>·</span>
+            <span style={{color:"rgba(255,255,255,0.85)",fontSize:13}}>{stats.productos} producto{stats.productos!==1?"s":""}</span>
+          </div>
+        </div>
+      )}
+
+      {/* Zona central: input enfocado + estado */}
+      <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",
+        justifyContent:"center",padding:28,gap:22}}>
+        <div style={{fontSize:52}}>🔌</div>
+        <div style={{textAlign:"center",maxWidth:420}}>
+          <div style={{color:"#fff",fontSize:18,fontWeight:800,marginBottom:8}}>
+            Escanea con el lector conectado
+          </div>
+          <div style={{color:"rgba(255,255,255,0.6)",fontSize:13,lineHeight:1.5}}>
+            Apunta el lector de código de barras a cada prenda. Cada lectura suma 1 unidad
+            automáticamente. No necesitas tocar la pantalla.
+          </div>
+        </div>
+
+        <input ref={inputRef} value={buf} onChange={onChange} onKeyDown={onKeyDown}
+          autoFocus inputMode="none" autoComplete="off" spellCheck={false}
+          placeholder="Esperando lectura…"
+          style={{width:"100%",maxWidth:420,padding:"16px 18px",borderRadius:14,
+            border:"1.5px solid rgba(255,255,255,0.25)",background:"rgba(255,255,255,0.06)",
+            color:"#fff",fontSize:17,fontFamily:"monospace",letterSpacing:1,textAlign:"center",
+            outline:"none"}}/>
+        <div style={{color:"rgba(255,255,255,0.4)",fontSize:11.5}}>
+          ¿No lee? Haz clic en el campo y vuelve a escanear. También puedes teclear el código y Enter.
+        </div>
+      </div>
+
+      {/* Flash de feedback */}
+      {flash&&(
+        <div style={{position:"absolute",inset:0,zIndex:9520,display:"flex",flexDirection:"column",
+          alignItems:"center",justifyContent:"center",gap:10,pointerEvents:"none",
+          background: flash.ok?"rgba(22,163,74,0.32)":"rgba(220,38,38,0.32)",
+          animation:"thFlashFade 1.1s ease-out forwards"}}>
+          <div style={{width:84,height:84,borderRadius:"50%",
+            background: flash.ok?"#16A34A":"#DC2626",display:"flex",alignItems:"center",
+            justifyContent:"center",fontSize:42,color:"#fff",boxShadow:"0 8px 28px rgba(0,0,0,0.35)",
+            animation:"thFlashPop .35s cubic-bezier(.34,1.56,.64,1)"}}>
+            {flash.ok?"✓":"✕"}
+          </div>
+          <div style={{color:"#fff",fontSize:16,fontWeight:800,textAlign:"center",padding:"0 32px"}}>{flash.title}</div>
+          {flash.sub&&<div style={{color:"rgba(255,255,255,0.85)",fontSize:13,textAlign:"center",padding:"0 32px"}}>{flash.sub}</div>}
+        </div>
+      )}
+
+      <style>{`
+        @keyframes thFlashFade{0%{opacity:0} 12%{opacity:1} 70%{opacity:1} 100%{opacity:0}}
+        @keyframes thFlashPop{0%{transform:scale(.4);opacity:0} 60%{transform:scale(1.12);opacity:1} 100%{transform:scale(1)}}
+      `}</style>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════
 // ImportarExcelModal — Importación masiva con auto-generación de códigos
 // ══════════════════════════════════════════════════════════════════════
 function ImportarExcelModal({inv, onImportar, onClose}){
@@ -11916,7 +12056,7 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
             Iniciar Verificación Rápida
           </div>
           <div style={{fontSize:11.5,color:"rgba(255,255,255,0.65)",fontFamily:FONT,marginTop:2}}>
-            Escaneo continuo — apunta y sigue, sin tocar la pantalla
+            Con lector de código de barras USB — escanea cada prenda en continuo
           </div>
         </div>
         <div style={{fontSize:13,color:"#C4A57B",fontWeight:700,fontFamily:FONT,flexShrink:0}}>→</div>
@@ -11924,7 +12064,7 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
 
       {/* Overlay de escaneo continuo */}
       {modoCierre && (
-        <CameraScanner continuous
+        <LectorHID
           onDetect={onDetectCierreRapido}
           feedback={liveFeedback}
           stats={{productos:itemsContados, unidades:unidadesContadas}}
@@ -11932,9 +12072,9 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
         />
       )}
 
-      {/* Overlay de verificación (2da pasada) */}
+      {/* Overlay de verificación (2da pasada / doble conteo) — lector USB */}
       {modoVerif && (
-        <CameraScanner continuous
+        <LectorHID
           onDetect={onDetectVerificacion}
           feedback={liveFeedback}
           stats={{productos:verificadosCount, unidades:discrepancias.length}}

@@ -27604,6 +27604,158 @@ Fecha: ${venta.fecha}`);
         }
       `));
   }
+  function LectorHID({ onDetect, onClose, feedback, stats }) {
+    const inputRef = (0, import_react.useRef)(null);
+    const idleRef = (0, import_react.useRef)(null);
+    const [buf, setBuf] = (0, import_react.useState)("");
+    const [flash, setFlash] = (0, import_react.useState)(null);
+    (0, import_react.useEffect)(() => {
+      const f = () => {
+        try {
+          inputRef.current && inputRef.current.focus();
+        } catch (_) {
+        }
+      };
+      f();
+      const t = setInterval(f, 400);
+      return () => clearInterval(t);
+    }, []);
+    (0, import_react.useEffect)(() => {
+      if (!feedback) return;
+      setFlash(feedback);
+      const t = setTimeout(() => setFlash(null), 1100);
+      return () => clearTimeout(t);
+    }, [feedback?.ts]);
+    function beep() {
+      try {
+        const ac = new (window.AudioContext || window.webkitAudioContext)();
+        const o = ac.createOscillator(), g = ac.createGain();
+        o.connect(g);
+        g.connect(ac.destination);
+        o.frequency.value = 1046;
+        g.gain.value = 0.22;
+        o.start();
+        o.stop(ac.currentTime + 0.1);
+        setTimeout(() => ac.close(), 400);
+      } catch (_) {
+      }
+    }
+    function submit(valor) {
+      const code = (valor !== void 0 ? valor : buf).trim();
+      setBuf("");
+      if (idleRef.current) clearTimeout(idleRef.current);
+      if (code.length < 2) return;
+      beep();
+      onDetect(code);
+    }
+    function onChange(e) {
+      const v = e.target.value;
+      setBuf(v);
+      if (idleRef.current) clearTimeout(idleRef.current);
+      if (v.trim().length >= 3) {
+        idleRef.current = setTimeout(() => submit(v), 140);
+      }
+    }
+    function onKeyDown(e) {
+      if (e.key === "Enter" || e.key === "Tab") {
+        e.preventDefault();
+        submit();
+      }
+    }
+    return /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      position: "fixed",
+      inset: 0,
+      zIndex: 9500,
+      background: "linear-gradient(160deg,#14110E,#1F1A15)",
+      display: "flex",
+      flexDirection: "column"
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      flexShrink: 0,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between",
+      padding: "calc(env(safe-area-inset-top,0px) + 12px) 18px 12px",
+      background: "rgba(0,0,0,0.35)"
+    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 15, fontWeight: 700, color: "#fff" } }, "\u26A1 Verificaci\xF3n r\xE1pida \u2014 lector USB"), /* @__PURE__ */ import_react.default.createElement("button", { onClick: onClose, style: {
+      background: "rgba(34,197,94,0.25)",
+      border: "1px solid rgba(74,222,128,0.5)",
+      borderRadius: 9,
+      padding: "7px 16px",
+      color: "#fff",
+      fontSize: 14,
+      fontWeight: 700,
+      cursor: "pointer"
+    } }, "\u2713 Finalizar")), stats && /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "center", marginTop: 14 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      display: "flex",
+      gap: 10,
+      background: "rgba(0,0,0,0.4)",
+      border: "1px solid rgba(255,255,255,0.15)",
+      borderRadius: 999,
+      padding: "7px 18px"
+    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { color: "#fff", fontSize: 13, fontWeight: 700 } }, "\u{1F4E6} ", stats.unidades), /* @__PURE__ */ import_react.default.createElement("span", { style: { color: "rgba(255,255,255,0.35)" } }, "\xB7"), /* @__PURE__ */ import_react.default.createElement("span", { style: { color: "rgba(255,255,255,0.85)", fontSize: 13 } }, stats.productos, " producto", stats.productos !== 1 ? "s" : ""))), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      flex: 1,
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      justifyContent: "center",
+      padding: 28,
+      gap: 22
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 52 } }, "\u{1F50C}"), /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center", maxWidth: 420 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { color: "#fff", fontSize: 18, fontWeight: 800, marginBottom: 8 } }, "Escanea con el lector conectado"), /* @__PURE__ */ import_react.default.createElement("div", { style: { color: "rgba(255,255,255,0.6)", fontSize: 13, lineHeight: 1.5 } }, "Apunta el lector de c\xF3digo de barras a cada prenda. Cada lectura suma 1 unidad autom\xE1ticamente. No necesitas tocar la pantalla.")), /* @__PURE__ */ import_react.default.createElement(
+      "input",
+      {
+        ref: inputRef,
+        value: buf,
+        onChange,
+        onKeyDown,
+        autoFocus: true,
+        inputMode: "none",
+        autoComplete: "off",
+        spellCheck: false,
+        placeholder: "Esperando lectura\u2026",
+        style: {
+          width: "100%",
+          maxWidth: 420,
+          padding: "16px 18px",
+          borderRadius: 14,
+          border: "1.5px solid rgba(255,255,255,0.25)",
+          background: "rgba(255,255,255,0.06)",
+          color: "#fff",
+          fontSize: 17,
+          fontFamily: "monospace",
+          letterSpacing: 1,
+          textAlign: "center",
+          outline: "none"
+        }
+      }
+    ), /* @__PURE__ */ import_react.default.createElement("div", { style: { color: "rgba(255,255,255,0.4)", fontSize: 11.5 } }, "\xBFNo lee? Haz clic en el campo y vuelve a escanear. Tambi\xE9n puedes teclear el c\xF3digo y Enter.")), flash && /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      position: "absolute",
+      inset: 0,
+      zIndex: 9520,
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 10,
+      pointerEvents: "none",
+      background: flash.ok ? "rgba(22,163,74,0.32)" : "rgba(220,38,38,0.32)",
+      animation: "thFlashFade 1.1s ease-out forwards"
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      width: 84,
+      height: 84,
+      borderRadius: "50%",
+      background: flash.ok ? "#16A34A" : "#DC2626",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      fontSize: 42,
+      color: "#fff",
+      boxShadow: "0 8px 28px rgba(0,0,0,0.35)",
+      animation: "thFlashPop .35s cubic-bezier(.34,1.56,.64,1)"
+    } }, flash.ok ? "\u2713" : "\u2715"), /* @__PURE__ */ import_react.default.createElement("div", { style: { color: "#fff", fontSize: 16, fontWeight: 800, textAlign: "center", padding: "0 32px" } }, flash.title), flash.sub && /* @__PURE__ */ import_react.default.createElement("div", { style: { color: "rgba(255,255,255,0.85)", fontSize: 13, textAlign: "center", padding: "0 32px" } }, flash.sub)), /* @__PURE__ */ import_react.default.createElement("style", null, `
+        @keyframes thFlashFade{0%{opacity:0} 12%{opacity:1} 70%{opacity:1} 100%{opacity:0}}
+        @keyframes thFlashPop{0%{transform:scale(.4);opacity:0} 60%{transform:scale(1.12);opacity:1} 100%{transform:scale(1)}}
+      `));
+  }
   function ImportarExcelModal({ inv, onImportar, onClose }) {
     const isDesktop = useIsDesktop();
     const [preview, setPreview] = (0, import_react.useState)([]);
@@ -34380,19 +34532,17 @@ Base de inventario tomada: ${baseTs.toLocaleString("es-BO")}`)) return;
       alignItems: "center",
       justifyContent: "center",
       fontSize: 22
-    } }, "\u26A1"), /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 14.5, fontWeight: 800, color: "#fff", fontFamily: FONT, letterSpacing: ".01em" } }, "Iniciar Verificaci\xF3n R\xE1pida"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11.5, color: "rgba(255,255,255,0.65)", fontFamily: FONT, marginTop: 2 } }, "Escaneo continuo \u2014 apunta y sigue, sin tocar la pantalla")), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: "#C4A57B", fontWeight: 700, fontFamily: FONT, flexShrink: 0 } }, "\u2192")), modoCierre && /* @__PURE__ */ import_react.default.createElement(
-      CameraScanner,
+    } }, "\u26A1"), /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 14.5, fontWeight: 800, color: "#fff", fontFamily: FONT, letterSpacing: ".01em" } }, "Iniciar Verificaci\xF3n R\xE1pida"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11.5, color: "rgba(255,255,255,0.65)", fontFamily: FONT, marginTop: 2 } }, "Con lector de c\xF3digo de barras USB \u2014 escanea cada prenda en continuo")), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: "#C4A57B", fontWeight: 700, fontFamily: FONT, flexShrink: 0 } }, "\u2192")), modoCierre && /* @__PURE__ */ import_react.default.createElement(
+      LectorHID,
       {
-        continuous: true,
         onDetect: onDetectCierreRapido,
         feedback: liveFeedback,
         stats: { productos: itemsContados, unidades: unidadesContadas },
         onClose: () => setModoCierre(false)
       }
     ), modoVerif && /* @__PURE__ */ import_react.default.createElement(
-      CameraScanner,
+      LectorHID,
       {
-        continuous: true,
         onDetect: onDetectVerificacion,
         feedback: liveFeedback,
         stats: { productos: verificadosCount, unidades: discrepancias.length },
