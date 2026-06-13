@@ -32034,17 +32034,29 @@ Fecha: ${venta.fecha}`);
       setInv((p) => p.map((i) => i.id === r.prodId ? { ...i, stock: stockDespues } : i));
       sbActualizarStock(r.prodId, stockDespues);
       sbGuardarRetiro(r);
-      logAudit("RETIRO", {
-        resumen: `Retiro: ${prod?.nombre || r.codigo} \xD7 ${r.cantidad} u.`,
-        codigo: r.codigo,
-        nombre: prod?.nombre || r.codigo,
-        marca: prod?.marcaNombre || "\u2014",
-        cantidad: r.cantidad,
-        destinatario: r.destinatario || "\u2014",
-        motivo: r.motivo || "\u2014",
-        stockAntes,
-        stockDespues
-      }, user);
+      if (r.motivo === "Baja") {
+        logAudit("BAJA", {
+          resumen: `Baja: ${prod?.nombre || r.codigo} \xB7 stock ${stockAntes}\u21920`,
+          codigo: r.codigo,
+          nombre: prod?.nombre || r.codigo,
+          marca: prod?.marcaNombre || "\u2014",
+          precio: prod?.precio || 0,
+          stockAntes,
+          stockDespues
+        }, user);
+      } else {
+        logAudit("RETIRO", {
+          resumen: `Retiro: ${prod?.nombre || r.codigo} \xD7 ${r.cantidad} u.`,
+          codigo: r.codigo,
+          nombre: prod?.nombre || r.codigo,
+          marca: prod?.marcaNombre || "\u2014",
+          cantidad: r.cantidad,
+          destinatario: r.destinatario || "\u2014",
+          motivo: r.motivo || "\u2014",
+          stockAntes,
+          stockDespues
+        }, user);
+      }
     }
     (0, import_react.useEffect)(() => {
       setDbStatus("connecting");

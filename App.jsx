@@ -9829,15 +9829,25 @@ function App(){
     sbActualizarStock(r.prodId, stockDespues);
     sbGuardarRetiro(r);
     // ── Audit forense ─────────────────────────────────────────────
-    logAudit("RETIRO", {
-      resumen: `Retiro: ${prod?.nombre||r.codigo} × ${r.cantidad} u.`,
-      codigo: r.codigo, nombre: prod?.nombre||r.codigo,
-      marca: prod?.marcaNombre||"—",
-      cantidad: r.cantidad,
-      destinatario: r.destinatario||"—",
-      motivo: r.motivo||"—",
-      stockAntes, stockDespues,
-    }, user);
+    if(r.motivo==="Baja"){
+      logAudit("BAJA", {
+        resumen: `Baja: ${prod?.nombre||r.codigo} · stock ${stockAntes}→0`,
+        codigo: r.codigo, nombre: prod?.nombre||r.codigo,
+        marca: prod?.marcaNombre||"—",
+        precio: prod?.precio||0,
+        stockAntes, stockDespues,
+      }, user);
+    } else {
+      logAudit("RETIRO", {
+        resumen: `Retiro: ${prod?.nombre||r.codigo} × ${r.cantidad} u.`,
+        codigo: r.codigo, nombre: prod?.nombre||r.codigo,
+        marca: prod?.marcaNombre||"—",
+        cantidad: r.cantidad,
+        destinatario: r.destinatario||"—",
+        motivo: r.motivo||"—",
+        stockAntes, stockDespues,
+      }, user);
+    }
   }
 
   // Cargar datos desde Supabase al inicio — merge inteligente con localStorage
