@@ -31944,7 +31944,13 @@ Fecha: ${venta.fecha}`);
     }, []);
     (0, import_react.useEffect)(() => {
       sbCargarRetiros().then((data) => {
-        if (data.length > 0) setRetiros(data);
+        setRetiros((prev) => {
+          const sbIds = new Set(data.map((r) => String(r.id)));
+          const pendientes = prev.filter((r) => !sbIds.has(String(r.id)));
+          pendientes.forEach((r) => sbGuardarRetiro(r));
+          if (data.length === 0 && prev.length > 0) return prev;
+          return pendientes.length > 0 ? [...data, ...pendientes] : data;
+        });
       });
     }, []);
     (0, import_react.useEffect)(() => {
