@@ -32168,19 +32168,27 @@ Fecha: ${venta.fecha}`);
         return;
       }
       const stockAntes = prod.stock;
-      setInv((p) => p.map((i) => i.id === prod.id ? { ...i, stock: 0 } : i));
-      sbActualizarStock(prod.id, 0);
-      setBajaMsg({ ok: true, msg: `\u2713 "${prod.nombre}" dado de baja` });
-      setBajaCod("");
-      logAudit("BAJA", {
-        resumen: `Baja: ${prod.nombre} (${cod}) \u2014 stock ${stockAntes}\u21920`,
+      if (!window.confirm(`\xBFConfirmar baja de "${prod.nombre}" (${cod})?
+Stock actual: ${stockAntes} \u2192 0`)) {
+        return;
+      }
+      const ahora = /* @__PURE__ */ new Date();
+      const retiro = {
+        id: Date.now(),
+        prodId: prod.id,
         codigo: cod,
         nombre: prod.nombre,
-        marca: prod.marcaNombre || "\u2014",
-        precio: prod.precio,
-        stockAntes,
-        stockDespues: 0
-      }, user);
+        marcaId: prod.marcaId,
+        marcaNombre: prod.marcaNombre || "\u2014",
+        cantidad: stockAntes,
+        destinatario: "Baja de inventario",
+        motivo: "Baja",
+        fecha: ahora.toLocaleDateString("es-BO"),
+        hora: ahora.toLocaleTimeString("es-BO", { hour: "2-digit", minute: "2-digit" })
+      };
+      registrarRetiro(retiro);
+      setBajaMsg({ ok: true, msg: `\u2713 "${prod.nombre}" dado de baja` });
+      setBajaCod("");
     }
     const _importBuf = (0, import_react.useRef)({ items: [], ts: 0, timer: null });
     function handleImportarExcel({ tipo, codigo, stock, producto }) {

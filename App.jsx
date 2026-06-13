@@ -9948,18 +9948,20 @@ function App(){
     if(!prod){setBajaMsg({ok:false,msg:`"${cod}" no encontrado`});return;}
     if(prod.stock<=0){setBajaMsg({ok:false,msg:`"${prod.nombre}" ya está agotado`});return;}
     const stockAntes = prod.stock;
-    setInv(p=>p.map(i=>i.id===prod.id?{...i,stock:0}:i));
-    sbActualizarStock(prod.id, 0);
+    if(!window.confirm(`¿Confirmar baja de "${prod.nombre}" (${cod})?\nStock actual: ${stockAntes} → 0`)){
+      return;
+    }
+    const ahora=new Date();
+    const retiro={
+      id: Date.now(), prodId: prod.id, codigo: cod, nombre: prod.nombre,
+      marcaId: prod.marcaId, marcaNombre: prod.marcaNombre||"—",
+      cantidad: stockAntes, destinatario: "Baja de inventario", motivo: "Baja",
+      fecha: ahora.toLocaleDateString("es-BO"),
+      hora: ahora.toLocaleTimeString("es-BO",{hour:"2-digit",minute:"2-digit"}),
+    };
+    registrarRetiro(retiro);
     setBajaMsg({ok:true,msg:`✓ "${prod.nombre}" dado de baja`});
     setBajaCod("");
-    // ── Audit forense ─────────────────────────────────────────────
-    logAudit("BAJA", {
-      resumen: `Baja: ${prod.nombre} (${cod}) — stock ${stockAntes}→0`,
-      codigo: cod, nombre: prod.nombre,
-      marca: prod.marcaNombre||"—",
-      precio: prod.precio,
-      stockAntes, stockDespues: 0,
-    }, user);
   }
 
   // Buffer de importación para consolidar en un solo evento de auditoría
