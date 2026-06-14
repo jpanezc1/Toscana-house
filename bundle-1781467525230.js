@@ -34934,8 +34934,25 @@ Base de inventario tomada: ${baseTs.toLocaleString("es-BO")}`)) return;
       marginBottom: 6,
       display: "flex",
       alignItems: "center",
+      justifyContent: "space-between",
       gap: 8
-    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 20 } }, "\u2316"), " Verificaci\xF3n de Inventario \xB7 ", MESES[mes], " ", anio, marcaSelec ? ` \xB7 Solo ${marcaSelNombre}` : ""), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12.5, color: C.label3, fontFamily: FONT, lineHeight: 1.5 } }, "Herramienta de verificaci\xF3n: escanea (o ingresa el c\xF3digo de) cada producto f\xEDsico y la app lo cruza con el stock del sistema para detectar faltantes (posible fuga) o sobrantes. Es un simulador de control \u2014 ", /* @__PURE__ */ import_react.default.createElement("b", { style: { color: C.label2 } }, "no cierra contabilidad ni modifica el stock"), "."), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { display: "flex", alignItems: "center", gap: 8, minWidth: 0 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 20 } }, "\u2316"), /* @__PURE__ */ import_react.default.createElement("span", { style: { overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, "Verificaci\xF3n de Inventario \xB7 ", MESES[mes], " ", anio, marcaSelec ? ` \xB7 Solo ${marcaSelNombre}` : "")), (itemsContados > 0 || Object.keys(verifConteo).length > 0) && /* @__PURE__ */ import_react.default.createElement("button", { onClick: reiniciarConteo, title: "Cancelar y reiniciar la verificaci\xF3n \u2014 pone el conteo en cero", style: {
+      flexShrink: 0,
+      display: "flex",
+      alignItems: "center",
+      gap: 5,
+      padding: "6px 11px",
+      borderRadius: 9,
+      border: `1.5px solid ${C.red}55`,
+      background: C.redBg,
+      color: C.red,
+      fontSize: 11,
+      fontWeight: 700,
+      fontFamily: FONT,
+      cursor: "pointer",
+      WebkitTapHighlightColor: "transparent",
+      whiteSpace: "nowrap"
+    } }, "\u21BA Reiniciar")), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12.5, color: C.label3, fontFamily: FONT, lineHeight: 1.5 } }, "Herramienta de verificaci\xF3n: escanea (o ingresa el c\xF3digo de) cada producto f\xEDsico y la app lo cruza con el stock del sistema para detectar faltantes (posible fuga) o sobrantes. Es un simulador de control \u2014 ", /* @__PURE__ */ import_react.default.createElement("b", { style: { color: C.label2 } }, "no cierra contabilidad ni modifica el stock"), "."), /* @__PURE__ */ import_react.default.createElement("div", { style: {
       marginTop: 10,
       display: "flex",
       alignItems: "center",

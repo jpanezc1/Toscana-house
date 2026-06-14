@@ -12332,8 +12332,21 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
       <div style={{background:C.bg1,borderRadius:16,padding:18,marginBottom:14,
         border:`1px solid ${C.sep}`,boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}>
         <div style={{fontSize:16,fontWeight:700,color:C.label,fontFamily:FONT,marginBottom:6,
-          display:"flex",alignItems:"center",gap:8}}>
-          <span style={{fontSize:20}}>⌖</span> Verificación de Inventario · {MESES[mes]} {anio}{marcaSelec?` · Solo ${marcaSelNombre}`:""}
+          display:"flex",alignItems:"center",justifyContent:"space-between",gap:8}}>
+          <span style={{display:"flex",alignItems:"center",gap:8,minWidth:0}}>
+            <span style={{fontSize:20}}>⌖</span>
+            <span style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+              Verificación de Inventario · {MESES[mes]} {anio}{marcaSelec?` · Solo ${marcaSelNombre}`:""}
+            </span>
+          </span>
+          {(itemsContados>0||Object.keys(verifConteo).length>0)&&(
+            <button onClick={reiniciarConteo} title="Cancelar y reiniciar la verificación — pone el conteo en cero" style={{
+              flexShrink:0,display:"flex",alignItems:"center",gap:5,padding:"6px 11px",
+              borderRadius:9,border:`1.5px solid ${C.red}55`,background:C.redBg,
+              color:C.red,fontSize:11,fontWeight:700,fontFamily:FONT,cursor:"pointer",
+              WebkitTapHighlightColor:"transparent",whiteSpace:"nowrap",
+            }}>↺ Reiniciar</button>
+          )}
         </div>
         <div style={{fontSize:12.5,color:C.label3,fontFamily:FONT,lineHeight:1.5}}>
           Herramienta de verificación: escanea (o ingresa el código de) cada producto físico y la app
