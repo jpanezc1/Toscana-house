@@ -26051,21 +26051,22 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
     const fileRef = (0, import_react.useRef)(null);
     function buscarProdPorCod(cod) {
       const c = cod.trim().toUpperCase();
-      if (!c) return;
+      if (!c) return false;
       const p = inv.find((i) => i.codigo.toUpperCase() === c);
       if (!p) {
         setMsg({ ok: false, txt: `C\xF3digo "${c}" no encontrado` });
         setProdEncontrado(null);
-        return;
+        return false;
       }
       if (p.stock <= 0) {
         setMsg({ ok: false, txt: `"${p.nombre}" no tiene stock disponible` });
         setProdEncontrado(null);
-        return;
+        return false;
       }
       setProdEncontrado(p);
       setMsg(null);
       setCantidad("1");
+      return true;
     }
     function buscarProd() {
       buscarProdPorCod(codBusq);
@@ -26168,13 +26169,14 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
     } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 20 } }, "\u{1F4E4}"), " Registrar Retiro"), showScanner && /* @__PURE__ */ import_react.default.createElement(CameraScanner, { onDetect: (codigo) => {
       setShowScanner(false);
       setCodBusq(codigo);
-      buscarProdPorCod(codigo);
-      setScanStatus("ok");
+      const ok = buscarProdPorCod(codigo);
+      setScanStatus(ok ? "ok" : "notfound");
       setScanMsg(`C\xF3digo: ${codigo}`);
       setTimeout(() => {
         setScanStatus(null);
         setScanMsg("");
       }, 3e3);
+      return ok;
     }, onClose: () => setShowScanner(false) }), /* @__PURE__ */ import_react.default.createElement(
       "input",
       {
@@ -27367,8 +27369,9 @@ Fecha: ${venta.fecha}`);
       try {
         const codigo = await leerCodigoDeImagen(f);
         if (codigo) {
-          beep2();
-          onDetect(codigo);
+          const ok = onDetect(codigo);
+          if (ok === false) beepError2();
+          else beep2();
           setModo(continuous ? "foto" : "leyendo");
         } else {
           setScanMsg("No se detect\xF3 c\xF3digo \u2014 intenta de nuevo");
@@ -27423,8 +27426,9 @@ Fecha: ${venta.fecha}`);
             );
             if (res && !firedRef.current) {
               firedRef.current = true;
-              beep2();
-              onDetect(res.getText());
+              const ok = onDetect(res.getText());
+              if (ok === false) beepError2();
+              else beep2();
               if (continuous) {
                 cooldownRef.current = setTimeout(() => {
                   firedRef.current = false;
@@ -27465,6 +27469,25 @@ Fecha: ${venta.fecha}`);
         g.gain.value = 0.25;
         o.start();
         o.stop(ac.currentTime + 0.12);
+        setTimeout(() => ac.close(), 500);
+      } catch (_) {
+      }
+    }
+    function beepError2() {
+      try {
+        navigator.vibrate && navigator.vibrate([100, 60, 100]);
+      } catch (_) {
+      }
+      try {
+        const ac = new (window.AudioContext || window.webkitAudioContext)();
+        const o = ac.createOscillator(), g = ac.createGain();
+        o.connect(g);
+        g.connect(ac.destination);
+        o.type = "square";
+        o.frequency.value = 220;
+        g.gain.value = 0.2;
+        o.start();
+        o.stop(ac.currentTime + 0.22);
         setTimeout(() => ac.close(), 500);
       } catch (_) {
       }
@@ -33830,6 +33853,7 @@ Motivo: ${motivo}` : ""}`)) {
         setScanMsg(`C\xF3digo "${codigo}" \u2014 busca manualmente`);
       }
       setTimeout(() => setScanStatus(null), 3e3);
+      return !!prod;
     }, onClose: () => setShowScanner(false) }), /* @__PURE__ */ import_react.default.createElement(
       "input",
       {
@@ -34625,17 +34649,17 @@ Motivo: ${motivo}` : ""}`)) {
     }
     function buscarYAgregar(codigo) {
       const c = (codigo || "").trim().toUpperCase().replace(/'/g, "-");
-      if (!c) return;
+      if (!c) return false;
       const cAlnum = c.replace(/[^A-Z0-9]/g, "");
       const p = baseInv.find((i) => i.codigo.toUpperCase() === c) || baseInv.find((i) => i.codigo.toUpperCase().replace(/[^A-Z0-9]/g, "") === cAlnum);
       if (!p) {
         flash(false, `C\xF3digo "${c}" no encontrado en inventario`);
-        return;
+        return false;
       }
       if (!enAlcance(p)) {
         flash(false, `"${p.codigo}" es de ${p.marcaNombre || "otra marca"} \u2014 la verificaci\xF3n est\xE1 filtrada por ${marcaSelNombre}`);
         setCodManual("");
-        return;
+        return false;
       }
       const r = intentarContar(p);
       if (!r.ok) {
@@ -34644,6 +34668,7 @@ Motivo: ${motivo}` : ""}`)) {
         flash(true, r.repetido ? `Repetido OK \xB7 unidad ${r.cantNueva}/${r.sistemaP} \xB7 ${(p.nombre || "").toUpperCase()}` : `+1 \xB7 ${(p.nombre || "").toUpperCase()} (${p.codigo})`);
       }
       setCodManual("");
+      return r.ok;
     }
     function onDetectCierreRapido(codigo) {
       const c = (codigo || "").trim().toUpperCase();
@@ -35045,7 +35070,7 @@ Base de inventario tomada: ${baseTs.toLocaleString("es-BO")}`)) return;
       }
     )), vista === "conteo" && /* @__PURE__ */ import_react.default.createElement("div", null, showScanner && /* @__PURE__ */ import_react.default.createElement(CameraScanner, { onDetect: (codigo) => {
       setShowScanner(false);
-      buscarYAgregar(codigo);
+      return buscarYAgregar(codigo);
     }, onClose: () => setShowScanner(false) }), /* @__PURE__ */ import_react.default.createElement("div", { onClick: () => setShowScanner(true), style: {
       background: C.bg2,
       borderRadius: 13,

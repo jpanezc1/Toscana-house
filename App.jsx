@@ -4226,11 +4226,12 @@ function RetirosTab({inv, retiros, onRetiro}){
 
   function buscarProdPorCod(cod){
     const c = cod.trim().toUpperCase();
-    if(!c) return;
+    if(!c) return false;
     const p = inv.find(i=>i.codigo.toUpperCase()===c);
-    if(!p){ setMsg({ok:false,txt:`Código "${c}" no encontrado`}); setProdEncontrado(null); return; }
-    if(p.stock<=0){ setMsg({ok:false,txt:`"${p.nombre}" no tiene stock disponible`}); setProdEncontrado(null); return; }
+    if(!p){ setMsg({ok:false,txt:`Código "${c}" no encontrado`}); setProdEncontrado(null); return false; }
+    if(p.stock<=0){ setMsg({ok:false,txt:`"${p.nombre}" no tiene stock disponible`}); setProdEncontrado(null); return false; }
     setProdEncontrado(p); setMsg(null); setCantidad("1");
+    return true;
   }
 
   function buscarProd(){ buscarProdPorCod(codBusq); }
@@ -4316,9 +4317,10 @@ function RetirosTab({inv, retiros, onRetiro}){
         {showScanner && <CameraScanner onDetect={(codigo)=>{
           setShowScanner(false);
           setCodBusq(codigo);
-          buscarProdPorCod(codigo);
-          setScanStatus("ok"); setScanMsg(`Código: ${codigo}`);
+          const ok = buscarProdPorCod(codigo);
+          setScanStatus(ok?"ok":"notfound"); setScanMsg(`Código: ${codigo}`);
           setTimeout(()=>{setScanStatus(null);setScanMsg("");},3000);
+          return ok;
         }} onClose={()=>setShowScanner(false)}/>}
         <input ref={fileRef} type="file" accept="image/*" capture="environment"
           onChange={handleScanRetiro} style={{display:"none"}}/>
@@ -5607,7 +5609,8 @@ function CameraScanner({onDetect, onClose, continuous, feedback, stats}){
     try{
       const codigo = await leerCodigoDeImagen(f);
       if(codigo){
-        beep(); onDetect(codigo);
+        const ok = onDetect(codigo);
+        if(ok===false) beepError(); else beep();
         setModo(continuous?"foto":"leyendo");
       } else {
         setScanMsg("No se detectó código — intenta de nuevo");
@@ -5661,7 +5664,8 @@ function CameraScanner({onDetect, onClose, continuous, feedback, stats}){
           );
           if(res&&!firedRef.current){
             firedRef.current=true;
-            beep(); onDetect(res.getText());
+            const ok = onDetect(res.getText());
+            if(ok===false) beepError(); else beep();
             if(continuous){
               cooldownRef.current=setTimeout(()=>{firedRef.current=false;},1300);
             }else{
@@ -5693,6 +5697,20 @@ function CameraScanner({onDetect, onClose, continuous, feedback, stats}){
       o.connect(g);g.connect(ac.destination);
       o.frequency.value=1046;g.gain.value=0.25;
       o.start();o.stop(ac.currentTime+0.12);
+      setTimeout(()=>ac.close(),500);
+    }catch(_){}
+  }
+
+  // Beep de error — tono grave y más largo, para códigos que no se cargan/encuentran.
+  function beepError(){
+    try{ navigator.vibrate&&navigator.vibrate([100,60,100]); }catch(_){}
+    try{
+      const ac=new(window.AudioContext||window.webkitAudioContext)();
+      const o=ac.createOscillator(),g=ac.createGain();
+      o.connect(g);g.connect(ac.destination);
+      o.type="square";
+      o.frequency.value=220;g.gain.value=0.2;
+      o.start();o.stop(ac.currentTime+0.22);
       setTimeout(()=>ac.close(),500);
     }catch(_){}
   }
@@ -11375,6 +11393,7 @@ function POS({inv,onVenta,onVerNota}){
         if(prod){ add(prod); setScanStatus("ok"); setScanMsg(`✓ "${prod.nombre}" agregado al carrito`); }
         else { setBusq(codigo); setScanStatus("notfound"); setScanMsg(`Código "${codigo}" — busca manualmente`); }
         setTimeout(()=>setScanStatus(null),3000);
+        return !!prod;
       }} onClose={()=>setShowScanner(false)}/>}
       <input ref={fileRef} type="file" accept="image/*" capture="environment"
         onChange={handleEtiqueta} style={{display:"none"}}/>
@@ -12070,11 +12089,11 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
 
   function buscarYAgregar(codigo){
     const c=(codigo||"").trim().toUpperCase().replace(/'/g,"-");
-    if(!c) return;
+    if(!c) return false;
     const cAlnum=c.replace(/[^A-Z0-9]/g,"");
     const p=baseInv.find(i=>i.codigo.toUpperCase()===c) || baseInv.find(i=>i.codigo.toUpperCase().replace(/[^A-Z0-9]/g,"")===cAlnum);
-    if(!p){ flash(false, `Código "${c}" no encontrado en inventario`); return; }
-    if(!enAlcance(p)){ flash(false, `"${p.codigo}" es de ${p.marcaNombre||"otra marca"} — la verificación está filtrada por ${marcaSelNombre}`); setCodManual(""); return; }
+    if(!p){ flash(false, `Código "${c}" no encontrado en inventario`); return false; }
+    if(!enAlcance(p)){ flash(false, `"${p.codigo}" es de ${p.marcaNombre||"otra marca"} — la verificación está filtrada por ${marcaSelNombre}`); setCodManual(""); return false; }
     const r=intentarContar(p);
     if(!r.ok){
       flash(false, r.sistemaP<=1
@@ -12086,6 +12105,7 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
         : `+1 · ${(p.nombre||"").toUpperCase()} (${p.codigo})`);
     }
     setCodManual("");
+    return r.ok;
   }
 
   // ── Verificación rápida: escaneo continuo con lector USB ──
@@ -12453,7 +12473,7 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
           {/* Scanner */}
           {showScanner && <CameraScanner onDetect={(codigo)=>{
             setShowScanner(false);
-            buscarYAgregar(codigo);
+            return buscarYAgregar(codigo);
           }} onClose={()=>setShowScanner(false)}/>}
 
           <div onClick={()=>setShowScanner(true)} style={{background:C.bg2,borderRadius:13,
