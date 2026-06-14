@@ -27691,6 +27691,21 @@ Fecha: ${venta.fecha}`);
     } catch (_) {
     }
   }
+  function beepError() {
+    try {
+      const ac = new (window.AudioContext || window.webkitAudioContext)();
+      const o = ac.createOscillator(), g = ac.createGain();
+      o.connect(g);
+      g.connect(ac.destination);
+      o.type = "square";
+      o.frequency.value = 220;
+      g.gain.value = 0.18;
+      o.start();
+      o.stop(ac.currentTime + 0.22);
+      setTimeout(() => ac.close(), 400);
+    } catch (_) {
+    }
+  }
   function LectorHID({ onDetect, onClose, feedback, stats, rows, marcaNombre }) {
     const inputRef = (0, import_react.useRef)(null);
     const idleRef = (0, import_react.useRef)(null);
@@ -27736,8 +27751,9 @@ Fecha: ${venta.fecha}`);
       setBuf("");
       if (idleRef.current) clearTimeout(idleRef.current);
       if (code.length < 2) return;
-      beep();
-      onDetect(code);
+      const ok = onDetect(code);
+      if (ok === false) beepError();
+      else beep();
     }
     function onChange(e) {
       const v = e.target.value;
@@ -34634,11 +34650,11 @@ Motivo: ${motivo}` : ""}`)) {
       const p = baseInv.find((i) => i.codigo.toUpperCase() === c);
       if (!p) {
         setLiveFeedback({ ts: Date.now(), ok: false, title: "C\xF3digo no encontrado", sub: c });
-        return;
+        return false;
       }
       if (!enAlcance(p)) {
         setLiveFeedback({ ts: Date.now(), ok: false, title: `Otra marca \u2014 fuera de la verificaci\xF3n de ${marcaSelNombre}`, sub: `${p.codigo} \xB7 ${p.marcaNombre || ""}` });
-        return;
+        return false;
       }
       const r = intentarContar(p);
       if (!r.ok) {
@@ -34651,7 +34667,7 @@ Motivo: ${motivo}` : ""}`)) {
           title: `Repetido \xB7 ${(p.nombre || "").toUpperCase()}`,
           sub: `${p.codigo} \xB7 ${motivo}`
         });
-        return;
+        return false;
       }
       setLiveFeedback({
         ts: Date.now(),
@@ -34661,6 +34677,7 @@ Motivo: ${motivo}` : ""}`)) {
         title: (p.nombre || "").toUpperCase(),
         sub: r.repetido ? `Repetido OK \xB7 unidad ${r.cantNueva} de ${r.sistemaP}` : `${p.codigo} \xB7 contabilizado (1 de ${r.sistemaP})`
       });
+      return true;
     }
     function reiniciarConteo() {
       if (Object.keys(conteo).length === 0) return;
@@ -34762,7 +34779,7 @@ Motivo: ${motivo}` : ""}`)) {
           title: enInv ? "Sin discrepancia \u2014 no requiere verificaci\xF3n" : "C\xF3digo no encontrado",
           sub: c
         });
-        return;
+        return false;
       }
       let nuevo = 0;
       setVerifConteo((prev) => {
@@ -34795,6 +34812,7 @@ Motivo: ${motivo}` : ""}`)) {
           sub: `Verificando\u2026 ${nuevo} de ${r.contado}`
         });
       }
+      return true;
     }
     function confirmarCierre() {
       if (itemsContados === 0) {

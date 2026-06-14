@@ -5912,6 +5912,20 @@ function beep(remoto){
   }catch(_){}
 }
 
+// Beep de error — tono grave y más largo, distinto al de confirmación,
+// para distinguir al oído un código que NO se pudo cargar/contar.
+function beepError(){
+  try{
+    const ac=new(window.AudioContext||window.webkitAudioContext)();
+    const o=ac.createOscillator(),g=ac.createGain();
+    o.connect(g);g.connect(ac.destination);
+    o.type="square";
+    o.frequency.value=220;g.gain.value=0.18;
+    o.start();o.stop(ac.currentTime+0.22);
+    setTimeout(()=>ac.close(),400);
+  }catch(_){}
+}
+
 // ══════════════════════════════════════════════════════════
 // LectorHID — Verificación rápida con lector de código de barras
 // conectado a la computadora (USB/HID). El lector "teclea" el código
@@ -5961,8 +5975,8 @@ function LectorHID({onDetect, onClose, feedback, stats, rows, marcaNombre}){
     setBuf("");
     if(idleRef.current) clearTimeout(idleRef.current);
     if(code.length<2) return; // ignora ruido / Enter vacío
-    beep();
-    onDetect(code);
+    const ok = onDetect(code);
+    if(ok===false) beepError(); else beep();
   }
 
   function onChange(e){
@@ -12080,11 +12094,11 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
     const p=baseInv.find(i=>i.codigo.toUpperCase()===c);
     if(!p){
       setLiveFeedback({ts:Date.now(),ok:false,title:"Código no encontrado",sub:c});
-      return;
+      return false;
     }
     if(!enAlcance(p)){
       setLiveFeedback({ts:Date.now(),ok:false,title:`Otra marca — fuera de la verificación de ${marcaSelNombre}`,sub:`${p.codigo} · ${p.marcaNombre||""}`});
-      return;
+      return false;
     }
     const r=intentarContar(p);
     if(!r.ok){
@@ -12096,13 +12110,14 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
           : `ya contaste las ${r.sistemaP} unidades — repetido no contabilizado`;
       setLiveFeedback({ts:Date.now(),ok:false,code:p.codigo,repetido:true,
         title:`Repetido · ${(p.nombre||"").toUpperCase()}`, sub:`${p.codigo} · ${motivo}`});
-      return;
+      return false;
     }
     setLiveFeedback({ts:Date.now(),ok:true,code:p.codigo,repetido:r.repetido,
       title:(p.nombre||"").toUpperCase(),
       sub: r.repetido
         ? `Repetido OK · unidad ${r.cantNueva} de ${r.sistemaP}`
         : `${p.codigo} · contabilizado (1 de ${r.sistemaP})`});
+    return true;
   }
 
   function reiniciarConteo(){
@@ -12217,7 +12232,7 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
       setLiveFeedback({ts:Date.now(),ok:false,
         title: enInv ? "Sin discrepancia — no requiere verificación" : "Código no encontrado",
         sub:c});
-      return;
+      return false;
     }
     let nuevo=0;
     setVerifConteo(prev=>{
@@ -12237,6 +12252,7 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
         title:(r.nombre||"").toUpperCase(),
         sub:`Verificando… ${nuevo} de ${r.contado}`});
     }
+    return true;
   }
 
   function confirmarCierre(){
