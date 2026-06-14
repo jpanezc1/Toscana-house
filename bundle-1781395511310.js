@@ -31860,6 +31860,8 @@ Fecha: ${venta.fecha}`);
     const [mLiq, setMLiq] = (0, import_react.useState)(null);
     const [fInv, setFInv] = (0, import_react.useState)({ marcaId: "", nombre: "", categoria: "", descripcion: "", subcat: "", precio: "", stock: "", fecha: hoy(), codigoManual: "" });
     const [bajaCod, setBajaCod] = (0, import_react.useState)("");
+    const [bajaCant, setBajaCant] = (0, import_react.useState)("");
+    const [bajaMotivo, setBajaMotivo] = (0, import_react.useState)("");
     const [bajaMsg, setBajaMsg] = (0, import_react.useState)(null);
     const [sheetReponer, setShReponer] = (0, import_react.useState)(false);
     const [repCod, setRepCod] = (0, import_react.useState)("");
@@ -32260,25 +32262,38 @@ Fecha: ${venta.fecha}`);
         return;
       }
       const stockAntes = prod.stock;
-      if (!window.confirm(`\xBFConfirmar baja de "${prod.nombre}" (${cod})?
-Stock actual: ${stockAntes} \u2192 0`)) {
+      const cant = bajaCant.trim() === "" ? stockAntes : Number(bajaCant);
+      if (!cant || cant <= 0 || cant > stockAntes) {
+        setBajaMsg({ ok: false, msg: `Cantidad inv\xE1lida (stock actual: ${stockAntes})` });
         return;
       }
-      registrarBaja(prod, stockAntes);
-      setBajaMsg({ ok: true, msg: `\u2713 "${prod.nombre}" dado de baja` });
+      const motivo = bajaMotivo.trim();
+      const stockDespues = stockAntes - cant;
+      if (!window.confirm(`\xBFConfirmar baja de "${prod.nombre}" (${cod})?
+Stock actual: ${stockAntes} \u2192 ${stockDespues}${motivo ? `
+Motivo: ${motivo}` : ""}`)) {
+        return;
+      }
+      registrarBaja(prod, stockAntes, cant, motivo);
+      setBajaMsg({ ok: true, msg: `\u2713 "${prod.nombre}": stock ${stockAntes} \u2192 ${stockDespues}` });
       setBajaCod("");
+      setBajaCant("");
+      setBajaMotivo("");
     }
-    function registrarBaja(prod, stockAntes) {
-      setInv((p) => p.map((i) => i.id === prod.id ? { ...i, stock: 0 } : i));
-      sbActualizarStock(prod.id, 0);
+    function registrarBaja(prod, stockAntes, cant, motivo) {
+      const stockDespues = stockAntes - cant;
+      setInv((p) => p.map((i) => i.id === prod.id ? { ...i, stock: stockDespues } : i));
+      sbActualizarStock(prod.id, stockDespues);
       logAudit("BAJA", {
-        resumen: `Baja: ${prod.nombre} \xB7 stock ${stockAntes}\u21920`,
+        resumen: `Baja: ${prod.nombre} (${prod.codigo}) -${cant} \xB7 stock ${stockAntes}\u2192${stockDespues}${motivo ? ` \xB7 ${motivo}` : ""}`,
         codigo: prod.codigo,
         nombre: prod.nombre,
         marca: prod.marcaNombre || "\u2014",
         precio: prod.precio || 0,
+        cantidad: cant,
+        motivo,
         stockAntes,
-        stockDespues: 0
+        stockDespues
       }, user);
     }
     function reponerStock() {
@@ -32656,6 +32671,8 @@ Stock actual: ${stockAntes} \u2192 0`)) {
       setShBaja(true);
       setBajaMsg(null);
       setBajaCod("");
+      setBajaCant("");
+      setBajaMotivo("");
     }, onImportarExcel: () => setShImportarExcel(true), onReponer: () => {
       setShReponer(true);
       setRepMsg(null);
@@ -33039,7 +33056,7 @@ Stock actual: ${stockAntes} \u2192 0`)) {
         fInv,
         setFInv
       }
-    ), /* @__PURE__ */ import_react.default.createElement(Sheet, { open: sheetBaja, onClose: () => setShBaja(false), title: "Dar de Baja por C\xF3digo" }, /* @__PURE__ */ import_react.default.createElement("p", { style: { color: C.label2, fontFamily: FONT, fontSize: 15, margin: "0 0 16px" } }, "Ingresa el c\xF3digo del producto para marcarlo como agotado."), /* @__PURE__ */ import_react.default.createElement(
+    ), /* @__PURE__ */ import_react.default.createElement(Sheet, { open: sheetBaja, onClose: () => setShBaja(false), title: "Dar de Baja por C\xF3digo" }, /* @__PURE__ */ import_react.default.createElement("p", { style: { color: C.label2, fontFamily: FONT, fontSize: 15, margin: "0 0 16px" } }, "Ingresa el c\xF3digo del producto para marcarlo como agotado. Si el stock est\xE1 duplicado (m\xE1s de 1), puedes dar de baja solo la cantidad necesaria."), /* @__PURE__ */ import_react.default.createElement(
       IOSInput,
       {
         label: "C\xF3digo del producto",
@@ -33050,6 +33067,26 @@ Stock actual: ${stockAntes} \u2192 0`)) {
         },
         placeholder: "Ej: DON-CREM-0001",
         style: { fontFamily: "monospace", textTransform: "uppercase" }
+      }
+    ), /* @__PURE__ */ import_react.default.createElement(
+      IOSInput,
+      {
+        label: "Cantidad a dar de baja (vac\xEDo = todo el stock)",
+        type: "number",
+        value: bajaCant,
+        onChange: (e) => {
+          setBajaCant(e.target.value);
+          setBajaMsg(null);
+        },
+        placeholder: "Ej: 1"
+      }
+    ), /* @__PURE__ */ import_react.default.createElement(
+      IOSInput,
+      {
+        label: "Detalle / motivo (opcional)",
+        value: bajaMotivo,
+        onChange: (e) => setBajaMotivo(e.target.value),
+        placeholder: "Ej: Error en stock"
       }
     ), bajaMsg && /* @__PURE__ */ import_react.default.createElement("div", { style: {
       padding: "12px 14px",

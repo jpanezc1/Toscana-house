@@ -9693,6 +9693,8 @@ function App(){
   const[mLiq,setMLiq]       =useState(null);
   const[fInv,setFInv]       =useState({marcaId:"",nombre:"",categoria:"",descripcion:"",subcat:"",precio:"",stock:"",fecha:hoy(),codigoManual:""});
   const[bajaCod,setBajaCod] =useState("");
+  const[bajaCant,setBajaCant]=useState("");
+  const[bajaMotivo,setBajaMotivo]=useState("");
   const[bajaMsg,setBajaMsg] =useState(null);
   const[sheetReponer,setShReponer]=useState(false);
   const[repCod,setRepCod]   =useState("");
@@ -10016,24 +10018,32 @@ function App(){
     if(!prod){setBajaMsg({ok:false,msg:`"${cod}" no encontrado`});return;}
     if(prod.stock<=0){setBajaMsg({ok:false,msg:`"${prod.nombre}" ya está agotado`});return;}
     const stockAntes = prod.stock;
-    if(!window.confirm(`¿Confirmar baja de "${prod.nombre}" (${cod})?\nStock actual: ${stockAntes} → 0`)){
+    // Cantidad opcional: si no se especifica, se da de baja todo el stock
+    const cant = bajaCant.trim()==="" ? stockAntes : Number(bajaCant);
+    if(!cant||cant<=0||cant>stockAntes){setBajaMsg({ok:false,msg:`Cantidad inválida (stock actual: ${stockAntes})`});return;}
+    const motivo = bajaMotivo.trim();
+    const stockDespues = stockAntes - cant;
+    if(!window.confirm(`¿Confirmar baja de "${prod.nombre}" (${cod})?\nStock actual: ${stockAntes} → ${stockDespues}${motivo?`\nMotivo: ${motivo}`:""}`)){
       return;
     }
-    registrarBaja(prod, stockAntes);
-    setBajaMsg({ok:true,msg:`✓ "${prod.nombre}" dado de baja`});
-    setBajaCod("");
+    registrarBaja(prod, stockAntes, cant, motivo);
+    setBajaMsg({ok:true,msg:`✓ "${prod.nombre}": stock ${stockAntes} → ${stockDespues}`});
+    setBajaCod(""); setBajaCant(""); setBajaMotivo("");
   }
 
   // Dar de baja — SOLO Inventario. No genera retiro (eso es exclusivo de Caja).
-  function registrarBaja(prod, stockAntes){
-    setInv(p=>p.map(i=>i.id===prod.id?{...i,stock:0}:i));
-    sbActualizarStock(prod.id, 0);
+  // Permite baja parcial (ej. para corregir stock duplicado) y un motivo/detalle.
+  function registrarBaja(prod, stockAntes, cant, motivo){
+    const stockDespues = stockAntes - cant;
+    setInv(p=>p.map(i=>i.id===prod.id?{...i,stock:stockDespues}:i));
+    sbActualizarStock(prod.id, stockDespues);
     logAudit("BAJA", {
-      resumen: `Baja: ${prod.nombre} · stock ${stockAntes}→0`,
+      resumen: `Baja: ${prod.nombre} (${prod.codigo}) -${cant} · stock ${stockAntes}→${stockDespues}${motivo?` · ${motivo}`:""}`,
       codigo: prod.codigo, nombre: prod.nombre,
       marca: prod.marcaNombre||"—",
       precio: prod.precio||0,
-      stockAntes, stockDespues: 0,
+      cantidad: cant, motivo,
+      stockAntes, stockDespues,
     }, user);
   }
 
@@ -10368,7 +10378,7 @@ function App(){
 
         {/* INVENTARIO — por marca */}
         {tab==="inventario" && (
-          <InventarioPorMarca inv={inv} ventas={ventas} onRecibir={()=>setShInv(true)} onBaja={()=>{setShBaja(true);setBajaMsg(null);setBajaCod("");}} onImportarExcel={()=>setShImportarExcel(true)} onReponer={()=>{setShReponer(true);setRepMsg(null);setRepCod("");setRepCant("");}}/>
+          <InventarioPorMarca inv={inv} ventas={ventas} onRecibir={()=>setShInv(true)} onBaja={()=>{setShBaja(true);setBajaMsg(null);setBajaCod("");setBajaCant("");setBajaMotivo("");}} onImportarExcel={()=>setShImportarExcel(true)} onReponer={()=>{setShReponer(true);setRepMsg(null);setRepCod("");setRepCant("");}}/>
         )}
 
         {/* AUDITORÍA — cierre de inventario mensual (conteo físico vs sistema) */}
@@ -10741,12 +10751,16 @@ function App(){
       {/* Sheet: Dar de Baja */}
       <Sheet open={sheetBaja} onClose={()=>setShBaja(false)} title="Dar de Baja por Código">
         <p style={{color:C.label2,fontFamily:FONT,fontSize:15,margin:"0 0 16px"}}>
-          Ingresa el código del producto para marcarlo como agotado.
+          Ingresa el código del producto para marcarlo como agotado. Si el stock está duplicado (más de 1), puedes dar de baja solo la cantidad necesaria.
         </p>
         <IOSInput label="Código del producto" value={bajaCod}
           onChange={e=>{setBajaCod(e.target.value.toUpperCase());setBajaMsg(null);}}
           placeholder="Ej: DON-CREM-0001"
           style={{fontFamily:"monospace",textTransform:"uppercase"}}/>
+        <IOSInput label="Cantidad a dar de baja (vacío = todo el stock)" type="number" value={bajaCant}
+          onChange={e=>{setBajaCant(e.target.value);setBajaMsg(null);}} placeholder="Ej: 1"/>
+        <IOSInput label="Detalle / motivo (opcional)" value={bajaMotivo}
+          onChange={e=>setBajaMotivo(e.target.value)} placeholder="Ej: Error en stock"/>
         {bajaMsg&&(
           <div style={{padding:"12px 14px",borderRadius:12,marginBottom:12,
             background:bajaMsg.ok?`${C.green}15`:`${C.red}15`,
