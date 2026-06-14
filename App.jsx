@@ -158,6 +158,13 @@ async function sbIncrementarConteoVerif(id, codigo) {
   } catch(e) { console.warn("Supabase incrementar conteo verif:", e.message); return null; }
 }
 
+async function sbResetSesionVerif(id) {
+  try {
+    const db = await getSupabase();
+    await db.from("th_verif_sesion").update({ conteo: {} }).eq("id", id);
+  } catch(e) { console.warn("Supabase reset sesión verif:", e.message); }
+}
+
 async function sbGuardarRetiro(retiro) {
   try {
     const db = await getSupabase();
@@ -11919,11 +11926,20 @@ function SheetRecibir({open, onClose, inv, onAdd, fInv, setFInv}){
 // ══════════════════════════════════════════════════════════
 function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, onGuardarAuditoria, user}){
   const isDesktop = useIsDesktop();
-  const[vista,setVista]=useState("conteo");
-  const[marcaSelec,setMarcaSelec]=useState(null);
-  const[conteo,setConteo]=useState({}); // {prodId: cantidad} — 1ra pasada
-  const[verifConteo,setVerifConteo]=useState({}); // {prodId: cantidad} — 2da pasada (verificación)
-  const[manualVerif,setManualVerif]=useState({}); // {prodId: true} — verificado manualmente por admin
+  // El trabajo en curso (vista, marca seleccionada, doble conteo) se guarda
+  // en localStorage para que NO se pierda si el usuario cambia de pestaña
+  // (ej. va a Caja a cobrar una venta) y vuelve — solo "Reiniciar conteo"
+  // (Borrar) lo limpia.
+  const[vista,setVista]=useState(()=>{ try{return localStorage.getItem(`th_verif_vista_${MK}`)||"conteo";}catch{return "conteo";} });
+  const[marcaSelec,setMarcaSelec]=useState(()=>{ try{return JSON.parse(localStorage.getItem(`th_verif_marca_${MK}`)||"null");}catch{return null;} });
+  const[conteo,setConteo]=useState(()=>{
+    try{
+      const marca=JSON.parse(localStorage.getItem(`th_verif_marca_${MK}`)||"null");
+      return JSON.parse(localStorage.getItem(`th_verif_conteo_${MK}_${marca||"ALL"}`)||"{}");
+    }catch{return {};}
+  }); // {prodId: cantidad} — 1ra pasada
+  const[verifConteo,setVerifConteo]=useState(()=>{ try{return JSON.parse(localStorage.getItem(`th_verif_doble_${MK}`)||"{}");}catch{return {};} }); // {prodId: cantidad} — 2da pasada (verificación)
+  const[manualVerif,setManualVerif]=useState(()=>{ try{return JSON.parse(localStorage.getItem(`th_verif_manual_${MK}`)||"{}");}catch{return {};} }); // {prodId: true} — verificado manualmente por admin
   const[showScanner,setShowScanner]=useState(false);
   const[modoCierre,setModoCierre]=useState(false); // escaneo continuo de cierre rápido
   const[modoVerif,setModoVerif]=useState(false); // escaneo continuo de verificación (2da pasada)
@@ -11963,6 +11979,13 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
       return next;
     });
   }
+
+  // ── Persistencia local del progreso (sobrevive a cambios de pestaña) ──
+  useEffect(()=>{ try{localStorage.setItem(`th_verif_vista_${MK}`, vista);}catch{} },[vista,MK]);
+  useEffect(()=>{ try{localStorage.setItem(`th_verif_marca_${MK}`, JSON.stringify(marcaSelec));}catch{} },[marcaSelec,MK]);
+  useEffect(()=>{ try{localStorage.setItem(`th_verif_conteo_${MK}_${marcaSelec||"ALL"}`, JSON.stringify(conteo));}catch{} },[conteo,MK,marcaSelec]);
+  useEffect(()=>{ try{localStorage.setItem(`th_verif_doble_${MK}`, JSON.stringify(verifConteo));}catch{} },[verifConteo,MK]);
+  useEffect(()=>{ try{localStorage.setItem(`th_verif_manual_${MK}`, JSON.stringify(manualVerif));}catch{} },[manualVerif,MK]);
 
   const sesionId = `VERIF-${MK}-${marcaSelec||"ALL"}`;
   const channelRef = useRef(null);
@@ -12086,6 +12109,12 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
     if(Object.keys(conteo).length===0) return;
     if(window.confirm("¿Reiniciar el conteo físico? Se perderán los ítems escaneados hasta ahora.")) {
       setConteo({}); setVerifConteo({}); setManualVerif({});
+      try{
+        localStorage.removeItem(`th_verif_conteo_${MK}_${marcaSelec||"ALL"}`);
+        localStorage.removeItem(`th_verif_doble_${MK}`);
+        localStorage.removeItem(`th_verif_manual_${MK}`);
+      }catch{}
+      sbResetSesionVerif(sesionId);
     }
   }
 
@@ -12234,6 +12263,12 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
     // sistema vs escaneado, con faltantes/sobrantes marcados)
     try{ exportAuditoriaExcel(aud); }catch(e){ console.error("Export cierre:",e); }
     setConteo({}); setVerifConteo({}); setManualVerif({});
+    try{
+      localStorage.removeItem(`th_verif_conteo_${MK}_${marcaSelec||"ALL"}`);
+      localStorage.removeItem(`th_verif_doble_${MK}`);
+      localStorage.removeItem(`th_verif_manual_${MK}`);
+    }catch{}
+    sbResetSesionVerif(sesionId);
     flash(true,"✓ Verificación guardada · Excel generado");
     setVista("historial");
   }
@@ -12592,6 +12627,9 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
           )}
 
           <div style={{display:"flex",flexDirection:"column",gap:10}}>
+            <IOSBtn onPress={()=>setModoCierre(true)} variant="fill" full icon="📷">
+              Escanear ítem rezagado
+            </IOSBtn>
             <IOSBtn onPress={()=>exportAuditoriaExcel({
               id:`AUD-${MK}-preview`, mk:MK, mes, anio, fecha:hoy(), hora:hora(),
               usuario:user?.nombre||"—", marcaId:marcaSelec,

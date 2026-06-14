@@ -21612,6 +21612,14 @@
       return null;
     }
   }
+  async function sbResetSesionVerif(id) {
+    try {
+      const db = await getSupabase();
+      await db.from("th_verif_sesion").update({ conteo: {} }).eq("id", id);
+    } catch (e) {
+      console.warn("Supabase reset sesi\xF3n verif:", e.message);
+    }
+  }
   async function sbGuardarRetiro(retiro) {
     try {
       const db = await getSupabase();
@@ -34438,11 +34446,42 @@ Motivo: ${motivo}` : ""}`)) {
   }
   function AuditoriaInventario({ inv, ventas, cargas, mes, anio, MK, auditorias, onGuardarAuditoria, user }) {
     const isDesktop = useIsDesktop();
-    const [vista, setVista] = (0, import_react.useState)("conteo");
-    const [marcaSelec, setMarcaSelec] = (0, import_react.useState)(null);
-    const [conteo, setConteo] = (0, import_react.useState)({});
-    const [verifConteo, setVerifConteo] = (0, import_react.useState)({});
-    const [manualVerif, setManualVerif] = (0, import_react.useState)({});
+    const [vista, setVista] = (0, import_react.useState)(() => {
+      try {
+        return localStorage.getItem(`th_verif_vista_${MK}`) || "conteo";
+      } catch {
+        return "conteo";
+      }
+    });
+    const [marcaSelec, setMarcaSelec] = (0, import_react.useState)(() => {
+      try {
+        return JSON.parse(localStorage.getItem(`th_verif_marca_${MK}`) || "null");
+      } catch {
+        return null;
+      }
+    });
+    const [conteo, setConteo] = (0, import_react.useState)(() => {
+      try {
+        const marca = JSON.parse(localStorage.getItem(`th_verif_marca_${MK}`) || "null");
+        return JSON.parse(localStorage.getItem(`th_verif_conteo_${MK}_${marca || "ALL"}`) || "{}");
+      } catch {
+        return {};
+      }
+    });
+    const [verifConteo, setVerifConteo] = (0, import_react.useState)(() => {
+      try {
+        return JSON.parse(localStorage.getItem(`th_verif_doble_${MK}`) || "{}");
+      } catch {
+        return {};
+      }
+    });
+    const [manualVerif, setManualVerif] = (0, import_react.useState)(() => {
+      try {
+        return JSON.parse(localStorage.getItem(`th_verif_manual_${MK}`) || "{}");
+      } catch {
+        return {};
+      }
+    });
     const [showScanner, setShowScanner] = (0, import_react.useState)(false);
     const [modoCierre, setModoCierre] = (0, import_react.useState)(false);
     const [modoVerif, setModoVerif] = (0, import_react.useState)(false);
@@ -34474,6 +34513,36 @@ Motivo: ${motivo}` : ""}`)) {
         return next;
       });
     }
+    (0, import_react.useEffect)(() => {
+      try {
+        localStorage.setItem(`th_verif_vista_${MK}`, vista);
+      } catch {
+      }
+    }, [vista, MK]);
+    (0, import_react.useEffect)(() => {
+      try {
+        localStorage.setItem(`th_verif_marca_${MK}`, JSON.stringify(marcaSelec));
+      } catch {
+      }
+    }, [marcaSelec, MK]);
+    (0, import_react.useEffect)(() => {
+      try {
+        localStorage.setItem(`th_verif_conteo_${MK}_${marcaSelec || "ALL"}`, JSON.stringify(conteo));
+      } catch {
+      }
+    }, [conteo, MK, marcaSelec]);
+    (0, import_react.useEffect)(() => {
+      try {
+        localStorage.setItem(`th_verif_doble_${MK}`, JSON.stringify(verifConteo));
+      } catch {
+      }
+    }, [verifConteo, MK]);
+    (0, import_react.useEffect)(() => {
+      try {
+        localStorage.setItem(`th_verif_manual_${MK}`, JSON.stringify(manualVerif));
+      } catch {
+      }
+    }, [manualVerif, MK]);
     const sesionId = `VERIF-${MK}-${marcaSelec || "ALL"}`;
     const channelRef = (0, import_react.useRef)(null);
     (0, import_react.useEffect)(() => {
@@ -34599,6 +34668,13 @@ Motivo: ${motivo}` : ""}`)) {
         setConteo({});
         setVerifConteo({});
         setManualVerif({});
+        try {
+          localStorage.removeItem(`th_verif_conteo_${MK}_${marcaSelec || "ALL"}`);
+          localStorage.removeItem(`th_verif_doble_${MK}`);
+          localStorage.removeItem(`th_verif_manual_${MK}`);
+        } catch {
+        }
+        sbResetSesionVerif(sesionId);
       }
     }
     const ventasAjuste = (0, import_react.useMemo)(() => {
@@ -34774,6 +34850,13 @@ Base de inventario tomada: ${baseTs.toLocaleString("es-BO")}`)) return;
       setConteo({});
       setVerifConteo({});
       setManualVerif({});
+      try {
+        localStorage.removeItem(`th_verif_conteo_${MK}_${marcaSelec || "ALL"}`);
+        localStorage.removeItem(`th_verif_doble_${MK}`);
+        localStorage.removeItem(`th_verif_manual_${MK}`);
+      } catch {
+      }
+      sbResetSesionVerif(sesionId);
       flash(true, "\u2713 Verificaci\xF3n guardada \xB7 Excel generado");
       setVista("historial");
     }
@@ -35156,7 +35239,7 @@ Base de inventario tomada: ${baseTs.toLocaleString("es-BO")}`)) return;
       marginBottom: 14,
       background: C.redBg,
       border: `1px solid ${C.red}33`
-    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 18 } }, "\u26A0"), /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1, fontSize: 12, color: C.red, fontFamily: FONT, lineHeight: 1.4 } }, /* @__PURE__ */ import_react.default.createElement("b", null, discrepancias.length - verificadosCount, " discrepancia(s) sin verificar."), " Antes de confirmar el cierre se requiere una segunda revisi\xF3n (doble conteo) \u2014 toca para ir a Verificaci\xF3n.")), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 10 } }, /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => exportAuditoriaExcel({
+    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 18 } }, "\u26A0"), /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1, fontSize: 12, color: C.red, fontFamily: FONT, lineHeight: 1.4 } }, /* @__PURE__ */ import_react.default.createElement("b", null, discrepancias.length - verificadosCount, " discrepancia(s) sin verificar."), " Antes de confirmar el cierre se requiere una segunda revisi\xF3n (doble conteo) \u2014 toca para ir a Verificaci\xF3n.")), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 10 } }, /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => setModoCierre(true), variant: "fill", full: true, icon: "\u{1F4F7}" }, "Escanear \xEDtem rezagado"), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => exportAuditoriaExcel({
       id: `AUD-${MK}-preview`,
       mk: MK,
       mes,
