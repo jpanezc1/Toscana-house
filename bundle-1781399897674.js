@@ -28586,6 +28586,7 @@ Fecha: ${venta.fecha}`);
     const totalHoy = vHoy.reduce((s, v) => s + v.total, 0);
     const totalMes = vMes.reduce((s, v) => s + v.total, 0);
     const stockTotal = inv.reduce((s, i) => s + (i.stock || 0), 0);
+    const valorInventario = inv.reduce((s, i) => s + (i.stock || 0) * (i.precio || 0), 0);
     const last7 = (0, import_react.useMemo)(() => {
       const days = [];
       for (let i = 6; i >= 0; i--) {
@@ -28657,7 +28658,7 @@ Fecha: ${venta.fecha}`);
       letterSpacing: 5,
       lineHeight: 1.6,
       textTransform: "uppercase"
-    } }, "CASA DE MODA"))), /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center", marginBottom: isDesktop ? 10 : 16, marginTop: -6 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT_UI } }, dateStr)), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "grid", gridTemplateColumns: isDesktop ? "1fr 1fr 1fr 1fr" : "1fr 1fr", gap: isDesktop ? 8 : 10, marginBottom: isDesktop ? 10 : 14 } }, /* @__PURE__ */ import_react.default.createElement(
+    } }, "CASA DE MODA"))), /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center", marginBottom: isDesktop ? 10 : 16, marginTop: -6 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT_UI } }, dateStr)), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "grid", gridTemplateColumns: isDesktop ? "1fr 1fr 1fr 1fr 1fr" : "1fr 1fr", gap: isDesktop ? 8 : 10, marginBottom: isDesktop ? 10 : 14 } }, /* @__PURE__ */ import_react.default.createElement(
       KPICard,
       {
         icon: "\u{1F4B0}",
@@ -28696,6 +28697,16 @@ Fecha: ${venta.fecha}`);
         val: MARCAS.length,
         sub: "marcas en tienda",
         color: C.amber
+      }
+    ), /* @__PURE__ */ import_react.default.createElement(
+      KPICard,
+      {
+        icon: "\u{1F48E}",
+        label: "Valor inventario",
+        compact: isDesktop,
+        val: `Bs ${new Intl.NumberFormat("es-BO", { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(valorInventario)}`,
+        sub: "a precio de venta",
+        color: "#6D4C41"
       }
     )), (() => {
       const feed = [

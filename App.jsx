@@ -6803,6 +6803,7 @@ function HomeDashboard({ventas, inv, vMes, mes, anio, onGoTab}){
   const totalHoy = vHoy.reduce((s, v) => s + v.total, 0);
   const totalMes  = vMes.reduce((s, v) => s + v.total, 0);
   const stockTotal = inv.reduce((s, i) => s + (i.stock || 0), 0);
+  const valorInventario = inv.reduce((s, i) => s + (i.stock || 0) * (i.precio || 0), 0);
 
   // ── Últimos 7 días (bar chart) ──────────────────────────
   const last7 = useMemo(() => {
@@ -6891,8 +6892,8 @@ function HomeDashboard({ventas, inv, vMes, mes, anio, onGoTab}){
         <div style={{fontSize:12, color:C.label3, fontFamily:FONT_UI}}>{dateStr}</div>
       </div>
 
-      {/* ── KPI 2×2 grid ── */}
-      <div style={{display:"grid", gridTemplateColumns: isDesktop ? "1fr 1fr 1fr 1fr" : "1fr 1fr", gap: isDesktop ? 8 : 10, marginBottom: isDesktop ? 10 : 14}}>
+      {/* ── KPI grid ── */}
+      <div style={{display:"grid", gridTemplateColumns: isDesktop ? "1fr 1fr 1fr 1fr 1fr" : "1fr 1fr", gap: isDesktop ? 8 : 10, marginBottom: isDesktop ? 10 : 14}}>
         <KPICard icon="💰" label="Ventas hoy" compact={isDesktop}
           val={`Bs ${new Intl.NumberFormat("es-BO",{minimumFractionDigits:0,maximumFractionDigits:0}).format(totalHoy)}`}
           sub={`${vHoy.length} transacción${vHoy.length!==1?"es":""}`}
@@ -6909,6 +6910,10 @@ function HomeDashboard({ventas, inv, vMes, mes, anio, onGoTab}){
           val={MARCAS.length}
           sub="marcas en tienda"
           color={C.amber}/>
+        <KPICard icon="💎" label="Valor inventario" compact={isDesktop}
+          val={`Bs ${new Intl.NumberFormat("es-BO",{minimumFractionDigits:0,maximumFractionDigits:0}).format(valorInventario)}`}
+          sub="a precio de venta"
+          color="#6D4C41"/>
       </div>
 
       {/* ── Actividad showroom ── */}
