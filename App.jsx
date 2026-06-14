@@ -5595,7 +5595,10 @@ function CameraScanner({onDetect, onClose, continuous, feedback, stats}){
   useEffect(()=>{
     if(!feedback) return;
     setFlash(feedback);
-    const t = setTimeout(()=>setFlash(null), 1100);
+    // Si fue error (repetido, no encontrado, etc.) deja el aviso visible más
+    // tiempo (15s) para que se pueda leer con calma — se cierra antes si
+    // llega un nuevo escaneo (feedback.ts cambia y reinicia este efecto).
+    const t = setTimeout(()=>setFlash(null), feedback.ok===false ? 15000 : 1100);
     return ()=>clearTimeout(t);
   },[feedback?.ts]);
 
@@ -5972,7 +5975,10 @@ function LectorHID({onDetect, onClose, feedback, stats, rows, marcaNombre}){
       const el=rowRefs.current[feedback.code];
       if(el) try{ el.scrollIntoView({block:"nearest",behavior:"smooth"}); }catch(_){}
     }
-    const t=setTimeout(()=>setFlash(null),2200);
+    // Si fue error (repetido, no encontrado, etc.) deja el aviso visible más
+    // tiempo (15s) para que se pueda leer con calma — se cierra antes si
+    // llega un nuevo escaneo (feedback.ts cambia y reinicia este efecto).
+    const t=setTimeout(()=>setFlash(null), feedback.ok===false ? 15000 : 2200);
     return ()=>clearTimeout(t);
   },[feedback?.ts]);
 

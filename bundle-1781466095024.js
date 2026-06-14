@@ -27357,7 +27357,7 @@ Fecha: ${venta.fecha}`);
     (0, import_react.useEffect)(() => {
       if (!feedback) return;
       setFlash(feedback);
-      const t = setTimeout(() => setFlash(null), 1100);
+      const t = setTimeout(() => setFlash(null), feedback.ok === false ? 15e3 : 1100);
       return () => clearTimeout(t);
     }, [feedback?.ts]);
     async function handleFoto(e) {
@@ -27756,7 +27756,7 @@ Fecha: ${venta.fecha}`);
         } catch (_) {
         }
       }
-      const t = setTimeout(() => setFlash(null), 2200);
+      const t = setTimeout(() => setFlash(null), feedback.ok === false ? 15e3 : 2200);
       return () => clearTimeout(t);
     }, [feedback?.ts]);
     const lista = (rows || []).slice().sort((a, b) => (a.codigo || "").localeCompare(b.codigo || ""));
