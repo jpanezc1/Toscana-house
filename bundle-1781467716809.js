@@ -22220,6 +22220,9 @@
       alert("Activ\xE1 las ventanas emergentes para imprimir");
       return;
     }
+    items = items.slice().sort(
+      (a, b) => (a.codigo || a.sku || "").localeCompare(b.codigo || b.sku || "", void 0, { numeric: true, sensitivity: "base" })
+    );
     const etiquetas = items.map((it, idx) => {
       const nombre = abreviarNombre((it.nombre || it.desc || "").toUpperCase());
       const codigo = (it.codigo || it.sku || "").toUpperCase();

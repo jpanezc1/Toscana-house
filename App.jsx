@@ -678,6 +678,14 @@ function imprimirEtiquetasLote(items) {
   const win = window.open("", "_blank", "width=900,height=700");
   if (!win) { alert("Activá las ventanas emergentes para imprimir"); return; }
 
+  // Orden correlativo por código (ej: COM-001, COM-002, COM-003…) para que
+  // las etiquetas impresas salgan en secuencia, sin importar el orden de
+  // la lista en pantalla. "numeric:true" ordena los números dentro del
+  // código de forma natural (1,2,…,9,10) en vez de alfabética (1,10,2,…).
+  items = items.slice().sort((a, b) =>
+    (a.codigo || a.sku || "").localeCompare((b.codigo || b.sku || ""), undefined, { numeric: true, sensitivity: "base" })
+  );
+
   const etiquetas = items.map((it, idx) => {
     const nombre  = abreviarNombre((it.nombre || it.desc || "").toUpperCase());
     const codigo  = (it.codigo || it.sku || "").toUpperCase();
