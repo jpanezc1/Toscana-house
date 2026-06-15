@@ -7004,6 +7004,7 @@ function ImportarExcelModal({inv, onImportar, onClose}){
   const nErrores = preview.filter(f=>f._errs.length>0).length;
   const nDups    = preview.filter(f=>f._dup).length;
   const nAuto    = preview.filter(f=>f.autoSKU).length;
+  const nUnidades = preview.filter(f=>f._errs.length===0).reduce((s,f)=>s+(Number(f.stock)||0),0);
 
   return (
     <Sheet open title="Importar Excel — Inventario" onClose={onClose} tall>
@@ -7117,12 +7118,13 @@ function ImportarExcelModal({inv, onImportar, onClose}){
       {estado==="preview"&&(
         <div>
           {/* Stats KPIs */}
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:8,marginBottom:16}}>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr 1fr",gap:8,marginBottom:16}}>
             {[
               {v:preview.length, l:"Total",    c:C.label},
               {v:nValidas,       l:"Válidas",  c:C.green},
               {v:nErrores,       l:"Errores",  c:C.red},
               {v:nAuto,          l:"Auto-cód", c:C.gold},
+              {v:nUnidades,      l:"Unidades", c:C.blue},
             ].map(s=>(
               <div key={s.l} style={{background:C.bg2,borderRadius:12,padding:"10px 8px",
                 textAlign:"center",border:`1px solid ${s.c}25`}}>

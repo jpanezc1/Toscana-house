@@ -28722,6 +28722,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
     const nErrores = preview.filter((f) => f._errs.length > 0).length;
     const nDups = preview.filter((f) => f._dup).length;
     const nAuto = preview.filter((f) => f.autoSKU).length;
+    const nUnidades = preview.filter((f) => f._errs.length === 0).reduce((s, f) => s + (Number(f.stock) || 0), 0);
     return /* @__PURE__ */ import_react.default.createElement(Sheet, { open: true, title: "Importar Excel \u2014 Inventario", onClose, tall: true }, /* @__PURE__ */ import_react.default.createElement("div", { style: { padding: "0 4px 20px" } }, estado === "idle" && /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: {
       background: `${C.gold}10`,
       border: `1.5px solid ${C.gold}35`,
@@ -28836,11 +28837,12 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       background: `${C.gold}10`,
       borderRadius: 12,
       border: `1px solid ${C.gold}25`
-    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT_UI, lineHeight: 1.5 } }, "\u{1F4A1} Formato de c\xF3digo auto-generado:", " ", /* @__PURE__ */ import_react.default.createElement("span", { style: { fontFamily: "monospace", color: C.label, fontWeight: 700 } }, "RAM-VLB-S-001"), " ", /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.label3 } }, "= Marca \xB7 Iniciales prod. \xB7 Talla \xB7 N\xFAmero secuencial"))))), estado === "leyendo" && /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center", padding: "50px 20px" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 40, marginBottom: 16 } }, "\u23F3"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 16, fontWeight: 600, color: C.label, fontFamily: FONT_UI, marginBottom: 6 } }, "Analizando archivo\u2026"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.label3, fontFamily: FONT_UI } }, "Detectando columnas y generando c\xF3digos")), estado === "preview" && /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 8, marginBottom: 16 } }, [
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT_UI, lineHeight: 1.5 } }, "\u{1F4A1} Formato de c\xF3digo auto-generado:", " ", /* @__PURE__ */ import_react.default.createElement("span", { style: { fontFamily: "monospace", color: C.label, fontWeight: 700 } }, "RAM-VLB-S-001"), " ", /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.label3 } }, "= Marca \xB7 Iniciales prod. \xB7 Talla \xB7 N\xFAmero secuencial"))))), estado === "leyendo" && /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center", padding: "50px 20px" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 40, marginBottom: 16 } }, "\u23F3"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 16, fontWeight: 600, color: C.label, fontFamily: FONT_UI, marginBottom: 6 } }, "Analizando archivo\u2026"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.label3, fontFamily: FONT_UI } }, "Detectando columnas y generando c\xF3digos")), estado === "preview" && /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr", gap: 8, marginBottom: 16 } }, [
       { v: preview.length, l: "Total", c: C.label },
       { v: nValidas, l: "V\xE1lidas", c: C.green },
       { v: nErrores, l: "Errores", c: C.red },
-      { v: nAuto, l: "Auto-c\xF3d", c: C.gold }
+      { v: nAuto, l: "Auto-c\xF3d", c: C.gold },
+      { v: nUnidades, l: "Unidades", c: C.blue }
     ].map((s) => /* @__PURE__ */ import_react.default.createElement("div", { key: s.l, style: {
       background: C.bg2,
       borderRadius: 12,
