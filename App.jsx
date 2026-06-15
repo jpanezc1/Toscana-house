@@ -13216,6 +13216,7 @@ function InventarioPorMarca({inv, ventas, onRecibir, onBaja, onImportarExcel, on
   var _hN149 = useState(null); var marcaSelec = _hN149[0]; var setMarcaSelec = _hN149[1];;
   var _hInvBq = useState(""); var invBusq = _hInvBq[0]; var setInvBusq = _hInvBq[1];;
   const invBusqRef = useRef(null);
+  const invEsScanRef = useRef(false); // true si el último cambio vino de un lector de código de barras
   var _hInvFd = useState(""); var invFechaDesde = _hInvFd[0]; var setInvFechaDesde = _hInvFd[1];;
   var _hInvFh = useState(""); var invFechaHasta = _hInvFh[0]; var setInvFechaHasta = _hInvFh[1];;
   const marca = marcaSelec ? MARCAS.find(m=>m.id===marcaSelec) : null;
@@ -13325,6 +13326,19 @@ function InventarioPorMarca({inv, ventas, onRecibir, onBaja, onImportarExcel, on
                 setInvBusq(val.slice(invBusq.length));
               } else {
                 setInvBusq(val);
+              }
+              // Un escaneo entrega todos los caracteres de golpe (added>1);
+              // si se tipea letra por letra, added es 1 → es escritura manual.
+              invEsScanRef.current = added>1;
+            }}
+            onKeyDown={e=>{
+              // Los lectores de código de barras envían Enter al terminar.
+              // Si el último cambio fue un escaneo, limpiar el campo para
+              // dejarlo listo para el próximo escaneo. Si fue tipeado a
+              // mano, no borrar lo que escribió el usuario.
+              if(e.key==="Enter" && invEsScanRef.current){
+                setInvBusq("");
+                invEsScanRef.current = false;
               }
             }}
             placeholder="Buscar código de barras, nombre o categoría en TODAS las marcas…"

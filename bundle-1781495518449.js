@@ -35862,6 +35862,7 @@ Confirmas que el conteo de ${r.contado} unidad(es) es correcto.`)) {
     var setInvBusq = _hInvBq[1];
     ;
     const invBusqRef = (0, import_react.useRef)(null);
+    const invEsScanRef = (0, import_react.useRef)(false);
     var _hInvFd = (0, import_react.useState)("");
     var invFechaDesde = _hInvFd[0];
     var setInvFechaDesde = _hInvFd[1];
@@ -35977,6 +35978,13 @@ Confirmas que el conteo de ${r.contado} unidad(es) es correcto.`)) {
             setInvBusq(val.slice(invBusq.length));
           } else {
             setInvBusq(val);
+          }
+          invEsScanRef.current = added > 1;
+        },
+        onKeyDown: (e) => {
+          if (e.key === "Enter" && invEsScanRef.current) {
+            setInvBusq("");
+            invEsScanRef.current = false;
           }
         },
         placeholder: "Buscar c\xF3digo de barras, nombre o categor\xEDa en TODAS las marcas\u2026",
