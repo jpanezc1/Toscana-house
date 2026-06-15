@@ -6454,9 +6454,13 @@ function ImportarExcelModal({inv, onImportar, onClose}){
       const buf  = await file.arrayBuffer();
       const wb   = XLSX.read(buf,{type:"array"});
 
-      // ── Leer TODAS las hojas y unir filas ────────────────────────────
+      // ── Leer todas las hojas de datos y unir filas ───────────────────
+      // Se ignoran hojas auxiliares de la plantilla oficial (Marcas,
+      // Instrucciones) que no contienen productos.
+      const HOJAS_IGNORADAS = ["marcas","instrucciones"];
       let rawAll = [];
       for(const shName of wb.SheetNames){
+        if(HOJAS_IGNORADAS.includes(norm(shName).toLowerCase().trim())) continue;
         const ws  = wb.Sheets[shName];
         const rows = XLSX.utils.sheet_to_json(ws,{header:1,defval:""});
         if(rows.length>1) rawAll = rawAll.concat(rows);
