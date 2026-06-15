@@ -2667,12 +2667,6 @@ function exportTodasCSV(ventas,mes,anio){
   a.click();URL.revokeObjectURL(url);
 }
 
-function sendWA(venta){
-  const lines=venta.items.map(it=>{const m=MARCAS.find(x=>x.id===it.marcaId);return `• ${it.nombre} (${m?.nombre}) x${it.cantidad} = ${$(it.subtotal)}`;});
-  const msg=[`🏡 *TOSCANA HOUSE — ${venta.id}*`,`📅 ${venta.fecha} ${venta.hora}`,`💳 ${labelPago(venta.metodoPago)}${venta.descPct?` (-${venta.descPct}%)`:""}`,"",  ...lines,"",`💰 *TOTAL: ${$(venta.total)}*`].join("\n");
-  window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`,"_blank");
-}
-
 function sendFacturaWA(fac, venta, telefono){
   // Limpiar número: quitar +, espacios, guiones; agregar 591 si es número boliviano de 8 dígitos
   let num = (telefono||"").replace(/[\s\-\+()]/g,"");
@@ -2931,6 +2925,129 @@ function ImagenLiqPreviewModal({data, onClose}){
   return (
     <Sheet open={!!data} onClose={onClose} title="Vista previa" tall>
       <img src={data.url} alt="Vista previa de liquidación" style={{
+        width:"100%",borderRadius:12,marginBottom:16,border:`1px solid ${C.sep}`}}/>
+      <div style={{display:"flex",flexDirection:"column",gap:10}}>
+        <IOSBtn onPress={compartir} variant="fill" icon="📤">
+          Enviar por WhatsApp
+        </IOSBtn>
+        <IOSBtn onPress={descargar} variant="fill" icon="⬇">
+          Descargar imagen
+        </IOSBtn>
+      </div>
+    </Sheet>
+  );
+}
+
+// ── Generar imagen (captura) de la Nota de Venta ──────────────────────────────
+function construirImagenNotaVenta(venta, numSecuencial){
+  const num = numSecuencial || venta.id.replace(/\D/g,"").slice(-4).padStart(4,"0");
+  const fmt2 = n=>Number(n||0).toLocaleString("es-BO",{minimumFractionDigits:2,maximumFractionDigits:2});
+  const subtotalBruto = venta.items.reduce((s,i)=>s+i.precioUnit*i.cantidad,0);
+  const descAdicional = subtotalBruto-venta.total;
+
+  const width = 760;
+  const height = 380 + venta.items.length*32 + (descAdicional>0.01?28:0);
+
+  const rowsHtml = venta.items.map(it=>`
+    <tr>
+      <td style="padding:6px 8px;border:1px solid #ccc;font-size:11px">${it.nombre}${it.marcaNombre?" — "+it.marcaNombre:""}</td>
+      <td style="padding:6px 8px;border:1px solid #ccc;font-size:11px;text-align:center">${it.cantidad}</td>
+      <td style="padding:6px 8px;border:1px solid #ccc;font-size:11px;text-align:right">${fmt2(it.precioUnit)}</td>
+      <td style="padding:6px 8px;border:1px solid #ccc;font-size:11px;text-align:right;font-weight:600">${fmt2(it.subtotal)}</td>
+    </tr>`).join("");
+
+  const html = `<div xmlns="http://www.w3.org/1999/xhtml" style="font-family:Arial,sans-serif;color:#111;width:${width}px;padding:28px;box-sizing:border-box;background:#fff">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #111;padding-bottom:12px;margin-bottom:14px">
+      <div>
+        <div style="font-size:20px;font-weight:900;letter-spacing:3px;text-transform:uppercase">Toscana House</div>
+        <div style="font-size:9px;letter-spacing:5px;color:#666;margin-top:2px">CASA DE MODA</div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:15px;font-weight:700;text-transform:uppercase">Nota de venta</div>
+        <div style="font-size:11px;margin-top:3px">NIT ${NIT_EMPRESA}</div>
+        <div style="font-size:11px;margin-top:3px">N° <strong>${num}</strong></div>
+      </div>
+    </div>
+    <div style="font-size:13px;font-weight:700;text-transform:uppercase;border-bottom:1px solid #ccc;padding-bottom:6px;margin-bottom:12px">${PROPIETARIA}</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 20px;margin-bottom:14px;font-size:11px">
+      <div><div style="color:#666;font-size:9px;text-transform:uppercase;letter-spacing:.5px">Sucursal</div>${SUCURSAL_EMP}</div>
+      <div><div style="color:#666;font-size:9px;text-transform:uppercase;letter-spacing:.5px">Fecha</div>${venta.fecha} ${venta.hora||""}</div>
+      <div><div style="color:#666;font-size:9px;text-transform:uppercase;letter-spacing:.5px">Cliente</div>${venta.clienteNombre||"—"}</div>
+      <div><div style="color:#666;font-size:9px;text-transform:uppercase;letter-spacing:.5px">Método de pago</div>${labelPago(venta.metodoPago)}</div>
+    </div>
+    <table style="width:100%;border-collapse:collapse;margin-bottom:12px">
+      <thead><tr style="background:#f0f0f0">
+        <th style="padding:6px 8px;border:1px solid #ccc;font-size:9px;text-transform:uppercase;text-align:left">Descripción</th>
+        <th style="padding:6px 8px;border:1px solid #ccc;font-size:9px;text-transform:uppercase">Cant.</th>
+        <th style="padding:6px 8px;border:1px solid #ccc;font-size:9px;text-transform:uppercase;text-align:right">P. Unit.</th>
+        <th style="padding:6px 8px;border:1px solid #ccc;font-size:9px;text-transform:uppercase;text-align:right">Subtotal</th>
+      </tr></thead>
+      <tbody>${rowsHtml}</tbody>
+    </table>
+    <div style="display:flex;justify-content:flex-end;margin-bottom:12px">
+      <table style="width:280px;border-collapse:collapse">
+        <tr><td style="padding:3px 8px;font-size:11px;color:#555">Subtotal:</td><td style="padding:3px 8px;font-size:11px;text-align:right;font-weight:600">${fmt2(subtotalBruto)}</td></tr>
+        ${descAdicional>0.01?`<tr><td style="padding:3px 8px;font-size:11px;color:#555">Descuento:</td><td style="padding:3px 8px;font-size:11px;text-align:right;font-weight:600">- ${fmt2(descAdicional)}</td></tr>`:""}
+        <tr style="border-top:2px solid #111"><td style="padding:7px 8px;font-size:14px;font-weight:800">Total a pagar Bs</td><td style="padding:7px 8px;font-size:14px;font-weight:800;text-align:right">${fmt2(venta.total)}</td></tr>
+      </table>
+    </div>
+    <div style="background:#f8f8f8;border:1px solid #ccc;padding:8px 12px;border-radius:4px;font-size:10px;margin-bottom:14px">Son: <strong>${numeroALetras(venta.total)}</strong></div>
+    <div style="border-top:1px dashed #aaa;padding-top:8px;text-align:center;font-size:9px;color:#888;margin-top:12px">Toscana House · ${SUCURSAL_EMP} · ${TELEFONO_EMP} · ${CIUDAD_EMP}</div>
+  </div>`;
+
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">
+    <rect width="100%" height="100%" fill="#fff"/>
+    <foreignObject width="100%" height="100%">${html}</foreignObject>
+  </svg>`;
+
+  const dataUrl = "data:image/svg+xml;charset=utf-8;base64," + btoa(unescape(encodeURIComponent(svg)));
+
+  return new Promise((resolve, reject)=>{
+    const img = new Image();
+    img.onload = function(){
+      const scale = 2;
+      const canvas = document.createElement("canvas");
+      canvas.width = width*scale;
+      canvas.height = height*scale;
+      const ctx = canvas.getContext("2d");
+      ctx.scale(scale, scale);
+      ctx.fillStyle = "#fff";
+      ctx.fillRect(0, 0, width, height);
+      ctx.drawImage(img, 0, 0, width, height);
+      canvas.toBlob(blob=>blob?resolve(blob):reject(new Error("toBlob falló")));
+    };
+    img.onerror = ()=>reject(new Error("No se pudo generar la imagen"));
+    img.src = dataUrl;
+  });
+}
+
+// ── Genera la imagen de la Nota de Venta y abre la vista previa para enviar ────
+function generarVistaPreviaNotaVenta(venta, numSecuencial, setPreview){
+  const num = numSecuencial || venta.id.replace(/\D/g,"").slice(-4).padStart(4,"0");
+  construirImagenNotaVenta(venta, num).then(blob=>{
+    const nombre = `NotaVenta_${num}.png`;
+    const url = URL.createObjectURL(blob);
+    setPreview({url, blob, nombre, num});
+  }).catch(()=>alert("No se pudo generar la imagen de la nota"));
+}
+
+// ── Modal de vista previa de la Nota de Venta: enviar por WhatsApp o descargar ─
+function NotaImgPreviewModal({data, onClose}){
+  if(!data) return null;
+  function compartir(){
+    const file = new File([data.blob], data.nombre, {type:"image/png"});
+    if(navigator.canShare && navigator.canShare({files:[file]})){
+      navigator.share({files:[file], title:`Nota de Venta #${data.num}`}).catch(()=>{});
+    } else {
+      descargarArchivo(data.blob, data.nombre);
+    }
+  }
+  function descargar(){
+    descargarArchivo(data.blob, data.nombre);
+  }
+  return (
+    <Sheet open={!!data} onClose={onClose} title="Nota de venta">
+      <img src={data.url} alt="Nota de venta" style={{
         width:"100%",borderRadius:12,marginBottom:16,border:`1px solid ${C.sep}`}}/>
       <div style={{display:"flex",flexDirection:"column",gap:10}}>
         <IOSBtn onPress={compartir} variant="fill" icon="📤">
@@ -5108,6 +5225,7 @@ function NotaVentaModal({venta, onClose, numVenta, onAnularVenta}){
   const [confirmAnulF,   setConfirmAnulF]    = useState(false);
   const [anulandoFac,    setAnulandoFac]     = useState(false);
   const [anulFacMsg,     setAnulFacMsg]      = useState(null);
+  const [previewNota,    setPreviewNota]     = useState(null);
   const num = numVenta || venta.id.replace(/\D/g,"").slice(-4).padStart(4,"0");
   const facturaGuardada = leerFacturaLocal(venta.id);
 
@@ -5257,7 +5375,7 @@ function NotaVentaModal({venta, onClose, numVenta, onAnularVenta}){
           <span style={{fontSize:13,fontWeight:700,color:"#fff",fontFamily:FONT_UI}}>Imprimir</span>
         </button>
         <button
-          onClick={()=>sendWA(venta)}
+          onClick={()=>generarVistaPreviaNotaVenta(venta,num,setPreviewNota)}
           style={{background:`linear-gradient(135deg,#25D366,#128C7E)`,
             border:"none",borderRadius:14,padding:"14px 10px",
             display:"flex",flexDirection:"column",alignItems:"center",gap:4,
@@ -5266,14 +5384,7 @@ function NotaVentaModal({venta, onClose, numVenta, onAnularVenta}){
           <span style={{fontSize:13,fontWeight:700,color:"#fff",fontFamily:FONT_UI}}>WhatsApp</span>
         </button>
         <button
-          onClick={()=>{
-            if(navigator.share){
-              navigator.share({title:`Nota de Venta #${num}`,text:`Toscana House\nVenta: ${venta.id}\nTotal: Bs ${venta.total}\nFecha: ${venta.fecha}`});
-            } else {
-              navigator.clipboard.writeText(`Toscana House\nVenta: ${venta.id}\nTotal: Bs ${venta.total}\nFecha: ${venta.fecha}`);
-              alert("Copiado al portapapeles");
-            }
-          }}
+          onClick={()=>generarVistaPreviaNotaVenta(venta,num,setPreviewNota)}
           style={{background:`linear-gradient(135deg,#546E7A,#37474F)`,
             border:"none",borderRadius:14,padding:"14px 10px",
             display:"flex",flexDirection:"column",alignItems:"center",gap:4,
@@ -5430,6 +5541,9 @@ function NotaVentaModal({venta, onClose, numVenta, onAnularVenta}){
         onClose={()=>setShowFactura(false)}
         onFacturada={()=>setShowFactura(false)}
       />
+
+      {/* Vista previa de la Nota de Venta para enviar/descargar */}
+      <NotaImgPreviewModal data={previewNota} onClose={()=>setPreviewNota(null)}/>
     </Sheet>
   );
 }
@@ -11548,6 +11662,7 @@ function POS({inv,onVenta,onVerNota}){
   const qrRefVenta = useMemo(()=>"TH"+Date.now().toString(36).toUpperCase(), [showPago]);
   var _hNm1 = useState(false); var pagoMixto = _hNm1[0]; var setPagoMixto = _hNm1[1];
   var _hNm2 = useState({efectivo:"", qr:"", tarjeta:""}); var montosMixtos = _hNm2[0]; var setMontosMixtos = _hNm2[1];
+  const [previewNota, setPreviewNota] = useState(null);
   // Gift Card payment state
   const [pagoGC,       setPagoGC]       = useState(false);
   const [gcCodigo,     setGcCodigo]     = useState("");
@@ -11974,12 +12089,13 @@ function POS({inv,onVenta,onVerNota}){
               style={{background:`linear-gradient(135deg,#1A237E,#283593)`}}>
               Emitir Factura SIAT
             </IOSBtn>
-            <IOSBtn onPress={()=>sendWA(ultima)} variant="fill" full small icon="📲">
+            <IOSBtn onPress={()=>generarVistaPreviaNotaVenta(ultima,undefined,setPreviewNota)} variant="fill" full small icon="📲">
               Enviar por WhatsApp
             </IOSBtn>
           </div>
         </div>
       )}
+      <NotaImgPreviewModal data={previewNota} onClose={()=>setPreviewNota(null)}/>
       {/* Factura POS */}
       <FacturaModal
         venta={ultima}
@@ -16649,6 +16765,7 @@ function VentasTab({vMes, totalVtas, mes, anio, onVentaClick}){
   const isDesktop = useIsDesktop();
   var _hN166 = useState("marcas"); var vistaActiva = _hN166[0]; var setVistaActiva = _hN166[1];; // "marcas" | "historial"
   var _hN167 = useState(null); var marcaFiltro = _hN167[0]; var setMarcaFiltro = _hN167[1];; // id marca o null = todas
+  const [previewNota, setPreviewNota] = useState(null);
 
   // Ventas activas (excluye anuladas) — para totales, montos y desglose por marca
   const vMesActivas = useMemo(()=>vMes.filter(v=>!v.anulada),[vMes]);
@@ -16685,6 +16802,7 @@ function VentasTab({vMes, totalVtas, mes, anio, onVentaClick}){
   },[vMes, marcaFiltro]);
 
   return (
+    <>
     <div>
       {/* Stats globales */}
       <div style={{display:"grid",gridTemplateColumns: isDesktop ? "2fr 1fr 1fr 1fr" : "1fr 1fr",gap: isDesktop ? 8 : 10,marginBottom: isDesktop ? 12 : 16}}>
@@ -16892,7 +17010,7 @@ function VentasTab({vMes, totalVtas, mes, anio, onVentaClick}){
                       </div>
                     ))}
                     {!isDesktop && (
-                      <IOSBtn onPress={()=>sendWA(v)} variant="fill" small full icon="📲">
+                      <IOSBtn onPress={()=>generarVistaPreviaNotaVenta(v,undefined,setPreviewNota)} variant="fill" small full icon="📲">
                         Enviar por WhatsApp
                       </IOSBtn>
                     )}
@@ -16905,6 +17023,8 @@ function VentasTab({vMes, totalVtas, mes, anio, onVentaClick}){
         </div>
       )}
     </div>
+    <NotaImgPreviewModal data={previewNota} onClose={()=>setPreviewNota(null)}/>
+    </>
   );
 }
 

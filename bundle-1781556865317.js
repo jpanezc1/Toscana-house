@@ -24274,14 +24274,6 @@
     const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
     descargarArchivo(blob, `TH_Trazabilidad_Cargas_${hoy().replace(/\//g, "-")}.xlsx`);
   }
-  function sendWA(venta) {
-    const lines = venta.items.map((it) => {
-      const m = MARCAS.find((x) => x.id === it.marcaId);
-      return `\u2022 ${it.nombre} (${m?.nombre}) x${it.cantidad} = ${$(it.subtotal)}`;
-    });
-    const msg = [`\u{1F3E1} *TOSCANA HOUSE \u2014 ${venta.id}*`, `\u{1F4C5} ${venta.fecha} ${venta.hora}`, `\u{1F4B3} ${labelPago(venta.metodoPago)}${venta.descPct ? ` (-${venta.descPct}%)` : ""}`, "", ...lines, "", `\u{1F4B0} *TOTAL: ${$(venta.total)}*`].join("\n");
-    window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, "_blank");
-  }
   function sendFacturaWA(fac, venta, telefono) {
     let num = (telefono || "").replace(/[\s\-\+()]/g, "");
     if (/^[67]\d{7}$/.test(num)) num = "591" + num;
@@ -24534,6 +24526,110 @@
       descargarArchivo(data.blob, data.nombre);
     }
     return /* @__PURE__ */ import_react.default.createElement(Sheet, { open: !!data, onClose, title: "Vista previa", tall: true }, /* @__PURE__ */ import_react.default.createElement("img", { src: data.url, alt: "Vista previa de liquidaci\xF3n", style: {
+      width: "100%",
+      borderRadius: 12,
+      marginBottom: 16,
+      border: `1px solid ${C.sep}`
+    } }), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 10 } }, /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: compartir, variant: "fill", icon: "\u{1F4E4}" }, "Enviar por WhatsApp"), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: descargar, variant: "fill", icon: "\u2B07" }, "Descargar imagen")));
+  }
+  function construirImagenNotaVenta(venta, numSecuencial) {
+    const num = numSecuencial || venta.id.replace(/\D/g, "").slice(-4).padStart(4, "0");
+    const fmt2 = (n) => Number(n || 0).toLocaleString("es-BO", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const subtotalBruto = venta.items.reduce((s, i) => s + i.precioUnit * i.cantidad, 0);
+    const descAdicional = subtotalBruto - venta.total;
+    const width = 760;
+    const height = 380 + venta.items.length * 32 + (descAdicional > 0.01 ? 28 : 0);
+    const rowsHtml = venta.items.map((it) => `
+    <tr>
+      <td style="padding:6px 8px;border:1px solid #ccc;font-size:11px">${it.nombre}${it.marcaNombre ? " \u2014 " + it.marcaNombre : ""}</td>
+      <td style="padding:6px 8px;border:1px solid #ccc;font-size:11px;text-align:center">${it.cantidad}</td>
+      <td style="padding:6px 8px;border:1px solid #ccc;font-size:11px;text-align:right">${fmt2(it.precioUnit)}</td>
+      <td style="padding:6px 8px;border:1px solid #ccc;font-size:11px;text-align:right;font-weight:600">${fmt2(it.subtotal)}</td>
+    </tr>`).join("");
+    const html = `<div xmlns="http://www.w3.org/1999/xhtml" style="font-family:Arial,sans-serif;color:#111;width:${width}px;padding:28px;box-sizing:border-box;background:#fff">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #111;padding-bottom:12px;margin-bottom:14px">
+      <div>
+        <div style="font-size:20px;font-weight:900;letter-spacing:3px;text-transform:uppercase">Toscana House</div>
+        <div style="font-size:9px;letter-spacing:5px;color:#666;margin-top:2px">CASA DE MODA</div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:15px;font-weight:700;text-transform:uppercase">Nota de venta</div>
+        <div style="font-size:11px;margin-top:3px">NIT ${NIT_EMPRESA}</div>
+        <div style="font-size:11px;margin-top:3px">N\xB0 <strong>${num}</strong></div>
+      </div>
+    </div>
+    <div style="font-size:13px;font-weight:700;text-transform:uppercase;border-bottom:1px solid #ccc;padding-bottom:6px;margin-bottom:12px">${PROPIETARIA}</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 20px;margin-bottom:14px;font-size:11px">
+      <div><div style="color:#666;font-size:9px;text-transform:uppercase;letter-spacing:.5px">Sucursal</div>${SUCURSAL_EMP}</div>
+      <div><div style="color:#666;font-size:9px;text-transform:uppercase;letter-spacing:.5px">Fecha</div>${venta.fecha} ${venta.hora || ""}</div>
+      <div><div style="color:#666;font-size:9px;text-transform:uppercase;letter-spacing:.5px">Cliente</div>${venta.clienteNombre || "\u2014"}</div>
+      <div><div style="color:#666;font-size:9px;text-transform:uppercase;letter-spacing:.5px">M\xE9todo de pago</div>${labelPago(venta.metodoPago)}</div>
+    </div>
+    <table style="width:100%;border-collapse:collapse;margin-bottom:12px">
+      <thead><tr style="background:#f0f0f0">
+        <th style="padding:6px 8px;border:1px solid #ccc;font-size:9px;text-transform:uppercase;text-align:left">Descripci\xF3n</th>
+        <th style="padding:6px 8px;border:1px solid #ccc;font-size:9px;text-transform:uppercase">Cant.</th>
+        <th style="padding:6px 8px;border:1px solid #ccc;font-size:9px;text-transform:uppercase;text-align:right">P. Unit.</th>
+        <th style="padding:6px 8px;border:1px solid #ccc;font-size:9px;text-transform:uppercase;text-align:right">Subtotal</th>
+      </tr></thead>
+      <tbody>${rowsHtml}</tbody>
+    </table>
+    <div style="display:flex;justify-content:flex-end;margin-bottom:12px">
+      <table style="width:280px;border-collapse:collapse">
+        <tr><td style="padding:3px 8px;font-size:11px;color:#555">Subtotal:</td><td style="padding:3px 8px;font-size:11px;text-align:right;font-weight:600">${fmt2(subtotalBruto)}</td></tr>
+        ${descAdicional > 0.01 ? `<tr><td style="padding:3px 8px;font-size:11px;color:#555">Descuento:</td><td style="padding:3px 8px;font-size:11px;text-align:right;font-weight:600">- ${fmt2(descAdicional)}</td></tr>` : ""}
+        <tr style="border-top:2px solid #111"><td style="padding:7px 8px;font-size:14px;font-weight:800">Total a pagar Bs</td><td style="padding:7px 8px;font-size:14px;font-weight:800;text-align:right">${fmt2(venta.total)}</td></tr>
+      </table>
+    </div>
+    <div style="background:#f8f8f8;border:1px solid #ccc;padding:8px 12px;border-radius:4px;font-size:10px;margin-bottom:14px">Son: <strong>${numeroALetras(venta.total)}</strong></div>
+    <div style="border-top:1px dashed #aaa;padding-top:8px;text-align:center;font-size:9px;color:#888;margin-top:12px">Toscana House \xB7 ${SUCURSAL_EMP} \xB7 ${TELEFONO_EMP} \xB7 ${CIUDAD_EMP}</div>
+  </div>`;
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">
+    <rect width="100%" height="100%" fill="#fff"/>
+    <foreignObject width="100%" height="100%">${html}</foreignObject>
+  </svg>`;
+    const dataUrl = "data:image/svg+xml;charset=utf-8;base64," + btoa(unescape(encodeURIComponent(svg)));
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = function() {
+        const scale = 2;
+        const canvas = document.createElement("canvas");
+        canvas.width = width * scale;
+        canvas.height = height * scale;
+        const ctx = canvas.getContext("2d");
+        ctx.scale(scale, scale);
+        ctx.fillStyle = "#fff";
+        ctx.fillRect(0, 0, width, height);
+        ctx.drawImage(img, 0, 0, width, height);
+        canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error("toBlob fall\xF3")));
+      };
+      img.onerror = () => reject(new Error("No se pudo generar la imagen"));
+      img.src = dataUrl;
+    });
+  }
+  function generarVistaPreviaNotaVenta(venta, numSecuencial, setPreview) {
+    const num = numSecuencial || venta.id.replace(/\D/g, "").slice(-4).padStart(4, "0");
+    construirImagenNotaVenta(venta, num).then((blob) => {
+      const nombre = `NotaVenta_${num}.png`;
+      const url = URL.createObjectURL(blob);
+      setPreview({ url, blob, nombre, num });
+    }).catch(() => alert("No se pudo generar la imagen de la nota"));
+  }
+  function NotaImgPreviewModal({ data, onClose }) {
+    if (!data) return null;
+    function compartir() {
+      const file = new File([data.blob], data.nombre, { type: "image/png" });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        navigator.share({ files: [file], title: `Nota de Venta #${data.num}` }).catch(() => {
+        });
+      } else {
+        descargarArchivo(data.blob, data.nombre);
+      }
+    }
+    function descargar() {
+      descargarArchivo(data.blob, data.nombre);
+    }
+    return /* @__PURE__ */ import_react.default.createElement(Sheet, { open: !!data, onClose, title: "Nota de venta" }, /* @__PURE__ */ import_react.default.createElement("img", { src: data.url, alt: "Nota de venta", style: {
       width: "100%",
       borderRadius: 12,
       marginBottom: 16,
@@ -27025,6 +27121,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
     const [confirmAnulF, setConfirmAnulF] = (0, import_react.useState)(false);
     const [anulandoFac, setAnulandoFac] = (0, import_react.useState)(false);
     const [anulFacMsg, setAnulFacMsg] = (0, import_react.useState)(null);
+    const [previewNota, setPreviewNota] = (0, import_react.useState)(null);
     const num = numVenta || venta.id.replace(/\D/g, "").slice(-4).padStart(4, "0");
     const facturaGuardada = leerFacturaLocal(venta.id);
     async function ejecutarAnularFactura() {
@@ -27154,7 +27251,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
     ), /* @__PURE__ */ import_react.default.createElement(
       "button",
       {
-        onClick: () => sendWA(venta),
+        onClick: () => generarVistaPreviaNotaVenta(venta, num, setPreviewNota),
         style: {
           background: `linear-gradient(135deg,#25D366,#128C7E)`,
           border: "none",
@@ -27173,20 +27270,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
     ), /* @__PURE__ */ import_react.default.createElement(
       "button",
       {
-        onClick: () => {
-          if (navigator.share) {
-            navigator.share({ title: `Nota de Venta #${num}`, text: `Toscana House
-Venta: ${venta.id}
-Total: Bs ${venta.total}
-Fecha: ${venta.fecha}` });
-          } else {
-            navigator.clipboard.writeText(`Toscana House
-Venta: ${venta.id}
-Total: Bs ${venta.total}
-Fecha: ${venta.fecha}`);
-            alert("Copiado al portapapeles");
-          }
-        },
+        onClick: () => generarVistaPreviaNotaVenta(venta, num, setPreviewNota),
         style: {
           background: `linear-gradient(135deg,#546E7A,#37474F)`,
           border: "none",
@@ -27356,7 +27440,7 @@ Fecha: ${venta.fecha}`);
         onClose: () => setShowFactura(false),
         onFacturada: () => setShowFactura(false)
       }
-    ));
+    ), /* @__PURE__ */ import_react.default.createElement(NotaImgPreviewModal, { data: previewNota, onClose: () => setPreviewNota(null) }));
   }
   function CajasTab() {
     const CAJAS_KEY = "th_cajas_v1";
@@ -33970,6 +34054,7 @@ Motivo: ${motivo}` : ""}`)) {
     var _hNm2 = (0, import_react.useState)({ efectivo: "", qr: "", tarjeta: "" });
     var montosMixtos = _hNm2[0];
     var setMontosMixtos = _hNm2[1];
+    const [previewNota, setPreviewNota] = (0, import_react.useState)(null);
     const [pagoGC, setPagoGC] = (0, import_react.useState)(false);
     const [gcCodigo, setGcCodigo] = (0, import_react.useState)("");
     const [gcEncontrado, setGcEncontrado] = (0, import_react.useState)(null);
@@ -34487,7 +34572,7 @@ Motivo: ${motivo}` : ""}`)) {
         style: { background: `linear-gradient(135deg,#1A237E,#283593)` }
       },
       "Emitir Factura SIAT"
-    ), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => sendWA(ultima), variant: "fill", full: true, small: true, icon: "\u{1F4F2}" }, "Enviar por WhatsApp"))), /* @__PURE__ */ import_react.default.createElement(
+    ), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => generarVistaPreviaNotaVenta(ultima, void 0, setPreviewNota), variant: "fill", full: true, small: true, icon: "\u{1F4F2}" }, "Enviar por WhatsApp"))), /* @__PURE__ */ import_react.default.createElement(NotaImgPreviewModal, { data: previewNota, onClose: () => setPreviewNota(null) }), /* @__PURE__ */ import_react.default.createElement(
       FacturaModal,
       {
         venta: ultima,
@@ -39480,6 +39565,7 @@ Esta acci\xF3n no se puede deshacer.`,
     var marcaFiltro = _hN167[0];
     var setMarcaFiltro = _hN167[1];
     ;
+    const [previewNota, setPreviewNota] = (0, import_react.useState)(null);
     const vMesActivas = (0, import_react.useMemo)(() => vMes.filter((v) => !v.anulada), [vMes]);
     const porMarca = (0, import_react.useMemo)(() => {
       return MARCAS.map((m) => {
@@ -39507,7 +39593,7 @@ Esta acci\xF3n no se puede deshacer.`,
       if (!marcaFiltro) return [...vMes].reverse();
       return [...vMes].filter((v) => v.items.some((i) => i.marcaId === marcaFiltro)).reverse();
     }, [vMes, marcaFiltro]);
-    return /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "grid", gridTemplateColumns: isDesktop ? "2fr 1fr 1fr 1fr" : "1fr 1fr", gap: isDesktop ? 8 : 10, marginBottom: isDesktop ? 12 : 16 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+    return /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, null, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "grid", gridTemplateColumns: isDesktop ? "2fr 1fr 1fr 1fr" : "1fr 1fr", gap: isDesktop ? 8 : 10, marginBottom: isDesktop ? 12 : 16 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
       background: C.bg2,
       borderRadius: 16,
       padding: isDesktop ? "12px 16px" : "16px 20px",
@@ -39693,7 +39779,7 @@ Esta acci\xF3n no se puede deshacer.`,
           borderRadius: 6,
           borderLeft: `3px solid ${g.marca?.color}`
         } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 1 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 5 } }, /* @__PURE__ */ import_react.default.createElement(MarcaIcon, { marca: g.marca, size: 12, radius: 3 }), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 11, fontWeight: 600, color: g.marca?.color, fontFamily: FONT } }, g.marca?.nombre)), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 12, fontWeight: 700, color: C.label, fontFamily: FONT, letterSpacing: "-0.01em" } }, $(g.sub))), g.items.map((it, ii) => /* @__PURE__ */ import_react.default.createElement("div", { key: ii, style: { fontSize: 10, color: C.label2, fontFamily: FONT, lineHeight: "1.2" } }, "\xB7 ", it.nombre, " \xD7", it.cantidad, " = ", $(it.subtotal))))),
-        !isDesktop && /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => sendWA(v), variant: "fill", small: true, full: true, icon: "\u{1F4F2}" }, "Enviar por WhatsApp"),
+        !isDesktop && /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => generarVistaPreviaNotaVenta(v, void 0, setPreviewNota), variant: "fill", small: true, full: true, icon: "\u{1F4F2}" }, "Enviar por WhatsApp"),
         v.etiquetaImg && /* @__PURE__ */ import_react.default.createElement(
           "img",
           {
@@ -39703,7 +39789,7 @@ Esta acci\xF3n no se puede deshacer.`,
           }
         )
       );
-    })));
+    }))), /* @__PURE__ */ import_react.default.createElement(NotaImgPreviewModal, { data: previewNota, onClose: () => setPreviewNota(null) }));
   }
   function EmptyState({ icon, title, sub }) {
     return /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center", padding: "48px 20px", color: C.label3 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 44, marginBottom: 12, opacity: 0.5 } }, icon), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 17, fontWeight: 600, color: C.label2, fontFamily: FONT, marginBottom: 6 } }, title), sub && /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 14, color: C.label3, fontFamily: FONT } }, sub));
