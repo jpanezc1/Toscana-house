@@ -3043,6 +3043,11 @@ function NotaImgPreviewModal({data, onClose}){
     }
   }
   function descargar(){
+    if(navigator.clipboard && window.ClipboardItem){
+      navigator.clipboard.write([new ClipboardItem({"image/png":data.blob})])
+        .then(()=>alert("Imagen copiada al portapapeles — pégala con Cmd+V en WhatsApp"))
+        .catch(()=>{});
+    }
     descargarArchivo(data.blob, data.nombre);
   }
   return (
@@ -3054,7 +3059,7 @@ function NotaImgPreviewModal({data, onClose}){
           Enviar por WhatsApp
         </IOSBtn>
         <IOSBtn onPress={descargar} variant="fill" icon="⬇">
-          Descargar imagen
+          Descargar y copiar imagen
         </IOSBtn>
       </div>
     </Sheet>

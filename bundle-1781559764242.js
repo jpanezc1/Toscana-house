@@ -24627,6 +24627,10 @@
       }
     }
     function descargar() {
+      if (navigator.clipboard && window.ClipboardItem) {
+        navigator.clipboard.write([new ClipboardItem({ "image/png": data.blob })]).then(() => alert("Imagen copiada al portapapeles \u2014 p\xE9gala con Cmd+V en WhatsApp")).catch(() => {
+        });
+      }
       descargarArchivo(data.blob, data.nombre);
     }
     return /* @__PURE__ */ import_react.default.createElement(Sheet, { open: !!data, onClose, title: "Nota de venta" }, /* @__PURE__ */ import_react.default.createElement("img", { src: data.url, alt: "Nota de venta", style: {
@@ -24634,7 +24638,7 @@
       borderRadius: 12,
       marginBottom: 16,
       border: `1px solid ${C.sep}`
-    } }), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 10 } }, /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: compartir, variant: "fill", icon: "\u{1F4E4}" }, "Enviar por WhatsApp"), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: descargar, variant: "fill", icon: "\u2B07" }, "Descargar imagen")));
+    } }), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 10 } }, /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: compartir, variant: "fill", icon: "\u{1F4E4}" }, "Enviar por WhatsApp"), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: descargar, variant: "fill", icon: "\u2B07" }, "Descargar y copiar imagen")));
   }
   function numeroALetras(monto) {
     const entero = Math.floor(monto), cts = Math.round((monto - entero) * 100);
