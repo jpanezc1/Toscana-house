@@ -24622,6 +24622,11 @@
       if (navigator.canShare && navigator.canShare({ files: [file] })) {
         navigator.share({ files: [file], title: `Nota de Venta #${data.num}` }).catch(() => {
         });
+      } else if (navigator.clipboard && window.ClipboardItem) {
+        navigator.clipboard.write([new ClipboardItem({ "image/png": data.blob })]).then(() => {
+          window.open("https://wa.me/", "_blank");
+          alert("Imagen copiada \u2014 se abri\xF3 WhatsApp, pega la imagen con Cmd+V en el chat");
+        }).catch(() => descargarArchivo(data.blob, data.nombre));
       } else {
         descargarArchivo(data.blob, data.nombre);
       }
