@@ -5960,7 +5960,7 @@ function beepError(){
 // conectado a la computadora (USB/HID). El lector "teclea" el código
 // y termina con Enter; aquí se captura y se cuenta automáticamente.
 // ══════════════════════════════════════════════════════════
-function LectorHID({onDetect, onClose, feedback, stats, rows, marcaNombre}){
+function LectorHID({onDetect, onClose, onReiniciar, feedback, stats, rows, marcaNombre}){
   const inputRef = useRef(null);
   const idleRef  = useRef(null);
   const rowRefs  = useRef({});
@@ -6038,10 +6038,18 @@ function LectorHID({onDetect, onClose, feedback, stats, rows, marcaNombre}){
           <div style={{fontSize:15,fontWeight:700,color:"#fff"}}>⚡ Verificación rápida — lector USB</div>
           <div style={{fontSize:11,color:"rgba(255,255,255,0.55)",marginTop:1}}>{marcaNombre||"Todas las marcas"}</div>
         </div>
-        <button onClick={onClose} style={{
-          background:"rgba(34,197,94,0.25)",border:"1px solid rgba(74,222,128,0.5)",
-          borderRadius:9,padding:"7px 16px",color:"#fff",fontSize:14,fontWeight:700,
-          cursor:"pointer"}}>✓ Finalizar</button>
+        <div style={{display:"flex",gap:8,flexShrink:0}}>
+          {onReiniciar&&(
+            <button onClick={onReiniciar} title="Termina esta verificación, borra el conteo y vuelve a la selección de marcas para empezar de cero" style={{
+              background:"rgba(239,68,68,0.18)",border:"1px solid rgba(248,113,113,0.45)",
+              borderRadius:9,padding:"7px 14px",color:"#fff",fontSize:13,fontWeight:700,
+              cursor:"pointer",whiteSpace:"nowrap"}}>↺ Empezar de nuevo</button>
+          )}
+          <button onClick={onClose} style={{
+            background:"rgba(34,197,94,0.25)",border:"1px solid rgba(74,222,128,0.5)",
+            borderRadius:9,padding:"7px 16px",color:"#fff",fontSize:14,fontWeight:700,
+            cursor:"pointer",whiteSpace:"nowrap"}}>✓ Finalizar</button>
+        </div>
       </div>
 
       {/* Input enfocado (captura el lector) + HUD */}
@@ -12323,6 +12331,26 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
     }
   }
 
+  // ── Finalizar la verificación rápida en curso y arrancar de cero,
+  // volviendo a la selección de marcas (sin guardar el conteo actual) ──
+  function finalizarYEmpezarDeNuevo(){
+    if(itemsContados>0 && !window.confirm(
+      "¿Finalizar esta verificación y empezar de nuevo desde la selección de marcas?\n\n"+
+      "Se borrará el conteo actual (no quedará guardado en el historial)."
+    )) return;
+    setConteo({}); setVerifConteo({}); setManualVerif({});
+    try{
+      localStorage.removeItem(`th_verif_conteo_${MK}_${marcaSelec||"ALL"}`);
+      localStorage.removeItem(`th_verif_doble_${MK}`);
+      localStorage.removeItem(`th_verif_manual_${MK}`);
+    }catch{}
+    sbResetSesionVerif(sesionId);
+    setModoCierre(false);
+    setModoVerif(false);
+    setMarcaSelec(null);
+    setVista("conteo");
+  }
+
   // ── Movimientos registrados DESPUÉS de congelar la base ───────────
   // Evita inconsistencias por ventas o cargas/recepciones de stock reales
   // ocurridas mientras se contaba: si se vendió 1 unidad, esa unidad ya no
@@ -12622,6 +12650,7 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
           rows={cruce}
           marcaNombre={marcaSelec?`Solo ${marcaSelNombre}`:"Todas las marcas"}
           onClose={()=>setModoCierre(false)}
+          onReiniciar={finalizarYEmpezarDeNuevo}
         />
       )}
 
@@ -12634,6 +12663,7 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
           rows={discrepancias.map(d=>({id:d.id,codigo:d.codigo,nombre:d.nombre,sistema:d.contado,contado:verifConteo[d.id]||0}))}
           marcaNombre={`Doble conteo${marcaSelec?` · ${marcaSelNombre}`:""}`}
           onClose={()=>setModoVerif(false)}
+          onReiniciar={finalizarYEmpezarDeNuevo}
         />
       )}
 

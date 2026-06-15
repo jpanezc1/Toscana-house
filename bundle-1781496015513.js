@@ -27732,7 +27732,7 @@ Fecha: ${venta.fecha}`);
     } catch (_) {
     }
   }
-  function LectorHID({ onDetect, onClose, feedback, stats, rows, marcaNombre }) {
+  function LectorHID({ onDetect, onClose, onReiniciar, feedback, stats, rows, marcaNombre }) {
     const inputRef = (0, import_react.useRef)(null);
     const idleRef = (0, import_react.useRef)(null);
     const rowRefs = (0, import_react.useRef)({});
@@ -27809,7 +27809,17 @@ Fecha: ${venta.fecha}`);
       justifyContent: "space-between",
       padding: "calc(env(safe-area-inset-top,0px) + 12px) 18px 12px",
       background: "rgba(0,0,0,0.35)"
-    } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 15, fontWeight: 700, color: "#fff" } }, "\u26A1 Verificaci\xF3n r\xE1pida \u2014 lector USB"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: "rgba(255,255,255,0.55)", marginTop: 1 } }, marcaNombre || "Todas las marcas")), /* @__PURE__ */ import_react.default.createElement("button", { onClick: onClose, style: {
+    } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 15, fontWeight: 700, color: "#fff" } }, "\u26A1 Verificaci\xF3n r\xE1pida \u2014 lector USB"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: "rgba(255,255,255,0.55)", marginTop: 1 } }, marcaNombre || "Todas las marcas")), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 8, flexShrink: 0 } }, onReiniciar && /* @__PURE__ */ import_react.default.createElement("button", { onClick: onReiniciar, title: "Termina esta verificaci\xF3n, borra el conteo y vuelve a la selecci\xF3n de marcas para empezar de cero", style: {
+      background: "rgba(239,68,68,0.18)",
+      border: "1px solid rgba(248,113,113,0.45)",
+      borderRadius: 9,
+      padding: "7px 14px",
+      color: "#fff",
+      fontSize: 13,
+      fontWeight: 700,
+      cursor: "pointer",
+      whiteSpace: "nowrap"
+    } }, "\u21BA Empezar de nuevo"), /* @__PURE__ */ import_react.default.createElement("button", { onClick: onClose, style: {
       background: "rgba(34,197,94,0.25)",
       border: "1px solid rgba(74,222,128,0.5)",
       borderRadius: 9,
@@ -27817,8 +27827,9 @@ Fecha: ${venta.fecha}`);
       color: "#fff",
       fontSize: 14,
       fontWeight: 700,
-      cursor: "pointer"
-    } }, "\u2713 Finalizar")), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      cursor: "pointer",
+      whiteSpace: "nowrap"
+    } }, "\u2713 Finalizar"))), /* @__PURE__ */ import_react.default.createElement("div", { style: {
       flexShrink: 0,
       padding: "12px 16px 10px",
       display: "flex",
@@ -34908,6 +34919,25 @@ Motivo: ${motivo}` : ""}`)) {
         sbResetSesionVerif(sesionId);
       }
     }
+    function finalizarYEmpezarDeNuevo() {
+      if (itemsContados > 0 && !window.confirm(
+        "\xBFFinalizar esta verificaci\xF3n y empezar de nuevo desde la selecci\xF3n de marcas?\n\nSe borrar\xE1 el conteo actual (no quedar\xE1 guardado en el historial)."
+      )) return;
+      setConteo({});
+      setVerifConteo({});
+      setManualVerif({});
+      try {
+        localStorage.removeItem(`th_verif_conteo_${MK}_${marcaSelec || "ALL"}`);
+        localStorage.removeItem(`th_verif_doble_${MK}`);
+        localStorage.removeItem(`th_verif_manual_${MK}`);
+      } catch {
+      }
+      sbResetSesionVerif(sesionId);
+      setModoCierre(false);
+      setModoVerif(false);
+      setMarcaSelec(null);
+      setVista("conteo");
+    }
     const ventasAjuste = (0, import_react.useMemo)(() => {
       const baseMs = baseTs.getTime();
       const map = {};
@@ -35250,7 +35280,8 @@ Base de inventario tomada: ${baseTs.toLocaleString("es-BO")}`)) return;
         stats: { productos: itemsContados, unidades: unidadesContadas },
         rows: cruce,
         marcaNombre: marcaSelec ? `Solo ${marcaSelNombre}` : "Todas las marcas",
-        onClose: () => setModoCierre(false)
+        onClose: () => setModoCierre(false),
+        onReiniciar: finalizarYEmpezarDeNuevo
       }
     ), modoVerif && /* @__PURE__ */ import_react.default.createElement(
       LectorHID,
@@ -35260,7 +35291,8 @@ Base de inventario tomada: ${baseTs.toLocaleString("es-BO")}`)) return;
         stats: { productos: verificadosCount, unidades: discrepancias.length },
         rows: discrepancias.map((d) => ({ id: d.id, codigo: d.codigo, nombre: d.nombre, sistema: d.contado, contado: verifConteo[d.id] || 0 })),
         marcaNombre: `Doble conteo${marcaSelec ? ` \xB7 ${marcaSelNombre}` : ""}`,
-        onClose: () => setModoVerif(false)
+        onClose: () => setModoVerif(false),
+        onReiniciar: finalizarYEmpezarDeNuevo
       }
     ), /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 16 } }, /* @__PURE__ */ import_react.default.createElement(
       SegControl,
