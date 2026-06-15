@@ -92,41 +92,50 @@ async function sbGuardarProducto(prod) {
 async function sbActualizarStock(prodId, nuevoStock) {
   try {
     const db = await getSupabase();
-    await db.from("inventario").update({ stock: nuevoStock }).eq("id", prodId);
-  } catch(e) { console.warn("Supabase update stock:", e.message); }
+    const { error } = await db.from("inventario").update({ stock: nuevoStock }).eq("id", prodId);
+    if (error) throw error;
+    return true;
+  } catch(e) { console.warn("Supabase update stock:", e.message); return false; }
 }
 
 async function sbGuardarVenta(venta) {
   try {
     const db = await getSupabase();
-    await db.from("ventas").upsert({
+    const { error: errVenta } = await db.from("ventas").upsert({
       id: venta.id, fecha: venta.fecha, hora: venta.hora,
       mk: venta.mk, mes: venta.mes, anio: venta.anio,
       total: venta.total, subtotal: venta.subtotal,
       desc_pct: venta.descPct||0, metodo_pago: venta.metodoPago,
       vendedor: venta.vendedor, etiqueta_img: venta.etiquetaImg||null
     });
+    if (errVenta) throw errVenta;
     const items = venta.items.map(it => ({
       venta_id: venta.id, prod_id: it.prodId, codigo: it.codigo,
       nombre: it.nombre, marca_id: it.marcaId, marca_nombre: it.marcaNombre,
       cantidad: it.cantidad, precio_unit: it.precioUnit, subtotal: it.subtotal
     }));
-    await db.from("venta_items").insert(items);
-  } catch(e) { console.warn("Supabase save venta:", e.message); }
+    const { error: errItems } = await db.from("venta_items").insert(items);
+    if (errItems) throw errItems;
+    return true;
+  } catch(e) { console.warn("Supabase save venta:", e.message); return false; }
 }
 
 async function sbAnularVenta(ventaId) {
   try {
     const db = await getSupabase();
-    await db.from("ventas").update({ anulada: true }).eq("id", ventaId);
-  } catch(e) { console.warn("Supabase anular venta:", e.message); }
+    const { error } = await db.from("ventas").update({ anulada: true }).eq("id", ventaId);
+    if (error) throw error;
+    return true;
+  } catch(e) { console.warn("Supabase anular venta:", e.message); return false; }
 }
 
 async function sbGuardarCierre(key, data) {
   try {
     const db = await getSupabase();
-    await db.from("cierres").upsert({ id: key, ...data });
-  } catch(e) { console.warn("Supabase save cierre:", e.message); }
+    const { error } = await db.from("cierres").upsert({ id: key, ...data });
+    if (error) throw error;
+    return true;
+  } catch(e) { console.warn("Supabase save cierre:", e.message); return false; }
 }
 
 // ── Sesión de verificación de inventario compartida (multi-dispositivo) ─────
@@ -168,14 +177,16 @@ async function sbResetSesionVerif(id) {
 async function sbGuardarRetiro(retiro) {
   try {
     const db = await getSupabase();
-    await db.from("retiros").upsert({
+    const { error } = await db.from("retiros").upsert({
       id: retiro.id, fecha: retiro.fecha, hora: retiro.hora,
       prod_id: retiro.prodId, codigo: retiro.codigo,
       nombre: retiro.nombre, marca_id: retiro.marcaId,
       marca_nombre: retiro.marcaNombre, cantidad: retiro.cantidad,
       destinatario: retiro.destinatario, motivo: retiro.motivo||""
     });
-  } catch(e) { console.warn("Supabase retiro (tabla puede no existir):", e.message); }
+    if (error) throw error;
+    return true;
+  } catch(e) { console.warn("Supabase retiro (tabla puede no existir):", e.message); return false; }
 }
 
 async function sbCargarRetiros() {
@@ -195,7 +206,7 @@ async function sbCargarRetiros() {
 async function sbGuardarCarga(c) {
   try {
     const db = await getSupabase();
-    await db.from("cargas_inventario").insert({
+    const { error } = await db.from("cargas_inventario").insert({
       id: c.id, ts: c.ts, fecha: c.fecha, hora: c.hora, tipo: c.tipo,
       usuario: c.usuario, nombre: c.nombre, rol: c.rol,
       marca_id: c.marcaId, marca_nombre: c.marcaNombre,
@@ -203,7 +214,9 @@ async function sbGuardarCarga(c) {
       nuevos: c.nuevos||0, actualizados: c.actualizados||0,
       detalle: c.items||[],
     });
-  } catch(e) { console.warn("Supabase carga (tabla puede no existir):", e.message); }
+    if (error) throw error;
+    return true;
+  } catch(e) { console.warn("Supabase carga (tabla puede no existir):", e.message); return false; }
 }
 
 async function sbCargarCargas() {
@@ -224,7 +237,7 @@ async function sbCargarCargas() {
 async function sbGuardarAuditoria(aud) {
   try {
     const db = await getSupabase();
-    await db.from("auditorias_inventario").upsert({
+    const { error } = await db.from("auditorias_inventario").upsert({
       id: aud.id, mk: aud.mk, mes: aud.mes, anio: aud.anio,
       fecha: aud.fecha, hora: aud.hora, usuario: aud.usuario,
       marca_id: aud.marcaId, total_productos: aud.totalProductos,
@@ -232,7 +245,9 @@ async function sbGuardarAuditoria(aud) {
       valor_fuga: aud.valorFuga, valor_sobrante: aud.valorSobrante,
       detalle: aud.detalle,
     });
-  } catch(e) { console.warn("Supabase auditoria (tabla puede no existir):", e.message); }
+    if (error) throw error;
+    return true;
+  } catch(e) { console.warn("Supabase auditoria (tabla puede no existir):", e.message); return false; }
 }
 
 async function sbCargarAuditorias() {
@@ -335,8 +350,10 @@ async function sbGuardarAuditLog(evento) {
   try {
     const db = await getSupabase();
     const {id, ts, fecha, hora, tipo, usuario, nombre, rol, ...detalle} = evento;
-    await db.from("audit_log").upsert({id, ts, fecha, hora, tipo, usuario, nombre, rol, detalle});
-  } catch(e) { console.warn("Supabase save audit_log:", e.message); }
+    const { error } = await db.from("audit_log").upsert({id, ts, fecha, hora, tipo, usuario, nombre, rol, detalle});
+    if (error) throw error;
+    return true;
+  } catch(e) { console.warn("Supabase save audit_log:", e.message); return false; }
 }
 
 async function sbCargarAuditLog() {
@@ -350,6 +367,96 @@ async function sbCargarAuditLog() {
       ...(a.detalle||{}),
     }));
   } catch(e) { console.warn("Supabase load audit_log:", e.message); return null; }
+}
+
+// ════════════════════════════════════════════════════════════
+// OUTBOX — cola de respaldo para sincronización con Supabase.
+// Toda escritura que falle (sin internet, error del servidor, etc.)
+// se guarda aquí y se reintenta automáticamente al reconectar o de
+// forma periódica, para que ningún dato se pierda aunque la nube
+// no esté disponible en el momento de guardar.
+// ════════════════════════════════════════════════════════════
+const TH_OUTBOX_KEY = "th_sync_outbox";
+
+function getOutbox(){
+  try{ return JSON.parse(localStorage.getItem(TH_OUTBOX_KEY)||"[]"); }catch{ return []; }
+}
+function setOutbox(lista){
+  try{ localStorage.setItem(TH_OUTBOX_KEY, JSON.stringify(lista)); }catch{}
+  try{ window.dispatchEvent(new CustomEvent("th-outbox-changed",{detail:{count:lista.length}})); }catch{}
+}
+function pushToOutbox(tipo, payload){
+  const op = { id:`${Date.now()}-${Math.random().toString(36).slice(2,8)}`, tipo, payload, ts:Date.now(), intentos:0 };
+  setOutbox([...getOutbox(), op]);
+  return op.id;
+}
+function removeFromOutbox(id){
+  setOutbox(getOutbox().filter(o=>o.id!==id));
+}
+
+// Ejecuta la operación sb* correspondiente a un ítem de la cola.
+// Devuelve true si Supabase confirmó la escritura (sale de la cola).
+async function ejecutarOpOutbox(op){
+  switch(op.tipo){
+    case "producto":    return !!(await sbGuardarProducto(op.payload));
+    case "stock":       return await sbActualizarStock(op.payload.prodId, op.payload.stock);
+    case "venta":       return await sbGuardarVenta(op.payload);
+    case "anularVenta": return await sbAnularVenta(op.payload.id);
+    case "cierre":      return await sbGuardarCierre(op.payload.key, op.payload.data);
+    case "retiro":      return await sbGuardarRetiro(op.payload);
+    case "carga":       return await sbGuardarCarga(op.payload);
+    case "auditoria":   return await sbGuardarAuditoria(op.payload);
+    case "auditLog":    return await sbGuardarAuditLog(op.payload);
+    case "usuarios":    return await sbGuardarUsuarios(op.payload);
+    default: return true; // tipo desconocido — no bloquear la cola
+  }
+}
+
+let _procesandoOutbox = false;
+// Recorre la cola en orden y descarta los ítems que Supabase confirme.
+// Los que sigan fallando quedan en la cola para el próximo intento.
+async function procesarOutbox(){
+  if(_procesandoOutbox) return;
+  if(typeof navigator!=="undefined" && navigator.onLine===false) return;
+  if(getOutbox().length===0) return;
+  _procesandoOutbox = true;
+  try{
+    for(const op of getOutbox()){
+      let ok=false;
+      try{ ok = await ejecutarOpOutbox(op); }catch{ ok=false; }
+      if(ok){
+        removeFromOutbox(op.id);
+      }else{
+        const actual = getOutbox();
+        const idx = actual.findIndex(o=>o.id===op.id);
+        if(idx>=0){
+          actual[idx].intentos = (actual[idx].intentos||0)+1;
+          actual[idx].ultimoIntento = Date.now();
+          setOutbox(actual);
+        }
+      }
+    }
+  } finally {
+    _procesandoOutbox = false;
+  }
+}
+
+// Intenta guardar en Supabase de inmediato; si no hay red o falla,
+// encola la operación para reintento automático. Los datos ya están
+// seguros en localStorage (estado React) independientemente del resultado.
+async function syncConRespaldo(tipo, payload, fnDirecto){
+  try{
+    if(typeof navigator!=="undefined" && navigator.onLine===false){
+      pushToOutbox(tipo, payload);
+      return false;
+    }
+    const ok = await fnDirecto();
+    if(!ok){ pushToOutbox(tipo, payload); }
+    return ok;
+  }catch(e){
+    pushToOutbox(tipo, payload);
+    return false;
+  }
 }
 
 // ── Realtime sync — escucha cambios en Supabase y actualiza estado local ────
@@ -1994,6 +2101,96 @@ async function generarExcelStock(inventario, setGenerando) {
   setGenerando(false);
 }
 
+// ── RESPALDO COMPLETO — todas las tablas en un solo Excel ──────────
+// Redundancia adicional a Supabase + localStorage: un .xlsx con
+// inventario, ventas, cierres, retiros, auditorías y cargas, listo
+// para guardar en Drive/USB en caso de pérdida de datos.
+async function generarRespaldoCompleto({inv, ventas, cierres, retiros, auditorias, cargas, marcas}, setGenerando) {
+  setGenerando(true);
+  try {
+    const XLSX = await loadXLSX();
+    const wb = XLSX.utils.book_new();
+    const marcaNom = id => marcas.find(m=>m.id===id)?.nombre || id || "—";
+
+    // ── Inventario ──
+    const invRows = [
+      ["Código","Producto","Marca","Categoría","Subcategoría","Precio (Bs)","Stock inicial","Stock actual","Fecha ingreso","ID"],
+      ...inv.map(p=>[p.codigo, p.nombre, p.marcaNombre||marcaNom(p.marcaId), p.categoria||"", p.subcat||"", p.precio, p.stockInicial, p.stock, p.fecha, p.id]),
+    ];
+    const wsInv = XLSX.utils.aoa_to_sheet(invRows);
+    wsInv["!cols"] = [{wch:18},{wch:28},{wch:16},{wch:14},{wch:14},{wch:12},{wch:12},{wch:12},{wch:12},{wch:16}];
+    XLSX.utils.book_append_sheet(wb, wsInv, "Inventario");
+
+    // ── Ventas (encabezado por venta) ──
+    const ventasRows = [
+      ["ID Venta","Fecha","Hora","Total","Subtotal","Desc%","Pago","Vendedor","Anulada","Items"],
+      ...ventas.map(v=>[v.id, v.fecha, v.hora, v.total, v.subtotal, v.descPct||0, v.metodoPago, v.vendedor||"", v.anulada?"SÍ":"NO", (v.items||[]).length]),
+    ];
+    const wsVentas = XLSX.utils.aoa_to_sheet(ventasRows);
+    wsVentas["!cols"] = [{wch:16},{wch:12},{wch:8},{wch:10},{wch:10},{wch:8},{wch:12},{wch:14},{wch:8},{wch:8}];
+    XLSX.utils.book_append_sheet(wb, wsVentas, "Ventas");
+
+    // ── Detalle de ítems vendidos ──
+    const itemsRows = [
+      ["ID Venta","Fecha","Código","Producto","Marca","Cantidad","Precio Unit.","Subtotal"],
+    ];
+    ventas.forEach(v=>(v.items||[]).forEach(it=>{
+      itemsRows.push([v.id, v.fecha, it.codigo, it.nombre, it.marcaNombre||marcaNom(it.marcaId), it.cantidad, it.precioUnit, it.subtotal]);
+    }));
+    const wsItems = XLSX.utils.aoa_to_sheet(itemsRows);
+    wsItems["!cols"] = [{wch:16},{wch:12},{wch:18},{wch:26},{wch:16},{wch:10},{wch:12},{wch:12}];
+    XLSX.utils.book_append_sheet(wb, wsItems, "Items Vendidos");
+
+    // ── Cierres mensuales ──
+    const cierresRows = [
+      ["Clave","Marca/MK","Cerrado","Fecha"],
+      ...Object.entries(cierres||{}).map(([k,c])=>[k, c.mk||"", c.cerrado?"SÍ":"NO", c.fecha||""]),
+    ];
+    const wsCierres = XLSX.utils.aoa_to_sheet(cierresRows);
+    wsCierres["!cols"] = [{wch:20},{wch:14},{wch:10},{wch:12}];
+    XLSX.utils.book_append_sheet(wb, wsCierres, "Cierres");
+
+    // ── Retiros ──
+    const retirosRows = [
+      ["ID","Fecha","Hora","Código","Producto","Marca","Cantidad","Destinatario","Motivo"],
+      ...(retiros||[]).map(r=>[r.id, r.fecha, r.hora, r.codigo, r.nombre, r.marcaNombre||marcaNom(r.marcaId), r.cantidad, r.destinatario, r.motivo||""]),
+    ];
+    const wsRetiros = XLSX.utils.aoa_to_sheet(retirosRows);
+    wsRetiros["!cols"] = [{wch:16},{wch:12},{wch:8},{wch:18},{wch:26},{wch:16},{wch:10},{wch:18},{wch:24}];
+    XLSX.utils.book_append_sheet(wb, wsRetiros, "Retiros");
+
+    // ── Auditorías de inventario ──
+    const audRows = [
+      ["ID","Fecha","Hora","Marca","Total productos","OK","Faltantes","Sobrantes","Valor fuga (Bs)","Valor sobrante (Bs)","Usuario"],
+      ...(auditorias||[]).map(a=>[a.id, a.fecha, a.hora, marcaNom(a.marcaId), a.totalProductos, a.ok, a.faltantes, a.sobrantes, a.valorFuga, a.valorSobrante, a.usuario]),
+    ];
+    const wsAud = XLSX.utils.aoa_to_sheet(audRows);
+    wsAud["!cols"] = [{wch:16},{wch:12},{wch:8},{wch:16},{wch:14},{wch:8},{wch:10},{wch:10},{wch:14},{wch:16},{wch:14}];
+    XLSX.utils.book_append_sheet(wb, wsAud, "Auditorías");
+
+    // ── Cargas / importaciones de inventario ──
+    const cargasRows = [
+      ["ID","Fecha","Hora","Tipo","Usuario","Marca","Resumen","Total ítems","Nuevos","Actualizados"],
+      ...(cargas||[]).map(c=>[c.id, c.fecha, c.hora, c.tipo, c.usuario, c.marcaNombre||marcaNom(c.marcaId), c.resumen, c.totalItems, c.nuevos||0, c.actualizados||0]),
+    ];
+    const wsCargas = XLSX.utils.aoa_to_sheet(cargasRows);
+    wsCargas["!cols"] = [{wch:16},{wch:12},{wch:8},{wch:10},{wch:14},{wch:16},{wch:40},{wch:10},{wch:8},{wch:12}];
+    XLSX.utils.book_append_sheet(wb, wsCargas, "Cargas");
+
+    wb.SheetNames.forEach(name => { aplicarBordesSheet(wb.Sheets[name], XLSX); });
+    const wbOut = XLSX.write(wb, { bookType:"xlsx", type:"array" });
+    const blob  = new Blob([wbOut], { type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+    const ts = new Date().toISOString().replace(/[:.]/g,"-");
+    descargarArchivo(blob, `TH_Respaldo_Completo_${ts}.xlsx`);
+    return true;
+  } catch(e) {
+    alert("Error generando respaldo: " + e.message);
+    return false;
+  } finally {
+    setGenerando(false);
+  }
+}
+
 // ── Exportar Excel — detalle de ventas + desglose de liquidación ──
 async function exportExcelLiquidacion(marca,ventas,mes,anio){
   const XLSX = await loadXLSX();
@@ -2963,6 +3160,42 @@ function usePress(onPress) {
 }
 
 // ── Desktop breakpoint hook ───────────────────────────────
+// ── Estado global de sincronización con la nube ──────────────────────
+// Expone cuántas operaciones esperan subirse a Supabase y si hay
+// conexión. Reintenta automáticamente al reconectar y cada 20s.
+function useSyncStatus() {
+  const [pendientes, setPendientes] = useState(()=>getOutbox().length);
+  const [online, setOnline] = useState(()=> typeof navigator==="undefined" ? true : navigator.onLine);
+  const [procesando, setProcesando] = useState(false);
+
+  useEffect(()=>{
+    function onOutboxChange(e){ setPendientes(e.detail?.count ?? getOutbox().length); }
+    function intentar(){
+      if(!navigator.onLine) return;
+      setProcesando(true);
+      procesarOutbox().finally(()=>{ setProcesando(false); setPendientes(getOutbox().length); });
+    }
+    function onOnline(){ setOnline(true); intentar(); }
+    function onOffline(){ setOnline(false); }
+
+    window.addEventListener("th-outbox-changed", onOutboxChange);
+    window.addEventListener("online", onOnline);
+    window.addEventListener("offline", onOffline);
+
+    intentar(); // al montar
+    const interval = setInterval(intentar, 20000);
+
+    return ()=>{
+      window.removeEventListener("th-outbox-changed", onOutboxChange);
+      window.removeEventListener("online", onOnline);
+      window.removeEventListener("offline", onOffline);
+      clearInterval(interval);
+    };
+  },[]);
+
+  return { pendientes, online, procesando };
+}
+
 function useIsDesktop() {
   var _hND = useState(function(){ return typeof window !== "undefined" && window.innerWidth >= 500; });
   var isDesktop = _hND[0]; var setIsDesktop = _hND[1];
@@ -3150,6 +3383,54 @@ function Cell({icon,iconBg,label,value,chevron,onPress,danger,first,last,badge})
 }
 
 // Atelier Navigation Bar
+// ── Indicador global de sincronización con la nube ───────────────────
+// Aparece flotando sobre cualquier pantalla cuando:
+//  · No hay conexión a internet (datos se siguen guardando localmente)
+//  · Hay cambios pendientes de subir a Supabase
+//  · Justo se confirmó que todo quedó guardado en la nube (breve)
+function SyncBadge({sync}){
+  const {pendientes, online, procesando} = sync;
+  const [justSynced, setJustSynced] = useState(false);
+  const prevPend = useRef(pendientes);
+  useEffect(()=>{
+    if(prevPend.current>0 && pendientes===0 && online){
+      setJustSynced(true);
+      const t=setTimeout(()=>setJustSynced(false), 4000);
+      prevPend.current = pendientes;
+      return ()=>clearTimeout(t);
+    }
+    prevPend.current = pendientes;
+  },[pendientes,online]);
+
+  let badge=null;
+  if(!online){
+    badge = {color:"#EF4444", icon:"📡", text:"Sin conexión — guardando localmente"};
+  } else if(pendientes>0){
+    badge = {color:"#F59E0B", icon:procesando?"🔄":"⏳",
+      text:`${pendientes} cambio${pendientes===1?"":"s"} pendiente${pendientes===1?"":"s"} de subir a la nube`};
+  } else if(justSynced){
+    badge = {color:"#22C55E", icon:"☁", text:"Todo guardado en la nube ✓"};
+  }
+  if(!badge) return null;
+
+  return (
+    <div style={{
+      position:"fixed", bottom:96, left:"50%", transform:"translateX(-50%)",
+      zIndex:9998, display:"flex", alignItems:"center", gap:8,
+      background:`${badge.color}1A`, border:`1px solid ${badge.color}55`,
+      color:badge.color, fontFamily:FONT, fontSize:12, fontWeight:600,
+      borderRadius:999, padding:"8px 16px",
+      backdropFilter:"blur(12px)", WebkitBackdropFilter:"blur(12px)",
+      boxShadow:"0 4px 16px rgba(0,0,0,0.12)",
+      whiteSpace:"nowrap", maxWidth:"92vw", overflow:"hidden", textOverflow:"ellipsis",
+      pointerEvents:"none",
+    }}>
+      <span style={{fontSize:14}}>{badge.icon}</span>
+      <span>{badge.text}</span>
+    </div>
+  );
+}
+
 function NavBar({title, subtitle, back, onBack, right}){
   return (
     <div style={{
@@ -3932,7 +4213,7 @@ function LiqModal({marcaId,ventas,mes,anio,MK,cierres,setCierres,onClose,syncCie
           Exportar Excel
         </IOSBtn>
         {!cerrado
-          ? <IOSBtn onPress={()=>{setCierres(p=>({...p,[`${MK}-${marcaId}`]:{cerrado:true,fecha:hoy(),mk:MK}}));sbGuardarCierre(`${MK}-${marcaId}`,{cerrado:true,fecha:hoy(),mk:MK,marca_id:marcaId});onClose();}} variant="success" icon="✓">
+          ? <IOSBtn onPress={()=>{const key=`${MK}-${marcaId}`,data={cerrado:true,fecha:hoy(),mk:MK,marca_id:marcaId};setCierres(p=>({...p,[key]:{cerrado:true,fecha:hoy(),mk:MK}}));syncConRespaldo("cierre",{key,data},()=>sbGuardarCierre(key,data));onClose();}} variant="success" icon="✓">
               Confirmar Cierre Mensual
             </IOSBtn>
           : <IOSBtn onPress={()=>{setCierres(p=>({...p,[`${MK}-${marcaId}`]:{cerrado:false,mk:MK}}));onClose();}} variant="danger">
@@ -9891,6 +10172,7 @@ function GiftCardsTab() {
 function App(){
   const { user, login, logout } = useAuth();
   const isDesktop = useIsDesktop();
+  const sync = useSyncStatus();
   const now=new Date();
   const[tab,setTab]         =useState("inicio");
   // ── Persistencia local: ini desde localStorage, sync a nube con Supabase ──
@@ -9952,7 +10234,7 @@ function App(){
       })();
       const nueva = [...listaU, nuevoUsuario];
       localStorage.setItem("th_usuarios", JSON.stringify(nueva));
-      sbGuardarUsuarios(nueva); // ← también a la nube
+      syncConRespaldo("usuarios", nueva, ()=>sbGuardarUsuarios(nueva)); // ← también a la nube
     }
   }
 
@@ -10078,12 +10360,12 @@ function App(){
 
   function registrarAuditoria(aud){
     setAuditorias(prev=>[aud, ...prev]);
-    sbGuardarAuditoria(aud);
+    syncConRespaldo("auditoria", aud, ()=>sbGuardarAuditoria(aud));
   }
 
   function registrarCarga(carga){
     setCargas(prev=>[carga, ...prev]);
-    sbGuardarCarga(carga);
+    syncConRespaldo("carga", carga, ()=>sbGuardarCarga(carga));
   }
 
   function registrarRetiro(r){
@@ -10094,8 +10376,8 @@ function App(){
     const stockAntes = prod?.stock||0;
     const stockDespues = Math.max(0, stockAntes - r.cantidad);
     setInv(p=>p.map(i=>i.id===r.prodId?{...i,stock:stockDespues}:i));
-    sbActualizarStock(r.prodId, stockDespues);
-    sbGuardarRetiro(r);
+    syncConRespaldo("stock", {prodId:r.prodId, stock:stockDespues}, ()=>sbActualizarStock(r.prodId, stockDespues));
+    syncConRespaldo("retiro", r, ()=>sbGuardarRetiro(r));
     // ── Audit forense ─────────────────────────────────────────────
     logAudit("RETIRO", {
       resumen: `Retiro: ${prod?.nombre||r.codigo} × ${r.cantidad} u.`,
@@ -10207,7 +10489,7 @@ function App(){
       marcaNombre:marca?.nombre||""};
     setInv(p=>[...p,prod]);
     drive.syncProducto(prod);
-    sbGuardarProducto(prod); // guardar en nube
+    syncConRespaldo("producto", prod, ()=>sbGuardarProducto(prod)); // guardar en nube
     logAudit("IMPORT", {
       resumen: `Importación: 1 nuevos + 0 actualizados · ${prod.marcaNombre||"—"}`,
       nuevos:1, actualizados:0, totalItems:1,
@@ -10253,7 +10535,7 @@ function App(){
   function registrarBaja(prod, stockAntes, cant, motivo){
     const stockDespues = stockAntes - cant;
     setInv(p=>p.map(i=>i.id===prod.id?{...i,stock:stockDespues}:i));
-    sbActualizarStock(prod.id, stockDespues);
+    syncConRespaldo("stock", {prodId:prod.id, stock:stockDespues}, ()=>sbActualizarStock(prod.id, stockDespues));
     logAudit("BAJA", {
       resumen: `Baja: ${prod.nombre} (${prod.codigo}) -${cant} · stock ${stockAntes}→${stockDespues}${motivo?` · ${motivo}`:""}`,
       codigo: prod.codigo, nombre: prod.nombre,
@@ -10275,7 +10557,7 @@ function App(){
     const stockAntes=prod.stock||0;
     const stockDespues=stockAntes+cant;
     setInv(p=>p.map(i=>i.id===prod.id?{...i,stock:stockDespues}:i));
-    sbActualizarStock(prod.id, stockDespues);
+    syncConRespaldo("stock", {prodId:prod.id, stock:stockDespues}, ()=>sbActualizarStock(prod.id, stockDespues));
     logAudit("STOCK_ADD", {
       resumen: `Entrada de stock: ${prod.nombre} (${prod.codigo}) +${cant} · stock ${stockAntes}→${stockDespues}`,
       codigo: prod.codigo, nombre: prod.nombre,
@@ -10295,7 +10577,7 @@ function App(){
       const stockAntes = prod?.stock||0;
       const stockNuevo = stockAntes + stock;
       setInv(prev=>prev.map(p=>p.codigo===codigo?{...p,stock:stockNuevo}:p));
-      if(prod) sbActualizarStock(prod.id, stockNuevo);
+      if(prod) syncConRespaldo("stock", {prodId:prod.id, stock:stockNuevo}, ()=>sbActualizarStock(prod.id, stockNuevo));
       // buffer audit
       _importBuf.current.items.push({tipo:"update", codigo, nombre:prod?.nombre||codigo,
         marca:prod?.marcaNombre||"—", marcaId:prod?.marcaId??null, stockAntes, stockNuevo, stockSumado:stock});
@@ -10303,11 +10585,12 @@ function App(){
       const localId = Date.now() * 1000 + Math.floor(Math.random()*999);
       const newProd = { id: localId, ...producto };
       setInv(prev=>[...prev, newProd]);
-      sbGuardarProducto(newProd).then(sbId=>{
+      syncConRespaldo("producto", newProd, ()=>sbGuardarProducto(newProd).then(sbId=>{
         if(sbId && sbId !== localId){
           setInv(prev=>prev.map(p=>p.id===localId ? {...p, id:sbId} : p));
         }
-      });
+        return !!sbId;
+      }));
       // buffer audit
       _importBuf.current.items.push({tipo:"create", codigo:producto.codigo,
         nombre:producto.nombre, marca:producto.marcaNombre||"—", marcaId:producto.marcaId??null,
@@ -10348,11 +10631,11 @@ function App(){
       const stockAntes = inv.find(i=>i.id===it.prodId)?.stock||0;
       const stockDespues = Math.max(0, stockAntes - it.cantidad);
       setInv(p=>p.map(i=>i.id===it.prodId?{...i,stock:stockDespues}:i));
-      sbActualizarStock(it.prodId, stockDespues);
+      syncConRespaldo("stock", {prodId:it.prodId, stock:stockDespues}, ()=>sbActualizarStock(it.prodId, stockDespues));
       stockCambios.push({prodId:it.prodId, codigo:it.codigo, nombre:it.nombre, stockAntes, stockDespues});
     });
     drive.syncVenta(vf);
-    sbGuardarVenta(vf);
+    syncConRespaldo("venta", vf, ()=>sbGuardarVenta(vf));
     // ── Audit forense ─────────────────────────────────────────────
     const marcas = [...new Set(v.items.map(i=>i.marcaNombre))].join(", ");
     logAudit("VENTA", {
@@ -10386,13 +10669,13 @@ function App(){
     v.items.forEach(it=>{
       const actual = inv.find(i=>i.id===it.prodId)?.stock||0;
       setInv(p=>p.map(i=>i.id===it.prodId?{...i,stock:actual+it.cantidad}:i));
-      sbActualizarStock(it.prodId, actual+it.cantidad);
+      syncConRespaldo("stock", {prodId:it.prodId, stock:actual+it.cantidad}, ()=>sbActualizarStock(it.prodId, actual+it.cantidad));
       stockCambios.push({codigo:it.codigo, nombre:it.nombre, stockAntes:actual, stockDespues:actual+it.cantidad});
     });
     const vAnulada = {...v, anulada:true, fechaAnulacion:hoy()};
     setVentas(p=>p.map(x=>x.id===ventaId?vAnulada:x));
     setVentaDetalle(vAnulada);
-    sbAnularVenta(ventaId);
+    syncConRespaldo("anularVenta", {id:ventaId}, ()=>sbAnularVenta(ventaId));
     // ── Audit forense ─────────────────────────────────────────────
     logAudit("ANULACION", {
       resumen: `Anulación venta ${ventaId} · Bs ${v.total} devueltos`,
@@ -10495,6 +10778,9 @@ function App(){
           <style>{`@keyframes loadbar{0%{transform:translateX(-100%)}100%{transform:translateX(200%)}}@keyframes slideUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}`}</style>
         </div>
       )}
+
+      {/* ── INDICADOR GLOBAL DE SINCRONIZACIÓN ── */}
+      {!cargando && <SyncBadge sync={sync}/>}
 
       {/* ── DESKTOP SIDEBAR ── */}
       {isDesktop&&<DesktopSidebar tabs={TABS} active={tab} onChange={t=>{setTab(t);setMD(null);}} user={user} logout={logout}/>}
@@ -11009,6 +11295,24 @@ function App(){
 
       {/* ══ DRIVE CONFIG SHEET ══ */}
       <Sheet open={sheetDrive} onClose={()=>setShDrive(false)} title="☁ Google Drive" tall>
+        {/* Respaldo redundante en Excel */}
+        <div style={{background:`${C.gold}10`,borderRadius:16,padding:"16px",
+          marginBottom:20,border:`1px solid ${C.gold}30`}}>
+          <div style={{fontSize:15,fontWeight:600,color:C.label,fontFamily:FONT,marginBottom:6}}>
+            📊 Respaldo completo en Excel
+          </div>
+          <p style={{fontSize:12,color:C.label3,fontFamily:FONT,margin:"0 0 12px",lineHeight:1.5}}>
+            Descarga un archivo .xlsx con inventario, ventas, cierres, retiros, auditorías y cargas —
+            guárdalo en Drive, correo o USB como respaldo adicional, independiente de la nube y del dispositivo.
+          </p>
+          <IOSBtn
+            disabled={generando}
+            onPress={()=>generarRespaldoCompleto({inv, ventas, cierres, retiros, auditorias, cargas: cargasCompletas, marcas: marcasState}, setGenerando)}
+            variant="fill" full icon="⬇">
+            {generando?"Generando…":"Descargar respaldo completo"}
+          </IOSBtn>
+        </div>
+
         {/* Status */}
         <div style={{background:drive.url?`${C.green}15`:`${C.label3}10`,borderRadius:16,
           padding:"16px",marginBottom:20,border:`1px solid ${drive.url?C.green+"30":C.sep}`}}>
@@ -14326,7 +14630,7 @@ function logAudit(tipo, detalle, usuario){
     const logs = JSON.parse(localStorage.getItem(AUDIT_KEY)||"[]");
     logs.unshift(evento);
     localStorage.setItem(AUDIT_KEY, JSON.stringify(logs.slice(0,1000)));
-    sbGuardarAuditLog(evento);
+    syncConRespaldo("auditLog", evento, ()=>sbGuardarAuditLog(evento));
   }catch{}
 }
 
@@ -15418,7 +15722,7 @@ function ConfigTab({user, logout}){
       setAuditLog(prev=>{
         const sbIds = new Set(data.map(e=>e.id));
         const pendientes = prev.filter(e=>!sbIds.has(e.id));
-        pendientes.forEach(e=>sbGuardarAuditLog(e));
+        pendientes.forEach(e=>syncConRespaldo("auditLog", e, ()=>sbGuardarAuditLog(e)));
         const merged = [...pendientes, ...data].sort((a,b)=>(b.ts||0)-(a.ts||0)).slice(0,1000);
         try{localStorage.setItem(AUDIT_KEY, JSON.stringify(merged));}catch{}
         return merged;

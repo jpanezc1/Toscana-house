@@ -21525,15 +21525,18 @@
   async function sbActualizarStock(prodId, nuevoStock) {
     try {
       const db = await getSupabase();
-      await db.from("inventario").update({ stock: nuevoStock }).eq("id", prodId);
+      const { error } = await db.from("inventario").update({ stock: nuevoStock }).eq("id", prodId);
+      if (error) throw error;
+      return true;
     } catch (e) {
       console.warn("Supabase update stock:", e.message);
+      return false;
     }
   }
   async function sbGuardarVenta(venta) {
     try {
       const db = await getSupabase();
-      await db.from("ventas").upsert({
+      const { error: errVenta } = await db.from("ventas").upsert({
         id: venta.id,
         fecha: venta.fecha,
         hora: venta.hora,
@@ -21547,6 +21550,7 @@
         vendedor: venta.vendedor,
         etiqueta_img: venta.etiquetaImg || null
       });
+      if (errVenta) throw errVenta;
       const items = venta.items.map((it) => ({
         venta_id: venta.id,
         prod_id: it.prodId,
@@ -21558,25 +21562,34 @@
         precio_unit: it.precioUnit,
         subtotal: it.subtotal
       }));
-      await db.from("venta_items").insert(items);
+      const { error: errItems } = await db.from("venta_items").insert(items);
+      if (errItems) throw errItems;
+      return true;
     } catch (e) {
       console.warn("Supabase save venta:", e.message);
+      return false;
     }
   }
   async function sbAnularVenta(ventaId) {
     try {
       const db = await getSupabase();
-      await db.from("ventas").update({ anulada: true }).eq("id", ventaId);
+      const { error } = await db.from("ventas").update({ anulada: true }).eq("id", ventaId);
+      if (error) throw error;
+      return true;
     } catch (e) {
       console.warn("Supabase anular venta:", e.message);
+      return false;
     }
   }
   async function sbGuardarCierre(key, data) {
     try {
       const db = await getSupabase();
-      await db.from("cierres").upsert({ id: key, ...data });
+      const { error } = await db.from("cierres").upsert({ id: key, ...data });
+      if (error) throw error;
+      return true;
     } catch (e) {
       console.warn("Supabase save cierre:", e.message);
+      return false;
     }
   }
   async function sbObtenerSesionVerif(id) {
@@ -21623,7 +21636,7 @@
   async function sbGuardarRetiro(retiro) {
     try {
       const db = await getSupabase();
-      await db.from("retiros").upsert({
+      const { error } = await db.from("retiros").upsert({
         id: retiro.id,
         fecha: retiro.fecha,
         hora: retiro.hora,
@@ -21636,8 +21649,11 @@
         destinatario: retiro.destinatario,
         motivo: retiro.motivo || ""
       });
+      if (error) throw error;
+      return true;
     } catch (e) {
       console.warn("Supabase retiro (tabla puede no existir):", e.message);
+      return false;
     }
   }
   async function sbCargarRetiros() {
@@ -21665,7 +21681,7 @@
   async function sbGuardarCarga(c) {
     try {
       const db = await getSupabase();
-      await db.from("cargas_inventario").insert({
+      const { error } = await db.from("cargas_inventario").insert({
         id: c.id,
         ts: c.ts,
         fecha: c.fecha,
@@ -21682,8 +21698,11 @@
         actualizados: c.actualizados || 0,
         detalle: c.items || []
       });
+      if (error) throw error;
+      return true;
     } catch (e) {
       console.warn("Supabase carga (tabla puede no existir):", e.message);
+      return false;
     }
   }
   async function sbCargarCargas() {
@@ -21715,7 +21734,7 @@
   async function sbGuardarAuditoria(aud) {
     try {
       const db = await getSupabase();
-      await db.from("auditorias_inventario").upsert({
+      const { error } = await db.from("auditorias_inventario").upsert({
         id: aud.id,
         mk: aud.mk,
         mes: aud.mes,
@@ -21732,8 +21751,11 @@
         valor_sobrante: aud.valorSobrante,
         detalle: aud.detalle
       });
+      if (error) throw error;
+      return true;
     } catch (e) {
       console.warn("Supabase auditoria (tabla puede no existir):", e.message);
+      return false;
     }
   }
   async function sbCargarAuditorias() {
@@ -21867,9 +21889,12 @@
     try {
       const db = await getSupabase();
       const { id, ts, fecha, hora: hora2, tipo, usuario, nombre, rol, ...detalle } = evento;
-      await db.from("audit_log").upsert({ id, ts, fecha, hora: hora2, tipo, usuario, nombre, rol, detalle });
+      const { error } = await db.from("audit_log").upsert({ id, ts, fecha, hora: hora2, tipo, usuario, nombre, rol, detalle });
+      if (error) throw error;
+      return true;
     } catch (e) {
       console.warn("Supabase save audit_log:", e.message);
+      return false;
     }
   }
   async function sbCargarAuditLog() {
@@ -21891,6 +21916,104 @@
     } catch (e) {
       console.warn("Supabase load audit_log:", e.message);
       return null;
+    }
+  }
+  var TH_OUTBOX_KEY = "th_sync_outbox";
+  function getOutbox() {
+    try {
+      return JSON.parse(localStorage.getItem(TH_OUTBOX_KEY) || "[]");
+    } catch {
+      return [];
+    }
+  }
+  function setOutbox(lista) {
+    try {
+      localStorage.setItem(TH_OUTBOX_KEY, JSON.stringify(lista));
+    } catch {
+    }
+    try {
+      window.dispatchEvent(new CustomEvent("th-outbox-changed", { detail: { count: lista.length } }));
+    } catch {
+    }
+  }
+  function pushToOutbox(tipo, payload) {
+    const op = { id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, tipo, payload, ts: Date.now(), intentos: 0 };
+    setOutbox([...getOutbox(), op]);
+    return op.id;
+  }
+  function removeFromOutbox(id) {
+    setOutbox(getOutbox().filter((o) => o.id !== id));
+  }
+  async function ejecutarOpOutbox(op) {
+    switch (op.tipo) {
+      case "producto":
+        return !!await sbGuardarProducto(op.payload);
+      case "stock":
+        return await sbActualizarStock(op.payload.prodId, op.payload.stock);
+      case "venta":
+        return await sbGuardarVenta(op.payload);
+      case "anularVenta":
+        return await sbAnularVenta(op.payload.id);
+      case "cierre":
+        return await sbGuardarCierre(op.payload.key, op.payload.data);
+      case "retiro":
+        return await sbGuardarRetiro(op.payload);
+      case "carga":
+        return await sbGuardarCarga(op.payload);
+      case "auditoria":
+        return await sbGuardarAuditoria(op.payload);
+      case "auditLog":
+        return await sbGuardarAuditLog(op.payload);
+      case "usuarios":
+        return await sbGuardarUsuarios(op.payload);
+      default:
+        return true;
+    }
+  }
+  var _procesandoOutbox = false;
+  async function procesarOutbox() {
+    if (_procesandoOutbox) return;
+    if (typeof navigator !== "undefined" && navigator.onLine === false) return;
+    if (getOutbox().length === 0) return;
+    _procesandoOutbox = true;
+    try {
+      for (const op of getOutbox()) {
+        let ok = false;
+        try {
+          ok = await ejecutarOpOutbox(op);
+        } catch {
+          ok = false;
+        }
+        if (ok) {
+          removeFromOutbox(op.id);
+        } else {
+          const actual = getOutbox();
+          const idx = actual.findIndex((o) => o.id === op.id);
+          if (idx >= 0) {
+            actual[idx].intentos = (actual[idx].intentos || 0) + 1;
+            actual[idx].ultimoIntento = Date.now();
+            setOutbox(actual);
+          }
+        }
+      }
+    } finally {
+      _procesandoOutbox = false;
+    }
+  }
+  async function syncConRespaldo(tipo, payload, fnDirecto) {
+    try {
+      if (typeof navigator !== "undefined" && navigator.onLine === false) {
+        pushToOutbox(tipo, payload);
+        return false;
+      }
+      const ok = await fnDirecto();
+      if (!ok) {
+        pushToOutbox(tipo, payload);
+      }
+      return ok;
+    } catch (e) {
+      pushToOutbox(tipo, payload);
+      return false;
     }
   }
   function useRealtimeSync(setVentas, setInv, setRetiros) {
@@ -23613,6 +23736,78 @@
     }
     setGenerando(false);
   }
+  async function generarRespaldoCompleto({ inv, ventas, cierres, retiros, auditorias, cargas, marcas }, setGenerando) {
+    setGenerando(true);
+    try {
+      const XLSX = await loadXLSX();
+      const wb = XLSX.utils.book_new();
+      const marcaNom = (id) => marcas.find((m) => m.id === id)?.nombre || id || "\u2014";
+      const invRows = [
+        ["C\xF3digo", "Producto", "Marca", "Categor\xEDa", "Subcategor\xEDa", "Precio (Bs)", "Stock inicial", "Stock actual", "Fecha ingreso", "ID"],
+        ...inv.map((p) => [p.codigo, p.nombre, p.marcaNombre || marcaNom(p.marcaId), p.categoria || "", p.subcat || "", p.precio, p.stockInicial, p.stock, p.fecha, p.id])
+      ];
+      const wsInv = XLSX.utils.aoa_to_sheet(invRows);
+      wsInv["!cols"] = [{ wch: 18 }, { wch: 28 }, { wch: 16 }, { wch: 14 }, { wch: 14 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 16 }];
+      XLSX.utils.book_append_sheet(wb, wsInv, "Inventario");
+      const ventasRows = [
+        ["ID Venta", "Fecha", "Hora", "Total", "Subtotal", "Desc%", "Pago", "Vendedor", "Anulada", "Items"],
+        ...ventas.map((v) => [v.id, v.fecha, v.hora, v.total, v.subtotal, v.descPct || 0, v.metodoPago, v.vendedor || "", v.anulada ? "S\xCD" : "NO", (v.items || []).length])
+      ];
+      const wsVentas = XLSX.utils.aoa_to_sheet(ventasRows);
+      wsVentas["!cols"] = [{ wch: 16 }, { wch: 12 }, { wch: 8 }, { wch: 10 }, { wch: 10 }, { wch: 8 }, { wch: 12 }, { wch: 14 }, { wch: 8 }, { wch: 8 }];
+      XLSX.utils.book_append_sheet(wb, wsVentas, "Ventas");
+      const itemsRows = [
+        ["ID Venta", "Fecha", "C\xF3digo", "Producto", "Marca", "Cantidad", "Precio Unit.", "Subtotal"]
+      ];
+      ventas.forEach((v) => (v.items || []).forEach((it) => {
+        itemsRows.push([v.id, v.fecha, it.codigo, it.nombre, it.marcaNombre || marcaNom(it.marcaId), it.cantidad, it.precioUnit, it.subtotal]);
+      }));
+      const wsItems = XLSX.utils.aoa_to_sheet(itemsRows);
+      wsItems["!cols"] = [{ wch: 16 }, { wch: 12 }, { wch: 18 }, { wch: 26 }, { wch: 16 }, { wch: 10 }, { wch: 12 }, { wch: 12 }];
+      XLSX.utils.book_append_sheet(wb, wsItems, "Items Vendidos");
+      const cierresRows = [
+        ["Clave", "Marca/MK", "Cerrado", "Fecha"],
+        ...Object.entries(cierres || {}).map(([k, c]) => [k, c.mk || "", c.cerrado ? "S\xCD" : "NO", c.fecha || ""])
+      ];
+      const wsCierres = XLSX.utils.aoa_to_sheet(cierresRows);
+      wsCierres["!cols"] = [{ wch: 20 }, { wch: 14 }, { wch: 10 }, { wch: 12 }];
+      XLSX.utils.book_append_sheet(wb, wsCierres, "Cierres");
+      const retirosRows = [
+        ["ID", "Fecha", "Hora", "C\xF3digo", "Producto", "Marca", "Cantidad", "Destinatario", "Motivo"],
+        ...(retiros || []).map((r) => [r.id, r.fecha, r.hora, r.codigo, r.nombre, r.marcaNombre || marcaNom(r.marcaId), r.cantidad, r.destinatario, r.motivo || ""])
+      ];
+      const wsRetiros = XLSX.utils.aoa_to_sheet(retirosRows);
+      wsRetiros["!cols"] = [{ wch: 16 }, { wch: 12 }, { wch: 8 }, { wch: 18 }, { wch: 26 }, { wch: 16 }, { wch: 10 }, { wch: 18 }, { wch: 24 }];
+      XLSX.utils.book_append_sheet(wb, wsRetiros, "Retiros");
+      const audRows = [
+        ["ID", "Fecha", "Hora", "Marca", "Total productos", "OK", "Faltantes", "Sobrantes", "Valor fuga (Bs)", "Valor sobrante (Bs)", "Usuario"],
+        ...(auditorias || []).map((a) => [a.id, a.fecha, a.hora, marcaNom(a.marcaId), a.totalProductos, a.ok, a.faltantes, a.sobrantes, a.valorFuga, a.valorSobrante, a.usuario])
+      ];
+      const wsAud = XLSX.utils.aoa_to_sheet(audRows);
+      wsAud["!cols"] = [{ wch: 16 }, { wch: 12 }, { wch: 8 }, { wch: 16 }, { wch: 14 }, { wch: 8 }, { wch: 10 }, { wch: 10 }, { wch: 14 }, { wch: 16 }, { wch: 14 }];
+      XLSX.utils.book_append_sheet(wb, wsAud, "Auditor\xEDas");
+      const cargasRows = [
+        ["ID", "Fecha", "Hora", "Tipo", "Usuario", "Marca", "Resumen", "Total \xEDtems", "Nuevos", "Actualizados"],
+        ...(cargas || []).map((c) => [c.id, c.fecha, c.hora, c.tipo, c.usuario, c.marcaNombre || marcaNom(c.marcaId), c.resumen, c.totalItems, c.nuevos || 0, c.actualizados || 0])
+      ];
+      const wsCargas = XLSX.utils.aoa_to_sheet(cargasRows);
+      wsCargas["!cols"] = [{ wch: 16 }, { wch: 12 }, { wch: 8 }, { wch: 10 }, { wch: 14 }, { wch: 16 }, { wch: 40 }, { wch: 10 }, { wch: 8 }, { wch: 12 }];
+      XLSX.utils.book_append_sheet(wb, wsCargas, "Cargas");
+      wb.SheetNames.forEach((name) => {
+        aplicarBordesSheet(wb.Sheets[name], XLSX);
+      });
+      const wbOut = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+      const blob = new Blob([wbOut], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+      const ts = (/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/g, "-");
+      descargarArchivo(blob, `TH_Respaldo_Completo_${ts}.xlsx`);
+      return true;
+    } catch (e) {
+      alert("Error generando respaldo: " + e.message);
+      return false;
+    } finally {
+      setGenerando(false);
+    }
+  }
   async function exportExcelLiquidacion(marca, ventas, mes, anio) {
     const XLSX = await loadXLSX();
     const MK = mkKey(mes, anio);
@@ -24573,6 +24768,43 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       pressed
     };
   }
+  function useSyncStatus() {
+    const [pendientes, setPendientes] = (0, import_react.useState)(() => getOutbox().length);
+    const [online, setOnline] = (0, import_react.useState)(() => typeof navigator === "undefined" ? true : navigator.onLine);
+    const [procesando, setProcesando] = (0, import_react.useState)(false);
+    (0, import_react.useEffect)(() => {
+      function onOutboxChange(e) {
+        setPendientes(e.detail?.count ?? getOutbox().length);
+      }
+      function intentar() {
+        if (!navigator.onLine) return;
+        setProcesando(true);
+        procesarOutbox().finally(() => {
+          setProcesando(false);
+          setPendientes(getOutbox().length);
+        });
+      }
+      function onOnline() {
+        setOnline(true);
+        intentar();
+      }
+      function onOffline() {
+        setOnline(false);
+      }
+      window.addEventListener("th-outbox-changed", onOutboxChange);
+      window.addEventListener("online", onOnline);
+      window.addEventListener("offline", onOffline);
+      intentar();
+      const interval = setInterval(intentar, 2e4);
+      return () => {
+        window.removeEventListener("th-outbox-changed", onOutboxChange);
+        window.removeEventListener("online", onOnline);
+        window.removeEventListener("offline", onOffline);
+        clearInterval(interval);
+      };
+    }, []);
+    return { pendientes, online, procesando };
+  }
   function useIsDesktop() {
     var _hND = (0, import_react.useState)(function() {
       return typeof window !== "undefined" && window.innerWidth >= 500;
@@ -24752,6 +24984,59 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       whiteSpace: "nowrap",
       textTransform: "uppercase"
     } }, children);
+  }
+  function SyncBadge({ sync }) {
+    const { pendientes, online, procesando } = sync;
+    const [justSynced, setJustSynced] = (0, import_react.useState)(false);
+    const prevPend = (0, import_react.useRef)(pendientes);
+    (0, import_react.useEffect)(() => {
+      if (prevPend.current > 0 && pendientes === 0 && online) {
+        setJustSynced(true);
+        const t = setTimeout(() => setJustSynced(false), 4e3);
+        prevPend.current = pendientes;
+        return () => clearTimeout(t);
+      }
+      prevPend.current = pendientes;
+    }, [pendientes, online]);
+    let badge = null;
+    if (!online) {
+      badge = { color: "#EF4444", icon: "\u{1F4E1}", text: "Sin conexi\xF3n \u2014 guardando localmente" };
+    } else if (pendientes > 0) {
+      badge = {
+        color: "#F59E0B",
+        icon: procesando ? "\u{1F504}" : "\u23F3",
+        text: `${pendientes} cambio${pendientes === 1 ? "" : "s"} pendiente${pendientes === 1 ? "" : "s"} de subir a la nube`
+      };
+    } else if (justSynced) {
+      badge = { color: "#22C55E", icon: "\u2601", text: "Todo guardado en la nube \u2713" };
+    }
+    if (!badge) return null;
+    return /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      position: "fixed",
+      bottom: 96,
+      left: "50%",
+      transform: "translateX(-50%)",
+      zIndex: 9998,
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      background: `${badge.color}1A`,
+      border: `1px solid ${badge.color}55`,
+      color: badge.color,
+      fontFamily: FONT,
+      fontSize: 12,
+      fontWeight: 600,
+      borderRadius: 999,
+      padding: "8px 16px",
+      backdropFilter: "blur(12px)",
+      WebkitBackdropFilter: "blur(12px)",
+      boxShadow: "0 4px 16px rgba(0,0,0,0.12)",
+      whiteSpace: "nowrap",
+      maxWidth: "92vw",
+      overflow: "hidden",
+      textOverflow: "ellipsis",
+      pointerEvents: "none"
+    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 14 } }, badge.icon), /* @__PURE__ */ import_react.default.createElement("span", null, badge.text));
   }
   function NavBar({ title, subtitle, back, onBack, right }) {
     return /* @__PURE__ */ import_react.default.createElement("div", { style: {
@@ -25702,8 +25987,9 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       },
       "Compartir liquidaci\xF3n"
     ), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => exportExcelLiquidacion(marca, ventas, mes, anio), variant: "fill", icon: "\u2B07" }, "Exportar Excel"), !cerrado ? /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => {
-      setCierres((p) => ({ ...p, [`${MK}-${marcaId}`]: { cerrado: true, fecha: hoy(), mk: MK } }));
-      sbGuardarCierre(`${MK}-${marcaId}`, { cerrado: true, fecha: hoy(), mk: MK, marca_id: marcaId });
+      const key = `${MK}-${marcaId}`, data = { cerrado: true, fecha: hoy(), mk: MK, marca_id: marcaId };
+      setCierres((p) => ({ ...p, [key]: { cerrado: true, fecha: hoy(), mk: MK } }));
+      syncConRespaldo("cierre", { key, data }, () => sbGuardarCierre(key, data));
       onClose();
     }, variant: "success", icon: "\u2713" }, "Confirmar Cierre Mensual") : /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => {
       setCierres((p) => ({ ...p, [`${MK}-${marcaId}`]: { cerrado: false, mk: MK } }));
@@ -32065,6 +32351,7 @@ Fecha: ${venta.fecha}`);
   function App() {
     const { user, login, logout } = useAuth();
     const isDesktop = useIsDesktop();
+    const sync = useSyncStatus();
     const now = /* @__PURE__ */ new Date();
     const [tab, setTab] = (0, import_react.useState)("inicio");
     const [inv, setInv] = (0, import_react.useState)(() => {
@@ -32163,7 +32450,7 @@ Fecha: ${venta.fecha}`);
         })();
         const nueva = [...listaU, nuevoUsuario];
         localStorage.setItem("th_usuarios", JSON.stringify(nueva));
-        sbGuardarUsuarios(nueva);
+        syncConRespaldo("usuarios", nueva, () => sbGuardarUsuarios(nueva));
       }
     }
     (0, import_react.useEffect)(() => {
@@ -32332,11 +32619,11 @@ Fecha: ${venta.fecha}`);
     }, [inv, cargas]);
     function registrarAuditoria(aud) {
       setAuditorias((prev) => [aud, ...prev]);
-      sbGuardarAuditoria(aud);
+      syncConRespaldo("auditoria", aud, () => sbGuardarAuditoria(aud));
     }
     function registrarCarga(carga) {
       setCargas((prev) => [carga, ...prev]);
-      sbGuardarCarga(carga);
+      syncConRespaldo("carga", carga, () => sbGuardarCarga(carga));
     }
     function registrarRetiro(r) {
       const updated = [...retiros, r];
@@ -32349,8 +32636,8 @@ Fecha: ${venta.fecha}`);
       const stockAntes = prod?.stock || 0;
       const stockDespues = Math.max(0, stockAntes - r.cantidad);
       setInv((p) => p.map((i) => i.id === r.prodId ? { ...i, stock: stockDespues } : i));
-      sbActualizarStock(r.prodId, stockDespues);
-      sbGuardarRetiro(r);
+      syncConRespaldo("stock", { prodId: r.prodId, stock: stockDespues }, () => sbActualizarStock(r.prodId, stockDespues));
+      syncConRespaldo("retiro", r, () => sbGuardarRetiro(r));
       logAudit("RETIRO", {
         resumen: `Retiro: ${prod?.nombre || r.codigo} \xD7 ${r.cantidad} u.`,
         codigo: r.codigo,
@@ -32457,7 +32744,7 @@ Fecha: ${venta.fecha}`);
       };
       setInv((p) => [...p, prod]);
       drive.syncProducto(prod);
-      sbGuardarProducto(prod);
+      syncConRespaldo("producto", prod, () => sbGuardarProducto(prod));
       logAudit("IMPORT", {
         resumen: `Importaci\xF3n: 1 nuevos + 0 actualizados \xB7 ${prod.marcaNombre || "\u2014"}`,
         nuevos: 1,
@@ -32530,7 +32817,7 @@ Motivo: ${motivo}` : ""}`)) {
     function registrarBaja(prod, stockAntes, cant, motivo) {
       const stockDespues = stockAntes - cant;
       setInv((p) => p.map((i) => i.id === prod.id ? { ...i, stock: stockDespues } : i));
-      sbActualizarStock(prod.id, stockDespues);
+      syncConRespaldo("stock", { prodId: prod.id, stock: stockDespues }, () => sbActualizarStock(prod.id, stockDespues));
       logAudit("BAJA", {
         resumen: `Baja: ${prod.nombre} (${prod.codigo}) -${cant} \xB7 stock ${stockAntes}\u2192${stockDespues}${motivo ? ` \xB7 ${motivo}` : ""}`,
         codigo: prod.codigo,
@@ -32558,7 +32845,7 @@ Motivo: ${motivo}` : ""}`)) {
       const stockAntes = prod.stock || 0;
       const stockDespues = stockAntes + cant;
       setInv((p) => p.map((i) => i.id === prod.id ? { ...i, stock: stockDespues } : i));
-      sbActualizarStock(prod.id, stockDespues);
+      syncConRespaldo("stock", { prodId: prod.id, stock: stockDespues }, () => sbActualizarStock(prod.id, stockDespues));
       logAudit("STOCK_ADD", {
         resumen: `Entrada de stock: ${prod.nombre} (${prod.codigo}) +${cant} \xB7 stock ${stockAntes}\u2192${stockDespues}`,
         codigo: prod.codigo,
@@ -32579,7 +32866,7 @@ Motivo: ${motivo}` : ""}`)) {
         const stockAntes = prod?.stock || 0;
         const stockNuevo = stockAntes + stock;
         setInv((prev) => prev.map((p) => p.codigo === codigo ? { ...p, stock: stockNuevo } : p));
-        if (prod) sbActualizarStock(prod.id, stockNuevo);
+        if (prod) syncConRespaldo("stock", { prodId: prod.id, stock: stockNuevo }, () => sbActualizarStock(prod.id, stockNuevo));
         _importBuf.current.items.push({
           tipo: "update",
           codigo,
@@ -32594,11 +32881,12 @@ Motivo: ${motivo}` : ""}`)) {
         const localId = Date.now() * 1e3 + Math.floor(Math.random() * 999);
         const newProd = { id: localId, ...producto };
         setInv((prev) => [...prev, newProd]);
-        sbGuardarProducto(newProd).then((sbId) => {
+        syncConRespaldo("producto", newProd, () => sbGuardarProducto(newProd).then((sbId) => {
           if (sbId && sbId !== localId) {
             setInv((prev) => prev.map((p) => p.id === localId ? { ...p, id: sbId } : p));
           }
-        });
+          return !!sbId;
+        }));
         _importBuf.current.items.push({
           tipo: "create",
           codigo: producto.codigo,
@@ -32647,11 +32935,11 @@ Motivo: ${motivo}` : ""}`)) {
         const stockAntes = inv.find((i) => i.id === it.prodId)?.stock || 0;
         const stockDespues = Math.max(0, stockAntes - it.cantidad);
         setInv((p) => p.map((i) => i.id === it.prodId ? { ...i, stock: stockDespues } : i));
-        sbActualizarStock(it.prodId, stockDespues);
+        syncConRespaldo("stock", { prodId: it.prodId, stock: stockDespues }, () => sbActualizarStock(it.prodId, stockDespues));
         stockCambios.push({ prodId: it.prodId, codigo: it.codigo, nombre: it.nombre, stockAntes, stockDespues });
       });
       drive.syncVenta(vf);
-      sbGuardarVenta(vf);
+      syncConRespaldo("venta", vf, () => sbGuardarVenta(vf));
       const marcas = [...new Set(v.items.map((i) => i.marcaNombre))].join(", ");
       logAudit("VENTA", {
         resumen: `Venta Bs ${v.total} \xB7 ${v.items.length} \xEDtem(s) \xB7 ${marcas}`,
@@ -32686,13 +32974,13 @@ Motivo: ${motivo}` : ""}`)) {
       v.items.forEach((it) => {
         const actual = inv.find((i) => i.id === it.prodId)?.stock || 0;
         setInv((p) => p.map((i) => i.id === it.prodId ? { ...i, stock: actual + it.cantidad } : i));
-        sbActualizarStock(it.prodId, actual + it.cantidad);
+        syncConRespaldo("stock", { prodId: it.prodId, stock: actual + it.cantidad }, () => sbActualizarStock(it.prodId, actual + it.cantidad));
         stockCambios.push({ codigo: it.codigo, nombre: it.nombre, stockAntes: actual, stockDespues: actual + it.cantidad });
       });
       const vAnulada = { ...v, anulada: true, fechaAnulacion: hoy() };
       setVentas((p) => p.map((x) => x.id === ventaId ? vAnulada : x));
       setVentaDetalle(vAnulada);
-      sbAnularVenta(ventaId);
+      syncConRespaldo("anularVenta", { id: ventaId }, () => sbAnularVenta(ventaId));
       logAudit("ANULACION", {
         resumen: `Anulaci\xF3n venta ${ventaId} \xB7 Bs ${v.total} devueltos`,
         ventaId,
@@ -32777,7 +33065,7 @@ Motivo: ${motivo}` : ""}`)) {
       background: C.gold,
       borderRadius: 2,
       animation: "loadbar 1.2s ease-in-out infinite"
-    } })), /* @__PURE__ */ import_react.default.createElement("style", null, `@keyframes loadbar{0%{transform:translateX(-100%)}100%{transform:translateX(200%)}}@keyframes slideUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}`)), isDesktop && /* @__PURE__ */ import_react.default.createElement(DesktopSidebar, { tabs: TABS, active: tab, onChange: (t) => {
+    } })), /* @__PURE__ */ import_react.default.createElement("style", null, `@keyframes loadbar{0%{transform:translateX(-100%)}100%{transform:translateX(200%)}}@keyframes slideUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}`)), !cargando && /* @__PURE__ */ import_react.default.createElement(SyncBadge, { sync }), isDesktop && /* @__PURE__ */ import_react.default.createElement(DesktopSidebar, { tabs: TABS, active: tab, onChange: (t) => {
       setTab(t);
       setMD(null);
     }, user, logout }), /* @__PURE__ */ import_react.default.createElement("div", { style: isDesktop ? { flex: 1, minWidth: 0, overflowY: "auto", height: "100vh" } : {} }, showingDetail ? /* @__PURE__ */ import_react.default.createElement(
@@ -33378,6 +33666,22 @@ Motivo: ${motivo}` : ""}`)) {
       fontSize: 14,
       fontFamily: FONT
     } }, repMsg.msg), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: reponerStock, variant: "primary", full: true, disabled: !repCod.trim() || !repCant }, "Reponer Stock")), /* @__PURE__ */ import_react.default.createElement(Sheet, { open: sheetDrive, onClose: () => setShDrive(false), title: "\u2601 Google Drive", tall: true }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      background: `${C.gold}10`,
+      borderRadius: 16,
+      padding: "16px",
+      marginBottom: 20,
+      border: `1px solid ${C.gold}30`
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 15, fontWeight: 600, color: C.label, fontFamily: FONT, marginBottom: 6 } }, "\u{1F4CA} Respaldo completo en Excel"), /* @__PURE__ */ import_react.default.createElement("p", { style: { fontSize: 12, color: C.label3, fontFamily: FONT, margin: "0 0 12px", lineHeight: 1.5 } }, "Descarga un archivo .xlsx con inventario, ventas, cierres, retiros, auditor\xEDas y cargas \u2014 gu\xE1rdalo en Drive, correo o USB como respaldo adicional, independiente de la nube y del dispositivo."), /* @__PURE__ */ import_react.default.createElement(
+      IOSBtn,
+      {
+        disabled: generando,
+        onPress: () => generarRespaldoCompleto({ inv, ventas, cierres, retiros, auditorias, cargas: cargasCompletas, marcas: marcasState }, setGenerando),
+        variant: "fill",
+        full: true,
+        icon: "\u2B07"
+      },
+      generando ? "Generando\u2026" : "Descargar respaldo completo"
+    )), /* @__PURE__ */ import_react.default.createElement("div", { style: {
       background: drive.url ? `${C.green}15` : `${C.label3}10`,
       borderRadius: 16,
       padding: "16px",
@@ -36922,7 +37226,7 @@ Confirmas que el conteo de ${r.contado} unidad(es) es correcto.`)) {
       const logs = JSON.parse(localStorage.getItem(AUDIT_KEY) || "[]");
       logs.unshift(evento);
       localStorage.setItem(AUDIT_KEY, JSON.stringify(logs.slice(0, 1e3)));
-      sbGuardarAuditLog(evento);
+      syncConRespaldo("auditLog", evento, () => sbGuardarAuditLog(evento));
     } catch {
     }
   }
@@ -38158,7 +38462,7 @@ Confirmas que el conteo de ${r.contado} unidad(es) es correcto.`)) {
         setAuditLog((prev) => {
           const sbIds = new Set(data.map((e) => e.id));
           const pendientes = prev.filter((e) => !sbIds.has(e.id));
-          pendientes.forEach((e) => sbGuardarAuditLog(e));
+          pendientes.forEach((e) => syncConRespaldo("auditLog", e, () => sbGuardarAuditLog(e)));
           const merged = [...pendientes, ...data].sort((a, b) => (b.ts || 0) - (a.ts || 0)).slice(0, 1e3);
           try {
             localStorage.setItem(AUDIT_KEY, JSON.stringify(merged));
