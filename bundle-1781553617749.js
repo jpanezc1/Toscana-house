@@ -35369,16 +35369,15 @@ Motivo: ${motivo}` : ""}`)) {
         flash(false, "Escanea o agrega al menos un producto antes de confirmar el cierre");
         return;
       }
-      if (!todoVerificado) {
-        flash(false, `Faltan ${discrepancias.length - verificadosCount} discrepancia(s) por verificar (doble conteo) antes de confirmar`);
-        setVista("verificacion");
-        return;
-      }
+      const pendientesSinVerificar = discrepancias.length - verificadosCount;
+      const avisoVerif = pendientesSinVerificar > 0 ? `
+\u26A0 ${pendientesSinVerificar} discrepancia(s) sin doble conteo \u2014 se guardar\xE1n igual.
+` : "";
       if (!window.confirm(`\xBFGuardar esta verificaci\xF3n de inventario de ${MESES[mes]} ${anio}?
 
 Alcance: ${marcaSelec ? `Solo ${marcaSelNombre}` : "Todas las marcas"}
 ${cruce.length} productos verificados \xB7 ${faltantesFinal.length} faltante(s) \xB7 ${sobrantesFinal.length} sobrante(s)
-
+${avisoVerif}
 Es solo un cruce de control: NO modifica el stock ni cierra contabilidad.
 Base de inventario tomada: ${baseTs.toLocaleString("es-BO")}`)) return;
       const aud = {
@@ -35586,7 +35585,10 @@ Base de inventario tomada: ${baseTs.toLocaleString("es-BO")}`)) return;
         stats: { productos: itemsContados, unidades: unidadesContadas },
         rows: cruce,
         marcaNombre: marcaSelec ? `Solo ${marcaSelNombre}` : "Todas las marcas",
-        onClose: () => setModoCierre(false),
+        onClose: () => {
+          setModoCierre(false);
+          confirmarCierre();
+        },
         onReiniciar: finalizarYEmpezarDeNuevo
       }
     ), modoVerif && /* @__PURE__ */ import_react.default.createElement(
@@ -35826,7 +35828,7 @@ Base de inventario tomada: ${baseTs.toLocaleString("es-BO")}`)) return;
       marginBottom: 14,
       background: C.redBg,
       border: `1px solid ${C.red}33`
-    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 18 } }, "\u26A0"), /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1, fontSize: 12, color: C.red, fontFamily: FONT, lineHeight: 1.4 } }, /* @__PURE__ */ import_react.default.createElement("b", null, discrepancias.length - verificadosCount, " discrepancia(s) sin verificar."), " Antes de confirmar el cierre se requiere una segunda revisi\xF3n (doble conteo) \u2014 toca para ir a Verificaci\xF3n.")), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 10 } }, /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => setModoCierre(true), variant: "fill", full: true, icon: "\u{1F4F7}" }, "Escanear \xEDtem rezagado"), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => exportAuditoriaExcel({
+    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 18 } }, "\u26A0"), /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1, fontSize: 12, color: C.red, fontFamily: FONT, lineHeight: 1.4 } }, /* @__PURE__ */ import_react.default.createElement("b", null, discrepancias.length - verificadosCount, " discrepancia(s) sin verificar."), " Opcional: toca para hacer una segunda revisi\xF3n (doble conteo) antes de guardar.")), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 10 } }, /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => setModoCierre(true), variant: "fill", full: true, icon: "\u{1F4F7}" }, "Escanear \xEDtem rezagado"), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => exportAuditoriaExcel({
       id: `AUD-${MK}-preview`,
       mk: MK,
       mes,
@@ -35852,7 +35854,7 @@ Base de inventario tomada: ${baseTs.toLocaleString("es-BO")}`)) return;
         estado: r.estado,
         precio: r.precio
       }))
-    }), variant: "fill", full: true, icon: "\u2B07", disabled: cruceContados.length === 0 }, "Exportar Excel"), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: confirmarCierre, variant: "success", full: true, icon: "\u2713", disabled: itemsContados === 0 || !todoVerificado }, todoVerificado ? "Guardar Verificaci\xF3n y Generar Excel" : `Revisa ${discrepancias.length - verificadosCount} discrepancia(s) primero`))), vista === "verificacion" && /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 14 } }, /* @__PURE__ */ import_react.default.createElement(StatCard, { icon: "\u{1F501}", label: "Discrepancias", value: discrepancias.length, color: C.red, compact: isDesktop }), /* @__PURE__ */ import_react.default.createElement(StatCard, { icon: "\u2713", label: "Verificadas", value: verificadosCount, color: C.green, compact: isDesktop })), discrepancias.length === 0 ? /* @__PURE__ */ import_react.default.createElement(
+    }), variant: "fill", full: true, icon: "\u2B07", disabled: cruceContados.length === 0 }, "Exportar Excel"), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: confirmarCierre, variant: "success", full: true, icon: "\u2713", disabled: itemsContados === 0 }, "Guardar Verificaci\xF3n y Generar Excel"))), vista === "verificacion" && /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 14 } }, /* @__PURE__ */ import_react.default.createElement(StatCard, { icon: "\u{1F501}", label: "Discrepancias", value: discrepancias.length, color: C.red, compact: isDesktop }), /* @__PURE__ */ import_react.default.createElement(StatCard, { icon: "\u2713", label: "Verificadas", value: verificadosCount, color: C.green, compact: isDesktop })), discrepancias.length === 0 ? /* @__PURE__ */ import_react.default.createElement(
       EmptyState,
       {
         icon: "\u2713",

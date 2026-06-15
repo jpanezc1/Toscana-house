@@ -12783,12 +12783,11 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
 
   function confirmarCierre(){
     if(itemsContados===0){ flash(false,"Escanea o agrega al menos un producto antes de confirmar el cierre"); return; }
-    if(!todoVerificado){
-      flash(false,`Faltan ${discrepancias.length-verificadosCount} discrepancia(s) por verificar (doble conteo) antes de confirmar`);
-      setVista("verificacion");
-      return;
-    }
-    if(!window.confirm(`¿Guardar esta verificación de inventario de ${MESES[mes]} ${anio}?\n\nAlcance: ${marcaSelec?`Solo ${marcaSelNombre}`:"Todas las marcas"}\n${cruce.length} productos verificados · ${faltantesFinal.length} faltante(s) · ${sobrantesFinal.length} sobrante(s)\n\nEs solo un cruce de control: NO modifica el stock ni cierra contabilidad.\nBase de inventario tomada: ${baseTs.toLocaleString("es-BO")}`)) return;
+    const pendientesSinVerificar = discrepancias.length-verificadosCount;
+    const avisoVerif = pendientesSinVerificar>0
+      ? `\n⚠ ${pendientesSinVerificar} discrepancia(s) sin doble conteo — se guardarán igual.\n`
+      : "";
+    if(!window.confirm(`¿Guardar esta verificación de inventario de ${MESES[mes]} ${anio}?\n\nAlcance: ${marcaSelec?`Solo ${marcaSelNombre}`:"Todas las marcas"}\n${cruce.length} productos verificados · ${faltantesFinal.length} faltante(s) · ${sobrantesFinal.length} sobrante(s)\n${avisoVerif}\nEs solo un cruce de control: NO modifica el stock ni cierra contabilidad.\nBase de inventario tomada: ${baseTs.toLocaleString("es-BO")}`)) return;
     const aud = {
       id:`AUD-${MK}-${Date.now()}`, mk:MK, mes, anio, fecha:hoy(), hora:hora(),
       usuario:user?.nombre||"—", marcaId:marcaSelec,
@@ -12957,7 +12956,7 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
           stats={{productos:itemsContados, unidades:unidadesContadas}}
           rows={cruce}
           marcaNombre={marcaSelec?`Solo ${marcaSelNombre}`:"Todas las marcas"}
-          onClose={()=>setModoCierre(false)}
+          onClose={()=>{ setModoCierre(false); confirmarCierre(); }}
           onReiniciar={finalizarYEmpezarDeNuevo}
         />
       )}
@@ -13177,8 +13176,8 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
               background:C.redBg,border:`1px solid ${C.red}33`}}>
               <span style={{fontSize:18}}>⚠</span>
               <div style={{flex:1,fontSize:12,color:C.red,fontFamily:FONT,lineHeight:1.4}}>
-                <b>{discrepancias.length-verificadosCount} discrepancia(s) sin verificar.</b> Antes de
-                confirmar el cierre se requiere una segunda revisión (doble conteo) — toca para ir a Verificación.
+                <b>{discrepancias.length-verificadosCount} discrepancia(s) sin verificar.</b> Opcional:
+                toca para hacer una segunda revisión (doble conteo) antes de guardar.
               </div>
             </div>
           )}
@@ -13196,8 +13195,8 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
                 marcaNombre:r.marcaNombre||MARCAS.find(m=>m.id===r.marcaId)?.nombre,
                 sistema:r.sistema,contado:r.contado,diferencia:r.diferencia,estado:r.estado,precio:r.precio})),
             })} variant="fill" full icon="⬇" disabled={cruceContados.length===0}>Exportar Excel</IOSBtn>
-            <IOSBtn onPress={confirmarCierre} variant="success" full icon="✓" disabled={itemsContados===0||!todoVerificado}>
-              {todoVerificado ? "Guardar Verificación y Generar Excel" : `Revisa ${discrepancias.length-verificadosCount} discrepancia(s) primero`}
+            <IOSBtn onPress={confirmarCierre} variant="success" full icon="✓" disabled={itemsContados===0}>
+              Guardar Verificación y Generar Excel
             </IOSBtn>
           </div>
         </div>
