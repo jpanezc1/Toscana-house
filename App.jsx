@@ -6135,7 +6135,10 @@ function ImportarExcelModal({inv, onImportar, onClose}){
   const [stats,      setStats]      = useState(null);
   const [isDragging, setIsDragging] = useState(false);
   const [filtro,     setFiltro]     = useState("todas"); // todas|validas|errores|dups
+  const [verif,      setVerif]      = useState(null); // verificación post-carga
   const fileRef = useRef(null);
+  const invRef  = useRef(inv);
+  useEffect(()=>{ invRef.current = inv; },[inv]);
 
   // ── Normalizar texto: quitar acentos, trim, uppercase ─────────────
   function norm(s){ return String(s||"").trim().normalize("NFD").replace(/[̀-ͯ]/g,""); }
@@ -6434,7 +6437,7 @@ function ImportarExcelModal({inv, onImportar, onClose}){
   async function importar(){
     setEstado("importando");
     const importables = preview.filter(f=>f.desc&&f.marcaId&&f.precio>0);
-    let ok=0, upd=0, skip=0;
+    let ok=0, upd=0;
 
     for(const f of importables){
       if(f._dup){
@@ -6457,9 +6460,86 @@ function ImportarExcelModal({inv, onImportar, onClose}){
         }});
       }
     }
-    skip = preview.length - importables.length;
-    setStats({ok, upd, skip, total:preview.length});
+    // ── Filas omitidas (con errores) — se listan con su motivo ────────
+    const omitidos = preview
+      .filter(f=>!(f.desc&&f.marcaId&&f.precio>0))
+      .map(f=>({sku:f.sku, desc:f.desc, marca:f.marcaNombre, errs:f._errs}));
+
+    // ── Códigos que SÍ deberían quedar en el inventario tras la carga ──
+    const codigosEsperados = importables.map(f=>f.sku.toUpperCase().trim());
+
+    setStats({ok, upd, skip:omitidos.length, total:preview.length, omitidos, codigosEsperados});
+    setVerif({checking:true, intento:0, faltantes:[], confirmados:0, total:codigosEsperados.length});
     setEstado("done");
+  }
+
+  // ── Verificación post-carga: confirma 2-3 veces que cada código    ──
+  // ── importado quedó realmente en el inventario (cubre escrituras   ──
+  // ── asíncronas a Supabase que pueden tardar unos segundos).         ──
+  useEffect(()=>{
+    if(estado!=="done"||!stats||!stats.codigosEsperados?.length) return;
+    let cancelado=false;
+    const timers=[];
+    const delays=[1200,3000,6000]; // hasta 3 verificaciones
+    function check(intento){
+      if(cancelado) return;
+      const presentes = new Set(invRef.current.map(p=>(p.codigo||"").toUpperCase().trim()));
+      const faltantes = stats.codigosEsperados.filter(c=>!presentes.has(c));
+      setVerif({
+        intento, faltantes,
+        confirmados: stats.codigosEsperados.length - faltantes.length,
+        total: stats.codigosEsperados.length,
+        checking: faltantes.length>0 && intento<delays.length,
+      });
+      if(faltantes.length>0 && intento<delays.length){
+        timers.push(setTimeout(()=>check(intento+1), delays[intento]));
+      }
+    }
+    timers.push(setTimeout(()=>check(1), delays[0]));
+    return ()=>{cancelado=true; timers.forEach(clearTimeout);};
+  },[estado, stats]);
+
+  // ── Reintentar verificación manualmente ────────────────────────────
+  function reverificar(){
+    if(!stats?.codigosEsperados?.length) return;
+    setVerif(v=>({...v, checking:true}));
+    setTimeout(()=>{
+      const presentes = new Set(invRef.current.map(p=>(p.codigo||"").toUpperCase().trim()));
+      const faltantes = stats.codigosEsperados.filter(c=>!presentes.has(c));
+      setVerif({
+        intento:(verif?.intento||0)+1, faltantes,
+        confirmados: stats.codigosEsperados.length - faltantes.length,
+        total: stats.codigosEsperados.length,
+        checking:false,
+      });
+    },600);
+  }
+
+  // ── Exportar Excel con los códigos pendientes (omitidos + no confirmados) ──
+  async function exportarPendientes(){
+    const XLSX = await loadXLSX();
+    const pendientes = [];
+    (stats?.omitidos||[]).forEach(o=>pendientes.push({
+      sku:o.sku, desc:o.desc, marca:o.marca, motivo:o.errs.join("; ")||"Omitido",
+    }));
+    (verif?.faltantes||[]).forEach(cod=>{
+      const f = preview.find(p=>p.sku.toUpperCase()===cod);
+      pendientes.push({
+        sku:cod, desc:f?.desc||"", marca:f?.marcaNombre||"",
+        motivo:"No se confirmó en el inventario tras la carga — reintentar",
+      });
+    });
+    const rows = [
+      ["Código","Descripción","Marca","Motivo"],
+      ...pendientes.map(p=>[p.sku,p.desc,p.marca,p.motivo]),
+    ];
+    const ws=XLSX.utils.aoa_to_sheet(rows);
+    ws["!cols"]=[18,40,16,46].map(w=>({wch:w}));
+    const wb=XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb,ws,"Pendientes");
+    const buf=XLSX.write(wb,{bookType:"xlsx",type:"array"});
+    const blob=new Blob([buf],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
+    descargarArchivo(blob,`ToscanaHouse_Pendientes_${hoy()}.xlsx`);
   }
 
   // ── Exportar preview como Excel ───────────────────────────────────
@@ -6759,7 +6839,7 @@ function ImportarExcelModal({inv, onImportar, onClose}){
           <div style={{fontSize:13,color:C.label3,fontFamily:FONT_UI,marginBottom:20}}>
             {stats.total} filas procesadas
           </div>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:24}}>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:16}}>
             {[
               {v:stats.ok,  l:"Creados",      c:C.green},
               {v:stats.upd, l:"Actualizados", c:C.blue},
@@ -6772,6 +6852,77 @@ function ImportarExcelModal({inv, onImportar, onClose}){
               </div>
             ))}
           </div>
+
+          {/* ── Verificación post-carga ── */}
+          {verif && stats.codigosEsperados?.length>0 && (
+            <div style={{
+              background: verif.checking ? `${C.gold}10` : verif.faltantes.length===0 ? `${C.green}10` : `${C.red}08`,
+              border:`1.5px solid ${verif.checking ? C.gold+"40" : verif.faltantes.length===0 ? C.green+"35" : C.red+"35"}`,
+              borderRadius:16, padding:"14px 16px", marginBottom:16, textAlign:"left",
+            }}>
+              {verif.checking ? (
+                <div style={{fontSize:13,fontWeight:700,color:C.gold,fontFamily:FONT_UI}}>
+                  🔄 Verificando carga… (intento {verif.intento}/3) — confirmando {verif.confirmados}/{verif.total} códigos en inventario
+                </div>
+              ) : verif.faltantes.length===0 ? (
+                <div style={{fontSize:13,fontWeight:700,color:C.green,fontFamily:FONT_UI}}>
+                  ✅ Verificado: los {verif.total} códigos de este lote están confirmados en el inventario.
+                </div>
+              ) : (
+                <div>
+                  <div style={{fontSize:13,fontWeight:700,color:C.red,fontFamily:FONT_UI,marginBottom:8}}>
+                    ⚠ {verif.faltantes.length} de {verif.total} códigos NO se confirmaron en el inventario tras 3 verificaciones
+                  </div>
+                  <div style={{fontFamily:"monospace",fontSize:11,color:C.label,lineHeight:1.6,
+                    background:C.bg1,borderRadius:8,padding:"8px 10px",marginBottom:10,
+                    maxHeight:100,overflowY:"auto",border:`1px solid ${C.sep}`}}>
+                    {verif.faltantes.join(", ")}
+                  </div>
+                  <div style={{display:"flex",gap:8}}>
+                    <button onClick={reverificar}
+                      style={{flex:1,background:C.bg1,border:`1px solid ${C.red}40`,borderRadius:10,
+                        padding:"9px",fontSize:12,fontWeight:700,color:C.red,cursor:"pointer",fontFamily:FONT_UI}}>
+                      🔁 Reintentar verificación
+                    </button>
+                    <button onClick={exportarPendientes}
+                      style={{flex:1,background:C.bg1,border:`1px solid ${C.red}40`,borderRadius:10,
+                        padding:"9px",fontSize:12,fontWeight:700,color:C.red,cursor:"pointer",fontFamily:FONT_UI}}>
+                      ⬇ Descargar pendientes
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── Filas omitidas por error (no se intentaron cargar) ── */}
+          {stats.omitidos?.length>0 && (
+            <div style={{
+              background:`${C.amber}08`, border:`1.5px solid ${C.amber}35`,
+              borderRadius:16, padding:"14px 16px", marginBottom:16, textAlign:"left",
+            }}>
+              <div style={{fontSize:13,fontWeight:700,color:C.amber,fontFamily:FONT_UI,marginBottom:8}}>
+                ⚠️ {stats.omitidos.length} código{stats.omitidos.length!==1?"s":""} del Excel NO se cargó por error de datos
+              </div>
+              <div style={{display:"flex",flexDirection:"column",gap:4,maxHeight:120,overflowY:"auto",
+                marginBottom:10}}>
+                {stats.omitidos.map((o,i)=>(
+                  <div key={i} style={{fontSize:11,fontFamily:FONT_UI,color:C.label,
+                    display:"flex",justifyContent:"space-between",gap:8,
+                    background:C.bg1,borderRadius:6,padding:"4px 8px"}}>
+                    <span style={{fontFamily:"monospace",fontWeight:700,color:C.gold,flexShrink:0}}>{o.sku}</span>
+                    <span style={{color:C.red,textAlign:"right"}}>{o.errs.join("; ")}</span>
+                  </div>
+                ))}
+              </div>
+              <button onClick={exportarPendientes}
+                style={{width:"100%",background:C.bg1,border:`1px solid ${C.amber}40`,borderRadius:10,
+                  padding:"9px",fontSize:12,fontWeight:700,color:C.amber,cursor:"pointer",fontFamily:FONT_UI}}>
+                ⬇ Descargar Excel con códigos pendientes
+              </button>
+            </div>
+          )}
+
           {/* Imprimir etiquetas de todo el cargamento (una por unidad de stock) */}
           {stats.ok > 0 && (()=>{
             const importables = preview.filter(f=>f.desc&&f.marcaId&&f.precio>0&&f._errs.length===0&&!f._dup);
