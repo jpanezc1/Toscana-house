@@ -13093,6 +13093,19 @@ function InventarioPorMarca({inv, ventas, onRecibir, onBaja, onImportarExcel, on
     if(invFechaHasta) r=r.filter(p=>p.fecha&&p.fecha<=invFechaHasta);
     // Si hay marca seleccionada y NO hay filtro, limitar a esa marca
     if(marcaSelec && !hayFiltro) r=r.filter(i=>i.marcaId===marcaSelec);
+    // Si la búsqueda coincide exactamente con un código, mostrar solo esos ítems.
+    // Si hay varios con el mismo código (duplicados), agruparlos en uno solo sumando el stock.
+    if(q){
+      const exactos = r.filter(p=>(p.codigo||"").toUpperCase()===q);
+      if(exactos.length>0){
+        if(exactos.length===1) r=exactos;
+        else{
+          const base = {...exactos[0]};
+          base.stock = exactos.reduce((s,p)=>s+(p.stock||0),0);
+          r=[base];
+        }
+      }
+    }
     return r.sort((a,b)=>(a.nombre||"").localeCompare(b.nombre||""));
   },[inv,marcaSelec,invBusq,invFechaDesde,invFechaHasta]);
   const totalStock = productos.reduce((s,p)=>s+p.stock,0);

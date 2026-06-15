@@ -35713,6 +35713,17 @@ Confirmas que el conteo de ${r.contado} unidad(es) es correcto.`)) {
       if (invFechaDesde) r = r.filter((p) => p.fecha && p.fecha >= invFechaDesde);
       if (invFechaHasta) r = r.filter((p) => p.fecha && p.fecha <= invFechaHasta);
       if (marcaSelec && !hayFiltro2) r = r.filter((i) => i.marcaId === marcaSelec);
+      if (q) {
+        const exactos = r.filter((p) => (p.codigo || "").toUpperCase() === q);
+        if (exactos.length > 0) {
+          if (exactos.length === 1) r = exactos;
+          else {
+            const base = { ...exactos[0] };
+            base.stock = exactos.reduce((s, p) => s + (p.stock || 0), 0);
+            r = [base];
+          }
+        }
+      }
       return r.sort((a, b) => (a.nombre || "").localeCompare(b.nombre || ""));
     }, [inv, marcaSelec, invBusq, invFechaDesde, invFechaHasta]);
     const totalStock = productos.reduce((s, p) => s + p.stock, 0);
