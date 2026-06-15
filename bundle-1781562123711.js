@@ -24623,7 +24623,9 @@
         navigator.share({ files: [file], title: `Nota de Venta #${data.num}` }).catch(() => {
         });
       } else if (navigator.clipboard && window.ClipboardItem) {
-        window.open("https://wa.me/", "_blank");
+        const a = document.createElement("a");
+        a.href = "whatsapp://send?text=";
+        a.click();
         navigator.clipboard.write([new ClipboardItem({ "image/png": data.blob })]).then(() => alert("Imagen copiada \u2014 pega la imagen con Cmd+V en el chat de WhatsApp")).catch(() => descargarArchivo(data.blob, data.nombre));
       } else {
         descargarArchivo(data.blob, data.nombre);
