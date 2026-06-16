@@ -21678,6 +21678,21 @@
       return [];
     }
   }
+  async function sbMarcarCargaVerificada(cargaId, verificado, nombre) {
+    try {
+      const db = await getSupabase();
+      const { error } = await db.from("cargas_inventario").update({
+        verificado,
+        verificado_ts: verificado ? (/* @__PURE__ */ new Date()).toISOString() : null,
+        verificado_por: verificado ? nombre : null
+      }).eq("id", cargaId);
+      if (error) throw error;
+      return true;
+    } catch (e) {
+      console.warn("Supabase verificar carga:", e.message);
+      return false;
+    }
+  }
   async function sbGuardarCarga(c) {
     try {
       const db = await getSupabase();
@@ -21724,7 +21739,10 @@
         totalItems: c.total_items,
         nuevos: c.nuevos || 0,
         actualizados: c.actualizados || 0,
-        items: c.detalle || []
+        items: c.detalle || [],
+        verificado: c.verificado || false,
+        verificadoTs: c.verificado_ts || null,
+        verificadoPor: c.verificado_por || null
       }));
     } catch (e) {
       console.warn("Supabase load cargas:", e.message);
@@ -32987,6 +33005,10 @@ Motivo: ${motivo}` : ""}`)) {
       setRepPrecio("");
     }
     const _importBuf = (0, import_react.useRef)({ items: [], ts: 0, timer: null });
+    function handleVerificarCarga(cargaId, verificado) {
+      setCargas((prev) => prev.map((c) => c.id === cargaId ? { ...c, verificado, verificadoTs: verificado ? (/* @__PURE__ */ new Date()).toISOString() : null, verificadoPor: verificado ? user.nombre : null } : c));
+      sbMarcarCargaVerificada(cargaId, verificado, user.nombre);
+    }
     function handleImportarExcel({ tipo, codigo, stock, producto }) {
       if (tipo === "update") {
         const prod = inv.find((p) => p.codigo === codigo);
@@ -33355,7 +33377,7 @@ Motivo: ${motivo}` : ""}`)) {
         onGuardarAuditoria: registrarAuditoria,
         user
       }
-    ), tab === "cargas" && /* @__PURE__ */ import_react.default.createElement(RegistroCargas, { cargas: cargasCompletas, marcas: MARCAS }), tab === "marcas" && !marcaDetalle && /* @__PURE__ */ import_react.default.createElement("div", null, marcasState.filter((m) => m.estado === "inactiva").length > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: {
+    ), tab === "cargas" && /* @__PURE__ */ import_react.default.createElement(RegistroCargas, { cargas: cargasCompletas, marcas: MARCAS, onVerificar: handleVerificarCarga, user }), tab === "marcas" && !marcaDetalle && /* @__PURE__ */ import_react.default.createElement("div", null, marcasState.filter((m) => m.estado === "inactiva").length > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: {
       fontSize: 13,
       fontWeight: 600,
       color: C.label3,
@@ -36165,7 +36187,7 @@ Confirmas que el conteo de ${r.contado} unidad(es) es correcto.`)) {
       } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.label2 } }, "Valor de sobrantes"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontWeight: 700, color: C.blue } }, "+", $(Math.round(a.valorSobrante || 0)))), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => exportAuditoriaExcel(a), full: true, small: true, icon: "\u2B07" }, "Exportar Excel")));
     }))));
   }
-  function RegistroCargas({ cargas, marcas, marcaId = null }) {
+  function RegistroCargas({ cargas, marcas, marcaId = null, onVerificar = null, user = null }) {
     const isDesktop = useIsDesktop();
     const fijaMarca = marcaId != null;
     const [marcaSelec, setMarcaSelec] = (0, import_react.useState)(marcaId);
@@ -36175,25 +36197,6 @@ Confirmas que el conteo de ${r.contado} unidad(es) es correcto.`)) {
     const [hasta, setHasta] = (0, import_react.useState)("");
     const [abierta, setAbierta] = (0, import_react.useState)(null);
     const [exportando, setExportando] = (0, import_react.useState)(false);
-    const [verificadas, setVerificadas] = (0, import_react.useState)(() => {
-      try {
-        return JSON.parse(localStorage.getItem("th_carga_verif") || "{}");
-      } catch {
-        return {};
-      }
-    });
-    function toggleVerif(id) {
-      setVerificadas((prev) => {
-        const next = { ...prev };
-        if (next[id]) delete next[id];
-        else next[id] = { ts: Date.now() };
-        try {
-          localStorage.setItem("th_carga_verif", JSON.stringify(next));
-        } catch {
-        }
-        return next;
-      });
-    }
     const usuarios = (0, import_react.useMemo)(() => [...new Set(cargas.map((c) => c.nombre).filter((n) => n && n !== "\u2014"))].sort(), [cargas]);
     function fechaKey(f) {
       const [d, m, y] = (f || "").split("/");
@@ -36364,7 +36367,7 @@ Confirmas que el conteo de ${r.contado} unidad(es) es correcto.`)) {
         overflow: "hidden",
         textOverflow: "ellipsis",
         whiteSpace: "nowrap"
-      } }, c.resumen || "Carga de inventario"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT, marginTop: 2 } }, c.fecha, " \xB7 ", c.hora, " \xB7 ", c.nombre, " (", c.rol, ") \xB7 ", items.length, " \xEDtem", items.length !== 1 ? "s" : "")), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4, flexShrink: 0 } }, /* @__PURE__ */ import_react.default.createElement(Chip, { color: tipoInfo.color, small: true }, tipoInfo.icon, " ", tipoInfo.label), verificadas[c.id] && /* @__PURE__ */ import_react.default.createElement("span", { style: {
+      } }, c.resumen || "Carga de inventario"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT, marginTop: 2 } }, c.fecha, " \xB7 ", c.hora, " \xB7 ", c.nombre, " (", c.rol, ") \xB7 ", items.length, " \xEDtem", items.length !== 1 ? "s" : "")), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4, flexShrink: 0 } }, /* @__PURE__ */ import_react.default.createElement(Chip, { color: tipoInfo.color, small: true }, tipoInfo.icon, " ", tipoInfo.label), c.verificado && /* @__PURE__ */ import_react.default.createElement("span", { style: {
         fontSize: 10,
         fontWeight: 700,
         color: C.green,
@@ -36404,21 +36407,20 @@ Confirmas que el conteo de ${r.contado} unidad(es) es correcto.`)) {
         overflow: "hidden",
         textOverflow: "ellipsis",
         whiteSpace: "nowrap"
-      } }, (it.nombre || "").toUpperCase()), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: C.label3, fontFamily: FONT_MONO } }, it.codigo, " \xB7 ", it.marca || "\u2014")), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label2, fontFamily: FONT, textAlign: "right", flexShrink: 0 } }, it.tipo === "update" ? `${it.stockAntes} \u2192 ${it.stockNuevo} (+${it.stockSumado})` : `Stock ${it.stock}${it.precio ? ` \xB7 ${$(it.precio)}` : ""}`)))), /* @__PURE__ */ import_react.default.createElement(
+      } }, (it.nombre || "").toUpperCase()), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: C.label3, fontFamily: FONT_MONO } }, it.codigo, " \xB7 ", it.marca || "\u2014")), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label2, fontFamily: FONT, textAlign: "right", flexShrink: 0 } }, it.tipo === "update" ? `${it.stockAntes} \u2192 ${it.stockNuevo} (+${it.stockSumado})` : `Stock ${it.stock}${it.precio ? ` \xB7 ${$(it.precio)}` : ""}`)))), onVerificar && /* @__PURE__ */ import_react.default.createElement("div", { style: { marginTop: 10 } }, c.verificado && c.verificadoPor && /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT_UI, marginBottom: 6, textAlign: "center" } }, "Verificado por ", /* @__PURE__ */ import_react.default.createElement("b", null, c.verificadoPor), " \xB7 ", c.verificadoTs ? new Date(c.verificadoTs).toLocaleString("es-BO", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "\u2014"), /* @__PURE__ */ import_react.default.createElement(
         "button",
         {
           onClick: (e) => {
             e.stopPropagation();
-            toggleVerif(c.id);
+            onVerificar(c.id, !c.verificado);
           },
           style: {
-            marginTop: 10,
             width: "100%",
             padding: "9px",
             borderRadius: 10,
-            border: `1.5px solid ${verificadas[c.id] ? C.green : C.sep}`,
-            background: verificadas[c.id] ? `${C.green}12` : "transparent",
-            color: verificadas[c.id] ? C.green : C.label3,
+            border: `1.5px solid ${c.verificado ? C.green : C.sep}`,
+            background: c.verificado ? `${C.green}12` : "transparent",
+            color: c.verificado ? C.green : C.label3,
             fontSize: 12,
             fontWeight: 700,
             cursor: "pointer",
@@ -36426,8 +36428,8 @@ Confirmas que el conteo de ${r.contado} unidad(es) es correcto.`)) {
             transition: "all .15s"
           }
         },
-        verificadas[c.id] ? "\u2713 Verificado \u2014 quitar marca" : "Marcar como verificado \u2713"
-      )));
+        c.verificado ? "\u2713 Verificado \u2014 quitar marca" : "Marcar como verificado \u2713"
+      ))));
     })));
   }
   function InventarioPorMarca({ inv, ventas, onRecibir, onBaja, onImportarExcel, onReponer }) {

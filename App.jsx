@@ -203,6 +203,19 @@ async function sbCargarRetiros() {
 }
 
 // ── Trazabilidad de cargas a inventario (manuales + importaciones) ──
+async function sbMarcarCargaVerificada(cargaId, verificado, nombre) {
+  try {
+    const db = await getSupabase();
+    const { error } = await db.from("cargas_inventario").update({
+      verificado,
+      verificado_ts: verificado ? new Date().toISOString() : null,
+      verificado_por: verificado ? nombre : null,
+    }).eq("id", cargaId);
+    if(error) throw error;
+    return true;
+  } catch(e) { console.warn("Supabase verificar carga:", e.message); return false; }
+}
+
 async function sbGuardarCarga(c) {
   try {
     const db = await getSupabase();
@@ -229,6 +242,7 @@ async function sbCargarCargas() {
       marcaId:c.marca_id, marcaNombre:c.marca_nombre,
       resumen:c.resumen, totalItems:c.total_items,
       nuevos:c.nuevos||0, actualizados:c.actualizados||0, items:c.detalle||[],
+      verificado:c.verificado||false, verificadoTs:c.verificado_ts||null, verificadoPor:c.verificado_por||null,
     }));
   } catch(e) { console.warn("Supabase load cargas:", e.message); return []; }
 }
@@ -10725,6 +10739,13 @@ function App(){
   // Buffer de importación para consolidar en un solo evento de auditoría
   const _importBuf = useRef({items:[], ts:0, timer:null});
 
+  function handleVerificarCarga(cargaId, verificado){
+    setCargas(prev=>prev.map(c=>c.id===cargaId
+      ? {...c, verificado, verificadoTs:verificado?new Date().toISOString():null, verificadoPor:verificado?user.nombre:null}
+      : c));
+    sbMarcarCargaVerificada(cargaId, verificado, user.nombre);
+  }
+
   function handleImportarExcel({tipo, codigo, stock, producto}){
     if(tipo==="update"){
       const prod = inv.find(p=>p.codigo===codigo);
@@ -11046,7 +11067,7 @@ function App(){
 
         {/* CARGAS — trazabilidad de cargas a inventario (manuales + importaciones) */}
         {tab==="cargas" && (
-          <RegistroCargas cargas={cargasCompletas} marcas={MARCAS}/>
+          <RegistroCargas cargas={cargasCompletas} marcas={MARCAS} onVerificar={handleVerificarCarga} user={user}/>
         )}
 
         {/* MARCAS — lista */}
@@ -13524,7 +13545,7 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
 // ══════════════════════════════════════════════════════════
 // CARGAS — trazabilidad de cargas a inventario (manuales + importaciones)
 // ══════════════════════════════════════════════════════════
-function RegistroCargas({cargas, marcas, marcaId=null}){
+function RegistroCargas({cargas, marcas, marcaId=null, onVerificar=null, user=null}){
   const isDesktop = useIsDesktop();
   const fijaMarca = marcaId!=null;
   const[marcaSelec,setMarcaSelec]=useState(marcaId);
@@ -13534,17 +13555,6 @@ function RegistroCargas({cargas, marcas, marcaId=null}){
   const[hasta,setHasta]=useState("");
   const[abierta,setAbierta]=useState(null);
   const[exportando,setExportando]=useState(false);
-  const[verificadas,setVerificadas]=useState(()=>{try{return JSON.parse(localStorage.getItem("th_carga_verif")||"{}");}catch{return{};}});
-
-  function toggleVerif(id){
-    setVerificadas(prev=>{
-      const next={...prev};
-      if(next[id]) delete next[id];
-      else next[id]={ts:Date.now()};
-      try{localStorage.setItem("th_carga_verif",JSON.stringify(next));}catch{}
-      return next;
-    });
-  }
 
   const usuarios = useMemo(()=>[...new Set(cargas.map(c=>c.nombre).filter(n=>n&&n!=="—"))].sort(),[cargas]);
 
@@ -13698,7 +13708,7 @@ function RegistroCargas({cargas, marcas, marcaId=null}){
                     </div>
                     <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:4,flexShrink:0}}>
                       <Chip color={tipoInfo.color} small>{tipoInfo.icon} {tipoInfo.label}</Chip>
-                      {verificadas[c.id]&&(
+                      {c.verificado&&(
                         <span style={{fontSize:10,fontWeight:700,color:C.green,background:`${C.green}18`,
                           padding:"2px 8px",borderRadius:8,letterSpacing:.3,fontFamily:FONT_UI}}>
                           ✓ VERIFICADO
@@ -13739,15 +13749,24 @@ function RegistroCargas({cargas, marcas, marcaId=null}){
                           ))
                         }
                       </div>
-                      <button onClick={e=>{e.stopPropagation();toggleVerif(c.id);}}
-                        style={{marginTop:10,width:"100%",padding:"9px",borderRadius:10,
-                          border:`1.5px solid ${verificadas[c.id]?C.green:C.sep}`,
-                          background:verificadas[c.id]?`${C.green}12`:"transparent",
-                          color:verificadas[c.id]?C.green:C.label3,
-                          fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:FONT_UI,
-                          transition:"all .15s"}}>
-                        {verificadas[c.id]?"✓ Verificado — quitar marca":"Marcar como verificado ✓"}
-                      </button>
+                      {onVerificar&&(
+                        <div style={{marginTop:10}}>
+                          {c.verificado&&c.verificadoPor&&(
+                            <div style={{fontSize:11,color:C.label3,fontFamily:FONT_UI,marginBottom:6,textAlign:"center"}}>
+                              Verificado por <b>{c.verificadoPor}</b> · {c.verificadoTs ? new Date(c.verificadoTs).toLocaleString("es-BO",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"}) : "—"}
+                            </div>
+                          )}
+                          <button onClick={e=>{e.stopPropagation();onVerificar(c.id,!c.verificado);}}
+                            style={{width:"100%",padding:"9px",borderRadius:10,
+                              border:`1.5px solid ${c.verificado?C.green:C.sep}`,
+                              background:c.verificado?`${C.green}12`:"transparent",
+                              color:c.verificado?C.green:C.label3,
+                              fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:FONT_UI,
+                              transition:"all .15s"}}>
+                            {c.verificado?"✓ Verificado — quitar marca":"Marcar como verificado ✓"}
+                          </button>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
