@@ -13658,8 +13658,45 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
                                   </div>
                                 )}
                                 {(a.detalle||[]).filter(d=>d.agregadoPost).length>0&&(
-                                  <div style={{fontSize:11,color:C.label3,fontFamily:FONT_UI,marginBottom:8}}>
-                                    {(a.detalle||[]).filter(d=>d.agregadoPost).length} ítem{(a.detalle||[]).filter(d=>d.agregadoPost).length!==1?"s":""} agregado{(a.detalle||[]).filter(d=>d.agregadoPost).length!==1?"s":""} post-verificación
+                                  <div style={{marginBottom:8}}>
+                                    <div style={{fontSize:11,fontWeight:700,color:C.label3,fontFamily:FONT_UI,
+                                      textTransform:"uppercase",letterSpacing:.5,marginBottom:6}}>
+                                      Ítems agregados ({(a.detalle||[]).filter(d=>d.agregadoPost).length})
+                                    </div>
+                                    {(a.detalle||[]).filter(d=>d.agregadoPost).map((d,i)=>(
+                                      <div key={d.codigo+i} style={{display:"flex",alignItems:"center",gap:8,
+                                        padding:"7px 10px",borderRadius:9,background:C.bg0,marginBottom:4,
+                                        border:`1px solid ${C.sep}`}}>
+                                        <div style={{flex:1,minWidth:0}}>
+                                          <div style={{fontSize:12,fontWeight:600,color:C.label,fontFamily:FONT,
+                                            whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>
+                                            {d.nombre}
+                                          </div>
+                                          <div style={{fontSize:10,color:C.label3,fontFamily:"monospace"}}>
+                                            {d.codigo} · {d.contado} ud · Bs {d.precio||"—"}
+                                          </div>
+                                        </div>
+                                        <button
+                                          onClick={()=>{
+                                            if(!window.confirm(`¿Eliminar "${d.nombre}" (${d.codigo}) de esta verificación?`)) return;
+                                            const detalleNuevo=(a.detalle||[]).filter(x=>x!==d);
+                                            const okC=detalleNuevo.filter(x=>x.estado==="OK").length;
+                                            const faltC=detalleNuevo.filter(x=>x.estado==="FALTANTE").length;
+                                            const sobrC=detalleNuevo.filter(x=>x.estado==="SOBRANTE").length;
+                                            onActualizarAuditoria({...a,
+                                              detalle:detalleNuevo,
+                                              totalProductos:detalleNuevo.length,
+                                              ok:okC,faltantes:faltC,sobrantes:sobrC,
+                                            });
+                                          }}
+                                          style={{flexShrink:0,width:24,height:24,borderRadius:"50%",border:"none",
+                                            background:`${C.red}20`,color:C.red,fontSize:14,fontWeight:700,
+                                            cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",
+                                            lineHeight:1}}>
+                                          ×
+                                        </button>
+                                      </div>
+                                    ))}
                                   </div>
                                 )}
                                 <button onClick={()=>{setAgregandoA(null);setCodAgregar("");setMsgAgregar(null);}}

@@ -36359,7 +36359,68 @@ Se registrar\xE1 que los faltantes/sobrantes fueron verificados f\xEDsicamente y
           background: msgAgregar.ok ? `${C.green}15` : `${C.red}15`,
           color: msgAgregar.ok ? C.green : C.red,
           fontFamily: FONT_UI
-        } }, msgAgregar.txt), (a.detalle || []).filter((d) => d.agregadoPost).length > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT_UI, marginBottom: 8 } }, (a.detalle || []).filter((d) => d.agregadoPost).length, " \xEDtem", (a.detalle || []).filter((d) => d.agregadoPost).length !== 1 ? "s" : "", " agregado", (a.detalle || []).filter((d) => d.agregadoPost).length !== 1 ? "s" : "", " post-verificaci\xF3n"), /* @__PURE__ */ import_react.default.createElement(
+        } }, msgAgregar.txt), (a.detalle || []).filter((d) => d.agregadoPost).length > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 8 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+          fontSize: 11,
+          fontWeight: 700,
+          color: C.label3,
+          fontFamily: FONT_UI,
+          textTransform: "uppercase",
+          letterSpacing: 0.5,
+          marginBottom: 6
+        } }, "\xCDtems agregados (", (a.detalle || []).filter((d) => d.agregadoPost).length, ")"), (a.detalle || []).filter((d) => d.agregadoPost).map((d, i) => /* @__PURE__ */ import_react.default.createElement("div", { key: d.codigo + i, style: {
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          padding: "7px 10px",
+          borderRadius: 9,
+          background: C.bg0,
+          marginBottom: 4,
+          border: `1px solid ${C.sep}`
+        } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+          fontSize: 12,
+          fontWeight: 600,
+          color: C.label,
+          fontFamily: FONT,
+          whiteSpace: "nowrap",
+          overflow: "hidden",
+          textOverflow: "ellipsis"
+        } }, d.nombre), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: C.label3, fontFamily: "monospace" } }, d.codigo, " \xB7 ", d.contado, " ud \xB7 Bs ", d.precio || "\u2014")), /* @__PURE__ */ import_react.default.createElement(
+          "button",
+          {
+            onClick: () => {
+              if (!window.confirm(`\xBFEliminar "${d.nombre}" (${d.codigo}) de esta verificaci\xF3n?`)) return;
+              const detalleNuevo = (a.detalle || []).filter((x) => x !== d);
+              const okC = detalleNuevo.filter((x) => x.estado === "OK").length;
+              const faltC = detalleNuevo.filter((x) => x.estado === "FALTANTE").length;
+              const sobrC = detalleNuevo.filter((x) => x.estado === "SOBRANTE").length;
+              onActualizarAuditoria({
+                ...a,
+                detalle: detalleNuevo,
+                totalProductos: detalleNuevo.length,
+                ok: okC,
+                faltantes: faltC,
+                sobrantes: sobrC
+              });
+            },
+            style: {
+              flexShrink: 0,
+              width: 24,
+              height: 24,
+              borderRadius: "50%",
+              border: "none",
+              background: `${C.red}20`,
+              color: C.red,
+              fontSize: 14,
+              fontWeight: 700,
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              lineHeight: 1
+            }
+          },
+          "\xD7"
+        )))), /* @__PURE__ */ import_react.default.createElement(
           "button",
           {
             onClick: () => {
