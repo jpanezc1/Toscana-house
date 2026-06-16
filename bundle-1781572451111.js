@@ -36175,6 +36175,25 @@ Confirmas que el conteo de ${r.contado} unidad(es) es correcto.`)) {
     const [hasta, setHasta] = (0, import_react.useState)("");
     const [abierta, setAbierta] = (0, import_react.useState)(null);
     const [exportando, setExportando] = (0, import_react.useState)(false);
+    const [verificadas, setVerificadas] = (0, import_react.useState)(() => {
+      try {
+        return JSON.parse(localStorage.getItem("th_carga_verif") || "{}");
+      } catch {
+        return {};
+      }
+    });
+    function toggleVerif(id) {
+      setVerificadas((prev) => {
+        const next = { ...prev };
+        if (next[id]) delete next[id];
+        else next[id] = { ts: Date.now() };
+        try {
+          localStorage.setItem("th_carga_verif", JSON.stringify(next));
+        } catch {
+        }
+        return next;
+      });
+    }
     const usuarios = (0, import_react.useMemo)(() => [...new Set(cargas.map((c) => c.nombre).filter((n) => n && n !== "\u2014"))].sort(), [cargas]);
     function fechaKey(f) {
       const [d, m, y] = (f || "").split("/");
@@ -36345,7 +36364,16 @@ Confirmas que el conteo de ${r.contado} unidad(es) es correcto.`)) {
         overflow: "hidden",
         textOverflow: "ellipsis",
         whiteSpace: "nowrap"
-      } }, c.resumen || "Carga de inventario"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT, marginTop: 2 } }, c.fecha, " \xB7 ", c.hora, " \xB7 ", c.nombre, " (", c.rol, ") \xB7 ", items.length, " \xEDtem", items.length !== 1 ? "s" : "")), /* @__PURE__ */ import_react.default.createElement(Chip, { color: tipoInfo.color, small: true }, tipoInfo.icon, " ", tipoInfo.label)), abierto && /* @__PURE__ */ import_react.default.createElement("div", { style: { padding: "0 14px 14px" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      } }, c.resumen || "Carga de inventario"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT, marginTop: 2 } }, c.fecha, " \xB7 ", c.hora, " \xB7 ", c.nombre, " (", c.rol, ") \xB7 ", items.length, " \xEDtem", items.length !== 1 ? "s" : "")), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4, flexShrink: 0 } }, /* @__PURE__ */ import_react.default.createElement(Chip, { color: tipoInfo.color, small: true }, tipoInfo.icon, " ", tipoInfo.label), verificadas[c.id] && /* @__PURE__ */ import_react.default.createElement("span", { style: {
+        fontSize: 10,
+        fontWeight: 700,
+        color: C.green,
+        background: `${C.green}18`,
+        padding: "2px 8px",
+        borderRadius: 8,
+        letterSpacing: 0.3,
+        fontFamily: FONT_UI
+      } }, "\u2713 VERIFICADO"))), abierto && /* @__PURE__ */ import_react.default.createElement("div", { style: { padding: "0 14px 14px" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
         borderTop: `1px solid ${C.sep}`,
         paddingTop: 10,
         display: "flex",
@@ -36376,7 +36404,30 @@ Confirmas que el conteo de ${r.contado} unidad(es) es correcto.`)) {
         overflow: "hidden",
         textOverflow: "ellipsis",
         whiteSpace: "nowrap"
-      } }, (it.nombre || "").toUpperCase()), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: C.label3, fontFamily: FONT_MONO } }, it.codigo, " \xB7 ", it.marca || "\u2014")), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label2, fontFamily: FONT, textAlign: "right", flexShrink: 0 } }, it.tipo === "update" ? `${it.stockAntes} \u2192 ${it.stockNuevo} (+${it.stockSumado})` : `Stock ${it.stock}${it.precio ? ` \xB7 ${$(it.precio)}` : ""}`))))));
+      } }, (it.nombre || "").toUpperCase()), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: C.label3, fontFamily: FONT_MONO } }, it.codigo, " \xB7 ", it.marca || "\u2014")), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label2, fontFamily: FONT, textAlign: "right", flexShrink: 0 } }, it.tipo === "update" ? `${it.stockAntes} \u2192 ${it.stockNuevo} (+${it.stockSumado})` : `Stock ${it.stock}${it.precio ? ` \xB7 ${$(it.precio)}` : ""}`)))), /* @__PURE__ */ import_react.default.createElement(
+        "button",
+        {
+          onClick: (e) => {
+            e.stopPropagation();
+            toggleVerif(c.id);
+          },
+          style: {
+            marginTop: 10,
+            width: "100%",
+            padding: "9px",
+            borderRadius: 10,
+            border: `1.5px solid ${verificadas[c.id] ? C.green : C.sep}`,
+            background: verificadas[c.id] ? `${C.green}12` : "transparent",
+            color: verificadas[c.id] ? C.green : C.label3,
+            fontSize: 12,
+            fontWeight: 700,
+            cursor: "pointer",
+            fontFamily: FONT_UI,
+            transition: "all .15s"
+          }
+        },
+        verificadas[c.id] ? "\u2713 Verificado \u2014 quitar marca" : "Marcar como verificado \u2713"
+      )));
     })));
   }
   function InventarioPorMarca({ inv, ventas, onRecibir, onBaja, onImportarExcel, onReponer }) {

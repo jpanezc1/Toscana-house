@@ -13534,6 +13534,17 @@ function RegistroCargas({cargas, marcas, marcaId=null}){
   const[hasta,setHasta]=useState("");
   const[abierta,setAbierta]=useState(null);
   const[exportando,setExportando]=useState(false);
+  const[verificadas,setVerificadas]=useState(()=>{try{return JSON.parse(localStorage.getItem("th_carga_verif")||"{}");}catch{return{};}});
+
+  function toggleVerif(id){
+    setVerificadas(prev=>{
+      const next={...prev};
+      if(next[id]) delete next[id];
+      else next[id]={ts:Date.now()};
+      try{localStorage.setItem("th_carga_verif",JSON.stringify(next));}catch{}
+      return next;
+    });
+  }
 
   const usuarios = useMemo(()=>[...new Set(cargas.map(c=>c.nombre).filter(n=>n&&n!=="—"))].sort(),[cargas]);
 
@@ -13685,7 +13696,15 @@ function RegistroCargas({cargas, marcas, marcaId=null}){
                         {c.fecha} · {c.hora} · {c.nombre} ({c.rol}) · {items.length} ítem{items.length!==1?"s":""}
                       </div>
                     </div>
-                    <Chip color={tipoInfo.color} small>{tipoInfo.icon} {tipoInfo.label}</Chip>
+                    <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:4,flexShrink:0}}>
+                      <Chip color={tipoInfo.color} small>{tipoInfo.icon} {tipoInfo.label}</Chip>
+                      {verificadas[c.id]&&(
+                        <span style={{fontSize:10,fontWeight:700,color:C.green,background:`${C.green}18`,
+                          padding:"2px 8px",borderRadius:8,letterSpacing:.3,fontFamily:FONT_UI}}>
+                          ✓ VERIFICADO
+                        </span>
+                      )}
+                    </div>
                   </div>
                   {abierto && (
                     <div style={{padding:"0 14px 14px"}}>
@@ -13720,6 +13739,15 @@ function RegistroCargas({cargas, marcas, marcaId=null}){
                           ))
                         }
                       </div>
+                      <button onClick={e=>{e.stopPropagation();toggleVerif(c.id);}}
+                        style={{marginTop:10,width:"100%",padding:"9px",borderRadius:10,
+                          border:`1.5px solid ${verificadas[c.id]?C.green:C.sep}`,
+                          background:verificadas[c.id]?`${C.green}12`:"transparent",
+                          color:verificadas[c.id]?C.green:C.label3,
+                          fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:FONT_UI,
+                          transition:"all .15s"}}>
+                        {verificadas[c.id]?"✓ Verificado — quitar marca":"Marcar como verificado ✓"}
+                      </button>
                     </div>
                   )}
                 </div>
