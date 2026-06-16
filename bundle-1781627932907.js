@@ -24688,10 +24688,12 @@
   }
   function generarVistaPreviaNotaVenta(venta, numSecuencial, setPreview) {
     const num = numSecuencial || venta.id.replace(/\D/g, "").slice(-4).padStart(4, "0");
+    const marcas = [...new Set((venta.items || []).map((i) => i.marcaNombre).filter(Boolean))];
+    const marcaNombre = marcas.length === 1 ? marcas[0] : null;
     construirImagenNotaVenta(venta, num).then((blob) => {
-      const nombre = `NotaVenta_${num}.png`;
+      const nombre = marcaNombre ? `TH_${marcaNombre.replace(/ /g, "_")}_NotaVenta_${num}.png` : `TH_NotaVenta_${num}.png`;
       const url = URL.createObjectURL(blob);
-      setPreview({ url, blob, nombre, num });
+      setPreview({ url, blob, nombre, num, marcaNombre });
     }).catch(() => alert("No se pudo generar la imagen de la nota"));
   }
   function NotaImgPreviewModal({ data, onClose }) {
@@ -24705,9 +24707,9 @@
         const a = document.createElement("a");
         a.href = "whatsapp://send?text=";
         a.click();
-        navigator.clipboard.write([new ClipboardItem({ "image/png": data.blob })]).then(() => alert("Imagen copiada \u2014 pega la imagen con Cmd+V en el chat de WhatsApp")).catch(() => descargarArchivo(data.blob, data.nombre));
+        navigator.clipboard.write([new ClipboardItem({ "image/png": data.blob })]).then(() => alert("Imagen copiada \u2014 pega la imagen con Cmd+V en el chat de WhatsApp")).catch(() => descargarOrganizado(data.blob, data.nombre, data.marcaNombre));
       } else {
-        descargarArchivo(data.blob, data.nombre);
+        descargarOrganizado(data.blob, data.nombre, data.marcaNombre);
       }
     }
     function descargar() {
@@ -24715,7 +24717,7 @@
         navigator.clipboard.write([new ClipboardItem({ "image/png": data.blob })]).then(() => alert("Imagen copiada al portapapeles \u2014 p\xE9gala con Cmd+V en WhatsApp")).catch(() => {
         });
       }
-      descargarArchivo(data.blob, data.nombre);
+      descargarOrganizado(data.blob, data.nombre, data.marcaNombre);
     }
     return /* @__PURE__ */ import_react.default.createElement(Sheet, { open: !!data, onClose, title: "Nota de venta" }, /* @__PURE__ */ import_react.default.createElement("img", { src: data.url, alt: "Nota de venta", style: {
       width: "100%",
