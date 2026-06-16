@@ -36172,35 +36172,58 @@ Confirmas que el conteo de ${r.contado} unidad(es) es correcto.`)) {
           setMsgAgregar({ ok: false, txt: `"${cod}" no encontrado en inventario` });
           return;
         }
-        const yaEsta = (aud.detalle || []).some((d) => (d.codigo || "").toUpperCase() === cod);
-        if (yaEsta) {
-          setMsgAgregar({ ok: false, txt: `"${cod}" ya est\xE1 en esta verificaci\xF3n` });
-          return;
+        const idxExistente = (aud.detalle || []).findIndex((d) => (d.codigo || "").toUpperCase() === cod);
+        let nuevoDetalle;
+        let msgOk;
+        if (idxExistente >= 0) {
+          nuevoDetalle = (aud.detalle || []).map((d, i) => {
+            if (i !== idxExistente) return d;
+            const nuevoContado = (d.contado || 0) + 1;
+            const nuevaDif = nuevoContado - (d.sistema || 0);
+            return {
+              ...d,
+              contado: nuevoContado,
+              diferencia: nuevaDif,
+              estado: nuevaDif === 0 ? "OK" : nuevaDif > 0 ? "SOBRANTE" : "FALTANTE",
+              ultimoAgregoPost: true,
+              ultimoAgregoPor: user?.nombre || "\u2014",
+              ultimoAgregoTs: (/* @__PURE__ */ new Date()).toISOString()
+            };
+          });
+          const item = nuevoDetalle[idxExistente];
+          msgOk = `\u2713 "${prod.nombre}": contado ${item.contado - 1} \u2192 ${item.contado}`;
+        } else {
+          nuevoDetalle = [...aud.detalle || [], {
+            codigo: prod.codigo,
+            nombre: prod.nombre,
+            marcaId: prod.marcaId,
+            marca: prod.marcaNombre || "\u2014",
+            precio: prod.precio,
+            sistema: prod.stock,
+            contado: 1,
+            diferencia: 1 - prod.stock,
+            estado: 1 - prod.stock === 0 ? "OK" : 1 - prod.stock > 0 ? "SOBRANTE" : "FALTANTE",
+            agregadoPost: true,
+            agregadoPor: user?.nombre || "\u2014",
+            agregadoTs: (/* @__PURE__ */ new Date()).toISOString()
+          }];
+          msgOk = `\u2713 "${prod.nombre}" agregado`;
         }
-        const nuevoDetalle = [...aud.detalle || [], {
-          codigo: prod.codigo,
-          nombre: prod.nombre,
-          marcaId: prod.marcaId,
-          marca: prod.marcaNombre || "\u2014",
-          precio: prod.precio,
-          sistema: prod.stock,
-          contado: prod.stock,
-          diferencia: 0,
-          estado: "OK",
-          agregadoPost: true,
-          agregadoPor: user?.nombre || "\u2014",
-          agregadoTs: (/* @__PURE__ */ new Date()).toISOString()
-        }];
+        const faltantes2 = nuevoDetalle.filter((d) => d.estado === "FALTANTE").length;
+        const sobrantes2 = nuevoDetalle.filter((d) => d.estado === "SOBRANTE").length;
+        const okCount2 = nuevoDetalle.filter((d) => d.estado === "OK").length;
         const audActualizada = {
           ...aud,
           detalle: nuevoDetalle,
-          totalProductos: (aud.totalProductos || 0) + 1,
-          ok: (aud.ok || 0) + 1,
+          totalProductos: nuevoDetalle.length,
+          ok: okCount2,
+          faltantes: faltantes2,
+          sobrantes: sobrantes2,
           marcadoOkPor: user?.nombre || "\u2014",
           marcadoOkTs: (/* @__PURE__ */ new Date()).toISOString()
         };
         onActualizarAuditoria(audActualizada);
-        setMsgAgregar({ ok: true, txt: `\u2713 "${prod.nombre}" agregado` });
+        setMsgAgregar({ ok: true, txt: msgOk });
         setCodAgregar("");
       }
       return auditorias.length === 0 ? /* @__PURE__ */ import_react.default.createElement(

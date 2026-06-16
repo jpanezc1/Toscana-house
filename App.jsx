@@ -13507,23 +13507,44 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
           if(!cod){ setMsgAgregar({ok:false,txt:"Ingresá un código"}); return; }
           const prod = inv.find(p=>(p.codigo||"").toUpperCase()===cod);
           if(!prod){ setMsgAgregar({ok:false,txt:`"${cod}" no encontrado en inventario`}); return; }
-          const yaEsta = (aud.detalle||[]).some(d=>(d.codigo||"").toUpperCase()===cod);
-          if(yaEsta){ setMsgAgregar({ok:false,txt:`"${cod}" ya está en esta verificación`}); return; }
-          const nuevoDetalle = [...(aud.detalle||[]), {
-            codigo:prod.codigo, nombre:prod.nombre, marcaId:prod.marcaId,
-            marca:prod.marcaNombre||"—", precio:prod.precio,
-            sistema:prod.stock, contado:prod.stock, diferencia:0, estado:"OK",
-            agregadoPost:true, agregadoPor:user?.nombre||"—", agregadoTs:new Date().toISOString(),
-          }];
+          const idxExistente = (aud.detalle||[]).findIndex(d=>(d.codigo||"").toUpperCase()===cod);
+          let nuevoDetalle;
+          let msgOk;
+          if(idxExistente>=0){
+            // Código ya en verificación → sumar 1 unidad al contado
+            nuevoDetalle = (aud.detalle||[]).map((d,i)=>{
+              if(i!==idxExistente) return d;
+              const nuevoContado = (d.contado||0)+1;
+              const nuevaDif = nuevoContado-(d.sistema||0);
+              return {...d, contado:nuevoContado, diferencia:nuevaDif,
+                estado:nuevaDif===0?"OK":nuevaDif>0?"SOBRANTE":"FALTANTE",
+                ultimoAgregoPost:true, ultimoAgregoPor:user?.nombre||"—", ultimoAgregoTs:new Date().toISOString()};
+            });
+            const item=nuevoDetalle[idxExistente];
+            msgOk=`✓ "${prod.nombre}": contado ${item.contado-1} → ${item.contado}`;
+          } else {
+            // Código nuevo → agregar fila
+            nuevoDetalle = [...(aud.detalle||[]), {
+              codigo:prod.codigo, nombre:prod.nombre, marcaId:prod.marcaId,
+              marca:prod.marcaNombre||"—", precio:prod.precio,
+              sistema:prod.stock, contado:1, diferencia:1-prod.stock,
+              estado:1-prod.stock===0?"OK":1-prod.stock>0?"SOBRANTE":"FALTANTE",
+              agregadoPost:true, agregadoPor:user?.nombre||"—", agregadoTs:new Date().toISOString(),
+            }];
+            msgOk=`✓ "${prod.nombre}" agregado`;
+          }
+          const faltantes=nuevoDetalle.filter(d=>d.estado==="FALTANTE").length;
+          const sobrantes=nuevoDetalle.filter(d=>d.estado==="SOBRANTE").length;
+          const okCount=nuevoDetalle.filter(d=>d.estado==="OK").length;
           const audActualizada = {...aud,
             detalle: nuevoDetalle,
-            totalProductos: (aud.totalProductos||0)+1,
-            ok: (aud.ok||0)+1,
+            totalProductos: nuevoDetalle.length,
+            ok: okCount, faltantes, sobrantes,
             marcadoOkPor: user?.nombre||"—",
             marcadoOkTs: new Date().toISOString(),
           };
           onActualizarAuditoria(audActualizada);
-          setMsgAgregar({ok:true,txt:`✓ "${prod.nombre}" agregado`});
+          setMsgAgregar({ok:true,txt:msgOk});
           setCodAgregar("");
         }
         return (
