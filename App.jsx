@@ -1375,12 +1375,16 @@ async function fsaHasBase(){
 
 // Descarga un archivo a <carpetaBase>/<marcaCarpeta>/<nombre>
 // Si FSA no disponible o no configurado → download normal.
-async function descargarOrganizado(blob, nombre, marcaCarpeta){
+async function descargarOrganizado(blob, nombre, marcaCarpeta, subcarpeta=null){
   const base=await fsaGetBase();
   if(base && marcaCarpeta){
     try{
       const carpeta=(marcaCarpeta||"General").replace(/[\/\\:*?"<>|]/g,"").trim()||"General";
-      const dir=await base.getDirectoryHandle(carpeta,{create:true});
+      let dir=await base.getDirectoryHandle(carpeta,{create:true});
+      if(subcarpeta){
+        const sub=subcarpeta.replace(/[\/\\:*?"<>|]/g,"").trim();
+        if(sub) dir=await dir.getDirectoryHandle(sub,{create:true});
+      }
       const fh=await dir.getFileHandle(nombre,{create:true});
       const wr=await fh.createWritable();
       await wr.write(blob);
@@ -3122,9 +3126,9 @@ function NotaImgPreviewModal({data, onClose}){
       a.click();
       navigator.clipboard.write([new ClipboardItem({"image/png":data.blob})])
         .then(()=>alert("Imagen copiada — pega la imagen con Cmd+V en el chat de WhatsApp"))
-        .catch(()=>descargarOrganizado(data.blob, data.nombre, data.marcaNombre));
+        .catch(()=>descargarOrganizado(data.blob, data.nombre, data.marcaNombre, "Notas de Ventas"));
     } else {
-      descargarOrganizado(data.blob, data.nombre, data.marcaNombre);
+      descargarOrganizado(data.blob, data.nombre, data.marcaNombre, "Notas de Ventas");
     }
   }
   function descargar(){
@@ -3133,7 +3137,7 @@ function NotaImgPreviewModal({data, onClose}){
         .then(()=>alert("Imagen copiada al portapapeles — pégala con Cmd+V en WhatsApp"))
         .catch(()=>{});
     }
-    descargarOrganizado(data.blob, data.nombre, data.marcaNombre);
+    descargarOrganizado(data.blob, data.nombre, data.marcaNombre, "Notas de Ventas");
   }
   return (
     <Sheet open={!!data} onClose={onClose} title="Nota de venta">
@@ -11602,6 +11606,53 @@ function App(){
 
       {/* ══ DRIVE CONFIG SHEET ══ */}
       <Sheet open={sheetDrive} onClose={()=>setShDrive(false)} title="☁ Google Drive" tall>
+        {/* ── Descargar TODAS las notas de venta ── */}
+        {(()=>{
+          const [descargando, setDescargando] = React.useState(false);
+          const [progreso, setProgreso] = React.useState(null);
+          async function descargarTodasNotas(){
+            if(!ventas.length){ alert("No hay ventas registradas"); return; }
+            const hasDir = await fsaGetBase();
+            if(!hasDir){ alert("Primero configura la carpeta de descargas organizadas en Config → Carpeta de Archivos"); return; }
+            setDescargando(true);
+            let ok=0, err=0;
+            const total=ventas.length;
+            for(let i=0;i<ventas.length;i++){
+              const vf=ventas[i];
+              try{
+                const num=vf.id.replace(/\D/g,"").slice(-4).padStart(4,"0");
+                const marcas=[...new Set((vf.items||[]).map(it=>it.marcaNombre).filter(Boolean))];
+                const marcaCarpeta=marcas.length===1?marcas[0]:marcas.length>1?"Multimarca":null;
+                const marcaSlug=marcas.map(m=>m.replace(/ /g,"_")).join("-")||"TH";
+                const fechaSlug=(vf.fecha||"").replace(/\//g,"-");
+                const nombre=`TH_${marcaSlug}_NotaVenta_N${num}_${fechaSlug}.png`;
+                const blob=await construirImagenNotaVenta(vf,num);
+                await descargarOrganizado(blob,nombre,marcaCarpeta,"Notas de Ventas");
+                ok++;
+              }catch(e){ err++; }
+              setProgreso(`${i+1}/${total}`);
+            }
+            setDescargando(false);
+            setProgreso(null);
+            alert(`✓ ${ok} notas descargadas${err>0?` · ${err} con error`:""}`);
+          }
+          return (
+            <div style={{background:`${C.indigo}12`,borderRadius:16,padding:"16px",
+              marginBottom:20,border:`1px solid ${C.indigo}40`}}>
+              <div style={{fontSize:15,fontWeight:600,color:C.label,fontFamily:FONT,marginBottom:6}}>
+                🧾 Descargar todas las notas de venta
+              </div>
+              <p style={{fontSize:12,color:C.label3,fontFamily:FONT,margin:"0 0 12px",lineHeight:1.5}}>
+                Genera y guarda las notas de venta de <strong style={{color:C.label}}>{ventas.length} ventas</strong> registradas,
+                organizadas en la carpeta <strong style={{color:C.label}}>Notas de Ventas</strong> dentro de cada marca.
+              </p>
+              <IOSBtn disabled={descargando} onPress={descargarTodasNotas} variant="fill" full icon="⬇">
+                {descargando ? `Descargando… ${progreso||""}` : `Descargar ${ventas.length} notas`}
+              </IOSBtn>
+            </div>
+          );
+        })()}
+
         {/* Respaldo redundante en Excel */}
         <div style={{background:`${C.gold}10`,borderRadius:16,padding:"16px",
           marginBottom:20,border:`1px solid ${C.gold}30`}}>
@@ -11862,7 +11913,7 @@ function POS({inv,onVenta,onVerNota}){
       const fechaSlug = (vf.fecha||"").replace(/\//g,"-");
       const nombre = `TH_${marcaSlug}_NotaVenta_N${num}_${fechaSlug}.png`;
       construirImagenNotaVenta(vf, num).then(blob=>{
-        descargarOrganizado(blob, nombre, marcaCarpeta);
+        descargarOrganizado(blob, nombre, marcaCarpeta, "Notas de Ventas");
       }).catch(()=>{});
     } catch(e){}
   }
