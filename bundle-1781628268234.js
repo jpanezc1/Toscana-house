@@ -24690,8 +24690,10 @@
     const num = numSecuencial || venta.id.replace(/\D/g, "").slice(-4).padStart(4, "0");
     const marcas = [...new Set((venta.items || []).map((i) => i.marcaNombre).filter(Boolean))];
     const marcaNombre = marcas.length === 1 ? marcas[0] : null;
+    const fechaSlug = (venta.fecha || "").replace(/\//g, "-");
     construirImagenNotaVenta(venta, num).then((blob) => {
-      const nombre = marcaNombre ? `TH_${marcaNombre.replace(/ /g, "_")}_NotaVenta_${num}.png` : `TH_NotaVenta_${num}.png`;
+      const base = marcaNombre ? `TH_${marcaNombre.replace(/ /g, "_")}` : "TH";
+      const nombre = `${base}_NotaVenta_N${num}_${fechaSlug}.png`;
       const url = URL.createObjectURL(blob);
       setPreview({ url, blob, nombre, num, marcaNombre });
     }).catch(() => alert("No se pudo generar la imagen de la nota"));
