@@ -10518,6 +10518,30 @@ function App(){
     syncConRespaldo("auditoria", aud, ()=>sbGuardarAuditoria(aud));
   }
 
+  function cuadrarConAuditoria(aud){
+    // Para cada ítem de la auditoría con diferencia ≠ 0, actualiza el stock
+    // del inventario al valor contado y registra un log de auditoría.
+    const cambios = (aud.detalle||[]).filter(d=>d.diferencia!==0 && d.contado>=0);
+    if(cambios.length===0) return;
+    const lineas = cambios.map(d=>`• ${d.codigo} ${d.nombre}: ${d.sistema} → ${d.contado} (${d.diferencia>0?"+":""}${d.diferencia})`).join("\n");
+    if(!window.confirm(`¿Cuadrar inventario con esta verificación?\n\nSe actualizarán ${cambios.length} producto(s):\n\n${lineas}\n\nEsta acción no se puede deshacer.`)) return;
+    setInv(prev=>{
+      const next=[...prev];
+      cambios.forEach(d=>{
+        const idx=next.findIndex(p=>p.codigo===d.codigo);
+        if(idx<0) return;
+        next[idx]={...next[idx], stock:d.contado};
+        syncConRespaldo("producto",next[idx],()=>sbGuardarProducto(next[idx]));
+      });
+      return next;
+    });
+    logAudit("CUADRE_AUDITORIA",{
+      resumen:`Cuadre de inventario desde verificación ${aud.id} · ${cambios.length} producto(s) ajustados`,
+      auditoriaId:aud.id, mes:aud.mes, anio:aud.anio, marcaId:aud.marcaId,
+      cambios:cambios.map(d=>({codigo:d.codigo,nombre:d.nombre,antes:d.sistema,despues:d.contado})),
+    },user);
+  }
+
   function registrarCarga(carga){
     setCargas(prev=>[carga, ...prev]);
     syncConRespaldo("carga", carga, ()=>sbGuardarCarga(carga));
@@ -11069,7 +11093,8 @@ function App(){
         {/* AUDITORÍA — cierre de inventario mensual (conteo físico vs sistema) */}
         {tab==="auditoria" && (
           <AuditoriaInventario inv={inv} ventas={ventas} cargas={cargasCompletas} mes={mes} anio={anio} MK={MK}
-            auditorias={auditorias} onGuardarAuditoria={registrarAuditoria} onActualizarAuditoria={actualizarAuditoria} user={user}/>
+            auditorias={auditorias} onGuardarAuditoria={registrarAuditoria} onActualizarAuditoria={actualizarAuditoria}
+            onCuadrarConAuditoria={cuadrarConAuditoria} user={user}/>
         )}
 
         {/* CARGAS — trazabilidad de cargas a inventario (manuales + importaciones) */}
@@ -12658,7 +12683,7 @@ function SheetRecibir({open, onClose, inv, onAdd, fInv, setFInv}){
 // ══════════════════════════════════════════════════════════
 // AUDITORÍA — Cierre de inventario mensual (conteo físico vs sistema)
 // ══════════════════════════════════════════════════════════
-function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, onGuardarAuditoria, onActualizarAuditoria, user}){
+function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, onGuardarAuditoria, onActualizarAuditoria, onCuadrarConAuditoria, user}){
   const isDesktop = useIsDesktop();
   // El trabajo en curso (vista, marca seleccionada, doble conteo) se guarda
   // en localStorage para que NO se pierda si el usuario cambia de pestaña
@@ -12800,6 +12825,7 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
     if(!enAlcance(p)){ flash(false, `"${p.codigo}" es de ${p.marcaNombre||"otra marca"} — la verificación está filtrada por ${marcaSelNombre}`); setCodManual(""); return false; }
     const r=intentarContar(p);
     if(!r.ok){
+      if(r.sistemaP<=1) beepError();
       flash(false, r.sistemaP<=1
         ? `${p.codigo}: repetido · solo ${r.sistemaP} en sistema, ya escaneado (no se suma)`
         : `${p.codigo}: repetido · ya contaste las ${r.sistemaP} unidades (no se suma)`);
@@ -12832,6 +12858,7 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
         : r.sistemaP===1
           ? "solo hay 1 unidad y ya fue escaneada — no se cuenta de nuevo"
           : `ya contaste las ${r.sistemaP} unidades — repetido no contabilizado`;
+      if(r.sistemaP<=1) beepError();
       setLiveFeedback({ts:Date.now(),ok:false,code:p.codigo,repetido:true,
         title:`Repetido · ${(p.nombre||"").toUpperCase()}`, sub:`${p.codigo} · ${motivo}`});
       return false;
@@ -13649,6 +13676,27 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
                                 + Agregar ítems nuevos a esta verificación
                               </button>
                             )}
+                          </div>
+                        )}
+                        {onCuadrarConAuditoria && (a.detalle||[]).some(d=>d.diferencia!==0)&&(
+                          <div style={{marginTop:10,borderTop:`1px dashed ${C.sep}`,paddingTop:10}}>
+                            {(()=>{
+                              const conDif=(a.detalle||[]).filter(d=>d.diferencia!==0);
+                              const falt=conDif.filter(d=>d.diferencia<0).length;
+                              const sobr=conDif.filter(d=>d.diferencia>0).length;
+                              return (
+                                <div>
+                                  <div style={{fontSize:11,color:C.label3,fontFamily:FONT_UI,marginBottom:8,textAlign:"center"}}>
+                                    {conDif.length} producto(s) con diferencia
+                                    {falt>0&&<span style={{color:C.red}}> · {falt} faltante{falt!==1?"s":""}</span>}
+                                    {sobr>0&&<span style={{color:C.blue}}> · {sobr} sobrante{sobr!==1?"s":""}</span>}
+                                  </div>
+                                  <IOSBtn onPress={()=>onCuadrarConAuditoria(a)} full small icon="⚖️" variant="warning">
+                                    Cuadrar inventario con esta verificación
+                                  </IOSBtn>
+                                </div>
+                              );
+                            })()}
                           </div>
                         )}
                         <div style={{marginTop:10}}>

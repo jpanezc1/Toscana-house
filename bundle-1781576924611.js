@@ -32746,6 +32746,36 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       setAuditorias((prev) => prev.map((a) => a.id === aud.id ? aud : a));
       syncConRespaldo("auditoria", aud, () => sbGuardarAuditoria(aud));
     }
+    function cuadrarConAuditoria(aud) {
+      const cambios = (aud.detalle || []).filter((d) => d.diferencia !== 0 && d.contado >= 0);
+      if (cambios.length === 0) return;
+      const lineas = cambios.map((d) => `\u2022 ${d.codigo} ${d.nombre}: ${d.sistema} \u2192 ${d.contado} (${d.diferencia > 0 ? "+" : ""}${d.diferencia})`).join("\n");
+      if (!window.confirm(`\xBFCuadrar inventario con esta verificaci\xF3n?
+
+Se actualizar\xE1n ${cambios.length} producto(s):
+
+${lineas}
+
+Esta acci\xF3n no se puede deshacer.`)) return;
+      setInv((prev) => {
+        const next = [...prev];
+        cambios.forEach((d) => {
+          const idx = next.findIndex((p) => p.codigo === d.codigo);
+          if (idx < 0) return;
+          next[idx] = { ...next[idx], stock: d.contado };
+          syncConRespaldo("producto", next[idx], () => sbGuardarProducto(next[idx]));
+        });
+        return next;
+      });
+      logAudit("CUADRE_AUDITORIA", {
+        resumen: `Cuadre de inventario desde verificaci\xF3n ${aud.id} \xB7 ${cambios.length} producto(s) ajustados`,
+        auditoriaId: aud.id,
+        mes: aud.mes,
+        anio: aud.anio,
+        marcaId: aud.marcaId,
+        cambios: cambios.map((d) => ({ codigo: d.codigo, nombre: d.nombre, antes: d.sistema, despues: d.contado }))
+      }, user);
+    }
     function registrarCarga(carga) {
       setCargas((prev) => [carga, ...prev]);
       syncConRespaldo("carga", carga, () => sbGuardarCarga(carga));
@@ -33384,6 +33414,7 @@ Motivo: ${motivo}` : ""}`)) {
         auditorias,
         onGuardarAuditoria: registrarAuditoria,
         onActualizarAuditoria: actualizarAuditoria,
+        onCuadrarConAuditoria: cuadrarConAuditoria,
         user
       }
     ), tab === "cargas" && /* @__PURE__ */ import_react.default.createElement(RegistroCargas, { cargas: cargasCompletas, marcas: MARCAS, onVerificar: handleVerificarCarga, user }), tab === "marcas" && !marcaDetalle && /* @__PURE__ */ import_react.default.createElement("div", null, marcasState.filter((m) => m.estado === "inactiva").length > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: {
@@ -35209,7 +35240,7 @@ Motivo: ${motivo}` : ""}`)) {
       marginBottom: 10
     } }, codigoGenerado), /* @__PURE__ */ import_react.default.createElement(BarcodeDisplay, { codigo: codigoGenerado }), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT, marginTop: 8 } }, fInv.nombre && /* @__PURE__ */ import_react.default.createElement("strong", { style: { color: C.label2 } }, fInv.nombre), fInv.categoria && /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.label3 } }, " \xB7 ", fInv.categoria))), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: onAdd, full: true, variant: "primary" }, "Registrar e Imprimir Ticket"));
   }
-  function AuditoriaInventario({ inv, ventas, cargas, mes, anio, MK, auditorias, onGuardarAuditoria, onActualizarAuditoria, user }) {
+  function AuditoriaInventario({ inv, ventas, cargas, mes, anio, MK, auditorias, onGuardarAuditoria, onActualizarAuditoria, onCuadrarConAuditoria, user }) {
     const isDesktop = useIsDesktop();
     const [vista, setVista] = (0, import_react.useState)(() => {
       try {
@@ -35391,6 +35422,7 @@ Motivo: ${motivo}` : ""}`)) {
       }
       const r = intentarContar(p);
       if (!r.ok) {
+        if (r.sistemaP <= 1) beepError();
         flash(false, r.sistemaP <= 1 ? `${p.codigo}: repetido \xB7 solo ${r.sistemaP} en sistema, ya escaneado (no se suma)` : `${p.codigo}: repetido \xB7 ya contaste las ${r.sistemaP} unidades (no se suma)`);
       } else {
         flash(true, r.repetido ? `Repetido OK \xB7 unidad ${r.cantNueva}/${r.sistemaP} \xB7 ${(p.nombre || "").toUpperCase()}` : `+1 \xB7 ${(p.nombre || "").toUpperCase()} (${p.codigo})`);
@@ -35412,6 +35444,7 @@ Motivo: ${motivo}` : ""}`)) {
       const r = intentarContar(p);
       if (!r.ok) {
         const motivo = r.sistemaP === 0 ? "no figura con stock en sistema \u2014 no se contabiliza" : r.sistemaP === 1 ? "solo hay 1 unidad y ya fue escaneada \u2014 no se cuenta de nuevo" : `ya contaste las ${r.sistemaP} unidades \u2014 repetido no contabilizado`;
+        if (r.sistemaP <= 1) beepError();
         setLiveFeedback({
           ts: Date.now(),
           ok: false,
@@ -36370,7 +36403,12 @@ Se registrar\xE1 que los faltantes/sobrantes fueron verificados f\xEDsicamente y
             }
           },
           "+ Agregar \xEDtems nuevos a esta verificaci\xF3n"
-        )), /* @__PURE__ */ import_react.default.createElement("div", { style: { marginTop: 10 } }, /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => exportAuditoriaExcel(a), full: true, small: true, icon: "\u2B07" }, "Exportar Excel"))));
+        )), onCuadrarConAuditoria && (a.detalle || []).some((d) => d.diferencia !== 0) && /* @__PURE__ */ import_react.default.createElement("div", { style: { marginTop: 10, borderTop: `1px dashed ${C.sep}`, paddingTop: 10 } }, (() => {
+          const conDif = (a.detalle || []).filter((d) => d.diferencia !== 0);
+          const falt = conDif.filter((d) => d.diferencia < 0).length;
+          const sobr = conDif.filter((d) => d.diferencia > 0).length;
+          return /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT_UI, marginBottom: 8, textAlign: "center" } }, conDif.length, " producto(s) con diferencia", falt > 0 && /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.red } }, " \xB7 ", falt, " faltante", falt !== 1 ? "s" : ""), sobr > 0 && /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.blue } }, " \xB7 ", sobr, " sobrante", sobr !== 1 ? "s" : "")), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => onCuadrarConAuditoria(a), full: true, small: true, icon: "\u2696\uFE0F", variant: "warning" }, "Cuadrar inventario con esta verificaci\xF3n"));
+        })()), /* @__PURE__ */ import_react.default.createElement("div", { style: { marginTop: 10 } }, /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => exportAuditoriaExcel(a), full: true, small: true, icon: "\u2B07" }, "Exportar Excel"))));
       }));
     })());
   }
