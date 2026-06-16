@@ -35254,6 +35254,9 @@ Motivo: ${motivo}` : ""}`)) {
     const [scanMsg, setScanMsg] = (0, import_react.useState)(null);
     const [codManual, setCodManual] = (0, import_react.useState)("");
     const [auditoriaAbierta, setAuditoriaAbierta] = (0, import_react.useState)(null);
+    const [agregandoA, setAgregandoA] = (0, import_react.useState)(null);
+    const [codAgregar, setCodAgregar] = (0, import_react.useState)("");
+    const [msgAgregar, setMsgAgregar] = (0, import_react.useState)(null);
     const [cruceVerTodo, setCruceVerTodo] = (0, import_react.useState)(false);
     const [baseInv] = (0, import_react.useState)(() => inv.map((p) => ({ ...p })));
     const [baseTs] = (0, import_react.useState)(() => /* @__PURE__ */ new Date());
@@ -36157,49 +36160,196 @@ Confirmas que el conteo de ${r.contado} unidad(es) es correcto.`)) {
         fontFamily: FONT,
         WebkitTapHighlightColor: "transparent"
       } }, "Revisar manual"))));
-    })))), vista === "historial" && (auditorias.length === 0 ? /* @__PURE__ */ import_react.default.createElement(
-      EmptyState,
-      {
-        icon: "\u{1F5C2}",
-        title: "Sin verificaciones de inventario registradas",
-        sub: "Cuando guardes una verificaci\xF3n, aparecer\xE1 aqu\xED con su resumen"
+    })))), vista === "historial" && (() => {
+      function agregarItem(aud) {
+        const cod = codAgregar.trim().toUpperCase();
+        if (!cod) {
+          setMsgAgregar({ ok: false, txt: "Ingres\xE1 un c\xF3digo" });
+          return;
+        }
+        const prod = inv.find((p) => (p.codigo || "").toUpperCase() === cod);
+        if (!prod) {
+          setMsgAgregar({ ok: false, txt: `"${cod}" no encontrado en inventario` });
+          return;
+        }
+        const yaEsta = (aud.detalle || []).some((d) => (d.codigo || "").toUpperCase() === cod);
+        if (yaEsta) {
+          setMsgAgregar({ ok: false, txt: `"${cod}" ya est\xE1 en esta verificaci\xF3n` });
+          return;
+        }
+        const nuevoDetalle = [...aud.detalle || [], {
+          codigo: prod.codigo,
+          nombre: prod.nombre,
+          marcaId: prod.marcaId,
+          marca: prod.marcaNombre || "\u2014",
+          precio: prod.precio,
+          sistema: prod.stock,
+          contado: prod.stock,
+          diferencia: 0,
+          estado: "OK",
+          agregadoPost: true,
+          agregadoPor: user?.nombre || "\u2014",
+          agregadoTs: (/* @__PURE__ */ new Date()).toISOString()
+        }];
+        const audActualizada = {
+          ...aud,
+          detalle: nuevoDetalle,
+          totalProductos: (aud.totalProductos || 0) + 1,
+          ok: (aud.ok || 0) + 1,
+          marcadoOkPor: user?.nombre || "\u2014",
+          marcadoOkTs: (/* @__PURE__ */ new Date()).toISOString()
+        };
+        onActualizarAuditoria(audActualizada);
+        setMsgAgregar({ ok: true, txt: `\u2713 "${prod.nombre}" agregado` });
+        setCodAgregar("");
       }
-    ) : /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 10 } }, auditorias.map((a) => {
-      const marcaNombre = a.marcaId ? MARCAS.find((m) => m.id === a.marcaId)?.nombre || "\u2014" : "Todas las marcas";
-      const abierta = auditoriaAbierta === a.id;
-      return /* @__PURE__ */ import_react.default.createElement("div", { key: a.id, style: {
-        background: C.bg1,
-        borderRadius: 14,
-        border: `1px solid ${C.sep}`,
-        overflow: "hidden",
-        boxShadow: "0 1px 3px rgba(0,0,0,.06)"
-      } }, /* @__PURE__ */ import_react.default.createElement("div", { onClick: () => setAuditoriaAbierta(abierta ? null : a.id), style: {
-        padding: 14,
-        cursor: "pointer",
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
-        gap: 10
-      } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, fontWeight: 700, color: C.label, fontFamily: FONT } }, MESES[a.mes], " ", a.anio, " \xB7 ", marcaNombre), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT, marginTop: 2 } }, a.fecha, " ", a.hora, " \xB7 ", a.usuario, " \xB7 ", a.totalProductos, " productos")), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 6, flexShrink: 0 } }, a.faltantes > 0 && /* @__PURE__ */ import_react.default.createElement(Chip, { color: C.red, small: true }, a.faltantes, " faltante", a.faltantes !== 1 ? "s" : ""), a.sobrantes > 0 && /* @__PURE__ */ import_react.default.createElement(Chip, { color: C.blue, small: true }, a.sobrantes, " sobrante", a.sobrantes !== 1 ? "s" : ""), a.faltantes === 0 && a.sobrantes === 0 && /* @__PURE__ */ import_react.default.createElement(Chip, { color: C.green, small: true }, "\u2713 OK"))), abierta && /* @__PURE__ */ import_react.default.createElement("div", { style: { padding: "0 14px 14px" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
-        display: "flex",
-        justifyContent: "space-between",
-        fontSize: 13,
-        fontFamily: FONT,
-        padding: "8px 0",
-        borderTop: `1px solid ${C.sep}`
-      } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.label2 } }, "Valor estimado de fuga"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontWeight: 700, color: C.red } }, "-", $(Math.round(a.valorFuga || 0)))), /* @__PURE__ */ import_react.default.createElement("div", { style: {
-        display: "flex",
-        justifyContent: "space-between",
-        fontSize: 13,
-        fontFamily: FONT,
-        padding: "4px 0 10px"
-      } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.label2 } }, "Valor de sobrantes"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontWeight: 700, color: C.blue } }, "+", $(Math.round(a.valorSobrante || 0)))), a.marcadoOkPor && /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT_UI, marginBottom: 8, textAlign: "center" } }, "Marcado OK por ", /* @__PURE__ */ import_react.default.createElement("b", null, a.marcadoOkPor), " \xB7 ", a.marcadoOkTs ? new Date(a.marcadoOkTs).toLocaleString("es-BO", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "\u2014"), onActualizarAuditoria && (a.faltantes > 0 || a.sobrantes > 0) && /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => {
-        if (!window.confirm(`\xBFMarcar esta verificaci\xF3n de ${MESES[a.mes]} ${a.anio} como OK?
+      return auditorias.length === 0 ? /* @__PURE__ */ import_react.default.createElement(
+        EmptyState,
+        {
+          icon: "\u{1F5C2}",
+          title: "Sin verificaciones de inventario registradas",
+          sub: "Cuando guardes una verificaci\xF3n, aparecer\xE1 aqu\xED con su resumen"
+        }
+      ) : /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 10 } }, auditorias.map((a) => {
+        const marcaNombre = a.marcaId ? MARCAS.find((m) => m.id === a.marcaId)?.nombre || "\u2014" : "Todas las marcas";
+        const abierta = auditoriaAbierta === a.id;
+        return /* @__PURE__ */ import_react.default.createElement("div", { key: a.id, style: {
+          background: C.bg1,
+          borderRadius: 14,
+          border: `1px solid ${C.sep}`,
+          overflow: "hidden",
+          boxShadow: "0 1px 3px rgba(0,0,0,.06)"
+        } }, /* @__PURE__ */ import_react.default.createElement("div", { onClick: () => setAuditoriaAbierta(abierta ? null : a.id), style: {
+          padding: 14,
+          cursor: "pointer",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          gap: 10
+        } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, fontWeight: 700, color: C.label, fontFamily: FONT } }, MESES[a.mes], " ", a.anio, " \xB7 ", marcaNombre), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT, marginTop: 2 } }, a.fecha, " ", a.hora, " \xB7 ", a.usuario, " \xB7 ", a.totalProductos, " productos")), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 6, flexShrink: 0 } }, a.faltantes > 0 && /* @__PURE__ */ import_react.default.createElement(Chip, { color: C.red, small: true }, a.faltantes, " faltante", a.faltantes !== 1 ? "s" : ""), a.sobrantes > 0 && /* @__PURE__ */ import_react.default.createElement(Chip, { color: C.blue, small: true }, a.sobrantes, " sobrante", a.sobrantes !== 1 ? "s" : ""), a.faltantes === 0 && a.sobrantes === 0 && /* @__PURE__ */ import_react.default.createElement(Chip, { color: C.green, small: true }, "\u2713 OK"))), abierta && /* @__PURE__ */ import_react.default.createElement("div", { style: { padding: "0 14px 14px" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+          display: "flex",
+          justifyContent: "space-between",
+          fontSize: 13,
+          fontFamily: FONT,
+          padding: "8px 0",
+          borderTop: `1px solid ${C.sep}`
+        } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.label2 } }, "Valor estimado de fuga"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontWeight: 700, color: C.red } }, "-", $(Math.round(a.valorFuga || 0)))), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+          display: "flex",
+          justifyContent: "space-between",
+          fontSize: 13,
+          fontFamily: FONT,
+          padding: "4px 0 10px"
+        } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.label2 } }, "Valor de sobrantes"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontWeight: 700, color: C.blue } }, "+", $(Math.round(a.valorSobrante || 0)))), a.marcadoOkPor && /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT_UI, marginBottom: 8, textAlign: "center" } }, "Marcado OK por ", /* @__PURE__ */ import_react.default.createElement("b", null, a.marcadoOkPor), " \xB7 ", a.marcadoOkTs ? new Date(a.marcadoOkTs).toLocaleString("es-BO", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "\u2014"), onActualizarAuditoria && (a.faltantes > 0 || a.sobrantes > 0) && /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => {
+          if (!window.confirm(`\xBFMarcar esta verificaci\xF3n de ${MESES[a.mes]} ${a.anio} como OK?
 
 Se registrar\xE1 que los faltantes/sobrantes fueron verificados f\xEDsicamente y est\xE1n conformes.`)) return;
-        onActualizarAuditoria({ ...a, faltantes: 0, sobrantes: 0, valorFuga: 0, valorSobrante: 0, marcadoOkPor: user?.nombre || "\u2014", marcadoOkTs: (/* @__PURE__ */ new Date()).toISOString() });
-      }, full: true, small: true, icon: "\u2713", variant: "success", style: { marginBottom: 8 } }, "Marcar como OK \u2014 todo conforme"), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => exportAuditoriaExcel(a), full: true, small: true, icon: "\u2B07" }, "Exportar Excel")));
-    }))));
+          onActualizarAuditoria({ ...a, faltantes: 0, sobrantes: 0, valorFuga: 0, valorSobrante: 0, marcadoOkPor: user?.nombre || "\u2014", marcadoOkTs: (/* @__PURE__ */ new Date()).toISOString() });
+        }, full: true, small: true, icon: "\u2713", variant: "success", style: { marginBottom: 8 } }, "Marcar como OK \u2014 todo conforme"), onActualizarAuditoria && /* @__PURE__ */ import_react.default.createElement("div", { style: { marginTop: 10, borderTop: `1px dashed ${C.sep}`, paddingTop: 10 } }, agregandoA === a.id ? /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+          fontSize: 11,
+          fontWeight: 700,
+          color: C.label,
+          fontFamily: FONT_UI,
+          textTransform: "uppercase",
+          letterSpacing: 0.6,
+          marginBottom: 8
+        } }, "Agregar \xEDtems nuevos a esta verificaci\xF3n"), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 8, marginBottom: 8 } }, /* @__PURE__ */ import_react.default.createElement(
+          "input",
+          {
+            autoFocus: true,
+            value: codAgregar,
+            onChange: (e) => {
+              setCodAgregar(e.target.value.toUpperCase());
+              setMsgAgregar(null);
+            },
+            onKeyDown: (e) => {
+              if (e.key === "Enter") agregarItem(a);
+            },
+            placeholder: "C\xF3digo del producto",
+            style: {
+              flex: 1,
+              padding: "10px 12px",
+              borderRadius: 10,
+              border: `1px solid ${C.sep}`,
+              fontSize: 14,
+              fontFamily: "monospace",
+              background: C.bg2,
+              color: C.label,
+              outline: "none"
+            }
+          }
+        ), /* @__PURE__ */ import_react.default.createElement(
+          "button",
+          {
+            onClick: () => agregarItem(a),
+            style: {
+              padding: "10px 16px",
+              borderRadius: 10,
+              border: "none",
+              background: C.label,
+              color: C.bg0,
+              fontSize: 13,
+              fontWeight: 700,
+              cursor: "pointer",
+              fontFamily: FONT_UI
+            }
+          },
+          "+ Agregar"
+        )), msgAgregar && /* @__PURE__ */ import_react.default.createElement("div", { style: {
+          fontSize: 12,
+          fontWeight: 600,
+          marginBottom: 8,
+          padding: "8px 10px",
+          borderRadius: 8,
+          background: msgAgregar.ok ? `${C.green}15` : `${C.red}15`,
+          color: msgAgregar.ok ? C.green : C.red,
+          fontFamily: FONT_UI
+        } }, msgAgregar.txt), (a.detalle || []).filter((d) => d.agregadoPost).length > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT_UI, marginBottom: 8 } }, (a.detalle || []).filter((d) => d.agregadoPost).length, " \xEDtem", (a.detalle || []).filter((d) => d.agregadoPost).length !== 1 ? "s" : "", " agregado", (a.detalle || []).filter((d) => d.agregadoPost).length !== 1 ? "s" : "", " post-verificaci\xF3n"), /* @__PURE__ */ import_react.default.createElement(
+          "button",
+          {
+            onClick: () => {
+              setAgregandoA(null);
+              setCodAgregar("");
+              setMsgAgregar(null);
+            },
+            style: {
+              width: "100%",
+              padding: "8px",
+              borderRadius: 10,
+              border: `1px solid ${C.sep}`,
+              background: "transparent",
+              color: C.label3,
+              fontSize: 12,
+              cursor: "pointer",
+              fontFamily: FONT_UI
+            }
+          },
+          "Cerrar"
+        )) : /* @__PURE__ */ import_react.default.createElement(
+          "button",
+          {
+            onClick: (e) => {
+              e.stopPropagation();
+              setAgregandoA(a.id);
+              setCodAgregar("");
+              setMsgAgregar(null);
+            },
+            style: {
+              width: "100%",
+              padding: "9px",
+              borderRadius: 10,
+              border: `1.5px dashed ${C.label3}`,
+              background: "transparent",
+              color: C.label3,
+              fontSize: 12,
+              fontWeight: 600,
+              cursor: "pointer",
+              fontFamily: FONT_UI
+            }
+          },
+          "+ Agregar \xEDtems nuevos a esta verificaci\xF3n"
+        )), /* @__PURE__ */ import_react.default.createElement("div", { style: { marginTop: 10 } }, /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => exportAuditoriaExcel(a), full: true, small: true, icon: "\u2B07" }, "Exportar Excel"))));
+      }));
+    })());
   }
   function RegistroCargas({ cargas, marcas, marcaId = null, onVerificar = null, user = null }) {
     const isDesktop = useIsDesktop();

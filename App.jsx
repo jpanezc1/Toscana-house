@@ -12681,6 +12681,9 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
   const[scanMsg,setScanMsg]=useState(null); // {ok,txt}
   const[codManual,setCodManual]=useState("");
   const[auditoriaAbierta,setAuditoriaAbierta]=useState(null);
+  const[agregandoA,setAgregandoA]=useState(null); // id de auditoria en modo "agregar ítems"
+  const[codAgregar,setCodAgregar]=useState("");
+  const[msgAgregar,setMsgAgregar]=useState(null);
   const[cruceVerTodo,setCruceVerTodo]=useState(false); // mostrar todo el inventario en Cruce (incluye no contados como faltante)
 
   // ── Inventario base congelado al abrir el cierre ────────────────────
@@ -13498,7 +13501,32 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
       )}
 
       {/* ── HISTORIAL ── */}
-      {vista==="historial" && (
+      {vista==="historial" && (() => {
+        function agregarItem(aud){
+          const cod = codAgregar.trim().toUpperCase();
+          if(!cod){ setMsgAgregar({ok:false,txt:"Ingresá un código"}); return; }
+          const prod = inv.find(p=>(p.codigo||"").toUpperCase()===cod);
+          if(!prod){ setMsgAgregar({ok:false,txt:`"${cod}" no encontrado en inventario`}); return; }
+          const yaEsta = (aud.detalle||[]).some(d=>(d.codigo||"").toUpperCase()===cod);
+          if(yaEsta){ setMsgAgregar({ok:false,txt:`"${cod}" ya está en esta verificación`}); return; }
+          const nuevoDetalle = [...(aud.detalle||[]), {
+            codigo:prod.codigo, nombre:prod.nombre, marcaId:prod.marcaId,
+            marca:prod.marcaNombre||"—", precio:prod.precio,
+            sistema:prod.stock, contado:prod.stock, diferencia:0, estado:"OK",
+            agregadoPost:true, agregadoPor:user?.nombre||"—", agregadoTs:new Date().toISOString(),
+          }];
+          const audActualizada = {...aud,
+            detalle: nuevoDetalle,
+            totalProductos: (aud.totalProductos||0)+1,
+            ok: (aud.ok||0)+1,
+            marcadoOkPor: user?.nombre||"—",
+            marcadoOkTs: new Date().toISOString(),
+          };
+          onActualizarAuditoria(audActualizada);
+          setMsgAgregar({ok:true,txt:`✓ "${prod.nombre}" agregado`});
+          setCodAgregar("");
+        }
+        return (
         auditorias.length===0
           ? <EmptyState icon="🗂" title="Sin verificaciones de inventario registradas"
               sub="Cuando guardes una verificación, aparecerá aquí con su resumen"/>
@@ -13550,14 +13578,69 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
                             Marcar como OK — todo conforme
                           </IOSBtn>
                         )}
-                        <IOSBtn onPress={()=>exportAuditoriaExcel(a)} full small icon="⬇">Exportar Excel</IOSBtn>
+                        {/* ── Agregar ítems post-verificación ── */}
+                        {onActualizarAuditoria&&(
+                          <div style={{marginTop:10,borderTop:`1px dashed ${C.sep}`,paddingTop:10}}>
+                            {agregandoA===a.id ? (
+                              <div>
+                                <div style={{fontSize:11,fontWeight:700,color:C.label,fontFamily:FONT_UI,
+                                  textTransform:"uppercase",letterSpacing:.6,marginBottom:8}}>
+                                  Agregar ítems nuevos a esta verificación
+                                </div>
+                                <div style={{display:"flex",gap:8,marginBottom:8}}>
+                                  <input
+                                    autoFocus
+                                    value={codAgregar}
+                                    onChange={e=>{setCodAgregar(e.target.value.toUpperCase());setMsgAgregar(null);}}
+                                    onKeyDown={e=>{if(e.key==="Enter") agregarItem(a);}}
+                                    placeholder="Código del producto"
+                                    style={{flex:1,padding:"10px 12px",borderRadius:10,border:`1px solid ${C.sep}`,
+                                      fontSize:14,fontFamily:"monospace",background:C.bg2,color:C.label,outline:"none"}}/>
+                                  <button onClick={()=>agregarItem(a)}
+                                    style={{padding:"10px 16px",borderRadius:10,border:"none",background:C.label,
+                                      color:C.bg0,fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:FONT_UI}}>
+                                    + Agregar
+                                  </button>
+                                </div>
+                                {msgAgregar&&(
+                                  <div style={{fontSize:12,fontWeight:600,marginBottom:8,padding:"8px 10px",borderRadius:8,
+                                    background:msgAgregar.ok?`${C.green}15`:`${C.red}15`,
+                                    color:msgAgregar.ok?C.green:C.red,fontFamily:FONT_UI}}>
+                                    {msgAgregar.txt}
+                                  </div>
+                                )}
+                                {(a.detalle||[]).filter(d=>d.agregadoPost).length>0&&(
+                                  <div style={{fontSize:11,color:C.label3,fontFamily:FONT_UI,marginBottom:8}}>
+                                    {(a.detalle||[]).filter(d=>d.agregadoPost).length} ítem{(a.detalle||[]).filter(d=>d.agregadoPost).length!==1?"s":""} agregado{(a.detalle||[]).filter(d=>d.agregadoPost).length!==1?"s":""} post-verificación
+                                  </div>
+                                )}
+                                <button onClick={()=>{setAgregandoA(null);setCodAgregar("");setMsgAgregar(null);}}
+                                  style={{width:"100%",padding:"8px",borderRadius:10,border:`1px solid ${C.sep}`,
+                                    background:"transparent",color:C.label3,fontSize:12,cursor:"pointer",fontFamily:FONT_UI}}>
+                                  Cerrar
+                                </button>
+                              </div>
+                            ):(
+                              <button onClick={e=>{e.stopPropagation();setAgregandoA(a.id);setCodAgregar("");setMsgAgregar(null);}}
+                                style={{width:"100%",padding:"9px",borderRadius:10,
+                                  border:`1.5px dashed ${C.label3}`,background:"transparent",
+                                  color:C.label3,fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:FONT_UI}}>
+                                + Agregar ítems nuevos a esta verificación
+                              </button>
+                            )}
+                          </div>
+                        )}
+                        <div style={{marginTop:10}}>
+                          <IOSBtn onPress={()=>exportAuditoriaExcel(a)} full small icon="⬇">Exportar Excel</IOSBtn>
+                        </div>
                       </div>
                     )}
                   </div>
                 );
               })}
             </div>
-      )}
+        );
+      })()}
     </div>
   );
 }
