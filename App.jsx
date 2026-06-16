@@ -13722,29 +13722,39 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
                                     {msgAgregar.txt}
                                   </div>
                                 )}
-                                {(a.detalle||[]).filter(d=>d.agregadoPost).length>0&&(
-                                  <div style={{marginBottom:8}}>
+                                {(a.detalle||[]).length>0&&(
+                                  <div style={{marginBottom:8,maxHeight:260,overflowY:"auto"}}>
                                     <div style={{fontSize:11,fontWeight:700,color:C.label3,fontFamily:FONT_UI,
                                       textTransform:"uppercase",letterSpacing:.5,marginBottom:6}}>
-                                      Ítems agregados ({(a.detalle||[]).filter(d=>d.agregadoPost).length})
+                                      Ítems en esta verificación ({(a.detalle||[]).length})
                                     </div>
-                                    {(a.detalle||[]).filter(d=>d.agregadoPost).map((d,i)=>(
-                                      <div key={d.codigo+i} style={{display:"flex",alignItems:"center",gap:8,
+                                    {(a.detalle||[]).map((d,i)=>{
+                                      const estadoColor = d.estado==="OK"?C.green:d.estado==="SOBRANTE"?C.blue:C.red;
+                                      return (
+                                      <div key={(d.codigo||"")+i} style={{display:"flex",alignItems:"center",gap:8,
                                         padding:"7px 10px",borderRadius:9,background:C.bg0,marginBottom:4,
-                                        border:`1px solid ${C.sep}`}}>
+                                        border:`1px solid ${d.estado==="OK"?C.sep:estadoColor+"44"}`}}>
                                         <div style={{flex:1,minWidth:0}}>
                                           <div style={{fontSize:12,fontWeight:600,color:C.label,fontFamily:FONT,
                                             whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>
                                             {d.nombre}
                                           </div>
-                                          <div style={{fontSize:10,color:C.label3,fontFamily:"monospace"}}>
-                                            {d.codigo} · {d.contado} ud · Bs {d.precio||"—"}
+                                          <div style={{fontSize:10,color:C.label3,fontFamily:"monospace",marginTop:2}}>
+                                            {d.codigo} · contado {d.contado} / sistema {d.sistema}
+                                            {d.diferencia!==0&&<span style={{color:estadoColor,fontWeight:700}}>
+                                              {" "}({d.diferencia>0?"+":""}{d.diferencia})
+                                            </span>}
                                           </div>
                                         </div>
+                                        <span style={{fontSize:9,fontWeight:700,color:estadoColor,
+                                          background:estadoColor+"18",borderRadius:5,padding:"2px 6px",
+                                          fontFamily:FONT_UI,flexShrink:0}}>
+                                          {d.estado||"—"}
+                                        </span>
                                         <button
                                           onClick={()=>{
-                                            if(!window.confirm(`¿Eliminar "${d.nombre}" (${d.codigo}) de esta verificación?`)) return;
-                                            const detalleNuevo=(a.detalle||[]).filter(x=>x!==d);
+                                            if(!window.confirm(`¿Quitar "${d.nombre}" (${d.codigo}) de esta verificación?`)) return;
+                                            const detalleNuevo=(a.detalle||[]).filter((_,j)=>j!==i);
                                             const okC=detalleNuevo.filter(x=>x.estado==="OK").length;
                                             const faltC=detalleNuevo.filter(x=>x.estado==="FALTANTE").length;
                                             const sobrC=detalleNuevo.filter(x=>x.estado==="SOBRANTE").length;
@@ -13761,7 +13771,8 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
                                           ×
                                         </button>
                                       </div>
-                                    ))}
+                                      );
+                                    })}
                                   </div>
                                 )}
                                 <button onClick={()=>{setAgregandoA(null);setCodAgregar("");setMsgAgregar(null);}}
