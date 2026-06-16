@@ -10328,8 +10328,10 @@ function App(){
   const[bajaMotivo,setBajaMotivo]=useState("");
   const[bajaMsg,setBajaMsg] =useState(null);
   const[sheetReponer,setShReponer]=useState(false);
+  const[repTab,setRepTab]   =useState("stock"); // "stock" | "precio"
   const[repCod,setRepCod]   =useState("");
   const[repCant,setRepCant] =useState("");
+  const[repPrecio,setRepPrecio]=useState("");
   const[repMsg,setRepMsg]   =useState(null);
   const[bajasLista,setBajasLista]=useState([]);
   const[busqInv,setBusqInv] =useState("");
@@ -10700,6 +10702,26 @@ function App(){
     setRepCod(""); setRepCant("");
   }
 
+  function modificarPrecio(){
+    const cod=repCod.trim().toUpperCase();
+    const prod=inv.find(i=>i.codigo.toUpperCase()===cod);
+    if(!prod){setRepMsg({ok:false,msg:`"${cod}" no encontrado`});return;}
+    const nuevoPrecio=Number(repPrecio);
+    if(!nuevoPrecio||nuevoPrecio<=0){setRepMsg({ok:false,msg:"Ingresa un precio válido"});return;}
+    const precioAntes=prod.precio||0;
+    const prodActualizado={...prod,precio:nuevoPrecio};
+    setInv(p=>p.map(i=>i.id===prod.id?prodActualizado:i));
+    syncConRespaldo("producto", prodActualizado, ()=>sbGuardarProducto(prodActualizado));
+    logAudit("PRECIO_EDIT", {
+      resumen: `Modificación de precio: ${prod.nombre} (${prod.codigo}) Bs ${precioAntes} → Bs ${nuevoPrecio}`,
+      codigo: prod.codigo, nombre: prod.nombre,
+      marca: prod.marcaNombre||"—",
+      precioAntes, precioNuevo: nuevoPrecio,
+    }, user);
+    setRepMsg({ok:true,msg:`✓ "${prod.nombre}": precio Bs ${precioAntes} → Bs ${nuevoPrecio}`});
+    setRepCod(""); setRepPrecio("");
+  }
+
   // Buffer de importación para consolidar en un solo evento de auditoría
   const _importBuf = useRef({items:[], ts:0, timer:null});
 
@@ -11013,7 +11035,7 @@ function App(){
 
         {/* INVENTARIO — por marca */}
         {tab==="inventario" && (
-          <InventarioPorMarca inv={inv} ventas={ventas} onRecibir={()=>setShInv(true)} onBaja={()=>{setShBaja(true);setBajaMsg(null);setBajaCod("");setBajaCant("");setBajaMotivo("");}} onImportarExcel={()=>setShImportarExcel(true)} onReponer={()=>{setShReponer(true);setRepMsg(null);setRepCod("");setRepCant("");}}/>
+          <InventarioPorMarca inv={inv} ventas={ventas} onRecibir={()=>setShInv(true)} onBaja={()=>{setShBaja(true);setBajaMsg(null);setBajaCod("");setBajaCant("");setBajaMotivo("");}} onImportarExcel={()=>setShImportarExcel(true)} onReponer={()=>{setShReponer(true);setRepMsg(null);setRepCod("");setRepCant("");setRepPrecio("");setRepTab("stock");}}/>
         )}
 
         {/* AUDITORÍA — cierre de inventario mensual (conteo físico vs sistema) */}
@@ -11405,24 +11427,59 @@ function App(){
         <IOSBtn onPress={darBaja} variant="danger" full disabled={!bajaCod.trim()}>Dar de Baja</IOSBtn>
       </Sheet>
 
-      {/* Sheet: Reponer Stock (etiquetas existentes) */}
+      {/* Sheet: Reponer Stock / Modificar Precio */}
       <Sheet open={sheetReponer} onClose={()=>setShReponer(false)} title="Reponer Stock">
-        <p style={{color:C.label2,fontFamily:FONT,fontSize:15,margin:"0 0 16px"}}>
-          Suma unidades a un producto que ya tiene etiqueta/código generado — sin crear un producto nuevo.
-        </p>
-        <IOSInput label="Código del producto" value={repCod}
-          onChange={e=>{setRepCod(e.target.value.toUpperCase());setRepMsg(null);}}
-          placeholder="Ej: RAM-39-08283"
-          style={{fontFamily:"monospace",textTransform:"uppercase"}}/>
-        <IOSInput label="Unidades a agregar" type="number" value={repCant}
-          onChange={e=>{setRepCant(e.target.value);setRepMsg(null);}} placeholder="0"/>
-        {repMsg&&(
-          <div style={{padding:"12px 14px",borderRadius:12,marginBottom:12,
-            background:repMsg.ok?`${C.green}15`:`${C.red}15`,
-            border:`1px solid ${(repMsg.ok?C.green:C.red)}40`,
-            color:repMsg.ok?C.green:C.red,fontSize:14,fontFamily:FONT}}>{repMsg.msg}</div>
-        )}
-        <IOSBtn onPress={reponerStock} variant="primary" full disabled={!repCod.trim()||!repCant}>Reponer Stock</IOSBtn>
+        {/* Pestañas */}
+        <div style={{display:"flex",gap:6,marginBottom:20}}>
+          {[{id:"stock",l:"📦 Reponer Stock"},{id:"precio",l:"💰 Modificar Precio"}].map(t=>(
+            <button key={t.id} onClick={()=>{setRepTab(t.id);setRepMsg(null);setRepCod("");setRepCant("");setRepPrecio("");}}
+              style={{flex:1,padding:"10px 8px",borderRadius:14,fontSize:13,fontWeight:700,
+                fontFamily:FONT_UI,cursor:"pointer",transition:"all .15s",border:"none",
+                background:repTab===t.id?C.label:"transparent",
+                color:repTab===t.id?C.bg0:C.label3,
+                boxShadow:repTab===t.id?"0 2px 8px rgba(0,0,0,.12)":"none"}}>
+              {t.l}
+            </button>
+          ))}
+        </div>
+
+        {repTab==="stock"&&(<>
+          <p style={{color:C.label2,fontFamily:FONT,fontSize:14,margin:"0 0 16px"}}>
+            Suma unidades a un producto que ya tiene etiqueta/código generado — sin crear un producto nuevo.
+          </p>
+          <IOSInput label="Código del producto" value={repCod}
+            onChange={e=>{setRepCod(e.target.value.toUpperCase());setRepMsg(null);}}
+            placeholder="Ej: RAM-39-08283"
+            style={{fontFamily:"monospace",textTransform:"uppercase"}}/>
+          <IOSInput label="Unidades a agregar" type="number" value={repCant}
+            onChange={e=>{setRepCant(e.target.value);setRepMsg(null);}} placeholder="0"/>
+          {repMsg&&(
+            <div style={{padding:"12px 14px",borderRadius:12,marginBottom:12,
+              background:repMsg.ok?`${C.green}15`:`${C.red}15`,
+              border:`1px solid ${(repMsg.ok?C.green:C.red)}40`,
+              color:repMsg.ok?C.green:C.red,fontSize:14,fontFamily:FONT}}>{repMsg.msg}</div>
+          )}
+          <IOSBtn onPress={reponerStock} variant="primary" full disabled={!repCod.trim()||!repCant}>Reponer Stock</IOSBtn>
+        </>)}
+
+        {repTab==="precio"&&(<>
+          <p style={{color:C.label2,fontFamily:FONT,fontSize:14,margin:"0 0 16px"}}>
+            Actualiza el precio de venta de un producto existente. El cambio queda registrado en auditoría.
+          </p>
+          <IOSInput label="Código del producto" value={repCod}
+            onChange={e=>{setRepCod(e.target.value.toUpperCase());setRepMsg(null);}}
+            placeholder="Ej: RAM-39-08283"
+            style={{fontFamily:"monospace",textTransform:"uppercase"}}/>
+          <IOSInput label="Nuevo precio (Bs.)" type="number" value={repPrecio}
+            onChange={e=>{setRepPrecio(e.target.value);setRepMsg(null);}} placeholder="0.00"/>
+          {repMsg&&(
+            <div style={{padding:"12px 14px",borderRadius:12,marginBottom:12,
+              background:repMsg.ok?`${C.green}15`:`${C.red}15`,
+              border:`1px solid ${(repMsg.ok?C.green:C.red)}40`,
+              color:repMsg.ok?C.green:C.red,fontSize:14,fontFamily:FONT}}>{repMsg.msg}</div>
+          )}
+          <IOSBtn onPress={modificarPrecio} variant="primary" full disabled={!repCod.trim()||!repPrecio}>Actualizar Precio</IOSBtn>
+        </>)}
       </Sheet>
 
       {/* ══ DRIVE CONFIG SHEET ══ */}

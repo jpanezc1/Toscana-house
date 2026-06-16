@@ -32495,8 +32495,10 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
     const [bajaMotivo, setBajaMotivo] = (0, import_react.useState)("");
     const [bajaMsg, setBajaMsg] = (0, import_react.useState)(null);
     const [sheetReponer, setShReponer] = (0, import_react.useState)(false);
+    const [repTab, setRepTab] = (0, import_react.useState)("stock");
     const [repCod, setRepCod] = (0, import_react.useState)("");
     const [repCant, setRepCant] = (0, import_react.useState)("");
+    const [repPrecio, setRepPrecio] = (0, import_react.useState)("");
     const [repMsg, setRepMsg] = (0, import_react.useState)(null);
     const [bajasLista, setBajasLista] = (0, import_react.useState)([]);
     const [busqInv, setBusqInv] = (0, import_react.useState)("");
@@ -32956,6 +32958,34 @@ Motivo: ${motivo}` : ""}`)) {
       setRepCod("");
       setRepCant("");
     }
+    function modificarPrecio() {
+      const cod = repCod.trim().toUpperCase();
+      const prod = inv.find((i) => i.codigo.toUpperCase() === cod);
+      if (!prod) {
+        setRepMsg({ ok: false, msg: `"${cod}" no encontrado` });
+        return;
+      }
+      const nuevoPrecio = Number(repPrecio);
+      if (!nuevoPrecio || nuevoPrecio <= 0) {
+        setRepMsg({ ok: false, msg: "Ingresa un precio v\xE1lido" });
+        return;
+      }
+      const precioAntes = prod.precio || 0;
+      const prodActualizado = { ...prod, precio: nuevoPrecio };
+      setInv((p) => p.map((i) => i.id === prod.id ? prodActualizado : i));
+      syncConRespaldo("producto", prodActualizado, () => sbGuardarProducto(prodActualizado));
+      logAudit("PRECIO_EDIT", {
+        resumen: `Modificaci\xF3n de precio: ${prod.nombre} (${prod.codigo}) Bs ${precioAntes} \u2192 Bs ${nuevoPrecio}`,
+        codigo: prod.codigo,
+        nombre: prod.nombre,
+        marca: prod.marcaNombre || "\u2014",
+        precioAntes,
+        precioNuevo: nuevoPrecio
+      }, user);
+      setRepMsg({ ok: true, msg: `\u2713 "${prod.nombre}": precio Bs ${precioAntes} \u2192 Bs ${nuevoPrecio}` });
+      setRepCod("");
+      setRepPrecio("");
+    }
     const _importBuf = (0, import_react.useRef)({ items: [], ts: 0, timer: null });
     function handleImportarExcel({ tipo, codigo, stock, producto }) {
       if (tipo === "update") {
@@ -33310,6 +33340,8 @@ Motivo: ${motivo}` : ""}`)) {
       setRepMsg(null);
       setRepCod("");
       setRepCant("");
+      setRepPrecio("");
+      setRepTab("stock");
     } }), tab === "auditoria" && /* @__PURE__ */ import_react.default.createElement(
       AuditoriaInventario,
       {
@@ -33729,7 +33761,34 @@ Motivo: ${motivo}` : ""}`)) {
       color: bajaMsg.ok ? C.green : C.red,
       fontSize: 14,
       fontFamily: FONT
-    } }, bajaMsg.msg), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: darBaja, variant: "danger", full: true, disabled: !bajaCod.trim() }, "Dar de Baja")), /* @__PURE__ */ import_react.default.createElement(Sheet, { open: sheetReponer, onClose: () => setShReponer(false), title: "Reponer Stock" }, /* @__PURE__ */ import_react.default.createElement("p", { style: { color: C.label2, fontFamily: FONT, fontSize: 15, margin: "0 0 16px" } }, "Suma unidades a un producto que ya tiene etiqueta/c\xF3digo generado \u2014 sin crear un producto nuevo."), /* @__PURE__ */ import_react.default.createElement(
+    } }, bajaMsg.msg), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: darBaja, variant: "danger", full: true, disabled: !bajaCod.trim() }, "Dar de Baja")), /* @__PURE__ */ import_react.default.createElement(Sheet, { open: sheetReponer, onClose: () => setShReponer(false), title: "Reponer Stock" }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 6, marginBottom: 20 } }, [{ id: "stock", l: "\u{1F4E6} Reponer Stock" }, { id: "precio", l: "\u{1F4B0} Modificar Precio" }].map((t) => /* @__PURE__ */ import_react.default.createElement(
+      "button",
+      {
+        key: t.id,
+        onClick: () => {
+          setRepTab(t.id);
+          setRepMsg(null);
+          setRepCod("");
+          setRepCant("");
+          setRepPrecio("");
+        },
+        style: {
+          flex: 1,
+          padding: "10px 8px",
+          borderRadius: 14,
+          fontSize: 13,
+          fontWeight: 700,
+          fontFamily: FONT_UI,
+          cursor: "pointer",
+          transition: "all .15s",
+          border: "none",
+          background: repTab === t.id ? C.label : "transparent",
+          color: repTab === t.id ? C.bg0 : C.label3,
+          boxShadow: repTab === t.id ? "0 2px 8px rgba(0,0,0,.12)" : "none"
+        }
+      },
+      t.l
+    ))), repTab === "stock" && /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, null, /* @__PURE__ */ import_react.default.createElement("p", { style: { color: C.label2, fontFamily: FONT, fontSize: 14, margin: "0 0 16px" } }, "Suma unidades a un producto que ya tiene etiqueta/c\xF3digo generado \u2014 sin crear un producto nuevo."), /* @__PURE__ */ import_react.default.createElement(
       IOSInput,
       {
         label: "C\xF3digo del producto",
@@ -33762,7 +33821,40 @@ Motivo: ${motivo}` : ""}`)) {
       color: repMsg.ok ? C.green : C.red,
       fontSize: 14,
       fontFamily: FONT
-    } }, repMsg.msg), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: reponerStock, variant: "primary", full: true, disabled: !repCod.trim() || !repCant }, "Reponer Stock")), /* @__PURE__ */ import_react.default.createElement(Sheet, { open: sheetDrive, onClose: () => setShDrive(false), title: "\u2601 Google Drive", tall: true }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+    } }, repMsg.msg), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: reponerStock, variant: "primary", full: true, disabled: !repCod.trim() || !repCant }, "Reponer Stock")), repTab === "precio" && /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, null, /* @__PURE__ */ import_react.default.createElement("p", { style: { color: C.label2, fontFamily: FONT, fontSize: 14, margin: "0 0 16px" } }, "Actualiza el precio de venta de un producto existente. El cambio queda registrado en auditor\xEDa."), /* @__PURE__ */ import_react.default.createElement(
+      IOSInput,
+      {
+        label: "C\xF3digo del producto",
+        value: repCod,
+        onChange: (e) => {
+          setRepCod(e.target.value.toUpperCase());
+          setRepMsg(null);
+        },
+        placeholder: "Ej: RAM-39-08283",
+        style: { fontFamily: "monospace", textTransform: "uppercase" }
+      }
+    ), /* @__PURE__ */ import_react.default.createElement(
+      IOSInput,
+      {
+        label: "Nuevo precio (Bs.)",
+        type: "number",
+        value: repPrecio,
+        onChange: (e) => {
+          setRepPrecio(e.target.value);
+          setRepMsg(null);
+        },
+        placeholder: "0.00"
+      }
+    ), repMsg && /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      padding: "12px 14px",
+      borderRadius: 12,
+      marginBottom: 12,
+      background: repMsg.ok ? `${C.green}15` : `${C.red}15`,
+      border: `1px solid ${repMsg.ok ? C.green : C.red}40`,
+      color: repMsg.ok ? C.green : C.red,
+      fontSize: 14,
+      fontFamily: FONT
+    } }, repMsg.msg), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: modificarPrecio, variant: "primary", full: true, disabled: !repCod.trim() || !repPrecio }, "Actualizar Precio"))), /* @__PURE__ */ import_react.default.createElement(Sheet, { open: sheetDrive, onClose: () => setShDrive(false), title: "\u2601 Google Drive", tall: true }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
       background: `${C.gold}10`,
       borderRadius: 16,
       padding: "16px",
