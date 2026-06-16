@@ -11852,6 +11852,21 @@ function POS({inv,onVenta,onVerNota}){
   var _hNm1 = useState(false); var pagoMixto = _hNm1[0]; var setPagoMixto = _hNm1[1];
   var _hNm2 = useState({efectivo:"", qr:"", tarjeta:""}); var montosMixtos = _hNm2[0]; var setMontosMixtos = _hNm2[1];
   const [previewNota, setPreviewNota] = useState(null);
+
+  function autoDescargarNota(vf){
+    try {
+      const num = vf.id.replace(/\D/g,"").slice(-4).padStart(4,"0");
+      const marcas = [...new Set((vf.items||[]).map(i=>i.marcaNombre).filter(Boolean))];
+      const marcaCarpeta = marcas.length===1 ? marcas[0] : marcas.length>1 ? "Multimarca" : null;
+      const marcaSlug = marcas.map(m=>m.replace(/ /g,"_")).join("-")||"TH";
+      const fechaSlug = (vf.fecha||"").replace(/\//g,"-");
+      const nombre = `TH_${marcaSlug}_NotaVenta_N${num}_${fechaSlug}.png`;
+      construirImagenNotaVenta(vf, num).then(blob=>{
+        descargarOrganizado(blob, nombre, marcaCarpeta);
+      }).catch(()=>{});
+    } catch(e){}
+  }
+
   // Gift Card payment state
   const [pagoGC,       setPagoGC]       = useState(false);
   const [gcCodigo,     setGcCodigo]     = useState("");
@@ -12008,6 +12023,7 @@ function POS({inv,onVenta,onVerNota}){
         gcId:gcEncontrado.codigo, gcUsado, gcAllocations,
       });
       setUltima(vf);setShowOk(true);setShowPago(false);
+      autoDescargarNota(vf);
       setCarrito([]);setDescExtra(0);setBusq("");setEtiqueta(null);setCliente("");
       setPagoGC(false);setGcCodigo("");setGcEncontrado(null);setGcBusqMsg(null);setGcMontoUsar("");
       return;
@@ -12028,6 +12044,7 @@ function POS({inv,onVenta,onVerNota}){
     }
     const vf=onVenta({items,total,subtotal,descPct,metodoPago:metodoPagoFinal,vendedor:vendedor||"Tienda",clienteNombre:cliente,etiquetaImg:etiqueta});
     setUltima(vf);setShowOk(true);setShowPago(false);
+    autoDescargarNota(vf);
     setCarrito([]);setDescExtra(0);setBusq("");setEtiqueta(null);setCliente("");
     setPagoMixto(false);setMontosMixtos({efectivo:"",qr:"",tarjeta:""});
   }
