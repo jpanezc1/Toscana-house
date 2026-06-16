@@ -258,6 +258,7 @@ async function sbGuardarAuditoria(aud) {
       ok: aud.ok, faltantes: aud.faltantes, sobrantes: aud.sobrantes,
       valor_fuga: aud.valorFuga, valor_sobrante: aud.valorSobrante,
       detalle: aud.detalle,
+      marcado_ok_por: aud.marcadoOkPor||null, marcado_ok_ts: aud.marcadoOkTs||null,
     });
     if (error) throw error;
     return true;
@@ -273,6 +274,7 @@ async function sbCargarAuditorias() {
       usuario:a.usuario, marcaId:a.marca_id, totalProductos:a.total_productos,
       ok:a.ok, faltantes:a.faltantes, sobrantes:a.sobrantes,
       valorFuga:a.valor_fuga, valorSobrante:a.valor_sobrante, detalle:a.detalle||[],
+      marcadoOkPor:a.marcado_ok_por||null, marcadoOkTs:a.marcado_ok_ts||null,
     }));
   } catch(e) { console.warn("Supabase load auditorias:", e.message); return []; }
 }
@@ -10511,6 +10513,11 @@ function App(){
     syncConRespaldo("auditoria", aud, ()=>sbGuardarAuditoria(aud));
   }
 
+  function actualizarAuditoria(aud){
+    setAuditorias(prev=>prev.map(a=>a.id===aud.id?aud:a));
+    syncConRespaldo("auditoria", aud, ()=>sbGuardarAuditoria(aud));
+  }
+
   function registrarCarga(carga){
     setCargas(prev=>[carga, ...prev]);
     syncConRespaldo("carga", carga, ()=>sbGuardarCarga(carga));
@@ -11062,7 +11069,7 @@ function App(){
         {/* AUDITORÍA — cierre de inventario mensual (conteo físico vs sistema) */}
         {tab==="auditoria" && (
           <AuditoriaInventario inv={inv} ventas={ventas} cargas={cargasCompletas} mes={mes} anio={anio} MK={MK}
-            auditorias={auditorias} onGuardarAuditoria={registrarAuditoria} user={user}/>
+            auditorias={auditorias} onGuardarAuditoria={registrarAuditoria} onActualizarAuditoria={actualizarAuditoria} user={user}/>
         )}
 
         {/* CARGAS — trazabilidad de cargas a inventario (manuales + importaciones) */}
@@ -12651,7 +12658,7 @@ function SheetRecibir({open, onClose, inv, onAdd, fInv, setFInv}){
 // ══════════════════════════════════════════════════════════
 // AUDITORÍA — Cierre de inventario mensual (conteo físico vs sistema)
 // ══════════════════════════════════════════════════════════
-function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, onGuardarAuditoria, user}){
+function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, onGuardarAuditoria, onActualizarAuditoria, user}){
   const isDesktop = useIsDesktop();
   // El trabajo en curso (vista, marca seleccionada, doble conteo) se guarda
   // en localStorage para que NO se pierda si el usuario cambia de pestaña
@@ -13530,6 +13537,19 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
                           <span style={{color:C.label2}}>Valor de sobrantes</span>
                           <span style={{fontWeight:700,color:C.blue}}>+{$(Math.round(a.valorSobrante||0))}</span>
                         </div>
+                        {a.marcadoOkPor&&(
+                          <div style={{fontSize:11,color:C.label3,fontFamily:FONT_UI,marginBottom:8,textAlign:"center"}}>
+                            Marcado OK por <b>{a.marcadoOkPor}</b> · {a.marcadoOkTs ? new Date(a.marcadoOkTs).toLocaleString("es-BO",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"}) : "—"}
+                          </div>
+                        )}
+                        {onActualizarAuditoria&&(a.faltantes>0||a.sobrantes>0)&&(
+                          <IOSBtn onPress={()=>{
+                            if(!window.confirm(`¿Marcar esta verificación de ${MESES[a.mes]} ${a.anio} como OK?\n\nSe registrará que los faltantes/sobrantes fueron verificados físicamente y están conformes.`)) return;
+                            onActualizarAuditoria({...a, faltantes:0, sobrantes:0, valorFuga:0, valorSobrante:0, marcadoOkPor:user?.nombre||"—", marcadoOkTs:new Date().toISOString()});
+                          }} full small icon="✓" variant="success" style={{marginBottom:8}}>
+                            Marcar como OK — todo conforme
+                          </IOSBtn>
+                        )}
                         <IOSBtn onPress={()=>exportAuditoriaExcel(a)} full small icon="⬇">Exportar Excel</IOSBtn>
                       </div>
                     )}

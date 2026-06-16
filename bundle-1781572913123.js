@@ -21767,7 +21767,9 @@
         sobrantes: aud.sobrantes,
         valor_fuga: aud.valorFuga,
         valor_sobrante: aud.valorSobrante,
-        detalle: aud.detalle
+        detalle: aud.detalle,
+        marcado_ok_por: aud.marcadoOkPor || null,
+        marcado_ok_ts: aud.marcadoOkTs || null
       });
       if (error) throw error;
       return true;
@@ -21795,7 +21797,9 @@
         sobrantes: a.sobrantes,
         valorFuga: a.valor_fuga,
         valorSobrante: a.valor_sobrante,
-        detalle: a.detalle || []
+        detalle: a.detalle || [],
+        marcadoOkPor: a.marcado_ok_por || null,
+        marcadoOkTs: a.marcado_ok_ts || null
       }));
     } catch (e) {
       console.warn("Supabase load auditorias:", e.message);
@@ -32738,6 +32742,10 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       setAuditorias((prev) => [aud, ...prev]);
       syncConRespaldo("auditoria", aud, () => sbGuardarAuditoria(aud));
     }
+    function actualizarAuditoria(aud) {
+      setAuditorias((prev) => prev.map((a) => a.id === aud.id ? aud : a));
+      syncConRespaldo("auditoria", aud, () => sbGuardarAuditoria(aud));
+    }
     function registrarCarga(carga) {
       setCargas((prev) => [carga, ...prev]);
       syncConRespaldo("carga", carga, () => sbGuardarCarga(carga));
@@ -33375,6 +33383,7 @@ Motivo: ${motivo}` : ""}`)) {
         MK,
         auditorias,
         onGuardarAuditoria: registrarAuditoria,
+        onActualizarAuditoria: actualizarAuditoria,
         user
       }
     ), tab === "cargas" && /* @__PURE__ */ import_react.default.createElement(RegistroCargas, { cargas: cargasCompletas, marcas: MARCAS, onVerificar: handleVerificarCarga, user }), tab === "marcas" && !marcaDetalle && /* @__PURE__ */ import_react.default.createElement("div", null, marcasState.filter((m) => m.estado === "inactiva").length > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: {
@@ -35200,7 +35209,7 @@ Motivo: ${motivo}` : ""}`)) {
       marginBottom: 10
     } }, codigoGenerado), /* @__PURE__ */ import_react.default.createElement(BarcodeDisplay, { codigo: codigoGenerado }), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT, marginTop: 8 } }, fInv.nombre && /* @__PURE__ */ import_react.default.createElement("strong", { style: { color: C.label2 } }, fInv.nombre), fInv.categoria && /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.label3 } }, " \xB7 ", fInv.categoria))), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: onAdd, full: true, variant: "primary" }, "Registrar e Imprimir Ticket"));
   }
-  function AuditoriaInventario({ inv, ventas, cargas, mes, anio, MK, auditorias, onGuardarAuditoria, user }) {
+  function AuditoriaInventario({ inv, ventas, cargas, mes, anio, MK, auditorias, onGuardarAuditoria, onActualizarAuditoria, user }) {
     const isDesktop = useIsDesktop();
     const [vista, setVista] = (0, import_react.useState)(() => {
       try {
@@ -36184,7 +36193,12 @@ Confirmas que el conteo de ${r.contado} unidad(es) es correcto.`)) {
         fontSize: 13,
         fontFamily: FONT,
         padding: "4px 0 10px"
-      } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.label2 } }, "Valor de sobrantes"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontWeight: 700, color: C.blue } }, "+", $(Math.round(a.valorSobrante || 0)))), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => exportAuditoriaExcel(a), full: true, small: true, icon: "\u2B07" }, "Exportar Excel")));
+      } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.label2 } }, "Valor de sobrantes"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontWeight: 700, color: C.blue } }, "+", $(Math.round(a.valorSobrante || 0)))), a.marcadoOkPor && /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT_UI, marginBottom: 8, textAlign: "center" } }, "Marcado OK por ", /* @__PURE__ */ import_react.default.createElement("b", null, a.marcadoOkPor), " \xB7 ", a.marcadoOkTs ? new Date(a.marcadoOkTs).toLocaleString("es-BO", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "\u2014"), onActualizarAuditoria && (a.faltantes > 0 || a.sobrantes > 0) && /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => {
+        if (!window.confirm(`\xBFMarcar esta verificaci\xF3n de ${MESES[a.mes]} ${a.anio} como OK?
+
+Se registrar\xE1 que los faltantes/sobrantes fueron verificados f\xEDsicamente y est\xE1n conformes.`)) return;
+        onActualizarAuditoria({ ...a, faltantes: 0, sobrantes: 0, valorFuga: 0, valorSobrante: 0, marcadoOkPor: user?.nombre || "\u2014", marcadoOkTs: (/* @__PURE__ */ new Date()).toISOString() });
+      }, full: true, small: true, icon: "\u2713", variant: "success", style: { marginBottom: 8 } }, "Marcar como OK \u2014 todo conforme"), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => exportAuditoriaExcel(a), full: true, small: true, icon: "\u2B07" }, "Exportar Excel")));
     }))));
   }
   function RegistroCargas({ cargas, marcas, marcaId = null, onVerificar = null, user = null }) {
