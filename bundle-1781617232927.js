@@ -22982,6 +22982,63 @@
     a.click();
     URL.revokeObjectURL(url);
   }
+  function _fsaIdb(mode, value) {
+    return new Promise((resolve) => {
+      const req = indexedDB.open("th_fsa", 1);
+      req.onupgradeneeded = (e) => e.target.result.createObjectStore("h");
+      req.onsuccess = (e) => {
+        const db = e.target.result;
+        const tx = db.transaction("h", mode === "get" ? "readonly" : "readwrite");
+        const st = tx.objectStore("h");
+        const r = mode === "get" ? st.get("base") : st.put(value, "base");
+        r.onsuccess = () => resolve(r.result || null);
+        r.onerror = () => resolve(null);
+      };
+      req.onerror = () => resolve(null);
+    });
+  }
+  async function fsaGetBase() {
+    const h = await _fsaIdb("get");
+    if (!h) return null;
+    try {
+      const perm = await h.queryPermission({ mode: "readwrite" });
+      if (perm === "granted") return h;
+      const req = await h.requestPermission({ mode: "readwrite" });
+      return req === "granted" ? h : null;
+    } catch {
+      return null;
+    }
+  }
+  async function fsaSetBase() {
+    if (!("showDirectoryPicker" in window)) return null;
+    try {
+      const h = await window.showDirectoryPicker({
+        mode: "readwrite",
+        startIn: "downloads",
+        id: "th-downloads"
+      });
+      await _fsaIdb("set", h);
+      return h;
+    } catch {
+      return null;
+    }
+  }
+  async function descargarOrganizado(blob, nombre, marcaCarpeta) {
+    const base = await fsaGetBase();
+    if (base && marcaCarpeta) {
+      try {
+        const carpeta = (marcaCarpeta || "General").replace(/[\/\\:*?"<>|]/g, "").trim() || "General";
+        const dir = await base.getDirectoryHandle(carpeta, { create: true });
+        const fh = await dir.getFileHandle(nombre, { create: true });
+        const wr = await fh.createWritable();
+        await wr.write(blob);
+        await wr.close();
+        return;
+      } catch (e) {
+      }
+    }
+    descargarArchivo(blob, nombre);
+  }
   var _QRPromise = null;
   function loadQR() {
     if (_QRPromise) return _QRPromise;
@@ -23704,7 +23761,7 @@
       });
       const wbOut = XLSX.write(wb, { bookType: "xlsx", type: "array" });
       const blob = new Blob([wbOut], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
-      descargarArchivo(blob, `TH_${marca.nombre.replace(/ /g, "_")}_Historial.xlsx`);
+      descargarOrganizado(blob, `TH_${marca.nombre.replace(/ /g, "_")}_Historial.xlsx`, marca.nombre);
     } catch (e) {
       alert("Error generando Excel: " + e.message);
     }
@@ -24033,7 +24090,7 @@
     XLSX.utils.book_append_sheet(wb, ws, "Liquidaci\xF3n");
     const buf = XLSX.write(wb, { bookType: "xlsx", type: "array" });
     const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
-    descargarArchivo(blob, `TH_${marca.nombre.replace(/ /g, "_")}_${MESES[mes]}_${anio}.xlsx`);
+    descargarOrganizado(blob, `TH_${marca.nombre.replace(/ /g, "_")}_Liquidacion_${MESES[mes]}_${anio}.xlsx`, marca.nombre);
   }
   async function exportAuditoriaExcel(aud) {
     const XLSX = await loadXLSX();
@@ -24227,7 +24284,7 @@
     XLSX.utils.book_append_sheet(wb, ws, "Verificacion Inventario");
     const buf = XLSX.write(wb, { bookType: "xlsx", type: "array" });
     const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
-    descargarArchivo(blob, `TH_VerificacionInventario_${marcaNombre.replace(/[^A-Za-z0-9]/g, "")}_${MESES[aud.mes]}_${aud.anio}_${aud.fecha.replace(/\//g, "-")}.xlsx`);
+    descargarOrganizado(blob, `TH_${marcaNombre}_Verificacion_${MESES[aud.mes]}_${aud.anio}_${aud.fecha.replace(/\//g, "-")}.xlsx`, marcaNombre);
   }
   async function exportCargasExcel(cargas, marcas) {
     const XLSX = await loadXLSX();
@@ -24518,7 +24575,7 @@
       vMarca: liq.vMarca,
       marcaId: marca?.id
     }).then((blob) => {
-      descargarArchivo(blob, `Liquidacion_${marca?.nombre || "marca"}_${MESES[mes]}_${anio}.png`);
+      descargarOrganizado(blob, `Liquidacion_${marca?.nombre || "marca"}_${MESES[mes]}_${anio}.png`, marca?.nombre);
     }).catch(() => alert("No se pudo generar la imagen"));
   }
   function generarVistaPreviaLiquidacion(marca, mes, anio, d, setPreview) {
@@ -24541,11 +24598,11 @@
         }).catch(() => {
         });
       } else {
-        descargarArchivo(data.blob, data.nombre);
+        descargarOrganizado(data.blob, data.nombre, data.marca?.nombre);
       }
     }
     function descargar() {
-      descargarArchivo(data.blob, data.nombre);
+      descargarOrganizado(data.blob, data.nombre, data.marca?.nombre);
     }
     return /* @__PURE__ */ import_react.default.createElement(Sheet, { open: !!data, onClose, title: "Vista previa", tall: true }, /* @__PURE__ */ import_react.default.createElement("img", { src: data.url, alt: "Vista previa de liquidaci\xF3n", style: {
       width: "100%",
@@ -38732,7 +38789,57 @@ Se registrar\xE1 que los faltantes/sobrantes fueron verificados f\xEDsicamente y
       justifyContent: "space-between",
       padding: "13px 16px",
       borderBottom: i < arr.length - 1 ? `1px solid ${C.sep}` : ""
-    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 14, color: C.label2, fontFamily: FONT } }, k), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 14, fontWeight: 500, color: C.label, fontFamily: FONT } }, v)))), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 14, color: C.label2, fontFamily: FONT } }, k), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 14, fontWeight: 500, color: C.label, fontFamily: FONT } }, v)))), (() => {
+      const [carpetaNombre, setCarpetaNombre] = import_react.default.useState(null);
+      const [fsaOk, setFsaOk] = import_react.default.useState("showDirectoryPicker" in window);
+      import_react.default.useEffect(() => {
+        _fsaIdb("get").then((h) => {
+          if (h) setCarpetaNombre(h.name || "Carpeta configurada");
+        });
+      }, []);
+      return /* @__PURE__ */ import_react.default.createElement("div", { style: {
+        background: C.bg1,
+        borderRadius: 16,
+        border: `1px solid ${C.sep}`,
+        padding: "16px",
+        marginBottom: 12,
+        boxShadow: "0 1px 6px rgba(0,0,0,0.04)"
+      } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 4 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 16 } }, "\u{1F4C1}"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, fontWeight: 700, color: C.label, fontFamily: FONT } }, "Carpeta de descargas organizada")), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT, lineHeight: 1.6, marginBottom: 12 } }, fsaOk ? "Seleccion\xE1 una carpeta base en este dispositivo. Cada descarga (liquidaciones, verificaciones, historiales) se guardar\xE1 autom\xE1ticamente en una subcarpeta con el nombre de la marca." : "Tu navegador no soporta esta funci\xF3n. Las descargas usar\xE1n el nombre de archivo organizado y se guardar\xE1n en la carpeta de descargas del sistema."), fsaOk && /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, null, carpetaNombre && /* @__PURE__ */ import_react.default.createElement("div", { style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        padding: "9px 12px",
+        borderRadius: 10,
+        background: `${C.green}12`,
+        border: `1px solid ${C.green}30`,
+        marginBottom: 10
+      } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 14 } }, "\u2713"), /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, fontWeight: 600, color: C.green, fontFamily: FONT } }, "Carpeta configurada"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: "monospace", marginTop: 2 } }, carpetaNombre)), /* @__PURE__ */ import_react.default.createElement("button", { onClick: async () => {
+        await _fsaIdb("set", null);
+        setCarpetaNombre(null);
+      }, style: {
+        background: "none",
+        border: "none",
+        color: C.label3,
+        fontSize: 18,
+        cursor: "pointer",
+        padding: "0 4px"
+      } }, "\xD7")), /* @__PURE__ */ import_react.default.createElement("button", { onClick: async () => {
+        const h = await fsaSetBase();
+        if (h) setCarpetaNombre(h.name || "Carpeta configurada");
+      }, style: {
+        width: "100%",
+        padding: "11px",
+        borderRadius: 10,
+        border: `1.5px solid ${C.indigo}40`,
+        background: `${C.indigo}10`,
+        cursor: "pointer",
+        fontSize: 13,
+        fontWeight: 600,
+        color: C.indigo,
+        fontFamily: FONT,
+        WebkitTapHighlightColor: "transparent"
+      } }, carpetaNombre ? "\u{1F504} Cambiar carpeta base" : "\u{1F4C1} Seleccionar carpeta base")));
+    })(), /* @__PURE__ */ import_react.default.createElement("div", { style: {
       background: C.bg1,
       borderRadius: 16,
       border: `1px solid ${C.sep}`,

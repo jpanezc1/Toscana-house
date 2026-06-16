@@ -1333,6 +1333,64 @@ function descargarArchivo(blob, nombre) {
   URL.revokeObjectURL(url);
 }
 
+// ── File System Access API — carpetas organizadas por marca ──────────────
+// Guarda/lee el handle de la carpeta base en IndexedDB (por dispositivo).
+function _fsaIdb(mode, value){
+  return new Promise(resolve=>{
+    const req=indexedDB.open("th_fsa",1);
+    req.onupgradeneeded=e=>e.target.result.createObjectStore("h");
+    req.onsuccess=e=>{
+      const db=e.target.result;
+      const tx=db.transaction("h",mode==="get"?"readonly":"readwrite");
+      const st=tx.objectStore("h");
+      const r=mode==="get"?st.get("base"):st.put(value,"base");
+      r.onsuccess=()=>resolve(r.result||null);
+      r.onerror=()=>resolve(null);
+    };
+    req.onerror=()=>resolve(null);
+  });
+}
+async function fsaGetBase(){
+  const h=await _fsaIdb("get");
+  if(!h) return null;
+  try{
+    const perm=await h.queryPermission({mode:"readwrite"});
+    if(perm==="granted") return h;
+    const req=await h.requestPermission({mode:"readwrite"});
+    return req==="granted"?h:null;
+  }catch{return null;}
+}
+async function fsaSetBase(){
+  if(!("showDirectoryPicker" in window)) return null;
+  try{
+    const h=await window.showDirectoryPicker({mode:"readwrite",
+      startIn:"downloads", id:"th-downloads"});
+    await _fsaIdb("set",h);
+    return h;
+  }catch{return null;}
+}
+async function fsaHasBase(){
+  const h=await _fsaIdb("get"); return !!h;
+}
+
+// Descarga un archivo a <carpetaBase>/<marcaCarpeta>/<nombre>
+// Si FSA no disponible o no configurado → download normal.
+async function descargarOrganizado(blob, nombre, marcaCarpeta){
+  const base=await fsaGetBase();
+  if(base && marcaCarpeta){
+    try{
+      const carpeta=(marcaCarpeta||"General").replace(/[\/\\:*?"<>|]/g,"").trim()||"General";
+      const dir=await base.getDirectoryHandle(carpeta,{create:true});
+      const fh=await dir.getFileHandle(nombre,{create:true});
+      const wr=await fh.createWritable();
+      await wr.write(blob);
+      await wr.close();
+      return;
+    }catch(e){ /* fallback */ }
+  }
+  descargarArchivo(blob,nombre);
+}
+
 // ══════════════════════════════════════════════════════════════
 // PAGO QR — generación de QR de cobro + verificación con sonido
 // ══════════════════════════════════════════════════════════════
@@ -2057,7 +2115,7 @@ async function generarExcelMarca(marca, ventas, inventario, setGenerando) {
     wb.SheetNames.forEach(name => { aplicarBordesSheet(wb.Sheets[name], XLSX); });
     const wbOut = XLSX.write(wb, { bookType:"xlsx", type:"array" });
     const blob  = new Blob([wbOut], { type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
-    descargarArchivo(blob, `TH_${marca.nombre.replace(/ /g,"_")}_Historial.xlsx`);
+    descargarOrganizado(blob, `TH_${marca.nombre.replace(/ /g,"_")}_Historial.xlsx`, marca.nombre);
 
   } catch(e) {
     alert("Error generando Excel: " + e.message);
@@ -2411,7 +2469,7 @@ async function exportExcelLiquidacion(marca,ventas,mes,anio){
   XLSX.utils.book_append_sheet(wb, ws, "Liquidación");
   const buf  = XLSX.write(wb, {bookType:"xlsx", type:"array"});
   const blob = new Blob([buf], {type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
-  descargarArchivo(blob, `TH_${marca.nombre.replace(/ /g,"_")}_${MESES[mes]}_${anio}.xlsx`);
+  descargarOrganizado(blob, `TH_${marca.nombre.replace(/ /g,"_")}_Liquidacion_${MESES[mes]}_${anio}.xlsx`, marca.nombre);
 }
 
 // ── Excel: Cierre de inventario / auditoría (conteo físico vs sistema) ──
@@ -2601,7 +2659,7 @@ async function exportAuditoriaExcel(aud){
   XLSX.utils.book_append_sheet(wb, ws, "Verificacion Inventario");
   const buf  = XLSX.write(wb, {bookType:"xlsx", type:"array"});
   const blob = new Blob([buf], {type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
-  descargarArchivo(blob, `TH_VerificacionInventario_${marcaNombre.replace(/[^A-Za-z0-9]/g,"")}_${MESES[aud.mes]}_${aud.anio}_${aud.fecha.replace(/\//g,"-")}.xlsx`);
+  descargarOrganizado(blob, `TH_${marcaNombre}_Verificacion_${MESES[aud.mes]}_${aud.anio}_${aud.fecha.replace(/\//g,"-")}.xlsx`, marcaNombre);
 }
 
 // ── Exportar trazabilidad de cargas a inventario ──────────────────────────
@@ -2906,7 +2964,7 @@ function generarImagenLiquidacion(marca, mes, anio, liq){
     alquiler: liq.alquiler, gastos: liq.gastos, totalGastos: liq.totalGastos, neto: liq.neto,
     vMarca: liq.vMarca, marcaId: marca?.id,
   }).then(blob=>{
-    descargarArchivo(blob, `Liquidacion_${marca?.nombre||"marca"}_${MESES[mes]}_${anio}.png`);
+    descargarOrganizado(blob, `Liquidacion_${marca?.nombre||"marca"}_${MESES[mes]}_${anio}.png`, marca?.nombre);
   }).catch(()=>alert("No se pudo generar la imagen"));
 }
 
@@ -2932,11 +2990,11 @@ function ImagenLiqPreviewModal({data, onClose}){
         title:`Liquidación ${data.marca?.nombre||""} — ${MESES[data.mes]} ${data.anio}`,
       }).catch(()=>{});
     } else {
-      descargarArchivo(data.blob, data.nombre);
+      descargarOrganizado(data.blob, data.nombre, data.marca?.nombre);
     }
   }
   function descargar(){
-    descargarArchivo(data.blob, data.nombre);
+    descargarOrganizado(data.blob, data.nombre, data.marca?.nombre);
   }
   return (
     <Sheet open={!!data} onClose={onClose} title="Vista previa" tall>
@@ -15917,6 +15975,64 @@ function SistemaTab({user, logout}){
           </div>
         ))}
       </div>
+
+      {/* Carpeta de descargas organizada por marca */}
+      {(()=>{
+        const [carpetaNombre, setCarpetaNombre] = React.useState(null);
+        const [fsaOk, setFsaOk] = React.useState("showDirectoryPicker" in window);
+        React.useEffect(()=>{
+          _fsaIdb("get").then(h=>{ if(h) setCarpetaNombre(h.name||"Carpeta configurada"); });
+        },[]);
+        return (
+          <div style={{background:C.bg1,borderRadius:16,border:`1px solid ${C.sep}`,
+            padding:"16px",marginBottom:12,boxShadow:"0 1px 6px rgba(0,0,0,0.04)"}}>
+            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
+              <span style={{fontSize:16}}>📁</span>
+              <span style={{fontSize:13,fontWeight:700,color:C.label,fontFamily:FONT}}>
+                Carpeta de descargas organizada
+              </span>
+            </div>
+            <div style={{fontSize:12,color:C.label3,fontFamily:FONT,lineHeight:1.6,marginBottom:12}}>
+              {fsaOk
+                ? "Seleccioná una carpeta base en este dispositivo. Cada descarga (liquidaciones, verificaciones, historiales) se guardará automáticamente en una subcarpeta con el nombre de la marca."
+                : "Tu navegador no soporta esta función. Las descargas usarán el nombre de archivo organizado y se guardarán en la carpeta de descargas del sistema."}
+            </div>
+            {fsaOk && (
+              <>
+                {carpetaNombre && (
+                  <div style={{display:"flex",alignItems:"center",gap:8,padding:"9px 12px",
+                    borderRadius:10,background:`${C.green}12`,border:`1px solid ${C.green}30`,marginBottom:10}}>
+                    <span style={{fontSize:14}}>✓</span>
+                    <div style={{flex:1}}>
+                      <div style={{fontSize:12,fontWeight:600,color:C.green,fontFamily:FONT}}>
+                        Carpeta configurada
+                      </div>
+                      <div style={{fontSize:11,color:C.label3,fontFamily:"monospace",marginTop:2}}>
+                        {carpetaNombre}
+                      </div>
+                    </div>
+                    <button onClick={async()=>{
+                      await _fsaIdb("set",null);
+                      setCarpetaNombre(null);
+                    }} style={{background:"none",border:"none",color:C.label3,fontSize:18,
+                      cursor:"pointer",padding:"0 4px"}}>×</button>
+                  </div>
+                )}
+                <button onClick={async()=>{
+                  const h=await fsaSetBase();
+                  if(h) setCarpetaNombre(h.name||"Carpeta configurada");
+                }} style={{
+                  width:"100%",padding:"11px",borderRadius:10,
+                  border:`1.5px solid ${C.indigo}40`,background:`${C.indigo}10`,
+                  cursor:"pointer",fontSize:13,fontWeight:600,color:C.indigo,
+                  fontFamily:FONT,WebkitTapHighlightColor:"transparent"}}>
+                  {carpetaNombre ? "🔄 Cambiar carpeta base" : "📁 Seleccionar carpeta base"}
+                </button>
+              </>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Cache local (siempre visible) */}
       <div style={{background:C.bg1,borderRadius:16,border:`1px solid ${C.sep}`,
