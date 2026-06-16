@@ -10383,6 +10383,51 @@ function GiftCardsTab() {
   );
 }
 
+function DescargarTodasNotasBtn({ventas}){
+  var _d=useState(false); var descargando=_d[0]; var setDescargando=_d[1];
+  var _p=useState(null);  var progreso=_p[0];    var setProgreso=_p[1];
+  async function descargarTodasNotas(){
+    if(!ventas.length){ alert("No hay ventas registradas"); return; }
+    const hasDir=await fsaGetBase();
+    if(!hasDir){ alert("Primero configura la carpeta de descargas en Config → Carpeta de Archivos"); return; }
+    setDescargando(true);
+    let ok=0, err=0;
+    for(let i=0;i<ventas.length;i++){
+      const vf=ventas[i];
+      try{
+        const num=vf.id.replace(/\D/g,"").slice(-4).padStart(4,"0");
+        const marcas=[...new Set((vf.items||[]).map(it=>it.marcaNombre).filter(Boolean))];
+        const marcaCarpeta=marcas.length===1?marcas[0]:marcas.length>1?"Multimarca":null;
+        const marcaSlug=marcas.map(m=>m.replace(/ /g,"_")).join("-")||"TH";
+        const fechaSlug=(vf.fecha||"").replace(/\//g,"-");
+        const nombre=`TH_${marcaSlug}_NotaVenta_N${num}_${fechaSlug}.png`;
+        const blob=await construirImagenNotaVenta(vf,num);
+        await descargarOrganizado(blob,nombre,marcaCarpeta,"Notas de Ventas");
+        ok++;
+      }catch(e){ err++; }
+      setProgreso(`${i+1}/${ventas.length}`);
+    }
+    setDescargando(false);
+    setProgreso(null);
+    alert(`✓ ${ok} notas guardadas${err>0?` · ${err} con error`:""}`);
+  }
+  return (
+    <div style={{background:"rgba(63,81,181,.07)",borderRadius:16,padding:"16px",
+      marginBottom:20,border:"1px solid rgba(63,81,181,.25)"}}>
+      <div style={{fontSize:15,fontWeight:600,marginBottom:6,fontFamily:FONT}}>
+        🧾 Descargar todas las notas de venta
+      </div>
+      <p style={{fontSize:12,color:"#888",fontFamily:FONT,margin:"0 0 12px",lineHeight:1.5}}>
+        Genera y guarda las notas de <strong>{ventas.length} ventas</strong> en la carpeta
+        <strong> Notas de Ventas</strong> dentro de cada marca.
+      </p>
+      <IOSBtn disabled={descargando} onPress={descargarTodasNotas} variant="fill" full icon="⬇">
+        {descargando?`Descargando… ${progreso||""}`:`Descargar ${ventas.length} notas`}
+      </IOSBtn>
+    </div>
+  );
+}
+
 function App(){
   const { user, login, logout } = useAuth();
   const isDesktop = useIsDesktop();
@@ -11607,51 +11652,7 @@ function App(){
       {/* ══ DRIVE CONFIG SHEET ══ */}
       <Sheet open={sheetDrive} onClose={()=>setShDrive(false)} title="☁ Google Drive" tall>
         {/* ── Descargar TODAS las notas de venta ── */}
-        {(()=>{
-          const [descargando, setDescargando] = React.useState(false);
-          const [progreso, setProgreso] = React.useState(null);
-          async function descargarTodasNotas(){
-            if(!ventas.length){ alert("No hay ventas registradas"); return; }
-            const hasDir = await fsaGetBase();
-            if(!hasDir){ alert("Primero configura la carpeta de descargas organizadas en Config → Carpeta de Archivos"); return; }
-            setDescargando(true);
-            let ok=0, err=0;
-            const total=ventas.length;
-            for(let i=0;i<ventas.length;i++){
-              const vf=ventas[i];
-              try{
-                const num=vf.id.replace(/\D/g,"").slice(-4).padStart(4,"0");
-                const marcas=[...new Set((vf.items||[]).map(it=>it.marcaNombre).filter(Boolean))];
-                const marcaCarpeta=marcas.length===1?marcas[0]:marcas.length>1?"Multimarca":null;
-                const marcaSlug=marcas.map(m=>m.replace(/ /g,"_")).join("-")||"TH";
-                const fechaSlug=(vf.fecha||"").replace(/\//g,"-");
-                const nombre=`TH_${marcaSlug}_NotaVenta_N${num}_${fechaSlug}.png`;
-                const blob=await construirImagenNotaVenta(vf,num);
-                await descargarOrganizado(blob,nombre,marcaCarpeta,"Notas de Ventas");
-                ok++;
-              }catch(e){ err++; }
-              setProgreso(`${i+1}/${total}`);
-            }
-            setDescargando(false);
-            setProgreso(null);
-            alert(`✓ ${ok} notas descargadas${err>0?` · ${err} con error`:""}`);
-          }
-          return (
-            <div style={{background:`${C.indigo}12`,borderRadius:16,padding:"16px",
-              marginBottom:20,border:`1px solid ${C.indigo}40`}}>
-              <div style={{fontSize:15,fontWeight:600,color:C.label,fontFamily:FONT,marginBottom:6}}>
-                🧾 Descargar todas las notas de venta
-              </div>
-              <p style={{fontSize:12,color:C.label3,fontFamily:FONT,margin:"0 0 12px",lineHeight:1.5}}>
-                Genera y guarda las notas de venta de <strong style={{color:C.label}}>{ventas.length} ventas</strong> registradas,
-                organizadas en la carpeta <strong style={{color:C.label}}>Notas de Ventas</strong> dentro de cada marca.
-              </p>
-              <IOSBtn disabled={descargando} onPress={descargarTodasNotas} variant="fill" full icon="⬇">
-                {descargando ? `Descargando… ${progreso||""}` : `Descargar ${ventas.length} notas`}
-              </IOSBtn>
-            </div>
-          );
-        })()}
+        <DescargarTodasNotasBtn ventas={ventas}/>
 
         {/* Respaldo redundante en Excel */}
         <div style={{background:`${C.gold}10`,borderRadius:16,padding:"16px",
