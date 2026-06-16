@@ -11287,6 +11287,9 @@ function App(){
             mes={mes} anio={anio} MK={MK}
             cierres={cierres} setCierres={setCierres}
             getHist={getHist} getLiq={getLiq}
+            auditorias={auditorias}
+            onActualizarAuditoria={actualizarAuditoria}
+            user={user}
           />
         )}
 
@@ -14372,9 +14375,12 @@ function InventarioPorMarca({inv, ventas, onRecibir, onBaja, onImportarExcel, on
 // ══════════════════════════════════════════════════════════
 // MARCA DETALLE — iOS navigation push style
 // ══════════════════════════════════════════════════════════
-function MarcaDetalle({marcaId,inv,ventas,vMes,mes,anio,MK,cierres,setCierres,getHist,getLiq}){
+function MarcaDetalle({marcaId,inv,ventas,vMes,mes,anio,MK,cierres,setCierres,getHist,getLiq,auditorias=[],onActualizarAuditoria,user}){
   const isDesktop = useIsDesktop();
   var _hN150 = useState("historial"); var sub = _hN150[0]; var setSub = _hN150[1];;
+  const [agregandoA, setAgregandoA] = useState(null);
+  const [codAgregar, setCodAgregar] = useState("");
+  const [msgAgregar, setMsgAgregar] = useState(null);
   var _hN151 = useState(""); var filtroMk = _hN151[0]; var setFMk = _hN151[1];;
   const [imgPreview, setImgPreview] = useState(null);
   const marca   =MARCAS.find(m=>m.id===marcaId);
@@ -14405,7 +14411,12 @@ function MarcaDetalle({marcaId,inv,ventas,vMes,mes,anio,MK,cierres,setCierres,ge
       {/* Segmented */}
       <div style={{marginBottom:16}}>
         <SegControl
-          options={[{value:"historial",label:"Historial"},{value:"productos",label:"Productos"},{value:"liquidacion",label:"Liquidación"}]}
+          options={[
+            {value:"historial",label:"Historial"},
+            {value:"productos",label:"Productos"},
+            {value:"liquidacion",label:"Liquidación"},
+            {value:"verificacion",label:`Verificación${auditorias.filter(a=>a.marcaId===marcaId).length?` (${auditorias.filter(a=>a.marcaId===marcaId).length})`:""}`},
+          ]}
           value={sub} onChange={setSub}
         />
       </div>
@@ -14664,6 +14675,166 @@ function MarcaDetalle({marcaId,inv,ventas,vMes,mes,anio,MK,cierres,setCierres,ge
       if(imgPreview) URL.revokeObjectURL(imgPreview.url);
       setImgPreview(null);
     }}/>
+
+      {/* ── VERIFICACIÓN de esta marca ── */}
+      {sub==="verificacion"&&(()=>{
+        const auds = auditorias.filter(a=>a.marcaId===marcaId).sort((a,b)=>b.id.localeCompare(a.id));
+        function agregarItemMarca(aud){
+          const cod = codAgregar.trim().toUpperCase();
+          if(!cod){ setMsgAgregar({ok:false,txt:"Ingresá un código"}); return; }
+          const prod = inv.find(p=>(p.codigo||"").toUpperCase()===cod && p.marcaId===marcaId);
+          if(!prod){ setMsgAgregar({ok:false,txt:`"${cod}" no encontrado en ${marca?.nombre||"esta marca"}`}); return; }
+          const idxExistente = (aud.detalle||[]).findIndex(d=>(d.codigo||"").toUpperCase()===cod);
+          let nuevoDetalle, msgOk;
+          if(idxExistente>=0){
+            nuevoDetalle = (aud.detalle||[]).map((d,i)=>{
+              if(i!==idxExistente) return d;
+              const nuevoContado=(d.contado||0)+1;
+              const nuevaDif=nuevoContado-(d.sistema||0);
+              return {...d,contado:nuevoContado,diferencia:nuevaDif,
+                estado:nuevaDif===0?"OK":nuevaDif>0?"SOBRANTE":"FALTANTE",
+                ultimoAgregoPor:user?.nombre||"—",ultimoAgregoTs:new Date().toISOString()};
+            });
+            const item=nuevoDetalle[idxExistente];
+            msgOk=`✓ "${prod.nombre}": contado ${item.contado-1} → ${item.contado}`;
+          } else {
+            nuevoDetalle=[...(aud.detalle||[]),{
+              codigo:prod.codigo,nombre:prod.nombre,marcaId:prod.marcaId,
+              marca:prod.marcaNombre||"—",precio:prod.precio,
+              sistema:prod.stock,contado:1,diferencia:1-prod.stock,
+              estado:1-prod.stock===0?"OK":1-prod.stock>0?"SOBRANTE":"FALTANTE",
+              agregadoPost:true,agregadoPor:user?.nombre||"—",agregadoTs:new Date().toISOString(),
+            }];
+            msgOk=`✓ "${prod.nombre}" agregado`;
+          }
+          const faltantes=nuevoDetalle.filter(d=>d.estado==="FALTANTE").length;
+          const sobrantes=nuevoDetalle.filter(d=>d.estado==="SOBRANTE").length;
+          const okCount=nuevoDetalle.filter(d=>d.estado==="OK").length;
+          onActualizarAuditoria&&onActualizarAuditoria({...aud,
+            detalle:nuevoDetalle,totalProductos:nuevoDetalle.length,
+            ok:okCount,faltantes,sobrantes,
+            marcadoOkPor:user?.nombre||"—",marcadoOkTs:new Date().toISOString(),
+          });
+          setMsgAgregar({ok:true,txt:msgOk});
+          setCodAgregar("");
+        }
+        return (
+          <div>
+            {auds.length===0
+              ? <EmptyState icon="⌖" title="Sin verificaciones" sub={`No hay verificaciones guardadas para ${marca?.nombre}`}/>
+              : auds.map(a=>{
+                  const abierta=agregandoA===a.id;
+                  return (
+                    <div key={a.id} style={{background:C.bg2,borderRadius:14,border:`1px solid ${C.sep}`,
+                      overflow:"hidden",marginBottom:10,boxShadow:"0 1px 3px rgba(0,0,0,.06)"}}>
+                      {/* Header */}
+                      <div style={{padding:"12px 14px",borderBottom:`1px solid ${C.sep}`,
+                        display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,
+                        background:`${marca?.color||C.gold}10`}}>
+                        <div>
+                          <div style={{fontSize:14,fontWeight:700,color:C.label,fontFamily:FONT}}>
+                            {MESES[a.mes]} {a.anio}
+                          </div>
+                          <div style={{fontSize:11,color:C.label3,fontFamily:FONT,marginTop:2}}>
+                            {a.fecha} · {a.usuario} · {a.totalProductos} productos
+                          </div>
+                        </div>
+                        <div style={{display:"flex",gap:6,flexShrink:0}}>
+                          {a.ok>0&&<Chip color={C.green} small>✓ {a.ok} OK</Chip>}
+                          {a.faltantes>0&&<Chip color={C.red} small>↓ {a.faltantes}</Chip>}
+                          {a.sobrantes>0&&<Chip color={C.blue} small>↑ {a.sobrantes}</Chip>}
+                        </div>
+                      </div>
+                      {/* Body */}
+                      <div style={{padding:"10px 14px"}}>
+                        {/* Ítems agregados post */}
+                        {(a.detalle||[]).filter(d=>d.agregadoPost).length>0&&(
+                          <div style={{marginBottom:10}}>
+                            <div style={{fontSize:11,fontWeight:700,color:C.label3,fontFamily:FONT_UI,
+                              textTransform:"uppercase",letterSpacing:.5,marginBottom:6}}>
+                              Ítems agregados ({(a.detalle||[]).filter(d=>d.agregadoPost).length})
+                            </div>
+                            {(a.detalle||[]).filter(d=>d.agregadoPost).map((d,i)=>(
+                              <div key={d.codigo+i} style={{display:"flex",alignItems:"center",gap:8,
+                                padding:"7px 10px",borderRadius:9,background:C.bg0,marginBottom:4,
+                                border:`1px solid ${C.sep}`}}>
+                                <div style={{flex:1,minWidth:0}}>
+                                  <div style={{fontSize:12,fontWeight:600,color:C.label,fontFamily:FONT,
+                                    whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{d.nombre}</div>
+                                  <div style={{fontSize:10,color:C.label3,fontFamily:"monospace"}}>
+                                    {d.codigo} · {d.contado} ud · Bs {d.precio||"—"}
+                                  </div>
+                                </div>
+                                <button onClick={()=>{
+                                  if(!window.confirm(`¿Eliminar "${d.nombre}" de esta verificación?`)) return;
+                                  const detalleNuevo=(a.detalle||[]).filter(x=>x!==d);
+                                  onActualizarAuditoria&&onActualizarAuditoria({...a,
+                                    detalle:detalleNuevo,totalProductos:detalleNuevo.length,
+                                    ok:detalleNuevo.filter(x=>x.estado==="OK").length,
+                                    faltantes:detalleNuevo.filter(x=>x.estado==="FALTANTE").length,
+                                    sobrantes:detalleNuevo.filter(x=>x.estado==="SOBRANTE").length,
+                                  });
+                                }} style={{flexShrink:0,width:24,height:24,borderRadius:"50%",border:"none",
+                                  background:`${C.red}20`,color:C.red,fontSize:14,fontWeight:700,
+                                  cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
+                                  ×
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {/* Input agregar */}
+                        {onActualizarAuditoria&&(
+                          abierta ? (
+                            <div>
+                              <div style={{fontSize:11,fontWeight:700,color:C.label,fontFamily:FONT_UI,
+                                textTransform:"uppercase",letterSpacing:.6,marginBottom:8}}>
+                                Agregar ítems nuevos a esta verificación
+                              </div>
+                              <div style={{display:"flex",gap:8,marginBottom:8}}>
+                                <input autoFocus value={codAgregar}
+                                  onChange={e=>{setCodAgregar(e.target.value.toUpperCase());setMsgAgregar(null);}}
+                                  onKeyDown={e=>{if(e.key==="Enter")agregarItemMarca(a);}}
+                                  placeholder="Código del producto"
+                                  style={{flex:1,padding:"10px 12px",borderRadius:10,border:`1px solid ${C.sep}`,
+                                    fontSize:14,fontFamily:"monospace",background:C.bg2,color:C.label,outline:"none"}}/>
+                                <button onClick={()=>agregarItemMarca(a)}
+                                  style={{padding:"10px 16px",borderRadius:10,border:"none",background:C.label,
+                                    color:C.bg0,fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:FONT_UI}}>
+                                  + Agregar
+                                </button>
+                              </div>
+                              {msgAgregar&&(
+                                <div style={{fontSize:12,fontWeight:600,marginBottom:8,padding:"8px 10px",borderRadius:8,
+                                  background:msgAgregar.ok?`${C.green}15`:`${C.red}15`,
+                                  color:msgAgregar.ok?C.green:C.red,fontFamily:FONT_UI}}>
+                                  {msgAgregar.txt}
+                                </div>
+                              )}
+                              <button onClick={()=>{setAgregandoA(null);setCodAgregar("");setMsgAgregar(null);}}
+                                style={{width:"100%",padding:"8px",borderRadius:10,border:`1px solid ${C.sep}`,
+                                  background:"transparent",color:C.label3,fontSize:12,cursor:"pointer",fontFamily:FONT_UI}}>
+                                Cerrar
+                              </button>
+                            </div>
+                          ) : (
+                            <button onClick={()=>{setAgregandoA(a.id);setCodAgregar("");setMsgAgregar(null);}}
+                              style={{width:"100%",padding:"9px",borderRadius:10,
+                                border:`1.5px dashed ${C.label3}`,background:"transparent",
+                                color:C.label3,fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:FONT_UI}}>
+                              + Agregar ítems nuevos a esta verificación
+                            </button>
+                          )
+                        )}
+                      </div>
+                    </div>
+                  );
+                })
+            }
+          </div>
+        );
+      })()}
+
     </>
   );
 }
