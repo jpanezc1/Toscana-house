@@ -24689,13 +24689,13 @@
   function generarVistaPreviaNotaVenta(venta, numSecuencial, setPreview) {
     const num = numSecuencial || venta.id.replace(/\D/g, "").slice(-4).padStart(4, "0");
     const marcas = [...new Set((venta.items || []).map((i) => i.marcaNombre).filter(Boolean))];
-    const marcaNombre = marcas.length === 1 ? marcas[0] : null;
+    const marcaCarpeta = marcas.length === 1 ? marcas[0] : marcas.length > 1 ? "Multimarca" : null;
     const fechaSlug = (venta.fecha || "").replace(/\//g, "-");
     construirImagenNotaVenta(venta, num).then((blob) => {
-      const base = marcaNombre ? `TH_${marcaNombre.replace(/ /g, "_")}` : "TH";
-      const nombre = `${base}_NotaVenta_N${num}_${fechaSlug}.png`;
+      const marcaSlug = marcas.map((m) => m.replace(/ /g, "_")).join("-") || "TH";
+      const nombre = `TH_${marcaSlug}_NotaVenta_N${num}_${fechaSlug}.png`;
       const url = URL.createObjectURL(blob);
-      setPreview({ url, blob, nombre, num, marcaNombre });
+      setPreview({ url, blob, nombre, num, marcaNombre: marcaCarpeta });
     }).catch(() => alert("No se pudo generar la imagen de la nota"));
   }
   function NotaImgPreviewModal({ data, onClose }) {
