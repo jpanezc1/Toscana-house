@@ -35698,19 +35698,22 @@ Motivo: ${motivo}` : ""}`)) {
       if (!c) return false;
       const p = buscarEnInv(c);
       if (!p) {
+        beepError();
         flash(false, `C\xF3digo "${c}" no encontrado en inventario`);
         return false;
       }
       if (!enAlcance(p)) {
+        beepError();
         flash(false, `"${p.codigo}" es de ${p.marcaNombre || "otra marca"} \u2014 la verificaci\xF3n est\xE1 filtrada por ${marcaSelNombre}`);
         setCodManual("");
         return false;
       }
       const r = intentarContar(p);
       if (!r.ok) {
-        if (r.sistemaP <= 1) beepError();
+        beepError();
         flash(false, r.sistemaP <= 1 ? `${p.codigo}: repetido \xB7 solo ${r.sistemaP} en sistema, ya escaneado (no se suma)` : `${p.codigo}: repetido \xB7 ya contaste las ${r.sistemaP} unidades (no se suma)`);
       } else {
+        beep();
         flash(true, r.sobrante ? `\u26A0 SOBRANTE \xB7 ${(p.nombre || "").toUpperCase()} (${p.codigo}) \u2014 stock sistema: 0` : r.repetido ? `Repetido OK \xB7 unidad ${r.cantNueva}/${r.sistemaP} \xB7 ${(p.nombre || "").toUpperCase()}` : `+1 \xB7 ${(p.nombre || "").toUpperCase()} (${p.codigo})`);
       }
       setCodManual("");

@@ -13111,15 +13111,16 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
     const c=(codigo||"").trim().toUpperCase().replace(/'/g,"-");
     if(!c) return false;
     const p=buscarEnInv(c);
-    if(!p){ flash(false, `Código "${c}" no encontrado en inventario`); return false; }
-    if(!enAlcance(p)){ flash(false, `"${p.codigo}" es de ${p.marcaNombre||"otra marca"} — la verificación está filtrada por ${marcaSelNombre}`); setCodManual(""); return false; }
+    if(!p){ beepError(); flash(false, `Código "${c}" no encontrado en inventario`); return false; }
+    if(!enAlcance(p)){ beepError(); flash(false, `"${p.codigo}" es de ${p.marcaNombre||"otra marca"} — la verificación está filtrada por ${marcaSelNombre}`); setCodManual(""); return false; }
     const r=intentarContar(p);
     if(!r.ok){
-      if(r.sistemaP<=1) beepError();
+      beepError();
       flash(false, r.sistemaP<=1
         ? `${p.codigo}: repetido · solo ${r.sistemaP} en sistema, ya escaneado (no se suma)`
         : `${p.codigo}: repetido · ya contaste las ${r.sistemaP} unidades (no se suma)`);
     } else {
+      beep();
       flash(true, r.sobrante
         ? `⚠ SOBRANTE · ${(p.nombre||"").toUpperCase()} (${p.codigo}) — stock sistema: 0`
         : r.repetido
