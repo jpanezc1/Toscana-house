@@ -11066,6 +11066,21 @@ function App(){
     }, 1200);
   }
 
+  // ── Forzar sincronización completa del inventario local → Supabase ─────
+  // Útil cuando importaciones previas no llegaron a la nube.
+  async function forzarSyncInventario(onProgress){
+    const productos = inv;
+    let ok = 0, fail = 0;
+    const CHUNK = 50;
+    for(let i=0; i<productos.length; i+=CHUNK){
+      const chunk = productos.slice(i, i+CHUNK);
+      const res = await sbGuardarProductosBatch(chunk);
+      if(res) ok += chunk.length; else fail += chunk.length;
+      if(onProgress) onProgress(Math.min(i+CHUNK, productos.length), productos.length);
+    }
+    return { ok, fail, total: productos.length };
+  }
+
   function handleVenta(v){
     const id=`V${Date.now()}`;
     const vf={...v,id,fecha:hoy(),hora:hora(),mk:MK,mes,anio};
@@ -11334,7 +11349,7 @@ function App(){
 
         {/* INVENTARIO — por marca */}
         {tab==="inventario" && (
-          <InventarioPorMarca inv={inv} ventas={ventas} onRecibir={()=>setShInv(true)} onBaja={()=>{setShBaja(true);setBajaMsg(null);setBajaCod("");setBajaCant("");setBajaMotivo("");}} onImportarExcel={()=>setShImportarExcel(true)} onReponer={()=>{setShReponer(true);setRepMsg(null);setRepCod("");setRepCant("");setRepPrecio("");setRepTab("stock");}}/>
+          <InventarioPorMarca inv={inv} ventas={ventas} onRecibir={()=>setShInv(true)} onBaja={()=>{setShBaja(true);setBajaMsg(null);setBajaCod("");setBajaCant("");setBajaMotivo("");}} onImportarExcel={()=>setShImportarExcel(true)} onReponer={()=>{setShReponer(true);setRepMsg(null);setRepCod("");setRepCant("");setRepPrecio("");setRepTab("stock");}} onSyncCompleto={forzarSyncInventario}/>
         )}
 
         {/* AUDITORÍA — cierre de inventario mensual (conteo físico vs sistema) */}
@@ -14344,8 +14359,9 @@ function RegistroCargas({cargas, marcas, marcaId=null, onVerificar=null, user=nu
 // ══════════════════════════════════════════════════════════
 // INVENTARIO POR MARCA — pestaña con scroll horizontal
 // ══════════════════════════════════════════════════════════
-function InventarioPorMarca({inv, ventas, onRecibir, onBaja, onImportarExcel, onReponer}){
+function InventarioPorMarca({inv, ventas, onRecibir, onBaja, onImportarExcel, onReponer, onSyncCompleto}){
   const isDesktop = useIsDesktop();
+  const [syncMsg, setSyncMsg] = useState(null); // null | {prog, total} | "ok" | "err"
   // null = "TODOS"
   var _hN149 = useState(null); var marcaSelec = _hN149[0]; var setMarcaSelec = _hN149[1];;
   var _hInvBq = useState(""); var invBusq = _hInvBq[0]; var setInvBusq = _hInvBq[1];;
@@ -14644,11 +14660,37 @@ function InventarioPorMarca({inv, ventas, onRecibir, onBaja, onImportarExcel, on
         <div style={{display:"flex",gap:8,marginBottom:8}}>
           <IOSBtn onPress={onReponer} variant="fill" full small icon="📦">Reponer Stock</IOSBtn>
         </div>
+        {syncMsg && (
+          <div style={{background:syncMsg==="ok"?"#e8f5e9":syncMsg==="err"?"#ffebee":"#e3f2fd",
+            borderRadius:10,padding:"8px 12px",marginBottom:8,fontSize:13,fontFamily:FONT,
+            color:syncMsg==="ok"?"#2e7d32":syncMsg==="err"?"#c62828":"#1565c0",textAlign:"center"}}>
+            {syncMsg==="ok" ? "✅ Inventario sincronizado con Supabase"
+              : syncMsg==="err" ? "⚠️ Algunos productos no se pudieron sincronizar"
+              : `Sincronizando… ${syncMsg.prog}/${syncMsg.total}`}
+          </div>
+        )}
         <div style={{display:"flex",gap:8}}>
           <IOSBtn onPress={onImportarExcel} variant="fill" full small icon="📥">Importar Excel</IOSBtn>
           <IOSBtn onPress={async()=>{ try{await generarPlantillaXLSX();}catch(e){alert("Error: "+e.message);} }}
             full small icon="📋">Plantilla</IOSBtn>
         </div>
+        {onSyncCompleto && (
+          <div style={{display:"flex",gap:8,marginTop:8}}>
+            <IOSBtn onPress={async()=>{
+              if(syncMsg && typeof syncMsg==="object") return; // ya en progreso
+              setSyncMsg({prog:0, total:inv.length});
+              try{
+                const r = await onSyncCompleto((prog,total)=>setSyncMsg({prog,total}));
+                setSyncMsg(r.fail>0?"err":"ok");
+                setTimeout(()=>setSyncMsg(null), 5000);
+              }catch(e){ setSyncMsg("err"); setTimeout(()=>setSyncMsg(null),5000); }
+            }} variant="fill" full small icon="☁️">
+              {syncMsg && typeof syncMsg==="object"
+                ? `Sincronizando… ${syncMsg.prog}/${syncMsg.total}`
+                : "Sincronizar con Supabase"}
+            </IOSBtn>
+          </div>
+        )}
         <div style={{display:"flex",gap:8,marginTop:8}}>
           <IOSBtn onPress={()=>{
               if(productos.length===0){ alert("No hay productos para imprimir"); return; }

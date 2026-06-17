@@ -33357,6 +33357,19 @@ Motivo: ${motivo}` : ""}`)) {
         _importBuf.current.items = [];
       }, 1200);
     }
+    async function forzarSyncInventario(onProgress) {
+      const productos = inv;
+      let ok = 0, fail = 0;
+      const CHUNK = 50;
+      for (let i = 0; i < productos.length; i += CHUNK) {
+        const chunk = productos.slice(i, i + CHUNK);
+        const res = await sbGuardarProductosBatch(chunk);
+        if (res) ok += chunk.length;
+        else fail += chunk.length;
+        if (onProgress) onProgress(Math.min(i + CHUNK, productos.length), productos.length);
+      }
+      return { ok, fail, total: productos.length };
+    }
     function handleVenta(v) {
       const id = `V${Date.now()}`;
       const vf = { ...v, id, fecha: hoy(), hora: hora(), mk: MK, mes, anio };
@@ -33654,7 +33667,7 @@ Motivo: ${motivo}` : ""}`)) {
       setRepCant("");
       setRepPrecio("");
       setRepTab("stock");
-    } }), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: tab === "auditoria" ? "block" : "none" } }, /* @__PURE__ */ import_react.default.createElement(
+    }, onSyncCompleto: forzarSyncInventario }), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: tab === "auditoria" ? "block" : "none" } }, /* @__PURE__ */ import_react.default.createElement(
       AuditoriaInventario,
       {
         inv,
@@ -37052,8 +37065,9 @@ Se registrar\xE1 que los faltantes/sobrantes fueron verificados f\xEDsicamente y
       ))));
     })));
   }
-  function InventarioPorMarca({ inv, ventas, onRecibir, onBaja, onImportarExcel, onReponer }) {
+  function InventarioPorMarca({ inv, ventas, onRecibir, onBaja, onImportarExcel, onReponer, onSyncCompleto }) {
     const isDesktop = useIsDesktop();
+    const [syncMsg, setSyncMsg] = (0, import_react.useState)(null);
     var _hN149 = (0, import_react.useState)(null);
     var marcaSelec = _hN149[0];
     var setMarcaSelec = _hN149[1];
@@ -37407,7 +37421,16 @@ Se registrar\xE1 que los faltantes/sobrantes fueron verificados f\xEDsicamente y
       padding: "12px 0 4px",
       marginTop: 8,
       boxShadow: "0 -4px 16px rgba(0,0,0,0.06)"
-    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 8, marginBottom: 8 } }, /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: onBaja, variant: "fill", full: true, small: true, icon: "\u{1F5D1}" }, "Dar de Baja"), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: onRecibir, full: true, small: true, icon: "+" }, "Recibir")), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 8, marginBottom: 8 } }, /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: onReponer, variant: "fill", full: true, small: true, icon: "\u{1F4E6}" }, "Reponer Stock")), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 8 } }, /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: onImportarExcel, variant: "fill", full: true, small: true, icon: "\u{1F4E5}" }, "Importar Excel"), /* @__PURE__ */ import_react.default.createElement(
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 8, marginBottom: 8 } }, /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: onBaja, variant: "fill", full: true, small: true, icon: "\u{1F5D1}" }, "Dar de Baja"), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: onRecibir, full: true, small: true, icon: "+" }, "Recibir")), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 8, marginBottom: 8 } }, /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: onReponer, variant: "fill", full: true, small: true, icon: "\u{1F4E6}" }, "Reponer Stock")), syncMsg && /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      background: syncMsg === "ok" ? "#e8f5e9" : syncMsg === "err" ? "#ffebee" : "#e3f2fd",
+      borderRadius: 10,
+      padding: "8px 12px",
+      marginBottom: 8,
+      fontSize: 13,
+      fontFamily: FONT,
+      color: syncMsg === "ok" ? "#2e7d32" : syncMsg === "err" ? "#c62828" : "#1565c0",
+      textAlign: "center"
+    } }, syncMsg === "ok" ? "\u2705 Inventario sincronizado con Supabase" : syncMsg === "err" ? "\u26A0\uFE0F Algunos productos no se pudieron sincronizar" : `Sincronizando\u2026 ${syncMsg.prog}/${syncMsg.total}`), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 8 } }, /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: onImportarExcel, variant: "fill", full: true, small: true, icon: "\u{1F4E5}" }, "Importar Excel"), /* @__PURE__ */ import_react.default.createElement(
       IOSBtn,
       {
         onPress: async () => {
@@ -37422,7 +37445,18 @@ Se registrar\xE1 que los faltantes/sobrantes fueron verificados f\xEDsicamente y
         icon: "\u{1F4CB}"
       },
       "Plantilla"
-    )), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 8, marginTop: 8 } }, /* @__PURE__ */ import_react.default.createElement(
+    )), onSyncCompleto && /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 8, marginTop: 8 } }, /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: async () => {
+      if (syncMsg && typeof syncMsg === "object") return;
+      setSyncMsg({ prog: 0, total: inv.length });
+      try {
+        const r = await onSyncCompleto((prog, total) => setSyncMsg({ prog, total }));
+        setSyncMsg(r.fail > 0 ? "err" : "ok");
+        setTimeout(() => setSyncMsg(null), 5e3);
+      } catch (e) {
+        setSyncMsg("err");
+        setTimeout(() => setSyncMsg(null), 5e3);
+      }
+    }, variant: "fill", full: true, small: true, icon: "\u2601\uFE0F" }, syncMsg && typeof syncMsg === "object" ? `Sincronizando\u2026 ${syncMsg.prog}/${syncMsg.total}` : "Sincronizar con Supabase")), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 8, marginTop: 8 } }, /* @__PURE__ */ import_react.default.createElement(
       IOSBtn,
       {
         onPress: () => {
