@@ -33617,7 +33617,7 @@ Motivo: ${motivo}` : ""}`)) {
       setRepCant("");
       setRepPrecio("");
       setRepTab("stock");
-    } }), tab === "auditoria" && /* @__PURE__ */ import_react.default.createElement(
+    } }), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: tab === "auditoria" ? "block" : "none" } }, /* @__PURE__ */ import_react.default.createElement(
       AuditoriaInventario,
       {
         inv,
@@ -33630,9 +33630,11 @@ Motivo: ${motivo}` : ""}`)) {
         onGuardarAuditoria: registrarAuditoria,
         onActualizarAuditoria: actualizarAuditoria,
         onCuadrarConAuditoria: cuadrarConAuditoria,
-        user
+        user,
+        onGoVerif: () => setTab("auditoria"),
+        tabActual: tab
       }
-    ), tab === "cargas" && /* @__PURE__ */ import_react.default.createElement(RegistroCargas, { cargas: cargasCompletas, marcas: MARCAS, onVerificar: handleVerificarCarga, user }), tab === "marcas" && !marcaDetalle && /* @__PURE__ */ import_react.default.createElement("div", null, marcasState.filter((m) => m.estado === "inactiva").length > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: {
+    )), tab === "cargas" && /* @__PURE__ */ import_react.default.createElement(RegistroCargas, { cargas: cargasCompletas, marcas: MARCAS, onVerificar: handleVerificarCarga, user }), tab === "marcas" && !marcaDetalle && /* @__PURE__ */ import_react.default.createElement("div", null, marcasState.filter((m) => m.estado === "inactiva").length > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: {
       fontSize: 13,
       fontWeight: 600,
       color: C.label3,
@@ -35475,7 +35477,7 @@ Motivo: ${motivo}` : ""}`)) {
       marginBottom: 10
     } }, codigoGenerado), /* @__PURE__ */ import_react.default.createElement(BarcodeDisplay, { codigo: codigoGenerado }), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT, marginTop: 8 } }, fInv.nombre && /* @__PURE__ */ import_react.default.createElement("strong", { style: { color: C.label2 } }, fInv.nombre), fInv.categoria && /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.label3 } }, " \xB7 ", fInv.categoria))), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: onAdd, full: true, variant: "primary" }, "Registrar e Imprimir Ticket"));
   }
-  function AuditoriaInventario({ inv, ventas, cargas, mes, anio, MK, auditorias, onGuardarAuditoria, onActualizarAuditoria, onCuadrarConAuditoria, user }) {
+  function AuditoriaInventario({ inv, ventas, cargas, mes, anio, MK, auditorias, onGuardarAuditoria, onActualizarAuditoria, onCuadrarConAuditoria, user, onGoVerif, tabActual }) {
     const isDesktop = useIsDesktop();
     const [vista, setVista] = (0, import_react.useState)(() => {
       try {
@@ -35667,7 +35669,8 @@ Motivo: ${motivo}` : ""}`)) {
     function buscarEnInv(codigo) {
       const c = (codigo || "").trim().toUpperCase().replace(/'/g, "-");
       const cAlnum = c.replace(/[^A-Z0-9]/g, "");
-      return baseInv.find((i) => i.codigo.toUpperCase() === c) || cAlnum.length >= 3 && baseInv.find((i) => i.codigo.toUpperCase().replace(/[^A-Z0-9]/g, "") === cAlnum);
+      const encontrarEn = (lista) => lista.find((i) => (i.codigo || "").toUpperCase() === c) || cAlnum.length >= 3 && lista.find((i) => (i.codigo || "").toUpperCase().replace(/[^A-Z0-9]/g, "") === cAlnum);
+      return encontrarEn(baseInv) || encontrarEn(inv);
     }
     function onDetectCierreRapido(codigo) {
       const c = (codigo || "").trim().toUpperCase();
@@ -35926,7 +35929,32 @@ Base de inventario tomada: ${baseTs.toLocaleString("es-BO")}`)) return;
       FALTANTE: { label: "\u26A0 Faltante", color: C.red, bg: C.redBg },
       SOBRANTE: { label: "\u2191 Sobrante", color: C.blue, bg: "#EEF2FF" }
     };
-    return /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+    const totalContado = Object.values(conteo).reduce((s, v) => s + (v || 0), 0);
+    const hayConteoActivo = totalContado > 0;
+    const minimizado = tabActual && tabActual !== "auditoria";
+    return /* @__PURE__ */ import_react.default.createElement("div", null, minimizado && hayConteoActivo && onGoVerif && /* @__PURE__ */ import_react.default.createElement("div", { onClick: onGoVerif, style: {
+      position: "fixed",
+      bottom: 80,
+      right: 16,
+      zIndex: 900,
+      background: "#3F51B5",
+      borderRadius: 24,
+      padding: "10px 18px",
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+      boxShadow: "0 4px 20px rgba(63,81,181,0.45)",
+      cursor: "pointer",
+      userSelect: "none",
+      WebkitTapHighlightColor: "transparent"
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      width: 10,
+      height: 10,
+      borderRadius: "50%",
+      background: "#69f0ae",
+      flexShrink: 0,
+      boxShadow: "0 0 0 3px rgba(105,240,174,0.3)"
+    } }), /* @__PURE__ */ import_react.default.createElement("div", { style: { lineHeight: 1.3 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, fontWeight: 700, color: "#fff", fontFamily: FONT } }, "Verificaci\xF3n activa"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: "rgba(255,255,255,0.8)", fontFamily: FONT } }, totalContado, " \xEDtem", totalContado !== 1 ? "s" : "", " escaneado", totalContado !== 1 ? "s" : "")), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: "rgba(255,255,255,0.7)", fontFamily: FONT, marginLeft: 4 } }, "Volver \u203A")), /* @__PURE__ */ import_react.default.createElement("div", { style: {
       background: C.bg1,
       borderRadius: 16,
       padding: 18,

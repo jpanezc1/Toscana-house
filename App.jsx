@@ -11299,11 +11299,14 @@ function App(){
         )}
 
         {/* AUDITORÍA — cierre de inventario mensual (conteo físico vs sistema) */}
-        {tab==="auditoria" && (
+        {/* VERIFICACIÓN — siempre montada para no perder el conteo ni el scanner */}
+        <div style={{display: tab==="auditoria" ? "block" : "none"}}>
           <AuditoriaInventario inv={inv} ventas={ventas} cargas={cargasCompletas} mes={mes} anio={anio} MK={MK}
             auditorias={auditorias} onGuardarAuditoria={registrarAuditoria} onActualizarAuditoria={actualizarAuditoria}
-            onCuadrarConAuditoria={cuadrarConAuditoria} user={user}/>
-        )}
+            onCuadrarConAuditoria={cuadrarConAuditoria} user={user}
+            onGoVerif={()=>setTab("auditoria")}
+            tabActual={tab}/>
+        </div>
 
         {/* CARGAS — trazabilidad de cargas a inventario (manuales + importaciones) */}
         {tab==="cargas" && (
@@ -12914,7 +12917,7 @@ function SheetRecibir({open, onClose, inv, onAdd, fInv, setFInv}){
 // ══════════════════════════════════════════════════════════
 // AUDITORÍA — Cierre de inventario mensual (conteo físico vs sistema)
 // ══════════════════════════════════════════════════════════
-function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, onGuardarAuditoria, onActualizarAuditoria, onCuadrarConAuditoria, user}){
+function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, onGuardarAuditoria, onActualizarAuditoria, onCuadrarConAuditoria, user, onGoVerif, tabActual}){
   const isDesktop = useIsDesktop();
   // El trabajo en curso (vista, marca seleccionada, doble conteo) se guarda
   // en localStorage para que NO se pierda si el usuario cambia de pestaña
@@ -13071,8 +13074,11 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
   function buscarEnInv(codigo){
     const c=(codigo||"").trim().toUpperCase().replace(/'/g,"-");
     const cAlnum=c.replace(/[^A-Z0-9]/g,"");
-    return baseInv.find(i=>i.codigo.toUpperCase()===c)
-      || (cAlnum.length>=3 && baseInv.find(i=>i.codigo.toUpperCase().replace(/[^A-Z0-9]/g,"")===cAlnum));
+    // Buscar primero en baseInv (inventario al abrir), luego en inv vivo (productos nuevos)
+    const encontrarEn = (lista) =>
+      lista.find(i=>(i.codigo||"").toUpperCase()===c)
+      || (cAlnum.length>=3 && lista.find(i=>(i.codigo||"").toUpperCase().replace(/[^A-Z0-9]/g,"")===cAlnum));
+    return encontrarEn(baseInv) || encontrarEn(inv);
   }
 
   // ── Verificación rápida: escaneo continuo con lector USB ──
@@ -13302,8 +13308,37 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
     SOBRANTE: {label:"↑ Sobrante",  color:C.blue,  bg:"#EEF2FF"},
   };
 
+  // Botón flotante cuando el usuario está en otra pestaña
+  const totalContado = Object.values(conteo).reduce((s,v)=>s+(v||0),0);
+  const hayConteoActivo = totalContado > 0;
+  const minimizado = tabActual && tabActual !== "auditoria";
+
   return (
     <div>
+      {/* ── Botón flotante cuando se minimiza ── */}
+      {minimizado && hayConteoActivo && onGoVerif && (
+        <div onClick={onGoVerif} style={{
+          position:"fixed", bottom:80, right:16, zIndex:900,
+          background:"#3F51B5", borderRadius:24, padding:"10px 18px",
+          display:"flex", alignItems:"center", gap:10,
+          boxShadow:"0 4px 20px rgba(63,81,181,0.45)",
+          cursor:"pointer", userSelect:"none",
+          WebkitTapHighlightColor:"transparent",
+        }}>
+          <div style={{
+            width:10, height:10, borderRadius:"50%", background:"#69f0ae", flexShrink:0,
+            boxShadow:"0 0 0 3px rgba(105,240,174,0.3)"
+          }}/>
+          <div style={{lineHeight:1.3}}>
+            <div style={{fontSize:12,fontWeight:700,color:"#fff",fontFamily:FONT}}>Verificación activa</div>
+            <div style={{fontSize:11,color:"rgba(255,255,255,0.8)",fontFamily:FONT}}>
+              {totalContado} ítem{totalContado!==1?"s":""} escaneado{totalContado!==1?"s":""}
+            </div>
+          </div>
+          <div style={{fontSize:11,color:"rgba(255,255,255,0.7)",fontFamily:FONT,marginLeft:4}}>Volver ›</div>
+        </div>
+      )}
+
       {/* ── Encabezado ── */}
       <div style={{background:C.bg1,borderRadius:16,padding:18,marginBottom:14,
         border:`1px solid ${C.sep}`,boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}>
