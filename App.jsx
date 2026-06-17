@@ -311,10 +311,25 @@ async function sbCargarUsuarios() {
 }
 
 async function sbCrearAuthUsuario(usuario, password, nombre, rol, marcaId) {
-  // Crear usuario en Auth requiere service_role (no disponible en frontend).
-  // El perfil ya se guarda en sbGuardarUsuarios. Acción manual: Supabase → Auth → Add user
-  // con email: usuario@th.internal y la contraseña indicada.
-  return false;
+  try {
+    const db = await getSupabase();
+    const { data: { session } } = await db.auth.getSession();
+    if (!session) return false;
+    const res = await fetch(
+      "https://uqphxiixdulqscbfyxhz.supabase.co/functions/v1/crear-usuario",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ usuario, password, nombre, rol, marca_id: marcaId || null }),
+      }
+    );
+    const data = await res.json();
+    if (!res.ok) { console.warn("crear-usuario edge fn:", data.error); return false; }
+    return true;
+  } catch(e) { console.warn("sbCrearAuthUsuario:", e.message); return false; }
 }
 
 async function sbCambiarPassword(nuevoPassword) {
