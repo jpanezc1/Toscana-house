@@ -13050,8 +13050,7 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
   function buscarYAgregar(codigo){
     const c=(codigo||"").trim().toUpperCase().replace(/'/g,"-");
     if(!c) return false;
-    const cAlnum=c.replace(/[^A-Z0-9]/g,"");
-    const p=baseInv.find(i=>i.codigo.toUpperCase()===c) || baseInv.find(i=>i.codigo.toUpperCase().replace(/[^A-Z0-9]/g,"")===cAlnum);
+    const p=buscarEnInv(c);
     if(!p){ flash(false, `Código "${c}" no encontrado en inventario`); return false; }
     if(!enAlcance(p)){ flash(false, `"${p.codigo}" es de ${p.marcaNombre||"otra marca"} — la verificación está filtrada por ${marcaSelNombre}`); setCodManual(""); return false; }
     const r=intentarContar(p);
@@ -13069,10 +13068,17 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
     return r.ok;
   }
 
+  function buscarEnInv(codigo){
+    const c=(codigo||"").trim().toUpperCase().replace(/'/g,"-");
+    const cAlnum=c.replace(/[^A-Z0-9]/g,"");
+    return baseInv.find(i=>i.codigo.toUpperCase()===c)
+      || (cAlnum.length>=3 && baseInv.find(i=>i.codigo.toUpperCase().replace(/[^A-Z0-9]/g,"")===cAlnum));
+  }
+
   // ── Verificación rápida: escaneo continuo con lector USB ──
   function onDetectCierreRapido(codigo){
     const c=(codigo||"").trim().toUpperCase();
-    const p=baseInv.find(i=>i.codigo.toUpperCase()===c);
+    const p=buscarEnInv(c);
     if(!p){
       setLiveFeedback({ts:Date.now(),ok:false,title:"Código no encontrado",sub:c});
       return false;

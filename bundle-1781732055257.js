@@ -35644,8 +35644,7 @@ Motivo: ${motivo}` : ""}`)) {
     function buscarYAgregar(codigo) {
       const c = (codigo || "").trim().toUpperCase().replace(/'/g, "-");
       if (!c) return false;
-      const cAlnum = c.replace(/[^A-Z0-9]/g, "");
-      const p = baseInv.find((i) => i.codigo.toUpperCase() === c) || baseInv.find((i) => i.codigo.toUpperCase().replace(/[^A-Z0-9]/g, "") === cAlnum);
+      const p = buscarEnInv(c);
       if (!p) {
         flash(false, `C\xF3digo "${c}" no encontrado en inventario`);
         return false;
@@ -35665,9 +35664,14 @@ Motivo: ${motivo}` : ""}`)) {
       setCodManual("");
       return r.ok;
     }
+    function buscarEnInv(codigo) {
+      const c = (codigo || "").trim().toUpperCase().replace(/'/g, "-");
+      const cAlnum = c.replace(/[^A-Z0-9]/g, "");
+      return baseInv.find((i) => i.codigo.toUpperCase() === c) || cAlnum.length >= 3 && baseInv.find((i) => i.codigo.toUpperCase().replace(/[^A-Z0-9]/g, "") === cAlnum);
+    }
     function onDetectCierreRapido(codigo) {
       const c = (codigo || "").trim().toUpperCase();
-      const p = baseInv.find((i) => i.codigo.toUpperCase() === c);
+      const p = buscarEnInv(c);
       if (!p) {
         setLiveFeedback({ ts: Date.now(), ok: false, title: "C\xF3digo no encontrado", sub: c });
         return false;
