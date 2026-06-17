@@ -13079,11 +13079,28 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
   function buscarEnInv(codigo){
     const c=(codigo||"").trim().toUpperCase().replace(/'/g,"-");
     const cAlnum=c.replace(/[^A-Z0-9]/g,"");
-    // Buscar primero en baseInv (inventario al abrir), luego en inv vivo (productos nuevos)
+
     const encontrarEn = (lista) =>
       lista.find(i=>(i.codigo||"").toUpperCase()===c)
       || (cAlnum.length>=3 && lista.find(i=>(i.codigo||"").toUpperCase().replace(/[^A-Z0-9]/g,"")===cAlnum));
-    return encontrarEn(baseInv) || encontrarEn(inv);
+
+    const exacto = encontrarEn(baseInv) || encontrarEn(inv);
+    if(exacto) return exacto;
+
+    // Fallback: si el barcode impreso es el código base (ej: GLOW-PRO-058) pero en el
+    // sistema existen variantes con sufijo (-A, -B, -C...), contar la primera
+    // variante que aún tenga unidades disponibles (o la primera si todas están agotadas)
+    const prefijo = c + "-";
+    const variantes = [...baseInv, ...inv.filter(i=>!baseInv.find(b=>b.id===i.id))]
+      .filter(i=>(i.codigo||"").toUpperCase().startsWith(prefijo));
+    if(variantes.length===0) return null;
+    // Preferir la que tenga unidades sin contar todavía
+    const disponible = variantes.find(v=>{
+      const ya = conteo[v.id]||0;
+      const sis = sistemaDe(v);
+      return sis===0 || ya < sis;
+    });
+    return disponible || variantes[0];
   }
 
   // ── Verificación rápida: escaneo continuo con lector USB ──

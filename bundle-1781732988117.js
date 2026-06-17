@@ -35670,7 +35670,17 @@ Motivo: ${motivo}` : ""}`)) {
       const c = (codigo || "").trim().toUpperCase().replace(/'/g, "-");
       const cAlnum = c.replace(/[^A-Z0-9]/g, "");
       const encontrarEn = (lista) => lista.find((i) => (i.codigo || "").toUpperCase() === c) || cAlnum.length >= 3 && lista.find((i) => (i.codigo || "").toUpperCase().replace(/[^A-Z0-9]/g, "") === cAlnum);
-      return encontrarEn(baseInv) || encontrarEn(inv);
+      const exacto = encontrarEn(baseInv) || encontrarEn(inv);
+      if (exacto) return exacto;
+      const prefijo = c + "-";
+      const variantes = [...baseInv, ...inv.filter((i) => !baseInv.find((b) => b.id === i.id))].filter((i) => (i.codigo || "").toUpperCase().startsWith(prefijo));
+      if (variantes.length === 0) return null;
+      const disponible = variantes.find((v) => {
+        const ya = conteo[v.id] || 0;
+        const sis = sistemaDe(v);
+        return sis === 0 || ya < sis;
+      });
+      return disponible || variantes[0];
     }
     function onDetectCierreRapido(codigo) {
       const c = (codigo || "").trim().toUpperCase();
