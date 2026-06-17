@@ -21522,6 +21522,36 @@
       return null;
     }
   }
+  async function sbGuardarProductosBatch(prods) {
+    if (!prods.length) return true;
+    try {
+      const db = await getSupabase();
+      const payload = prods.map((prod) => ({
+        codigo: prod.codigo,
+        marca_id: prod.marcaId,
+        marca_nombre: prod.marcaNombre,
+        nombre: prod.nombre,
+        categoria: prod.categoria || "GENERAL",
+        descripcion: prod.descripcion || "",
+        subcat: prod.subcat || "",
+        precio: prod.precio,
+        stock: prod.stock,
+        stock_inicial: prod.stockInicial || prod.stock,
+        fecha: prod.fecha || hoy()
+      }));
+      const { error } = await db.from("inventario").upsert(payload, { onConflict: "codigo" });
+      if (error) throw error;
+      return true;
+    } catch (e) {
+      console.error("[Supabase] batch save FAILED:", e.message, "n=", prods.length);
+      let allOk = true;
+      for (const p of prods) {
+        const ok = await sbGuardarProducto(p);
+        if (!ok) allOk = false;
+      }
+      return allOk;
+    }
+  }
   async function sbActualizarStock(prodId, nuevoStock) {
     try {
       const db = await getSupabase();
@@ -33257,7 +33287,7 @@ Motivo: ${motivo}` : ""}`)) {
       setRepCod("");
       setRepPrecio("");
     }
-    const _importBuf = (0, import_react.useRef)({ items: [], ts: 0, timer: null });
+    const _importBuf = (0, import_react.useRef)({ items: [], sbItems: [], ts: 0, timer: null });
     function handleVerificarCarga(cargaId, verificado) {
       setCargas((prev) => prev.map((c) => c.id === cargaId ? { ...c, verificado, verificadoTs: verificado ? (/* @__PURE__ */ new Date()).toISOString() : null, verificadoPor: verificado ? user.nombre : null } : c));
       sbMarcarCargaVerificada(cargaId, verificado, user.nombre);
@@ -33283,12 +33313,7 @@ Motivo: ${motivo}` : ""}`)) {
         const localId = Date.now() * 1e3 + Math.floor(Math.random() * 999);
         const newProd = { id: localId, ...producto };
         setInv((prev) => [...prev, newProd]);
-        syncConRespaldo("producto", newProd, () => sbGuardarProducto(newProd).then((sbId) => {
-          if (sbId && sbId !== localId) {
-            setInv((prev) => prev.map((p) => p.id === localId ? { ...p, id: sbId } : p));
-          }
-          return !!sbId;
-        }));
+        _importBuf.current.sbItems.push(newProd);
         _importBuf.current.items.push({
           tipo: "create",
           codigo: producto.codigo,
@@ -33301,7 +33326,11 @@ Motivo: ${motivo}` : ""}`)) {
         });
       }
       clearTimeout(_importBuf.current.timer);
-      _importBuf.current.timer = setTimeout(() => {
+      _importBuf.current.timer = setTimeout(async () => {
+        const sbItems = _importBuf.current.sbItems.splice(0);
+        for (let i = 0; i < sbItems.length; i += 50) {
+          await sbGuardarProductosBatch(sbItems.slice(i, i + 50));
+        }
         const buf = _importBuf.current.items;
         if (buf.length === 0) return;
         const nuevos = buf.filter((i) => i.tipo === "create").length;
@@ -33326,7 +33355,7 @@ Motivo: ${motivo}` : ""}`)) {
           items: buf
         }));
         _importBuf.current.items = [];
-      }, 800);
+      }, 1200);
     }
     function handleVenta(v) {
       const id = `V${Date.now()}`;

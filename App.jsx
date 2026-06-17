@@ -89,6 +89,35 @@ async function sbGuardarProducto(prod) {
   }
 }
 
+async function sbGuardarProductosBatch(prods) {
+  if(!prods.length) return true;
+  try {
+    const db = await getSupabase();
+    const payload = prods.map(prod => ({
+      codigo:       prod.codigo,
+      marca_id:     prod.marcaId,
+      marca_nombre: prod.marcaNombre,
+      nombre:       prod.nombre,
+      categoria:    prod.categoria||"GENERAL",
+      descripcion:  prod.descripcion||"",
+      subcat:       prod.subcat||"",
+      precio:       prod.precio,
+      stock:        prod.stock,
+      stock_inicial:prod.stockInicial||prod.stock,
+      fecha:        prod.fecha||hoy(),
+    }));
+    const { error } = await db.from("inventario").upsert(payload, { onConflict: "codigo" });
+    if(error) throw error;
+    return true;
+  } catch(e) {
+    console.error("[Supabase] batch save FAILED:", e.message, "n=", prods.length);
+    // Fallback: intentar uno por uno
+    let allOk = true;
+    for(const p of prods){ const ok = await sbGuardarProducto(p); if(!ok) allOk=false; }
+    return allOk;
+  }
+}
+
 async function sbActualizarStock(prodId, nuevoStock) {
   try {
     const db = await getSupabase();
@@ -10976,7 +11005,7 @@ function App(){
   }
 
   // Buffer de importación para consolidar en un solo evento de auditoría
-  const _importBuf = useRef({items:[], ts:0, timer:null});
+  const _importBuf = useRef({items:[], sbItems:[], ts:0, timer:null});
 
   function handleVerificarCarga(cargaId, verificado){
     setCargas(prev=>prev.map(c=>c.id===cargaId
@@ -10999,20 +11028,21 @@ function App(){
       const localId = Date.now() * 1000 + Math.floor(Math.random()*999);
       const newProd = { id: localId, ...producto };
       setInv(prev=>[...prev, newProd]);
-      syncConRespaldo("producto", newProd, ()=>sbGuardarProducto(newProd).then(sbId=>{
-        if(sbId && sbId !== localId){
-          setInv(prev=>prev.map(p=>p.id===localId ? {...p, id:sbId} : p));
-        }
-        return !!sbId;
-      }));
+      // Buffer para batch — no disparar request individual por cada producto
+      _importBuf.current.sbItems.push(newProd);
       // buffer audit
       _importBuf.current.items.push({tipo:"create", codigo:producto.codigo,
         nombre:producto.nombre, marca:producto.marcaNombre||"—", marcaId:producto.marcaId??null,
         stock:producto.stock, precio:producto.precio, categoria:producto.categoria});
     }
-    // Flush audit después de 800ms sin más llamadas (importación por lotes)
+    // Flush: batch Supabase + audit después de 800ms sin más llamadas
     clearTimeout(_importBuf.current.timer);
-    _importBuf.current.timer = setTimeout(()=>{
+    _importBuf.current.timer = setTimeout(async ()=>{
+      // ── Batch sync a Supabase (grupos de 50) ──────────────────────
+      const sbItems = _importBuf.current.sbItems.splice(0);
+      for(let i=0; i<sbItems.length; i+=50){
+        await sbGuardarProductosBatch(sbItems.slice(i, i+50));
+      }
       const buf = _importBuf.current.items;
       if(buf.length===0) return;
       const nuevos = buf.filter(i=>i.tipo==="create").length;
@@ -11033,7 +11063,7 @@ function App(){
         nuevos, actualizados, totalItems: buf.length, items: buf,
       }));
       _importBuf.current.items = [];
-    }, 800);
+    }, 1200);
   }
 
   function handleVenta(v){
