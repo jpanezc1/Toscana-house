@@ -21811,7 +21811,6 @@
       const db = await getSupabase();
       const rows = lista.map((u) => ({
         usuario: u.usuario,
-        password: u.password,
         nombre: u.nombre,
         rol: u.rol || "caja",
         marca_id: u.marcaId ? Number(u.marcaId) : null,
@@ -21828,11 +21827,10 @@
   async function sbCargarUsuarios() {
     try {
       const db = await getSupabase();
-      const { data, error } = await db.from("usuarios").select("*");
+      const { data, error } = await db.from("usuarios").select("usuario,nombre,rol,estado,marca_id,auth_id");
       if (error) throw error;
       return (data || []).map((u) => ({
         usuario: u.usuario,
-        password: u.password,
         nombre: u.nombre,
         rol: u.rol,
         marcaId: u.marca_id ? Number(u.marca_id) : void 0,
@@ -21841,6 +21839,19 @@
     } catch (e) {
       console.warn("Supabase load usuarios:", e.message);
       return null;
+    }
+  }
+  async function sbCrearAuthUsuario(usuario, password, nombre, rol, marcaId) {
+    return false;
+  }
+  async function sbEliminarAuthUsuario(usuario) {
+    try {
+      const db = await getSupabase();
+      await db.rpc("admin_eliminar_usuario", { p_usuario: usuario });
+      return true;
+    } catch (e) {
+      console.warn("eliminar auth usuario:", e.message);
+      return false;
     }
   }
   async function sbEliminarUsuario(usuario) {
@@ -23023,12 +23034,16 @@
       return null;
     }
   }
-  async function descargarOrganizado(blob, nombre, marcaCarpeta) {
+  async function descargarOrganizado(blob, nombre, marcaCarpeta, subcarpeta = null) {
     const base = await fsaGetBase();
     if (base && marcaCarpeta) {
       try {
         const carpeta = (marcaCarpeta || "General").replace(/[\/\\:*?"<>|]/g, "").trim() || "General";
-        const dir = await base.getDirectoryHandle(carpeta, { create: true });
+        let dir = await base.getDirectoryHandle(carpeta, { create: true });
+        if (subcarpeta) {
+          const sub = subcarpeta.replace(/[\/\\:*?"<>|]/g, "").trim();
+          if (sub) dir = await dir.getDirectoryHandle(sub, { create: true });
+        }
         const fh = await dir.getFileHandle(nombre, { create: true });
         const wr = await fh.createWritable();
         await wr.write(blob);
@@ -24709,9 +24724,9 @@
         const a = document.createElement("a");
         a.href = "whatsapp://send?text=";
         a.click();
-        navigator.clipboard.write([new ClipboardItem({ "image/png": data.blob })]).then(() => alert("Imagen copiada \u2014 pega la imagen con Cmd+V en el chat de WhatsApp")).catch(() => descargarOrganizado(data.blob, data.nombre, data.marcaNombre));
+        navigator.clipboard.write([new ClipboardItem({ "image/png": data.blob })]).then(() => alert("Imagen copiada \u2014 pega la imagen con Cmd+V en el chat de WhatsApp")).catch(() => descargarOrganizado(data.blob, data.nombre, data.marcaNombre, "Notas de Ventas"));
       } else {
-        descargarOrganizado(data.blob, data.nombre, data.marcaNombre);
+        descargarOrganizado(data.blob, data.nombre, data.marcaNombre, "Notas de Ventas");
       }
     }
     function descargar() {
@@ -24719,7 +24734,7 @@
         navigator.clipboard.write([new ClipboardItem({ "image/png": data.blob })]).then(() => alert("Imagen copiada al portapapeles \u2014 p\xE9gala con Cmd+V en WhatsApp")).catch(() => {
         });
       }
-      descargarOrganizado(data.blob, data.nombre, data.marcaNombre);
+      descargarOrganizado(data.blob, data.nombre, data.marcaNombre, "Notas de Ventas");
     }
     return /* @__PURE__ */ import_react.default.createElement(Sheet, { open: !!data, onClose, title: "Nota de venta" }, /* @__PURE__ */ import_react.default.createElement("img", { src: data.url, alt: "Nota de venta", style: {
       width: "100%",
@@ -26187,69 +26202,98 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       setImgPreview(null);
     } }));
   }
-  var USUARIOS = [
-    { usuario: "toscana", password: "casa2024", nombre: "Toscana House", rol: "admin" },
-    { usuario: "caja", password: "caja2024", nombre: "Vendedor Caja", rol: "caja" },
-    { usuario: "tatiana", password: "toscana2024", nombre: "Tatiana", rol: "admin" }
-  ];
   function useAuth() {
-    try {
-      localStorage.removeItem("th_user");
-      sessionStorage.removeItem("th_user");
-    } catch {
-    }
     var _hN108 = (0, import_react.useState)(null);
     var user = _hN108[0];
     var setUser = _hN108[1];
+    var _hN108b = (0, import_react.useState)(false);
+    var authReady = _hN108b[0];
+    var setAuthReady = _hN108b[1];
     (0, import_react.useEffect)(function() {
-      function onPageShow(e) {
-        if (e.persisted) setUser(null);
-      }
-      window.addEventListener("pageshow", onPageShow);
+      var cancelled = false;
+      (async function() {
+        try {
+          const db = await getSupabase();
+          const { data: { session } } = await db.auth.getSession();
+          if (!cancelled && session) {
+            const perfil = await _perfilDesdeSession(db, session);
+            if (perfil) setUser(perfil);
+          }
+        } catch (e) {
+        }
+        if (!cancelled) setAuthReady(true);
+      })();
       return function() {
-        window.removeEventListener("pageshow", onPageShow);
+        cancelled = true;
+      };
+    }, []);
+    (0, import_react.useEffect)(function() {
+      var sub = null;
+      (async function() {
+        const db = await getSupabase();
+        const { data } = db.auth.onAuthStateChange(async function(event, session) {
+          if (event === "SIGNED_OUT") {
+            setUser(null);
+            return;
+          }
+          if (session) {
+            const perfil = await _perfilDesdeSession(db, session);
+            if (perfil) setUser(perfil);
+          }
+        });
+        sub = data.subscription;
+      })();
+      return function() {
+        if (sub) sub.unsubscribe();
       };
     }, []);
     async function login(usuario, password) {
       const uLow = usuario.toLowerCase().trim();
       const pass = password.trim();
-      const enCodigo = USUARIOS.find(
-        (u) => u.usuario.toLowerCase() === uLow && u.password === pass
-      );
-      if (enCodigo) {
-        if (enCodigo.estado === "inactivo")
+      try {
+        const db = await getSupabase();
+        const email = uLow + "@th.internal";
+        const { data, error } = await db.auth.signInWithPassword({ email, password: pass });
+        if (error) return { ok: false, error: "Usuario o contrase\xF1a incorrectos" };
+        const perfil = await _perfilDesdeSession(db, data.session);
+        if (!perfil) return { ok: false, error: "Usuario sin perfil. Contact\xE1 al administrador." };
+        if (perfil.estado === "inactivo") {
+          await db.auth.signOut();
           return { ok: false, error: "Cuenta desactivada. Contact\xE1 al administrador." };
-        setUser({ ...enCodigo, loginAt: Date.now() });
-        return { ok: true };
-      }
-      let lista = (() => {
-        try {
-          return JSON.parse(localStorage.getItem("th_usuarios") || "null");
-        } catch {
-          return null;
         }
-      })();
-      const sbUsers = await sbCargarUsuarios();
-      if (sbUsers && sbUsers.length > 0) {
-        const custom = sbUsers.filter((u) => !USUARIOS.find((b) => b.usuario === u.usuario));
-        lista = [...USUARIOS, ...custom];
-        localStorage.setItem("th_usuarios", JSON.stringify(lista));
-      }
-      const found = (lista || []).find(
-        (u) => u.usuario.toLowerCase() === uLow && u.password === pass
-      );
-      if (found) {
-        if (found.estado === "inactivo")
-          return { ok: false, error: "Cuenta desactivada. Contact\xE1 al administrador." };
-        setUser({ ...found, loginAt: Date.now() });
+        setUser(perfil);
         return { ok: true };
+      } catch (e) {
+        return { ok: false, error: "Sin conexi\xF3n. Verific\xE1 internet e intent\xE1 de nuevo." };
       }
-      return { ok: false, error: "Usuario o contrase\xF1a incorrectos" };
     }
-    function logout() {
+    async function logout() {
+      try {
+        const db = await getSupabase();
+        await db.auth.signOut();
+      } catch (e) {
+      }
       setUser(null);
     }
-    return { user, login, logout };
+    return { user, login, logout, authReady };
+  }
+  async function _perfilDesdeSession(db, session) {
+    try {
+      const email = session.user.email || "";
+      const usuario = email.replace(/@th\.internal$/, "");
+      const { data } = await db.from("usuarios").select("usuario,nombre,rol,estado,marca_id").eq("usuario", usuario).single();
+      if (!data) return null;
+      return {
+        usuario: data.usuario,
+        nombre: data.nombre,
+        rol: data.rol,
+        estado: data.estado || "activo",
+        marcaId: data.marca_id ? Number(data.marca_id) : void 0,
+        loginAt: Date.now()
+      };
+    } catch (e) {
+      return null;
+    }
   }
   function LoginScreen({ onLogin }) {
     var _hN109 = (0, import_react.useState)("");
@@ -32528,8 +32572,56 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       );
     })), shCrear && /* @__PURE__ */ import_react.default.createElement(SheetCrearGC, { onClose: () => setShCrear(false), onCreada: (lista) => reload(lista) }), shUsar && /* @__PURE__ */ import_react.default.createElement(SheetUsarGC, { onClose: () => setShUsar(false), onUsada: (lista) => reload(lista) }), gcDetalle && /* @__PURE__ */ import_react.default.createElement(SheetDetalleGC, { gc: gcDetalle, onClose: () => setGcDetalle(null) }));
   }
+  function DescargarTodasNotasBtn({ ventas }) {
+    var _d = (0, import_react.useState)(false);
+    var descargando = _d[0];
+    var setDescargando = _d[1];
+    var _p = (0, import_react.useState)(null);
+    var progreso = _p[0];
+    var setProgreso = _p[1];
+    async function descargarTodasNotas() {
+      if (!ventas.length) {
+        alert("No hay ventas registradas");
+        return;
+      }
+      const hasDir = await fsaGetBase();
+      if (!hasDir) {
+        alert("Primero configura la carpeta de descargas en Config \u2192 Carpeta de Archivos");
+        return;
+      }
+      setDescargando(true);
+      let ok = 0, err = 0;
+      for (let i = 0; i < ventas.length; i++) {
+        const vf = ventas[i];
+        try {
+          const num = vf.id.replace(/\D/g, "").slice(-4).padStart(4, "0");
+          const marcas = [...new Set((vf.items || []).map((it) => it.marcaNombre).filter(Boolean))];
+          const marcaCarpeta = marcas.length === 1 ? marcas[0] : marcas.length > 1 ? "Multimarca" : null;
+          const marcaSlug = marcas.map((m) => m.replace(/ /g, "_")).join("-") || "TH";
+          const fechaSlug = (vf.fecha || "").replace(/\//g, "-");
+          const nombre = `TH_${marcaSlug}_NotaVenta_N${num}_${fechaSlug}.png`;
+          const blob = await construirImagenNotaVenta(vf, num);
+          await descargarOrganizado(blob, nombre, marcaCarpeta, "Notas de Ventas");
+          ok++;
+        } catch (e) {
+          err++;
+        }
+        setProgreso(`${i + 1}/${ventas.length}`);
+      }
+      setDescargando(false);
+      setProgreso(null);
+      alert(`\u2713 ${ok} notas guardadas${err > 0 ? ` \xB7 ${err} con error` : ""}`);
+    }
+    return /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      background: "rgba(63,81,181,.07)",
+      borderRadius: 16,
+      padding: "16px",
+      marginBottom: 20,
+      border: "1px solid rgba(63,81,181,.25)"
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 15, fontWeight: 600, marginBottom: 6, fontFamily: FONT } }, "\u{1F9FE} Descargar todas las notas de venta"), /* @__PURE__ */ import_react.default.createElement("p", { style: { fontSize: 12, color: "#888", fontFamily: FONT, margin: "0 0 12px", lineHeight: 1.5 } }, "Genera y guarda las notas de ", /* @__PURE__ */ import_react.default.createElement("strong", null, ventas.length, " ventas"), " en la carpeta", /* @__PURE__ */ import_react.default.createElement("strong", null, " Notas de Ventas"), " dentro de cada marca."), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { disabled: descargando, onPress: descargarTodasNotas, variant: "fill", full: true, icon: "\u2B07" }, descargando ? `Descargando\u2026 ${progreso || ""}` : `Descargar ${ventas.length} notas`));
+  }
   function App() {
-    const { user, login, logout } = useAuth();
+    const { user, login, logout, authReady } = useAuth();
     const isDesktop = useIsDesktop();
     const sync = useSyncStatus();
     const now = /* @__PURE__ */ new Date();
@@ -33278,6 +33370,14 @@ Motivo: ${motivo}` : ""}`)) {
     ];
     const TABS = user?.rol === "caja" ? TABS_ALL.filter((t) => ["inicio", "pos", "ventas"].includes(t.id)) : user?.rol === "admin" ? TABS_ALL : TABS_ALL.filter((t) => t.id !== "auditoria" && t.id !== "cargas");
     const showingDetail = tab === "marcas" && marcaDetalle;
+    if (!authReady) return /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      minHeight: "100vh",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      background: "#f5f5f7",
+      fontFamily: FONT
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center", color: "#999" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 28, marginBottom: 12 } }, "\u{1F510}"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 14 } }, "Verificando sesi\xF3n\u2026")));
     if (!user) return /* @__PURE__ */ import_react.default.createElement(LoginScreen, { onLogin: login });
     if (user.rol === "marca") return /* @__PURE__ */ import_react.default.createElement(BrandPortal, { user, ventas, inv, cargas: cargasCompletas, logout });
     const _liqPagos = sumPagos(vMes);
@@ -33980,7 +34080,7 @@ Motivo: ${motivo}` : ""}`)) {
       color: repMsg.ok ? C.green : C.red,
       fontSize: 14,
       fontFamily: FONT
-    } }, repMsg.msg), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: modificarPrecio, variant: "primary", full: true, disabled: !repCod.trim() || !repPrecio }, "Actualizar Precio"))), /* @__PURE__ */ import_react.default.createElement(Sheet, { open: sheetDrive, onClose: () => setShDrive(false), title: "\u2601 Google Drive", tall: true }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+    } }, repMsg.msg), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: modificarPrecio, variant: "primary", full: true, disabled: !repCod.trim() || !repPrecio }, "Actualizar Precio"))), /* @__PURE__ */ import_react.default.createElement(Sheet, { open: sheetDrive, onClose: () => setShDrive(false), title: "\u2601 Google Drive", tall: true }, /* @__PURE__ */ import_react.default.createElement(DescargarTodasNotasBtn, { ventas }), /* @__PURE__ */ import_react.default.createElement("div", { style: {
       background: `${C.gold}10`,
       borderRadius: 16,
       padding: "16px",
@@ -34284,6 +34384,21 @@ Motivo: ${motivo}` : ""}`)) {
     var montosMixtos = _hNm2[0];
     var setMontosMixtos = _hNm2[1];
     const [previewNota, setPreviewNota] = (0, import_react.useState)(null);
+    function autoDescargarNota(vf) {
+      try {
+        const num = vf.id.replace(/\D/g, "").slice(-4).padStart(4, "0");
+        const marcas = [...new Set((vf.items || []).map((i) => i.marcaNombre).filter(Boolean))];
+        const marcaCarpeta = marcas.length === 1 ? marcas[0] : marcas.length > 1 ? "Multimarca" : null;
+        const marcaSlug = marcas.map((m) => m.replace(/ /g, "_")).join("-") || "TH";
+        const fechaSlug = (vf.fecha || "").replace(/\//g, "-");
+        const nombre = `TH_${marcaSlug}_NotaVenta_N${num}_${fechaSlug}.png`;
+        construirImagenNotaVenta(vf, num).then((blob) => {
+          descargarOrganizado(blob, nombre, marcaCarpeta, "Notas de Ventas");
+        }).catch(() => {
+        });
+      } catch (e) {
+      }
+    }
     const [pagoGC, setPagoGC] = (0, import_react.useState)(false);
     const [gcCodigo, setGcCodigo] = (0, import_react.useState)("");
     const [gcEncontrado, setGcEncontrado] = (0, import_react.useState)(null);
@@ -34471,6 +34586,7 @@ Motivo: ${motivo}` : ""}`)) {
         setUltima(vf2);
         setShowOk(true);
         setShowPago(false);
+        autoDescargarNota(vf2);
         setCarrito([]);
         setDescExtra(0);
         setBusq("");
@@ -34502,6 +34618,7 @@ Motivo: ${motivo}` : ""}`)) {
       setUltima(vf);
       setShowOk(true);
       setShowPago(false);
+      autoDescargarNota(vf);
       setCarrito([]);
       setDescExtra(0);
       setBusq("");
@@ -36273,9 +36390,16 @@ Confirmas que el conteo de ${r.contado} unidad(es) es correcto.`)) {
         let nuevoDetalle;
         let msgOk;
         if (idxExistente >= 0) {
+          const dExistente = aud.detalle[idxExistente];
+          const yaContado = dExistente.contado || 0;
+          const stockSistema = dExistente.sistema || 0;
+          if (stockSistema > 0 && yaContado >= stockSistema) {
+            setMsgAgregar({ ok: false, txt: `"${prod.nombre}": ya contaste las ${stockSistema} unidad${stockSistema !== 1 ? "es" : ""} en sistema \u2014 no se suma` });
+            return;
+          }
           nuevoDetalle = (aud.detalle || []).map((d, i) => {
             if (i !== idxExistente) return d;
-            const nuevoContado = (d.contado || 0) + 1;
+            const nuevoContado = yaContado + 1;
             const nuevaDif = nuevoContado - (d.sistema || 0);
             return {
               ...d,
@@ -36423,7 +36547,7 @@ Se registrar\xE1 que los faltantes/sobrantes fueron verificados f\xEDsicamente y
           background: msgAgregar.ok ? `${C.green}15` : `${C.red}15`,
           color: msgAgregar.ok ? C.green : C.red,
           fontFamily: FONT_UI
-        } }, msgAgregar.txt), (a.detalle || []).filter((d) => d.agregadoPost).length > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 8 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+        } }, msgAgregar.txt), (a.detalle || []).length > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 8, maxHeight: 260, overflowY: "auto" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
           fontSize: 11,
           fontWeight: 700,
           color: C.label3,
@@ -36431,60 +36555,72 @@ Se registrar\xE1 que los faltantes/sobrantes fueron verificados f\xEDsicamente y
           textTransform: "uppercase",
           letterSpacing: 0.5,
           marginBottom: 6
-        } }, "\xCDtems agregados (", (a.detalle || []).filter((d) => d.agregadoPost).length, ")"), (a.detalle || []).filter((d) => d.agregadoPost).map((d, i) => /* @__PURE__ */ import_react.default.createElement("div", { key: d.codigo + i, style: {
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-          padding: "7px 10px",
-          borderRadius: 9,
-          background: C.bg0,
-          marginBottom: 4,
-          border: `1px solid ${C.sep}`
-        } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
-          fontSize: 12,
-          fontWeight: 600,
-          color: C.label,
-          fontFamily: FONT,
-          whiteSpace: "nowrap",
-          overflow: "hidden",
-          textOverflow: "ellipsis"
-        } }, d.nombre), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: C.label3, fontFamily: "monospace" } }, d.codigo, " \xB7 ", d.contado, " ud \xB7 Bs ", d.precio || "\u2014")), /* @__PURE__ */ import_react.default.createElement(
-          "button",
-          {
-            onClick: () => {
-              if (!window.confirm(`\xBFEliminar "${d.nombre}" (${d.codigo}) de esta verificaci\xF3n?`)) return;
-              const detalleNuevo = (a.detalle || []).filter((x) => x !== d);
-              const okC = detalleNuevo.filter((x) => x.estado === "OK").length;
-              const faltC = detalleNuevo.filter((x) => x.estado === "FALTANTE").length;
-              const sobrC = detalleNuevo.filter((x) => x.estado === "SOBRANTE").length;
-              onActualizarAuditoria({
-                ...a,
-                detalle: detalleNuevo,
-                totalProductos: detalleNuevo.length,
-                ok: okC,
-                faltantes: faltC,
-                sobrantes: sobrC
-              });
+        } }, "\xCDtems en esta verificaci\xF3n (", (a.detalle || []).length, ")"), (a.detalle || []).map((d, i) => {
+          const estadoColor = d.estado === "OK" ? C.green : d.estado === "SOBRANTE" ? C.blue : C.red;
+          return /* @__PURE__ */ import_react.default.createElement("div", { key: (d.codigo || "") + i, style: {
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            padding: "7px 10px",
+            borderRadius: 9,
+            background: C.bg0,
+            marginBottom: 4,
+            border: `1px solid ${d.estado === "OK" ? C.sep : estadoColor + "44"}`
+          } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+            fontSize: 12,
+            fontWeight: 600,
+            color: C.label,
+            fontFamily: FONT,
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis"
+          } }, d.nombre), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: C.label3, fontFamily: "monospace", marginTop: 2 } }, d.codigo, " \xB7 contado ", d.contado, " / sistema ", d.sistema, d.diferencia !== 0 && /* @__PURE__ */ import_react.default.createElement("span", { style: { color: estadoColor, fontWeight: 700 } }, " ", "(", d.diferencia > 0 ? "+" : "", d.diferencia, ")"))), /* @__PURE__ */ import_react.default.createElement("span", { style: {
+            fontSize: 9,
+            fontWeight: 700,
+            color: estadoColor,
+            background: estadoColor + "18",
+            borderRadius: 5,
+            padding: "2px 6px",
+            fontFamily: FONT_UI,
+            flexShrink: 0
+          } }, d.estado || "\u2014"), /* @__PURE__ */ import_react.default.createElement(
+            "button",
+            {
+              onClick: () => {
+                if (!window.confirm(`\xBFQuitar "${d.nombre}" (${d.codigo}) de esta verificaci\xF3n?`)) return;
+                const detalleNuevo = (a.detalle || []).filter((_, j) => j !== i);
+                const okC = detalleNuevo.filter((x) => x.estado === "OK").length;
+                const faltC = detalleNuevo.filter((x) => x.estado === "FALTANTE").length;
+                const sobrC = detalleNuevo.filter((x) => x.estado === "SOBRANTE").length;
+                onActualizarAuditoria({
+                  ...a,
+                  detalle: detalleNuevo,
+                  totalProductos: detalleNuevo.length,
+                  ok: okC,
+                  faltantes: faltC,
+                  sobrantes: sobrC
+                });
+              },
+              style: {
+                flexShrink: 0,
+                width: 24,
+                height: 24,
+                borderRadius: "50%",
+                border: "none",
+                background: `${C.red}20`,
+                color: C.red,
+                fontSize: 14,
+                fontWeight: 700,
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                lineHeight: 1
+              }
             },
-            style: {
-              flexShrink: 0,
-              width: 24,
-              height: 24,
-              borderRadius: "50%",
-              border: "none",
-              background: `${C.red}20`,
-              color: C.red,
-              fontSize: 14,
-              fontWeight: 700,
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              lineHeight: 1
-            }
-          },
-          "\xD7"
-        )))), /* @__PURE__ */ import_react.default.createElement(
+            "\xD7"
+          ));
+        })), /* @__PURE__ */ import_react.default.createElement(
           "button",
           {
             onClick: () => {
@@ -39501,13 +39637,7 @@ Se registrar\xE1 que los faltantes/sobrantes fueron verificados f\xEDsicamente y
     }
     function handleResetPass(u) {
       const temp = generarTempPassword();
-      guardarUsuarios(
-        usuarios.map((x) => x.usuario === u.usuario ? { ...x, password: temp } : x),
-        `Reset contrase\xF1a \u2192 [oculto]`,
-        u.usuario,
-        `Contrase\xF1a de @${u.usuario} reseteada`
-      );
-      setTempPass({ usuario: u.usuario, nombre: u.nombre, password: temp });
+      setTempPass({ usuario: u.usuario, nombre: u.nombre, password: temp, soloManual: true });
       setConfirmAct(null);
       setMenuAbierto(null);
     }
@@ -39524,6 +39654,7 @@ Se registrar\xE1 que los faltantes/sobrantes fueron verificados f\xEDsicamente y
     }
     function handleEliminar(u) {
       sbEliminarUsuario(u.usuario);
+      sbEliminarAuthUsuario(u.usuario);
       guardarUsuarios(
         usuarios.filter((x) => x.usuario !== u.usuario),
         "Elimin\xF3 usuario",
@@ -39535,15 +39666,17 @@ Se registrar\xE1 que los faltantes/sobrantes fueron verificados f\xEDsicamente y
     }
     function handleGuardarUsuario(data, isNew) {
       if (isNew) {
+        const nuevoUsuario = { ...data, estado: "activo", marcaId: data.marcaId ? Number(data.marcaId) : void 0 };
         guardarUsuarios(
-          [...usuarios, { ...data, estado: "activo", marcaId: data.marcaId ? Number(data.marcaId) : void 0 }],
+          [...usuarios, nuevoUsuario],
           "Cre\xF3 usuario",
           data.usuario,
           `Usuario @${data.usuario} creado correctamente`
         );
+        if (data.password) sbCrearAuthUsuario(data.usuario, data.password, data.nombre, data.rol, data.marcaId);
       } else {
         const update = { ...data, marcaId: data.marcaId ? Number(data.marcaId) : void 0 };
-        if (!update.password) delete update.password;
+        delete update.password;
         guardarUsuarios(
           usuarios.map((u) => u.usuario === data.usuario ? { ...u, ...update } : u),
           "Edit\xF3 usuario",
@@ -39990,7 +40123,7 @@ Esta acci\xF3n no se puede deshacer.`,
       textAlign: "center",
       marginBottom: 20,
       lineHeight: 1.5
-    } }, "Entreg\xE1 esta contrase\xF1a a", " ", /* @__PURE__ */ import_react.default.createElement("strong", { style: { color: C.label } }, tempPass.nombre), ". Solo se muestra una vez."), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+    } }, tempPass.soloManual ? /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, null, "Ingres\xE1 esta contrase\xF1a manualmente en ", /* @__PURE__ */ import_react.default.createElement("strong", { style: { color: C.label } }, "Supabase \u2192 Authentication \u2192 Users"), " para ", /* @__PURE__ */ import_react.default.createElement("strong", { style: { color: C.label } }, tempPass.nombre), ". El sistema no puede cambiarla autom\xE1ticamente.") : /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, null, "Entreg\xE1 esta contrase\xF1a a ", /* @__PURE__ */ import_react.default.createElement("strong", { style: { color: C.label } }, tempPass.nombre), ". Solo se muestra una vez.")), /* @__PURE__ */ import_react.default.createElement("div", { style: {
       background: C.bg0,
       borderRadius: 16,
       padding: "18px 20px",

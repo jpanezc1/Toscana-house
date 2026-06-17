@@ -285,7 +285,6 @@ async function sbGuardarUsuarios(lista) {
     const db = await getSupabase();
     const rows = lista.map(u => ({
       usuario: u.usuario,
-      password: u.password,
       nombre: u.nombre,
       rol: u.rol || "caja",
       marca_id: u.marcaId ? Number(u.marcaId) : null,
@@ -300,15 +299,39 @@ async function sbGuardarUsuarios(lista) {
 async function sbCargarUsuarios() {
   try {
     const db = await getSupabase();
-    const { data, error } = await db.from("usuarios").select("*");
+    const { data, error } = await db.from("usuarios").select("usuario,nombre,rol,estado,marca_id,auth_id");
     if (error) throw error;
     return (data || []).map(u => ({
-      usuario: u.usuario, password: u.password,
+      usuario: u.usuario,
       nombre: u.nombre, rol: u.rol,
       marcaId: u.marca_id ? Number(u.marca_id) : undefined,
       estado: u.estado || "activo"
     }));
   } catch(e) { console.warn("Supabase load usuarios:", e.message); return null; }
+}
+
+async function sbCrearAuthUsuario(usuario, password, nombre, rol, marcaId) {
+  // Crear usuario en Auth requiere service_role (no disponible en frontend).
+  // El perfil ya se guarda en sbGuardarUsuarios. Acción manual: Supabase → Auth → Add user
+  // con email: usuario@th.internal y la contraseña indicada.
+  return false;
+}
+
+async function sbCambiarPassword(nuevoPassword) {
+  try {
+    const db = await getSupabase();
+    const { error } = await db.auth.updateUser({ password: nuevoPassword });
+    if (error) throw error;
+    return true;
+  } catch(e) { console.warn("cambiar password:", e.message); return false; }
+}
+
+async function sbEliminarAuthUsuario(usuario) {
+  try {
+    const db = await getSupabase();
+    await db.rpc("admin_eliminar_usuario", { p_usuario: usuario });
+    return true;
+  } catch(e) { console.warn("eliminar auth usuario:", e.message); return false; }
 }
 
 async function sbEliminarUsuario(usuario) {
@@ -4450,73 +4473,92 @@ function LiqModal({marcaId,ventas,mes,anio,MK,cierres,setCierres,onClose,syncCie
 // ── Usuarios autorizados ─────────────────────────────────
 // Para agregar usuarios: {usuario, password, nombre, rol}
 // rol: "admin" (acceso total) | "caja" (solo POS y ventas)
-const USUARIOS = [
-  { usuario: "toscana",  password: "casa2024",    nombre: "Toscana House",  rol: "admin" },
-  { usuario: "caja",     password: "caja2024",    nombre: "Vendedor Caja",  rol: "caja"  },
-  { usuario: "tatiana",  password: "toscana2024", nombre: "Tatiana",        rol: "admin" },
-];
-
 function useAuth() {
-  // ── Sesión SOLO en memoria React ────────────────────────────────────────────
-  // Sin localStorage, sin sessionStorage → cualquier recarga/cierre = login nuevo.
-  // Limpiar restos de versiones anteriores que pudieran quedar guardados.
-  try { localStorage.removeItem("th_user"); sessionStorage.removeItem("th_user"); } catch{}
-
   var _hN108 = useState(null); var user = _hN108[0]; var setUser = _hN108[1];
+  var _hN108b = useState(false); var authReady = _hN108b[0]; var setAuthReady = _hN108b[1];
 
-  // Safari bfcache: al restaurar página desde caché de memoria, React conserva
-  // su estado. El evento pageshow con persisted=true lo detecta y fuerza logout.
+  // Al montar: restaurar sesión existente de Supabase Auth
   useEffect(function(){
-    function onPageShow(e){ if(e.persisted) setUser(null); }
-    window.addEventListener("pageshow", onPageShow);
-    return function(){ window.removeEventListener("pageshow", onPageShow); };
+    var cancelled = false;
+    (async function(){
+      try {
+        const db = await getSupabase();
+        const { data: { session } } = await db.auth.getSession();
+        if (!cancelled && session) {
+          const perfil = await _perfilDesdeSession(db, session);
+          if (perfil) setUser(perfil);
+        }
+      } catch(e) { /* sin conexión → quedar en login */ }
+      if (!cancelled) setAuthReady(true);
+    })();
+    return function(){ cancelled = true; };
+  }, []);
+
+  // Escuchar cambios de sesión (token refresh, signout desde otra pestaña)
+  useEffect(function(){
+    var sub = null;
+    (async function(){
+      const db = await getSupabase();
+      const { data } = db.auth.onAuthStateChange(async function(event, session){
+        if (event === "SIGNED_OUT") { setUser(null); return; }
+        if (session) {
+          const perfil = await _perfilDesdeSession(db, session);
+          if (perfil) setUser(perfil);
+        }
+      });
+      sub = data.subscription;
+    })();
+    return function(){ if (sub) sub.unsubscribe(); };
   }, []);
 
   async function login(usuario, password) {
     const uLow = usuario.toLowerCase().trim();
     const pass  = password.trim();
-
-    // 1. Siempre verificar primero contra USUARIOS del código (garantizado)
-    const enCodigo = USUARIOS.find(u =>
-      u.usuario.toLowerCase() === uLow && u.password === pass
-    );
-    if (enCodigo) {
-      if (enCodigo.estado === "inactivo")
+    try {
+      const db = await getSupabase();
+      const email = uLow + "@th.internal";
+      const { data, error } = await db.auth.signInWithPassword({ email, password: pass });
+      if (error) return { ok: false, error: "Usuario o contraseña incorrectos" };
+      const perfil = await _perfilDesdeSession(db, data.session);
+      if (!perfil) return { ok: false, error: "Usuario sin perfil. Contactá al administrador." };
+      if (perfil.estado === "inactivo") {
+        await db.auth.signOut();
         return { ok: false, error: "Cuenta desactivada. Contactá al administrador." };
-      setUser({ ...enCodigo, loginAt: Date.now() });
+      }
+      setUser(perfil);
       return { ok: true };
+    } catch(e) {
+      return { ok: false, error: "Sin conexión. Verificá internet e intentá de nuevo." };
     }
-
-    // 2. Buscar en usuarios custom (localStorage + Supabase)
-    let lista = (() => {
-      try { return JSON.parse(localStorage.getItem("th_usuarios")||"null"); }
-      catch { return null; }
-    })();
-    // Intentar actualizar desde Supabase
-    const sbUsers = await sbCargarUsuarios();
-    if (sbUsers && sbUsers.length > 0) {
-      // Combinar: mantener USUARIOS base + custom de Supabase
-      const custom = sbUsers.filter(u => !USUARIOS.find(b => b.usuario === u.usuario));
-      lista = [...USUARIOS, ...custom];
-      localStorage.setItem("th_usuarios", JSON.stringify(lista));
-    }
-    const found = (lista||[]).find(u =>
-      u.usuario.toLowerCase() === uLow && u.password === pass
-    );
-    if (found) {
-      if (found.estado === "inactivo")
-        return { ok: false, error: "Cuenta desactivada. Contactá al administrador." };
-      setUser({ ...found, loginAt: Date.now() });
-      return { ok: true };
-    }
-    return { ok: false, error: "Usuario o contraseña incorrectos" };
   }
 
-  function logout() {
+  async function logout() {
+    try {
+      const db = await getSupabase();
+      await db.auth.signOut();
+    } catch(e){}
     setUser(null);
   }
 
-  return { user, login, logout };
+  return { user, login, logout, authReady };
+}
+
+async function _perfilDesdeSession(db, session) {
+  try {
+    const email = session.user.email || "";
+    const usuario = email.replace(/@th\.internal$/, "");
+    const { data } = await db.from("usuarios").select("usuario,nombre,rol,estado,marca_id")
+      .eq("usuario", usuario).single();
+    if (!data) return null;
+    return {
+      usuario: data.usuario,
+      nombre: data.nombre,
+      rol: data.rol,
+      estado: data.estado || "activo",
+      marcaId: data.marca_id ? Number(data.marca_id) : undefined,
+      loginAt: Date.now()
+    };
+  } catch(e) { return null; }
 }
 
 // Pantalla de Login
@@ -10429,7 +10471,7 @@ function DescargarTodasNotasBtn({ventas}){
 }
 
 function App(){
-  const { user, login, logout } = useAuth();
+  const { user, login, logout, authReady } = useAuth();
   const isDesktop = useIsDesktop();
   const sync = useSyncStatus();
   const now=new Date();
@@ -11054,6 +11096,15 @@ function App(){
   // Pasar dbStatus al NavBar via closure (ya está en scope)
 
   // Early return si no hay sesión
+  if (!authReady) return (
+    <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",
+      background:"#f5f5f7",fontFamily:FONT}}>
+      <div style={{textAlign:"center",color:"#999"}}>
+        <div style={{fontSize:28,marginBottom:12}}>🔐</div>
+        <div style={{fontSize:14}}>Verificando sesión…</div>
+      </div>
+    </div>
+  );
   if (!user) return <LoginScreen onLogin={login}/>;
 
   // Portal de marca (lectura)
@@ -16664,12 +16715,9 @@ function ConfigTab({user, logout}){
   // acciones
   function handleResetPass(u){
     const temp=generarTempPassword();
-    guardarUsuarios(
-      usuarios.map(x=>x.usuario===u.usuario?{...x,password:temp}:x),
-      `Reset contraseña → [oculto]`, u.usuario,
-      `Contraseña de @${u.usuario} reseteada`
-    );
-    setTempPass({usuario:u.usuario,nombre:u.nombre,password:temp});
+    // Con Supabase Auth, el reset de contraseña debe hacerse desde el dashboard de Supabase
+    // o via service_role. Aquí mostramos la contraseña temporal para que el admin la ingrese allí.
+    setTempPass({usuario:u.usuario,nombre:u.nombre,password:temp,soloManual:true});
     setConfirmAct(null); setMenuAbierto(null);
   }
   function handleToggle(u){
@@ -16682,7 +16730,8 @@ function ConfigTab({user, logout}){
     setConfirmAct(null); setMenuAbierto(null);
   }
   function handleEliminar(u){
-    sbEliminarUsuario(u.usuario); // borrar de Supabase (upsert no lo elimina solo)
+    sbEliminarUsuario(u.usuario);
+    sbEliminarAuthUsuario(u.usuario);
     guardarUsuarios(
       usuarios.filter(x=>x.usuario!==u.usuario),
       "Eliminó usuario", u.usuario,
@@ -16692,15 +16741,17 @@ function ConfigTab({user, logout}){
   }
   function handleGuardarUsuario(data,isNew){
     if(isNew){
+      const nuevoUsuario = {...data,estado:"activo",marcaId:data.marcaId?Number(data.marcaId):undefined};
       guardarUsuarios(
-        [...usuarios,{...data,estado:"activo",marcaId:data.marcaId?Number(data.marcaId):undefined}],
+        [...usuarios, nuevoUsuario],
         "Creó usuario", data.usuario,
         `Usuario @${data.usuario} creado correctamente`
       );
+      // Crear también en Supabase Auth
+      if(data.password) sbCrearAuthUsuario(data.usuario, data.password, data.nombre, data.rol, data.marcaId);
     } else {
-      // Si el campo password viene vacío, conservar la contraseña existente
       const update = {...data, marcaId:data.marcaId?Number(data.marcaId):undefined};
-      if(!update.password) delete update.password;
+      delete update.password; // contraseña no se guarda en tabla usuarios
       guardarUsuarios(
         usuarios.map(u=>u.usuario===data.usuario ? {...u,...update} : u),
         "Editó usuario", data.usuario,
@@ -17066,9 +17117,11 @@ create policy "allow all usuarios" on usuarios
               textAlign:"center",marginBottom:6}}>Contraseña temporal</div>
             <div style={{fontSize:13,color:C.label3,fontFamily:FONT,
               textAlign:"center",marginBottom:20,lineHeight:1.5}}>
-              Entregá esta contraseña a{" "}
-              <strong style={{color:C.label}}>{tempPass.nombre}</strong>.
-              Solo se muestra una vez.
+              {tempPass.soloManual ? (
+                <>Ingresá esta contraseña manualmente en <strong style={{color:C.label}}>Supabase → Authentication → Users</strong> para <strong style={{color:C.label}}>{tempPass.nombre}</strong>. El sistema no puede cambiarla automáticamente.</>
+              ) : (
+                <>Entregá esta contraseña a <strong style={{color:C.label}}>{tempPass.nombre}</strong>. Solo se muestra una vez.</>
+              )}
             </div>
             <div style={{background:C.bg0,borderRadius:16,padding:"18px 20px",
               textAlign:"center",marginBottom:16,
