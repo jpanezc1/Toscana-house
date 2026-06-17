@@ -33148,7 +33148,15 @@ Esta acci\xF3n no se puede deshacer.`)) return;
     }
     function darBaja() {
       const cod = bajaCod.trim().toUpperCase();
-      const prod = inv.find((i) => i.codigo.toUpperCase() === cod);
+      let prod = inv.find((i) => i.codigo.toUpperCase() === cod);
+      if (!prod) {
+        const variantes = inv.filter((i) => (i.codigo || "").toUpperCase().startsWith(cod + "-") && i.stock > 0);
+        if (variantes.length === 1) prod = variantes[0];
+        else if (variantes.length > 1) {
+          setBajaMsg({ ok: false, msg: `Hay ${variantes.length} variantes: ${variantes.map((v) => v.codigo).join(", ")} \u2014 especific\xE1 el c\xF3digo completo` });
+          return;
+        }
+      }
       if (!prod) {
         setBajaMsg({ ok: false, msg: `"${cod}" no encontrado` });
         return;

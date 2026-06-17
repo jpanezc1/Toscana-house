@@ -10891,7 +10891,16 @@ function App(){
 
   function darBaja(){
     const cod=bajaCod.trim().toUpperCase();
-    const prod=inv.find(i=>i.codigo.toUpperCase()===cod);
+    let prod=inv.find(i=>i.codigo.toUpperCase()===cod);
+    // Fallback: si no existe exacto, buscar variantes con ese prefijo (-A, -B, -C...)
+    if(!prod){
+      const variantes=inv.filter(i=>(i.codigo||"").toUpperCase().startsWith(cod+"-") && i.stock>0);
+      if(variantes.length===1) prod=variantes[0];
+      else if(variantes.length>1){
+        setBajaMsg({ok:false,msg:`Hay ${variantes.length} variantes: ${variantes.map(v=>v.codigo).join(", ")} — especificá el código completo`});
+        return;
+      }
+    }
     if(!prod){setBajaMsg({ok:false,msg:`"${cod}" no encontrado`});return;}
     if(prod.stock<=0){setBajaMsg({ok:false,msg:`"${prod.nombre}" ya está agotado`});return;}
     const stockAntes = prod.stock;
