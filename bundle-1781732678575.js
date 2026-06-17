@@ -35630,11 +35630,11 @@ Motivo: ${motivo}` : ""}`)) {
       let res = { ok: false, sistemaP, cantNueva: 0, repetido: false };
       setConteo((prev) => {
         const ya = prev[p.id] || 0;
-        if (ya + 1 > sistemaP) {
+        if (sistemaP > 0 && ya + 1 > sistemaP) {
           res = { ok: false, sistemaP, cantNueva: ya, repetido: ya > 0 };
           return prev;
         }
-        res = { ok: true, sistemaP, cantNueva: ya + 1, repetido: ya > 0 };
+        res = { ok: true, sistemaP, cantNueva: ya + 1, repetido: ya > 0, sobrante: sistemaP === 0 };
         return { ...prev, [p.id]: ya + 1 };
       });
       if (res.ok) {
@@ -35661,7 +35661,7 @@ Motivo: ${motivo}` : ""}`)) {
         if (r.sistemaP <= 1) beepError();
         flash(false, r.sistemaP <= 1 ? `${p.codigo}: repetido \xB7 solo ${r.sistemaP} en sistema, ya escaneado (no se suma)` : `${p.codigo}: repetido \xB7 ya contaste las ${r.sistemaP} unidades (no se suma)`);
       } else {
-        flash(true, r.repetido ? `Repetido OK \xB7 unidad ${r.cantNueva}/${r.sistemaP} \xB7 ${(p.nombre || "").toUpperCase()}` : `+1 \xB7 ${(p.nombre || "").toUpperCase()} (${p.codigo})`);
+        flash(true, r.sobrante ? `\u26A0 SOBRANTE \xB7 ${(p.nombre || "").toUpperCase()} (${p.codigo}) \u2014 stock sistema: 0` : r.repetido ? `Repetido OK \xB7 unidad ${r.cantNueva}/${r.sistemaP} \xB7 ${(p.nombre || "").toUpperCase()}` : `+1 \xB7 ${(p.nombre || "").toUpperCase()} (${p.codigo})`);
       }
       setCodManual("");
       return r.ok;
@@ -35702,8 +35702,9 @@ Motivo: ${motivo}` : ""}`)) {
         ok: true,
         code: p.codigo,
         repetido: r.repetido,
+        sobrante: r.sobrante,
         title: (p.nombre || "").toUpperCase(),
-        sub: r.repetido ? `Repetido OK \xB7 unidad ${r.cantNueva} de ${r.sistemaP}` : `${p.codigo} \xB7 contabilizado (1 de ${r.sistemaP})`
+        sub: r.sobrante ? `\u26A0 SOBRANTE \xB7 ${p.codigo} \u2014 stock sistema: 0` : r.repetido ? `Repetido OK \xB7 unidad ${r.cantNueva} de ${r.sistemaP}` : `${p.codigo} \xB7 contabilizado (1 de ${r.sistemaP})`
       });
       return true;
     }

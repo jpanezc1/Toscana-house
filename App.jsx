@@ -13032,13 +13032,16 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
   // Suma 1 unidad respetando el stock del sistema. Si el mismo código se
   // escanea más veces de las unidades que existen, NO suma (devuelve ok:false)
   // para avisar "repetido sin más stock". `repetido` = ya se había escaneado.
+  // Excepción: si sistemaP=0 (stock agotado en sistema) SÍ se permite contar
+  // porque el ítem puede existir físicamente → aparece como SOBRANTE en el cruce.
   function intentarContar(p){
     const sistemaP=sistemaDe(p);
     let res={ok:false,sistemaP,cantNueva:0,repetido:false};
     setConteo(prev=>{
       const ya=prev[p.id]||0;
-      if(ya+1>sistemaP){ res={ok:false,sistemaP,cantNueva:ya,repetido:ya>0}; return prev; }
-      res={ok:true,sistemaP,cantNueva:ya+1,repetido:ya>0};
+      // Solo bloquear si sistemaP>0 y ya alcanzamos el máximo
+      if(sistemaP>0 && ya+1>sistemaP){ res={ok:false,sistemaP,cantNueva:ya,repetido:ya>0}; return prev; }
+      res={ok:true,sistemaP,cantNueva:ya+1,repetido:ya>0,sobrante:sistemaP===0};
       return {...prev,[p.id]:ya+1};
     });
     if(res.ok){
@@ -13063,9 +13066,11 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
         ? `${p.codigo}: repetido · solo ${r.sistemaP} en sistema, ya escaneado (no se suma)`
         : `${p.codigo}: repetido · ya contaste las ${r.sistemaP} unidades (no se suma)`);
     } else {
-      flash(true, r.repetido
-        ? `Repetido OK · unidad ${r.cantNueva}/${r.sistemaP} · ${(p.nombre||"").toUpperCase()}`
-        : `+1 · ${(p.nombre||"").toUpperCase()} (${p.codigo})`);
+      flash(true, r.sobrante
+        ? `⚠ SOBRANTE · ${(p.nombre||"").toUpperCase()} (${p.codigo}) — stock sistema: 0`
+        : r.repetido
+          ? `Repetido OK · unidad ${r.cantNueva}/${r.sistemaP} · ${(p.nombre||"").toUpperCase()}`
+          : `+1 · ${(p.nombre||"").toUpperCase()} (${p.codigo})`);
     }
     setCodManual("");
     return r.ok;
@@ -13106,11 +13111,13 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
         title:`Repetido · ${(p.nombre||"").toUpperCase()}`, sub:`${p.codigo} · ${motivo}`});
       return false;
     }
-    setLiveFeedback({ts:Date.now(),ok:true,code:p.codigo,repetido:r.repetido,
+    setLiveFeedback({ts:Date.now(),ok:true,code:p.codigo,repetido:r.repetido,sobrante:r.sobrante,
       title:(p.nombre||"").toUpperCase(),
-      sub: r.repetido
-        ? `Repetido OK · unidad ${r.cantNueva} de ${r.sistemaP}`
-        : `${p.codigo} · contabilizado (1 de ${r.sistemaP})`});
+      sub: r.sobrante
+        ? `⚠ SOBRANTE · ${p.codigo} — stock sistema: 0`
+        : r.repetido
+          ? `Repetido OK · unidad ${r.cantNueva} de ${r.sistemaP}`
+          : `${p.codigo} · contabilizado (1 de ${r.sistemaP})`});
     return true;
   }
 
