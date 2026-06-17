@@ -13672,10 +13672,18 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
           let nuevoDetalle;
           let msgOk;
           if(idxExistente>=0){
+            const dExistente = aud.detalle[idxExistente];
+            const yaContado = dExistente.contado||0;
+            const stockSistema = dExistente.sistema||0;
+            // Bloquear si ya contó todas las unidades que hay en sistema
+            if(stockSistema>0 && yaContado>=stockSistema){
+              setMsgAgregar({ok:false,txt:`"${prod.nombre}": ya contaste las ${stockSistema} unidad${stockSistema!==1?"es":""} en sistema — no se suma`});
+              return;
+            }
             // Código ya en verificación → sumar 1 unidad al contado
             nuevoDetalle = (aud.detalle||[]).map((d,i)=>{
               if(i!==idxExistente) return d;
-              const nuevoContado = (d.contado||0)+1;
+              const nuevoContado = yaContado+1;
               const nuevaDif = nuevoContado-(d.sistema||0);
               return {...d, contado:nuevoContado, diferencia:nuevaDif,
                 estado:nuevaDif===0?"OK":nuevaDif>0?"SOBRANTE":"FALTANTE",
