@@ -37502,163 +37502,221 @@ Se registrar\xE1 que los faltantes/sobrantes fueron verificados f\xEDsicamente y
       return s + (a?.gcAmount || 0);
     }, 0);
     const gcVentas = liq.vMarca.filter((v) => v.gcAllocations?.some((x) => x.marcaId === marcaId && x.gcAmount > 0)).length;
-    return /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, null, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "grid", gridTemplateColumns: isDesktop ? "1fr 1fr 1fr 1fr" : "1fr 1fr", gap: isDesktop ? 8 : 10, marginBottom: isDesktop ? 14 : 20 } }, /* @__PURE__ */ import_react.default.createElement(
-      StatCard,
-      {
-        icon: marca?.imagen ? /* @__PURE__ */ import_react.default.createElement(MarcaIcon, { marca, size: 22, radius: 6 }) : marca?.emoji || "\u25C6",
-        label: "Total hist\xF3rico",
-        value: $(totalHist),
-        sub: `${historial.reduce((s, h) => s + h.ventas.length, 0)} ventas`,
-        color: marca?.color,
-        compact: isDesktop
-      }
-    ), /* @__PURE__ */ import_react.default.createElement(
-      StatCard,
-      {
-        icon: "\u{1F4C5}",
-        label: MESES[mes],
-        value: $(liq.bruto),
-        sub: `${liq.vMarca.length} ventas`,
-        color: C.gold,
-        compact: isDesktop
-      }
-    ), /* @__PURE__ */ import_react.default.createElement(
-      StatCard,
-      {
-        icon: "\u{1F4E6}",
-        label: "Productos",
-        value: prods.filter((p) => p.stock > 0).length,
-        sub: `${prods.reduce((s, p) => s + p.stock, 0)} uds`,
-        color: C.blue,
-        compact: isDesktop
-      }
-    ), /* @__PURE__ */ import_react.default.createElement(StatCard, { icon: "\u{1F5D3}", label: "Per\xEDodos", value: historial.length, color: C.indigo, compact: isDesktop })), /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 16 } }, /* @__PURE__ */ import_react.default.createElement(
-      SegControl,
-      {
-        options: [
-          { value: "historial", label: "Historial" },
-          { value: "productos", label: "Productos" },
-          { value: "liquidacion", label: "Liquidaci\xF3n" },
-          { value: "verificacion", label: `Verificaci\xF3n${auditorias.filter((a) => a.marcaId === marcaId).length ? ` (${auditorias.filter((a) => a.marcaId === marcaId).length})` : ""}` }
-        ],
-        value: sub,
-        onChange: setSub
-      }
-    )), sub === "historial" && /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, color: C.label3, fontFamily: FONT } }, historial.length, " per\xEDodo", historial.length !== 1 ? "s" : ""), /* @__PURE__ */ import_react.default.createElement(
+    const SLabel = ({ children }) => /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      fontSize: 10,
+      fontWeight: 700,
+      letterSpacing: 1.4,
+      textTransform: "uppercase",
+      color: C.label3,
+      fontFamily: FONT_UI,
+      marginBottom: 14,
+      opacity: 0.7
+    } }, children);
+    return /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, null, /* @__PURE__ */ import_react.default.createElement("div", { style: { paddingTop: 4 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      display: "grid",
+      gridTemplateColumns: "1fr 1fr 1fr 1fr",
+      gap: 1,
+      borderRadius: 16,
+      overflow: "hidden",
+      border: `1px solid ${C.sep}`,
+      marginBottom: 24
+    } }, [
+      { label: "Hist\xF3rico", val: $(totalHist), sub: `${historial.reduce((s, h) => s + h.ventas.length, 0)} ventas` },
+      { label: MESES[mes], val: $(liq.bruto), sub: `${liq.vMarca.length} ventas` },
+      { label: "Disponibles", val: prods.filter((p) => p.stock > 0).length, sub: `${prods.reduce((s, p) => s + p.stock, 0)} uds` },
+      { label: "Per\xEDodos", val: historial.length, sub: "registros" }
+    ].map((s, i) => /* @__PURE__ */ import_react.default.createElement("div", { key: s.label, style: {
+      background: i === 0 ? `${marca?.color || C.gold}18` : C.bg2,
+      padding: "16px 14px",
+      textAlign: "center",
+      borderRight: i < 3 ? `1px solid ${C.sep}` : "none"
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      fontSize: 10,
+      letterSpacing: 1,
+      textTransform: "uppercase",
+      color: C.label3,
+      fontFamily: FONT_UI,
+      marginBottom: 6,
+      opacity: 0.65
+    } }, s.label), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      fontSize: 18,
+      fontWeight: 700,
+      color: C.label,
+      fontFamily: FONT,
+      letterSpacing: "-0.02em",
+      lineHeight: 1
+    } }, s.val), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: C.label3, fontFamily: FONT_UI, marginTop: 5, opacity: 0.5 } }, s.sub)))), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      display: "flex",
+      gap: 0,
+      marginBottom: 28,
+      borderBottom: `1px solid ${C.sep}`
+    } }, [
+      { value: "historial", label: "Historial" },
+      { value: "productos", label: "Productos" },
+      { value: "liquidacion", label: "Liquidaci\xF3n" },
+      { value: "verificacion", label: `Verificaci\xF3n${auditorias.filter((a) => a.marcaId === marcaId).length ? ` \xB7 ${auditorias.filter((a) => a.marcaId === marcaId).length}` : ""}` }
+    ].map((t) => /* @__PURE__ */ import_react.default.createElement("button", { key: t.value, onClick: () => setSub(t.value), style: {
+      flex: 1,
+      padding: "10px 4px",
+      border: "none",
+      background: "transparent",
+      cursor: "pointer",
+      fontSize: 12,
+      fontWeight: sub === t.value ? 700 : 400,
+      fontFamily: FONT_UI,
+      color: sub === t.value ? C.label : C.label3,
+      borderBottom: sub === t.value ? `2px solid ${C.label}` : "2px solid transparent",
+      transition: "all .15s",
+      letterSpacing: 0.2
+    } }, t.label))), sub === "historial" && /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 } }, /* @__PURE__ */ import_react.default.createElement(SLabel, null, historial.length, " per\xEDodo", historial.length !== 1 ? "s" : ""), /* @__PURE__ */ import_react.default.createElement(
       "select",
       {
         value: filtroMk,
         onChange: (e) => setFMk(e.target.value),
         style: {
-          background: C.bg2,
-          border: `1px solid ${C.sep}`,
-          color: C.label,
-          borderRadius: 10,
-          padding: "6px 12px",
-          fontSize: 13,
-          fontFamily: FONT,
+          background: "transparent",
+          border: "none",
+          color: C.label3,
+          fontSize: 12,
+          fontFamily: FONT_UI,
           cursor: "pointer",
           outline: "none",
-          WebkitAppearance: "none"
+          WebkitAppearance: "none",
+          letterSpacing: 0.5
         }
       },
-      /* @__PURE__ */ import_react.default.createElement("option", { value: "" }, "Todo"),
+      /* @__PURE__ */ import_react.default.createElement("option", { value: "" }, "Todos los per\xEDodos"),
       historial.map((h) => /* @__PURE__ */ import_react.default.createElement("option", { key: h.mk, value: h.mk }, MESES[h.mes], " ", h.anio))
-    )), histFil.length === 0 ? /* @__PURE__ */ import_react.default.createElement(EmptyState, { icon: "\u{1F4CB}", title: "Sin ventas registradas", sub: `No hay ventas para ${marca?.nombre}` }) : histFil.map((periodo) => /* @__PURE__ */ import_react.default.createElement("div", { key: periodo.mk, style: { background: C.bg2, borderRadius: 14, overflow: "hidden", marginBottom: isDesktop ? 6 : 10 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      padding: isDesktop ? "9px 14px" : "12px 14px",
-      borderBottom: `1px solid ${C.sep}`,
+    )), histFil.length === 0 ? /* @__PURE__ */ import_react.default.createElement(EmptyState, { icon: "\u{1F4CB}", title: "Sin ventas registradas", sub: `No hay ventas para ${marca?.nombre}` }) : histFil.map((periodo) => /* @__PURE__ */ import_react.default.createElement("div", { key: periodo.mk, style: { marginBottom: 28 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
       display: "flex",
       justifyContent: "space-between",
-      alignItems: "center",
-      background: `${marca?.color}10`
-    } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: isDesktop ? 13 : 15, fontWeight: 600, color: C.label, fontFamily: FONT } }, MESES[periodo.mes], " ", periodo.anio), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: isDesktop ? 11 : 12, color: C.label3, fontFamily: FONT, opacity: 0.65 } }, periodo.ventas.length, " transacciones")), /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "right" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: isDesktop ? 17 : 20, fontWeight: 700, color: C.label, fontFamily: FONT, letterSpacing: "-0.02em" } }, $(periodo.bruto)), cierres[`${periodo.mk}-${marcaId}`]?.cerrado && /* @__PURE__ */ import_react.default.createElement(Chip, { color: C.green, small: true }, "\u2713 Cerrado"))), periodo.ventas.map((v, i) => /* @__PURE__ */ import_react.default.createElement("div", { key: v.id, style: {
-      padding: isDesktop ? "8px 14px" : "10px 14px",
-      borderBottom: i < periodo.ventas.length - 1 ? `1px solid ${C.sep}` : ""
-    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: isDesktop ? 2 : 4 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 7 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontFamily: "monospace", fontSize: 11, color: C.gold, fontWeight: 600 } }, v.id), /* @__PURE__ */ import_react.default.createElement(PagoDisplay, { mp: v.metodoPago, total: v.total, small: true })), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: isDesktop ? 14 : 15, fontWeight: 700, color: C.label, fontFamily: FONT, letterSpacing: "-0.01em" } }, $(v.subMarca))), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT, marginBottom: isDesktop ? 2 : 4, opacity: 0.65 } }, v.fecha, " ", v.hora), v.itsMarca.map((it, ii) => /* @__PURE__ */ import_react.default.createElement("div", { key: `${v.id}-${it.prodId}-${ii}`, style: { fontSize: 12, color: C.label2, fontFamily: FONT, lineHeight: "1.3" } }, "\xB7 ", it.nombre, " ", /* @__PURE__ */ import_react.default.createElement("span", { style: { fontFamily: "monospace", fontSize: 10, color: C.label3, opacity: 0.7 } }, it.codigo), " ", "\xD7", it.cantidad))))))), sub === "productos" && /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      display: isDesktop ? "grid" : "flex",
-      gridTemplateColumns: isDesktop ? "1fr 1fr 1fr" : void 0,
-      flexDirection: isDesktop ? void 0 : "column",
-      gap: isDesktop ? 6 : 0
-    } }, prods.length === 0 ? /* @__PURE__ */ import_react.default.createElement(EmptyState, { icon: "\u{1F4E6}", title: "Sin productos", sub: `No hay \xEDtems registrados para ${marca?.nombre}` }) : prods.map((p, i) => {
+      alignItems: "baseline",
+      paddingBottom: 10,
+      borderBottom: `1px solid ${C.sep}`,
+      marginBottom: 0
+    } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 15, fontWeight: 600, color: C.label, fontFamily: FONT, letterSpacing: ".3px" } }, MESES[periodo.mes], " ", periodo.anio), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 11, color: C.label3, fontFamily: FONT_UI, marginLeft: 10, opacity: 0.6 } }, periodo.ventas.length, " transacciones")), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } }, cierres[`${periodo.mk}-${marcaId}`]?.cerrado && /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 10, color: C.green, fontFamily: FONT_UI, letterSpacing: 0.5 } }, "\u2713 CERRADO"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 17, fontWeight: 700, color: C.label, fontFamily: FONT, letterSpacing: "-0.02em" } }, $(periodo.bruto)))), periodo.ventas.map((v, i) => /* @__PURE__ */ import_react.default.createElement("div", { key: v.id, style: {
+      padding: "14px 0",
+      borderBottom: i < periodo.ventas.length - 1 ? `1px solid ${C.sep}` : "none"
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "flex-start" } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 5 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: {
+      fontFamily: "monospace",
+      fontSize: 11,
+      color: C.gold,
+      fontWeight: 600,
+      background: `${C.gold}18`,
+      padding: "2px 7px",
+      borderRadius: 5
+    } }, v.id), /* @__PURE__ */ import_react.default.createElement(PagoDisplay, { mp: v.metodoPago, total: v.total, small: true })), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT_UI, opacity: 0.55, marginBottom: 6 } }, v.fecha, " \xB7 ", v.hora), v.itsMarca.map((it, ii) => /* @__PURE__ */ import_react.default.createElement(
+      "div",
+      {
+        key: `${v.id}-${it.prodId}-${ii}`,
+        style: { fontSize: 12, color: C.label2, fontFamily: FONT, lineHeight: "1.8" }
+      },
+      it.nombre,
+      /* @__PURE__ */ import_react.default.createElement("span", { style: { fontFamily: "monospace", fontSize: 10, color: C.label3, opacity: 0.55, marginLeft: 5 } }, it.codigo),
+      /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.label3, marginLeft: 4, opacity: 0.6 } }, "\xD7", it.cantidad)
+    ))), /* @__PURE__ */ import_react.default.createElement("span", { style: {
+      fontSize: 16,
+      fontWeight: 700,
+      color: C.label,
+      fontFamily: FONT,
+      letterSpacing: "-0.02em",
+      flexShrink: 0,
+      paddingLeft: 12
+    } }, $(v.subMarca)))))))), sub === "productos" && /* @__PURE__ */ import_react.default.createElement("div", null, prods.length === 0 ? /* @__PURE__ */ import_react.default.createElement(EmptyState, { icon: "\u{1F4E6}", title: "Sin productos", sub: `No hay \xEDtems registrados para ${marca?.nombre}` }) : /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, null, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", marginBottom: 16 } }, /* @__PURE__ */ import_react.default.createElement(SLabel, null, prods.length, " productos \xB7 ", prods.reduce((s, p) => s + p.stock, 0), " uds"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 10, fontFamily: FONT_UI, color: C.label3, opacity: 0.5, letterSpacing: 0.5, textTransform: "uppercase" } }, prods.filter((p) => p.stock === 0).length, " agotados")), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      display: "grid",
+      gridTemplateColumns: "1fr auto auto",
+      gap: "0 16px",
+      paddingBottom: 8,
+      borderBottom: `1px solid ${C.sep}`,
+      marginBottom: 0
+    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 10, letterSpacing: 1, textTransform: "uppercase", color: C.label3, fontFamily: FONT_UI, opacity: 0.5 } }, "Producto"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 10, letterSpacing: 1, textTransform: "uppercase", color: C.label3, fontFamily: FONT_UI, opacity: 0.5, textAlign: "right" } }, "Precio"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 10, letterSpacing: 1, textTransform: "uppercase", color: C.label3, fontFamily: FONT_UI, opacity: 0.5, textAlign: "right", minWidth: 52 } }, "Stock")), prods.map((p, i) => {
       const vendidas = p.stockInicial - p.stock;
       return /* @__PURE__ */ import_react.default.createElement("div", { key: p.id, style: {
-        background: C.bg2,
-        borderRadius: isDesktop ? 12 : i === 0 ? "14px 14px 2px 2px" : i === prods.length - 1 ? "2px 2px 14px 14px" : "2px",
-        padding: isDesktop ? "10px 12px" : "14px 16px",
-        borderBottom: isDesktop ? "none" : i < prods.length - 1 ? `1px solid ${C.sep}` : "",
-        border: isDesktop ? `1px solid ${C.sep}` : void 0
-      } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "flex-start" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: isDesktop ? 13 : 15, fontWeight: 500, color: C.label, fontFamily: FONT, marginBottom: isDesktop ? 3 : 4 } }, p.nombre), /* @__PURE__ */ import_react.default.createElement("span", { style: {
-        fontFamily: "monospace",
-        fontSize: 11,
-        color: C.gold,
-        background: `${C.gold}18`,
-        padding: "1px 7px",
-        borderRadius: 5
-      } }, p.codigo)), /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "right" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: isDesktop ? 14 : 16, fontWeight: 700, color: C.label, fontFamily: FONT } }, $(p.precio)), /* @__PURE__ */ import_react.default.createElement("div", { style: {
-        fontSize: isDesktop ? 12 : 13,
+        display: "grid",
+        gridTemplateColumns: "1fr auto auto",
+        gap: "0 16px",
+        padding: "13px 0",
+        alignItems: "center",
+        borderBottom: i < prods.length - 1 ? `1px solid ${C.sep}` : "none"
+      } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, fontWeight: 500, color: C.label, fontFamily: FONT, marginBottom: 3, lineHeight: 1.3 } }, p.nombre), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontFamily: "monospace", fontSize: 10, color: C.label3, opacity: 0.6 } }, p.codigo, vendidas > 0 && /* @__PURE__ */ import_react.default.createElement("span", { style: { marginLeft: 8, color: C.label3 } }, "\xB7 ", vendidas, " vendidas"))), /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "right", fontSize: 13, fontWeight: 600, color: C.label, fontFamily: FONT } }, $(p.precio)), /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "right", minWidth: 52 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: {
+        fontSize: 13,
+        fontWeight: 600,
         fontFamily: FONT,
-        marginTop: 2,
         color: p.stock === 0 ? C.red : p.stock < 3 ? C.amber : C.green
-      } }, p.stock === 0 ? "Agotado" : p.stock < 3 ? `${p.stock} (bajo)` : `${p.stock} disp.`), vendidas > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT } }, vendidas, " vend."))));
-    })), sub === "liquidacion" && /* @__PURE__ */ import_react.default.createElement("div", null, cerrado && /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      padding: "12px 16px",
-      background: `${C.green}15`,
-      borderRadius: 14,
-      border: `1px solid ${C.green}30`,
-      marginBottom: 16,
-      fontSize: 15,
-      color: C.green,
-      fontFamily: FONT,
-      textAlign: "center",
-      fontWeight: 600
-    } }, "\u2713 Cierre de ", MESES[mes], " confirmado"), /* @__PURE__ */ import_react.default.createElement("div", { style: { background: C.bg2, borderRadius: 16, overflow: "hidden", marginBottom: 16 } }, gcTotal > 0 && /* @__PURE__ */ import_react.default.createElement("div", { key: "gc-summary", style: {
-      display: "flex",
-      justifyContent: "space-between",
-      alignItems: "center",
+      } }, p.stock === 0 ? "\u2014" : p.stock), p.stock === 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 9, color: C.red, fontFamily: FONT_UI, letterSpacing: 0.5 } }, "AGOTADO")));
+    }))), sub === "liquidacion" && /* @__PURE__ */ import_react.default.createElement("div", null, cerrado && /* @__PURE__ */ import_react.default.createElement("div", { style: {
       padding: "10px 16px",
-      background: "#7C3AED08",
-      borderBottom: `1px solid ${C.sep}`
-    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, color: "#7C3AED", fontFamily: FONT } }, "\u{1F381} Gift Card (", gcVentas, " venta", gcVentas !== 1 ? "s" : "", ")"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, fontWeight: 600, color: "#7C3AED", fontFamily: FONT } }, $(gcTotal))), /* @__PURE__ */ import_react.default.createElement("div", { style: { padding: "12px 16px", borderBottom: `1px solid ${C.sep}` } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      fontSize: 11,
-      fontWeight: 700,
-      color: C.label3,
+      background: `${C.green}10`,
+      borderRadius: 10,
+      marginBottom: 24,
+      fontSize: 12,
+      color: C.green,
+      fontFamily: FONT_UI,
+      letterSpacing: 0.5,
       textTransform: "uppercase",
-      letterSpacing: 0.6,
-      marginBottom: 8,
-      fontFamily: FONT
-    } }, "Desglose por m\xE9todo de pago"), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 } }, [
+      textAlign: "center"
+    } }, "\u2713 Cierre de ", MESES[mes], " confirmado"), /* @__PURE__ */ import_react.default.createElement(SLabel, null, "Por m\xE9todo de pago"), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 28 } }, [
       { label: "Efectivo", val: liq.brutoEf, color: C.green },
       { label: "QR", val: liq.brutoQR, color: C.blue },
-      { label: `Tarjeta (-${liq.cfg?.pctTarjeta ?? 0}%)`, val: liq.brutoTJ, color: C.amber }
+      { label: `Tarjeta`, val: liq.brutoTJ, color: C.amber }
     ].map((s) => /* @__PURE__ */ import_react.default.createElement("div", { key: s.label, style: {
-      textAlign: "center",
-      padding: "9px 8px",
-      background: `${s.color}10`,
-      borderRadius: 12
-    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 14, fontWeight: 700, color: C.label, fontFamily: FONT, letterSpacing: "-0.01em" } }, $(Math.round(s.val))), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: C.label3, fontFamily: FONT, marginTop: 2, opacity: 0.7 } }, s.label))))), [
-      ["Ventas brutas", $(liq.bruto), C.label, false],
-      [`\u2212 Desc. Tarjeta (${liq.cfg?.pctTarjeta ?? 0}%)`, `-${$(liq.descTJ)}`, C.red, false],
-      [`= Subtotal -${liq.cfg?.pctTarjeta ?? 0}%`, $(liq.subBanco), C.label2, false],
-      [`\u2212 Comisi\xF3n ventas (${liq.cfg?.pctComision ?? 0}%)`, `-${$(liq.comision)}`, C.red, false],
-      liq.alquiler > 0 ? [`\u2212 Alquiler`, `-${$(liq.alquiler)}`, C.amber, false] : null,
+      padding: "16px 12px",
+      borderRadius: 12,
+      background: C.bg2,
+      border: `1px solid ${C.sep}`,
+      textAlign: "center"
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      fontSize: 15,
+      fontWeight: 700,
+      color: C.label,
+      fontFamily: FONT,
+      letterSpacing: "-0.02em",
+      marginBottom: 5
+    } }, $(Math.round(s.val))), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      fontSize: 10,
+      color: C.label3,
+      fontFamily: FONT_UI,
+      letterSpacing: 0.5,
+      textTransform: "uppercase",
+      opacity: 0.6
+    } }, s.label)))), gcTotal > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      padding: "12px 0",
+      borderBottom: `1px solid ${C.sep}`,
+      marginBottom: 0
+    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 12, color: "#7C3AED", fontFamily: FONT_UI, letterSpacing: 0.3 } }, "Gift Card \xB7 ", gcVentas, " venta", gcVentas !== 1 ? "s" : ""), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, fontWeight: 600, color: "#7C3AED", fontFamily: FONT } }, $(gcTotal))), /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 28 } }, [
+      ["Ventas brutas", $(liq.bruto), false, false],
+      [`\u2212 Desc. Tarjeta (${liq.cfg?.pctTarjeta ?? 0}%)`, `-${$(liq.descTJ)}`, true, false],
+      [`= Subtotal`, $(liq.subBanco), false, false],
+      [`\u2212 Comisi\xF3n (${liq.cfg?.pctComision ?? 0}%)`, `-${$(liq.comision)}`, true, false],
+      liq.alquiler > 0 ? [`\u2212 Alquiler`, `-${$(liq.alquiler)}`, true, false] : null,
       ...liq.gastos.filter((g) => g.desc || Number(g.monto) > 0).map(
-        (g) => [`\u2212 ${g.desc || "Gasto extra"}`, `-${$(Math.round(Number(g.monto) || 0))}`, C.red, false]
+        (g) => [`\u2212 ${g.desc || "Gasto extra"}`, `-${$(Math.round(Number(g.monto) || 0))}`, true, false]
       ),
-      ["Neto a liquidar", $(liq.neto), C.green, true]
-    ].filter(Boolean).map(([k, v, c, bold], i, arr) => /* @__PURE__ */ import_react.default.createElement("div", { key: k, style: {
+      ["Neto a liquidar", $(liq.neto), false, true]
+    ].filter(Boolean).map(([k, v, muted, bold], i, arr) => /* @__PURE__ */ import_react.default.createElement("div", { key: k, style: {
       display: "flex",
       justifyContent: "space-between",
       alignItems: "center",
-      padding: "13px 16px",
-      borderBottom: i < arr.length - 1 ? `1px solid ${C.sep}` : "",
-      background: bold ? `${C.green}08` : "transparent"
-    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 14, color: bold ? C.green : C.label2, fontFamily: FONT, fontWeight: bold ? 600 : 400 } }, k), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 15, fontWeight: bold ? 700 : 600, color: c, fontFamily: FONT } }, v))), /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      display: "flex",
-      justifyContent: "space-between",
-      alignItems: "center",
-      padding: "18px 16px",
-      background: `${C.gold}12`
-    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 16, fontWeight: 700, color: C.label, fontFamily: FONT } }, "TOTAL A PAGAR"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 24, fontWeight: 700, color: C.label, fontFamily: FONT } }, $(liq.neto)))), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 10 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 10 } }, /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => generarVistaPreviaLiquidacion(marca, mes, anio, {
+      padding: bold ? "18px 0" : "13px 0",
+      borderBottom: i < arr.length - 1 ? `1px solid ${C.sep}` : "none",
+      borderTop: bold ? `1px solid ${C.sep}` : "none",
+      marginTop: bold ? 4 : 0
+    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: {
+      fontSize: bold ? 15 : 13,
+      color: bold ? C.label : muted ? C.label3 : C.label2,
+      fontFamily: bold ? FONT : FONT_UI,
+      fontWeight: bold ? 700 : 400,
+      letterSpacing: bold ? 0.3 : 0
+    } }, k), /* @__PURE__ */ import_react.default.createElement("span", { style: {
+      fontSize: bold ? 20 : 14,
+      fontWeight: bold ? 700 : 500,
+      color: bold ? C.green : muted ? C.red : C.label,
+      fontFamily: FONT,
+      letterSpacing: "-0.02em"
+    } }, v)))), /* @__PURE__ */ import_react.default.createElement(SLabel, null, "Acciones"), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 } }, /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => generarVistaPreviaLiquidacion(marca, mes, anio, {
       bruto: liq.bruto,
       brutoEfect: liq.brutoEf,
       brutoQR: liq.brutoQR,
@@ -37674,7 +37732,7 @@ Se registrar\xE1 que los faltantes/sobrantes fueron verificados f\xEDsicamente y
       neto: liq.neto,
       vMarca: liq.vMarca,
       marcaId
-    }, setImgPreview), variant: "fill", full: true, icon: "\u{1F4E4}" }, "Compartir"), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => imprimirLiquidacion(marca, mes, anio, liq), variant: "fill", full: true, icon: "\u{1F5A8}" }, "Imprimir")), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => generarImagenLiquidacion(marca, mes, anio, liq), variant: "fill", full: true, icon: "\u{1F4F7}" }, "Exportar Imagen"), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => exportExcelLiquidacion(MARCAS.find((m) => m.id === marcaId), ventas, mes, anio), variant: "fill", full: true, icon: "\u2B07" }, "Exportar Excel"), !cerrado ? /* @__PURE__ */ import_react.default.createElement(
+    }, setImgPreview), variant: "fill", full: true, icon: "\u{1F4E4}" }, "Compartir"), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => imprimirLiquidacion(marca, mes, anio, liq), variant: "fill", full: true, icon: "\u{1F5A8}" }, "Imprimir")), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 16 } }, /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => generarImagenLiquidacion(marca, mes, anio, liq), variant: "fill", full: true, icon: "\u{1F4F7}" }, "Imagen"), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => exportExcelLiquidacion(MARCAS.find((m) => m.id === marcaId), ventas, mes, anio), variant: "fill", full: true, icon: "\u2B07" }, "Excel")), !cerrado ? /* @__PURE__ */ import_react.default.createElement(
       IOSBtn,
       {
         variant: "success",
@@ -37691,41 +37749,39 @@ Se registrar\xE1 que los faltantes/sobrantes fueron verificados f\xEDsicamente y
         onPress: () => setCierres((p) => ({ ...p, [`${MK}-${marcaId}`]: { cerrado: false, mk: MK } }))
       },
       "Reabrir Liquidaci\xF3n"
-    )), liq.vMarca.length > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: { marginTop: 20 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      fontSize: 13,
-      fontWeight: 600,
-      color: C.label3,
-      textTransform: "uppercase",
-      letterSpacing: 0.6,
-      marginBottom: 12
-    } }, "Ventas del per\xEDodo"), liq.vMarca.map((v) => {
+    ), liq.vMarca.length > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: { marginTop: 32 } }, /* @__PURE__ */ import_react.default.createElement(SLabel, null, "Ventas del per\xEDodo \xB7 ", liq.vMarca.length), liq.vMarca.map((v, vi) => {
       const its = v.items.filter((i) => i.marcaId === marcaId);
       const sub2 = its.reduce((s, i) => s + i.subtotal, 0);
       const gcAlloc = v.gcAllocations?.find((a) => a.marcaId === marcaId);
       return /* @__PURE__ */ import_react.default.createElement("div", { key: v.id, style: {
-        background: C.bg2,
-        borderRadius: 10,
-        padding: "10px 14px",
-        marginBottom: 5,
-        border: v.gcId ? `1px solid #7C3AED20` : `1px solid ${C.sep}`
-      } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 3 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontFamily: "monospace", fontSize: 11, color: C.gold, fontWeight: 600 } }, v.id), v.gcId && /* @__PURE__ */ import_react.default.createElement("span", { style: {
+        padding: "14px 0",
+        borderBottom: vi < liq.vMarca.length - 1 ? `1px solid ${C.sep}` : "none"
+      } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "flex-start" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 7, marginBottom: 4 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontFamily: "monospace", fontSize: 11, color: C.gold, fontWeight: 600 } }, v.id), v.gcId && /* @__PURE__ */ import_react.default.createElement("span", { style: {
         fontSize: 9,
         background: "#7C3AED15",
         color: "#7C3AED",
         fontWeight: 700,
-        padding: "2px 5px",
-        borderRadius: 6,
+        padding: "2px 6px",
+        borderRadius: 5,
         fontFamily: FONT_UI
-      } }, "\u{1F381} GC")), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 15, fontWeight: 700, color: C.label, fontFamily: FONT, letterSpacing: "-0.01em" } }, $(sub2))), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT, marginBottom: gcAlloc ? 3 : 0, opacity: 0.65 } }, v.fecha, " ", v.hora, " \xB7 ", v.metodoPago?.startsWith("mixto|") ? /* @__PURE__ */ import_react.default.createElement(PagoDisplay, { mp: v.metodoPago, total: sub2, inline: true }) : labelPago(v.metodoPago)), gcAlloc && /* @__PURE__ */ import_react.default.createElement("div", { style: {
-        display: "flex",
-        gap: 10,
-        fontSize: 11,
-        fontFamily: FONT_UI,
-        marginBottom: 3,
-        padding: "4px 8px",
-        background: "#7C3AED08",
-        borderRadius: 6
-      } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { color: "#7C3AED", fontWeight: 600 } }, "\u{1F381} GC: ", $(gcAlloc.gcAmount)), gcAlloc.extraAmount > 0.01 && /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.amber, fontWeight: 600 } }, "+ ", $(gcAlloc.extraAmount), " extra")), its.map((it, ii) => /* @__PURE__ */ import_react.default.createElement("div", { key: `liq-${v.id}-${it.prodId}-${ii}`, style: { fontSize: 12, color: C.label2, fontFamily: FONT, lineHeight: "1.3" } }, "\xB7 ", it.nombre, " \xD7", it.cantidad, " = ", $(it.subtotal))));
+      } }, "GC")), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT_UI, opacity: 0.55, marginBottom: 6 } }, v.fecha, " \xB7 ", v.hora, " \xB7 ", v.metodoPago?.startsWith("mixto|") ? /* @__PURE__ */ import_react.default.createElement(PagoDisplay, { mp: v.metodoPago, total: sub2, inline: true }) : labelPago(v.metodoPago)), gcAlloc && /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: "#7C3AED", fontFamily: FONT_UI, marginBottom: 4 } }, "GC ", $(gcAlloc.gcAmount), gcAlloc.extraAmount > 0.01 ? ` + ${$(gcAlloc.extraAmount)} extra` : ""), its.map((it, ii) => /* @__PURE__ */ import_react.default.createElement(
+        "div",
+        {
+          key: `liq-${v.id}-${it.prodId}-${ii}`,
+          style: { fontSize: 12, color: C.label2, fontFamily: FONT, lineHeight: "1.8" }
+        },
+        it.nombre,
+        /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.label3, fontFamily: FONT_UI, marginLeft: 5, opacity: 0.6 } }, "\xD7", it.cantidad),
+        /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.label3, marginLeft: 5, opacity: 0.6 } }, $(it.subtotal))
+      ))), /* @__PURE__ */ import_react.default.createElement("span", { style: {
+        fontSize: 15,
+        fontWeight: 700,
+        color: C.label,
+        fontFamily: FONT,
+        letterSpacing: "-0.02em",
+        paddingLeft: 12,
+        flexShrink: 0
+      } }, $(sub2))));
     })))), /* @__PURE__ */ import_react.default.createElement(ImagenLiqPreviewModal, { data: imgPreview, onClose: () => {
       if (imgPreview) URL.revokeObjectURL(imgPreview.url);
       setImgPreview(null);
@@ -37793,49 +37849,39 @@ Se registrar\xE1 que los faltantes/sobrantes fueron verificados f\xEDsicamente y
         setMsgAgregar({ ok: true, txt: msgOk });
         setCodAgregar("");
       }
-      return /* @__PURE__ */ import_react.default.createElement("div", null, auds.length === 0 ? /* @__PURE__ */ import_react.default.createElement(EmptyState, { icon: "\u2316", title: "Sin verificaciones", sub: `No hay verificaciones guardadas para ${marca?.nombre}` }) : auds.map((a) => {
+      return /* @__PURE__ */ import_react.default.createElement("div", { style: { paddingTop: 4 } }, auds.length === 0 ? /* @__PURE__ */ import_react.default.createElement(EmptyState, { icon: "\u2316", title: "Sin verificaciones", sub: `No hay verificaciones guardadas para ${marca?.nombre}` }) : auds.map((a) => {
         const abierta = agregandoA === a.id;
-        return /* @__PURE__ */ import_react.default.createElement("div", { key: a.id, style: {
-          background: C.bg2,
-          borderRadius: 14,
-          border: `1px solid ${C.sep}`,
-          overflow: "hidden",
-          marginBottom: 10,
-          boxShadow: "0 1px 3px rgba(0,0,0,.06)"
-        } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
-          padding: "12px 14px",
-          borderBottom: `1px solid ${C.sep}`,
+        return /* @__PURE__ */ import_react.default.createElement("div", { key: a.id, style: { marginBottom: 24 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
           display: "flex",
           justifyContent: "space-between",
-          alignItems: "center",
-          gap: 10,
-          background: `${marca?.color || C.gold}10`
-        } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 14, fontWeight: 700, color: C.label, fontFamily: FONT } }, MESES[a.mes], " ", a.anio), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT, marginTop: 2 } }, a.fecha, " \xB7 ", a.usuario, " \xB7 ", a.totalProductos, " productos")), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 6, flexShrink: 0 } }, a.ok > 0 && /* @__PURE__ */ import_react.default.createElement(Chip, { color: C.green, small: true }, "\u2713 ", a.ok, " OK"), a.faltantes > 0 && /* @__PURE__ */ import_react.default.createElement(Chip, { color: C.red, small: true }, "\u2193 ", a.faltantes), a.sobrantes > 0 && /* @__PURE__ */ import_react.default.createElement(Chip, { color: C.blue, small: true }, "\u2191 ", a.sobrantes))), /* @__PURE__ */ import_react.default.createElement("div", { style: { padding: "10px 14px" } }, (a.detalle || []).filter((d) => d.agregadoPost).length > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 10 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
-          fontSize: 11,
-          fontWeight: 700,
+          alignItems: "baseline",
+          paddingBottom: 10,
+          borderBottom: `1px solid ${C.sep}`,
+          marginBottom: 14
+        } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 14, fontWeight: 600, color: C.label, fontFamily: FONT } }, MESES[a.mes], " ", a.anio), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 11, color: C.label3, fontFamily: FONT_UI, marginLeft: 10, opacity: 0.55 } }, a.fecha, " \xB7 ", a.usuario)), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 10, alignItems: "center" } }, a.ok > 0 && /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 11, color: C.green, fontFamily: FONT_UI } }, "\u2713 ", a.ok), a.faltantes > 0 && /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 11, color: C.red, fontFamily: FONT_UI } }, "\u2193 ", a.faltantes), a.sobrantes > 0 && /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 11, color: C.blue, fontFamily: FONT_UI } }, "\u2191 ", a.sobrantes))), (a.detalle || []).filter((d) => d.agregadoPost).length > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 14 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+          fontSize: 10,
+          letterSpacing: 1,
+          textTransform: "uppercase",
           color: C.label3,
           fontFamily: FONT_UI,
-          textTransform: "uppercase",
-          letterSpacing: 0.5,
-          marginBottom: 6
-        } }, "\xCDtems agregados (", (a.detalle || []).filter((d) => d.agregadoPost).length, ")"), (a.detalle || []).filter((d) => d.agregadoPost).map((d, i) => /* @__PURE__ */ import_react.default.createElement("div", { key: d.codigo + i, style: {
+          opacity: 0.55,
+          marginBottom: 10
+        } }, "Agregados \xB7 ", (a.detalle || []).filter((d) => d.agregadoPost).length), (a.detalle || []).filter((d) => d.agregadoPost).map((d, i) => /* @__PURE__ */ import_react.default.createElement("div", { key: d.codigo + i, style: {
           display: "flex",
           alignItems: "center",
-          gap: 8,
-          padding: "7px 10px",
-          borderRadius: 9,
-          background: C.bg0,
-          marginBottom: 4,
-          border: `1px solid ${C.sep}`
+          gap: 10,
+          padding: "10px 0",
+          borderBottom: `1px solid ${C.sep}`
         } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
-          fontSize: 12,
-          fontWeight: 600,
+          fontSize: 13,
+          fontWeight: 500,
           color: C.label,
           fontFamily: FONT,
           whiteSpace: "nowrap",
           overflow: "hidden",
-          textOverflow: "ellipsis"
-        } }, d.nombre), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: C.label3, fontFamily: "monospace" } }, d.codigo, " \xB7 ", d.contado, " ud \xB7 Bs ", d.precio || "\u2014")), /* @__PURE__ */ import_react.default.createElement("button", { onClick: () => {
+          textOverflow: "ellipsis",
+          marginBottom: 2
+        } }, d.nombre), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: C.label3, fontFamily: "monospace", opacity: 0.6 } }, d.codigo, " \xB7 ", d.contado, " ud")), /* @__PURE__ */ import_react.default.createElement("button", { onClick: () => {
           if (!window.confirm(`\xBFEliminar "${d.nombre}" de esta verificaci\xF3n?`)) return;
           const detalleNuevo = (a.detalle || []).filter((x) => x !== d);
           onActualizarAuditoria && onActualizarAuditoria({
@@ -37848,27 +37894,20 @@ Se registrar\xE1 que los faltantes/sobrantes fueron verificados f\xEDsicamente y
           });
         }, style: {
           flexShrink: 0,
-          width: 24,
-          height: 24,
+          width: 26,
+          height: 26,
           borderRadius: "50%",
           border: "none",
-          background: `${C.red}20`,
+          background: `${C.red}15`,
           color: C.red,
           fontSize: 14,
           fontWeight: 700,
           cursor: "pointer",
           display: "flex",
           alignItems: "center",
-          justifyContent: "center"
-        } }, "\xD7")))), onActualizarAuditoria && (abierta ? /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: {
-          fontSize: 11,
-          fontWeight: 700,
-          color: C.label,
-          fontFamily: FONT_UI,
-          textTransform: "uppercase",
-          letterSpacing: 0.6,
-          marginBottom: 8
-        } }, "Agregar \xEDtems nuevos a esta verificaci\xF3n"), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 8, marginBottom: 8 } }, /* @__PURE__ */ import_react.default.createElement(
+          justifyContent: "center",
+          opacity: 0.7
+        } }, "\xD7")))), onActualizarAuditoria && (abierta ? /* @__PURE__ */ import_react.default.createElement("div", { style: { paddingTop: 4 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 8, marginBottom: 10 } }, /* @__PURE__ */ import_react.default.createElement(
           "input",
           {
             autoFocus: true,
@@ -37883,7 +37922,7 @@ Se registrar\xE1 que los faltantes/sobrantes fueron verificados f\xEDsicamente y
             placeholder: "C\xF3digo del producto",
             style: {
               flex: 1,
-              padding: "10px 12px",
+              padding: "11px 14px",
               borderRadius: 10,
               border: `1px solid ${C.sep}`,
               fontSize: 14,
@@ -37898,25 +37937,25 @@ Se registrar\xE1 que los faltantes/sobrantes fueron verificados f\xEDsicamente y
           {
             onClick: () => agregarItemMarca(a),
             style: {
-              padding: "10px 16px",
+              padding: "11px 18px",
               borderRadius: 10,
               border: "none",
               background: C.label,
               color: C.bg0,
-              fontSize: 13,
+              fontSize: 12,
               fontWeight: 700,
               cursor: "pointer",
-              fontFamily: FONT_UI
+              fontFamily: FONT_UI,
+              letterSpacing: 0.3
             }
           },
-          "+ Agregar"
+          "Agregar"
         )), msgAgregar && /* @__PURE__ */ import_react.default.createElement("div", { style: {
           fontSize: 12,
-          fontWeight: 600,
-          marginBottom: 8,
-          padding: "8px 10px",
+          marginBottom: 10,
+          padding: "10px 12px",
           borderRadius: 8,
-          background: msgAgregar.ok ? `${C.green}15` : `${C.red}15`,
+          background: msgAgregar.ok ? `${C.green}12` : `${C.red}12`,
           color: msgAgregar.ok ? C.green : C.red,
           fontFamily: FONT_UI
         } }, msgAgregar.txt), /* @__PURE__ */ import_react.default.createElement(
@@ -37929,14 +37968,15 @@ Se registrar\xE1 que los faltantes/sobrantes fueron verificados f\xEDsicamente y
             },
             style: {
               width: "100%",
-              padding: "8px",
+              padding: "9px",
               borderRadius: 10,
               border: `1px solid ${C.sep}`,
               background: "transparent",
               color: C.label3,
-              fontSize: 12,
+              fontSize: 11,
               cursor: "pointer",
-              fontFamily: FONT_UI
+              fontFamily: FONT_UI,
+              letterSpacing: 0.5
             }
           },
           "Cerrar"
@@ -37950,19 +37990,21 @@ Se registrar\xE1 que los faltantes/sobrantes fueron verificados f\xEDsicamente y
             },
             style: {
               width: "100%",
-              padding: "9px",
+              padding: "10px",
               borderRadius: 10,
-              border: `1.5px dashed ${C.label3}`,
+              border: `1px dashed ${C.sep}`,
               background: "transparent",
               color: C.label3,
-              fontSize: 12,
-              fontWeight: 600,
+              fontSize: 11,
+              fontWeight: 500,
               cursor: "pointer",
-              fontFamily: FONT_UI
+              fontFamily: FONT_UI,
+              letterSpacing: 0.5,
+              marginTop: 4
             }
           },
-          "+ Agregar \xEDtems nuevos a esta verificaci\xF3n"
-        ))));
+          "+ Agregar \xEDtems"
+        )));
       }));
     })());
   }

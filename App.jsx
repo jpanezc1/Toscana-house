@@ -14726,90 +14726,129 @@ function MarcaDetalle({marcaId,inv,ventas,vMes,mes,anio,MK,cierres,setCierres,ge
   const gcTotal  = liq.vMarca.reduce((s,v)=>{const a=v.gcAllocations?.find(x=>x.marcaId===marcaId);return s+(a?.gcAmount||0);},0);
   const gcVentas = liq.vMarca.filter(v=>v.gcAllocations?.some(x=>x.marcaId===marcaId&&x.gcAmount>0)).length;
 
+  // ── label de sección editorial ──────────────────────────
+  const SLabel = ({children})=>(
+    <div style={{fontSize:10,fontWeight:700,letterSpacing:1.4,textTransform:"uppercase",
+      color:C.label3,fontFamily:FONT_UI,marginBottom:14,opacity:.7}}>
+      {children}
+    </div>
+  );
+
   return (
     <>
-    <div>
-      {/* Stats */}
-      <div style={{display:"grid",gridTemplateColumns: isDesktop ? "1fr 1fr 1fr 1fr" : "1fr 1fr", gap: isDesktop ? 8 : 10, marginBottom: isDesktop ? 14 : 20}}>
-        <StatCard icon={marca?.imagen?<MarcaIcon marca={marca} size={22} radius={6}/>:(marca?.emoji||"◆")} label="Total histórico" value={$(totalHist)}
-          sub={`${historial.reduce((s,h)=>s+h.ventas.length,0)} ventas`} color={marca?.color} compact={isDesktop}/>
-        <StatCard icon="📅" label={MESES[mes]} value={$(liq.bruto)}
-          sub={`${liq.vMarca.length} ventas`} color={C.gold} compact={isDesktop}/>
-        <StatCard icon="📦" label="Productos" value={prods.filter(p=>p.stock>0).length}
-          sub={`${prods.reduce((s,p)=>s+p.stock,0)} uds`} color={C.blue} compact={isDesktop}/>
-        <StatCard icon="🗓" label="Períodos" value={historial.length} color={C.indigo} compact={isDesktop}/>
+    <div style={{paddingTop:4}}>
+
+      {/* ── STATS BAR ──────────────────────────────────────── */}
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:1,
+        borderRadius:16,overflow:"hidden",border:`1px solid ${C.sep}`,marginBottom:24}}>
+        {[
+          {label:"Histórico",   val:$(totalHist),    sub:`${historial.reduce((s,h)=>s+h.ventas.length,0)} ventas`},
+          {label:MESES[mes],    val:$(liq.bruto),    sub:`${liq.vMarca.length} ventas`},
+          {label:"Disponibles", val:prods.filter(p=>p.stock>0).length, sub:`${prods.reduce((s,p)=>s+p.stock,0)} uds`},
+          {label:"Períodos",    val:historial.length, sub:"registros"},
+        ].map((s,i)=>(
+          <div key={s.label} style={{
+            background: i===0 ? `${marca?.color||C.gold}18` : C.bg2,
+            padding:"16px 14px",textAlign:"center",
+            borderRight: i<3 ? `1px solid ${C.sep}` : "none",
+          }}>
+            <div style={{fontSize:10,letterSpacing:1,textTransform:"uppercase",
+              color:C.label3,fontFamily:FONT_UI,marginBottom:6,opacity:.65}}>{s.label}</div>
+            <div style={{fontSize:18,fontWeight:700,color:C.label,fontFamily:FONT,
+              letterSpacing:"-0.02em",lineHeight:1}}>{s.val}</div>
+            <div style={{fontSize:10,color:C.label3,fontFamily:FONT_UI,marginTop:5,opacity:.5}}>{s.sub}</div>
+          </div>
+        ))}
       </div>
 
-      {/* Segmented */}
-      <div style={{marginBottom:16}}>
-        <SegControl
-          options={[
-            {value:"historial",label:"Historial"},
-            {value:"productos",label:"Productos"},
-            {value:"liquidacion",label:"Liquidación"},
-            {value:"verificacion",label:`Verificación${auditorias.filter(a=>a.marcaId===marcaId).length?` (${auditorias.filter(a=>a.marcaId===marcaId).length})`:""}`},
-          ]}
-          value={sub} onChange={setSub}
-        />
+      {/* ── TABS ────────────────────────────────────────────── */}
+      <div style={{display:"flex",gap:0,marginBottom:28,
+        borderBottom:`1px solid ${C.sep}`}}>
+        {[
+          {value:"historial",   label:"Historial"},
+          {value:"productos",   label:"Productos"},
+          {value:"liquidacion", label:"Liquidación"},
+          {value:"verificacion",label:`Verificación${auditorias.filter(a=>a.marcaId===marcaId).length?` · ${auditorias.filter(a=>a.marcaId===marcaId).length}`:""}`},
+        ].map(t=>(
+          <button key={t.value} onClick={()=>setSub(t.value)} style={{
+            flex:1,padding:"10px 4px",border:"none",background:"transparent",cursor:"pointer",
+            fontSize:12,fontWeight:sub===t.value?700:400,fontFamily:FONT_UI,
+            color:sub===t.value?C.label:C.label3,
+            borderBottom:sub===t.value?`2px solid ${C.label}`:"2px solid transparent",
+            transition:"all .15s",letterSpacing:.2,
+          }}>{t.label}</button>
+        ))}
       </div>
 
-      {/* HISTORIAL */}
+      {/* ── HISTORIAL ────────────────────────────────────────── */}
       {sub==="historial"&&(
         <div>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
-            <span style={{fontSize:13,color:C.label3,fontFamily:FONT}}>{historial.length} período{historial.length!==1?"s":""}</span>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
+            <SLabel>{historial.length} período{historial.length!==1?"s":""}</SLabel>
             <select value={filtroMk} onChange={e=>setFMk(e.target.value)}
-              style={{background:C.bg2,border:`1px solid ${C.sep}`,color:C.label,
-                borderRadius:10,padding:"6px 12px",fontSize:13,fontFamily:FONT,cursor:"pointer",
-                outline:"none",WebkitAppearance:"none"}}>
-              <option value="">Todo</option>
+              style={{background:"transparent",border:"none",color:C.label3,
+                fontSize:12,fontFamily:FONT_UI,cursor:"pointer",outline:"none",WebkitAppearance:"none",
+                letterSpacing:.5}}>
+              <option value="">Todos los períodos</option>
               {historial.map(h=><option key={h.mk} value={h.mk}>{MESES[h.mes]} {h.anio}</option>)}
             </select>
           </div>
           {histFil.length===0
             ? <EmptyState icon="📋" title="Sin ventas registradas" sub={`No hay ventas para ${marca?.nombre}`}/>
             : histFil.map(periodo=>(
-                <div key={periodo.mk} style={{background:C.bg2,borderRadius:14,overflow:"hidden",marginBottom: isDesktop ? 6 : 10}}>
-                  {/* Header período */}
-                  <div style={{padding: isDesktop ? "9px 14px" : "12px 14px", borderBottom:`1px solid ${C.sep}`,
-                    display:"flex",justifyContent:"space-between",alignItems:"center",
-                    background:`${marca?.color}10`}}>
+                <div key={periodo.mk} style={{marginBottom:28}}>
+                  {/* Período heading */}
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",
+                    paddingBottom:10,borderBottom:`1px solid ${C.sep}`,marginBottom:0}}>
                     <div>
-                      <div style={{fontSize: isDesktop ? 13 : 15, fontWeight:600,color:C.label,fontFamily:FONT}}>
+                      <span style={{fontSize:15,fontWeight:600,color:C.label,fontFamily:FONT,letterSpacing:".3px"}}>
                         {MESES[periodo.mes]} {periodo.anio}
-                      </div>
-                      <div style={{fontSize: isDesktop ? 11 : 12, color:C.label3,fontFamily:FONT,opacity:.65}}>
+                      </span>
+                      <span style={{fontSize:11,color:C.label3,fontFamily:FONT_UI,marginLeft:10,opacity:.6}}>
                         {periodo.ventas.length} transacciones
-                      </div>
+                      </span>
                     </div>
-                    <div style={{textAlign:"right"}}>
-                      <div style={{fontSize: isDesktop ? 17 : 20, fontWeight:700,color:C.label,fontFamily:FONT,letterSpacing:"-0.02em"}}>
+                    <div style={{display:"flex",alignItems:"center",gap:8}}>
+                      {cierres[`${periodo.mk}-${marcaId}`]?.cerrado&&(
+                        <span style={{fontSize:10,color:C.green,fontFamily:FONT_UI,letterSpacing:.5}}>✓ CERRADO</span>
+                      )}
+                      <span style={{fontSize:17,fontWeight:700,color:C.label,fontFamily:FONT,letterSpacing:"-0.02em"}}>
                         {$(periodo.bruto)}
-                      </div>
-                      {cierres[`${periodo.mk}-${marcaId}`]?.cerrado&&<Chip color={C.green} small>✓ Cerrado</Chip>}
+                      </span>
                     </div>
                   </div>
-                  {/* Ventas del período */}
+                  {/* Ventas */}
                   {periodo.ventas.map((v,i)=>(
-                    <div key={v.id} style={{padding: isDesktop ? "8px 14px" : "10px 14px",
-                      borderBottom:i<periodo.ventas.length-1?`1px solid ${C.sep}`:""}}>
-                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom: isDesktop ? 2 : 4}}>
-                        <div style={{display:"flex",alignItems:"center",gap:7}}>
-                          <span style={{fontFamily:"monospace",fontSize:11,color:C.gold,fontWeight:600}}>{v.id}</span>
-                          <PagoDisplay mp={v.metodoPago} total={v.total} small/>
+                    <div key={v.id} style={{
+                      padding:"14px 0",
+                      borderBottom:i<periodo.ventas.length-1?`1px solid ${C.sep}`:"none",
+                    }}>
+                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+                        <div>
+                          <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:5}}>
+                            <span style={{fontFamily:"monospace",fontSize:11,color:C.gold,fontWeight:600,
+                              background:`${C.gold}18`,padding:"2px 7px",borderRadius:5}}>{v.id}</span>
+                            <PagoDisplay mp={v.metodoPago} total={v.total} small/>
+                          </div>
+                          <div style={{fontSize:11,color:C.label3,fontFamily:FONT_UI,opacity:.55,marginBottom:6}}>
+                            {v.fecha} · {v.hora}
+                          </div>
+                          {v.itsMarca.map((it,ii)=>(
+                            <div key={`${v.id}-${it.prodId}-${ii}`}
+                              style={{fontSize:12,color:C.label2,fontFamily:FONT,lineHeight:"1.8"}}>
+                              {it.nombre}
+                              <span style={{fontFamily:"monospace",fontSize:10,color:C.label3,opacity:.55,marginLeft:5}}>
+                                {it.codigo}
+                              </span>
+                              <span style={{color:C.label3,marginLeft:4,opacity:.6}}>×{it.cantidad}</span>
+                            </div>
+                          ))}
                         </div>
-                        <span style={{fontSize: isDesktop ? 14 : 15, fontWeight:700,color:C.label,fontFamily:FONT,letterSpacing:"-0.01em"}}>{$(v.subMarca)}</span>
+                        <span style={{fontSize:16,fontWeight:700,color:C.label,fontFamily:FONT,
+                          letterSpacing:"-0.02em",flexShrink:0,paddingLeft:12}}>
+                          {$(v.subMarca)}
+                        </span>
                       </div>
-                      <div style={{fontSize:11,color:C.label3,fontFamily:FONT,marginBottom: isDesktop ? 2 : 4,opacity:.65}}>
-                        {v.fecha} {v.hora}
-                      </div>
-                      {v.itsMarca.map((it,ii)=>(
-                        <div key={`${v.id}-${it.prodId}-${ii}`} style={{fontSize:12,color:C.label2,fontFamily:FONT,lineHeight:"1.3"}}>
-                          · {it.nombre}{" "}
-                          <span style={{fontFamily:"monospace",fontSize:10,color:C.label3,opacity:.7}}>{it.codigo}</span>
-                          {" "}×{it.cantidad}
-                        </div>
-                      ))}
                     </div>
                   ))}
                 </div>
@@ -14818,183 +14857,196 @@ function MarcaDetalle({marcaId,inv,ventas,vMes,mes,anio,MK,cierres,setCierres,ge
         </div>
       )}
 
-      {/* PRODUCTOS */}
+      {/* ── PRODUCTOS ────────────────────────────────────────── */}
       {sub==="productos"&&(
-        <div style={{
-          display: isDesktop ? "grid" : "flex",
-          gridTemplateColumns: isDesktop ? "1fr 1fr 1fr" : undefined,
-          flexDirection: isDesktop ? undefined : "column",
-          gap: isDesktop ? 6 : 0,
-        }}>
+        <div>
           {prods.length===0
             ? <EmptyState icon="📦" title="Sin productos" sub={`No hay ítems registrados para ${marca?.nombre}`}/>
-            : prods.map((p,i)=>{
-                const vendidas=p.stockInicial-p.stock;
-                return (
-                  <div key={p.id} style={{
-                    background:C.bg2,
-                    borderRadius: isDesktop ? 12 : (i===0?"14px 14px 2px 2px":i===prods.length-1?"2px 2px 14px 14px":"2px"),
-                    padding: isDesktop ? "10px 12px" : "14px 16px",
-                    borderBottom: isDesktop ? "none" : (i<prods.length-1?`1px solid ${C.sep}`:""),
-                    border: isDesktop ? `1px solid ${C.sep}` : undefined,
-                  }}>
-                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
-                      <div style={{flex:1}}>
-                        <div style={{fontSize: isDesktop ? 13 : 15, fontWeight:500,color:C.label,fontFamily:FONT,marginBottom: isDesktop ? 3 : 4}}>
+            : (
+              <>
+                <div style={{display:"flex",justifyContent:"space-between",marginBottom:16}}>
+                  <SLabel>{prods.length} productos · {prods.reduce((s,p)=>s+p.stock,0)} uds</SLabel>
+                  <span style={{fontSize:10,fontFamily:FONT_UI,color:C.label3,opacity:.5,letterSpacing:.5,textTransform:"uppercase"}}>
+                    {prods.filter(p=>p.stock===0).length} agotados
+                  </span>
+                </div>
+                {/* Encabezado tabla */}
+                <div style={{display:"grid",gridTemplateColumns:"1fr auto auto",gap:"0 16px",
+                  paddingBottom:8,borderBottom:`1px solid ${C.sep}`,marginBottom:0}}>
+                  <span style={{fontSize:10,letterSpacing:1,textTransform:"uppercase",color:C.label3,fontFamily:FONT_UI,opacity:.5}}>Producto</span>
+                  <span style={{fontSize:10,letterSpacing:1,textTransform:"uppercase",color:C.label3,fontFamily:FONT_UI,opacity:.5,textAlign:"right"}}>Precio</span>
+                  <span style={{fontSize:10,letterSpacing:1,textTransform:"uppercase",color:C.label3,fontFamily:FONT_UI,opacity:.5,textAlign:"right",minWidth:52}}>Stock</span>
+                </div>
+                {prods.map((p,i)=>{
+                  const vendidas=p.stockInicial-p.stock;
+                  return (
+                    <div key={p.id} style={{
+                      display:"grid",gridTemplateColumns:"1fr auto auto",gap:"0 16px",
+                      padding:"13px 0",alignItems:"center",
+                      borderBottom:i<prods.length-1?`1px solid ${C.sep}`:"none",
+                    }}>
+                      <div>
+                        <div style={{fontSize:13,fontWeight:500,color:C.label,fontFamily:FONT,marginBottom:3,lineHeight:1.3}}>
                           {p.nombre}
                         </div>
-                        <span style={{fontFamily:"monospace",fontSize:11,color:C.gold,
-                          background:`${C.gold}18`,padding:"1px 7px",borderRadius:5}}>{p.codigo}</span>
+                        <span style={{fontFamily:"monospace",fontSize:10,color:C.label3,opacity:.6}}>
+                          {p.codigo}
+                          {vendidas>0&&<span style={{marginLeft:8,color:C.label3}}>· {vendidas} vendidas</span>}
+                        </span>
                       </div>
-                      <div style={{textAlign:"right"}}>
-                        <div style={{fontSize: isDesktop ? 14 : 16, fontWeight:700,color:C.label,fontFamily:FONT}}>{$(p.precio)}</div>
-                        <div style={{fontSize: isDesktop ? 12 : 13, fontFamily:FONT,marginTop:2,
+                      <div style={{textAlign:"right",fontSize:13,fontWeight:600,color:C.label,fontFamily:FONT}}>
+                        {$(p.precio)}
+                      </div>
+                      <div style={{textAlign:"right",minWidth:52}}>
+                        <span style={{fontSize:13,fontWeight:600,fontFamily:FONT,
                           color:p.stock===0?C.red:p.stock<3?C.amber:C.green}}>
-                          {p.stock===0?"Agotado":p.stock<3?`${p.stock} (bajo)`:`${p.stock} disp.`}
-                        </div>
-                        {vendidas>0&&<div style={{fontSize:12,color:C.label3,fontFamily:FONT}}>{vendidas} vend.</div>}
+                          {p.stock===0?"—":p.stock}
+                        </span>
+                        {p.stock===0&&<div style={{fontSize:9,color:C.red,fontFamily:FONT_UI,letterSpacing:.5}}>AGOTADO</div>}
                       </div>
                     </div>
-                  </div>
-                );
-              })
+                  );
+                })}
+              </>
+            )
           }
         </div>
       )}
 
-      {/* LIQUIDACIÓN */}
+      {/* ── LIQUIDACIÓN ──────────────────────────────────────── */}
       {sub==="liquidacion"&&(
         <div>
           {cerrado&&(
-            <div style={{padding:"12px 16px",background:`${C.green}15`,borderRadius:14,
-              border:`1px solid ${C.green}30`,marginBottom:16,fontSize:15,
-              color:C.green,fontFamily:FONT,textAlign:"center",fontWeight:600}}>
+            <div style={{padding:"10px 16px",background:`${C.green}10`,borderRadius:10,
+              marginBottom:24,fontSize:12,color:C.green,fontFamily:FONT_UI,
+              letterSpacing:.5,textTransform:"uppercase",textAlign:"center"}}>
               ✓ Cierre de {MESES[mes]} confirmado
             </div>
           )}
-          <div style={{background:C.bg2,borderRadius:16,overflow:"hidden",marginBottom:16}}>
-            {gcTotal>0&&(
-              <div key="gc-summary" style={{display:"flex",justifyContent:"space-between",alignItems:"center",
-                padding:"10px 16px",background:"#7C3AED08",borderBottom:`1px solid ${C.sep}`}}>
-                <span style={{fontSize:13,color:"#7C3AED",fontFamily:FONT}}>
-                  🎁 Gift Card ({gcVentas} venta{gcVentas!==1?"s":""})
-                </span>
-                <span style={{fontSize:13,fontWeight:600,color:"#7C3AED",fontFamily:FONT}}>{$(gcTotal)}</span>
-              </div>
-            )}
-            <div style={{padding:"12px 16px",borderBottom:`1px solid ${C.sep}`}}>
-              <div style={{fontSize:11,fontWeight:700,color:C.label3,textTransform:"uppercase",
-                letterSpacing:.6,marginBottom:8,fontFamily:FONT}}>Desglose por método de pago</div>
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
-                {[
-                  {label:"Efectivo",val:liq.brutoEf,color:C.green},
-                  {label:"QR",val:liq.brutoQR,color:C.blue},
-                  {label:`Tarjeta (-${liq.cfg?.pctTarjeta ?? 0}%)`,val:liq.brutoTJ,color:C.amber},
-                ].map(s=>(
-                  <div key={s.label} style={{textAlign:"center",padding:"9px 8px",
-                    background:`${s.color}10`,borderRadius:12}}>
-                    <div style={{fontSize:14,fontWeight:700,color:C.label,fontFamily:FONT,letterSpacing:"-0.01em"}}>{$(Math.round(s.val))}</div>
-                    <div style={{fontSize:10,color:C.label3,fontFamily:FONT,marginTop:2,opacity:.7}}>{s.label}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
+
+          {/* Métodos de pago */}
+          <SLabel>Por método de pago</SLabel>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:28}}>
             {[
-              ["Ventas brutas", $(liq.bruto), C.label, false],
-              [`− Desc. Tarjeta (${liq.cfg?.pctTarjeta ?? 0}%)`, `-${$(liq.descTJ)}`, C.red, false],
-              [`= Subtotal -${liq.cfg?.pctTarjeta ?? 0}%`, $(liq.subBanco), C.label2, false],
-              [`− Comisión ventas (${liq.cfg?.pctComision ?? 0}%)`, `-${$(liq.comision)}`, C.red, false],
-              (liq.alquiler > 0)
-                ? [`− Alquiler`, `-${$(liq.alquiler)}`, C.amber, false]
-                : null,
-              ...liq.gastos.filter(g=>g.desc||Number(g.monto)>0).map(g=>
-                [`− ${g.desc||"Gasto extra"}`, `-${$(Math.round(Number(g.monto)||0))}`, C.red, false]
-              ),
-              ["Neto a liquidar", $(liq.neto), C.green, true],
-            ].filter(Boolean).map(([k,v,c,bold],i,arr)=>(
-              <div key={k} style={{display:"flex",justifyContent:"space-between",alignItems:"center",
-                padding:"13px 16px",borderBottom:i<arr.length-1?`1px solid ${C.sep}`:"",
-                background: bold ? `${C.green}08` : "transparent"}}>
-                <span style={{fontSize:14,color:bold?C.green:C.label2,fontFamily:FONT,fontWeight:bold?600:400}}>{k}</span>
-                <span style={{fontSize:15,fontWeight:bold?700:600,color:c,fontFamily:FONT}}>{v}</span>
+              {label:"Efectivo",val:liq.brutoEf,color:C.green},
+              {label:"QR",val:liq.brutoQR,color:C.blue},
+              {label:`Tarjeta`,val:liq.brutoTJ,color:C.amber},
+            ].map(s=>(
+              <div key={s.label} style={{padding:"16px 12px",borderRadius:12,
+                background:C.bg2,border:`1px solid ${C.sep}`,textAlign:"center"}}>
+                <div style={{fontSize:15,fontWeight:700,color:C.label,fontFamily:FONT,
+                  letterSpacing:"-0.02em",marginBottom:5}}>{$(Math.round(s.val))}</div>
+                <div style={{fontSize:10,color:C.label3,fontFamily:FONT_UI,letterSpacing:.5,
+                  textTransform:"uppercase",opacity:.6}}>{s.label}</div>
               </div>
             ))}
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",
-              padding:"18px 16px",background:`${C.gold}12`}}>
-              <span style={{fontSize:16,fontWeight:700,color:C.label,fontFamily:FONT}}>TOTAL A PAGAR</span>
-              <span style={{fontSize:24,fontWeight:700,color:C.label,fontFamily:FONT}}>{$(liq.neto)}</span>
-            </div>
           </div>
 
-          <div style={{display:"flex",flexDirection:"column",gap:10}}>
-            <div style={{display:"flex",gap:10}}>
-              <IOSBtn onPress={()=>generarVistaPreviaLiquidacion(marca,mes,anio,{
-                bruto: liq.bruto, brutoEfect: liq.brutoEf, brutoQR: liq.brutoQR, brutoTarjeta: liq.brutoTJ,
-                descTarjeta: liq.descTJ, pctTarjeta: liq.cfg?.pctTarjeta ?? 0,
-                subtotalBanco: liq.subBanco, pctComision: liq.cfg?.pctComision ?? 0, comision: liq.comision,
-                alquiler: liq.alquiler, gastos: liq.gastos, totalGastos: liq.totalGastos, neto: liq.neto,
-                vMarca: liq.vMarca, marcaId,
-              },setImgPreview)} variant="fill" full icon="📤">
-                Compartir
-              </IOSBtn>
-              <IOSBtn onPress={()=>imprimirLiquidacion(marca,mes,anio,liq)} variant="fill" full icon="🖨">
-                Imprimir
-              </IOSBtn>
+          {/* Gift Card */}
+          {gcTotal>0&&(
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",
+              padding:"12px 0",borderBottom:`1px solid ${C.sep}`,marginBottom:0}}>
+              <span style={{fontSize:12,color:"#7C3AED",fontFamily:FONT_UI,letterSpacing:.3}}>
+                Gift Card · {gcVentas} venta{gcVentas!==1?"s":""}
+              </span>
+              <span style={{fontSize:13,fontWeight:600,color:"#7C3AED",fontFamily:FONT}}>{$(gcTotal)}</span>
             </div>
-            <IOSBtn onPress={()=>generarImagenLiquidacion(marca,mes,anio,liq)} variant="fill" full icon="📷">
-              Exportar Imagen
-            </IOSBtn>
-            <IOSBtn onPress={()=>exportExcelLiquidacion(MARCAS.find(m=>m.id===marcaId),ventas,mes,anio)} variant="fill" full icon="⬇">
-              Exportar Excel
-            </IOSBtn>
-            {!cerrado
-              ? <IOSBtn variant="success" full icon="✓"
-                  onPress={()=>setCierres(p=>({...p,[`${MK}-${marcaId}`]:{cerrado:true,fecha:hoy(),mk:MK}}))}>
-                  Confirmar Cierre Mensual
-                </IOSBtn>
-              : <IOSBtn variant="danger" full
-                  onPress={()=>setCierres(p=>({...p,[`${MK}-${marcaId}`]:{cerrado:false,mk:MK}}))}>
-                  Reabrir Liquidación
-                </IOSBtn>
-            }
+          )}
+
+          {/* Desglose */}
+          <div style={{marginBottom:28}}>
+            {[
+              ["Ventas brutas", $(liq.bruto), false, false],
+              [`− Desc. Tarjeta (${liq.cfg?.pctTarjeta ?? 0}%)`, `-${$(liq.descTJ)}`, true, false],
+              [`= Subtotal`, $(liq.subBanco), false, false],
+              [`− Comisión (${liq.cfg?.pctComision ?? 0}%)`, `-${$(liq.comision)}`, true, false],
+              (liq.alquiler > 0) ? [`− Alquiler`, `-${$(liq.alquiler)}`, true, false] : null,
+              ...liq.gastos.filter(g=>g.desc||Number(g.monto)>0).map(g=>
+                [`− ${g.desc||"Gasto extra"}`, `-${$(Math.round(Number(g.monto)||0))}`, true, false]
+              ),
+              ["Neto a liquidar", $(liq.neto), false, true],
+            ].filter(Boolean).map(([k,v,muted,bold],i,arr)=>(
+              <div key={k} style={{display:"flex",justifyContent:"space-between",alignItems:"center",
+                padding:bold?"18px 0":"13px 0",
+                borderBottom:i<arr.length-1?`1px solid ${C.sep}`:"none",
+                borderTop:bold?`1px solid ${C.sep}`:"none",
+                marginTop:bold?4:0,
+              }}>
+                <span style={{fontSize:bold?15:13,color:bold?C.label:muted?C.label3:C.label2,
+                  fontFamily:bold?FONT:FONT_UI,fontWeight:bold?700:400,letterSpacing:bold?.3:0}}>{k}</span>
+                <span style={{fontSize:bold?20:14,fontWeight:bold?700:500,
+                  color:bold?C.green:muted?C.red:C.label,fontFamily:FONT,letterSpacing:"-0.02em"}}>{v}</span>
+              </div>
+            ))}
           </div>
+
+          {/* Acciones */}
+          <SLabel>Acciones</SLabel>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+            <IOSBtn onPress={()=>generarVistaPreviaLiquidacion(marca,mes,anio,{
+              bruto:liq.bruto,brutoEfect:liq.brutoEf,brutoQR:liq.brutoQR,brutoTarjeta:liq.brutoTJ,
+              descTarjeta:liq.descTJ,pctTarjeta:liq.cfg?.pctTarjeta??0,
+              subtotalBanco:liq.subBanco,pctComision:liq.cfg?.pctComision??0,comision:liq.comision,
+              alquiler:liq.alquiler,gastos:liq.gastos,totalGastos:liq.totalGastos,neto:liq.neto,
+              vMarca:liq.vMarca,marcaId,
+            },setImgPreview)} variant="fill" full icon="📤">Compartir</IOSBtn>
+            <IOSBtn onPress={()=>imprimirLiquidacion(marca,mes,anio,liq)} variant="fill" full icon="🖨">Imprimir</IOSBtn>
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:16}}>
+            <IOSBtn onPress={()=>generarImagenLiquidacion(marca,mes,anio,liq)} variant="fill" full icon="📷">Imagen</IOSBtn>
+            <IOSBtn onPress={()=>exportExcelLiquidacion(MARCAS.find(m=>m.id===marcaId),ventas,mes,anio)} variant="fill" full icon="⬇">Excel</IOSBtn>
+          </div>
+          {!cerrado
+            ? <IOSBtn variant="success" full icon="✓"
+                onPress={()=>setCierres(p=>({...p,[`${MK}-${marcaId}`]:{cerrado:true,fecha:hoy(),mk:MK}}))}>
+                Confirmar Cierre Mensual
+              </IOSBtn>
+            : <IOSBtn variant="danger" full
+                onPress={()=>setCierres(p=>({...p,[`${MK}-${marcaId}`]:{cerrado:false,mk:MK}}))}>
+                Reabrir Liquidación
+              </IOSBtn>
+          }
 
           {/* Detalle ventas */}
           {liq.vMarca.length>0&&(
-            <div style={{marginTop:20}}>
-              <div style={{fontSize:13,fontWeight:600,color:C.label3,textTransform:"uppercase",
-                letterSpacing:.6,marginBottom:12}}>Ventas del período</div>
-              {liq.vMarca.map(v=>{
+            <div style={{marginTop:32}}>
+              <SLabel>Ventas del período · {liq.vMarca.length}</SLabel>
+              {liq.vMarca.map((v,vi)=>{
                 const its=v.items.filter(i=>i.marcaId===marcaId);
                 const sub2=its.reduce((s,i)=>s+i.subtotal,0);
-                // GC allocation for this brand in this venta
                 const gcAlloc=v.gcAllocations?.find(a=>a.marcaId===marcaId);
                 return (
-                  <div key={v.id} style={{background:C.bg2,borderRadius:10,padding:"10px 14px",marginBottom:5,
-                    border:v.gcId?`1px solid #7C3AED20`:`1px solid ${C.sep}`}}>
-                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:3}}>
-                      <div style={{display:"flex",alignItems:"center",gap:6}}>
-                        <span style={{fontFamily:"monospace",fontSize:11,color:C.gold,fontWeight:600}}>{v.id}</span>
-                        {v.gcId&&<span style={{fontSize:9,background:"#7C3AED15",color:"#7C3AED",
-                          fontWeight:700,padding:"2px 5px",borderRadius:6,fontFamily:FONT_UI}}>🎁 GC</span>}
+                  <div key={v.id} style={{
+                    padding:"14px 0",
+                    borderBottom:vi<liq.vMarca.length-1?`1px solid ${C.sep}`:"none",
+                  }}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+                      <div style={{flex:1}}>
+                        <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:4}}>
+                          <span style={{fontFamily:"monospace",fontSize:11,color:C.gold,fontWeight:600}}>{v.id}</span>
+                          {v.gcId&&<span style={{fontSize:9,background:"#7C3AED15",color:"#7C3AED",
+                            fontWeight:700,padding:"2px 6px",borderRadius:5,fontFamily:FONT_UI}}>GC</span>}
+                        </div>
+                        <div style={{fontSize:11,color:C.label3,fontFamily:FONT_UI,opacity:.55,marginBottom:6}}>
+                          {v.fecha} · {v.hora} · {v.metodoPago?.startsWith("mixto|")?<PagoDisplay mp={v.metodoPago} total={sub2} inline/>:labelPago(v.metodoPago)}
+                        </div>
+                        {gcAlloc&&(
+                          <div style={{fontSize:11,color:"#7C3AED",fontFamily:FONT_UI,marginBottom:4}}>
+                            GC {$(gcAlloc.gcAmount)}{gcAlloc.extraAmount>0.01?` + ${$(gcAlloc.extraAmount)} extra`:""}
+                          </div>
+                        )}
+                        {its.map((it,ii)=>(
+                          <div key={`liq-${v.id}-${it.prodId}-${ii}`}
+                            style={{fontSize:12,color:C.label2,fontFamily:FONT,lineHeight:"1.8"}}>
+                            {it.nombre}
+                            <span style={{color:C.label3,fontFamily:FONT_UI,marginLeft:5,opacity:.6}}>×{it.cantidad}</span>
+                            <span style={{color:C.label3,marginLeft:5,opacity:.6}}>{$(it.subtotal)}</span>
+                          </div>
+                        ))}
                       </div>
-                      <span style={{fontSize:15,fontWeight:700,color:C.label,fontFamily:FONT,letterSpacing:"-0.01em"}}>{$(sub2)}</span>
+                      <span style={{fontSize:15,fontWeight:700,color:C.label,fontFamily:FONT,
+                        letterSpacing:"-0.02em",paddingLeft:12,flexShrink:0}}>{$(sub2)}</span>
                     </div>
-                    <div style={{fontSize:11,color:C.label3,fontFamily:FONT,marginBottom:gcAlloc?3:0,opacity:.65}}>
-                      {v.fecha} {v.hora} · {v.metodoPago?.startsWith("mixto|")?<PagoDisplay mp={v.metodoPago} total={sub2} inline/>:labelPago(v.metodoPago)}
-                    </div>
-                    {gcAlloc&&(
-                      <div style={{display:"flex",gap:10,fontSize:11,fontFamily:FONT_UI,marginBottom:3,
-                        padding:"4px 8px",background:"#7C3AED08",borderRadius:6}}>
-                        <span style={{color:"#7C3AED",fontWeight:600}}>🎁 GC: {$(gcAlloc.gcAmount)}</span>
-                        {gcAlloc.extraAmount>0.01&&<span style={{color:C.amber,fontWeight:600}}>+ {$(gcAlloc.extraAmount)} extra</span>}
-                      </div>
-                    )}
-                    {its.map((it,ii)=>(
-                      <div key={`liq-${v.id}-${it.prodId}-${ii}`} style={{fontSize:12,color:C.label2,fontFamily:FONT,lineHeight:"1.3"}}>
-                        · {it.nombre} ×{it.cantidad} = {$(it.subtotal)}
-                      </div>
-                    ))}
                   </div>
                 );
               })}
@@ -15008,7 +15060,7 @@ function MarcaDetalle({marcaId,inv,ventas,vMes,mes,anio,MK,cierres,setCierres,ge
       setImgPreview(null);
     }}/>
 
-      {/* ── VERIFICACIÓN de esta marca ── */}
+      {/* ── VERIFICACIÓN ─────────────────────────────────────── */}
       {sub==="verificacion"&&(()=>{
         const auds = auditorias.filter(a=>a.marcaId===marcaId).sort((a,b)=>b.id.localeCompare(a.id));
         function agregarItemMarca(aud){
@@ -15051,114 +15103,111 @@ function MarcaDetalle({marcaId,inv,ventas,vMes,mes,anio,MK,cierres,setCierres,ge
           setCodAgregar("");
         }
         return (
-          <div>
+          <div style={{paddingTop:4}}>
             {auds.length===0
               ? <EmptyState icon="⌖" title="Sin verificaciones" sub={`No hay verificaciones guardadas para ${marca?.nombre}`}/>
               : auds.map(a=>{
                   const abierta=agregandoA===a.id;
                   return (
-                    <div key={a.id} style={{background:C.bg2,borderRadius:14,border:`1px solid ${C.sep}`,
-                      overflow:"hidden",marginBottom:10,boxShadow:"0 1px 3px rgba(0,0,0,.06)"}}>
-                      {/* Header */}
-                      <div style={{padding:"12px 14px",borderBottom:`1px solid ${C.sep}`,
-                        display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,
-                        background:`${marca?.color||C.gold}10`}}>
+                    <div key={a.id} style={{marginBottom:24}}>
+                      {/* Heading verificación */}
+                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",
+                        paddingBottom:10,borderBottom:`1px solid ${C.sep}`,marginBottom:14}}>
                         <div>
-                          <div style={{fontSize:14,fontWeight:700,color:C.label,fontFamily:FONT}}>
+                          <span style={{fontSize:14,fontWeight:600,color:C.label,fontFamily:FONT}}>
                             {MESES[a.mes]} {a.anio}
-                          </div>
-                          <div style={{fontSize:11,color:C.label3,fontFamily:FONT,marginTop:2}}>
-                            {a.fecha} · {a.usuario} · {a.totalProductos} productos
-                          </div>
+                          </span>
+                          <span style={{fontSize:11,color:C.label3,fontFamily:FONT_UI,marginLeft:10,opacity:.55}}>
+                            {a.fecha} · {a.usuario}
+                          </span>
                         </div>
-                        <div style={{display:"flex",gap:6,flexShrink:0}}>
-                          {a.ok>0&&<Chip color={C.green} small>✓ {a.ok} OK</Chip>}
-                          {a.faltantes>0&&<Chip color={C.red} small>↓ {a.faltantes}</Chip>}
-                          {a.sobrantes>0&&<Chip color={C.blue} small>↑ {a.sobrantes}</Chip>}
+                        <div style={{display:"flex",gap:10,alignItems:"center"}}>
+                          {a.ok>0&&<span style={{fontSize:11,color:C.green,fontFamily:FONT_UI}}>✓ {a.ok}</span>}
+                          {a.faltantes>0&&<span style={{fontSize:11,color:C.red,fontFamily:FONT_UI}}>↓ {a.faltantes}</span>}
+                          {a.sobrantes>0&&<span style={{fontSize:11,color:C.blue,fontFamily:FONT_UI}}>↑ {a.sobrantes}</span>}
                         </div>
                       </div>
-                      {/* Body */}
-                      <div style={{padding:"10px 14px"}}>
-                        {/* Ítems agregados post */}
-                        {(a.detalle||[]).filter(d=>d.agregadoPost).length>0&&(
-                          <div style={{marginBottom:10}}>
-                            <div style={{fontSize:11,fontWeight:700,color:C.label3,fontFamily:FONT_UI,
-                              textTransform:"uppercase",letterSpacing:.5,marginBottom:6}}>
-                              Ítems agregados ({(a.detalle||[]).filter(d=>d.agregadoPost).length})
-                            </div>
-                            {(a.detalle||[]).filter(d=>d.agregadoPost).map((d,i)=>(
-                              <div key={d.codigo+i} style={{display:"flex",alignItems:"center",gap:8,
-                                padding:"7px 10px",borderRadius:9,background:C.bg0,marginBottom:4,
-                                border:`1px solid ${C.sep}`}}>
-                                <div style={{flex:1,minWidth:0}}>
-                                  <div style={{fontSize:12,fontWeight:600,color:C.label,fontFamily:FONT,
-                                    whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{d.nombre}</div>
-                                  <div style={{fontSize:10,color:C.label3,fontFamily:"monospace"}}>
-                                    {d.codigo} · {d.contado} ud · Bs {d.precio||"—"}
-                                  </div>
-                                </div>
-                                <button onClick={()=>{
-                                  if(!window.confirm(`¿Eliminar "${d.nombre}" de esta verificación?`)) return;
-                                  const detalleNuevo=(a.detalle||[]).filter(x=>x!==d);
-                                  onActualizarAuditoria&&onActualizarAuditoria({...a,
-                                    detalle:detalleNuevo,totalProductos:detalleNuevo.length,
-                                    ok:detalleNuevo.filter(x=>x.estado==="OK").length,
-                                    faltantes:detalleNuevo.filter(x=>x.estado==="FALTANTE").length,
-                                    sobrantes:detalleNuevo.filter(x=>x.estado==="SOBRANTE").length,
-                                  });
-                                }} style={{flexShrink:0,width:24,height:24,borderRadius:"50%",border:"none",
-                                  background:`${C.red}20`,color:C.red,fontSize:14,fontWeight:700,
-                                  cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
-                                  ×
-                                </button>
-                              </div>
-                            ))}
+
+                      {/* Ítems agregados post */}
+                      {(a.detalle||[]).filter(d=>d.agregadoPost).length>0&&(
+                        <div style={{marginBottom:14}}>
+                          <div style={{fontSize:10,letterSpacing:1,textTransform:"uppercase",color:C.label3,
+                            fontFamily:FONT_UI,opacity:.55,marginBottom:10}}>
+                            Agregados · {(a.detalle||[]).filter(d=>d.agregadoPost).length}
                           </div>
-                        )}
-                        {/* Input agregar */}
-                        {onActualizarAuditoria&&(
-                          abierta ? (
-                            <div>
-                              <div style={{fontSize:11,fontWeight:700,color:C.label,fontFamily:FONT_UI,
-                                textTransform:"uppercase",letterSpacing:.6,marginBottom:8}}>
-                                Agregar ítems nuevos a esta verificación
-                              </div>
-                              <div style={{display:"flex",gap:8,marginBottom:8}}>
-                                <input autoFocus value={codAgregar}
-                                  onChange={e=>{setCodAgregar(e.target.value.toUpperCase());setMsgAgregar(null);}}
-                                  onKeyDown={e=>{if(e.key==="Enter")agregarItemMarca(a);}}
-                                  placeholder="Código del producto"
-                                  style={{flex:1,padding:"10px 12px",borderRadius:10,border:`1px solid ${C.sep}`,
-                                    fontSize:14,fontFamily:"monospace",background:C.bg2,color:C.label,outline:"none"}}/>
-                                <button onClick={()=>agregarItemMarca(a)}
-                                  style={{padding:"10px 16px",borderRadius:10,border:"none",background:C.label,
-                                    color:C.bg0,fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:FONT_UI}}>
-                                  + Agregar
-                                </button>
-                              </div>
-                              {msgAgregar&&(
-                                <div style={{fontSize:12,fontWeight:600,marginBottom:8,padding:"8px 10px",borderRadius:8,
-                                  background:msgAgregar.ok?`${C.green}15`:`${C.red}15`,
-                                  color:msgAgregar.ok?C.green:C.red,fontFamily:FONT_UI}}>
-                                  {msgAgregar.txt}
+                          {(a.detalle||[]).filter(d=>d.agregadoPost).map((d,i)=>(
+                            <div key={d.codigo+i} style={{display:"flex",alignItems:"center",gap:10,
+                              padding:"10px 0",
+                              borderBottom:`1px solid ${C.sep}`}}>
+                              <div style={{flex:1,minWidth:0}}>
+                                <div style={{fontSize:13,fontWeight:500,color:C.label,fontFamily:FONT,
+                                  whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",marginBottom:2}}>
+                                  {d.nombre}
                                 </div>
-                              )}
-                              <button onClick={()=>{setAgregandoA(null);setCodAgregar("");setMsgAgregar(null);}}
-                                style={{width:"100%",padding:"8px",borderRadius:10,border:`1px solid ${C.sep}`,
-                                  background:"transparent",color:C.label3,fontSize:12,cursor:"pointer",fontFamily:FONT_UI}}>
-                                Cerrar
+                                <div style={{fontSize:10,color:C.label3,fontFamily:"monospace",opacity:.6}}>
+                                  {d.codigo} · {d.contado} ud
+                                </div>
+                              </div>
+                              <button onClick={()=>{
+                                if(!window.confirm(`¿Eliminar "${d.nombre}" de esta verificación?`)) return;
+                                const detalleNuevo=(a.detalle||[]).filter(x=>x!==d);
+                                onActualizarAuditoria&&onActualizarAuditoria({...a,
+                                  detalle:detalleNuevo,totalProductos:detalleNuevo.length,
+                                  ok:detalleNuevo.filter(x=>x.estado==="OK").length,
+                                  faltantes:detalleNuevo.filter(x=>x.estado==="FALTANTE").length,
+                                  sobrantes:detalleNuevo.filter(x=>x.estado==="SOBRANTE").length,
+                                });
+                              }} style={{flexShrink:0,width:26,height:26,borderRadius:"50%",border:"none",
+                                background:`${C.red}15`,color:C.red,fontSize:14,fontWeight:700,
+                                cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",opacity:.7}}>
+                                ×
                               </button>
                             </div>
-                          ) : (
-                            <button onClick={()=>{setAgregandoA(a.id);setCodAgregar("");setMsgAgregar(null);}}
-                              style={{width:"100%",padding:"9px",borderRadius:10,
-                                border:`1.5px dashed ${C.label3}`,background:"transparent",
-                                color:C.label3,fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:FONT_UI}}>
-                              + Agregar ítems nuevos a esta verificación
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Input agregar */}
+                      {onActualizarAuditoria&&(
+                        abierta ? (
+                          <div style={{paddingTop:4}}>
+                            <div style={{display:"flex",gap:8,marginBottom:10}}>
+                              <input autoFocus value={codAgregar}
+                                onChange={e=>{setCodAgregar(e.target.value.toUpperCase());setMsgAgregar(null);}}
+                                onKeyDown={e=>{if(e.key==="Enter")agregarItemMarca(a);}}
+                                placeholder="Código del producto"
+                                style={{flex:1,padding:"11px 14px",borderRadius:10,border:`1px solid ${C.sep}`,
+                                  fontSize:14,fontFamily:"monospace",background:C.bg2,color:C.label,outline:"none"}}/>
+                              <button onClick={()=>agregarItemMarca(a)}
+                                style={{padding:"11px 18px",borderRadius:10,border:"none",background:C.label,
+                                  color:C.bg0,fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:FONT_UI,letterSpacing:.3}}>
+                                Agregar
+                              </button>
+                            </div>
+                            {msgAgregar&&(
+                              <div style={{fontSize:12,marginBottom:10,padding:"10px 12px",borderRadius:8,
+                                background:msgAgregar.ok?`${C.green}12`:`${C.red}12`,
+                                color:msgAgregar.ok?C.green:C.red,fontFamily:FONT_UI}}>
+                                {msgAgregar.txt}
+                              </div>
+                            )}
+                            <button onClick={()=>{setAgregandoA(null);setCodAgregar("");setMsgAgregar(null);}}
+                              style={{width:"100%",padding:"9px",borderRadius:10,border:`1px solid ${C.sep}`,
+                                background:"transparent",color:C.label3,fontSize:11,cursor:"pointer",
+                                fontFamily:FONT_UI,letterSpacing:.5}}>
+                              Cerrar
                             </button>
-                          )
-                        )}
-                      </div>
+                          </div>
+                        ) : (
+                          <button onClick={()=>{setAgregandoA(a.id);setCodAgregar("");setMsgAgregar(null);}}
+                            style={{width:"100%",padding:"10px",borderRadius:10,
+                              border:`1px dashed ${C.sep}`,background:"transparent",
+                              color:C.label3,fontSize:11,fontWeight:500,cursor:"pointer",
+                              fontFamily:FONT_UI,letterSpacing:.5,marginTop:4}}>
+                            + Agregar ítems
+                          </button>
+                        )
+                      )}
                     </div>
                   );
                 })
