@@ -30820,7 +30820,23 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
         whiteSpace: "nowrap",
         lineHeight: "1.3",
         marginBottom: 3
-      } }, p.nombre), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: C.label3, fontFamily: "monospace", opacity: 0.55 } }, p.codigo, p.categoria && p.categoria !== "GENERAL" ? ` \xB7 ${p.categoria}` : "")), /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "right", flexShrink: 0, marginLeft: 16 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 14, fontWeight: 700, color: C.label, fontFamily: FONT, letterSpacing: "-0.01em" } }, $(p.precio)), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      } }, p.nombre), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6, marginTop: 3, flexWrap: "wrap" } }, /* @__PURE__ */ import_react.default.createElement("span", { style: {
+        fontSize: 10,
+        fontWeight: 600,
+        color: C.label2,
+        fontFamily: "monospace",
+        background: C.bg2,
+        border: `1px solid ${C.sep}`,
+        borderRadius: 5,
+        padding: "2px 6px",
+        letterSpacing: 0.3
+      } }, p.codigo), p.categoria && p.categoria !== "GENERAL" && /* @__PURE__ */ import_react.default.createElement("span", { style: {
+        fontSize: 10,
+        color: C.label3,
+        fontFamily: FONT_UI,
+        letterSpacing: 0.5,
+        textTransform: "uppercase"
+      } }, p.categoria))), /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "right", flexShrink: 0, marginLeft: 16 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 14, fontWeight: 700, color: C.label, fontFamily: FONT, letterSpacing: "-0.01em" } }, $(p.precio)), /* @__PURE__ */ import_react.default.createElement("div", { style: {
         fontSize: 11,
         fontWeight: 600,
         marginTop: 2,

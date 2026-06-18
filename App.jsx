@@ -8877,8 +8877,14 @@ function BrandPortal({user, ventas, inv, cargas, logout}){
                                 overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",lineHeight:"1.3",marginBottom:3}}>
                                 {p.nombre}
                               </div>
-                              <div style={{fontSize:10,color:C.label3,fontFamily:"monospace",opacity:.55}}>
-                                {p.codigo}{p.categoria&&p.categoria!=="GENERAL"?` · ${p.categoria}`:""}
+                              <div style={{display:"flex",alignItems:"center",gap:6,marginTop:3,flexWrap:"wrap"}}>
+                                <span style={{fontSize:10,fontWeight:600,color:C.label2,fontFamily:"monospace",
+                                  background:C.bg2,border:`1px solid ${C.sep}`,borderRadius:5,
+                                  padding:"2px 6px",letterSpacing:.3}}>{p.codigo}</span>
+                                {p.categoria&&p.categoria!=="GENERAL"&&(
+                                  <span style={{fontSize:10,color:C.label3,fontFamily:FONT_UI,
+                                    letterSpacing:.5,textTransform:"uppercase"}}>{p.categoria}</span>
+                                )}
                               </div>
                             </div>
                             <div style={{textAlign:"right",flexShrink:0,marginLeft:16}}>
