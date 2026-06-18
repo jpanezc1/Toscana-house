@@ -8020,7 +8020,7 @@ function BrandVentaModal({venta, marca, onClose}){
             <FilaInfo lbl="Fecha" val={`${venta.fecha} ${venta.hora}`}/>
             <FilaInfo lbl="Vendedor" val={venta.vendedor||"Tienda"}/>
             <FilaInfo lbl="Método de pago" val={<PagoDisplay mp={venta.metodoPago} total={venta.total} small/>}/>
-            <FilaInfo lbl="Estado" val={venta.anulada?"❌ Anulada":"✅ Completada"}/>
+            <FilaInfo lbl="Estado" val={venta.anulada?"Anulada":"Completada"}/>
             {venta.descPct>0&&<FilaInfo lbl="Descuento" val={`${venta.descPct}%`}/>}
           </div>
 
@@ -8060,12 +8060,12 @@ function BrandVentaModal({venta, marca, onClose}){
             ))}
             {/* Total */}
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",
-              padding:"12px 14px",background:`${marca.color}10`,
-              borderTop:`2px solid ${marca.color}30`}}>
-              <span style={{fontSize:14,fontWeight:700,color:C.label,fontFamily:FONT}}>
+              padding:"12px 14px",background:C.bg2,
+              borderTop:`1px solid ${C.sep}`}}>
+              <span style={{fontSize:13,fontWeight:700,color:C.label,fontFamily:FONT}}>
                 Subtotal {marca.nombre}
               </span>
-              <span style={{fontSize:20,fontWeight:700,color:marca.color,fontFamily:FONT_DISPLAY}}>
+              <span style={{fontSize:20,fontWeight:700,color:C.label,fontFamily:FONT_DISPLAY,letterSpacing:"-0.02em"}}>
                 {$(sub)}
               </span>
             </div>
@@ -8102,20 +8102,25 @@ function BrandVentaModal({venta, marca, onClose}){
                   {venta.fecha} · Total {$(venta.total)}
                 </div>
               </div>
-              <span style={{fontSize:28}}>{iconPago(venta.metodoPago)}</span>
+              <span style={{fontSize:12,fontWeight:700,color:C.label3,fontFamily:FONT_UI,
+                letterSpacing:.5,textTransform:"uppercase",opacity:.6}}>
+                {labelPago(venta.metodoPago)}
+              </span>
             </div>
             <div style={{display:"flex",gap:8}}>
               <button onClick={()=>verNotaVenta(venta,num)}
                 style={{flex:1,padding:"10px 0",borderRadius:12,border:`1px solid ${C.sep}`,
-                  background:C.bg2,cursor:"pointer",fontSize:13,fontWeight:600,
-                  color:C.label,fontFamily:FONT,WebkitTapHighlightColor:"transparent"}}>
-                👁 Ver nota
+                  background:C.bg2,cursor:"pointer",fontSize:12,fontWeight:600,
+                  color:C.label,fontFamily:FONT_UI,letterSpacing:.3,
+                  WebkitTapHighlightColor:"transparent"}}>
+                Ver nota
               </button>
               <button onClick={()=>imprimirNotaVenta(venta,num)}
                 style={{flex:1,padding:"10px 0",borderRadius:12,border:"none",
-                  background:C.label,cursor:"pointer",fontSize:13,fontWeight:600,
-                  color:C.bg0,fontFamily:FONT,WebkitTapHighlightColor:"transparent"}}>
-                🖨 Imprimir
+                  background:C.label,cursor:"pointer",fontSize:12,fontWeight:600,
+                  color:C.bg0,fontFamily:FONT_UI,letterSpacing:.3,
+                  WebkitTapHighlightColor:"transparent"}}>
+                Imprimir
               </button>
             </div>
           </div>
@@ -8133,9 +8138,9 @@ function BrandVentaModal({venta, marca, onClose}){
                 <div style={{display:"flex",justifyContent:"space-between",
                   alignItems:"flex-start",marginBottom:12}}>
                   <div>
-                    <div style={{fontSize:11,fontWeight:700,color:"#1A237E",fontFamily:FONT,
+                    <div style={{fontSize:11,fontWeight:700,color:"#1A237E",fontFamily:FONT_UI,
                       textTransform:"uppercase",letterSpacing:.5,marginBottom:4}}>
-                      🧾 Factura Electrónica Bolivia
+                      Factura Electrónica Bolivia
                     </div>
                     <div style={{fontSize:18,fontWeight:700,color:"#1A237E",
                       fontFamily:FONT_DISPLAY}}>N° {fac.numero||"—"}</div>
@@ -8736,7 +8741,7 @@ function BrandPortal({user, ventas, inv, cargas, logout}){
                             <span style={{fontSize:9,color:C.label3,fontFamily:FONT,opacity:.75}}>
                               {v.metodoPago?.startsWith("mixto|")
                                 ? <PagoDisplay mp={v.metodoPago} total={csub} inline/>
-                                : `${iconPago(v.metodoPago)} ${labelPago(v.metodoPago)}`}
+                                : labelPago(v.metodoPago)}
                             </span>
                             {v.anulada&&(
                               <span style={{fontSize:8,background:C.redBg,color:C.red,
@@ -8885,25 +8890,34 @@ function BrandPortal({user, ventas, inv, cargas, logout}){
                               width:`${Math.min(100,pct)}%`}}/>
                           </div>
                           {/* Stats cruzadas */}
-                          <div style={{display:"flex",gap:16}}>
-                            <div>
-                              <div style={{fontSize:9,letterSpacing:.8,textTransform:"uppercase",
-                                color:C.label3,fontFamily:FONT_UI,opacity:.5,marginBottom:2}}>Vendidas total</div>
-                              <div style={{fontSize:12,fontWeight:600,color:C.label,fontFamily:FONT}}>{vendTot}</div>
-                            </div>
-                            <div>
-                              <div style={{fontSize:9,letterSpacing:.8,textTransform:"uppercase",
-                                color:C.label3,fontFamily:FONT_UI,opacity:.5,marginBottom:2}}>Este mes</div>
-                              <div style={{fontSize:12,fontWeight:600,
-                                color:vendMes>0?C.label:C.label3,fontFamily:FONT}}>{vendMes}</div>
-                            </div>
-                            {(p.stockInicial||0)>0&&(
-                              <div>
-                                <div style={{fontSize:9,letterSpacing:.8,textTransform:"uppercase",
-                                  color:C.label3,fontFamily:FONT_UI,opacity:.5,marginBottom:2}}>Stock inicial</div>
-                                <div style={{fontSize:12,fontWeight:500,color:C.label3,fontFamily:FONT}}>{p.stockInicial}</div>
+                          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginTop:4}}>
+                            <div style={{background:C.bg0,borderRadius:8,padding:"8px 10px",
+                              border:`1px solid ${C.sep}`}}>
+                              <div style={{fontSize:9,letterSpacing:.9,textTransform:"uppercase",
+                                color:C.label3,fontFamily:FONT_UI,marginBottom:4}}>Vendidas total</div>
+                              <div style={{fontSize:16,fontWeight:700,
+                                color:vendTot>0?C.label:C.label3,fontFamily:FONT,letterSpacing:"-0.02em"}}>
+                                {vendTot}
                               </div>
-                            )}
+                            </div>
+                            <div style={{background:vendMes>0?`${C.green}10`:C.bg0,borderRadius:8,
+                              padding:"8px 10px",border:`1px solid ${vendMes>0?C.green+"30":C.sep}`}}>
+                              <div style={{fontSize:9,letterSpacing:.9,textTransform:"uppercase",
+                                color:vendMes>0?C.green:C.label3,fontFamily:FONT_UI,marginBottom:4}}>Este mes</div>
+                              <div style={{fontSize:16,fontWeight:700,
+                                color:vendMes>0?C.green:C.label3,fontFamily:FONT,letterSpacing:"-0.02em"}}>
+                                {vendMes}
+                              </div>
+                            </div>
+                            <div style={{background:C.bg0,borderRadius:8,padding:"8px 10px",
+                              border:`1px solid ${C.sep}`}}>
+                              <div style={{fontSize:9,letterSpacing:.9,textTransform:"uppercase",
+                                color:C.label3,fontFamily:FONT_UI,marginBottom:4}}>Ingresaron</div>
+                              <div style={{fontSize:16,fontWeight:700,color:C.label3,
+                                fontFamily:FONT,letterSpacing:"-0.02em"}}>
+                                {p.stockInicial||stockReal+vendTot||"—"}
+                              </div>
+                            </div>
                           </div>
                         </div>
                         );

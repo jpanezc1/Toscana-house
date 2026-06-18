@@ -29761,7 +29761,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
         border: `1px solid ${C.sep}`,
         marginBottom: 20,
         boxShadow: "0 1px 6px rgba(0,0,0,0.04)"
-      } }, /* @__PURE__ */ import_react.default.createElement(FilaInfo, { lbl: "Fecha", val: `${venta.fecha} ${venta.hora}` }), /* @__PURE__ */ import_react.default.createElement(FilaInfo, { lbl: "Vendedor", val: venta.vendedor || "Tienda" }), /* @__PURE__ */ import_react.default.createElement(FilaInfo, { lbl: "M\xE9todo de pago", val: /* @__PURE__ */ import_react.default.createElement(PagoDisplay, { mp: venta.metodoPago, total: venta.total, small: true }) }), /* @__PURE__ */ import_react.default.createElement(FilaInfo, { lbl: "Estado", val: venta.anulada ? "\u274C Anulada" : "\u2705 Completada" }), venta.descPct > 0 && /* @__PURE__ */ import_react.default.createElement(FilaInfo, { lbl: "Descuento", val: `${venta.descPct}%` })), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      } }, /* @__PURE__ */ import_react.default.createElement(FilaInfo, { lbl: "Fecha", val: `${venta.fecha} ${venta.hora}` }), /* @__PURE__ */ import_react.default.createElement(FilaInfo, { lbl: "Vendedor", val: venta.vendedor || "Tienda" }), /* @__PURE__ */ import_react.default.createElement(FilaInfo, { lbl: "M\xE9todo de pago", val: /* @__PURE__ */ import_react.default.createElement(PagoDisplay, { mp: venta.metodoPago, total: venta.total, small: true }) }), /* @__PURE__ */ import_react.default.createElement(FilaInfo, { lbl: "Estado", val: venta.anulada ? "Anulada" : "Completada" }), venta.descPct > 0 && /* @__PURE__ */ import_react.default.createElement(FilaInfo, { lbl: "Descuento", val: `${venta.descPct}%` })), /* @__PURE__ */ import_react.default.createElement("div", { style: {
         fontSize: 11,
         fontWeight: 700,
         color: C.label3,
@@ -29821,9 +29821,9 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
         justifyContent: "space-between",
         alignItems: "center",
         padding: "12px 14px",
-        background: `${marca.color}10`,
-        borderTop: `2px solid ${marca.color}30`
-      } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 14, fontWeight: 700, color: C.label, fontFamily: FONT } }, "Subtotal ", marca.nombre), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 20, fontWeight: 700, color: marca.color, fontFamily: FONT_DISPLAY } }, $(sub)))), fac && /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, null, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+        background: C.bg2,
+        borderTop: `1px solid ${C.sep}`
+      } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, fontWeight: 700, color: C.label, fontFamily: FONT } }, "Subtotal ", marca.nombre), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 20, fontWeight: 700, color: C.label, fontFamily: FONT_DISPLAY, letterSpacing: "-0.02em" } }, $(sub)))), fac && /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, null, /* @__PURE__ */ import_react.default.createElement("div", { style: {
         fontSize: 11,
         fontWeight: 700,
         color: C.label3,
@@ -29858,7 +29858,15 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
         justifyContent: "space-between",
         alignItems: "center",
         marginBottom: 12
-      } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 15, fontWeight: 700, color: C.label, fontFamily: FONT } }, "N\xB0 ", num), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT, marginTop: 2 } }, venta.fecha, " \xB7 Total ", $(venta.total))), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 28 } }, iconPago(venta.metodoPago))), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 8 } }, /* @__PURE__ */ import_react.default.createElement(
+      } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 15, fontWeight: 700, color: C.label, fontFamily: FONT } }, "N\xB0 ", num), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT, marginTop: 2 } }, venta.fecha, " \xB7 Total ", $(venta.total))), /* @__PURE__ */ import_react.default.createElement("span", { style: {
+        fontSize: 12,
+        fontWeight: 700,
+        color: C.label3,
+        fontFamily: FONT_UI,
+        letterSpacing: 0.5,
+        textTransform: "uppercase",
+        opacity: 0.6
+      } }, labelPago(venta.metodoPago))), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 8 } }, /* @__PURE__ */ import_react.default.createElement(
         "button",
         {
           onClick: () => verNotaVenta(venta, num),
@@ -29869,14 +29877,15 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
             border: `1px solid ${C.sep}`,
             background: C.bg2,
             cursor: "pointer",
-            fontSize: 13,
+            fontSize: 12,
             fontWeight: 600,
             color: C.label,
-            fontFamily: FONT,
+            fontFamily: FONT_UI,
+            letterSpacing: 0.3,
             WebkitTapHighlightColor: "transparent"
           }
         },
-        "\u{1F441} Ver nota"
+        "Ver nota"
       ), /* @__PURE__ */ import_react.default.createElement(
         "button",
         {
@@ -29888,14 +29897,15 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
             border: "none",
             background: C.label,
             cursor: "pointer",
-            fontSize: 13,
+            fontSize: 12,
             fontWeight: 600,
             color: C.bg0,
-            fontFamily: FONT,
+            fontFamily: FONT_UI,
+            letterSpacing: 0.3,
             WebkitTapHighlightColor: "transparent"
           }
         },
-        "\u{1F5A8} Imprimir"
+        "Imprimir"
       ))), fac && /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, null, /* @__PURE__ */ import_react.default.createElement("div", { style: {
         fontSize: 11,
         fontWeight: 700,
@@ -29920,11 +29930,11 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
         fontSize: 11,
         fontWeight: 700,
         color: "#1A237E",
-        fontFamily: FONT,
+        fontFamily: FONT_UI,
         textTransform: "uppercase",
         letterSpacing: 0.5,
         marginBottom: 4
-      } }, "\u{1F9FE} Factura Electr\xF3nica Bolivia"), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      } }, "Factura Electr\xF3nica Bolivia"), /* @__PURE__ */ import_react.default.createElement("div", { style: {
         fontSize: 18,
         fontWeight: 700,
         color: "#1A237E",
@@ -30575,7 +30585,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
           whiteSpace: "nowrap",
           lineHeight: "1.3",
           marginBottom: 1
-        } }, citems.map((i) => `${i.nombre} \xD7${i.cantidad}`).join(" \xB7 ")), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap" } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 9, color: C.label3, fontFamily: FONT, opacity: 0.75 } }, v.fecha, " ", v.hora), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 9, color: C.label3, opacity: 0.4 } }, "\xB7"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 9, color: C.label3, fontFamily: FONT, opacity: 0.75 } }, v.vendedor || "Tienda"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 9, color: C.label3, opacity: 0.4 } }, "\xB7"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 9, color: C.label3, fontFamily: FONT, opacity: 0.75 } }, v.metodoPago?.startsWith("mixto|") ? /* @__PURE__ */ import_react.default.createElement(PagoDisplay, { mp: v.metodoPago, total: csub, inline: true }) : `${iconPago(v.metodoPago)} ${labelPago(v.metodoPago)}`), v.anulada && /* @__PURE__ */ import_react.default.createElement("span", { style: {
+        } }, citems.map((i) => `${i.nombre} \xD7${i.cantidad}`).join(" \xB7 ")), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap" } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 9, color: C.label3, fontFamily: FONT, opacity: 0.75 } }, v.fecha, " ", v.hora), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 9, color: C.label3, opacity: 0.4 } }, "\xB7"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 9, color: C.label3, fontFamily: FONT, opacity: 0.75 } }, v.vendedor || "Tienda"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 9, color: C.label3, opacity: 0.4 } }, "\xB7"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 9, color: C.label3, fontFamily: FONT, opacity: 0.75 } }, v.metodoPago?.startsWith("mixto|") ? /* @__PURE__ */ import_react.default.createElement(PagoDisplay, { mp: v.metodoPago, total: csub, inline: true }) : labelPago(v.metodoPago)), v.anulada && /* @__PURE__ */ import_react.default.createElement("span", { style: {
           fontSize: 8,
           background: C.redBg,
           color: C.red,
@@ -30812,36 +30822,61 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
         transition: "width .4s",
         background: stockReal === 0 ? C.red : stockReal <= 2 ? C.amber : C.label,
         width: `${Math.min(100, pct)}%`
-      } })), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 16 } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      } })), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginTop: 4 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+        background: C.bg0,
+        borderRadius: 8,
+        padding: "8px 10px",
+        border: `1px solid ${C.sep}`
+      } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
         fontSize: 9,
-        letterSpacing: 0.8,
+        letterSpacing: 0.9,
         textTransform: "uppercase",
         color: C.label3,
         fontFamily: FONT_UI,
-        opacity: 0.5,
-        marginBottom: 2
-      } }, "Vendidas total"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, fontWeight: 600, color: C.label, fontFamily: FONT } }, vendTot)), /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+        marginBottom: 4
+      } }, "Vendidas total"), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+        fontSize: 16,
+        fontWeight: 700,
+        color: vendTot > 0 ? C.label : C.label3,
+        fontFamily: FONT,
+        letterSpacing: "-0.02em"
+      } }, vendTot)), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+        background: vendMes > 0 ? `${C.green}10` : C.bg0,
+        borderRadius: 8,
+        padding: "8px 10px",
+        border: `1px solid ${vendMes > 0 ? C.green + "30" : C.sep}`
+      } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
         fontSize: 9,
-        letterSpacing: 0.8,
+        letterSpacing: 0.9,
         textTransform: "uppercase",
-        color: C.label3,
+        color: vendMes > 0 ? C.green : C.label3,
         fontFamily: FONT_UI,
-        opacity: 0.5,
-        marginBottom: 2
+        marginBottom: 4
       } }, "Este mes"), /* @__PURE__ */ import_react.default.createElement("div", { style: {
-        fontSize: 12,
-        fontWeight: 600,
-        color: vendMes > 0 ? C.label : C.label3,
-        fontFamily: FONT
-      } }, vendMes)), (p.stockInicial || 0) > 0 && /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+        fontSize: 16,
+        fontWeight: 700,
+        color: vendMes > 0 ? C.green : C.label3,
+        fontFamily: FONT,
+        letterSpacing: "-0.02em"
+      } }, vendMes)), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+        background: C.bg0,
+        borderRadius: 8,
+        padding: "8px 10px",
+        border: `1px solid ${C.sep}`
+      } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
         fontSize: 9,
-        letterSpacing: 0.8,
+        letterSpacing: 0.9,
         textTransform: "uppercase",
         color: C.label3,
         fontFamily: FONT_UI,
-        opacity: 0.5,
-        marginBottom: 2
-      } }, "Stock inicial"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, fontWeight: 500, color: C.label3, fontFamily: FONT } }, p.stockInicial))));
+        marginBottom: 4
+      } }, "Ingresaron"), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+        fontSize: 16,
+        fontWeight: 700,
+        color: C.label3,
+        fontFamily: FONT,
+        letterSpacing: "-0.02em"
+      } }, p.stockInicial || stockReal + vendTot || "\u2014"))));
     })))), tab === "cargas" && /* @__PURE__ */ import_react.default.createElement(RegistroCargas, { cargas: cargas || [], marcas: MARCAS, marcaId: mid }), tab === "liquidacion" && /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 24 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
       fontSize: 10,
       letterSpacing: 1.2,
