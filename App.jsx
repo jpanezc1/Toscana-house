@@ -8202,12 +8202,43 @@ function BrandPortal({user, ventas, inv, cargas, logout}){
   const [mes,  setMes]  = useState(now.getMonth());
   const [anio, setAnio] = useState(now.getFullYear());
   const [tab,  setTab]  = useState("dashboard");
+  const [rtStatus, setRtStatus] = useState("connecting"); // connecting | live | error
+  const [lastUpdate, setLastUpdate] = useState(Date.now());
 
   // marcaId puede llegar como string o number; normalizar
   const marcaId = Number(user.marcaId);
   const marca   = MARCAS.find(m=>m.id===marcaId) || null;
 
   const MK = mkKey(mes, anio);
+
+  // ── Canal Realtime propio del portal de marca ─────────────────────────────
+  // Garantiza actualizaciones en tiempo real aunque el Admin esté en otro dispositivo.
+  useEffect(()=>{
+    let ch = null;
+    let mounted = true;
+    getSupabase().then(db=>{
+      if(!mounted) return;
+      ch = db.channel(`brand-portal-${marcaId}`)
+        .on("postgres_changes",{event:"INSERT",schema:"public",table:"ventas"},()=>{
+          if(mounted){ setLastUpdate(Date.now()); setRtStatus("live"); }
+        })
+        .on("postgres_changes",{event:"UPDATE",schema:"public",table:"ventas"},()=>{
+          if(mounted){ setLastUpdate(Date.now()); setRtStatus("live"); }
+        })
+        .on("postgres_changes",{event:"UPDATE",schema:"public",table:"inventario"},()=>{
+          if(mounted){ setLastUpdate(Date.now()); setRtStatus("live"); }
+        })
+        .subscribe(status=>{
+          if(!mounted) return;
+          if(status==="SUBSCRIBED") setRtStatus("live");
+          if(status==="CHANNEL_ERROR"||status==="TIMED_OUT") setRtStatus("error");
+        });
+    }).catch(()=>{ if(mounted) setRtStatus("error"); });
+    return ()=>{ mounted=false; if(ch) getSupabase().then(db=>db.removeChannel(ch)).catch(()=>{}); };
+  },[marcaId]); // eslint-disable-line
+
+  // Actualizar lastUpdate cuando cambien ventas o inv (cualquier fuente)
+  useEffect(()=>{ setLastUpdate(Date.now()); },[ventas, inv]);
 
   // Ventas filtradas por marca (excluir anuladas) — seguro si marca es null
   const todasMarca = useMemo(()=>
@@ -8227,6 +8258,24 @@ function BrandPortal({user, ventas, inv, cargas, logout}){
   const udsMes   = useMemo(()=>udsV(vMes),[vMes]);
   const udsHoy   = useMemo(()=>udsV(vHoy),[vHoy]);
   const tktProm  = vMes.length>0?(brutoMes/vMes.length):0;
+
+  // ── Mapa de unidades vendidas totales por código (todas las ventas) ────────
+  const vendidasPorCodigo = useMemo(()=>{
+    const map = {};
+    todasMarca.forEach(v=>v.items.filter(i=>i.marcaId===mid).forEach(it=>{
+      map[it.codigo] = (map[it.codigo]||0) + it.cantidad;
+    }));
+    return map;
+  },[todasMarca, mid]);
+
+  // ── Mapa de unidades vendidas este mes por código ─────────────────────────
+  const vendidasMesPorCodigo = useMemo(()=>{
+    const map = {};
+    vMes.forEach(v=>v.items.filter(i=>i.marcaId===mid).forEach(it=>{
+      map[it.codigo] = (map[it.codigo]||0) + it.cantidad;
+    }));
+    return map;
+  },[vMes, mid]);
 
   // Liquidación con config real (incluye gastos extra del período)
   const liq = useMemo(()=>calcLiqMarca(vMes, mid, MK),[vMes, mid, MK]);
@@ -8424,6 +8473,22 @@ function BrandPortal({user, ventas, inv, cargas, logout}){
     </select>
   );
 
+  // Indicador de conexión compacto (reutilizable)
+  const LiveBadge = ()=>(
+    <div style={{display:"flex",alignItems:"center",gap:6}}>
+      <span style={{display:"inline-block",width:6,height:6,borderRadius:"50%",flexShrink:0,
+        background:rtStatus==="live"?C.green:rtStatus==="error"?"#EF4444":"#F59E0B",
+      }}/>
+      <span style={{fontSize:10,color:C.label3,fontFamily:FONT_UI,letterSpacing:.7,
+        textTransform:"uppercase",opacity:.65}}>
+        {rtStatus==="live"?"En vivo":rtStatus==="error"?"Sin conexión":"Conectando"}
+      </span>
+      <span style={{fontSize:10,color:C.label3,fontFamily:FONT_UI,opacity:.4,marginLeft:2}}>
+        {new Date(lastUpdate).toLocaleTimeString("es-BO",{hour:"2-digit",minute:"2-digit",second:"2-digit"})}
+      </span>
+    </div>
+  );
+
   return (
     <div style={{
       minHeight:"100vh",background:C.bg0,color:C.label,
@@ -8431,6 +8496,7 @@ function BrandPortal({user, ventas, inv, cargas, logout}){
       paddingBottom: isDesktop ? 0 : 84,
       display: isDesktop ? "flex" : "block",
     }}>
+      <style>{`@keyframes pulse-dot{0%,100%{opacity:1}50%{opacity:.4}}`}</style>
 
       {/* ── Sidebar (desktop) ── */}
       {isDesktop&&<DesktopSidebar
@@ -8446,7 +8512,7 @@ function BrandPortal({user, ventas, inv, cargas, logout}){
       {!isDesktop&&(
         <NavBar
           title={marca.nombre}
-          subtitle="Portal · Vista de marca"
+          subtitle={<LiveBadge/>}
           right={MesSel}
         />
       )}
@@ -8461,9 +8527,7 @@ function BrandPortal({user, ventas, inv, cargas, logout}){
             <div style={{fontSize:18,fontWeight:600,color:C.label,fontFamily:FONT,letterSpacing:"-0.01em"}}>
               {marca.nombre}
             </div>
-            <div style={{fontSize:11,color:C.label3,fontFamily:FONT,marginTop:1,textTransform:"uppercase",letterSpacing:".07em"}}>
-              Vista de marca
-            </div>
+            <div style={{marginTop:4}}><LiveBadge/></div>
           </div>
           {MesSel}
         </div>
@@ -8745,8 +8809,8 @@ function BrandPortal({user, ventas, inv, cargas, logout}){
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",
               marginBottom:14,gap:8,flexWrap:"wrap"}}>
               <span style={{fontSize:12,color:C.label3,fontFamily:FONT}}>
-                {invFiltrado.length} de {invMarca.length} productos ·{" "}
-                {$(invFiltrado.reduce((s,i)=>s+i.precio*i.stock,0))} en stock
+                {invFiltrado.length} de {invMarca.length} · {invFiltrado.reduce((s,i)=>s+i.stock,0)} uds ·{" "}
+                {$(invFiltrado.reduce((s,i)=>s+i.precio*i.stock,0))} valor
               </span>
               <div style={{display:"flex",gap:8,alignItems:"center"}}>
                 {(busqInvP||catFilP||fechaDesde||fechaHasta)&&(
@@ -8787,36 +8851,63 @@ function BrandPortal({user, ventas, inv, cargas, logout}){
                           background:g.color,opacity:.7}}/>
                         {g.label} · {g.prods.length}
                       </div>
-                      {g.prods.map(p=>(
-                        <div key={p.id} style={{background:C.bg1,borderRadius:10,
-                          padding:"12px 14px",marginBottom:1,borderBottom:`1px solid ${C.sep}`}}>
-                          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                      {g.prods.map(p=>{
+                        const vendTot = vendidasPorCodigo[p.codigo]||0;
+                        const vendMes = vendidasMesPorCodigo[p.codigo]||0;
+                        const stockReal = p.stock;
+                        const pct = (p.stockInicial||0)>0 ? Math.round((stockReal/(p.stockInicial))*100) : stockReal>0?100:0;
+                        return (
+                        <div key={p.id} style={{padding:"14px 0",borderBottom:`1px solid ${C.sep}`}}>
+                          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10}}>
                             <div style={{flex:1,minWidth:0}}>
-                              <div style={{fontSize:13,fontWeight:600,color:C.label,fontFamily:FONT,
-                                overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",lineHeight:"1.3"}}>
+                              <div style={{fontSize:13,fontWeight:500,color:C.label,fontFamily:FONT,
+                                overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",lineHeight:"1.3",marginBottom:3}}>
                                 {p.nombre}
                               </div>
-                              <div style={{fontSize:10,color:C.label3,fontFamily:FONT,marginTop:1,opacity:.65}}>
-                                {p.codigo} · {p.categoria||"General"}
-                                {p.fecha&&<span> · {p.fecha}</span>}
+                              <div style={{fontSize:10,color:C.label3,fontFamily:"monospace",opacity:.55}}>
+                                {p.codigo}{p.categoria&&p.categoria!=="GENERAL"?` · ${p.categoria}`:""}
                               </div>
                             </div>
-                            <div style={{textAlign:"right",flexShrink:0,marginLeft:10}}>
+                            <div style={{textAlign:"right",flexShrink:0,marginLeft:16}}>
                               <div style={{fontSize:14,fontWeight:700,color:C.label,fontFamily:FONT,letterSpacing:"-0.01em"}}>
                                 {$(p.precio)}
                               </div>
-                              <div style={{fontSize:10,fontWeight:600,color:g.color,fontFamily:FONT,marginTop:1}}>
-                                {p.stock} / {p.stockInicial||p.stock} uds
+                              <div style={{fontSize:11,fontWeight:600,marginTop:2,
+                                color:stockReal===0?C.red:stockReal<=2?C.amber:C.green,fontFamily:FONT}}>
+                                {stockReal===0?"Agotado":`${stockReal} en stock`}
                               </div>
                             </div>
                           </div>
-                          <div style={{marginTop:7,height:3,background:`${g.color}20`,borderRadius:2}}>
-                            <div style={{height:"100%",background:g.color,borderRadius:2,
-                              width:`${(p.stockInicial||p.stock)>0?Math.round((p.stock/(p.stockInicial||p.stock))*100):0}%`,
-                              transition:"width .3s"}}/>
+                          {/* Barra de stock */}
+                          <div style={{height:2,background:C.sep,borderRadius:1,marginBottom:8,overflow:"hidden"}}>
+                            <div style={{height:"100%",borderRadius:1,transition:"width .4s",
+                              background:stockReal===0?C.red:stockReal<=2?C.amber:C.label,
+                              width:`${Math.min(100,pct)}%`}}/>
+                          </div>
+                          {/* Stats cruzadas */}
+                          <div style={{display:"flex",gap:16}}>
+                            <div>
+                              <div style={{fontSize:9,letterSpacing:.8,textTransform:"uppercase",
+                                color:C.label3,fontFamily:FONT_UI,opacity:.5,marginBottom:2}}>Vendidas total</div>
+                              <div style={{fontSize:12,fontWeight:600,color:C.label,fontFamily:FONT}}>{vendTot}</div>
+                            </div>
+                            <div>
+                              <div style={{fontSize:9,letterSpacing:.8,textTransform:"uppercase",
+                                color:C.label3,fontFamily:FONT_UI,opacity:.5,marginBottom:2}}>Este mes</div>
+                              <div style={{fontSize:12,fontWeight:600,
+                                color:vendMes>0?C.label:C.label3,fontFamily:FONT}}>{vendMes}</div>
+                            </div>
+                            {(p.stockInicial||0)>0&&(
+                              <div>
+                                <div style={{fontSize:9,letterSpacing:.8,textTransform:"uppercase",
+                                  color:C.label3,fontFamily:FONT_UI,opacity:.5,marginBottom:2}}>Stock inicial</div>
+                                <div style={{fontSize:12,fontWeight:500,color:C.label3,fontFamily:FONT}}>{p.stockInicial}</div>
+                              </div>
+                            )}
                           </div>
                         </div>
-                      ))}
+                        );
+                      })}
                     </div>
                 ))
             }
