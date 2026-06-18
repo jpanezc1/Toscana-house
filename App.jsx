@@ -4099,14 +4099,12 @@ function StatCard({icon,label,value,sub,color=C.gold,compact}){
       padding: compact ? "14px 16px" : "16px 18px",
       border:`1px solid ${C.sep}`,
       boxShadow:"0 1px 3px rgba(0,0,0,0.06),0 1px 2px rgba(0,0,0,0.04)",
+      textAlign:"center",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",
     }}>
-      <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",marginBottom: compact ? 10 : 12}}>
-        <span style={{fontSize: compact ? 18 : 20}}>{icon}</span>
-        {sub&&<span style={{
-          fontSize:10,color:sub.startsWith?.("+")?C.green:sub.startsWith?.("-")?C.red:C.label3,
-          fontFamily:FONT,fontWeight:600,letterSpacing:"0.04em",
-        }}>{sub}</span>}
-      </div>
+      {sub&&<span style={{
+        fontSize:10,color:sub.startsWith?.("+")?C.green:sub.startsWith?.("-")?C.red:C.label3,
+        fontFamily:FONT,fontWeight:600,letterSpacing:"0.04em",marginBottom:4,
+      }}>{sub}</span>}
       <div style={{
         fontSize: compact ? 20 : 24,
         fontWeight:700,
@@ -6131,22 +6129,22 @@ function KPICard({icon, label, val, sub, color, compact}){
       padding: compact ? "14px 16px" : "18px 20px",
       border:`1px solid ${C.sep}`,
       boxShadow:"0 1px 3px rgba(0,0,0,0.06),0 1px 2px rgba(0,0,0,0.04)",
+      textAlign:"center",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",
     }}>
-      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom: compact ? 10 : 14}}>
-        <span style={{
-          fontSize:10,color:C.label3,fontFamily:FONT,fontWeight:600,
-          letterSpacing:"0.1em",textTransform:"uppercase",
-        }}>{label}</span>
-        <span style={{fontSize: compact ? 16 : 18, opacity:.7}}>{icon}</span>
-      </div>
+      <span style={{fontSize: compact ? 16 : 18, opacity:.7, marginBottom: compact ? 6 : 8}}>{icon}</span>
       <div style={{
         fontSize: compact ? 22 : 26,
         fontWeight:700,
         color: C.label,
         fontFamily:FONT,
         lineHeight:1,letterSpacing:"-0.03em",
+        marginBottom: compact ? 6 : 8,
       }}>{val}</div>
-      {sub&&<div style={{fontSize:11,color:C.label3,fontFamily:FONT,marginTop: compact ? 6 : 8}}>{sub}</div>}
+      <span style={{
+        fontSize:10,color:C.label3,fontFamily:FONT,fontWeight:600,
+        letterSpacing:"0.1em",textTransform:"uppercase",
+      }}>{label}</span>
+      {sub&&<div style={{fontSize:11,color:C.label3,fontFamily:FONT,marginTop: compact ? 4 : 6}}>{sub}</div>}
     </div>
   );
 }
@@ -8436,7 +8434,8 @@ function BrandPortal({user, ventas, inv, cargas, logout}){
 
   // KPI card limpio — sin emoji, monocromático
   const KCard=({label,value,sub,accent=false})=>(
-    <div style={{background:C.bg1,borderRadius:14,padding:"16px",border:`1px solid ${C.sep}`}}>
+    <div style={{background:C.bg1,borderRadius:14,padding:"16px",border:`1px solid ${C.sep}`,
+      textAlign:"center",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center"}}>
       <div style={{fontSize:10,letterSpacing:1.2,textTransform:"uppercase",color:C.label3,
         fontFamily:FONT_UI,marginBottom:8,opacity:.65}}>{label}</div>
       <div style={{fontSize:22,fontWeight:700,color:accent?C.green:C.label,
