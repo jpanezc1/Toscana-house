@@ -8368,30 +8368,28 @@ function BrandPortal({user, ventas, inv, cargas, logout}){
 
   // ── Ahora sí: return condicional DESPUÉS de todos los hooks ──
   if(!marca) return (
-    <div style={{padding:40,textAlign:"center",color:C.label3,fontFamily:FONT,
+    <div style={{padding:40,textAlign:"center",color:C.label3,fontFamily:FONT_UI,
       minHeight:"100vh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center"}}>
-      <div style={{fontSize:40,marginBottom:12}}>⚠️</div>
-      <div style={{marginBottom:8}}>Marca no encontrada.</div>
-      <div style={{fontSize:12,color:C.label3,marginBottom:20}}>Contactá al administrador (marcaId: {String(user.marcaId)})</div>
+      <div style={{fontSize:13,marginBottom:8,color:C.label}}>Marca no encontrada.</div>
+      <div style={{fontSize:11,color:C.label3,marginBottom:24,opacity:.6}}>Contactá al administrador (marcaId: {String(user.marcaId)})</div>
       <button onClick={logout} style={{padding:"10px 24px",borderRadius:10,
-        background:C.red,border:"none",color:"#fff",cursor:"pointer",fontFamily:FONT}}>Salir</button>
+        background:C.label,border:"none",color:C.bg0,cursor:"pointer",fontFamily:FONT_UI,fontSize:12}}>Salir</button>
     </div>
   );
   const stockOk  = invMarca.filter(i=>i.stock>2).length;
   const stockBaj = invMarca.filter(i=>i.stock>0&&i.stock<=2).length;
   const agotados = invMarca.filter(i=>i.stock===0).length;
 
-  // KPI card pequeño
-  const KCard=({icon,label,value,sub,color=C.gold})=>(
-    <div style={{background:C.bg1,borderRadius:16,padding:"14px 16px",border:`1px solid ${C.sep}`,
-      boxShadow:"0 2px 8px rgba(0,0,0,0.04)"}}>
-      <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",marginBottom:4}}>
-        <span style={{fontSize:20}}>{icon}</span>
-        {sub&&<span style={{fontSize:11,color:sub.startsWith("+")?C.green:sub.startsWith("-")?C.red:C.label3,
-          fontFamily:FONT,fontWeight:600}}>{sub}</span>}
-      </div>
-      <div style={{fontSize:22,fontWeight:700,color,fontFamily:FONT_DISPLAY,lineHeight:1,marginBottom:2}}>{value}</div>
-      <div style={{fontSize:11,color:C.label3,fontFamily:FONT,textTransform:"uppercase",letterSpacing:.4}}>{label}</div>
+  // KPI card limpio — sin emoji, monocromático
+  const KCard=({label,value,sub,accent=false})=>(
+    <div style={{background:C.bg1,borderRadius:14,padding:"16px",border:`1px solid ${C.sep}`}}>
+      <div style={{fontSize:10,letterSpacing:1.2,textTransform:"uppercase",color:C.label3,
+        fontFamily:FONT_UI,marginBottom:8,opacity:.65}}>{label}</div>
+      <div style={{fontSize:22,fontWeight:700,color:accent?C.green:C.label,
+        fontFamily:FONT,lineHeight:1,letterSpacing:"-0.03em",marginBottom:sub?6:0}}>{value}</div>
+      {sub&&<div style={{fontSize:11,fontWeight:600,
+        color:sub.startsWith("+")?C.green:sub.startsWith("-")?C.red:C.label3,
+        fontFamily:FONT_UI}}>{sub}</div>}
     </div>
   );
 
@@ -8399,7 +8397,7 @@ function BrandPortal({user, ventas, inv, cargas, logout}){
     {id:"dashboard",  icon:"⊞", label:"Inicio"},
     {id:"ventas",     icon:"◈", label:"Ventas"},
     {id:"inventario", icon:"◫", label:"Inventario"},
-    {id:"cargas",     icon:"🧾", label:"Cargas"},
+    {id:"cargas",     icon:"◉", label:"Cargas"},
     {id:"liquidacion",icon:"◎", label:"Liquidar"},
   ];
   const BRAND_GROUPS=[
@@ -8477,116 +8475,123 @@ function BrandPortal({user, ventas, inv, cargas, logout}){
         {/* ══ DASHBOARD ══ */}
         {tab==="dashboard"&&(
           <div>
-            {/* KPIs Hoy */}
-            <div style={{fontSize:12,fontWeight:700,color:C.label3,textTransform:"uppercase",
-              letterSpacing:.6,marginBottom:10,fontFamily:FONT}}>Hoy</div>
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:20}}>
-              <KCard icon="💰" label="Ventas hoy" value={$(brutoHoy)} color={C.gold}/>
-              <KCard icon="👜" label="Unidades" value={udsHoy} color={marca.color}/>
+            {/* ── Sección Hoy ── */}
+            <div style={{fontSize:10,letterSpacing:1.2,textTransform:"uppercase",color:C.label3,
+              fontFamily:FONT_UI,marginBottom:12,opacity:.65}}>Hoy</div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:24}}>
+              <KCard label="Ingresos" value={$(brutoHoy)}/>
+              <KCard label="Ítems vendidos" value={udsHoy}/>
             </div>
 
-            {/* KPIs Mes */}
-            <div style={{fontSize:12,fontWeight:700,color:C.label3,textTransform:"uppercase",
-              letterSpacing:.6,marginBottom:10,fontFamily:FONT}}>{MESES[mes]} {anio}</div>
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:20}}>
-              <KCard icon="📈" label="Ventas brutas" value={$(brutoMes)}
-                sub={varBruto!==0?(varBruto>0?`+${varBruto.toFixed(0)}%`:`${varBruto.toFixed(0)}%`):undefined}/>
-              <KCard icon="📦" label="Unidades" value={udsMes}
+            {/* ── Sección Mes ── */}
+            <div style={{fontSize:10,letterSpacing:1.2,textTransform:"uppercase",color:C.label3,
+              fontFamily:FONT_UI,marginBottom:12,opacity:.65}}>{MESES[mes]} {anio}</div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:24}}>
+              <KCard label="Ventas brutas" value={$(brutoMes)}
+                sub={varBruto!==0?(varBruto>0?`+${varBruto.toFixed(0)}% vs mes ant.`:`${varBruto.toFixed(0)}% vs mes ant.`):undefined}/>
+              <KCard label="Ítems vendidos" value={udsMes}
                 sub={varUds!==0?(varUds>0?`+${varUds.toFixed(0)}%`:`${varUds.toFixed(0)}%`):undefined}/>
-              <KCard icon="🧾" label="Ticket prom." value={$(tktProm)} color={C.blue}/>
-              <KCard icon="✓" label="Neto estimado" value={$(liq.neto)} color={C.green}/>
+              <KCard label="Transacciones" value={vMes.length}/>
+              <KCard label="Ticket promedio" value={$(tktProm)}/>
+              <KCard label="Neto estimado" value={$(liq.neto)} accent/>
+              <KCard label="Proyección cierre" value={$(proyeccion)}/>
             </div>
 
-            {/* Chart 6 meses */}
-            <div style={{background:C.bg1,borderRadius:18,padding:16,marginBottom:16,
-              border:`1px solid ${C.sep}`,boxShadow:"0 2px 8px rgba(0,0,0,0.04)"}}>
-              <div style={{fontSize:13,fontWeight:700,color:C.label,fontFamily:FONT,marginBottom:14}}>
-                Evolución mensual
-              </div>
-              <MiniBarChart data={hist6} color={marca.color} height={72}/>
-              <div style={{display:"flex",justifyContent:"space-between",marginTop:10,
-                paddingTop:10,borderTop:`1px solid ${C.sep}`}}>
+            {/* ── Evolución 6 meses ── */}
+            <div style={{background:C.bg1,borderRadius:14,padding:"16px",marginBottom:16,
+              border:`1px solid ${C.sep}`}}>
+              <div style={{fontSize:10,letterSpacing:1.2,textTransform:"uppercase",color:C.label3,
+                fontFamily:FONT_UI,marginBottom:14,opacity:.65}}>Evolución mensual</div>
+              <MiniBarChart data={hist6} color={C.label} height={64}/>
+              <div style={{display:"flex",justifyContent:"space-between",marginTop:12,
+                paddingTop:12,borderTop:`1px solid ${C.sep}`}}>
                 <div>
-                  <div style={{fontSize:11,color:C.label3,fontFamily:FONT}}>Mes anterior</div>
-                  <div style={{fontSize:15,fontWeight:700,color:C.label,fontFamily:FONT}}>{$(brutoPrev)}</div>
+                  <div style={{fontSize:10,color:C.label3,fontFamily:FONT_UI,letterSpacing:.5,opacity:.6,marginBottom:3}}>
+                    MES ANTERIOR
+                  </div>
+                  <div style={{fontSize:15,fontWeight:700,color:C.label,fontFamily:FONT,letterSpacing:"-0.02em"}}>{$(brutoPrev)}</div>
                 </div>
                 <div style={{textAlign:"right"}}>
-                  <div style={{fontSize:11,color:C.label3,fontFamily:FONT}}>Proyección cierre</div>
-                  <div style={{fontSize:15,fontWeight:700,color:C.label,fontFamily:FONT}}>{$(proyeccion)}</div>
+                  <div style={{fontSize:10,color:C.label3,fontFamily:FONT_UI,letterSpacing:.5,opacity:.6,marginBottom:3}}>
+                    PROYECCIÓN
+                  </div>
+                  <div style={{fontSize:15,fontWeight:700,color:C.label,fontFamily:FONT,letterSpacing:"-0.02em"}}>{$(proyeccion)}</div>
                 </div>
               </div>
             </div>
 
-            {/* Top productos */}
+            {/* ── Top productos ── */}
             {topProds.length>0&&(
-              <div style={{background:C.bg1,borderRadius:18,padding:16,marginBottom:16,
-                border:`1px solid ${C.sep}`,boxShadow:"0 2px 8px rgba(0,0,0,0.04)"}}>
-                <div style={{fontSize:13,fontWeight:700,color:C.label,fontFamily:FONT,marginBottom:12}}>
-                  🏆 Top productos — {MESES[mes]}
-                </div>
+              <div style={{background:C.bg1,borderRadius:14,padding:"16px",marginBottom:16,
+                border:`1px solid ${C.sep}`}}>
+                <div style={{fontSize:10,letterSpacing:1.2,textTransform:"uppercase",color:C.label3,
+                  fontFamily:FONT_UI,marginBottom:14,opacity:.65}}>Top productos · {MESES[mes]}</div>
                 {topProds.map((p,i)=>(
                   <div key={p.codigo} style={{display:"flex",alignItems:"center",gap:12,
-                    padding:"10px 0",borderBottom:i<topProds.length-1?`1px solid ${C.sep}`:""}}>
-                    <div style={{width:28,height:28,borderRadius:"50%",
-                      background:`${marca.color}30`,display:"flex",alignItems:"center",
-                      justifyContent:"center",fontSize:13,fontWeight:800,
-                      color:marca.color,fontFamily:FONT,flexShrink:0}}>
+                    padding:"11px 0",borderBottom:i<topProds.length-1?`1px solid ${C.sep}`:""}}>
+                    <div style={{width:20,fontSize:10,fontWeight:700,color:C.label3,
+                      fontFamily:FONT_UI,flexShrink:0,textAlign:"center",opacity:.5}}>
                       {i+1}
                     </div>
                     <div style={{flex:1,minWidth:0}}>
-                      <div style={{fontSize:13,fontWeight:600,color:C.label,fontFamily:FONT,
-                        overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.nombre}</div>
-                      <div style={{fontSize:11,color:C.label3,fontFamily:FONT}}>{p.codigo}</div>
+                      <div style={{fontSize:13,fontWeight:500,color:C.label,fontFamily:FONT,
+                        overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",marginBottom:2}}>{p.nombre}</div>
+                      <div style={{fontSize:10,color:C.label3,fontFamily:"monospace",opacity:.55}}>{p.codigo}</div>
                     </div>
                     <div style={{textAlign:"right",flexShrink:0}}>
-                      <div style={{fontSize:13,fontWeight:700,color:C.label,fontFamily:FONT}}>{$(p.total)}</div>
-                      <div style={{fontSize:11,color:C.label3,fontFamily:FONT}}>{p.uds} uds</div>
+                      <div style={{fontSize:13,fontWeight:700,color:C.label,fontFamily:FONT,letterSpacing:"-0.01em"}}>{$(p.total)}</div>
+                      <div style={{fontSize:10,color:C.label3,fontFamily:FONT_UI,opacity:.6,marginTop:2}}>{p.uds} uds</div>
                     </div>
                   </div>
                 ))}
               </div>
             )}
 
-            {/* Inventario resumen */}
-            <div style={{background:C.bg1,borderRadius:18,padding:16,marginBottom:16,
-              border:`1px solid ${C.sep}`,boxShadow:"0 2px 8px rgba(0,0,0,0.04)"}}>
-              <div style={{fontSize:13,fontWeight:700,color:C.label,fontFamily:FONT,marginBottom:12}}>
-                📦 Stock actual
-              </div>
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
+            {/* ── Stock ── */}
+            <div style={{background:C.bg1,borderRadius:14,padding:"16px",marginBottom:16,
+              border:`1px solid ${C.sep}`}}>
+              <div style={{fontSize:10,letterSpacing:1.2,textTransform:"uppercase",color:C.label3,
+                fontFamily:FONT_UI,marginBottom:14,opacity:.65}}>Stock actual</div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:1,
+                borderRadius:10,overflow:"hidden",border:`1px solid ${C.sep}`}}>
                 {[
-                  {label:"En stock",  value:stockOk,  color:C.green,  bg:C.greenBg},
-                  {label:"Bajo stock",value:stockBaj, color:C.amber,  bg:C.amberBg},
-                  {label:"Agotados",  value:agotados, color:C.red,    bg:C.redBg},
-                ].map(s=>(
-                  <div key={s.label} style={{background:s.bg,borderRadius:12,padding:"12px 10px",textAlign:"center"}}>
-                    <div style={{fontSize:22,fontWeight:700,color:s.color,fontFamily:FONT}}>{s.value}</div>
-                    <div style={{fontSize:10,color:s.color,fontFamily:FONT,marginTop:2,
-                      textTransform:"uppercase",letterSpacing:.4}}>{s.label}</div>
+                  {label:"En stock",   value:stockOk,  color:C.green},
+                  {label:"Bajo stock", value:stockBaj, color:C.amber},
+                  {label:"Agotados",   value:agotados, color:C.red},
+                ].map((s,si)=>(
+                  <div key={s.label} style={{
+                    padding:"14px 8px",textAlign:"center",background:C.bg0,
+                    borderRight:si<2?`1px solid ${C.sep}`:"none",
+                  }}>
+                    <div style={{fontSize:20,fontWeight:700,color:C.label,
+                      fontFamily:FONT,letterSpacing:"-0.02em",marginBottom:4}}>{s.value}</div>
+                    <div style={{fontSize:9,color:C.label3,fontFamily:FONT_UI,
+                      textTransform:"uppercase",letterSpacing:.8,opacity:.55}}>{s.label}</div>
+                    <div style={{width:24,height:2,background:s.color,borderRadius:1,
+                      margin:"6px auto 0",opacity:.6}}/>
                   </div>
                 ))}
               </div>
             </div>
 
-            {/* Comparativo mes anterior */}
-            <div style={{background:C.bg1,borderRadius:18,padding:16,marginBottom:16,
-              border:`1px solid ${C.sep}`,boxShadow:"0 2px 8px rgba(0,0,0,0.04)"}}>
-              <div style={{fontSize:13,fontWeight:700,color:C.label,fontFamily:FONT,marginBottom:12}}>
-                📊 vs {MESES[mPrev]}
-              </div>
+            {/* ── Comparativo mes anterior ── */}
+            <div style={{background:C.bg1,borderRadius:14,padding:"16px",marginBottom:16,
+              border:`1px solid ${C.sep}`}}>
+              <div style={{fontSize:10,letterSpacing:1.2,textTransform:"uppercase",color:C.label3,
+                fontFamily:FONT_UI,marginBottom:14,opacity:.65}}>vs {MESES[mPrev]}</div>
               {[
-                ["Ventas brutas", $(brutoPrev), $(brutoMes), varBruto],
-                ["Unidades",      udsPrev,      udsMes,      varUds],
-                ["Transacciones", vMesPrev.length, vMes.length, vMesPrev.length>0?((vMes.length-vMesPrev.length)/vMesPrev.length*100):0],
+                ["Ventas brutas",  $(brutoPrev), $(brutoMes), varBruto],
+                ["Ítems vendidos", udsPrev,      udsMes,      varUds],
+                ["Transacciones",  vMesPrev.length, vMes.length, vMesPrev.length>0?((vMes.length-vMesPrev.length)/vMesPrev.length*100):0],
               ].map(([label,prev,curr,pct])=>(
                 <div key={label} style={{display:"flex",justifyContent:"space-between",
-                  alignItems:"center",padding:"10px 0",borderBottom:`1px solid ${C.sep}`}}>
+                  alignItems:"center",padding:"11px 0",borderBottom:`1px solid ${C.sep}`}}>
                   <div style={{fontSize:13,color:C.label2,fontFamily:FONT}}>{label}</div>
                   <div style={{display:"flex",gap:12,alignItems:"center"}}>
-                    <div style={{fontSize:12,color:C.label3,fontFamily:FONT}}>{prev}</div>
-                    <div style={{fontSize:14,fontWeight:700,color:C.label,fontFamily:FONT}}>{curr}</div>
-                    <div style={{fontSize:12,fontWeight:700,
-                      color:pct>0?C.green:pct<0?C.red:C.label3,fontFamily:FONT,minWidth:42,textAlign:"right"}}>
+                    <div style={{fontSize:12,color:C.label3,fontFamily:FONT,opacity:.6}}>{prev}</div>
+                    <div style={{fontSize:14,fontWeight:700,color:C.label,fontFamily:FONT,letterSpacing:"-0.01em"}}>{curr}</div>
+                    <div style={{fontSize:11,fontWeight:700,minWidth:40,textAlign:"right",
+                      color:pct>0?C.green:pct<0?C.red:C.label3,fontFamily:FONT_UI}}>
                       {pct>0?"+":""}{pct.toFixed(0)}%
                     </div>
                   </div>
@@ -8601,16 +8606,13 @@ function BrandPortal({user, ventas, inv, cargas, logout}){
           <div>
             {/* ── Buscador ventas ── */}
             <div style={{position:"relative",marginBottom:12}}>
-              <span style={{position:"absolute",left:13,top:"50%",transform:"translateY(-50%)",
-                fontSize:15,pointerEvents:"none"}}>🔍</span>
               <input
                 value={busqV}
                 onChange={e=>setBusqV(e.target.value)}
                 placeholder={`Buscar en ${MESES[mes]}…`}
-                style={{width:"100%",padding:"10px 14px 10px 38px",borderRadius:12,
+                style={{width:"100%",padding:"10px 14px",borderRadius:12,
                   border:`1px solid ${C.sep}`,background:C.bg1,fontSize:13,
-                  color:C.label,fontFamily:FONT,outline:"none",boxSizing:"border-box",
-                  WebkitAppearance:"none"}}
+                  color:C.label,fontFamily:FONT,outline:"none",boxSizing:"border-box"}}
               />
               {busqV&&(
                 <button onClick={()=>setBusqV("")} style={{position:"absolute",right:10,
@@ -8621,23 +8623,22 @@ function BrandPortal({user, ventas, inv, cargas, logout}){
 
             {/* ── Stats bar ── */}
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",
-              marginBottom:14}}>
-              <span style={{fontSize:12,color:C.label3,fontFamily:FONT}}>
+              marginBottom:14,paddingBottom:12,borderBottom:`1px solid ${C.sep}`}}>
+              <span style={{fontSize:12,color:C.label3,fontFamily:FONT_UI,letterSpacing:.3}}>
                 {vMesFiltradas.length} {vMesFiltradas.length===1?"venta":"ventas"}
                 {busqV&&` · "${busqV}"`}
+                {" · "}{udsMes} ítems
               </span>
-              <span style={{fontSize:13,fontWeight:700,color:marca.color,fontFamily:FONT}}>
+              <span style={{fontSize:14,fontWeight:700,color:C.label,fontFamily:FONT,letterSpacing:"-0.02em"}}>
                 {$(brutoMes)}
               </span>
             </div>
 
             {/* ── Lista ventas ── */}
             {vMesFiltradas.length===0
-              ? <div style={{textAlign:"center",padding:"48px 0",color:C.label3}}>
-                  <div style={{fontSize:40,marginBottom:8}}>🛍</div>
-                  <div style={{fontFamily:FONT}}>
-                    {busqV ? `Sin resultados para "${busqV}"` : `Sin ventas en ${MESES[mes]}`}
-                  </div>
+              ? <div style={{textAlign:"center",padding:"48px 0",color:C.label3,fontFamily:FONT_UI,
+                  fontSize:13,opacity:.5}}>
+                  {busqV ? `Sin resultados para "${busqV}"` : `Sin ventas en ${MESES[mes]}`}
                 </div>
               : vMesFiltradas.map(v=>{
                   const citems = v.items.filter(i=>i.marcaId===marca.id);
@@ -8646,12 +8647,10 @@ function BrandPortal({user, ventas, inv, cargas, logout}){
                   return (
                     <div key={v.id}
                       onClick={()=>setVentaSeleccionada(v)}
-                      style={{background:C.bg1,borderRadius:10,padding:"6px 11px",
-                        marginBottom:3,border:`1px solid ${C.sep}`,
-                        boxShadow:"0 1px 3px rgba(0,0,0,0.03)",
+                      style={{background:C.bg1,borderRadius:10,padding:"12px 14px",
+                        marginBottom:1,borderBottom:`1px solid ${C.sep}`,
                         cursor:"pointer",WebkitTapHighlightColor:"transparent",
-                        transition:"all .15s",
-                        borderLeft:`3px solid ${v.anulada?C.red:marca.color}`}}>
+                        transition:"all .15s",opacity:v.anulada?.55:1}}>
                       {/* Fila única — precio + metadata compactos */}
                       <div style={{display:"flex",justifyContent:"space-between",
                         alignItems:"center",gap:10}}>
@@ -8706,13 +8705,11 @@ function BrandPortal({user, ventas, inv, cargas, logout}){
           <div>
             {/* ── Buscador ── */}
             <div style={{position:"relative",marginBottom:10}}>
-              <span style={{position:"absolute",left:13,top:"50%",transform:"translateY(-50%)",
-                fontSize:15,pointerEvents:"none"}}>🔍</span>
               <input
                 value={busqInvP}
                 onChange={e=>setBusqInvP(e.target.value)}
                 placeholder="SKU, nombre o categoría…"
-                style={{width:"100%",padding:"10px 14px 10px 38px",borderRadius:12,
+                style={{width:"100%",padding:"10px 14px",borderRadius:12,
                   border:`1px solid ${C.sep}`,background:C.bg1,fontSize:13,
                   color:C.label,fontFamily:FONT,outline:"none",boxSizing:"border-box"}}
               />
@@ -8765,37 +8762,34 @@ function BrandPortal({user, ventas, inv, cargas, logout}){
                     fontSize:12,fontWeight:700,color:"#fff",fontFamily:FONT,
                     display:"flex",alignItems:"center",gap:6,
                     WebkitTapHighlightColor:"transparent"}}>
-                  {xlsxCarg?"⏳":"📊"} {xlsxCarg?"Generando…":"Excel"}
+                  {xlsxCarg?"Generando…":"Excel"}
                 </button>
               </div>
             </div>
 
             {/* ── Lista inventario ── */}
             {invMarca.length===0
-              ? <div style={{textAlign:"center",padding:"48px 0",color:C.label3}}>
-                  <div style={{fontSize:40,marginBottom:8}}>📦</div>
-                  <div style={{fontFamily:FONT}}>Sin productos registrados</div>
-                </div>
+              ? <div style={{textAlign:"center",padding:"48px 0",color:C.label3,
+                  fontFamily:FONT_UI,fontSize:13,opacity:.5}}>Sin productos registrados</div>
               : invFiltrado.length===0
-              ? <div style={{textAlign:"center",padding:"48px 0",color:C.label3}}>
-                  <div style={{fontSize:32,marginBottom:8}}>🔍</div>
-                  <div style={{fontFamily:FONT}}>Sin resultados con los filtros aplicados</div>
-                </div>
+              ? <div style={{textAlign:"center",padding:"48px 0",color:C.label3,
+                  fontFamily:FONT_UI,fontSize:13,opacity:.5}}>Sin resultados con los filtros aplicados</div>
               : [
-                  {label:"🔴 Agotados",   prods:invFiltrado.filter(i=>i.stock===0),           color:C.red},
-                  {label:"🟡 Bajo stock", prods:invFiltrado.filter(i=>i.stock>0&&i.stock<=2), color:C.amber},
-                  {label:"🟢 En stock",   prods:invFiltrado.filter(i=>i.stock>2),              color:C.green},
+                  {label:"Agotados",   prods:invFiltrado.filter(i=>i.stock===0),           color:C.red},
+                  {label:"Bajo stock", prods:invFiltrado.filter(i=>i.stock>0&&i.stock<=2), color:C.amber},
+                  {label:"En stock",   prods:invFiltrado.filter(i=>i.stock>2),              color:C.green},
                 ].filter(g=>g.prods.length>0).map(g=>(
-                    <div key={g.label} style={{marginBottom:16}}>
-                      <div style={{fontSize:11,fontWeight:700,color:g.color,fontFamily:FONT,
-                        textTransform:"uppercase",letterSpacing:.5,marginBottom:8}}>
-                        {g.label} ({g.prods.length})
+                    <div key={g.label} style={{marginBottom:20}}>
+                      <div style={{fontSize:10,letterSpacing:1.2,textTransform:"uppercase",
+                        color:C.label3,fontFamily:FONT_UI,marginBottom:10,opacity:.65,
+                        display:"flex",alignItems:"center",gap:8}}>
+                        <span style={{display:"inline-block",width:6,height:6,borderRadius:"50%",
+                          background:g.color,opacity:.7}}/>
+                        {g.label} · {g.prods.length}
                       </div>
                       {g.prods.map(p=>(
                         <div key={p.id} style={{background:C.bg1,borderRadius:10,
-                          padding:"9px 12px",marginBottom:5,border:`1px solid ${C.sep}`,
-                          borderLeft:`3px solid ${g.color}`,
-                          boxShadow:"0 1px 3px rgba(0,0,0,0.03)"}}>
+                          padding:"12px 14px",marginBottom:1,borderBottom:`1px solid ${C.sep}`}}>
                           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                             <div style={{flex:1,minWidth:0}}>
                               <div style={{fontSize:13,fontWeight:600,color:C.label,fontFamily:FONT,
@@ -8837,63 +8831,55 @@ function BrandPortal({user, ventas, inv, cargas, logout}){
         {/* ══ LIQUIDACIÓN ══ */}
         {tab==="liquidacion"&&(
           <div>
-            <div style={{background:`${marca.color}15`,borderRadius:18,padding:16,
-              marginBottom:16,border:`1px solid ${marca.color}30`}}>
-              <div style={{fontSize:13,fontWeight:700,color:C.label,fontFamily:FONT,marginBottom:4}}>
-                {marca.emoji} Liquidación estimada — {MESES[mes]} {anio}
-              </div>
-              <div style={{fontSize:11,color:C.label3,fontFamily:FONT}}>
-                Basado en la configuración de comisiones de Toscana House
+            <div style={{marginBottom:24}}>
+              <div style={{fontSize:10,letterSpacing:1.2,textTransform:"uppercase",color:C.label3,
+                fontFamily:FONT_UI,marginBottom:4,opacity:.65}}>Liquidación estimada</div>
+              <div style={{fontSize:13,color:C.label2,fontFamily:FONT}}>
+                {MESES[mes]} {anio} · Basado en configuración Toscana House
               </div>
             </div>
 
             {/* Desglose */}
-            <div style={{background:C.bg1,borderRadius:18,overflow:"hidden",
-              border:`1px solid ${C.sep}`,marginBottom:16,boxShadow:"0 2px 8px rgba(0,0,0,0.04)"}}>
+            <div style={{marginBottom:24}}>
               {[
-                {label:"Ventas brutas",                                  value:liq.bruto,      sign:"",  color:C.label, bold:false},
-                {label:"Efectivo",                                        value:liq.brutoEf,    sign:"",  color:C.label3,bold:false,sub:true},
-                {label:"QR",                                              value:liq.brutoQR,    sign:"",  color:C.label3,bold:false,sub:true},
-                {label:"Tarjeta",                                         value:liq.brutoTJ,    sign:"",  color:C.label3,bold:false,sub:true},
-                ...(gcMarca>0?[{label:"Gift Cards",                       value:gcMarca,        sign:"",  color:"#7C3AED",bold:false,sub:true}]:[]),
-                {label:`Desc. Tarjeta (${liq.cfg.pctTarjeta}%)`,         value:-liq.descTJ,    sign:"−", color:C.red,   bold:false},
-                {label:`Subtotal -${liq.cfg.pctTarjeta}%`,                value:liq.subBanco,   sign:"",  color:C.blue,  bold:true},
-                {label:`Comisión Toscana (${liq.cfg.pctComision}%)`,      value:-liq.comision,  sign:"−", color:C.red,   bold:false},
-                {label:"Alquiler",                                        value:-liq.alquiler,  sign:"−", color:C.red,   bold:false},
+                {label:"Ventas brutas",                                 value:liq.bruto,     sign:"",  muted:false, bold:false},
+                {label:"Efectivo",                                       value:liq.brutoEf,   sign:"",  muted:true,  bold:false,sub:true},
+                {label:"QR",                                             value:liq.brutoQR,   sign:"",  muted:true,  bold:false,sub:true},
+                {label:"Tarjeta",                                        value:liq.brutoTJ,   sign:"",  muted:true,  bold:false,sub:true},
+                ...(gcMarca>0?[{label:"Gift Cards",value:gcMarca,sign:"",muted:true,bold:false,sub:true}]:[]),
+                {label:`− Desc. Tarjeta (${liq.cfg.pctTarjeta}%)`,      value:liq.descTJ,    sign:"−", muted:false, bold:false,red:true},
+                {label:`= Subtotal`,                                     value:liq.subBanco,  sign:"",  muted:false, bold:false},
+                {label:`− Comisión Toscana (${liq.cfg.pctComision}%)`,   value:liq.comision,  sign:"−", muted:false, bold:false,red:true},
+                ...(liq.alquiler>0?[{label:"− Alquiler",value:liq.alquiler,sign:"−",muted:false,bold:false,red:true}]:[]),
                 ...gastos.filter(g=>g.desc||Number(g.monto)>0).map(g=>(
-                  {label:g.desc||"Gasto extra", value:-(Number(g.monto)||0), sign:"−", color:C.red, bold:false, sub:true}
+                  {label:`− ${g.desc||"Gasto extra"}`,value:Number(g.monto)||0,sign:"−",muted:false,bold:false,red:true,sub:true}
                 )),
+                {label:"Neto a liquidar",                               value:liq.neto,      sign:"",  muted:false, bold:true},
               ].map((row,i,arr)=>(
                 <div key={row.label} style={{
                   display:"flex",justifyContent:"space-between",alignItems:"center",
-                  padding:`${row.sub?"8px":"12px"} 16px ${row.sub?"8px":"12px"} ${row.sub?"28px":"16px"}`,
-                  borderBottom:i<arr.length-1?`1px solid ${C.sep}`:"",
-                  background:row.bold?`${C.blue}08`:undefined,
+                  padding:row.bold?"18px 0":"11px 0",
+                  paddingLeft:row.sub?16:0,
+                  borderBottom:i<arr.length-1?`1px solid ${C.sep}`:"none",
+                  borderTop:row.bold?`1px solid ${C.sep}`:"none",
+                  marginTop:row.bold?4:0,
                 }}>
-                  <span style={{fontSize:row.sub?12:13,color:row.color||C.label2,fontFamily:FONT,
-                    fontWeight:row.bold?700:400}}>{row.label}</span>
-                  <span style={{fontSize:row.sub?12:14,fontWeight:row.bold?700:500,
-                    color:row.color||C.label,fontFamily:FONT}}>
+                  <span style={{fontSize:row.bold?15:row.sub?12:13,
+                    color:row.muted?C.label3:C.label2,
+                    fontFamily:row.bold?FONT:FONT_UI,fontWeight:row.bold?700:400}}>{row.label}</span>
+                  <span style={{fontSize:row.bold?20:row.sub?12:14,fontWeight:row.bold?700:500,
+                    color:row.bold?C.green:row.red?C.red:C.label,
+                    fontFamily:FONT,letterSpacing:row.bold?"-0.02em":0}}>
                     {row.sign} {$(Math.abs(row.value))}
                   </span>
                 </div>
               ))}
-              {/* Neto final */}
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",
-                padding:"16px",background:`${C.green}12`,borderTop:`2px solid ${C.green}30`}}>
-                <span style={{fontSize:15,fontWeight:700,color:C.green,fontFamily:FONT}}>
-                  💚 Total Neto Estimado
-                </span>
-                <span style={{fontSize:22,fontWeight:700,color:C.green,fontFamily:FONT_DISPLAY}}>
-                  {$(liq.neto)}
-                </span>
-              </div>
             </div>
 
-            <div style={{background:C.bg2,borderRadius:14,padding:12,border:`1px solid ${C.sep}`}}>
-              <div style={{fontSize:11,color:C.label3,fontFamily:FONT,lineHeight:1.6}}>
-                ℹ️ Esta liquidación es una estimación automática. El monto final puede variar
-                según revisión de Toscana House. Contactá a la administración para confirmar.
+            <div style={{padding:"12px 14px",borderRadius:10,border:`1px solid ${C.sep}`,
+              background:C.bg1}}>
+              <div style={{fontSize:11,color:C.label3,fontFamily:FONT_UI,lineHeight:1.7,opacity:.7}}>
+                Estimación automática. El monto final puede variar según revisión de Toscana House.
               </div>
             </div>
           </div>
