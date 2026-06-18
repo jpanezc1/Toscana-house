@@ -30709,14 +30709,24 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
           cursor: "pointer"
         }
       }
-    )), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+    )), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 8, marginBottom: 12 } }, [
+      { label: "SKUs", value: invFiltrado.length, color: C.label },
+      { label: "Uds. en stock", value: invFiltrado.reduce((s, i) => s + i.stock, 0), color: C.green },
+      { label: "Vendidas", value: invFiltrado.reduce((s, i) => s + (vendidasPorCodigo[i.codigo] || 0), 0), color: C.blue },
+      { label: "Agotados", value: invFiltrado.filter((i) => i.stock === 0).length, color: C.red }
+    ].map((s) => /* @__PURE__ */ import_react.default.createElement("div", { key: s.label, style: {
+      background: C.bg1,
+      borderRadius: 12,
+      padding: "10px 8px",
+      border: `1px solid ${C.sep}`,
+      textAlign: "center"
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 18, fontWeight: 700, color: s.color, fontFamily: FONT, marginBottom: 2 } }, s.value), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 9, color: C.label3, fontFamily: FONT_UI, textTransform: "uppercase", letterSpacing: 0.7 } }, s.label)))), /* @__PURE__ */ import_react.default.createElement("div", { style: {
       display: "flex",
-      justifyContent: "space-between",
+      justifyContent: "flex-end",
       alignItems: "center",
       marginBottom: 14,
-      gap: 8,
-      flexWrap: "wrap"
-    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 12, color: C.label3, fontFamily: FONT } }, invFiltrado.length, " de ", invMarca.length, " \xB7 ", invFiltrado.reduce((s, i) => s + i.stock, 0), " uds \xB7", " ", $(invFiltrado.reduce((s, i) => s + i.precio * i.stock, 0)), " valor"), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 8, alignItems: "center" } }, (busqInvP || catFilP || fechaDesde || fechaHasta) && /* @__PURE__ */ import_react.default.createElement(
+      gap: 8
+    } }, (busqInvP || catFilP || fechaDesde || fechaHasta) && /* @__PURE__ */ import_react.default.createElement(
       "button",
       {
         onClick: () => {
@@ -30759,7 +30769,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
         }
       },
       xlsxCarg ? "Generando\u2026" : "Excel"
-    ))), invMarca.length === 0 ? /* @__PURE__ */ import_react.default.createElement("div", { style: {
+    )), invMarca.length === 0 ? /* @__PURE__ */ import_react.default.createElement("div", { style: {
       textAlign: "center",
       padding: "48px 0",
       color: C.label3,
@@ -37523,17 +37533,18 @@ Se registrar\xE1 que los faltantes/sobrantes fueron verificados f\xEDsicamente y
         }
       },
       "\u2715"
-    )), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 14 } }, [
-      { icon: "\u{1F4E6}", label: "En stock", value: totalStock, color: C.green },
-      { icon: "\u2705", label: "Vendidas", value: totalVendidas, color: C.blue },
-      { icon: "\u274C", label: "Agotados", value: agotados, color: C.red }
+    )), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 8, marginBottom: 14 } }, [
+      { label: "SKUs", value: productos.length, color: C.label },
+      { label: "Uds. en stock", value: totalStock, color: C.green },
+      { label: "Vendidas", value: totalVendidas, color: C.blue },
+      { label: "Agotados", value: agotados, color: C.red }
     ].map((s) => /* @__PURE__ */ import_react.default.createElement("div", { key: s.label, style: {
       background: C.bg2,
       borderRadius: 14,
       padding: isDesktop ? "10px 8px" : "12px 10px",
       border: `1px solid ${C.sep}`,
       textAlign: "center"
-    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 20, marginBottom: 4 } }, s.icon), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 18, fontWeight: 700, color: s.color, fontFamily: FONT } }, s.value), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: C.label3, fontFamily: FONT, textTransform: "uppercase", letterSpacing: 0.5 } }, s.label)))), productos.length === 0 ? /* @__PURE__ */ import_react.default.createElement(
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 18, fontWeight: 700, color: s.color, fontFamily: FONT, marginBottom: 2 } }, s.value), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 9, color: C.label3, fontFamily: FONT_UI, textTransform: "uppercase", letterSpacing: 0.7 } }, s.label)))), productos.length === 0 ? /* @__PURE__ */ import_react.default.createElement(
       EmptyState,
       {
         icon: "\u{1F4E6}",

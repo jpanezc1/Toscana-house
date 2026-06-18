@@ -8811,29 +8811,37 @@ function BrandPortal({user, ventas, inv, cargas, logout}){
             </div>
 
             {/* ── Stats + acciones ── */}
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",
-              marginBottom:14,gap:8,flexWrap:"wrap"}}>
-              <span style={{fontSize:12,color:C.label3,fontFamily:FONT}}>
-                {invFiltrado.length} de {invMarca.length} · {invFiltrado.reduce((s,i)=>s+i.stock,0)} uds ·{" "}
-                {$(invFiltrado.reduce((s,i)=>s+i.precio*i.stock,0))} valor
-              </span>
-              <div style={{display:"flex",gap:8,alignItems:"center"}}>
-                {(busqInvP||catFilP||fechaDesde||fechaHasta)&&(
-                  <button onClick={()=>{setBusqInvP("");setCatFilP("");setFechaDesde("");setFechaHasta("");}}
-                    style={{padding:"6px 12px",borderRadius:10,border:`1px solid ${C.sep}`,
-                      background:C.bg2,cursor:"pointer",fontSize:11,color:C.label3,fontFamily:FONT}}>
-                    Limpiar filtros
-                  </button>
-                )}
-                <button onClick={descargarExcelInvMarca} disabled={xlsxCarg}
-                  style={{padding:"6px 14px",borderRadius:10,border:"none",
-                    background:xlsxCarg?C.label3:C.green,cursor:xlsxCarg?"not-allowed":"pointer",
-                    fontSize:12,fontWeight:700,color:"#fff",fontFamily:FONT,
-                    display:"flex",alignItems:"center",gap:6,
-                    WebkitTapHighlightColor:"transparent"}}>
-                  {xlsxCarg?"Generando…":"Excel"}
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:8,marginBottom:12}}>
+              {[
+                {label:"SKUs",          value:invFiltrado.length,                                              color:C.label},
+                {label:"Uds. en stock", value:invFiltrado.reduce((s,i)=>s+i.stock,0),                        color:C.green},
+                {label:"Vendidas",      value:invFiltrado.reduce((s,i)=>s+(vendidasPorCodigo[i.codigo]||0),0),color:C.blue},
+                {label:"Agotados",      value:invFiltrado.filter(i=>i.stock===0).length,                      color:C.red},
+              ].map(s=>(
+                <div key={s.label} style={{background:C.bg1,borderRadius:12,padding:"10px 8px",
+                  border:`1px solid ${C.sep}`,textAlign:"center"}}>
+                  <div style={{fontSize:18,fontWeight:700,color:s.color,fontFamily:FONT,marginBottom:2}}>{s.value}</div>
+                  <div style={{fontSize:9,color:C.label3,fontFamily:FONT_UI,textTransform:"uppercase",letterSpacing:.7}}>{s.label}</div>
+                </div>
+              ))}
+            </div>
+            <div style={{display:"flex",justifyContent:"flex-end",alignItems:"center",
+              marginBottom:14,gap:8}}>
+              {(busqInvP||catFilP||fechaDesde||fechaHasta)&&(
+                <button onClick={()=>{setBusqInvP("");setCatFilP("");setFechaDesde("");setFechaHasta("");}}
+                  style={{padding:"6px 12px",borderRadius:10,border:`1px solid ${C.sep}`,
+                    background:C.bg2,cursor:"pointer",fontSize:11,color:C.label3,fontFamily:FONT}}>
+                  Limpiar filtros
                 </button>
-              </div>
+              )}
+              <button onClick={descargarExcelInvMarca} disabled={xlsxCarg}
+                style={{padding:"6px 14px",borderRadius:10,border:"none",
+                  background:xlsxCarg?C.label3:C.green,cursor:xlsxCarg?"not-allowed":"pointer",
+                  fontSize:12,fontWeight:700,color:"#fff",fontFamily:FONT,
+                  display:"flex",alignItems:"center",gap:6,
+                  WebkitTapHighlightColor:"transparent"}}>
+                {xlsxCarg?"Generando…":"Excel"}
+              </button>
             </div>
 
             {/* ── Lista inventario ── */}
@@ -14617,17 +14625,17 @@ function InventarioPorMarca({inv, ventas, onRecibir, onBaja, onImportarExcel, on
       </div>
 
       {/* Stats */}
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8, marginBottom:14}}>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:8, marginBottom:14}}>
         {[
-          {icon:"📦",label:"En stock",value:totalStock,color:C.green},
-          {icon:"✅",label:"Vendidas",value:totalVendidas,color:C.blue},
-          {icon:"❌",label:"Agotados",value:agotados,color:C.red},
+          {label:"SKUs",          value:productos.length, color:C.label},
+          {label:"Uds. en stock", value:totalStock,       color:C.green},
+          {label:"Vendidas",      value:totalVendidas,    color:C.blue},
+          {label:"Agotados",      value:agotados,         color:C.red},
         ].map(s=>(
           <div key={s.label} style={{background:C.bg2,borderRadius:14,padding: isDesktop ? "10px 8px" : "12px 10px",
             border:`1px solid ${C.sep}`,textAlign:"center"}}>
-            <div style={{fontSize:20,marginBottom:4}}>{s.icon}</div>
-            <div style={{fontSize:18,fontWeight:700,color:s.color,fontFamily:FONT}}>{s.value}</div>
-            <div style={{fontSize:10,color:C.label3,fontFamily:FONT,textTransform:"uppercase",letterSpacing:.5}}>{s.label}</div>
+            <div style={{fontSize:18,fontWeight:700,color:s.color,fontFamily:FONT,marginBottom:2}}>{s.value}</div>
+            <div style={{fontSize:9,color:C.label3,fontFamily:FONT_UI,textTransform:"uppercase",letterSpacing:.7}}>{s.label}</div>
           </div>
         ))}
       </div>
