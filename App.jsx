@@ -121,7 +121,7 @@ async function sbGuardarProductosBatch(prods) {
 async function sbActualizarStock(prodId, nuevoStock) {
   try {
     const db = await getSupabase();
-    const { error } = await db.from("inventario").update({ stock: nuevoStock }).eq("id", prodId);
+    const { error } = await db.from("inventario").update({ stock: Math.max(0, nuevoStock) }).eq("id", prodId);
     if (error) throw error;
     return true;
   } catch(e) { console.warn("Supabase update stock:", e.message); return false; }
@@ -11091,7 +11091,7 @@ function App(){
     const cant = bajaCant.trim()==="" ? stockAntes : Number(bajaCant);
     if(!cant||cant<=0||cant>stockAntes){setBajaMsg({ok:false,msg:`Cantidad inválida (stock actual: ${stockAntes})`});return;}
     const motivo = bajaMotivo.trim();
-    const stockDespues = stockAntes - cant;
+    const stockDespues = Math.max(0, stockAntes - cant);
     if(!window.confirm(`¿Confirmar baja de "${prod.nombre}" (${cod})?\nStock actual: ${stockAntes} → ${stockDespues}${motivo?`\nMotivo: ${motivo}`:""}`)){
       return;
     }
@@ -11103,7 +11103,7 @@ function App(){
   // Dar de baja — SOLO Inventario. No genera retiro (eso es exclusivo de Caja).
   // Permite baja parcial (ej. para corregir stock duplicado) y un motivo/detalle.
   function registrarBaja(prod, stockAntes, cant, motivo){
-    const stockDespues = stockAntes - cant;
+    const stockDespues = Math.max(0, stockAntes - cant);
     setInv(p=>p.map(i=>i.id===prod.id?{...i,stock:stockDespues}:i));
     syncConRespaldo("stock", {prodId:prod.id, stock:stockDespues}, ()=>sbActualizarStock(prod.id, stockDespues));
     logAudit("BAJA", {
