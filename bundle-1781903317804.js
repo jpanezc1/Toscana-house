@@ -34403,7 +34403,7 @@ Motivo: ${motivo}` : ""}`)) {
         cierres,
         onVentaClick: (v) => setVentaDetalle(v)
       }
-    ), tab === "config" && /* @__PURE__ */ import_react.default.createElement(ConfigTab, { user, logout }))), !isDesktop && /* @__PURE__ */ import_react.default.createElement(TabBar, { tabs: TABS, active: tab, onChange: (t) => {
+    ), tab === "config" && /* @__PURE__ */ import_react.default.createElement(ConfigTab, { user, logout, onRecargarDesdeSupabase: recargarDesdeSupabase, onSyncCompleto: forzarSyncInventario }))), !isDesktop && /* @__PURE__ */ import_react.default.createElement(TabBar, { tabs: TABS, active: tab, onChange: (t) => {
       setTab(t);
       setMD(null);
     } }), /* @__PURE__ */ import_react.default.createElement(
@@ -37877,29 +37877,7 @@ Se registrar\xE1 que los faltantes/sobrantes fueron verificados f\xEDsicamente y
         icon: "\u{1F4CB}"
       },
       "Plantilla"
-    )), (onSyncCompleto || onRecargarDesdeSupabase) && /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 8, marginTop: 8 } }, onRecargarDesdeSupabase && /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: async () => {
-      if (syncMsg && typeof syncMsg === "object") return;
-      setSyncMsg({ prog: 1, total: 1 });
-      try {
-        const ok = await onRecargarDesdeSupabase();
-        setSyncMsg(ok ? "ok" : "err");
-        setTimeout(() => setSyncMsg(null), 4e3);
-      } catch (e) {
-        setSyncMsg("err");
-        setTimeout(() => setSyncMsg(null), 4e3);
-      }
-    }, variant: "outline", full: true, small: true, icon: "\u2B07\uFE0F" }, syncMsg && typeof syncMsg === "object" ? "Cargando\u2026" : "Recargar desde Supabase"), onSyncCompleto && /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: async () => {
-      if (syncMsg && typeof syncMsg === "object") return;
-      setSyncMsg({ prog: 0, total: inv.length });
-      try {
-        const r = await onSyncCompleto((prog, total) => setSyncMsg({ prog, total }));
-        setSyncMsg(r.fail > 0 ? "err" : "ok");
-        setTimeout(() => setSyncMsg(null), 5e3);
-      } catch (e) {
-        setSyncMsg("err");
-        setTimeout(() => setSyncMsg(null), 5e3);
-      }
-    }, variant: "fill", full: true, small: true, icon: "\u2601\uFE0F" }, syncMsg && typeof syncMsg === "object" ? `Sincronizando\u2026 ${syncMsg.prog}/${syncMsg.total}` : "Sincronizar con Supabase")), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 8, marginTop: 8 } }, /* @__PURE__ */ import_react.default.createElement(
+    )), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 8, marginTop: 8 } }, /* @__PURE__ */ import_react.default.createElement(
       IOSBtn,
       {
         onPress: () => {
@@ -39746,7 +39724,7 @@ Se registrar\xE1 que los faltantes/sobrantes fueron verificados f\xEDsicamente y
       maxWidth: "60%"
     } }, String(v)));
   }
-  function SistemaTab({ user, logout }) {
+  function SistemaTab({ user, logout, onRecargarDesdeSupabase, onSyncCompleto }) {
     const [resetState, setResetState] = (0, import_react.useState)("idle");
     const [resetLog, setResetLog] = (0, import_react.useState)([]);
     const [inputVal, setInputVal] = (0, import_react.useState)("");
@@ -39878,6 +39856,57 @@ Se registrar\xE1 que los faltantes/sobrantes fueron verificados f\xEDsicamente y
         fontFamily: FONT,
         WebkitTapHighlightColor: "transparent"
       } }, carpetaNombre ? "\u{1F504} Cambiar carpeta base" : "\u{1F4C1} Seleccionar carpeta base")));
+    })(), (onRecargarDesdeSupabase || onSyncCompleto) && (() => {
+      const [sbMsg, setSbMsg] = import_react.default.useState(null);
+      return /* @__PURE__ */ import_react.default.createElement("div", { style: {
+        background: C.bg1,
+        borderRadius: 16,
+        border: `1px solid ${C.sep}`,
+        padding: "16px",
+        marginBottom: 12,
+        boxShadow: "0 1px 6px rgba(0,0,0,0.04)"
+      } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, fontWeight: 700, color: C.label, fontFamily: FONT, marginBottom: 4 } }, "\u2601\uFE0F Sincronizaci\xF3n con Supabase"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT, marginBottom: 12, lineHeight: 1.5 } }, "Recargar baja los datos actuales desde la nube al dispositivo. Sincronizar sube los datos locales a la nube."), sbMsg && /* @__PURE__ */ import_react.default.createElement("div", { style: {
+        fontSize: 12,
+        fontWeight: 600,
+        color: sbMsg === "ok" ? C.green : sbMsg === "err" ? C.red : C.indigo,
+        marginBottom: 10,
+        textAlign: "center"
+      } }, sbMsg === "ok" ? "\u2705 Datos recargados desde Supabase" : sbMsg === "err" ? "\u26A0\uFE0F Error al conectar" : sbMsg), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 8 } }, onRecargarDesdeSupabase && /* @__PURE__ */ import_react.default.createElement("button", { onClick: async () => {
+        setSbMsg("Cargando desde Supabase\u2026");
+        const ok = await onRecargarDesdeSupabase();
+        setSbMsg(ok ? "ok" : "err");
+        setTimeout(() => setSbMsg(null), 4e3);
+      }, style: {
+        flex: 1,
+        padding: "11px",
+        borderRadius: 10,
+        border: `1.5px solid ${C.indigo}40`,
+        background: `${C.indigo}10`,
+        cursor: "pointer",
+        fontSize: 13,
+        fontWeight: 600,
+        color: C.indigo,
+        fontFamily: FONT,
+        WebkitTapHighlightColor: "transparent"
+      } }, "\u2B07\uFE0F Recargar desde Supabase"), onSyncCompleto && /* @__PURE__ */ import_react.default.createElement("button", { onClick: async () => {
+        setSbMsg("Sincronizando\u2026");
+        const r = await onSyncCompleto(() => {
+        });
+        setSbMsg(r.fail > 0 ? "err" : "ok");
+        setTimeout(() => setSbMsg(null), 4e3);
+      }, style: {
+        flex: 1,
+        padding: "11px",
+        borderRadius: 10,
+        border: `1.5px solid ${C.sep}`,
+        background: C.bg2,
+        cursor: "pointer",
+        fontSize: 13,
+        fontWeight: 600,
+        color: C.label2,
+        fontFamily: FONT,
+        WebkitTapHighlightColor: "transparent"
+      } }, "\u2601\uFE0F Subir a Supabase")));
     })(), /* @__PURE__ */ import_react.default.createElement("div", { style: {
       background: C.bg1,
       borderRadius: 16,
@@ -40117,7 +40146,7 @@ Se registrar\xE1 que los faltantes/sobrantes fueron verificados f\xEDsicamente y
     } }, "Volver"));
     return /* @__PURE__ */ import_react.default.createElement("div", null, resetState === "idle" && renderIdle(), resetState === "confirm1" && renderConfirm1(), resetState === "confirm2" && renderConfirm2(), resetState === "running" && renderRunning(), resetState === "done" && renderDone(), resetState === "error" && renderError());
   }
-  function ConfigTab({ user, logout }) {
+  function ConfigTab({ user, logout, onRecargarDesdeSupabase, onSyncCompleto }) {
     const [subTab, setSubTab] = (0, import_react.useState)("perfil");
     const [usuarios, setUsuarios] = (0, import_react.useState)(() => {
       try {
@@ -40633,7 +40662,7 @@ Esta acci\xF3n no se puede deshacer.`,
         usuarios,
         onGuardar: (u) => guardarUsuarios(u, "Cambi\xF3 su contrase\xF1a", user.usuario, "\u2713 Contrase\xF1a actualizada")
       }
-    )), subTab === "sistema" && /* @__PURE__ */ import_react.default.createElement(SistemaTab, { user, logout }), subTab === "factura" && /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement(FacturacionConfig, null), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+    )), subTab === "sistema" && /* @__PURE__ */ import_react.default.createElement(SistemaTab, { user, logout, onRecargarDesdeSupabase, onSyncCompleto }), subTab === "factura" && /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement(FacturacionConfig, null), /* @__PURE__ */ import_react.default.createElement("div", { style: {
       padding: 14,
       background: `${C.blue}08`,
       borderRadius: 14,

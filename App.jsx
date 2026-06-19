@@ -11936,7 +11936,7 @@ function App(){
 
         {/* CONFIG */}
         {tab==="config" && (
-          <ConfigTab user={user} logout={logout}/>
+          <ConfigTab user={user} logout={logout} onRecargarDesdeSupabase={recargarDesdeSupabase} onSyncCompleto={forzarSyncInventario}/>
         )}
       </div>
 
@@ -14941,38 +14941,6 @@ function InventarioPorMarca({inv, ventas, onRecibir, onBaja, onImportarExcel, on
           <IOSBtn onPress={async()=>{ try{await generarPlantillaXLSX();}catch(e){alert("Error: "+e.message);} }}
             full small icon="📋">Plantilla</IOSBtn>
         </div>
-        {(onSyncCompleto || onRecargarDesdeSupabase) && (
-          <div style={{display:"flex",gap:8,marginTop:8}}>
-            {onRecargarDesdeSupabase && (
-              <IOSBtn onPress={async()=>{
-                if(syncMsg && typeof syncMsg==="object") return;
-                setSyncMsg({prog:1, total:1});
-                try{
-                  const ok = await onRecargarDesdeSupabase();
-                  setSyncMsg(ok?"ok":"err");
-                  setTimeout(()=>setSyncMsg(null), 4000);
-                }catch(e){ setSyncMsg("err"); setTimeout(()=>setSyncMsg(null),4000); }
-              }} variant="outline" full small icon="⬇️">
-                {syncMsg && typeof syncMsg==="object" ? "Cargando…" : "Recargar desde Supabase"}
-              </IOSBtn>
-            )}
-            {onSyncCompleto && (
-              <IOSBtn onPress={async()=>{
-                if(syncMsg && typeof syncMsg==="object") return;
-                setSyncMsg({prog:0, total:inv.length});
-                try{
-                  const r = await onSyncCompleto((prog,total)=>setSyncMsg({prog,total}));
-                  setSyncMsg(r.fail>0?"err":"ok");
-                  setTimeout(()=>setSyncMsg(null), 5000);
-                }catch(e){ setSyncMsg("err"); setTimeout(()=>setSyncMsg(null),5000); }
-              }} variant="fill" full small icon="☁️">
-                {syncMsg && typeof syncMsg==="object"
-                  ? `Sincronizando… ${syncMsg.prog}/${syncMsg.total}`
-                  : "Sincronizar con Supabase"}
-              </IOSBtn>
-            )}
-          </div>
-        )}
         <div style={{display:"flex",gap:8,marginTop:8}}>
           <IOSBtn onPress={()=>{
               if(productos.length===0){ alert("No hay productos para imprimir"); return; }
@@ -16730,7 +16698,7 @@ function Row({k,v}){
 }
 
 // ── Sistema Tab con Factory Reset ────────────────────────────────────────────
-function SistemaTab({user, logout}){
+function SistemaTab({user, logout, onRecargarDesdeSupabase, onSyncCompleto}){
   const [resetState, setResetState] = useState("idle"); // idle | confirm1 | confirm2 | running | done | error
   const [resetLog, setResetLog]   = useState([]);
   const [inputVal, setInputVal]   = useState("");
@@ -16867,6 +16835,54 @@ function SistemaTab({user, logout}){
                 </button>
               </>
             )}
+          </div>
+        );
+      })()}
+
+      {/* Sincronización con Supabase */}
+      {(onRecargarDesdeSupabase||onSyncCompleto) && (()=>{
+        const [sbMsg, setSbMsg] = React.useState(null);
+        return (
+          <div style={{background:C.bg1,borderRadius:16,border:`1px solid ${C.sep}`,
+            padding:"16px",marginBottom:12,boxShadow:"0 1px 6px rgba(0,0,0,0.04)"}}>
+            <div style={{fontSize:13,fontWeight:700,color:C.label,fontFamily:FONT,marginBottom:4}}>
+              ☁️ Sincronización con Supabase
+            </div>
+            <div style={{fontSize:12,color:C.label3,fontFamily:FONT,marginBottom:12,lineHeight:1.5}}>
+              Recargar baja los datos actuales desde la nube al dispositivo. Sincronizar sube los datos locales a la nube.
+            </div>
+            {sbMsg && (
+              <div style={{fontSize:12,fontWeight:600,color:sbMsg==="ok"?C.green:sbMsg==="err"?C.red:C.indigo,
+                marginBottom:10,textAlign:"center"}}>
+                {sbMsg==="ok"?"✅ Datos recargados desde Supabase":sbMsg==="err"?"⚠️ Error al conectar":sbMsg}
+              </div>
+            )}
+            <div style={{display:"flex",gap:8}}>
+              {onRecargarDesdeSupabase&&(
+                <button onClick={async()=>{
+                  setSbMsg("Cargando desde Supabase…");
+                  const ok = await onRecargarDesdeSupabase();
+                  setSbMsg(ok?"ok":"err");
+                  setTimeout(()=>setSbMsg(null),4000);
+                }} style={{flex:1,padding:"11px",borderRadius:10,border:`1.5px solid ${C.indigo}40`,
+                  background:`${C.indigo}10`,cursor:"pointer",fontSize:13,fontWeight:600,
+                  color:C.indigo,fontFamily:FONT,WebkitTapHighlightColor:"transparent"}}>
+                  ⬇️ Recargar desde Supabase
+                </button>
+              )}
+              {onSyncCompleto&&(
+                <button onClick={async()=>{
+                  setSbMsg("Sincronizando…");
+                  const r = await onSyncCompleto(()=>{});
+                  setSbMsg(r.fail>0?"err":"ok");
+                  setTimeout(()=>setSbMsg(null),4000);
+                }} style={{flex:1,padding:"11px",borderRadius:10,border:`1.5px solid ${C.sep}`,
+                  background:C.bg2,cursor:"pointer",fontSize:13,fontWeight:600,
+                  color:C.label2,fontFamily:FONT,WebkitTapHighlightColor:"transparent"}}>
+                  ☁️ Subir a Supabase
+                </button>
+              )}
+            </div>
           </div>
         );
       })()}
@@ -17103,7 +17119,7 @@ function SistemaTab({user, logout}){
 }
 
 // ── Panel configuración principal ─────────────────────────────────────────────
-function ConfigTab({user, logout}){
+function ConfigTab({user, logout, onRecargarDesdeSupabase, onSyncCompleto}){
   const [subTab, setSubTab] = useState("perfil");
   const [usuarios, setUsuarios] = useState(()=>{
     try{return JSON.parse(localStorage.getItem("th_usuarios")||"null")||USUARIOS;}
@@ -17537,7 +17553,7 @@ create policy "allow all usuarios" on usuarios
 
       {/* ════ SISTEMA ════ */}
       {subTab==="sistema"&&(
-        <SistemaTab user={user} logout={logout}/>
+        <SistemaTab user={user} logout={logout} onRecargarDesdeSupabase={onRecargarDesdeSupabase} onSyncCompleto={onSyncCompleto}/>
       )}
 
       {/* ════ FACTURACIÓN ════ */}
