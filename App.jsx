@@ -7449,13 +7449,27 @@ function ImportarExcelModal({inv, onImportar, onClose}){
 
       {/* ── IMPORTANDO ── */}
       {estado==="importando"&&(
-        <div style={{textAlign:"center",padding:"50px 20px"}}>
+        <div style={{textAlign:"center",padding:"40px 20px"}}>
           <div style={{fontSize:40,marginBottom:16}}>⚙️</div>
           <div style={{fontSize:16,fontWeight:600,color:C.label,fontFamily:FONT_UI,marginBottom:6}}>
             Importando productos…
           </div>
-          <div style={{fontSize:13,color:C.label3,fontFamily:FONT_UI}}>
+          <div style={{fontSize:13,color:C.label3,fontFamily:FONT_UI,marginBottom:20}}>
             Guardando en inventario
+          </div>
+          <div style={{display:"inline-flex",gap:16,background:C.bg2,borderRadius:14,
+            padding:"12px 24px",border:`1px solid ${C.sep}`}}>
+            <span style={{fontSize:13,color:C.label3,fontFamily:FONT_UI}}>
+              <span style={{fontWeight:700,color:C.label}}>{preview.filter(f=>!f._dup&&f._errs.length===0).length}</span> nuevos
+            </span>
+            <span style={{color:C.sep}}>·</span>
+            <span style={{fontSize:13,color:C.label3,fontFamily:FONT_UI}}>
+              <span style={{fontWeight:700,color:C.blue}}>{preview.filter(f=>f._dup).length}</span> actualizados
+            </span>
+            <span style={{color:C.sep}}>·</span>
+            <span style={{fontSize:13,color:C.label3,fontFamily:FONT_UI}}>
+              <span style={{fontWeight:700,color:C.green}}>{nUnidades}</span> uds.
+            </span>
           </div>
         </div>
       )}
@@ -8839,6 +8853,14 @@ function BrandPortal({user, ventas, inv, cargas, logout}){
                   <div style={{fontSize:9,color:C.label3,fontFamily:FONT_UI,textTransform:"uppercase",letterSpacing:.7}}>{s.label}</div>
                 </div>
               ))}
+            </div>
+            {/* Total general siempre visible */}
+            <div style={{fontSize:11,color:C.label3,fontFamily:FONT_UI,textAlign:"right",
+              marginBottom:6,paddingRight:2}}>
+              Total marca:&nbsp;
+              <span style={{color:C.label,fontWeight:700}}>{invMarca.length} SKUs</span>
+              &nbsp;·&nbsp;
+              <span style={{color:C.green,fontWeight:700}}>{invMarca.reduce((s,i)=>s+i.stock,0)} uds.</span>
             </div>
             <div style={{display:"flex",justifyContent:"flex-end",alignItems:"center",
               marginBottom:14,gap:8}}>
@@ -14646,20 +14668,45 @@ function InventarioPorMarca({inv, ventas, onRecibir, onBaja, onImportarExcel, on
       </div>
 
       {/* Stats */}
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:8, marginBottom:14}}>
-        {[
-          {label:"SKUs",          value:productos.length, color:C.label},
-          {label:"Uds. en stock", value:totalStock,       color:C.green},
-          {label:"Vendidas",      value:totalVendidas,    color:C.blue},
-          {label:"Agotados",      value:agotados,         color:C.red},
-        ].map(s=>(
-          <div key={s.label} style={{background:C.bg2,borderRadius:14,padding: isDesktop ? "10px 8px" : "12px 10px",
-            border:`1px solid ${C.sep}`,textAlign:"center"}}>
-            <div style={{fontSize:18,fontWeight:700,color:s.color,fontFamily:FONT,marginBottom:2}}>{s.value}</div>
-            <div style={{fontSize:9,color:C.label3,fontFamily:FONT_UI,textTransform:"uppercase",letterSpacing:.7}}>{s.label}</div>
+      {(()=>{
+        const totalSkusGlobal = inv.length;
+        const totalUdsGlobal  = inv.reduce((s,p)=>s+p.stock,0);
+        const hayFiltroActivo = hayFiltro || marcaSelec;
+        return (<>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:8, marginBottom: hayFiltroActivo ? 6 : 14}}>
+          {[
+            {label:"SKUs",          value:productos.length, color:C.label},
+            {label:"Uds. en stock", value:totalStock,       color:C.green},
+            {label:"Vendidas",      value:totalVendidas,    color:C.blue},
+            {label:"Agotados",      value:agotados,         color:C.red},
+          ].map(s=>(
+            <div key={s.label} style={{background:C.bg2,borderRadius:14,padding: isDesktop ? "10px 8px" : "12px 10px",
+              border:`1px solid ${C.sep}`,textAlign:"center"}}>
+              <div style={{fontSize:18,fontWeight:700,color:s.color,fontFamily:FONT,marginBottom:2}}>{s.value}</div>
+              <div style={{fontSize:9,color:C.label3,fontFamily:FONT_UI,textTransform:"uppercase",letterSpacing:.7}}>{s.label}</div>
+            </div>
+          ))}
+        </div>
+        {/* Total general siempre visible cuando hay filtro activo */}
+        {hayFiltroActivo && (
+          <div style={{fontSize:11,color:C.label3,fontFamily:FONT_UI,textAlign:"right",
+            marginBottom:12,paddingRight:2}}>
+            Total inventario:&nbsp;
+            <span style={{color:C.label,fontWeight:700}}>{totalSkusGlobal} SKUs</span>
+            &nbsp;·&nbsp;
+            <span style={{color:C.green,fontWeight:700}}>{totalUdsGlobal} uds.</span>
           </div>
-        ))}
-      </div>
+        )}
+        {/* Sin filtro: mostrar total siempre como línea discreta */}
+        {!hayFiltroActivo && (
+          <div style={{fontSize:11,color:C.label3,fontFamily:FONT_UI,textAlign:"right",
+            marginBottom:12,paddingRight:2}}>
+            Total:&nbsp;
+            <span style={{color:C.green,fontWeight:700}}>{totalUdsGlobal} uds.</span>
+          </div>
+        )}
+        </>);
+      })()}
 
       {/* ── Lista profesional de productos ── */}
       {productos.length===0

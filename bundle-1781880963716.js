@@ -29218,7 +29218,14 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
         }
       },
       "\u2190 Cargar otro archivo"
-    ))), estado === "importando" && /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center", padding: "50px 20px" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 40, marginBottom: 16 } }, "\u2699\uFE0F"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 16, fontWeight: 600, color: C.label, fontFamily: FONT_UI, marginBottom: 6 } }, "Importando productos\u2026"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.label3, fontFamily: FONT_UI } }, "Guardando en inventario")), estado === "done" && stats && /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center", padding: "20px 0" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 48, marginBottom: 16 } }, "\u2705"), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+    ))), estado === "importando" && /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center", padding: "40px 20px" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 40, marginBottom: 16 } }, "\u2699\uFE0F"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 16, fontWeight: 600, color: C.label, fontFamily: FONT_UI, marginBottom: 6 } }, "Importando productos\u2026"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.label3, fontFamily: FONT_UI, marginBottom: 20 } }, "Guardando en inventario"), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      display: "inline-flex",
+      gap: 16,
+      background: C.bg2,
+      borderRadius: 14,
+      padding: "12px 24px",
+      border: `1px solid ${C.sep}`
+    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, color: C.label3, fontFamily: FONT_UI } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontWeight: 700, color: C.label } }, preview.filter((f) => !f._dup && f._errs.length === 0).length), " nuevos"), /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.sep } }, "\xB7"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, color: C.label3, fontFamily: FONT_UI } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontWeight: 700, color: C.blue } }, preview.filter((f) => f._dup).length), " actualizados"), /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.sep } }, "\xB7"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, color: C.label3, fontFamily: FONT_UI } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontWeight: 700, color: C.green } }, nUnidades), " uds."))), estado === "done" && stats && /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center", padding: "20px 0" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 48, marginBottom: 16 } }, "\u2705"), /* @__PURE__ */ import_react.default.createElement("div", { style: {
       fontSize: 20,
       fontWeight: 700,
       color: C.green,
@@ -30754,6 +30761,13 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       border: `1px solid ${C.sep}`,
       textAlign: "center"
     } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 18, fontWeight: 700, color: s.color, fontFamily: FONT, marginBottom: 2 } }, s.value), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 9, color: C.label3, fontFamily: FONT_UI, textTransform: "uppercase", letterSpacing: 0.7 } }, s.label)))), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      fontSize: 11,
+      color: C.label3,
+      fontFamily: FONT_UI,
+      textAlign: "right",
+      marginBottom: 6,
+      paddingRight: 2
+    } }, "Total marca:\xA0", /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.label, fontWeight: 700 } }, invMarca.length, " SKUs"), "\xA0\xB7\xA0", /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.green, fontWeight: 700 } }, invMarca.reduce((s, i) => s + i.stock, 0), " uds.")), /* @__PURE__ */ import_react.default.createElement("div", { style: {
       display: "flex",
       justifyContent: "flex-end",
       alignItems: "center",
@@ -37582,18 +37596,37 @@ Se registrar\xE1 que los faltantes/sobrantes fueron verificados f\xEDsicamente y
         }
       },
       "\u2715"
-    )), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 8, marginBottom: 14 } }, [
-      { label: "SKUs", value: productos.length, color: C.label },
-      { label: "Uds. en stock", value: totalStock, color: C.green },
-      { label: "Vendidas", value: totalVendidas, color: C.blue },
-      { label: "Agotados", value: agotados, color: C.red }
-    ].map((s) => /* @__PURE__ */ import_react.default.createElement("div", { key: s.label, style: {
-      background: C.bg2,
-      borderRadius: 14,
-      padding: isDesktop ? "10px 8px" : "12px 10px",
-      border: `1px solid ${C.sep}`,
-      textAlign: "center"
-    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 18, fontWeight: 700, color: s.color, fontFamily: FONT, marginBottom: 2 } }, s.value), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 9, color: C.label3, fontFamily: FONT_UI, textTransform: "uppercase", letterSpacing: 0.7 } }, s.label)))), productos.length === 0 ? /* @__PURE__ */ import_react.default.createElement(
+    )), (() => {
+      const totalSkusGlobal = inv.length;
+      const totalUdsGlobal = inv.reduce((s, p) => s + p.stock, 0);
+      const hayFiltroActivo = hayFiltro || marcaSelec;
+      return /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, null, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 8, marginBottom: hayFiltroActivo ? 6 : 14 } }, [
+        { label: "SKUs", value: productos.length, color: C.label },
+        { label: "Uds. en stock", value: totalStock, color: C.green },
+        { label: "Vendidas", value: totalVendidas, color: C.blue },
+        { label: "Agotados", value: agotados, color: C.red }
+      ].map((s) => /* @__PURE__ */ import_react.default.createElement("div", { key: s.label, style: {
+        background: C.bg2,
+        borderRadius: 14,
+        padding: isDesktop ? "10px 8px" : "12px 10px",
+        border: `1px solid ${C.sep}`,
+        textAlign: "center"
+      } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 18, fontWeight: 700, color: s.color, fontFamily: FONT, marginBottom: 2 } }, s.value), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 9, color: C.label3, fontFamily: FONT_UI, textTransform: "uppercase", letterSpacing: 0.7 } }, s.label)))), hayFiltroActivo && /* @__PURE__ */ import_react.default.createElement("div", { style: {
+        fontSize: 11,
+        color: C.label3,
+        fontFamily: FONT_UI,
+        textAlign: "right",
+        marginBottom: 12,
+        paddingRight: 2
+      } }, "Total inventario:\xA0", /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.label, fontWeight: 700 } }, totalSkusGlobal, " SKUs"), "\xA0\xB7\xA0", /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.green, fontWeight: 700 } }, totalUdsGlobal, " uds.")), !hayFiltroActivo && /* @__PURE__ */ import_react.default.createElement("div", { style: {
+        fontSize: 11,
+        color: C.label3,
+        fontFamily: FONT_UI,
+        textAlign: "right",
+        marginBottom: 12,
+        paddingRight: 2
+      } }, "Total:\xA0", /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.green, fontWeight: 700 } }, totalUdsGlobal, " uds.")));
+    })(), productos.length === 0 ? /* @__PURE__ */ import_react.default.createElement(
       EmptyState,
       {
         icon: "\u{1F4E6}",
