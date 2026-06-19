@@ -714,6 +714,8 @@ async function leerCodigoDeImagen(file) {
   }
 }
 
+function limpiarCod(c){ return (c||"").toUpperCase().replace(/[^A-Z0-9]/g,""); }
+
 // Genera código de barras CODE128 como SVG (string)
 async function generarSVGBarcode(codigo) {
   try {
@@ -4842,7 +4844,7 @@ function RetirosTab({inv, retiros, onRetiro}){
   function buscarProdPorCod(cod){
     const c = cod.trim().toUpperCase();
     if(!c) return false;
-    const p = inv.find(i=>i.codigo.toUpperCase()===c);
+    const p = inv.find(i=>i.codigo.toUpperCase()===c) || inv.find(i=>limpiarCod(i.codigo)===limpiarCod(c));
     if(!p){ setMsg({ok:false,txt:`Código "${c}" no encontrado`}); setProdEncontrado(null); return false; }
     if(p.stock<=0){ setMsg({ok:false,txt:`"${p.nombre}" no tiene stock disponible`}); setProdEncontrado(null); return false; }
     setProdEncontrado(p); setMsg(null); setCantidad("1");
@@ -11072,7 +11074,7 @@ function App(){
 
   function darBaja(){
     const cod=bajaCod.trim().toUpperCase();
-    let prod=inv.find(i=>i.codigo.toUpperCase()===cod);
+    let prod=inv.find(i=>i.codigo.toUpperCase()===cod)||inv.find(i=>limpiarCod(i.codigo)===limpiarCod(cod));
     // Fallback: si no existe exacto, buscar variantes con ese prefijo (-A, -B, -C...)
     if(!prod){
       const variantes=inv.filter(i=>(i.codigo||"").toUpperCase().startsWith(cod+"-") && i.stock>0);
@@ -11118,7 +11120,7 @@ function App(){
   // un producto nuevo ni una etiqueta nueva, solo suma unidades).
   function reponerStock(){
     const cod=repCod.trim().toUpperCase();
-    const prod=inv.find(i=>i.codigo.toUpperCase()===cod);
+    const prod=inv.find(i=>i.codigo.toUpperCase()===cod)||inv.find(i=>limpiarCod(i.codigo)===limpiarCod(cod));
     if(!prod){setRepMsg({ok:false,msg:`"${cod}" no encontrado`});return;}
     const cant=Number(repCant);
     if(!cant||cant<=0){setRepMsg({ok:false,msg:"Ingresa una cantidad válida"});return;}
@@ -11138,7 +11140,7 @@ function App(){
 
   function modificarPrecio(){
     const cod=repCod.trim().toUpperCase();
-    const prod=inv.find(i=>i.codigo.toUpperCase()===cod);
+    const prod=inv.find(i=>i.codigo.toUpperCase()===cod)||inv.find(i=>limpiarCod(i.codigo)===limpiarCod(cod));
     if(!prod){setRepMsg({ok:false,msg:`"${cod}" no encontrado`});return;}
     const nuevoPrecio=Number(repPrecio);
     if(!nuevoPrecio||nuevoPrecio<=0){setRepMsg({ok:false,msg:"Ingresa un precio válido"});return;}
@@ -12291,7 +12293,7 @@ function POS({inv,onVenta,onVerNota}){
         setScanStatus("ok");
         setScanMsg(`Código detectado: ${codigo}`);
         // Buscar el producto en el inventario por código
-        const prod = inv.find(i=>i.codigo.toUpperCase()===codigo.toUpperCase());
+        const prod = inv.find(i=>i.codigo.toUpperCase()===codigo.toUpperCase())||inv.find(i=>limpiarCod(i.codigo)===limpiarCod(codigo));
         if(prod){
           // Agregar directamente al carrito
           add(prod);
