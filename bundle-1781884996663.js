@@ -33068,7 +33068,13 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
         return [];
       }
     });
-    const [cargas, setCargas] = (0, import_react.useState)([]);
+    const [cargas, setCargas] = (0, import_react.useState)(() => {
+      try {
+        return JSON.parse(localStorage.getItem("th_cargas") || "[]");
+      } catch {
+        return [];
+      }
+    });
     const [ventaDetalle, setVentaDetalle] = (0, import_react.useState)(null);
     const [shImportarExcel, setShImportarExcel] = (0, import_react.useState)(false);
     const [modalNuevaMarca, setModalNuevaMarca] = (0, import_react.useState)(false);
@@ -33131,6 +33137,12 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       } catch {
       }
     }, [auditorias]);
+    (0, import_react.useEffect)(() => {
+      try {
+        localStorage.setItem("th_cargas", JSON.stringify(cargas));
+      } catch {
+      }
+    }, [cargas]);
     useRealtimeSync(setVentas, setInv, setRetiros);
     (0, import_react.useEffect)(() => {
       setMarcasState((prev) => {
@@ -33172,7 +33184,11 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
     }, []);
     (0, import_react.useEffect)(() => {
       sbCargarCargas().then((data) => {
-        if (data.length > 0) setCargas(data);
+        if (data.length > 0) setCargas((prev) => {
+          const sbIds = new Set(data.map((c) => c.id));
+          const locales = prev.filter((c) => !sbIds.has(c.id));
+          return [...data, ...locales];
+        });
       });
     }, []);
     (0, import_react.useEffect)(() => {

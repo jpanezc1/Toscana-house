@@ -10729,7 +10729,7 @@ function App(){
   const[generando,setGenerando]=useState(false);
   const[retiros,setRetiros]    =useState(()=>{ try{return JSON.parse(localStorage.getItem("th_retiros_v1")||"[]");}catch{return[];} });
   const[auditorias,setAuditorias]=useState(()=>{ try{return JSON.parse(localStorage.getItem("th_auditorias")||"[]");}catch{return[];} });
-  const[cargas,setCargas]=useState([]);
+  const[cargas,setCargas]=useState(()=>{ try{return JSON.parse(localStorage.getItem("th_cargas")||"[]");}catch{return[];} });
   const[ventaDetalle,setVentaDetalle]=useState(null);
   const[shImportarExcel,setShImportarExcel]=useState(false);
   const[modalNuevaMarca,setModalNuevaMarca]=useState(false);
@@ -10768,6 +10768,7 @@ function App(){
   useEffect(()=>{ try{localStorage.setItem("th_cierres",JSON.stringify(cierres));}catch{} },[cierres]);
   useEffect(()=>{ try{localStorage.setItem("th_retiros_v1",JSON.stringify(retiros));}catch{} },[retiros]);
   useEffect(()=>{ try{localStorage.setItem("th_auditorias",JSON.stringify(auditorias));}catch{} },[auditorias]);
+  useEffect(()=>{ try{localStorage.setItem("th_cargas",JSON.stringify(cargas));}catch{} },[cargas]);
 
   // ── Realtime sync — cualquier cambio en Supabase (otro dispositivo) actualiza aquí ──
   useRealtimeSync(setVentas, setInv, setRetiros);
@@ -10815,7 +10816,13 @@ function App(){
 
   // Cargar trazabilidad de cargas a inventario desde Supabase al inicio
   useEffect(()=>{
-    sbCargarCargas().then(data=>{ if(data.length>0) setCargas(data); });
+    sbCargarCargas().then(data=>{
+      if(data.length>0) setCargas(prev=>{
+        const sbIds=new Set(data.map(c=>c.id));
+        const locales=prev.filter(c=>!sbIds.has(c.id));
+        return [...data,...locales];
+      });
+    });
   },[]);
 
   // ── Realtime: cargas registradas en otros dispositivos ──
