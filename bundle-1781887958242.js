@@ -22359,7 +22359,7 @@
   function expandirPorStock(items) {
     const out = [];
     for (const it of items) {
-      const n = Math.max(1, Number(it.stock) || 1);
+      const n = Math.max(0, Number(it.stock) || 0);
       for (let i = 0; i < n; i++) out.push(it);
     }
     return out;
@@ -37793,7 +37793,7 @@ Se registrar\xE1 que los faltantes/sobrantes fueron verificados f\xEDsicamente y
         small: true,
         icon: "\u{1F3F7}"
       },
-      `Imprimir ${productos.reduce((acc, p) => acc + Math.max(1, Number(p.stock) || 1), 0)} etiqueta${productos.length !== 1 ? "s" : ""} (c\xF3digo de barras)`
+      `Imprimir ${productos.reduce((acc, p) => acc + Math.max(0, Number(p.stock) || 0), 0)} etiqueta${productos.length !== 1 ? "s" : ""} (c\xF3digo de barras)`
     ))));
   }
   function MarcaDetalle({ marcaId, inv, ventas, vMes, mes, anio, MK, cierres, setCierres, getHist, getLiq, auditorias = [], onActualizarAuditoria, user }) {

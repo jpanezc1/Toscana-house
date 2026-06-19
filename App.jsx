@@ -796,7 +796,7 @@ function abreviarNombre(nombre, maxLen = 60) {
 function expandirPorStock(items) {
   const out = [];
   for (const it of items) {
-    const n = Math.max(1, Number(it.stock) || 1);
+    const n = Math.max(0, Number(it.stock) || 0);
     for (let i = 0; i < n; i++) out.push(it);
   }
   return out;
@@ -14874,7 +14874,7 @@ function InventarioPorMarca({inv, ventas, onRecibir, onBaja, onImportarExcel, on
               if(productos.length===0){ alert("No hay productos para imprimir"); return; }
               imprimirEtiquetasLote(expandirPorStock(productos));
             }}
-            full small icon="🏷">{`Imprimir ${productos.reduce((acc,p)=>acc+Math.max(1,Number(p.stock)||1),0)} etiqueta${productos.length!==1?'s':''} (código de barras)`}</IOSBtn>
+            full small icon="🏷">{`Imprimir ${productos.reduce((acc,p)=>acc+Math.max(0,Number(p.stock)||0),0)} etiqueta${productos.length!==1?'s':''} (código de barras)`}</IOSBtn>
         </div>
       </div>
     </div>
