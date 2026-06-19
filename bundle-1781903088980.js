@@ -22208,7 +22208,8 @@
             stock: p.stock,
             nombre: p.nombre,
             precio: p.precio,
-            categoria: p.categoria
+            categoria: p.categoria,
+            descripcion: p.descripcion || i.descripcion
           } : i));
         }).on("postgres_changes", { event: "INSERT", schema: "public", table: "retiros" }, (payload) => {
           const r = payload.new;
