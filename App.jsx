@@ -13428,7 +13428,7 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
       const contado = conteo[p.id]||0;
       const diferencia = contado - sistema;
       return {...p, sistema, sistemaBase:p.stock, ajuste, contado, diferencia,
-        estado: diferencia===0 ? "OK" : diferencia<0 ? "FALTANTE" : "SOBRANTE"};
+        estado: diferencia<=0 ? (diferencia===0 ? "OK" : "FALTANTE") : "OK"};
     })
     .filter(r=>r.sistema>0 || r.contado>0)
     .sort((a,b)=> Math.abs(b.diferencia)-Math.abs(a.diferencia) || (a.nombre||"").localeCompare(b.nombre||""));
@@ -13842,7 +13842,6 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
           <div style={{display:"grid",gridTemplateColumns: isDesktop?"1fr 1fr 1fr 1fr 1fr":"1fr 1fr",gap:8,marginBottom:14}}>
             <StatCard icon="✓" label="Coinciden" value={okCount} color={C.green} compact={isDesktop}/>
             <StatCard icon="⚠" label="Faltantes" value={faltantes.length} color={C.red} compact={isDesktop}/>
-            <StatCard icon="↑" label="Sobrantes" value={sobrantes.length} color={C.blue} compact={isDesktop}/>
             <StatCard icon="💰" label="Valor en fuga" value={$(Math.round(valorFuga))} color={C.red} compact={isDesktop}/>
             <StatCard icon="⏳" label="Unidades sin contar" value={unidadesPendientes} sub={`${pendientes.length} prod.`} color={C.label3} compact={isDesktop}/>
           </div>
@@ -13907,21 +13906,13 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
               </div>
           }
 
-          {(faltantes.length>0||sobrantes.length>0)&&(
+          {faltantes.length>0&&(
             <div style={{background:C.bg1,borderRadius:14,padding:16,marginBottom:16,
               border:`1px solid ${C.sep}`,display:"flex",flexDirection:"column",gap:8}}>
-              {faltantes.length>0&&(
-                <div style={{display:"flex",justifyContent:"space-between",fontSize:13,fontFamily:FONT}}>
-                  <span style={{color:C.label2}}>Valor estimado de fuga ({faltantes.length} ítem{faltantes.length!==1?"s":""})</span>
-                  <span style={{fontWeight:700,color:C.red}}>-{$(Math.round(valorFuga))}</span>
-                </div>
-              )}
-              {sobrantes.length>0&&(
-                <div style={{display:"flex",justifyContent:"space-between",fontSize:13,fontFamily:FONT}}>
-                  <span style={{color:C.label2}}>Valor de sobrantes ({sobrantes.length} ítem{sobrantes.length!==1?"s":""})</span>
-                  <span style={{fontWeight:700,color:C.blue}}>+{$(Math.round(valorSobrante))}</span>
-                </div>
-              )}
+              <div style={{display:"flex",justifyContent:"space-between",fontSize:13,fontFamily:FONT}}>
+                <span style={{color:C.label2}}>Valor estimado de fuga ({faltantes.length} ítem{faltantes.length!==1?"s":""})</span>
+                <span style={{fontWeight:700,color:C.red}}>-{$(Math.round(valorFuga))}</span>
+              </div>
             </div>
           )}
 
