@@ -28577,10 +28577,10 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
           const s = String(raw2).replace(/bs\.?|bs|kit|\$|€|ufv|usd/gi, "").replace(/[^\d.,]/g, "").replace(",", ".");
           return parseFloat(s) || 0;
         }, parseStock = function(raw2) {
-          if (raw2 === null || raw2 === void 0 || raw2 === "") return 1;
+          if (raw2 === null || raw2 === void 0 || raw2 === "") return 0;
           const s = String(raw2).replace(/[^\d]/g, "");
           const n2 = parseInt(s);
-          return isNaN(n2) ? 1 : n2;
+          return isNaN(n2) ? 0 : n2;
         };
         const XLSX = await loadXLSX();
         const buf = await file.arrayBuffer();

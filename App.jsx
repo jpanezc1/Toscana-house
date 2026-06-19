@@ -6944,10 +6944,10 @@ function ImportarExcelModal({inv, onImportar, onClose}){
 
       // ── Parsear stock flexible ────────────────────────────────────────
       function parseStock(raw){
-        if(raw===null||raw===undefined||raw==="") return 1;
+        if(raw===null||raw===undefined||raw==="") return 0; // sin valor = no sumar
         const s = String(raw).replace(/[^\d]/g,"");
         const n = parseInt(s);
-        return isNaN(n) ? 1 : n; // respeta 0 si el Excel dice 0
+        return isNaN(n) ? 0 : n; // siempre lo que dice el Excel, exacto
       }
 
       // ── Construir índice de códigos existentes (local + normalizado) ──
