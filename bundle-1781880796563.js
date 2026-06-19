@@ -28824,7 +28824,8 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       }
       const omitidos = preview.filter((f) => !(f.desc && f.marcaId && f.precio > 0)).map((f) => ({ sku: f.sku, desc: f.desc, marca: f.marcaNombre, errs: f._errs }));
       const codigosEsperados = importables.map((f) => f.sku.toUpperCase().trim());
-      setStats({ ok, upd, skip: omitidos.length, total: preview.length, omitidos, codigosEsperados });
+      const totalUnidades = importables.reduce((s, f) => s + (Number(f.stock) || 1), 0);
+      setStats({ ok, upd, skip: omitidos.length, total: preview.length, omitidos, codigosEsperados, totalUnidades });
       setVerif({ checking: true, intento: 0, faltantes: [], confirmados: 0, total: codigosEsperados.length });
       setEstado("done");
     }
@@ -29224,7 +29225,8 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       fontFamily: FONT_DISPLAY,
       letterSpacing: "0.01em",
       marginBottom: 6
-    } }, "Importaci\xF3n completada"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.label3, fontFamily: FONT_UI, marginBottom: 20 } }, stats.total, " filas procesadas"), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 16 } }, [
+    } }, "Importaci\xF3n completada"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.label3, fontFamily: FONT_UI, marginBottom: 20 } }, stats.total, " filas procesadas"), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 10, marginBottom: 16 } }, [
+      { v: stats.totalUnidades, l: "Unidades", c: C.gold },
       { v: stats.ok, l: "Creados", c: C.green },
       { v: stats.upd, l: "Actualizados", c: C.blue },
       { v: stats.skip, l: "Omitidos", c: C.label3 }

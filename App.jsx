@@ -7097,7 +7097,8 @@ function ImportarExcelModal({inv, onImportar, onClose}){
     // ── Códigos que SÍ deberían quedar en el inventario tras la carga ──
     const codigosEsperados = importables.map(f=>f.sku.toUpperCase().trim());
 
-    setStats({ok, upd, skip:omitidos.length, total:preview.length, omitidos, codigosEsperados});
+    const totalUnidades = importables.reduce((s,f)=>s+(Number(f.stock)||1),0);
+    setStats({ok, upd, skip:omitidos.length, total:preview.length, omitidos, codigosEsperados, totalUnidades});
     setVerif({checking:true, intento:0, faltantes:[], confirmados:0, total:codigosEsperados.length});
     setEstado("done");
   }
@@ -7470,11 +7471,12 @@ function ImportarExcelModal({inv, onImportar, onClose}){
           <div style={{fontSize:13,color:C.label3,fontFamily:FONT_UI,marginBottom:20}}>
             {stats.total} filas procesadas
           </div>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:16}}>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:10,marginBottom:16}}>
             {[
-              {v:stats.ok,  l:"Creados",      c:C.green},
-              {v:stats.upd, l:"Actualizados", c:C.blue},
-              {v:stats.skip,l:"Omitidos",     c:C.label3},
+              {v:stats.totalUnidades, l:"Unidades",     c:C.gold},
+              {v:stats.ok,            l:"Creados",      c:C.green},
+              {v:stats.upd,           l:"Actualizados", c:C.blue},
+              {v:stats.skip,          l:"Omitidos",     c:C.label3},
             ].map(s=>(
               <div key={s.l} style={{background:C.bg2,borderRadius:14,padding:"14px 10px",
                 textAlign:"center",border:`1px solid ${s.c}25`}}>
