@@ -11296,6 +11296,16 @@ function App(){
     }, 1200);
   }
 
+  // ── Bajar inventario completo desde Supabase → reemplaza localStorage ──
+  async function recargarDesdeSupabase(){
+    const data = await sbCargarTodo();
+    if(!data) return false;
+    if(data.inv && data.inv.length > 0){
+      setInv(data.inv);
+    }
+    return true;
+  }
+
   // ── Forzar sincronización completa del inventario local → Supabase ─────
   // Útil cuando importaciones previas no llegaron a la nube.
   async function forzarSyncInventario(onProgress){
@@ -11579,7 +11589,7 @@ function App(){
 
         {/* INVENTARIO — por marca */}
         {tab==="inventario" && (
-          <InventarioPorMarca inv={inv} ventas={ventas} onRecibir={()=>setShInv(true)} onBaja={()=>{setShBaja(true);setBajaMsg(null);setBajaCod("");setBajaCant("");setBajaMotivo("");}} onImportarExcel={()=>setShImportarExcel(true)} onReponer={()=>{setShReponer(true);setRepMsg(null);setRepCod("");setRepCant("");setRepPrecio("");setRepTab("stock");}} onSyncCompleto={forzarSyncInventario}/>
+          <InventarioPorMarca inv={inv} ventas={ventas} onRecibir={()=>setShInv(true)} onBaja={()=>{setShBaja(true);setBajaMsg(null);setBajaCod("");setBajaCant("");setBajaMotivo("");}} onImportarExcel={()=>setShImportarExcel(true)} onReponer={()=>{setShReponer(true);setRepMsg(null);setRepCod("");setRepCant("");setRepPrecio("");setRepTab("stock");}} onSyncCompleto={forzarSyncInventario} onRecargarDesdeSupabase={recargarDesdeSupabase}/>
         )}
 
         {/* AUDITORÍA — cierre de inventario mensual (conteo físico vs sistema) */}
@@ -14590,7 +14600,7 @@ function RegistroCargas({cargas, marcas, marcaId=null, onVerificar=null, user=nu
 // ══════════════════════════════════════════════════════════
 // INVENTARIO POR MARCA — pestaña con scroll horizontal
 // ══════════════════════════════════════════════════════════
-function InventarioPorMarca({inv, ventas, onRecibir, onBaja, onImportarExcel, onReponer, onSyncCompleto}){
+function InventarioPorMarca({inv, ventas, onRecibir, onBaja, onImportarExcel, onReponer, onSyncCompleto, onRecargarDesdeSupabase}){
   const isDesktop = useIsDesktop();
   const [syncMsg, setSyncMsg] = useState(null); // null | {prog, total} | "ok" | "err"
   // null = "TODOS"
@@ -14931,21 +14941,36 @@ function InventarioPorMarca({inv, ventas, onRecibir, onBaja, onImportarExcel, on
           <IOSBtn onPress={async()=>{ try{await generarPlantillaXLSX();}catch(e){alert("Error: "+e.message);} }}
             full small icon="📋">Plantilla</IOSBtn>
         </div>
-        {onSyncCompleto && (
+        {(onSyncCompleto || onRecargarDesdeSupabase) && (
           <div style={{display:"flex",gap:8,marginTop:8}}>
-            <IOSBtn onPress={async()=>{
-              if(syncMsg && typeof syncMsg==="object") return; // ya en progreso
-              setSyncMsg({prog:0, total:inv.length});
-              try{
-                const r = await onSyncCompleto((prog,total)=>setSyncMsg({prog,total}));
-                setSyncMsg(r.fail>0?"err":"ok");
-                setTimeout(()=>setSyncMsg(null), 5000);
-              }catch(e){ setSyncMsg("err"); setTimeout(()=>setSyncMsg(null),5000); }
-            }} variant="fill" full small icon="☁️">
-              {syncMsg && typeof syncMsg==="object"
-                ? `Sincronizando… ${syncMsg.prog}/${syncMsg.total}`
-                : "Sincronizar con Supabase"}
-            </IOSBtn>
+            {onRecargarDesdeSupabase && (
+              <IOSBtn onPress={async()=>{
+                if(syncMsg && typeof syncMsg==="object") return;
+                setSyncMsg({prog:1, total:1});
+                try{
+                  const ok = await onRecargarDesdeSupabase();
+                  setSyncMsg(ok?"ok":"err");
+                  setTimeout(()=>setSyncMsg(null), 4000);
+                }catch(e){ setSyncMsg("err"); setTimeout(()=>setSyncMsg(null),4000); }
+              }} variant="outline" full small icon="⬇️">
+                {syncMsg && typeof syncMsg==="object" ? "Cargando…" : "Recargar desde Supabase"}
+              </IOSBtn>
+            )}
+            {onSyncCompleto && (
+              <IOSBtn onPress={async()=>{
+                if(syncMsg && typeof syncMsg==="object") return;
+                setSyncMsg({prog:0, total:inv.length});
+                try{
+                  const r = await onSyncCompleto((prog,total)=>setSyncMsg({prog,total}));
+                  setSyncMsg(r.fail>0?"err":"ok");
+                  setTimeout(()=>setSyncMsg(null), 5000);
+                }catch(e){ setSyncMsg("err"); setTimeout(()=>setSyncMsg(null),5000); }
+              }} variant="fill" full small icon="☁️">
+                {syncMsg && typeof syncMsg==="object"
+                  ? `Sincronizando… ${syncMsg.prog}/${syncMsg.total}`
+                  : "Sincronizar con Supabase"}
+              </IOSBtn>
+            )}
           </div>
         )}
         <div style={{display:"flex",gap:8,marginTop:8}}>

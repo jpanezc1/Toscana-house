@@ -21555,7 +21555,7 @@
   async function sbActualizarStock(prodId, nuevoStock) {
     try {
       const db = await getSupabase();
-      const { error } = await db.from("inventario").update({ stock: nuevoStock }).eq("id", prodId);
+      const { error } = await db.from("inventario").update({ stock: Math.max(0, nuevoStock) }).eq("id", prodId);
       if (error) throw error;
       return true;
     } catch (e) {
@@ -21741,7 +21741,9 @@
         total_items: c.totalItems,
         nuevos: c.nuevos || 0,
         actualizados: c.actualizados || 0,
-        detalle: c.items || []
+        detalle: c.items || [],
+        archivo_nombre: c.archivoNombre || null,
+        archivo_url: c.archivoUrl || null
       });
       if (error) throw error;
       return true;
@@ -21749,6 +21751,35 @@
       console.warn("Supabase carga (tabla puede no existir):", e.message);
       return false;
     }
+  }
+  async function sbSubirEvidencia(blob, fileName, cargaId) {
+    try {
+      const db = await getSupabase();
+      const path = `${cargaId}/${fileName}`;
+      const { error } = await db.storage.from("cargas-evidencia").upload(path, blob, {
+        upsert: true,
+        contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+      });
+      if (error) throw error;
+      const { data } = db.storage.from("cargas-evidencia").getPublicUrl(path);
+      return data.publicUrl;
+    } catch (e) {
+      console.warn("Supabase subir evidencia:", e.message);
+      return null;
+    }
+  }
+  async function generarExcelEvidenciaManual(items, titulo) {
+    const XLSX = await loadXLSX();
+    const filas = [
+      ["CODIGO", "NOMBRE", "MARCA", "PRECIO (Bs)", "STOCK", "CATEGORIA"],
+      ...items.map((it) => [it.codigo || "", it.nombre || "", it.marcaNombre || "", it.precio || 0, it.stock || 0, it.categoria || ""])
+    ];
+    const ws = XLSX.utils.aoa_to_sheet(filas);
+    ws["!cols"] = [20, 35, 18, 14, 8, 18].map((w) => ({ wch: w }));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Evidencia");
+    const buf = XLSX.write(wb, { type: "array", bookType: "xlsx" });
+    return new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
   }
   async function sbCargarCargas() {
     try {
@@ -22284,6 +22315,9 @@
       return null;
     }
   }
+  function limpiarCod(c) {
+    return (c || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+  }
   function BarcodeDisplay({ codigo, small }) {
     const svgRef = (0, import_react.useRef)(null);
     (0, import_react.useEffect)(() => {
@@ -22323,7 +22357,11 @@
       wordBreak: "break-all"
     } }, codigo));
   }
-  function abreviarNombre(nombre, maxLen = 60) {
+  function extraerColor(desc) {
+    const m = (desc || "").match(/COLOR:\s*([^·\n]+)/i);
+    return m ? m[1].trim() : "";
+  }
+  function abreviarNombre(nombre, maxLen = 90) {
     if (!nombre) return "";
     let n = nombre.trim();
     if (n.length <= maxLen) return n;
@@ -22383,22 +22421,25 @@
       overflow:hidden; display:flex; flex-direction:column; align-items:center; justify-content:center; }
     .top { display:flex; justify-content:space-between; align-items:center; width:100%;
       font-size:8.64px; letter-spacing:0.5px; text-transform:uppercase; color:#333; }
-    .producto { font-size:8px; font-weight:bold; text-align:center; width:100%;
-      text-transform:uppercase; line-height:1.1; margin:0.3mm 0;
-      display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2;
+    .producto { font-size:7.5px; font-weight:bold; text-align:center; width:100%;
+      text-transform:uppercase; line-height:1.15; margin:0.2mm 0;
+      display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:3;
       overflow:hidden; text-overflow:ellipsis; }
     .barcode-wrap { width:100%; display:flex; justify-content:center; }
-    .barcode-wrap svg { width:45mm!important; height:9mm!important; }
+    .barcode-wrap svg { width:45mm!important; height:8.5mm!important; }
+    .color-row { font-size:6.5px; color:#555; text-transform:uppercase; letter-spacing:0.5px;
+      text-align:center; width:100%; margin:0.1mm 0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .bottom-row { display:flex; justify-content:space-between; align-items:center; width:100%;
-      margin-top:0.3mm; }
-    .codigo { font-size:8.64px; color:#333; font-family:monospace; }
-    .precio { font-size:13.2px; font-weight:900; }
+      margin-top:0.1mm; }
+    .codigo { font-size:8px; color:#333; font-family:monospace; }
+    .precio { font-size:12px; font-weight:900; }
     @media print { body { print-color-adjust:exact; -webkit-print-color-adjust:exact; } }
   </style>
 </head>
 <body>
   <div class="top"><span>${marcaNombre}</span><span style="font-weight:bold">TOSCANA HOUSE</span></div>
   <div class="producto">${abreviarNombre(producto.nombre)}</div>
+  ${extraerColor(producto.descripcion) ? `<div class="color-row">Color: ${extraerColor(producto.descripcion)}</div>` : ""}
   <div class="barcode-wrap">
     <svg id="barcode"></svg>
   </div>
@@ -22438,10 +22479,12 @@
       const codigo = (it.codigo || it.sku || "").toUpperCase();
       const precio = it.precio || 0;
       const marca = it.marcaNombre || it.marca || "";
+      const color = extraerColor(it.descripcion);
       return `
       <div class="label">
         <div class="top"><span>${marca.toUpperCase()}</span><span style="font-weight:bold">TOSCANA HOUSE</span></div>
         <div class="producto">${nombre}</div>
+        ${color ? `<div class="color-row">Color: ${color}</div>` : ""}
         <div class="barcode-wrap"><svg id="bc-${idx}"></svg></div>
         <div class="bottom-row">
           <span class="codigo">${codigo}</span>
@@ -22476,16 +22519,18 @@
       overflow:hidden; background:#fff; display:flex; flex-direction:column; align-items:center; justify-content:center; }
     .top { display:flex; justify-content:space-between; align-items:center; width:100%;
       font-size:8.64px; letter-spacing:0.5px; text-transform:uppercase; color:#333; }
-    .producto { font-size:8px; font-weight:bold; text-align:center; width:100%;
-      text-transform:uppercase; line-height:1.1; margin:0.3mm 0;
-      display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2;
+    .producto { font-size:7.5px; font-weight:bold; text-align:center; width:100%;
+      text-transform:uppercase; line-height:1.15; margin:0.2mm 0;
+      display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:3;
       overflow:hidden; text-overflow:ellipsis; }
     .barcode-wrap { width:100%; display:flex; justify-content:center; }
-    .barcode-wrap svg { width:45mm!important; height:9mm!important; }
+    .barcode-wrap svg { width:45mm!important; height:8.5mm!important; }
+    .color-row { font-size:6.5px; color:#555; text-transform:uppercase; letter-spacing:0.5px;
+      text-align:center; width:100%; margin:0.1mm 0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .bottom-row { display:flex; justify-content:space-between; align-items:center; width:100%;
-      margin-top:0.3mm; }
-    .codigo { font-size:8.64px; color:#333; font-family:monospace; }
-    .precio { font-size:13.2px; font-weight:900; }
+      margin-top:0.1mm; }
+    .codigo { font-size:8px; color:#333; font-family:monospace; }
+    .precio { font-size:12px; font-weight:900; }
     @media print {
       .controls { display:none!important; }
       .print-note { display:none!important; }
@@ -22713,8 +22758,6 @@
     // Magenta
     12: { alquiler: 1750, comision: 3 },
     // Ikawi
-    13: { alquiler: 1200, comision: 0 },
-    // Romero Brand
     14: { alquiler: 1950, comision: 0 },
     // Minimal
     15: { alquiler: 1950, comision: 3 },
@@ -22813,13 +22856,6 @@
       color: "#A8CCD4",
       emoji: "\u{1F30A}",
       imagen: "data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PSIwIDAgMjAwIDIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgcng9IjEyIiBmaWxsPSIjRkFGQUY4Ii8+CiAgPHRleHQgeD0iMTAwIiB5PSI5NSIgZm9udC1mYW1pbHk9IidDb3Jtb3JhbnQgR2FyYW1vbmQnLEdlb3JnaWEsc2VyaWYiIGZvbnQtc2l6ZT0iMjgiIGZvbnQtd2VpZ2h0PSI0MDAiIGZvbnQtc3R5bGU9Im5vcm1hbCIgZmlsbD0iIzFBMTcxNCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZG9taW5hbnQtYmFzZWxpbmU9Im1pZGRsZSIgbGV0dGVyLXNwYWNpbmc9IjIiPkkgSyBBIFcgSTwvdGV4dD4KICA8dGV4dCB4PSIxMDAiIHk9IjE3NiIgZm9udC1mYW1pbHk9IidDb3Jtb3JhbnQgR2FyYW1vbmQnLEdlb3JnaWEsc2VyaWYiIGZvbnQtc2l6ZT0iMTEiIGZvbnQtd2VpZ2h0PSI0MDAiIGZpbGw9IiMxQTE3MTQiIG9wYWNpdHk9Ii4zNSIgdGV4dC1hbmNob3I9Im1pZGRsZSI+MTIuPC90ZXh0Pgo8L3N2Zz4="
-    },
-    {
-      id: 13,
-      nombre: "Romero Brand",
-      color: "#C4B89A",
-      emoji: "\u26A1",
-      imagen: "data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PSIwIDAgMjAwIDIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgcng9IjEyIiBmaWxsPSIjRkFGQUY4Ii8+CiAgPGxpbmUgeDE9IjMwIiB5MT0iMTE4IiB4Mj0iODgiIHkyPSIxMTgiIHN0cm9rZT0iIzFBMTcxNCIgc3Ryb2tlLXdpZHRoPSIwLjgiIG9wYWNpdHk9Ii40Ii8+CiAgPGxpbmUgeDE9IjExMiIgeTE9IjExOCIgeDI9IjE3MCIgeTI9IjExOCIgc3Ryb2tlPSIjMUExNzE0IiBzdHJva2Utd2lkdGg9IjAuOCIgb3BhY2l0eT0iLjQiLz4KICA8dGV4dCB4PSIxMDAiIHk9Ijk1IiBmb250LWZhbWlseT0iJ0Nvcm1vcmFudCBHYXJhbW9uZCcsR2VvcmdpYSxzZXJpZiIgZm9udC1zaXplPSIzMCIgZm9udC13ZWlnaHQ9IjQwMCIgZm9udC1zdHlsZT0ibm9ybWFsIiBmaWxsPSIjMUExNzE0IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkb21pbmFudC1iYXNlbGluZT0ibWlkZGxlIiBsZXR0ZXItc3BhY2luZz0iNSI+Uk9NRVJPPC90ZXh0PgogIDx0ZXh0IHg9IjEwMCIgeT0iMTI0IiBmb250LWZhbWlseT0iJ0Nvcm1vcmFudCBHYXJhbW9uZCcsR2VvcmdpYSxzZXJpZiIgZm9udC1zaXplPSIxNCIgZm9udC13ZWlnaHQ9IjQwMCIgZmlsbD0iIzFBMTcxNCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZG9taW5hbnQtYmFzZWxpbmU9Im1pZGRsZSIgbGV0dGVyLXNwYWNpbmc9IjgiPkJSQU5EPC90ZXh0PgogIDx0ZXh0IHg9IjEwMCIgeT0iMTc2IiBmb250LWZhbWlseT0iJ0Nvcm1vcmFudCBHYXJhbW9uZCcsR2VvcmdpYSxzZXJpZiIgZm9udC1zaXplPSIxMSIgZm9udC13ZWlnaHQ9IjQwMCIgZmlsbD0iIzFBMTcxNCIgb3BhY2l0eT0iLjM1IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj4xMy48L3RleHQ+Cjwvc3ZnPg=="
     },
     {
       id: 14,
@@ -26663,7 +26699,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
     function buscarProdPorCod(cod) {
       const c = cod.trim().toUpperCase();
       if (!c) return false;
-      const p = inv.find((i) => i.codigo.toUpperCase() === c);
+      const p = inv.find((i) => i.codigo.toUpperCase() === c) || inv.find((i) => limpiarCod(i.codigo) === limpiarCod(c));
       if (!p) {
         setMsg({ ok: false, txt: `C\xF3digo "${c}" no encontrado` });
         setProdEncontrado(null);
@@ -28537,7 +28573,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       );
     }))));
   }
-  function ImportarExcelModal({ inv, onImportar, onClose }) {
+  function ImportarExcelModal({ inv, onImportar, onClose, onArchivoCapturado }) {
     const isDesktop = useIsDesktop();
     const [preview, setPreview] = (0, import_react.useState)([]);
     const [estado, setEstado] = (0, import_react.useState)("idle");
@@ -28565,6 +28601,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       return cod;
     }
     async function parsearArchivo(file) {
+      if (onArchivoCapturado) onArchivoCapturado(file);
       setEstado("leyendo");
       try {
         let matchMarca = function(nomRaw) {
@@ -28638,19 +28675,27 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
           return -1;
         };
         const hJoined = headers.join("|");
-        const isTH = headers.some((h) => h.includes("\u2605") || h.includes("descripcion del producto"));
-        const isNumerico = headers.some((h) => /^\d+\.\s/.test(h) || h.includes("item/art") || h.includes("unidad de medida") || h.includes("cant. de ingreso"));
-        const isIZi = !isNumerico && headers.some((h) => h.includes("subgategoria"));
+        const isTH = headers.some((h) => h.includes("\u2605") || h.includes("descripciondelproducto") || h.includes("descripcion del producto") || h.includes("descripcion") && headers.some((hh) => hh.includes("sku") || hh.includes("codigo")));
+        const isNumerico = !isTH && headers.some((h) => /^\d+\.\s/.test(h) || h.includes("item/art") || h.includes("unidad de medida") || h.includes("cant. de ingreso"));
+        const isIZi = !isNumerico && !isTH && headers.some((h) => h.includes("subgategoria"));
         let cSKU, cMarca, cDesc, cPrecio, cCat, cTalla, cColor, cStock;
         if (isTH) {
           cMarca = col("marca");
+          if (cMarca < 0) cMarca = 0;
           cDesc = col("descripcion del producto", "descripcion", "nombre", "producto");
+          if (cDesc < 0) cDesc = 1;
           cPrecio = col("precio");
+          if (cPrecio < 0) cPrecio = 2;
           cStock = col("stock", "cantidad", "unidades");
+          if (cStock < 0) cStock = 3;
           cTalla = col("talla", "size", "medida");
+          if (cTalla < 0) cTalla = 4;
           cCat = col("categoria", "cat", "tipo");
+          if (cCat < 0) cCat = 5;
           cColor = col("color");
+          if (cColor < 0) cColor = 6;
           cSKU = col("sku", "codigo", "cod", "code");
+          if (cSKU < 0) cSKU = 7;
         } else if (isNumerico) {
           cSKU = col("codigo", "item", "articulo", "sku", "ref");
           cMarca = headers.findIndex((h) => h.match(/^2\.|h\.includes("nombre")/)) || headers.findIndex((h) => h === "nombre" || h.includes("2. nombre") || h.includes("nombre de"));
@@ -28815,7 +28860,10 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
             marcaId: f.marcaId,
             marcaNombre: f.marcaNombre,
             categoria: (f.cat || "General").toUpperCase(),
-            descripcion: [f.talla && `TALLA: ${(f.talla || "").toUpperCase()}`, f.color && `COLOR: ${(f.color || "").toUpperCase()}`].filter(Boolean).join(" \xB7 ") || "",
+            descripcion: [
+              f.talla && `TALLA: ${f.talla.toUpperCase()}`,
+              f.color && `COLOR: ${f.color.toUpperCase()}`
+            ].filter(Boolean).join(" \xB7 ") || "",
             subcat: (f.subcat || f.talla || "").toUpperCase(),
             precio: f.precio,
             stock: f.stock,
@@ -30864,11 +30912,9 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
         fontWeight: 500,
         color: C.label,
         fontFamily: FONT,
-        overflow: "hidden",
-        textOverflow: "ellipsis",
-        whiteSpace: "nowrap",
         lineHeight: "1.3",
-        marginBottom: 3
+        marginBottom: 3,
+        wordBreak: "break-word"
       } }, p.nombre), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6, marginTop: 3, flexWrap: "wrap" } }, /* @__PURE__ */ import_react.default.createElement("span", { style: {
         fontSize: 10,
         fontWeight: 600,
@@ -33313,9 +33359,17 @@ Esta acci\xF3n no se puede deshacer.`)) return;
         cambios: cambios.map((d) => ({ codigo: d.codigo, nombre: d.nombre, antes: d.sistema, despues: d.contado }))
       }, user);
     }
-    function registrarCarga(carga) {
-      setCargas((prev) => [carga, ...prev]);
-      syncConRespaldo("carga", carga, () => sbGuardarCarga(carga));
+    async function registrarCarga(carga, archivoBlob = null, archivoNombre = null) {
+      let cargaFinal = { ...carga };
+      if (archivoBlob && archivoNombre) {
+        const url = await sbSubirEvidencia(archivoBlob, archivoNombre, carga.id);
+        if (url) {
+          cargaFinal.archivoUrl = url;
+          cargaFinal.archivoNombre = archivoNombre;
+        }
+      }
+      setCargas((prev) => [cargaFinal, ...prev]);
+      syncConRespaldo("carga", cargaFinal, () => sbGuardarCarga(cargaFinal));
     }
     function registrarRetiro(r) {
       const updated = [...retiros, r];
@@ -33454,7 +33508,7 @@ Esta acci\xF3n no se puede deshacer.`)) return;
           categoria: prod.categoria
         }]
       }, user);
-      registrarCarga(crearCarga("MANUAL", user, {
+      const cargaManual = crearCarga("MANUAL", user, {
         marcaId: prod.marcaId,
         marcaNombre: prod.marcaNombre,
         resumen: `Carga manual: ${prod.nombre} (${prod.codigo})`,
@@ -33471,14 +33525,18 @@ Esta acci\xF3n no se puede deshacer.`)) return;
           precio: prod.precio,
           categoria: prod.categoria
         }]
-      }));
+      });
+      generarExcelEvidenciaManual([{ ...prod }], prod.marcaNombre).then((blob) => {
+        const nombre = `manual_${prod.codigo}_${hoy().replace(/\//g, "-")}.xlsx`;
+        registrarCarga(cargaManual, blob, nombre);
+      });
       setFInv({ marcaId: "", nombre: "", categoria: "", precio: "", stock: "", fecha: hoy(), codigoManual: "" });
       setShInv(false);
       setTimeout(() => imprimirTicket(prod, marca?.nombre || "Toscana House"), 300);
     }
     function darBaja() {
       const cod = bajaCod.trim().toUpperCase();
-      let prod = inv.find((i) => i.codigo.toUpperCase() === cod);
+      let prod = inv.find((i) => i.codigo.toUpperCase() === cod) || inv.find((i) => limpiarCod(i.codigo) === limpiarCod(cod));
       if (!prod) {
         const variantes = inv.filter((i) => (i.codigo || "").toUpperCase().startsWith(cod + "-") && i.stock > 0);
         if (variantes.length === 1) prod = variantes[0];
@@ -33502,7 +33560,7 @@ Esta acci\xF3n no se puede deshacer.`)) return;
         return;
       }
       const motivo = bajaMotivo.trim();
-      const stockDespues = stockAntes - cant;
+      const stockDespues = Math.max(0, stockAntes - cant);
       if (!window.confirm(`\xBFConfirmar baja de "${prod.nombre}" (${cod})?
 Stock actual: ${stockAntes} \u2192 ${stockDespues}${motivo ? `
 Motivo: ${motivo}` : ""}`)) {
@@ -33515,7 +33573,7 @@ Motivo: ${motivo}` : ""}`)) {
       setBajaMotivo("");
     }
     function registrarBaja(prod, stockAntes, cant, motivo) {
-      const stockDespues = stockAntes - cant;
+      const stockDespues = Math.max(0, stockAntes - cant);
       setInv((p) => p.map((i) => i.id === prod.id ? { ...i, stock: stockDespues } : i));
       syncConRespaldo("stock", { prodId: prod.id, stock: stockDespues }, () => sbActualizarStock(prod.id, stockDespues));
       logAudit("BAJA", {
@@ -33532,7 +33590,7 @@ Motivo: ${motivo}` : ""}`)) {
     }
     function reponerStock() {
       const cod = repCod.trim().toUpperCase();
-      const prod = inv.find((i) => i.codigo.toUpperCase() === cod);
+      const prod = inv.find((i) => i.codigo.toUpperCase() === cod) || inv.find((i) => limpiarCod(i.codigo) === limpiarCod(cod));
       if (!prod) {
         setRepMsg({ ok: false, msg: `"${cod}" no encontrado` });
         return;
@@ -33561,7 +33619,7 @@ Motivo: ${motivo}` : ""}`)) {
     }
     function modificarPrecio() {
       const cod = repCod.trim().toUpperCase();
-      const prod = inv.find((i) => i.codigo.toUpperCase() === cod);
+      const prod = inv.find((i) => i.codigo.toUpperCase() === cod) || inv.find((i) => limpiarCod(i.codigo) === limpiarCod(cod));
       if (!prod) {
         setRepMsg({ ok: false, msg: `"${cod}" no encontrado` });
         return;
@@ -33587,7 +33645,7 @@ Motivo: ${motivo}` : ""}`)) {
       setRepCod("");
       setRepPrecio("");
     }
-    const _importBuf = (0, import_react.useRef)({ items: [], sbItems: [], ts: 0, timer: null });
+    const _importBuf = (0, import_react.useRef)({ items: [], sbItems: [], ts: 0, timer: null, archivo: null, archivoNombre: null });
     function handleVerificarCarga(cargaId, verificado) {
       setCargas((prev) => prev.map((c) => c.id === cargaId ? { ...c, verificado, verificadoTs: verificado ? (/* @__PURE__ */ new Date()).toISOString() : null, verificadoPor: verificado ? user.nombre : null } : c));
       sbMarcarCargaVerificada(cargaId, verificado, user.nombre);
@@ -33645,7 +33703,7 @@ Motivo: ${motivo}` : ""}`)) {
           marcas,
           items: buf
         }, user);
-        registrarCarga(crearCarga("IMPORT", user, {
+        const carga = crearCarga("IMPORT", user, {
           marcaId: marcaIds.length === 1 ? marcaIds[0] : null,
           marcaNombre: marcas,
           resumen: `Importaci\xF3n: ${nuevos} nuevos + ${actualizados} actualizados \xB7 ${marcas}`,
@@ -33653,9 +33711,22 @@ Motivo: ${motivo}` : ""}`)) {
           actualizados,
           totalItems: buf.length,
           items: buf
-        }));
+        });
+        const archivoBlob = _importBuf.current.archivo;
+        const archivoNombre = _importBuf.current.archivoNombre;
+        registrarCarga(carga, archivoBlob, archivoNombre);
         _importBuf.current.items = [];
+        _importBuf.current.archivo = null;
+        _importBuf.current.archivoNombre = null;
       }, 1200);
+    }
+    async function recargarDesdeSupabase() {
+      const data = await sbCargarTodo();
+      if (!data) return false;
+      if (data.inv && data.inv.length > 0) {
+        setInv(data.inv);
+      }
+      return true;
     }
     async function forzarSyncInventario(onProgress) {
       const productos = inv;
@@ -33967,7 +34038,7 @@ Motivo: ${motivo}` : ""}`)) {
       setRepCant("");
       setRepPrecio("");
       setRepTab("stock");
-    }, onSyncCompleto: forzarSyncInventario }), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: tab === "auditoria" ? "block" : "none" } }, /* @__PURE__ */ import_react.default.createElement(
+    }, onSyncCompleto: forzarSyncInventario, onRecargarDesdeSupabase: recargarDesdeSupabase }), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: tab === "auditoria" ? "block" : "none" } }, /* @__PURE__ */ import_react.default.createElement(
       AuditoriaInventario,
       {
         inv,
@@ -34603,7 +34674,10 @@ Motivo: ${motivo}` : ""}`)) {
         syncCierre: drive.syncCierre,
         onCfgChange: bumpCfgLiq
       }
-    ), shImportarExcel && /* @__PURE__ */ import_react.default.createElement(ImportarExcelModal, { inv, onImportar: handleImportarExcel, onClose: () => setShImportarExcel(false) }), modalNuevaMarca && /* @__PURE__ */ import_react.default.createElement(
+    ), shImportarExcel && /* @__PURE__ */ import_react.default.createElement(ImportarExcelModal, { inv, onImportar: handleImportarExcel, onClose: () => setShImportarExcel(false), onArchivoCapturado: (f) => {
+      _importBuf.current.archivo = f;
+      _importBuf.current.archivoNombre = f.name;
+    } }), modalNuevaMarca && /* @__PURE__ */ import_react.default.createElement(
       NuevaMarcaModal,
       {
         editMarca,
@@ -34866,7 +34940,11 @@ Motivo: ${motivo}` : ""}`)) {
       setBusq("");
     }
     function cambiar(prodId, d) {
-      setCarrito((p) => p.map((x) => x.prodId === prodId ? { ...x, cantidad: Math.max(1, x.cantidad + d) } : x));
+      setCarrito((p) => p.map((x) => {
+        if (x.prodId !== prodId) return x;
+        const maxQ = inv.find((i) => i.id === prodId)?.stock ?? 1;
+        return { ...x, cantidad: Math.min(maxQ, Math.max(1, x.cantidad + d)) };
+      }));
     }
     function quitar(prodId) {
       setCarrito((p) => p.filter((x) => x.prodId !== prodId));
@@ -34883,7 +34961,7 @@ Motivo: ${motivo}` : ""}`)) {
         if (codigo) {
           setScanStatus("ok");
           setScanMsg(`C\xF3digo detectado: ${codigo}`);
-          const prod = inv.find((i) => i.codigo.toUpperCase() === codigo.toUpperCase());
+          const prod = inv.find((i) => i.codigo.toUpperCase() === codigo.toUpperCase()) || inv.find((i) => limpiarCod(i.codigo) === limpiarCod(codigo));
           if (prod) {
             add(prod);
             setScanMsg(`\u2713 "${prod.nombre}" agregado al carrito`);
@@ -34941,6 +35019,18 @@ Motivo: ${motivo}` : ""}`)) {
     }
     function cobrar() {
       if (!carrito.length) return;
+      const sinStock = carrito.filter((it) => {
+        const s = inv.find((i) => i.id === it.prodId)?.stock || 0;
+        return it.cantidad > s;
+      });
+      if (sinStock.length) {
+        alert(`Stock insuficiente:
+${sinStock.map((it) => {
+          const s = inv.find((i) => i.id === it.prodId)?.stock || 0;
+          return `\u2022 ${it.nombre}: ped\xEDs ${it.cantidad}, hay ${s}`;
+        }).join("\n")}`);
+        return;
+      }
       const factor = 1 - descPct / 100;
       const items = carrito.map((it) => ({
         prodId: it.prodId,
@@ -36145,7 +36235,7 @@ Motivo: ${motivo}` : ""}`)) {
           ajuste,
           contado,
           diferencia,
-          estado: diferencia === 0 ? "OK" : diferencia < 0 ? "FALTANTE" : "SOBRANTE"
+          estado: diferencia <= 0 ? diferencia === 0 ? "OK" : "FALTANTE" : "OK"
         };
       }).filter((r) => r.sistema > 0 || r.contado > 0).sort((a, b) => Math.abs(b.diferencia) - Math.abs(a.diferencia) || (a.nombre || "").localeCompare(b.nombre || ""));
     }, [productos, conteo, ventasAjuste, cargasAjuste]);
@@ -36614,7 +36704,7 @@ Base de inventario tomada: ${baseTs.toLocaleString("es-BO")}`)) return;
         cursor: "pointer",
         WebkitTapHighlightColor: "transparent"
       } }, "+")));
-    })), itemsContados > 0 && /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: reiniciarConteo, variant: "danger", full: true, small: true, icon: "\u21BA" }, "Reiniciar conteo")), vista === "cruce" && /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "grid", gridTemplateColumns: isDesktop ? "1fr 1fr 1fr 1fr 1fr" : "1fr 1fr", gap: 8, marginBottom: 14 } }, /* @__PURE__ */ import_react.default.createElement(StatCard, { icon: "\u2713", label: "Coinciden", value: okCount, color: C.green, compact: isDesktop }), /* @__PURE__ */ import_react.default.createElement(StatCard, { icon: "\u26A0", label: "Faltantes", value: faltantes.length, color: C.red, compact: isDesktop }), /* @__PURE__ */ import_react.default.createElement(StatCard, { icon: "\u2191", label: "Sobrantes", value: sobrantes.length, color: C.blue, compact: isDesktop }), /* @__PURE__ */ import_react.default.createElement(StatCard, { icon: "\u{1F4B0}", label: "Valor en fuga", value: $(Math.round(valorFuga)), color: C.red, compact: isDesktop }), /* @__PURE__ */ import_react.default.createElement(StatCard, { icon: "\u23F3", label: "Unidades sin contar", value: unidadesPendientes, sub: `${pendientes.length} prod.`, color: C.label3, compact: isDesktop })), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 6, marginBottom: 12 } }, /* @__PURE__ */ import_react.default.createElement("button", { onClick: () => setCruceVerTodo(false), style: {
+    })), itemsContados > 0 && /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: reiniciarConteo, variant: "danger", full: true, small: true, icon: "\u21BA" }, "Reiniciar conteo")), vista === "cruce" && /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "grid", gridTemplateColumns: isDesktop ? "1fr 1fr 1fr 1fr 1fr" : "1fr 1fr", gap: 8, marginBottom: 14 } }, /* @__PURE__ */ import_react.default.createElement(StatCard, { icon: "\u2713", label: "Coinciden", value: okCount, color: C.green, compact: isDesktop }), /* @__PURE__ */ import_react.default.createElement(StatCard, { icon: "\u26A0", label: "Faltantes", value: faltantes.length, color: C.red, compact: isDesktop }), /* @__PURE__ */ import_react.default.createElement(StatCard, { icon: "\u{1F4B0}", label: "Valor en fuga", value: $(Math.round(valorFuga)), color: C.red, compact: isDesktop }), /* @__PURE__ */ import_react.default.createElement(StatCard, { icon: "\u23F3", label: "Unidades sin contar", value: unidadesPendientes, sub: `${pendientes.length} prod.`, color: C.label3, compact: isDesktop })), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 6, marginBottom: 12 } }, /* @__PURE__ */ import_react.default.createElement("button", { onClick: () => setCruceVerTodo(false), style: {
       flex: 1,
       padding: "8px 10px",
       borderRadius: 9,
@@ -36695,7 +36785,7 @@ Base de inventario tomada: ${baseTs.toLocaleString("es-BO")}`)) return;
         borderRadius: 6,
         letterSpacing: "0.02em"
       } }, ei.label)));
-    })), (faltantes.length > 0 || sobrantes.length > 0) && /* @__PURE__ */ import_react.default.createElement("div", { style: {
+    })), faltantes.length > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: {
       background: C.bg1,
       borderRadius: 14,
       padding: 16,
@@ -36704,7 +36794,7 @@ Base de inventario tomada: ${baseTs.toLocaleString("es-BO")}`)) return;
       display: "flex",
       flexDirection: "column",
       gap: 8
-    } }, faltantes.length > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", fontSize: 13, fontFamily: FONT } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.label2 } }, "Valor estimado de fuga (", faltantes.length, " \xEDtem", faltantes.length !== 1 ? "s" : "", ")"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontWeight: 700, color: C.red } }, "-", $(Math.round(valorFuga)))), sobrantes.length > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", fontSize: 13, fontFamily: FONT } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.label2 } }, "Valor de sobrantes (", sobrantes.length, " \xEDtem", sobrantes.length !== 1 ? "s" : "", ")"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontWeight: 700, color: C.blue } }, "+", $(Math.round(valorSobrante))))), !todoVerificado && discrepancias.length > 0 && /* @__PURE__ */ import_react.default.createElement("div", { onClick: () => setVista("verificacion"), style: {
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", fontSize: 13, fontFamily: FONT } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.label2 } }, "Valor estimado de fuga (", faltantes.length, " \xEDtem", faltantes.length !== 1 ? "s" : "", ")"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontWeight: 700, color: C.red } }, "-", $(Math.round(valorFuga))))), !todoVerificado && discrepancias.length > 0 && /* @__PURE__ */ import_react.default.createElement("div", { onClick: () => setVista("verificacion"), style: {
       display: "flex",
       alignItems: "center",
       gap: 10,
@@ -36920,20 +37010,14 @@ Confirmas que el conteo de ${r.contado} unidad(es) es correcto.`)) {
           justifyContent: "space-between",
           alignItems: "center",
           gap: 10
-        } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, fontWeight: 700, color: C.label, fontFamily: FONT } }, MESES[a.mes], " ", a.anio, " \xB7 ", marcaNombre), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT, marginTop: 2 } }, a.fecha, " ", a.hora, " \xB7 ", a.usuario, " \xB7 ", a.totalProductos, " productos")), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 6, flexShrink: 0 } }, a.faltantes > 0 && /* @__PURE__ */ import_react.default.createElement(Chip, { color: C.red, small: true }, a.faltantes, " faltante", a.faltantes !== 1 ? "s" : ""), a.sobrantes > 0 && /* @__PURE__ */ import_react.default.createElement(Chip, { color: C.blue, small: true }, a.sobrantes, " sobrante", a.sobrantes !== 1 ? "s" : ""), a.faltantes === 0 && a.sobrantes === 0 && /* @__PURE__ */ import_react.default.createElement(Chip, { color: C.green, small: true }, "\u2713 OK"))), abierta && /* @__PURE__ */ import_react.default.createElement("div", { style: { padding: "0 14px 14px" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+        } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, fontWeight: 700, color: C.label, fontFamily: FONT } }, MESES[a.mes], " ", a.anio, " \xB7 ", marcaNombre), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT, marginTop: 2 } }, a.fecha, " ", a.hora, " \xB7 ", a.usuario, " \xB7 ", a.totalProductos, " productos")), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 6, flexShrink: 0 } }, a.faltantes > 0 && /* @__PURE__ */ import_react.default.createElement(Chip, { color: C.red, small: true }, a.faltantes, " faltante", a.faltantes !== 1 ? "s" : ""), a.faltantes === 0 && /* @__PURE__ */ import_react.default.createElement(Chip, { color: C.green, small: true }, "\u2713 OK"))), abierta && /* @__PURE__ */ import_react.default.createElement("div", { style: { padding: "0 14px 14px" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
           display: "flex",
           justifyContent: "space-between",
           fontSize: 13,
           fontFamily: FONT,
           padding: "8px 0",
           borderTop: `1px solid ${C.sep}`
-        } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.label2 } }, "Valor estimado de fuga"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontWeight: 700, color: C.red } }, "-", $(Math.round(a.valorFuga || 0)))), /* @__PURE__ */ import_react.default.createElement("div", { style: {
-          display: "flex",
-          justifyContent: "space-between",
-          fontSize: 13,
-          fontFamily: FONT,
-          padding: "4px 0 10px"
-        } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.label2 } }, "Valor de sobrantes"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontWeight: 700, color: C.blue } }, "+", $(Math.round(a.valorSobrante || 0)))), a.marcadoOkPor && /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT_UI, marginBottom: 8, textAlign: "center" } }, "Marcado OK por ", /* @__PURE__ */ import_react.default.createElement("b", null, a.marcadoOkPor), " \xB7 ", a.marcadoOkTs ? new Date(a.marcadoOkTs).toLocaleString("es-BO", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "\u2014"), onActualizarAuditoria && (a.faltantes > 0 || a.sobrantes > 0) && /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => {
+        } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.label2 } }, "Valor estimado de fuga"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontWeight: 700, color: C.red } }, "-", $(Math.round(a.valorFuga || 0)))), a.marcadoOkPor && /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT_UI, marginBottom: 8, textAlign: "center" } }, "Marcado OK por ", /* @__PURE__ */ import_react.default.createElement("b", null, a.marcadoOkPor), " \xB7 ", a.marcadoOkTs ? new Date(a.marcadoOkTs).toLocaleString("es-BO", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "\u2014"), onActualizarAuditoria && a.faltantes > 0 && /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => {
           if (!window.confirm(`\xBFMarcar esta verificaci\xF3n de ${MESES[a.mes]} ${a.anio} como OK?
 
 Se registrar\xE1 que los faltantes/sobrantes fueron verificados f\xEDsicamente y est\xE1n conformes.`)) return;
@@ -37006,7 +37090,7 @@ Se registrar\xE1 que los faltantes/sobrantes fueron verificados f\xEDsicamente y
           letterSpacing: 0.5,
           marginBottom: 6
         } }, "\xCDtems en esta verificaci\xF3n (", (a.detalle || []).length, ")"), (a.detalle || []).map((d, i) => {
-          const estadoColor = d.estado === "OK" ? C.green : d.estado === "SOBRANTE" ? C.blue : C.red;
+          const estadoColor = d.estado === "FALTANTE" ? C.red : C.green;
           return /* @__PURE__ */ import_react.default.createElement("div", { key: (d.codigo || "") + i, style: {
             display: "flex",
             alignItems: "center",
@@ -37118,7 +37202,7 @@ Se registrar\xE1 que los faltantes/sobrantes fueron verificados f\xEDsicamente y
           const conDif = (a.detalle || []).filter((d) => d.diferencia !== 0);
           const falt = conDif.filter((d) => d.diferencia < 0).length;
           const sobr = conDif.filter((d) => d.diferencia > 0).length;
-          return /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT_UI, marginBottom: 8, textAlign: "center" } }, conDif.length, " producto(s) con diferencia", falt > 0 && /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.red } }, " \xB7 ", falt, " faltante", falt !== 1 ? "s" : ""), sobr > 0 && /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.blue } }, " \xB7 ", sobr, " sobrante", sobr !== 1 ? "s" : "")), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => onCuadrarConAuditoria(a), full: true, small: true, icon: "\u2696\uFE0F", variant: "warning" }, "Cuadrar inventario con esta verificaci\xF3n"));
+          return /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT_UI, marginBottom: 8, textAlign: "center" } }, conDif.length, " producto(s) con diferencia", falt > 0 && /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.red } }, " \xB7 ", falt, " faltante", falt !== 1 ? "s" : "")), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => onCuadrarConAuditoria(a), full: true, small: true, icon: "\u2696\uFE0F", variant: "warning" }, "Cuadrar inventario con esta verificaci\xF3n"));
         })()), /* @__PURE__ */ import_react.default.createElement("div", { style: { marginTop: 10 } }, /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => exportAuditoriaExcel(a), full: true, small: true, icon: "\u2B07" }, "Exportar Excel"))));
       }));
     })());
@@ -37343,7 +37427,31 @@ Se registrar\xE1 que los faltantes/sobrantes fueron verificados f\xEDsicamente y
         overflow: "hidden",
         textOverflow: "ellipsis",
         whiteSpace: "nowrap"
-      } }, (it.nombre || "").toUpperCase()), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: C.label3, fontFamily: FONT_MONO } }, it.codigo, " \xB7 ", it.marca || "\u2014")), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label2, fontFamily: FONT, textAlign: "right", flexShrink: 0 } }, it.tipo === "update" ? `${it.stockAntes} \u2192 ${it.stockNuevo} (+${it.stockSumado})` : `Stock ${it.stock}${it.precio ? ` \xB7 ${$(it.precio)}` : ""}`)))), onVerificar && /* @__PURE__ */ import_react.default.createElement("div", { style: { marginTop: 10 } }, c.verificado && c.verificadoPor && /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT_UI, marginBottom: 6, textAlign: "center" } }, "Verificado por ", /* @__PURE__ */ import_react.default.createElement("b", null, c.verificadoPor), " \xB7 ", c.verificadoTs ? new Date(c.verificadoTs).toLocaleString("es-BO", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "\u2014"), /* @__PURE__ */ import_react.default.createElement(
+      } }, (it.nombre || "").toUpperCase()), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: C.label3, fontFamily: FONT_MONO } }, it.codigo, " \xB7 ", it.marca || "\u2014")), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label2, fontFamily: FONT, textAlign: "right", flexShrink: 0 } }, it.tipo === "update" ? `${it.stockAntes} \u2192 ${it.stockNuevo} (+${it.stockSumado})` : `Stock ${it.stock}${it.precio ? ` \xB7 ${$(it.precio)}` : ""}`)))), c.archivoUrl && /* @__PURE__ */ import_react.default.createElement(
+        "a",
+        {
+          href: c.archivoUrl,
+          download: c.archivoNombre || "evidencia.xlsx",
+          onClick: (e) => e.stopPropagation(),
+          style: {
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 6,
+            marginTop: 10,
+            padding: "9px",
+            borderRadius: 10,
+            textDecoration: "none",
+            border: `1.5px solid ${C.indigo}`,
+            background: `${C.indigo}10`,
+            color: C.indigo,
+            fontSize: 12,
+            fontWeight: 700,
+            fontFamily: FONT_UI
+          }
+        },
+        "\u{1F4C4} Descargar Excel de evidencia"
+      ), onVerificar && /* @__PURE__ */ import_react.default.createElement("div", { style: { marginTop: 10 } }, c.verificado && c.verificadoPor && /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT_UI, marginBottom: 6, textAlign: "center" } }, "Verificado por ", /* @__PURE__ */ import_react.default.createElement("b", null, c.verificadoPor), " \xB7 ", c.verificadoTs ? new Date(c.verificadoTs).toLocaleString("es-BO", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "\u2014"), /* @__PURE__ */ import_react.default.createElement(
         "button",
         {
           onClick: (e) => {
@@ -37368,7 +37476,7 @@ Se registrar\xE1 que los faltantes/sobrantes fueron verificados f\xEDsicamente y
       ))));
     })));
   }
-  function InventarioPorMarca({ inv, ventas, onRecibir, onBaja, onImportarExcel, onReponer, onSyncCompleto }) {
+  function InventarioPorMarca({ inv, ventas, onRecibir, onBaja, onImportarExcel, onReponer, onSyncCompleto, onRecargarDesdeSupabase }) {
     const isDesktop = useIsDesktop();
     const [syncMsg, setSyncMsg] = (0, import_react.useState)(null);
     var _hN149 = (0, import_react.useState)(null);
@@ -37706,7 +37814,7 @@ Se registrar\xE1 que los faltantes/sobrantes fueron verificados f\xEDsicamente y
         borderRadius: 4,
         fontWeight: 500,
         letterSpacing: "0.04em"
-      } }, prod.codigo), prod.categoria && /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 10, color: C.label3, fontFamily: FONT } }, prod.categoria), prod.fecha && /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 9, color: C.label3, fontFamily: FONT_MONO, opacity: 0.7 } }, prod.fecha))), /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "right", fontFamily: FONT, paddingRight: 8 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 14, fontWeight: 700, color: C.label, letterSpacing: "-0.02em" } }, $(prod.precio)), vendidas > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: C.blue, fontFamily: FONT } }, "\u2191", vendidas, " vend.")), /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center" } }, /* @__PURE__ */ import_react.default.createElement("span", { style: {
+      } }, prod.codigo), prod.categoria && /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 10, color: C.label3, fontFamily: FONT } }, prod.categoria), prod.fecha && /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 9, color: C.label3, fontFamily: FONT_MONO, opacity: 0.7 } }, prod.fecha)), prod.descripcion && /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: C.label3, fontFamily: FONT, marginTop: 2, lineHeight: 1.3 } }, prod.descripcion)), /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "right", fontFamily: FONT, paddingRight: 8 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 14, fontWeight: 700, color: C.label, letterSpacing: "-0.02em" } }, $(prod.precio)), vendidas > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: C.blue, fontFamily: FONT } }, "\u2191", vendidas, " vend.")), /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center" } }, /* @__PURE__ */ import_react.default.createElement("span", { style: {
         display: "inline-block",
         fontFamily: FONT,
         fontSize: 11,
@@ -37768,7 +37876,18 @@ Se registrar\xE1 que los faltantes/sobrantes fueron verificados f\xEDsicamente y
         icon: "\u{1F4CB}"
       },
       "Plantilla"
-    )), onSyncCompleto && /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 8, marginTop: 8 } }, /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: async () => {
+    )), (onSyncCompleto || onRecargarDesdeSupabase) && /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 8, marginTop: 8 } }, onRecargarDesdeSupabase && /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: async () => {
+      if (syncMsg && typeof syncMsg === "object") return;
+      setSyncMsg({ prog: 1, total: 1 });
+      try {
+        const ok = await onRecargarDesdeSupabase();
+        setSyncMsg(ok ? "ok" : "err");
+        setTimeout(() => setSyncMsg(null), 4e3);
+      } catch (e) {
+        setSyncMsg("err");
+        setTimeout(() => setSyncMsg(null), 4e3);
+      }
+    }, variant: "outline", full: true, small: true, icon: "\u2B07\uFE0F" }, syncMsg && typeof syncMsg === "object" ? "Cargando\u2026" : "Recargar desde Supabase"), onSyncCompleto && /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: async () => {
       if (syncMsg && typeof syncMsg === "object") return;
       setSyncMsg({ prog: 0, total: inv.length });
       try {
