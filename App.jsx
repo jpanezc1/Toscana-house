@@ -6978,8 +6978,10 @@ function ImportarExcelModal({inv, onImportar, onClose}){
         const rowText = row.map(c=>n(String(c))).join(" ");
         if(skips.some(s=>rowText.includes(s))) continue;
         // Saltar si la fila parece ser otra fila de encabezado
-        if(headers.filter(h=>h.length>2).some(h=>rowText.includes(h)&&rowText.length<200)
-           && i>hRow+2) continue;
+        // Requiere al menos 2 coincidencias de header para evitar falsos positivos
+        // (ej: "BICOLOR" contiene "color" que es un header pero NO es encabezado)
+        const hMatches = headers.filter(h=>h.length>4&&rowText.includes(h)).length;
+        if(hMatches>=2 && rowText.length<200 && i>hRow+2) continue;
 
         if(!descRaw && !skuRaw) continue; // fila sin datos útiles
 

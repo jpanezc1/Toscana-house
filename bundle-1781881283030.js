@@ -28732,7 +28732,8 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
           ];
           const rowText = row.map((c) => n(String(c))).join(" ");
           if (skips.some((s) => rowText.includes(s))) continue;
-          if (headers.filter((h) => h.length > 2).some((h) => rowText.includes(h) && rowText.length < 200) && i > hRow + 2) continue;
+          const hMatches = headers.filter((h) => h.length > 4 && rowText.includes(h)).length;
+          if (hMatches >= 2 && rowText.length < 200 && i > hRow + 2) continue;
           if (!descRaw && !skuRaw) continue;
           const precioRaw = cPrecio >= 0 ? row[cPrecio] : "";
           const precio = parsePrecio(precioRaw);
