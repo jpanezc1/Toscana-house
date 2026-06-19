@@ -255,10 +255,40 @@ async function sbGuardarCarga(c) {
       resumen: c.resumen, total_items: c.totalItems,
       nuevos: c.nuevos||0, actualizados: c.actualizados||0,
       detalle: c.items||[],
+      archivo_nombre: c.archivoNombre||null,
+      archivo_url: c.archivoUrl||null,
     });
     if (error) throw error;
     return true;
   } catch(e) { console.warn("Supabase carga (tabla puede no existir):", e.message); return false; }
+}
+
+async function sbSubirEvidencia(blob, fileName, cargaId) {
+  try {
+    const db = await getSupabase();
+    const path = `${cargaId}/${fileName}`;
+    const { error } = await db.storage.from("cargas-evidencia").upload(path, blob, {
+      upsert: true,
+      contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    });
+    if (error) throw error;
+    const { data } = db.storage.from("cargas-evidencia").getPublicUrl(path);
+    return data.publicUrl;
+  } catch(e) { console.warn("Supabase subir evidencia:", e.message); return null; }
+}
+
+async function generarExcelEvidenciaManual(items, titulo) {
+  const XLSX = await loadXLSX();
+  const filas = [
+    ["CODIGO", "NOMBRE", "MARCA", "PRECIO (Bs)", "STOCK", "CATEGORIA"],
+    ...items.map(it => [it.codigo||"", it.nombre||"", it.marcaNombre||"", it.precio||0, it.stock||0, it.categoria||""]),
+  ];
+  const ws = XLSX.utils.aoa_to_sheet(filas);
+  ws["!cols"] = [20,35,18,14,8,18].map(w=>({wch:w}));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Evidencia");
+  const buf = XLSX.write(wb, {type:"array", bookType:"xlsx"});
+  return new Blob([buf], {type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
 }
 
 async function sbCargarCargas() {
@@ -6739,7 +6769,7 @@ function LectorHID({onDetect, onClose, onReiniciar, feedback, stats, rows, marca
 // ══════════════════════════════════════════════════════════
 // ImportarExcelModal — Importación masiva con auto-generación de códigos
 // ══════════════════════════════════════════════════════════════════════
-function ImportarExcelModal({inv, onImportar, onClose}){
+function ImportarExcelModal({inv, onImportar, onClose, onArchivoCapturado}){
   const isDesktop = useIsDesktop();
   const [preview,    setPreview]    = useState([]);
   const [estado,     setEstado]     = useState("idle"); // idle|leyendo|preview|importando|done
@@ -6770,6 +6800,7 @@ function ImportarExcelModal({inv, onImportar, onClose}){
 
   // ── Parsear archivo ───────────────────────────────────────────────
   async function parsearArchivo(file){
+    if(onArchivoCapturado) onArchivoCapturado(file);
     setEstado("leyendo");
     try{
       const XLSX = await loadXLSX();
@@ -10921,9 +10952,14 @@ function App(){
     },user);
   }
 
-  function registrarCarga(carga){
-    setCargas(prev=>[carga, ...prev]);
-    syncConRespaldo("carga", carga, ()=>sbGuardarCarga(carga));
+  async function registrarCarga(carga, archivoBlob=null, archivoNombre=null){
+    let cargaFinal = {...carga};
+    if(archivoBlob && archivoNombre){
+      const url = await sbSubirEvidencia(archivoBlob, archivoNombre, carga.id);
+      if(url){ cargaFinal.archivoUrl = url; cargaFinal.archivoNombre = archivoNombre; }
+    }
+    setCargas(prev=>[cargaFinal, ...prev]);
+    syncConRespaldo("carga", cargaFinal, ()=>sbGuardarCarga(cargaFinal));
   }
 
   function registrarRetiro(r){
@@ -11056,14 +11092,18 @@ function App(){
         marca:prod.marcaNombre, marcaId:prod.marcaId,
         stock:prod.stock, precio:prod.precio, categoria:prod.categoria}],
     }, user);
-    registrarCarga(crearCarga("MANUAL", user, {
+    const cargaManual = crearCarga("MANUAL", user, {
       marcaId: prod.marcaId, marcaNombre: prod.marcaNombre,
       resumen: `Carga manual: ${prod.nombre} (${prod.codigo})`,
       totalItems:1, nuevos:1, actualizados:0,
       items:[{tipo:"create", codigo:prod.codigo, nombre:prod.nombre,
         marca:prod.marcaNombre, marcaId:prod.marcaId,
         stock:prod.stock, precio:prod.precio, categoria:prod.categoria}],
-    }));
+    });
+    generarExcelEvidenciaManual([{...prod}], prod.marcaNombre).then(blob=>{
+      const nombre = `manual_${prod.codigo}_${hoy().replace(/\//g,"-")}.xlsx`;
+      registrarCarga(cargaManual, blob, nombre);
+    });
     setFInv({marcaId:"",nombre:"",categoria:"",precio:"",stock:"",fecha:hoy(),codigoManual:""});
     setShInv(false);
     setTimeout(()=>imprimirTicket(prod, marca?.nombre||"Toscana House"), 300);
@@ -11156,7 +11196,7 @@ function App(){
   }
 
   // Buffer de importación para consolidar en un solo evento de auditoría
-  const _importBuf = useRef({items:[], sbItems:[], ts:0, timer:null});
+  const _importBuf = useRef({items:[], sbItems:[], ts:0, timer:null, archivo:null, archivoNombre:null});
 
   function handleVerificarCarga(cargaId, verificado){
     setCargas(prev=>prev.map(c=>c.id===cargaId
@@ -11207,13 +11247,18 @@ function App(){
         marcas,
         items: buf,
       }, user);
-      registrarCarga(crearCarga("IMPORT", user, {
+      const carga = crearCarga("IMPORT", user, {
         marcaId: marcaIds.length===1 ? marcaIds[0] : null,
         marcaNombre: marcas,
         resumen: `Importación: ${nuevos} nuevos + ${actualizados} actualizados · ${marcas}`,
         nuevos, actualizados, totalItems: buf.length, items: buf,
-      }));
+      });
+      const archivoBlob = _importBuf.current.archivo;
+      const archivoNombre = _importBuf.current.archivoNombre;
+      registrarCarga(carga, archivoBlob, archivoNombre);
       _importBuf.current.items = [];
+      _importBuf.current.archivo = null;
+      _importBuf.current.archivoNombre = null;
     }, 1200);
   }
 
@@ -12075,7 +12120,7 @@ function App(){
       />
 
       {/* Modal: Importar Excel */}
-      {shImportarExcel && <ImportarExcelModal inv={inv} onImportar={handleImportarExcel} onClose={()=>setShImportarExcel(false)}/>}
+      {shImportarExcel && <ImportarExcelModal inv={inv} onImportar={handleImportarExcel} onClose={()=>setShImportarExcel(false)} onArchivoCapturado={f=>{_importBuf.current.archivo=f;_importBuf.current.archivoNombre=f.name;}}/>}
 
       {/* Modal: Nueva / Editar Marca */}
       {modalNuevaMarca && (
@@ -14469,6 +14514,16 @@ function RegistroCargas({cargas, marcas, marcaId=null, onVerificar=null, user=nu
                           ))
                         }
                       </div>
+                      {c.archivoUrl&&(
+                        <a href={c.archivoUrl} download={c.archivoNombre||"evidencia.xlsx"}
+                          onClick={e=>e.stopPropagation()}
+                          style={{display:"flex",alignItems:"center",justifyContent:"center",gap:6,
+                            marginTop:10,padding:"9px",borderRadius:10,textDecoration:"none",
+                            border:`1.5px solid ${C.indigo}`,background:`${C.indigo}10`,
+                            color:C.indigo,fontSize:12,fontWeight:700,fontFamily:FONT_UI}}>
+                          📄 Descargar Excel de evidencia
+                        </a>
+                      )}
                       {onVerificar&&(
                         <div style={{marginTop:10}}>
                           {c.verificado&&c.verificadoPor&&(
