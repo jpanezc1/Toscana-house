@@ -6866,16 +6866,28 @@ function ImportarExcelModal({inv, onImportar, onClose, onArchivoCapturado}){
       // ── Detectar formato por fingerprint de headers ───────────────────
       const hJoined = headers.join("|");
 
-      // Formato A: Plantilla Toscana House oficial
-      // Headers: ★  MARCA | ★  DESCRIPCION DEL PRODUCTO | ★  PRECIO | STOCK | TALLA | CATEGORIA | COLOR | SKU
-      const isTH = headers.some(h=>h.includes("★")||h.includes("descripcion del producto"));
+      // ─────────────────────────────────────────────────────────────────
+      // FORMATO A — Plantilla Oficial Toscana House
+      // Columnas fijas (posición + nombre):
+      //   A (0) ★ MARCA            → marcaNombre  (sistema + etiqueta: fila top)
+      //   B (1) ★ DESCRIPCION DEL  → nombre       (sistema + etiqueta: texto central)
+      //            PRODUCTO          El nombre ya viene compuesto:
+      //                              CATEGORIA DESCRIPCION COLOR TALLA
+      //   C (2) ★ PRECIO (Bs.)     → precio       (sistema + etiqueta: fila inferior)
+      //   D (3)   STOCK (unidades) → stock        (sistema: badge de unidades)
+      //   E (4)   TALLA            → subcat       + descripcion "TALLA: X"
+      //   F (5)   CATEGORIA        → categoria    (sistema: chip categoria)
+      //   G (6)   COLOR            → descripcion  "COLOR: X" → etiqueta: fila color
+      //   H (7)   SKU / CODIGO     → codigo       (sistema + etiqueta: código de barras)
+      // ─────────────────────────────────────────────────────────────────
+      const isTH = headers.some(h=>h.includes("★")||h.includes("descripciondelproducto")||h.includes("descripcion del producto")||(h.includes("descripcion")&&headers.some(hh=>hh.includes("sku")||hh.includes("codigo"))));
 
       // Formato B: Plantilla numérica (PDF de marcas / "1. Código del ÍTEM/ARTÍCULO")
       // Headers numerados: "1. codigo...", "2. nombre", "3. categoria", "4. descripcion", "5. unidad", "6. cant"
-      const isNumerico = headers.some(h=>/^\d+\.\s/.test(h)||h.includes("item/art")||h.includes("unidad de medida")||h.includes("cant. de ingreso"));
+      const isNumerico = !isTH && headers.some(h=>/^\d+\.\s/.test(h)||h.includes("item/art")||h.includes("unidad de medida")||h.includes("cant. de ingreso"));
 
       // Formato C: iZi (SUBGATEGORÍA con typo)
-      const isIZi = !isNumerico && headers.some(h=>h.includes("subgategoria"));
+      const isIZi = !isNumerico && !isTH && headers.some(h=>h.includes("subgategoria"));
 
       // Formato D: Estándar genérico (cualquier otro Excel reconocible)
       // — se maneja con col() flexible abajo
@@ -6883,15 +6895,17 @@ function ImportarExcelModal({inv, onImportar, onClose, onArchivoCapturado}){
       let cSKU, cMarca, cDesc, cPrecio, cCat, cTalla, cColor, cStock;
 
       if(isTH){
-        // ── Plantilla Oficial TH ──────────────────────────────────────
-        cMarca  = col("marca");
-        cDesc   = col("descripcion del producto","descripcion","nombre","producto");
-        cPrecio = col("precio");
-        cStock  = col("stock","cantidad","unidades");
-        cTalla  = col("talla","size","medida");
-        cCat    = col("categoria","cat","tipo");
-        cColor  = col("color");
-        cSKU    = col("sku","codigo","cod","code");
+        // ── Plantilla Oficial TH — mapeo por nombre + fallback posición ──
+        // Nombre compuesto (col B) = CATEGORIA DESCRIPCION COLOR TALLA → va a `nombre`
+        // Talla (col E) + Color (col G) → van a `descripcion` para el label
+        cMarca  = col("marca");                                               if(cMarca <0) cMarca =0;
+        cDesc   = col("descripcion del producto","descripcion","nombre","producto"); if(cDesc  <0) cDesc  =1;
+        cPrecio = col("precio");                                              if(cPrecio<0) cPrecio=2;
+        cStock  = col("stock","cantidad","unidades");                         if(cStock <0) cStock =3;
+        cTalla  = col("talla","size","medida");                               if(cTalla <0) cTalla =4;
+        cCat    = col("categoria","cat","tipo");                              if(cCat   <0) cCat   =5;
+        cColor  = col("color");                                               if(cColor <0) cColor =6;
+        cSKU    = col("sku","codigo","cod","code");                           if(cSKU   <0) cSKU   =7;
 
       } else if(isNumerico){
         // ── Plantilla numérica (PDF / marcas) ─────────────────────────
@@ -7117,13 +7131,23 @@ function ImportarExcelModal({inv, onImportar, onClose, onArchivoCapturado}){
         onImportar({tipo:"update", codigo:f.sku, stock:f.stock});
       } else {
         ok++;
+        // ── Mapeo plantilla → sistema + etiqueta ─────────────────────
+        // nombre      (col B) : nombre visible en sistema y línea central de etiqueta
+        // categoria   (col F) : chip categoría en sistema
+        // descripcion (col E+G): "TALLA: X · COLOR: Y" — alimenta extraerColor() para
+        //                        la fila de color en la etiqueta impresa
+        // codigo      (col H) : código de barras en etiqueta + búsqueda por scanner
+        // precio      (col C) : precio visible en etiqueta (fila inferior derecha)
         onImportar({tipo:"create", producto:{
           codigo:      f.sku.toUpperCase(),
           nombre:      (f.desc||"").toUpperCase(),
           marcaId:     f.marcaId,
           marcaNombre: f.marcaNombre,
           categoria:   (f.cat||"General").toUpperCase(),
-          descripcion: [f.talla&&`TALLA: ${(f.talla||"").toUpperCase()}`, f.color&&`COLOR: ${(f.color||"").toUpperCase()}`].filter(Boolean).join(" · ")||"",
+          descripcion: [
+            f.talla && `TALLA: ${f.talla.toUpperCase()}`,
+            f.color && `COLOR: ${f.color.toUpperCase()}`,
+          ].filter(Boolean).join(" · ") || "",
           subcat:      (f.subcat||f.talla||"").toUpperCase(),
           precio:      f.precio,
           stock:       f.stock,
