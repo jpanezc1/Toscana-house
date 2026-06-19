@@ -743,9 +743,10 @@ function BarcodeDisplay({ codigo, small }) {
     loadJsBarcode().then(ok => {
       if (!ok || !window.JsBarcode || !svgRef.current) return;
       try {
+        const _bw = codigo.length <= 8 ? (small ? 1.4 : 2) : codigo.length <= 11 ? (small ? 1.2 : 1.6) : (small ? 1.0 : 1.3);
         window.JsBarcode(svgRef.current, codigo, {
           format: "CODE128",
-          width: small ? 1.4 : 2,
+          width: _bw,
           height: small ? 50 : 70,
           displayValue: false,
           margin: 4,
@@ -846,9 +847,10 @@ async function imprimirTicket(producto, marcaNombre) {
   <script>
     window.onload = function() {
       try {
-        JsBarcode("#barcode", "${producto.codigo}", {
+        var _c="${producto.codigo}";var _bw=_c.length<=8?1.56:_c.length<=11?1.3:1.1;
+        JsBarcode("#barcode", _c, {
           format: "CODE128",
-          width: 1.56, height: 38.4,
+          width: _bw, height: 38.4,
           displayValue: false,
           margin: 0
         });
@@ -10318,7 +10320,7 @@ function SheetDetalleGC({ gc: gcProp, onClose }) {
               <svg id="bc"></svg>
               <p style="margin-top:16px;font-size:11px;color:#bbb">Toscana House</p>
               <script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.5/JsBarcode.all.min.js"><\/script>
-              <script>try{JsBarcode("#bc","${gc.codigo}",{format:"CODE128",width:2,height:70,displayValue:true,margin:10,lineColor:"#1A2E1A"});}catch(e){}<\/script>
+              <script>var _gc="${gc.codigo}";var _bwgc=_gc.length<=8?2:_gc.length<=11?1.6:1.3;try{JsBarcode("#bc",_gc,{format:"CODE128",width:_bwgc,height:70,displayValue:true,margin:10,lineColor:"#1A2E1A"});}catch(e){}<\/script>
               </body></html>`);
               w.document.close();
               setTimeout(()=>w.print(),800);
