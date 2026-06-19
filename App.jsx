@@ -7040,7 +7040,20 @@ function ImportarExcelModal({inv, onImportar, onClose}){
 
       if(filas.length===0){ setEstado("idle"); alert("No se encontraron productos válidos en el archivo."); return; }
 
-      setPreview(filas);
+      // ── Consolidar duplicados dentro del mismo Excel ─────────────────
+      // Código repetido en el archivo = misma prenda, más unidades → sumar stock
+      const filasMap = new Map();
+      for(const f of filas){
+        const key = f.sku.toUpperCase();
+        if(filasMap.has(key)){
+          filasMap.get(key).stock += f.stock;
+        } else {
+          filasMap.set(key, {...f});
+        }
+      }
+      const filasFinal = Array.from(filasMap.values());
+
+      setPreview(filasFinal);
       setFiltro("todas");
       setEstado("preview");
     }catch(e){
@@ -7542,21 +7555,22 @@ function ImportarExcelModal({inv, onImportar, onClose}){
           )}
 
           {/* Imprimir etiquetas de todo el cargamento (una por unidad de stock) */}
-          {stats.ok > 0 && (()=>{
-            const importables = preview.filter(f=>f.desc&&f.marcaId&&f.precio>0&&f._errs.length===0&&!f._dup);
-            const totalEtiquetas = importables.reduce((acc,f)=>acc+Math.max(1,Number(f.stock)||1),0);
+          {(stats.ok > 0 || stats.upd > 0) && (()=>{
+            // Incluir nuevos Y actualizados — para cada uno imprimir tantas etiquetas
+            // como unidades se cargaron en este Excel (f.stock = cantidad sumada)
+            const paraNuevas = preview.filter(f=>f.desc&&f.marcaId&&f.precio>0&&f._errs.length===0&&!f._dup);
+            const paraActs   = preview.filter(f=>f._dup&&f.marcaId&&f.precio>0);
+            const todosParaEtiquetas = [
+              ...paraNuevas.map(f=>({nombre:(f.desc||"").toUpperCase(), codigo:f.sku.toUpperCase(), precio:f.precio, marcaNombre:f.marcaNombre, stock:f.stock})),
+              ...paraActs.map(f=>{
+                const prod = inv.find(p=>p.codigo.toUpperCase()===f.sku.toUpperCase());
+                return {nombre:(prod?.nombre||f.desc||"").toUpperCase(), codigo:f.sku.toUpperCase(), precio:prod?.precio||f.precio, marcaNombre:prod?.marcaNombre||f.marcaNombre, stock:f.stock};
+              }),
+            ];
+            const totalEtiquetas = todosParaEtiquetas.reduce((acc,f)=>acc+Math.max(1,Number(f.stock)||1),0);
             return (
             <button
-              onClick={()=>{
-                const importados = importables.map(f=>({
-                    nombre: (f.desc||"").toUpperCase(),
-                    codigo: f.sku.toUpperCase(),
-                    precio: f.precio,
-                    marcaNombre: f.marcaNombre,
-                    stock: f.stock,
-                  }));
-                imprimirEtiquetasLote(expandirPorStock(importados));
-              }}
+              onClick={()=>imprimirEtiquetasLote(expandirPorStock(todosParaEtiquetas))}
               style={{width:"100%",background:`${C.gold}14`,border:`1.5px solid ${C.gold}`,
                 borderRadius:12,padding:"13px",fontSize:14,fontWeight:700,
                 color:C.gold,cursor:"pointer",fontFamily:FONT_UI,marginBottom:10,

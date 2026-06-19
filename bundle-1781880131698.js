@@ -28779,7 +28779,17 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
           alert("No se encontraron productos v\xE1lidos en el archivo.");
           return;
         }
-        setPreview(filas);
+        const filasMap = /* @__PURE__ */ new Map();
+        for (const f of filas) {
+          const key = f.sku.toUpperCase();
+          if (filasMap.has(key)) {
+            filasMap.get(key).stock += f.stock;
+          } else {
+            filasMap.set(key, { ...f });
+          }
+        }
+        const filasFinal = Array.from(filasMap.values());
+        setPreview(filasFinal);
         setFiltro("todas");
         setEstado("preview");
       } catch (e) {
@@ -29321,22 +29331,21 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
         }
       },
       "\u2B07 Descargar Excel con c\xF3digos pendientes"
-    )), stats.ok > 0 && (() => {
-      const importables = preview.filter((f) => f.desc && f.marcaId && f.precio > 0 && f._errs.length === 0 && !f._dup);
-      const totalEtiquetas = importables.reduce((acc, f) => acc + Math.max(1, Number(f.stock) || 1), 0);
+    )), (stats.ok > 0 || stats.upd > 0) && (() => {
+      const paraNuevas = preview.filter((f) => f.desc && f.marcaId && f.precio > 0 && f._errs.length === 0 && !f._dup);
+      const paraActs = preview.filter((f) => f._dup && f.marcaId && f.precio > 0);
+      const todosParaEtiquetas = [
+        ...paraNuevas.map((f) => ({ nombre: (f.desc || "").toUpperCase(), codigo: f.sku.toUpperCase(), precio: f.precio, marcaNombre: f.marcaNombre, stock: f.stock })),
+        ...paraActs.map((f) => {
+          const prod = inv.find((p) => p.codigo.toUpperCase() === f.sku.toUpperCase());
+          return { nombre: (prod?.nombre || f.desc || "").toUpperCase(), codigo: f.sku.toUpperCase(), precio: prod?.precio || f.precio, marcaNombre: prod?.marcaNombre || f.marcaNombre, stock: f.stock };
+        })
+      ];
+      const totalEtiquetas = todosParaEtiquetas.reduce((acc, f) => acc + Math.max(1, Number(f.stock) || 1), 0);
       return /* @__PURE__ */ import_react.default.createElement(
         "button",
         {
-          onClick: () => {
-            const importados = importables.map((f) => ({
-              nombre: (f.desc || "").toUpperCase(),
-              codigo: f.sku.toUpperCase(),
-              precio: f.precio,
-              marcaNombre: f.marcaNombre,
-              stock: f.stock
-            }));
-            imprimirEtiquetasLote(expandirPorStock(importados));
-          },
+          onClick: () => imprimirEtiquetasLote(expandirPorStock(todosParaEtiquetas)),
           style: {
             width: "100%",
             background: `${C.gold}14`,
