@@ -714,6 +714,11 @@ async function leerCodigoDeImagen(file) {
   }
 }
 
+// Retorna el código a codificar en el barcode: sin guiones, slashes ni espacios
+// para que barras más cortas quepan en 45mm con ancho suficiente para el escáner.
+// El texto completo se sigue mostrando en la etiqueta; el matching usa ambas formas.
+function limpiarParaBarcode(c){ return (c||"").toUpperCase().replace(/[^A-Z0-9]/g,""); }
+
 // Genera código de barras CODE128 como SVG (string)
 async function generarSVGBarcode(codigo) {
   try {
@@ -847,7 +852,7 @@ async function imprimirTicket(producto, marcaNombre) {
   <script>
     window.onload = function() {
       try {
-        var _c="${producto.codigo}";var _bw=_c.length<=8?1.56:_c.length<=11?1.3:1.1;
+        var _c="${limpiarParaBarcode(producto.codigo)}";var _bw=_c.length<=8?1.56:_c.length<=11?1.3:1.1;
         JsBarcode("#barcode", _c, {
           format: "CODE128",
           width: _bw, height: 38.4,
@@ -896,9 +901,9 @@ function imprimirEtiquetasLote(items) {
   }).join('');
 
   const barcodeScripts = items.map((it, idx) => {
-    const codigo = (it.codigo || it.sku || "").toUpperCase();
-    const bw = codigo.length <= 8 ? 1.56 : codigo.length <= 11 ? 1.3 : 1.1;
-    return `try{JsBarcode("#bc-${idx}","${codigo}",{format:"CODE128",width:${bw},height:38.4,displayValue:false,margin:0});}catch(e){document.getElementById("bc-${idx}").outerHTML='<span style="font-size:7px;color:red;font-family:monospace">${codigo}</span>';}`;
+    const codigoLimpio = limpiarParaBarcode(it.codigo || it.sku || "");
+    const bw = codigoLimpio.length <= 8 ? 1.56 : codigoLimpio.length <= 11 ? 1.3 : 1.1;
+    return `try{JsBarcode("#bc-${idx}","${codigoLimpio}",{format:"CODE128",width:${bw},height:38.4,displayValue:false,margin:0});}catch(e){document.getElementById("bc-${idx}").outerHTML='<span style="font-size:7px;color:red;font-family:monospace">${codigoLimpio}</span>';}`;
   }).join('\n');
 
   win.document.write(`<!DOCTYPE html>
@@ -4845,7 +4850,7 @@ function RetirosTab({inv, retiros, onRetiro}){
   function buscarProdPorCod(cod){
     const c = cod.trim().toUpperCase();
     if(!c) return false;
-    const p = inv.find(i=>i.codigo.toUpperCase()===c);
+    const p = inv.find(i=>i.codigo.toUpperCase()===c) || inv.find(i=>limpiarParaBarcode(i.codigo)===limpiarParaBarcode(c));
     if(!p){ setMsg({ok:false,txt:`Código "${c}" no encontrado`}); setProdEncontrado(null); return false; }
     if(p.stock<=0){ setMsg({ok:false,txt:`"${p.nombre}" no tiene stock disponible`}); setProdEncontrado(null); return false; }
     setProdEncontrado(p); setMsg(null); setCantidad("1");
@@ -11075,7 +11080,7 @@ function App(){
 
   function darBaja(){
     const cod=bajaCod.trim().toUpperCase();
-    let prod=inv.find(i=>i.codigo.toUpperCase()===cod);
+    let prod=inv.find(i=>i.codigo.toUpperCase()===cod)||inv.find(i=>limpiarParaBarcode(i.codigo)===limpiarParaBarcode(cod));
     // Fallback: si no existe exacto, buscar variantes con ese prefijo (-A, -B, -C...)
     if(!prod){
       const variantes=inv.filter(i=>(i.codigo||"").toUpperCase().startsWith(cod+"-") && i.stock>0);
@@ -11121,7 +11126,7 @@ function App(){
   // un producto nuevo ni una etiqueta nueva, solo suma unidades).
   function reponerStock(){
     const cod=repCod.trim().toUpperCase();
-    const prod=inv.find(i=>i.codigo.toUpperCase()===cod);
+    const prod=inv.find(i=>i.codigo.toUpperCase()===cod)||inv.find(i=>limpiarParaBarcode(i.codigo)===limpiarParaBarcode(cod));
     if(!prod){setRepMsg({ok:false,msg:`"${cod}" no encontrado`});return;}
     const cant=Number(repCant);
     if(!cant||cant<=0){setRepMsg({ok:false,msg:"Ingresa una cantidad válida"});return;}
@@ -11141,7 +11146,7 @@ function App(){
 
   function modificarPrecio(){
     const cod=repCod.trim().toUpperCase();
-    const prod=inv.find(i=>i.codigo.toUpperCase()===cod);
+    const prod=inv.find(i=>i.codigo.toUpperCase()===cod)||inv.find(i=>limpiarParaBarcode(i.codigo)===limpiarParaBarcode(cod));
     if(!prod){setRepMsg({ok:false,msg:`"${cod}" no encontrado`});return;}
     const nuevoPrecio=Number(repPrecio);
     if(!nuevoPrecio||nuevoPrecio<=0){setRepMsg({ok:false,msg:"Ingresa un precio válido"});return;}
@@ -12294,7 +12299,7 @@ function POS({inv,onVenta,onVerNota}){
         setScanStatus("ok");
         setScanMsg(`Código detectado: ${codigo}`);
         // Buscar el producto en el inventario por código
-        const prod = inv.find(i=>i.codigo.toUpperCase()===codigo.toUpperCase());
+        const prod = inv.find(i=>i.codigo.toUpperCase()===codigo.toUpperCase())||inv.find(i=>limpiarParaBarcode(i.codigo)===limpiarParaBarcode(codigo));
         if(prod){
           // Agregar directamente al carrito
           add(prod);
