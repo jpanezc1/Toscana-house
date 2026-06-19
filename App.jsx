@@ -714,11 +714,6 @@ async function leerCodigoDeImagen(file) {
   }
 }
 
-// Retorna el código a codificar en el barcode: sin guiones, slashes ni espacios
-// para que barras más cortas quepan en 45mm con ancho suficiente para el escáner.
-// El texto completo se sigue mostrando en la etiqueta; el matching usa ambas formas.
-function limpiarParaBarcode(c){ return (c||"").toUpperCase().replace(/[^A-Z0-9]/g,""); }
-
 // Genera código de barras CODE128 como SVG (string)
 async function generarSVGBarcode(codigo) {
   try {
@@ -748,10 +743,9 @@ function BarcodeDisplay({ codigo, small }) {
     loadJsBarcode().then(ok => {
       if (!ok || !window.JsBarcode || !svgRef.current) return;
       try {
-        const _bw = codigo.length <= 8 ? (small ? 1.4 : 2) : codigo.length <= 11 ? (small ? 1.2 : 1.6) : (small ? 1.0 : 1.3);
         window.JsBarcode(svgRef.current, codigo, {
           format: "CODE128",
-          width: _bw,
+          width: small ? 1.4 : 2,
           height: small ? 50 : 70,
           displayValue: false,
           margin: 4,
@@ -852,10 +846,9 @@ async function imprimirTicket(producto, marcaNombre) {
   <script>
     window.onload = function() {
       try {
-        var _c="${producto.codigo}";var _bw=_c.length<=8?1.56:_c.length<=11?1.3:1.1;
-        JsBarcode("#barcode", _c, {
+        JsBarcode("#barcode", "${producto.codigo}", {
           format: "CODE128",
-          width: _bw, height: 38.4,
+          width: 1.56, height: 38.4,
           displayValue: false,
           margin: 0
         });
@@ -902,8 +895,7 @@ function imprimirEtiquetasLote(items) {
 
   const barcodeScripts = items.map((it, idx) => {
     const codigo = (it.codigo || it.sku || "").toUpperCase();
-    const bw = codigo.length <= 8 ? 1.56 : codigo.length <= 11 ? 1.3 : 1.1;
-    return `try{JsBarcode("#bc-${idx}","${codigo}",{format:"CODE128",width:${bw},height:38.4,displayValue:false,margin:0});}catch(e){document.getElementById("bc-${idx}").outerHTML='<span style="font-size:7px;color:red;font-family:monospace">${codigo}</span>';}`;
+    return `try{JsBarcode("#bc-${idx}","${codigo}",{format:"CODE128",width:1.56,height:38.4,displayValue:false,margin:0});}catch(e){}`;
   }).join('\n');
 
   win.document.write(`<!DOCTYPE html>
@@ -4850,7 +4842,7 @@ function RetirosTab({inv, retiros, onRetiro}){
   function buscarProdPorCod(cod){
     const c = cod.trim().toUpperCase();
     if(!c) return false;
-    const p = inv.find(i=>i.codigo.toUpperCase()===c) || inv.find(i=>limpiarParaBarcode(i.codigo)===limpiarParaBarcode(c));
+    const p = inv.find(i=>i.codigo.toUpperCase()===c);
     if(!p){ setMsg({ok:false,txt:`Código "${c}" no encontrado`}); setProdEncontrado(null); return false; }
     if(p.stock<=0){ setMsg({ok:false,txt:`"${p.nombre}" no tiene stock disponible`}); setProdEncontrado(null); return false; }
     setProdEncontrado(p); setMsg(null); setCantidad("1");
@@ -10325,7 +10317,7 @@ function SheetDetalleGC({ gc: gcProp, onClose }) {
               <svg id="bc"></svg>
               <p style="margin-top:16px;font-size:11px;color:#bbb">Toscana House</p>
               <script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.5/JsBarcode.all.min.js"><\/script>
-              <script>var _gc="${gc.codigo}";var _bwgc=_gc.length<=8?2:_gc.length<=11?1.6:1.3;try{JsBarcode("#bc",_gc,{format:"CODE128",width:_bwgc,height:70,displayValue:true,margin:10,lineColor:"#1A2E1A"});}catch(e){}<\/script>
+              <script>try{JsBarcode("#bc","${gc.codigo}",{format:"CODE128",width:2,height:70,displayValue:true,margin:10,lineColor:"#1A2E1A"});}catch(e){}<\/script>
               </body></html>`);
               w.document.close();
               setTimeout(()=>w.print(),800);
@@ -11080,7 +11072,7 @@ function App(){
 
   function darBaja(){
     const cod=bajaCod.trim().toUpperCase();
-    let prod=inv.find(i=>i.codigo.toUpperCase()===cod)||inv.find(i=>limpiarParaBarcode(i.codigo)===limpiarParaBarcode(cod));
+    let prod=inv.find(i=>i.codigo.toUpperCase()===cod);
     // Fallback: si no existe exacto, buscar variantes con ese prefijo (-A, -B, -C...)
     if(!prod){
       const variantes=inv.filter(i=>(i.codigo||"").toUpperCase().startsWith(cod+"-") && i.stock>0);
@@ -11126,7 +11118,7 @@ function App(){
   // un producto nuevo ni una etiqueta nueva, solo suma unidades).
   function reponerStock(){
     const cod=repCod.trim().toUpperCase();
-    const prod=inv.find(i=>i.codigo.toUpperCase()===cod)||inv.find(i=>limpiarParaBarcode(i.codigo)===limpiarParaBarcode(cod));
+    const prod=inv.find(i=>i.codigo.toUpperCase()===cod);
     if(!prod){setRepMsg({ok:false,msg:`"${cod}" no encontrado`});return;}
     const cant=Number(repCant);
     if(!cant||cant<=0){setRepMsg({ok:false,msg:"Ingresa una cantidad válida"});return;}
@@ -11146,7 +11138,7 @@ function App(){
 
   function modificarPrecio(){
     const cod=repCod.trim().toUpperCase();
-    const prod=inv.find(i=>i.codigo.toUpperCase()===cod)||inv.find(i=>limpiarParaBarcode(i.codigo)===limpiarParaBarcode(cod));
+    const prod=inv.find(i=>i.codigo.toUpperCase()===cod);
     if(!prod){setRepMsg({ok:false,msg:`"${cod}" no encontrado`});return;}
     const nuevoPrecio=Number(repPrecio);
     if(!nuevoPrecio||nuevoPrecio<=0){setRepMsg({ok:false,msg:"Ingresa un precio válido"});return;}
@@ -12299,7 +12291,7 @@ function POS({inv,onVenta,onVerNota}){
         setScanStatus("ok");
         setScanMsg(`Código detectado: ${codigo}`);
         // Buscar el producto en el inventario por código
-        const prod = inv.find(i=>i.codigo.toUpperCase()===codigo.toUpperCase())||inv.find(i=>limpiarParaBarcode(i.codigo)===limpiarParaBarcode(codigo));
+        const prod = inv.find(i=>i.codigo.toUpperCase()===codigo.toUpperCase());
         if(prod){
           // Agregar directamente al carrito
           add(prod);
