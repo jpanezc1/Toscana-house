@@ -804,6 +804,9 @@ function BarcodeDisplay({ codigo, small }) {
   );
 }
 
+// Extrae el color del campo descripcion ("TALLA: X · COLOR: Y")
+function extraerColor(desc){ const m=(desc||"").match(/COLOR:\s*([^·\n]+)/i); return m?m[1].trim():""; }
+
 // Abrevia nombres largos de productos para que entren en la etiqueta
 function abreviarNombre(nombre, maxLen = 60) {
   if (!nombre) return "";
@@ -858,8 +861,10 @@ async function imprimirTicket(producto, marcaNombre) {
       overflow:hidden; text-overflow:ellipsis; }
     .barcode-wrap { width:100%; display:flex; justify-content:center; }
     .barcode-wrap svg { width:45mm!important; height:9mm!important; }
+    .color-row { font-size:7px; color:#555; text-transform:uppercase; letter-spacing:0.5px;
+      text-align:center; width:100%; margin:0.2mm 0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .bottom-row { display:flex; justify-content:space-between; align-items:center; width:100%;
-      margin-top:0.3mm; }
+      margin-top:0.2mm; }
     .codigo { font-size:8.64px; color:#333; font-family:monospace; }
     .precio { font-size:13.2px; font-weight:900; }
     @media print { body { print-color-adjust:exact; -webkit-print-color-adjust:exact; } }
@@ -868,6 +873,7 @@ async function imprimirTicket(producto, marcaNombre) {
 <body>
   <div class="top"><span>${marcaNombre}</span><span style="font-weight:bold">TOSCANA HOUSE</span></div>
   <div class="producto">${abreviarNombre(producto.nombre)}</div>
+  ${extraerColor(producto.descripcion)?`<div class="color-row">Color: ${extraerColor(producto.descripcion)}</div>`:""}
   <div class="barcode-wrap">
     <svg id="barcode"></svg>
   </div>
@@ -913,10 +919,12 @@ function imprimirEtiquetasLote(items) {
     const codigo  = (it.codigo || it.sku || "").toUpperCase();
     const precio  = it.precio || 0;
     const marca   = it.marcaNombre || it.marca || "";
+    const color   = extraerColor(it.descripcion);
     return `
       <div class="label">
         <div class="top"><span>${marca.toUpperCase()}</span><span style="font-weight:bold">TOSCANA HOUSE</span></div>
         <div class="producto">${nombre}</div>
+        ${color?`<div class="color-row">Color: ${color}</div>`:""}
         <div class="barcode-wrap"><svg id="bc-${idx}"></svg></div>
         <div class="bottom-row">
           <span class="codigo">${codigo}</span>
@@ -959,8 +967,10 @@ function imprimirEtiquetasLote(items) {
       overflow:hidden; text-overflow:ellipsis; }
     .barcode-wrap { width:100%; display:flex; justify-content:center; }
     .barcode-wrap svg { width:45mm!important; height:9mm!important; }
+    .color-row { font-size:7px; color:#555; text-transform:uppercase; letter-spacing:0.5px;
+      text-align:center; width:100%; margin:0.2mm 0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .bottom-row { display:flex; justify-content:space-between; align-items:center; width:100%;
-      margin-top:0.3mm; }
+      margin-top:0.2mm; }
     .codigo { font-size:8.64px; color:#333; font-family:monospace; }
     .precio { font-size:13.2px; font-weight:900; }
     @media print {
@@ -14826,6 +14836,7 @@ function InventarioPorMarca({inv, ventas, onRecibir, onBaja, onImportarExcel, on
                       {prod.categoria&&<span style={{fontSize:10,color:C.label3,fontFamily:FONT}}>{prod.categoria}</span>}
                       {prod.fecha&&<span style={{fontSize:9,color:C.label3,fontFamily:FONT_MONO,opacity:.7}}>{prod.fecha}</span>}
                     </div>
+                    {prod.descripcion&&<div style={{fontSize:10,color:C.label3,fontFamily:FONT,marginTop:2,lineHeight:1.3}}>{prod.descripcion}</div>}
                   </div>
 
                   {/* Precio */}
