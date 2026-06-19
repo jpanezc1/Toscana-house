@@ -14107,8 +14107,7 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
                       </div>
                       <div style={{display:"flex",gap:6,flexShrink:0}}>
                         {a.faltantes>0&&<Chip color={C.red} small>{a.faltantes} faltante{a.faltantes!==1?"s":""}</Chip>}
-                        {a.sobrantes>0&&<Chip color={C.blue} small>{a.sobrantes} sobrante{a.sobrantes!==1?"s":""}</Chip>}
-                        {a.faltantes===0&&a.sobrantes===0&&<Chip color={C.green} small>✓ OK</Chip>}
+                        {a.faltantes===0&&<Chip color={C.green} small>✓ OK</Chip>}
                       </div>
                     </div>
                     {abierta&&(
@@ -14118,17 +14117,12 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
                           <span style={{color:C.label2}}>Valor estimado de fuga</span>
                           <span style={{fontWeight:700,color:C.red}}>-{$(Math.round(a.valorFuga||0))}</span>
                         </div>
-                        <div style={{display:"flex",justifyContent:"space-between",fontSize:13,fontFamily:FONT,
-                          padding:"4px 0 10px"}}>
-                          <span style={{color:C.label2}}>Valor de sobrantes</span>
-                          <span style={{fontWeight:700,color:C.blue}}>+{$(Math.round(a.valorSobrante||0))}</span>
-                        </div>
                         {a.marcadoOkPor&&(
                           <div style={{fontSize:11,color:C.label3,fontFamily:FONT_UI,marginBottom:8,textAlign:"center"}}>
                             Marcado OK por <b>{a.marcadoOkPor}</b> · {a.marcadoOkTs ? new Date(a.marcadoOkTs).toLocaleString("es-BO",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"}) : "—"}
                           </div>
                         )}
-                        {onActualizarAuditoria&&(a.faltantes>0||a.sobrantes>0)&&(
+                        {onActualizarAuditoria&&a.faltantes>0&&(
                           <IOSBtn onPress={()=>{
                             if(!window.confirm(`¿Marcar esta verificación de ${MESES[a.mes]} ${a.anio} como OK?\n\nSe registrará que los faltantes/sobrantes fueron verificados físicamente y están conformes.`)) return;
                             onActualizarAuditoria({...a, faltantes:0, sobrantes:0, valorFuga:0, valorSobrante:0, marcadoOkPor:user?.nombre||"—", marcadoOkTs:new Date().toISOString()});
@@ -14174,7 +14168,7 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
                                       Ítems en esta verificación ({(a.detalle||[]).length})
                                     </div>
                                     {(a.detalle||[]).map((d,i)=>{
-                                      const estadoColor = d.estado==="OK"?C.green:d.estado==="SOBRANTE"?C.blue:C.red;
+                                      const estadoColor = d.estado==="FALTANTE"?C.red:C.green;
                                       return (
                                       <div key={(d.codigo||"")+i} style={{display:"flex",alignItems:"center",gap:8,
                                         padding:"7px 10px",borderRadius:9,background:C.bg0,marginBottom:4,
@@ -14247,7 +14241,6 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
                                   <div style={{fontSize:11,color:C.label3,fontFamily:FONT_UI,marginBottom:8,textAlign:"center"}}>
                                     {conDif.length} producto(s) con diferencia
                                     {falt>0&&<span style={{color:C.red}}> · {falt} faltante{falt!==1?"s":""}</span>}
-                                    {sobr>0&&<span style={{color:C.blue}}> · {sobr} sobrante{sobr!==1?"s":""}</span>}
                                   </div>
                                   <IOSBtn onPress={()=>onCuadrarConAuditoria(a)} full small icon="⚖️" variant="warning">
                                     Cuadrar inventario con esta verificación
