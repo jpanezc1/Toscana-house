@@ -895,7 +895,8 @@ function imprimirEtiquetasLote(items) {
 
   const barcodeScripts = items.map((it, idx) => {
     const codigo = (it.codigo || it.sku || "").toUpperCase();
-    return `try{JsBarcode("#bc-${idx}","${codigo}",{format:"CODE128",width:1.56,height:38.4,displayValue:false,margin:0});}catch(e){}`;
+    const bw = codigo.length <= 8 ? 1.56 : codigo.length <= 11 ? 1.3 : 1.1;
+    return `try{JsBarcode("#bc-${idx}","${codigo}",{format:"CODE128",width:${bw},height:38.4,displayValue:false,margin:0});}catch(e){document.getElementById("bc-${idx}").outerHTML='<span style="font-size:7px;color:red;font-family:monospace">${codigo}</span>';}`;
   }).join('\n');
 
   win.document.write(`<!DOCTYPE html>
