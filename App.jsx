@@ -12276,7 +12276,11 @@ function POS({inv,onVenta,onVerNota}){
     });
     setBusq("");
   }
-  function cambiar(prodId,d){setCarrito(p=>p.map(x=>x.prodId===prodId?{...x,cantidad:Math.max(1,x.cantidad+d)}:x));}
+  function cambiar(prodId,d){setCarrito(p=>p.map(x=>{
+    if(x.prodId!==prodId)return x;
+    const maxQ=inv.find(i=>i.id===prodId)?.stock??1;
+    return{...x,cantidad:Math.min(maxQ,Math.max(1,x.cantidad+d))};
+  }));}
   function quitar(prodId){setCarrito(p=>p.filter(x=>x.prodId!==prodId));}
   async function handleEtiqueta(e){
     const f=e.target.files?.[0];
@@ -12346,6 +12350,8 @@ function POS({inv,onVenta,onVerNota}){
 
   function cobrar(){
     if(!carrito.length) return;
+    const sinStock=carrito.filter(it=>{const s=inv.find(i=>i.id===it.prodId)?.stock||0;return it.cantidad>s;});
+    if(sinStock.length){alert(`Stock insuficiente:\n${sinStock.map(it=>{const s=inv.find(i=>i.id===it.prodId)?.stock||0;return`• ${it.nombre}: pedís ${it.cantidad}, hay ${s}`;}).join("\n")}`);return;}
     const factor=1-descPct/100;
     const items=carrito.map(it=>({
       prodId:it.prodId,codigo:it.codigo,nombre:it.nombre,
