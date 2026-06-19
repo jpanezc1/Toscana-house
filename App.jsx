@@ -808,7 +808,7 @@ function BarcodeDisplay({ codigo, small }) {
 function extraerColor(desc){ const m=(desc||"").match(/COLOR:\s*([^·\n]+)/i); return m?m[1].trim():""; }
 
 // Abrevia nombres largos de productos para que entren en la etiqueta
-function abreviarNombre(nombre, maxLen = 60) {
+function abreviarNombre(nombre, maxLen = 90) {
   if (!nombre) return "";
   let n = nombre.trim();
   if (n.length <= maxLen) return n;
@@ -855,18 +855,18 @@ async function imprimirTicket(producto, marcaNombre) {
       overflow:hidden; display:flex; flex-direction:column; align-items:center; justify-content:center; }
     .top { display:flex; justify-content:space-between; align-items:center; width:100%;
       font-size:8.64px; letter-spacing:0.5px; text-transform:uppercase; color:#333; }
-    .producto { font-size:8px; font-weight:bold; text-align:center; width:100%;
-      text-transform:uppercase; line-height:1.1; margin:0.3mm 0;
-      display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2;
+    .producto { font-size:7.5px; font-weight:bold; text-align:center; width:100%;
+      text-transform:uppercase; line-height:1.15; margin:0.2mm 0;
+      display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:3;
       overflow:hidden; text-overflow:ellipsis; }
     .barcode-wrap { width:100%; display:flex; justify-content:center; }
-    .barcode-wrap svg { width:45mm!important; height:9mm!important; }
-    .color-row { font-size:7px; color:#555; text-transform:uppercase; letter-spacing:0.5px;
-      text-align:center; width:100%; margin:0.2mm 0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .barcode-wrap svg { width:45mm!important; height:8.5mm!important; }
+    .color-row { font-size:6.5px; color:#555; text-transform:uppercase; letter-spacing:0.5px;
+      text-align:center; width:100%; margin:0.1mm 0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .bottom-row { display:flex; justify-content:space-between; align-items:center; width:100%;
-      margin-top:0.2mm; }
-    .codigo { font-size:8.64px; color:#333; font-family:monospace; }
-    .precio { font-size:13.2px; font-weight:900; }
+      margin-top:0.1mm; }
+    .codigo { font-size:8px; color:#333; font-family:monospace; }
+    .precio { font-size:12px; font-weight:900; }
     @media print { body { print-color-adjust:exact; -webkit-print-color-adjust:exact; } }
   </style>
 </head>
@@ -961,18 +961,18 @@ function imprimirEtiquetasLote(items) {
       overflow:hidden; background:#fff; display:flex; flex-direction:column; align-items:center; justify-content:center; }
     .top { display:flex; justify-content:space-between; align-items:center; width:100%;
       font-size:8.64px; letter-spacing:0.5px; text-transform:uppercase; color:#333; }
-    .producto { font-size:8px; font-weight:bold; text-align:center; width:100%;
-      text-transform:uppercase; line-height:1.1; margin:0.3mm 0;
-      display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2;
+    .producto { font-size:7.5px; font-weight:bold; text-align:center; width:100%;
+      text-transform:uppercase; line-height:1.15; margin:0.2mm 0;
+      display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:3;
       overflow:hidden; text-overflow:ellipsis; }
     .barcode-wrap { width:100%; display:flex; justify-content:center; }
-    .barcode-wrap svg { width:45mm!important; height:9mm!important; }
-    .color-row { font-size:7px; color:#555; text-transform:uppercase; letter-spacing:0.5px;
-      text-align:center; width:100%; margin:0.2mm 0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .barcode-wrap svg { width:45mm!important; height:8.5mm!important; }
+    .color-row { font-size:6.5px; color:#555; text-transform:uppercase; letter-spacing:0.5px;
+      text-align:center; width:100%; margin:0.1mm 0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .bottom-row { display:flex; justify-content:space-between; align-items:center; width:100%;
-      margin-top:0.2mm; }
-    .codigo { font-size:8.64px; color:#333; font-family:monospace; }
-    .precio { font-size:13.2px; font-weight:900; }
+      margin-top:0.1mm; }
+    .codigo { font-size:8px; color:#333; font-family:monospace; }
+    .precio { font-size:12px; font-weight:900; }
     @media print {
       .controls { display:none!important; }
       .print-note { display:none!important; }
@@ -8954,7 +8954,7 @@ function BrandPortal({user, ventas, inv, cargas, logout}){
                           <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10}}>
                             <div style={{flex:1,minWidth:0}}>
                               <div style={{fontSize:13,fontWeight:500,color:C.label,fontFamily:FONT,
-                                overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",lineHeight:"1.3",marginBottom:3}}>
+                                lineHeight:"1.3",marginBottom:3,wordBreak:"break-word"}}>
                                 {p.nombre}
                               </div>
                               <div style={{display:"flex",alignItems:"center",gap:6,marginTop:3,flexWrap:"wrap"}}>
