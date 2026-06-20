@@ -11853,6 +11853,7 @@ function App(){
             onActualizarAuditoria={actualizarAuditoria}
             user={user}
             retiros={retiros}
+            onVentaClick={v=>setVentaDetalle(v)}
           />
         )}
 
@@ -15389,7 +15390,7 @@ function InventarioPorMarca({inv, ventas, retiros=[], onRecibir, onBaja, onImpor
 // ══════════════════════════════════════════════════════════
 // MARCA DETALLE — iOS navigation push style
 // ══════════════════════════════════════════════════════════
-function MarcaDetalle({marcaId,inv,ventas,vMes,mes,anio,MK,cierres,setCierres,getHist,getLiq,auditorias=[],onActualizarAuditoria,user,retiros=[]}){
+function MarcaDetalle({marcaId,inv,ventas,vMes,mes,anio,MK,cierres,setCierres,getHist,getLiq,auditorias=[],onActualizarAuditoria,user,retiros=[],onVentaClick}){
   const isDesktop = useIsDesktop();
   var _hN150 = useState("historial"); var sub = _hN150[0]; var setSub = _hN150[1];;
   const [agregandoA, setAgregandoA] = useState(null);
@@ -15567,7 +15568,10 @@ function MarcaDetalle({marcaId,inv,ventas,vMes,mes,anio,MK,cierres,setCierres,ge
                       if(item.tipo==="venta"){
                         const v=item.data;
                         return (
-                          <div key={v.id} style={{padding:"14px 0",borderBottom:i<items.length-1?`1px solid ${C.sep}`:"none"}}>
+                          <div key={v.id}
+                            onClick={()=>onVentaClick&&onVentaClick(v)}
+                            style={{padding:"14px 0",borderBottom:i<items.length-1?`1px solid ${C.sep}`:"none",
+                              cursor:onVentaClick?"pointer":"default"}}>
                             <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
                               <div>
                                 <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:5}}>
@@ -15589,10 +15593,13 @@ function MarcaDetalle({marcaId,inv,ventas,vMes,mes,anio,MK,cierres,setCierres,ge
                                   </div>
                                 ))}
                               </div>
-                              <span style={{fontSize:16,fontWeight:700,color:C.label,fontFamily:FONT,
-                                letterSpacing:"-0.02em",flexShrink:0,paddingLeft:12}}>
-                                {$(v.subMarca)}
-                              </span>
+                              <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0,paddingLeft:12}}>
+                                <span style={{fontSize:16,fontWeight:700,color:C.label,fontFamily:FONT,
+                                  letterSpacing:"-0.02em"}}>
+                                  {$(v.subMarca)}
+                                </span>
+                                {onVentaClick&&<span style={{fontSize:18,color:C.label3}}>›</span>}
+                              </div>
                             </div>
                           </div>
                         );
