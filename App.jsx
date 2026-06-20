@@ -15404,11 +15404,15 @@ function MarcaDetalle({marcaId,inv,ventas,vMes,mes,anio,MK,cierres,setCierres,ge
   const historial=getHist(marcaId);
   const prods   =inv.filter(i=>i.marcaId===marcaId);
   // Retiros de esta marca — comparación con coerción numérica para evitar string/int mismatch
-  const retirosMarca = retiros.filter(r=>
-    Number(r.marcaId)===Number(marcaId) ||
-    (!r.marcaId && r.marcaNombre && marca &&
-      r.marcaNombre.toLowerCase()===marca.nombre.toLowerCase())
-  );
+  const retirosMarca = retiros.filter(r=>{
+    if(Number(r.marcaId)===Number(marcaId)) return true;
+    if(r.marcaNombre && marca &&
+      r.marcaNombre.toLowerCase()===marca.nombre.toLowerCase()) return true;
+    // fallback: cruzar por código con inventario
+    const prod = inv.find(p=>p.codigo===r.codigo ||
+      (r.codigo && p.codigo && limpiarCod(p.codigo)===limpiarCod(r.codigo)));
+    return prod ? Number(prod.marcaId)===Number(marcaId) : false;
+  });
   // Períodos adicionales que solo tienen retiros (sin ventas registradas)
   const histConRetiros = (()=>{
     const base = historial.map(h=>({...h})); // copia para no mutar
