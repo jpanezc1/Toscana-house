@@ -22440,6 +22440,7 @@
 <body>
   <div class="top"><span>${marcaNombre}</span><span style="font-weight:bold">TOSCANA HOUSE</span></div>
   <div class="producto">${abreviarNombre(producto.nombre)}</div>
+  ${producto.descripcion ? `<div class="color-row">${producto.descripcion.toUpperCase()}</div>` : ""}
   ${extraerColor(producto.descripcion) ? `<div class="color-row">Color: ${extraerColor(producto.descripcion)}</div>` : ""}
   <div class="barcode-wrap">
     <svg id="barcode"></svg>
@@ -22480,11 +22481,13 @@
       const codigo = (it.codigo || it.sku || "").toUpperCase();
       const precio = it.precio || 0;
       const marca = it.marcaNombre || it.marca || "";
+      const desc = (it.descripcion || "").toUpperCase();
       const color = extraerColor(it.descripcion);
       return `
       <div class="label">
         <div class="top"><span>${marca.toUpperCase()}</span><span style="font-weight:bold">TOSCANA HOUSE</span></div>
         <div class="producto">${nombre}</div>
+        ${desc ? `<div class="color-row">${desc}</div>` : ""}
         ${color ? `<div class="color-row">Color: ${color}</div>` : ""}
         <div class="barcode-wrap"><svg id="bc-${idx}"></svg></div>
         <div class="bottom-row">
