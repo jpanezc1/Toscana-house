@@ -15005,107 +15005,118 @@ function InventarioPorMarca({inv, ventas, onRecibir, onBaja, onImportarExcel, on
         </div>
       </div>
 
-      {/* ── Modal nota de venta desde inventario ── */}
-    {ventasCodigoInv&&(()=>{
-      const {codigo, lista, abrirUna} = ventasCodigoInv;
-      if (abrirUna && !ventaAbiertaInv) {
-        setTimeout(()=>{setVentaAbiertaInv(lista[0]); setVentasCodigoInv(null);},0);
-        return null;
-      }
+      {/* ── Bottom sheet nota de venta desde inventario ── */}
+    {(ventasCodigoInv||ventaAbiertaInv)&&(()=>{
+      const cerrarTodo = ()=>{ setVentaAbiertaInv(null); setVentasCodigoInv(null); };
+      const codigo = ventasCodigoInv?.codigo || ventaAbiertaInv?._codigoOrigen || "";
+
+      const SheetOverlay = ({onClose, children})=>(
+        <div onClick={onClose}
+          style={{position:"fixed",inset:0,background:"rgba(0,0,0,.72)",zIndex:1200,
+            display:"flex",alignItems:"flex-end",justifyContent:"center"}}>
+          <div onClick={e=>e.stopPropagation()}
+            style={{background:C.bg,borderRadius:"20px 20px 0 0",width:"100%",
+              borderTop:`0.5px solid ${C.sep}`,borderLeft:`0.5px solid ${C.sep}`,borderRight:`0.5px solid ${C.sep}`}}>
+            <div style={{width:36,height:4,background:C.sep,borderRadius:2,margin:"12px auto 0"}}/>
+            {children}
+          </div>
+        </div>
+      );
+
       if (ventaAbiertaInv) {
         const v = ventaAbiertaInv;
         const itemDelCodigo = v.items?.find(it=>it.codigo===codigo);
         const vendedor = v.vendedor||"—";
-        const iniciales = vendedor!=="—" ? vendedor.trim().split(/\s+/).map(w=>w[0]).join("").toUpperCase().slice(0,2) : "??";
-        const numV = v.numSecuencial||1;
+        const iniciales = vendedor!=="—" ? vendedor.trim().split(/\s+/).map(w=>w[0]).join("").toUpperCase().slice(0,2) : "—";
         return (
-          <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.5)",zIndex:1200,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}
-            onClick={()=>setVentaAbiertaInv(null)}>
-            <div style={{background:C.bg,borderRadius:20,width:"100%",maxWidth:360,border:`1px solid ${C.sep}`,overflow:"hidden"}}
-              onClick={e=>e.stopPropagation()}>
-
-              {/* Header */}
-              <div style={{padding:"18px 20px 14px",borderBottom:`1px solid ${C.sep}`}}>
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
-                  <div style={{flex:1,minWidth:0,paddingRight:12}}>
-                    <div style={{fontSize:10,letterSpacing:.8,textTransform:"uppercase",color:C.label3,fontFamily:FONT_UI,marginBottom:3}}>Nota de venta</div>
-                    <div style={{fontSize:14,fontWeight:700,color:C.label,fontFamily:FONT,lineHeight:1.3,marginBottom:4}}>
-                      {itemDelCodigo?.nombre||codigo}
-                    </div>
-                    <div style={{fontSize:10,color:C.label3,fontFamily:"monospace",background:C.bg2,display:"inline-block",padding:"2px 8px",borderRadius:5}}>{codigo}</div>
-                  </div>
-                  <button onClick={()=>setVentaAbiertaInv(null)}
-                    style={{background:"none",border:"none",cursor:"pointer",color:C.label3,padding:4,flexShrink:0,fontSize:18,lineHeight:1}}>✕</button>
+          <SheetOverlay onClose={cerrarTodo}>
+            <div style={{padding:"16px 20px 10px",display:"flex",justifyContent:"space-between",alignItems:"flex-start",borderBottom:`0.5px solid ${C.sep}`}}>
+              <div style={{flex:1,minWidth:0,paddingRight:12}}>
+                <div style={{fontSize:10,letterSpacing:.7,textTransform:"uppercase",color:C.label3,fontFamily:FONT_UI,marginBottom:3}}>Nota de venta</div>
+                <div style={{fontSize:15,fontWeight:700,color:C.label,fontFamily:FONT,lineHeight:1.3,marginBottom:5}}>
+                  {itemDelCodigo?.nombre||codigo}
                 </div>
+                <span style={{fontSize:11,color:C.label3,fontFamily:"monospace",background:C.bg2,padding:"2px 8px",borderRadius:5}}>{codigo}</span>
               </div>
-
-              {/* Info grid */}
-              <div style={{padding:"16px 20px",borderBottom:`1px solid ${C.sep}`}}>
-                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
-                  <div>
-                    <div style={{fontSize:10,textTransform:"uppercase",letterSpacing:.6,color:C.label3,fontFamily:FONT_UI,marginBottom:4}}>Fecha</div>
-                    <div style={{fontSize:14,fontWeight:700,color:C.label,fontFamily:FONT}}>{v.fecha}</div>
-                    <div style={{fontSize:11,color:C.label3,fontFamily:FONT_UI,marginTop:1}}>{v.hora||"—"}</div>
-                  </div>
-                  <div>
-                    <div style={{fontSize:10,textTransform:"uppercase",letterSpacing:.6,color:C.label3,fontFamily:FONT_UI,marginBottom:4}}>Vendió</div>
-                    <div style={{display:"flex",alignItems:"center",gap:8}}>
-                      <div style={{width:30,height:30,borderRadius:"50%",background:`${C.blue}20`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                        <span style={{fontSize:11,fontWeight:700,color:C.blue,fontFamily:FONT_UI}}>{iniciales}</span>
-                      </div>
-                      <div style={{fontSize:13,fontWeight:600,color:C.label,fontFamily:FONT}}>{vendedor}</div>
-                    </div>
-                  </div>
-                  <div>
-                    <div style={{fontSize:10,textTransform:"uppercase",letterSpacing:.6,color:C.label3,fontFamily:FONT_UI,marginBottom:4}}>Total</div>
-                    <div style={{fontSize:14,fontWeight:700,color:C.label,fontFamily:FONT}}>Bs {v.total}</div>
-                  </div>
-                  <div>
-                    <div style={{fontSize:10,textTransform:"uppercase",letterSpacing:.6,color:C.label3,fontFamily:FONT_UI,marginBottom:4}}>Pago</div>
-                    <div style={{fontSize:14,fontWeight:700,color:C.label,fontFamily:FONT}}>{v.metodoPago||"—"}</div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Botón nota completa */}
-              <div style={{padding:"14px 20px"}}>
-                <button onClick={()=>verNotaVenta(v, numV)}
-                  style={{width:"100%",padding:"12px 0",borderRadius:12,border:`1px solid ${C.blue}40`,
-                    background:`${C.blue}12`,color:C.blue,fontFamily:FONT_UI,fontSize:13,fontWeight:700,
-                    cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
-                  🧾 Abrir nota de venta completa
-                </button>
-              </div>
+              <button onClick={cerrarTodo}
+                style={{background:C.bg2,border:"none",borderRadius:"50%",width:30,height:30,cursor:"pointer",
+                  display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,color:C.label3,fontSize:16}}>✕</button>
             </div>
-          </div>
-        );
-      }
-      return (
-        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.55)",zIndex:1200,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}
-          onClick={()=>setVentasCodigoInv(null)}>
-          <div style={{background:C.bg,borderRadius:16,padding:24,maxWidth:360,width:"100%",boxShadow:"0 8px 40px rgba(0,0,0,.3)"}}
-            onClick={e=>e.stopPropagation()}>
-            <div style={{fontSize:11,letterSpacing:.8,textTransform:"uppercase",color:C.label3,fontFamily:FONT_UI,marginBottom:4}}>Ventas del código</div>
-            <div style={{fontSize:15,fontWeight:700,color:C.label,fontFamily:FONT,marginBottom:16}}>{codigo}</div>
-            {lista.map((v,i)=>(
-              <div key={v.id||i} onClick={()=>{setVentaAbiertaInv(v); setVentasCodigoInv(null);}}
-                style={{display:"flex",justifyContent:"space-between",alignItems:"center",
-                  padding:"12px 14px",borderRadius:10,marginBottom:8,cursor:"pointer",
-                  background:C.bg2,border:`1px solid ${C.sep}`}}>
-                <div>
-                  <div style={{fontSize:13,fontWeight:600,color:C.label,fontFamily:FONT}}>{v.fecha}</div>
-                  <div style={{fontSize:11,color:C.label3,fontFamily:FONT_UI,marginTop:2}}>{v.hora||""}</div>
+
+            <div style={{padding:"16px 20px",borderBottom:`0.5px solid ${C.sep}`,
+              display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
+              <div>
+                <div style={{fontSize:10,textTransform:"uppercase",letterSpacing:.6,color:C.label3,fontFamily:FONT_UI,marginBottom:3}}>Fecha</div>
+                <div style={{fontSize:14,fontWeight:700,color:C.label,fontFamily:FONT}}>{v.fecha}</div>
+                <div style={{fontSize:11,color:C.label3,fontFamily:FONT_UI,marginTop:2}}>{v.hora||"—"}</div>
+              </div>
+              <div>
+                <div style={{fontSize:10,textTransform:"uppercase",letterSpacing:.6,color:C.label3,fontFamily:FONT_UI,marginBottom:6}}>Vendió</div>
+                <div style={{display:"flex",alignItems:"center",gap:8}}>
+                  <div style={{width:32,height:32,borderRadius:"50%",background:`${C.blue}18`,
+                    display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                    <span style={{fontSize:12,fontWeight:700,color:C.blue,fontFamily:FONT_UI}}>{iniciales}</span>
+                  </div>
+                  <div style={{fontSize:13,fontWeight:600,color:C.label,fontFamily:FONT}}>{vendedor}</div>
                 </div>
+              </div>
+              <div>
+                <div style={{fontSize:10,textTransform:"uppercase",letterSpacing:.6,color:C.label3,fontFamily:FONT_UI,marginBottom:3}}>Total</div>
                 <div style={{fontSize:14,fontWeight:700,color:C.label,fontFamily:FONT}}>Bs {v.total}</div>
               </div>
-            ))}
-            <button onClick={()=>setVentasCodigoInv(null)}
-              style={{width:"100%",marginTop:8,padding:"10px 0",borderRadius:10,border:"none",
-                background:C.bg2,color:C.label3,fontFamily:FONT_UI,fontSize:13,cursor:"pointer"}}>
-              Cancelar
-            </button>
+              <div>
+                <div style={{fontSize:10,textTransform:"uppercase",letterSpacing:.6,color:C.label3,fontFamily:FONT_UI,marginBottom:3}}>Método de pago</div>
+                <div style={{fontSize:14,fontWeight:700,color:C.label,fontFamily:FONT}}>{v.metodoPago||"—"}</div>
+              </div>
+            </div>
+
+            <div style={{padding:"14px 20px 28px"}}>
+              <button onClick={()=>verNotaVenta(v, v.numSecuencial||1)}
+                style={{width:"100%",padding:"13px 0",borderRadius:12,
+                  border:`0.5px solid ${C.sep}`,background:C.bg2,
+                  color:C.label,fontFamily:FONT_UI,fontSize:13,fontWeight:600,
+                  cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+                🧾 Abrir nota de venta completa
+              </button>
+            </div>
+          </SheetOverlay>
+        );
+      }
+
+      const {lista} = ventasCodigoInv;
+      return (
+        <SheetOverlay onClose={cerrarTodo}>
+          <div style={{padding:"16px 20px 14px",display:"flex",justifyContent:"space-between",alignItems:"center",borderBottom:`0.5px solid ${C.sep}`}}>
+            <div>
+              <div style={{fontSize:10,letterSpacing:.7,textTransform:"uppercase",color:C.label3,fontFamily:FONT_UI,marginBottom:2}}>{lista.length} ventas registradas</div>
+              <div style={{fontSize:14,fontWeight:700,color:C.label,fontFamily:FONT}}>{codigo}</div>
+            </div>
+            <button onClick={cerrarTodo}
+              style={{background:C.bg2,border:"none",borderRadius:"50%",width:30,height:30,cursor:"pointer",
+                display:"flex",alignItems:"center",justifyContent:"center",color:C.label3,fontSize:16}}>✕</button>
           </div>
-        </div>
+          <div style={{padding:"4px 20px 28px"}}>
+            {lista.map((v,i)=>{
+              const vendedor = v.vendedor||"—";
+              return (
+                <div key={v.id||i}
+                  onClick={()=>setVentaAbiertaInv({...v, _codigoOrigen:codigo})}
+                  style={{display:"flex",justifyContent:"space-between",alignItems:"center",
+                    padding:"13px 0",borderBottom:i<lista.length-1?`0.5px solid ${C.sep}`:"none",
+                    cursor:"pointer"}}>
+                  <div>
+                    <div style={{fontSize:13,fontWeight:600,color:C.label,fontFamily:FONT}}>{v.fecha} · {v.hora||"—"}</div>
+                    <div style={{fontSize:12,color:C.label3,fontFamily:FONT_UI,marginTop:2}}>{vendedor} · {v.metodoPago||"—"}</div>
+                  </div>
+                  <div style={{display:"flex",alignItems:"center",gap:10,flexShrink:0}}>
+                    <div style={{fontSize:14,fontWeight:700,color:C.label,fontFamily:FONT}}>Bs {v.total}</div>
+                    <div style={{fontSize:16,color:C.label3}}>›</div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </SheetOverlay>
       );
     })()}
     </div>
