@@ -8422,6 +8422,14 @@ function BrandPortal({user, ventas, inv, cargas, logout}){
 
   // ── Estado UI adicional (ventas modal, búsquedas, filtros) ──
   const [ventaSeleccionada, setVentaSeleccionada] = useState(null);
+  const [ventasCodigo, setVentasCodigo] = useState(null); // {codigo, lista:[]}
+
+  function abrirVentasPorCodigo(codigo) {
+    const lista = todasMarca.filter(v=>v.items.some(it=>it.codigo===codigo));
+    if (lista.length === 0) return;
+    if (lista.length === 1) { setVentaSeleccionada(lista[0]); return; }
+    setVentasCodigo({codigo, lista: lista.slice().sort((a,b)=>b.fecha.localeCompare(a.fecha))});
+  }
   const [busqV,      setBusqV]      = useState("");
   const [busqInvP,   setBusqInvP]   = useState("");
   const [catFilP,    setCatFilP]    = useState("");
@@ -9009,14 +9017,18 @@ function BrandPortal({user, ventas, inv, cargas, logout}){
                           </div>
                           {/* Stats cruzadas */}
                           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginTop:4}}>
-                            <div style={{background:C.bg0,borderRadius:8,padding:"8px 10px",
-                              border:`1px solid ${C.sep}`}}>
+                            <div onClick={vendTot>0?()=>abrirVentasPorCodigo(p.codigo):undefined}
+                              style={{background:C.bg0,borderRadius:8,padding:"8px 10px",
+                              border:`1px solid ${vendTot>0?C.label+"30":C.sep}`,
+                              cursor:vendTot>0?"pointer":"default",
+                              transition:"background .15s"}}>
                               <div style={{fontSize:9,letterSpacing:.9,textTransform:"uppercase",
                                 color:C.label3,fontFamily:FONT_UI,marginBottom:4}}>Vendidas total</div>
                               <div style={{fontSize:16,fontWeight:700,
                                 color:vendTot>0?C.label:C.label3,fontFamily:FONT,letterSpacing:"-0.02em"}}>
                                 {vendTot}
                               </div>
+                              {vendTot>0&&<div style={{fontSize:8,color:C.label3,fontFamily:FONT_UI,marginTop:2}}>ver nota →</div>}
                             </div>
                             <div style={{background:vendMes>0?`${C.green}10`:C.bg0,borderRadius:8,
                               padding:"8px 10px",border:`1px solid ${vendMes>0?C.green+"30":C.sep}`}}>
@@ -9117,6 +9129,35 @@ function BrandPortal({user, ventas, inv, cargas, logout}){
           marca={marca}
           onClose={()=>setVentaSeleccionada(null)}
         />
+      )}
+
+      {/* ── Picker cuando el mismo código tiene múltiples ventas ── */}
+      {ventasCodigo&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.55)",zIndex:1100,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}
+          onClick={()=>setVentasCodigo(null)}>
+          <div style={{background:C.bg,borderRadius:16,padding:24,maxWidth:360,width:"100%",boxShadow:"0 8px 40px rgba(0,0,0,.3)"}}
+            onClick={e=>e.stopPropagation()}>
+            <div style={{fontSize:11,letterSpacing:.8,textTransform:"uppercase",color:C.label3,fontFamily:FONT_UI,marginBottom:4}}>Ventas del código</div>
+            <div style={{fontSize:15,fontWeight:700,color:C.label,fontFamily:FONT,marginBottom:16}}>{ventasCodigo.codigo}</div>
+            {ventasCodigo.lista.map((v,i)=>(
+              <div key={v.id||i} onClick={()=>{setVentaSeleccionada(v);setVentasCodigo(null);}}
+                style={{display:"flex",justifyContent:"space-between",alignItems:"center",
+                  padding:"12px 14px",borderRadius:10,marginBottom:8,cursor:"pointer",
+                  background:C.bg2,border:`1px solid ${C.sep}`}}>
+                <div>
+                  <div style={{fontSize:13,fontWeight:600,color:C.label,fontFamily:FONT}}>{v.fecha}</div>
+                  <div style={{fontSize:11,color:C.label3,fontFamily:FONT_UI,marginTop:2}}>{v.hora||""}</div>
+                </div>
+                <div style={{fontSize:14,fontWeight:700,color:C.label,fontFamily:FONT}}>Bs {v.total}</div>
+              </div>
+            ))}
+            <button onClick={()=>setVentasCodigo(null)}
+              style={{width:"100%",marginTop:8,padding:"10px 0",borderRadius:10,border:"none",
+                background:C.bg2,color:C.label3,fontFamily:FONT_UI,fontSize:13,cursor:"pointer"}}>
+              Cancelar
+            </button>
+          </div>
+        </div>
       )}
 
       </div>{/* fin main area */}

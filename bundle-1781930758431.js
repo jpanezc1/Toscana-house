@@ -30201,6 +30201,16 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
     }, [vMes, mid]);
     const invMarca = (0, import_react.useMemo)(() => inv.filter((i) => i.marcaId === mid), [inv, mid]);
     const [ventaSeleccionada, setVentaSeleccionada] = (0, import_react.useState)(null);
+    const [ventasCodigo, setVentasCodigo] = (0, import_react.useState)(null);
+    function abrirVentasPorCodigo(codigo) {
+      const lista = todasMarca.filter((v) => v.items.some((it) => it.codigo === codigo));
+      if (lista.length === 0) return;
+      if (lista.length === 1) {
+        setVentaSeleccionada(lista[0]);
+        return;
+      }
+      setVentasCodigo({ codigo, lista: lista.slice().sort((a, b) => b.fecha.localeCompare(a.fecha)) });
+    }
     const [busqV, setBusqV] = (0, import_react.useState)("");
     const [busqInvP, setBusqInvP] = (0, import_react.useState)("");
     const [catFilP, setCatFilP] = (0, import_react.useState)("");
@@ -30944,25 +30954,36 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
         transition: "width .4s",
         background: stockReal === 0 ? C.red : stockReal <= 2 ? C.amber : C.label,
         width: `${Math.min(100, pct)}%`
-      } })), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginTop: 4 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
-        background: C.bg0,
-        borderRadius: 8,
-        padding: "8px 10px",
-        border: `1px solid ${C.sep}`
-      } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
-        fontSize: 9,
-        letterSpacing: 0.9,
-        textTransform: "uppercase",
-        color: C.label3,
-        fontFamily: FONT_UI,
-        marginBottom: 4
-      } }, "Vendidas total"), /* @__PURE__ */ import_react.default.createElement("div", { style: {
-        fontSize: 16,
-        fontWeight: 700,
-        color: vendTot > 0 ? C.label : C.label3,
-        fontFamily: FONT,
-        letterSpacing: "-0.02em"
-      } }, vendTot)), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      } })), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginTop: 4 } }, /* @__PURE__ */ import_react.default.createElement(
+        "div",
+        {
+          onClick: vendTot > 0 ? () => abrirVentasPorCodigo(p.codigo) : void 0,
+          style: {
+            background: C.bg0,
+            borderRadius: 8,
+            padding: "8px 10px",
+            border: `1px solid ${vendTot > 0 ? C.label + "30" : C.sep}`,
+            cursor: vendTot > 0 ? "pointer" : "default",
+            transition: "background .15s"
+          }
+        },
+        /* @__PURE__ */ import_react.default.createElement("div", { style: {
+          fontSize: 9,
+          letterSpacing: 0.9,
+          textTransform: "uppercase",
+          color: C.label3,
+          fontFamily: FONT_UI,
+          marginBottom: 4
+        } }, "Vendidas total"),
+        /* @__PURE__ */ import_react.default.createElement("div", { style: {
+          fontSize: 16,
+          fontWeight: 700,
+          color: vendTot > 0 ? C.label : C.label3,
+          fontFamily: FONT,
+          letterSpacing: "-0.02em"
+        } }, vendTot),
+        vendTot > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 8, color: C.label3, fontFamily: FONT_UI, marginTop: 2 } }, "ver nota \u2192")
+      ), /* @__PURE__ */ import_react.default.createElement("div", { style: {
         background: vendMes > 0 ? `${C.green}10` : C.bg0,
         borderRadius: 8,
         padding: "8px 10px",
@@ -31051,6 +31072,63 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
         marca,
         onClose: () => setVentaSeleccionada(null)
       }
+    ), ventasCodigo && /* @__PURE__ */ import_react.default.createElement(
+      "div",
+      {
+        style: { position: "fixed", inset: 0, background: "rgba(0,0,0,.55)", zIndex: 1100, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 },
+        onClick: () => setVentasCodigo(null)
+      },
+      /* @__PURE__ */ import_react.default.createElement(
+        "div",
+        {
+          style: { background: C.bg, borderRadius: 16, padding: 24, maxWidth: 360, width: "100%", boxShadow: "0 8px 40px rgba(0,0,0,.3)" },
+          onClick: (e) => e.stopPropagation()
+        },
+        /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, letterSpacing: 0.8, textTransform: "uppercase", color: C.label3, fontFamily: FONT_UI, marginBottom: 4 } }, "Ventas del c\xF3digo"),
+        /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 15, fontWeight: 700, color: C.label, fontFamily: FONT, marginBottom: 16 } }, ventasCodigo.codigo),
+        ventasCodigo.lista.map((v, i) => /* @__PURE__ */ import_react.default.createElement(
+          "div",
+          {
+            key: v.id || i,
+            onClick: () => {
+              setVentaSeleccionada(v);
+              setVentasCodigo(null);
+            },
+            style: {
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              padding: "12px 14px",
+              borderRadius: 10,
+              marginBottom: 8,
+              cursor: "pointer",
+              background: C.bg2,
+              border: `1px solid ${C.sep}`
+            }
+          },
+          /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, fontWeight: 600, color: C.label, fontFamily: FONT } }, v.fecha), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT_UI, marginTop: 2 } }, v.hora || "")),
+          /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 14, fontWeight: 700, color: C.label, fontFamily: FONT } }, "Bs ", v.total)
+        )),
+        /* @__PURE__ */ import_react.default.createElement(
+          "button",
+          {
+            onClick: () => setVentasCodigo(null),
+            style: {
+              width: "100%",
+              marginTop: 8,
+              padding: "10px 0",
+              borderRadius: 10,
+              border: "none",
+              background: C.bg2,
+              color: C.label3,
+              fontFamily: FONT_UI,
+              fontSize: 13,
+              cursor: "pointer"
+            }
+          },
+          "Cancelar"
+        )
+      )
     )), !isDesktop && /* @__PURE__ */ import_react.default.createElement(TabBar, { tabs: PORTAL_TABS, active: tab, onChange: setTab }));
   }
   var MARCA_EMOJIS = [
