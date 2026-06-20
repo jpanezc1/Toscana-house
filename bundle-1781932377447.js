@@ -25002,6 +25002,86 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
   function verNotaVenta(v, n) {
     abrirNotaVenta(v, n, false);
   }
+  function abrirNotaRetiro(r, autoPrint = false) {
+    const win = window.open("", "_blank", "width=760,height=700");
+    if (!win) {
+      alert("Activa las ventanas emergentes para imprimir");
+      return;
+    }
+    const num = (r.id || "").replace(/\D/g, "").slice(-6).padStart(6, "0");
+    win.document.write(`<!DOCTYPE html>
+<html lang="es"><head>
+<meta charset="UTF-8">
+<title>Nota de Retiro N\xB0 ${num}</title>
+<style>
+  @page{size:A4;margin:20mm 18mm}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:Arial,sans-serif;font-size:11px;color:#111;background:#fff}
+  .hdr{display:flex;justify-content:space-between;align-items:flex-start;
+    padding-bottom:12px;border-bottom:2px solid #111;margin-bottom:14px}
+  .logo{font-size:20px;font-weight:900;letter-spacing:3px;text-transform:uppercase}
+  .logo-sub{font-size:7px;letter-spacing:5px;color:#666;margin-top:2px}
+  .nr-r{text-align:right}
+  .nr-r h2{font-size:15px;font-weight:700;text-transform:uppercase}
+  .nr-r p{font-size:11px;margin-top:3px}
+  .prop{font-size:13px;font-weight:700;text-transform:uppercase;
+    border-bottom:1px solid #ccc;padding-bottom:6px;margin-bottom:12px}
+  .info{display:grid;grid-template-columns:1fr 1fr;gap:4px 20px;margin-bottom:14px;font-size:11px}
+  .lbl{color:#666;font-size:9px;text-transform:uppercase;letter-spacing:.5px;margin-bottom:1px}
+  table{width:100%;border-collapse:collapse;margin-bottom:12px}
+  thead tr{background:#f0f0f0}
+  th,td{padding:6px 8px;border:1px solid #ccc;font-size:10px;vertical-align:middle}
+  th{font-weight:700;text-transform:uppercase;font-size:9px}
+  .motivo{background:#fff8f0;border:1px solid #e5c8a0;padding:8px 12px;border-radius:4px;font-size:10px;margin-bottom:14px}
+  .foot{border-top:1px dashed #aaa;padding-top:8px;text-align:center;font-size:9px;color:#888;margin-top:12px}
+  @media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+</style>
+</head>
+<body>
+<div class="hdr">
+  <div>
+    <div class="logo">Toscana House</div>
+    <div class="logo-sub">CASA DE MODA</div>
+  </div>
+  <div class="nr-r">
+    <h2>Nota de retiro</h2>
+    <p>NIT &nbsp; ${NIT_EMPRESA}</p>
+    <p>Retiro N\xB0 &nbsp; <strong>${num}</strong></p>
+  </div>
+</div>
+<div class="prop">${PROPIETARIA}</div>
+<div class="info">
+  <div><div class="lbl">Sucursal</div>${SUCURSAL_EMP}</div>
+  <div><div class="lbl">Lugar y fecha</div>${CIUDAD_EMP}, ${r.fecha} ${r.hora || ""}</div>
+  <div><div class="lbl">Direcci\xF3n</div>${DIRECCION_EMP}</div>
+  <div><div class="lbl">Destinatario</div>${r.destinatario || "\u2014"}</div>
+</div>
+<table>
+  <thead>
+    <tr><th>C\xF3digo</th><th>Descripci\xF3n</th><th>Marca</th><th>Cant.</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>${r.codigo || "\u2014"}</td>
+      <td>${r.nombre || "\u2014"}</td>
+      <td>${r.marcaNombre || "\u2014"}</td>
+      <td style="text-align:center">${r.cantidad}</td>
+    </tr>
+  </tbody>
+</table>
+${r.motivo ? `<div class="motivo"><strong>Motivo:</strong> ${r.motivo}</div>` : ""}
+<div style="margin-top:24px;display:grid;grid-template-columns:1fr 1fr;gap:40px">
+  <div style="text-align:center;padding-top:40px;border-top:1px solid #ccc;font-size:9px;color:#666">Firma Responsable</div>
+  <div style="text-align:center;padding-top:40px;border-top:1px solid #ccc;font-size:9px;color:#666">Firma Destinatario \u2014 ${r.destinatario || ""}</div>
+</div>
+<div class="foot">Toscana House \xB7 ${SUCURSAL_EMP} \xB7 ${TELEFONO_EMP} \xB7 ${CIUDAD_EMP}</div>
+${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.print();},600);}<\/script>` : ""}
+</body></html>`);
+    win.document.close();
+  }
+  function verNotaRetiro(r) {
+    abrirNotaRetiro(r, false);
+  }
   var FONT = "'Inter', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif";
   var FONT_UI = "'Inter', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif";
   var FONT_DISPLAY = "'Cormorant Garamond', Georgia, 'Times New Roman', serif";
@@ -38253,7 +38333,24 @@ Se registrar\xE1 que los faltantes/sobrantes fueron verificados f\xEDsicamente y
         alignItems: "flex-start",
         padding: "13px 0",
         borderBottom: i < lista.length - 1 ? `1px solid ${C.sep}` : "none"
-      } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, fontWeight: 700, color: C.label, fontFamily: FONT } }, r.fecha), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT_UI, marginTop: 2 } }, r.hora || "\u2014", " \xB7 ", r.destinatario || "\u2014"), r.motivo && /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.amber, fontFamily: FONT_UI, marginTop: 2 } }, r.motivo)), /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "right", flexShrink: 0, marginLeft: 12 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, fontWeight: 700, color: C.label, fontFamily: FONT } }, r.cantidad, " ud", r.cantidad !== 1 ? "s" : ""))))), /* @__PURE__ */ import_react.default.createElement("div", { style: { height: 12 } }));
+      } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, fontWeight: 700, color: C.label, fontFamily: FONT } }, r.fecha), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT_UI, marginTop: 2 } }, r.hora || "\u2014", " \xB7 ", r.destinatario || "\u2014"), r.motivo && /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.amber, fontFamily: FONT_UI, marginTop: 2 } }, r.motivo)), /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "right", flexShrink: 0, marginLeft: 12, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, fontWeight: 700, color: C.label, fontFamily: FONT } }, r.cantidad, " ud", r.cantidad !== 1 ? "s" : ""), /* @__PURE__ */ import_react.default.createElement(
+        "button",
+        {
+          onClick: () => verNotaRetiro(r),
+          style: {
+            fontSize: 10,
+            color: C.amber,
+            background: "none",
+            border: `1px solid ${C.amber}40`,
+            borderRadius: 6,
+            padding: "3px 8px",
+            cursor: "pointer",
+            fontFamily: FONT_UI,
+            fontWeight: 600
+          }
+        },
+        "\u{1F4C4} Nota de retiro"
+      ))))), /* @__PURE__ */ import_react.default.createElement("div", { style: { height: 12 } }));
     })());
   }
   function MarcaDetalle({ marcaId, inv, ventas, vMes, mes, anio, MK, cierres, setCierres, getHist, getLiq, auditorias = [], onActualizarAuditoria, user }) {
