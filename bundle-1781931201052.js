@@ -37904,7 +37904,24 @@ Se registrar\xE1 que los faltantes/sobrantes fueron verificados f\xEDsicamente y
         borderRadius: 4,
         fontWeight: 500,
         letterSpacing: "0.04em"
-      } }, prod.codigo), prod.categoria && /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 10, color: C.label3, fontFamily: FONT } }, prod.categoria), prod.fecha && /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 9, color: C.label3, fontFamily: FONT_MONO, opacity: 0.7 } }, prod.fecha)), prod.descripcion && /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: C.label3, fontFamily: FONT, marginTop: 2, lineHeight: 1.3 } }, prod.descripcion)), /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "right", fontFamily: FONT, paddingRight: 8 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 14, fontWeight: 700, color: C.label, letterSpacing: "-0.02em" } }, $(prod.precio)), vendidas > 0 && /* @__PURE__ */ import_react.default.createElement("div", { onClick: () => abrirVentasPorCodigoInv(prod), style: { fontSize: 10, color: C.blue, fontFamily: FONT, cursor: "pointer", textDecoration: "underline", display: "inline-block" } }, "\u2191", vendidas, " vend.")), /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center" } }, /* @__PURE__ */ import_react.default.createElement("span", { style: {
+      } }, prod.codigo), prod.categoria && /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 10, color: C.label3, fontFamily: FONT } }, prod.categoria), prod.fecha && /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 9, color: C.label3, fontFamily: FONT_MONO, opacity: 0.7 } }, prod.fecha)), prod.descripcion && /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: C.label3, fontFamily: FONT, marginTop: 2, lineHeight: 1.3 } }, prod.descripcion)), /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "right", fontFamily: FONT, paddingRight: 8 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 14, fontWeight: 700, color: C.label, letterSpacing: "-0.02em" } }, $(prod.precio)), vendidas > 0 && /* @__PURE__ */ import_react.default.createElement(
+        "div",
+        {
+          onClick: () => abrirVentasPorCodigoInv(prod),
+          style: {
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 4,
+            marginTop: 4,
+            padding: "3px 8px",
+            borderRadius: 6,
+            cursor: "pointer",
+            background: `${C.blue}15`,
+            border: `1px solid ${C.blue}30`
+          }
+        },
+        /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 10, color: C.blue, fontFamily: FONT_UI, fontWeight: 600 } }, "\u{1F9FE} ", vendidas, " vend.")
+      )), /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center" } }, /* @__PURE__ */ import_react.default.createElement("span", { style: {
         display: "inline-block",
         fontFamily: FONT,
         fontSize: 11,
@@ -37990,45 +38007,59 @@ Se registrar\xE1 que los faltantes/sobrantes fueron verificados f\xEDsicamente y
         }, 0);
         return null;
       }
-      if (ventaAbiertaInv) return /* @__PURE__ */ import_react.default.createElement(
-        "div",
-        {
-          style: { position: "fixed", inset: 0, background: "rgba(0,0,0,.55)", zIndex: 1200, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 },
-          onClick: () => setVentaAbiertaInv(null)
-        },
-        /* @__PURE__ */ import_react.default.createElement(
+      if (ventaAbiertaInv) {
+        const v = ventaAbiertaInv;
+        const itemDelCodigo = v.items?.find((it) => it.codigo === codigo);
+        const vendedor = v.vendedor || "\u2014";
+        const iniciales = vendedor !== "\u2014" ? vendedor.trim().split(/\s+/).map((w) => w[0]).join("").toUpperCase().slice(0, 2) : "??";
+        const numV = v.numSecuencial || 1;
+        return /* @__PURE__ */ import_react.default.createElement(
           "div",
           {
-            style: { background: C.bg, borderRadius: 16, padding: 24, maxWidth: 380, width: "100%", boxShadow: "0 8px 40px rgba(0,0,0,.3)" },
-            onClick: (e) => e.stopPropagation()
+            style: { position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", zIndex: 1200, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 },
+            onClick: () => setVentaAbiertaInv(null)
           },
-          /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, letterSpacing: 0.8, textTransform: "uppercase", color: C.label3, fontFamily: FONT_UI, marginBottom: 4 } }, "Nota de venta"),
-          /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 15, fontWeight: 700, color: C.label, fontFamily: FONT, marginBottom: 16 } }, codigo),
-          /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 8 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.label3, fontSize: 12 } }, "Fecha: "), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontWeight: 600, fontSize: 13 } }, ventaAbiertaInv.fecha)),
-          /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 8 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.label3, fontSize: 12 } }, "Hora: "), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontWeight: 600, fontSize: 13 } }, ventaAbiertaInv.hora || "\u2014")),
-          /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 8 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.label3, fontSize: 12 } }, "Total: "), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontWeight: 600, fontSize: 13 } }, "Bs ", ventaAbiertaInv.total)),
-          /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 16 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.label3, fontSize: 12 } }, "Pago: "), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontWeight: 600, fontSize: 13 } }, ventaAbiertaInv.metodoPago || "\u2014")),
-          ventaAbiertaInv.items?.map((it, i) => /* @__PURE__ */ import_react.default.createElement("div", { key: i, style: { fontSize: 12, color: C.label3, padding: "4px 0", borderTop: `1px solid ${C.sep}` } }, it.nombre, " \u2014 Bs ", it.precioUnit)),
-          /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 8, marginTop: 16 } }, /* @__PURE__ */ import_react.default.createElement(
-            "button",
+          /* @__PURE__ */ import_react.default.createElement(
+            "div",
             {
-              onClick: () => {
-                const mk = MARCAS.find((m) => m.id === ventaAbiertaInv.mk);
-                verNotaVenta(ventaAbiertaInv, ventaAbiertaInv.numSecuencial || 1);
+              style: { background: C.bg, borderRadius: 20, width: "100%", maxWidth: 360, border: `1px solid ${C.sep}`, overflow: "hidden" },
+              onClick: (e) => e.stopPropagation()
+            },
+            /* @__PURE__ */ import_react.default.createElement("div", { style: { padding: "18px 20px 14px", borderBottom: `1px solid ${C.sep}` } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "flex-start" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1, minWidth: 0, paddingRight: 12 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, letterSpacing: 0.8, textTransform: "uppercase", color: C.label3, fontFamily: FONT_UI, marginBottom: 3 } }, "Nota de venta"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 14, fontWeight: 700, color: C.label, fontFamily: FONT, lineHeight: 1.3, marginBottom: 4 } }, itemDelCodigo?.nombre || codigo), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: C.label3, fontFamily: "monospace", background: C.bg2, display: "inline-block", padding: "2px 8px", borderRadius: 5 } }, codigo)), /* @__PURE__ */ import_react.default.createElement(
+              "button",
+              {
+                onClick: () => setVentaAbiertaInv(null),
+                style: { background: "none", border: "none", cursor: "pointer", color: C.label3, padding: 4, flexShrink: 0, fontSize: 18, lineHeight: 1 }
               },
-              style: { flex: 1, padding: "10px 0", borderRadius: 10, border: `1px solid ${C.gold}`, background: `${C.gold}10`, color: C.gold, fontFamily: FONT_UI, fontSize: 13, cursor: "pointer" }
-            },
-            "Ver nota completa"
-          ), /* @__PURE__ */ import_react.default.createElement(
-            "button",
-            {
-              onClick: () => setVentaAbiertaInv(null),
-              style: { flex: 1, padding: "10px 0", borderRadius: 10, border: "none", background: C.bg2, color: C.label3, fontFamily: FONT_UI, fontSize: 13, cursor: "pointer" }
-            },
-            "Cerrar"
-          ))
-        )
-      );
+              "\u2715"
+            ))),
+            /* @__PURE__ */ import_react.default.createElement("div", { style: { padding: "16px 20px", borderBottom: `1px solid ${C.sep}` } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, textTransform: "uppercase", letterSpacing: 0.6, color: C.label3, fontFamily: FONT_UI, marginBottom: 4 } }, "Fecha"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 14, fontWeight: 700, color: C.label, fontFamily: FONT } }, v.fecha), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT_UI, marginTop: 1 } }, v.hora || "\u2014")), /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, textTransform: "uppercase", letterSpacing: 0.6, color: C.label3, fontFamily: FONT_UI, marginBottom: 4 } }, "Vendi\xF3"), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { width: 30, height: 30, borderRadius: "50%", background: `${C.blue}20`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 11, fontWeight: 700, color: C.blue, fontFamily: FONT_UI } }, iniciales)), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, fontWeight: 600, color: C.label, fontFamily: FONT } }, vendedor))), /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, textTransform: "uppercase", letterSpacing: 0.6, color: C.label3, fontFamily: FONT_UI, marginBottom: 4 } }, "Total"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 14, fontWeight: 700, color: C.label, fontFamily: FONT } }, "Bs ", v.total)), /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, textTransform: "uppercase", letterSpacing: 0.6, color: C.label3, fontFamily: FONT_UI, marginBottom: 4 } }, "Pago"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 14, fontWeight: 700, color: C.label, fontFamily: FONT } }, v.metodoPago || "\u2014")))),
+            /* @__PURE__ */ import_react.default.createElement("div", { style: { padding: "14px 20px" } }, /* @__PURE__ */ import_react.default.createElement(
+              "button",
+              {
+                onClick: () => verNotaVenta(v, numV),
+                style: {
+                  width: "100%",
+                  padding: "12px 0",
+                  borderRadius: 12,
+                  border: `1px solid ${C.blue}40`,
+                  background: `${C.blue}12`,
+                  color: C.blue,
+                  fontFamily: FONT_UI,
+                  fontSize: 13,
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 8
+                }
+              },
+              "\u{1F9FE} Abrir nota de venta completa"
+            ))
+          )
+        );
+      }
       return /* @__PURE__ */ import_react.default.createElement(
         "div",
         {
