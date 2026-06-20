@@ -89,10 +89,39 @@ async function sbGuardarProducto(prod) {
   }
 }
 
+async function sbGuardarProductosBatch(prods) {
+  if(!prods.length) return true;
+  try {
+    const db = await getSupabase();
+    const payload = prods.map(prod => ({
+      codigo:       prod.codigo,
+      marca_id:     prod.marcaId,
+      marca_nombre: prod.marcaNombre,
+      nombre:       prod.nombre,
+      categoria:    prod.categoria||"GENERAL",
+      descripcion:  prod.descripcion||"",
+      subcat:       prod.subcat||"",
+      precio:       prod.precio,
+      stock:        prod.stock,
+      stock_inicial:prod.stockInicial||prod.stock,
+      fecha:        prod.fecha||hoy(),
+    }));
+    const { error } = await db.from("inventario").upsert(payload, { onConflict: "codigo" });
+    if(error) throw error;
+    return true;
+  } catch(e) {
+    console.error("[Supabase] batch save FAILED:", e.message, "n=", prods.length);
+    // Fallback: intentar uno por uno
+    let allOk = true;
+    for(const p of prods){ const ok = await sbGuardarProducto(p); if(!ok) allOk=false; }
+    return allOk;
+  }
+}
+
 async function sbActualizarStock(prodId, nuevoStock) {
   try {
     const db = await getSupabase();
-    const { error } = await db.from("inventario").update({ stock: nuevoStock }).eq("id", prodId);
+    const { error } = await db.from("inventario").update({ stock: Math.max(0, nuevoStock) }).eq("id", prodId);
     if (error) throw error;
     return true;
   } catch(e) { console.warn("Supabase update stock:", e.message); return false; }
@@ -203,6 +232,19 @@ async function sbCargarRetiros() {
 }
 
 // ── Trazabilidad de cargas a inventario (manuales + importaciones) ──
+async function sbMarcarCargaVerificada(cargaId, verificado, nombre) {
+  try {
+    const db = await getSupabase();
+    const { error } = await db.from("cargas_inventario").update({
+      verificado,
+      verificado_ts: verificado ? new Date().toISOString() : null,
+      verificado_por: verificado ? nombre : null,
+    }).eq("id", cargaId);
+    if(error) throw error;
+    return true;
+  } catch(e) { console.warn("Supabase verificar carga:", e.message); return false; }
+}
+
 async function sbGuardarCarga(c) {
   try {
     const db = await getSupabase();
@@ -213,10 +255,40 @@ async function sbGuardarCarga(c) {
       resumen: c.resumen, total_items: c.totalItems,
       nuevos: c.nuevos||0, actualizados: c.actualizados||0,
       detalle: c.items||[],
+      archivo_nombre: c.archivoNombre||null,
+      archivo_url: c.archivoUrl||null,
     });
     if (error) throw error;
     return true;
   } catch(e) { console.warn("Supabase carga (tabla puede no existir):", e.message); return false; }
+}
+
+async function sbSubirEvidencia(blob, fileName, cargaId) {
+  try {
+    const db = await getSupabase();
+    const path = `${cargaId}/${fileName}`;
+    const { error } = await db.storage.from("cargas-evidencia").upload(path, blob, {
+      upsert: true,
+      contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    });
+    if (error) throw error;
+    const { data } = db.storage.from("cargas-evidencia").getPublicUrl(path);
+    return data.publicUrl;
+  } catch(e) { console.warn("Supabase subir evidencia:", e.message); return null; }
+}
+
+async function generarExcelEvidenciaManual(items, titulo) {
+  const XLSX = await loadXLSX();
+  const filas = [
+    ["CODIGO", "NOMBRE", "MARCA", "PRECIO (Bs)", "STOCK", "CATEGORIA"],
+    ...items.map(it => [it.codigo||"", it.nombre||"", it.marcaNombre||"", it.precio||0, it.stock||0, it.categoria||""]),
+  ];
+  const ws = XLSX.utils.aoa_to_sheet(filas);
+  ws["!cols"] = [20,35,18,14,8,18].map(w=>({wch:w}));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Evidencia");
+  const buf = XLSX.write(wb, {type:"array", bookType:"xlsx"});
+  return new Blob([buf], {type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
 }
 
 async function sbCargarCargas() {
@@ -229,6 +301,7 @@ async function sbCargarCargas() {
       marcaId:c.marca_id, marcaNombre:c.marca_nombre,
       resumen:c.resumen, totalItems:c.total_items,
       nuevos:c.nuevos||0, actualizados:c.actualizados||0, items:c.detalle||[],
+      verificado:c.verificado||false, verificadoTs:c.verificado_ts||null, verificadoPor:c.verificado_por||null,
     }));
   } catch(e) { console.warn("Supabase load cargas:", e.message); return []; }
 }
@@ -244,6 +317,7 @@ async function sbGuardarAuditoria(aud) {
       ok: aud.ok, faltantes: aud.faltantes, sobrantes: aud.sobrantes,
       valor_fuga: aud.valorFuga, valor_sobrante: aud.valorSobrante,
       detalle: aud.detalle,
+      marcado_ok_por: aud.marcadoOkPor||null, marcado_ok_ts: aud.marcadoOkTs||null,
     });
     if (error) throw error;
     return true;
@@ -259,6 +333,7 @@ async function sbCargarAuditorias() {
       usuario:a.usuario, marcaId:a.marca_id, totalProductos:a.total_productos,
       ok:a.ok, faltantes:a.faltantes, sobrantes:a.sobrantes,
       valorFuga:a.valor_fuga, valorSobrante:a.valor_sobrante, detalle:a.detalle||[],
+      marcadoOkPor:a.marcado_ok_por||null, marcadoOkTs:a.marcado_ok_ts||null,
     }));
   } catch(e) { console.warn("Supabase load auditorias:", e.message); return []; }
 }
@@ -269,7 +344,6 @@ async function sbGuardarUsuarios(lista) {
     const db = await getSupabase();
     const rows = lista.map(u => ({
       usuario: u.usuario,
-      password: u.password,
       nombre: u.nombre,
       rol: u.rol || "caja",
       marca_id: u.marcaId ? Number(u.marcaId) : null,
@@ -284,15 +358,54 @@ async function sbGuardarUsuarios(lista) {
 async function sbCargarUsuarios() {
   try {
     const db = await getSupabase();
-    const { data, error } = await db.from("usuarios").select("*");
+    const { data, error } = await db.from("usuarios").select("usuario,nombre,rol,estado,marca_id,auth_id");
     if (error) throw error;
     return (data || []).map(u => ({
-      usuario: u.usuario, password: u.password,
+      usuario: u.usuario,
       nombre: u.nombre, rol: u.rol,
       marcaId: u.marca_id ? Number(u.marca_id) : undefined,
       estado: u.estado || "activo"
     }));
   } catch(e) { console.warn("Supabase load usuarios:", e.message); return null; }
+}
+
+async function sbCrearAuthUsuario(usuario, password, nombre, rol, marcaId) {
+  try {
+    const db = await getSupabase();
+    const { data: { session } } = await db.auth.getSession();
+    if (!session) return false;
+    const res = await fetch(
+      "https://uqphxiixdulqscbfyxhz.supabase.co/functions/v1/crear-usuario",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ usuario, password, nombre, rol, marca_id: marcaId || null }),
+      }
+    );
+    const data = await res.json();
+    if (!res.ok) { console.warn("crear-usuario edge fn:", data.error); return false; }
+    return true;
+  } catch(e) { console.warn("sbCrearAuthUsuario:", e.message); return false; }
+}
+
+async function sbCambiarPassword(nuevoPassword) {
+  try {
+    const db = await getSupabase();
+    const { error } = await db.auth.updateUser({ password: nuevoPassword });
+    if (error) throw error;
+    return true;
+  } catch(e) { console.warn("cambiar password:", e.message); return false; }
+}
+
+async function sbEliminarAuthUsuario(usuario) {
+  try {
+    const db = await getSupabase();
+    await db.rpc("admin_eliminar_usuario", { p_usuario: usuario });
+    return true;
+  } catch(e) { console.warn("eliminar auth usuario:", e.message); return false; }
 }
 
 async function sbEliminarUsuario(usuario) {
@@ -520,7 +633,7 @@ function useRealtimeSync(setVentas, setInv, setRetiros) {
         .on("postgres_changes", { event: "UPDATE", schema: "public", table: "inventario" }, payload => {
           const p = payload.new;
           if (mounted) setInv(prev => prev.map(i => i.id === p.id ? {
-            ...i, stock: p.stock, nombre: p.nombre, precio: p.precio, categoria: p.categoria
+            ...i, stock: p.stock, nombre: p.nombre, precio: p.precio, categoria: p.categoria, descripcion: p.descripcion||i.descripcion
           } : i));
         })
         // ── Retiro registrado en otro dispositivo ───────────────────────
@@ -631,6 +744,8 @@ async function leerCodigoDeImagen(file) {
   }
 }
 
+function limpiarCod(c){ return (c||"").toUpperCase().replace(/[^A-Z0-9]/g,""); }
+
 // Genera código de barras CODE128 como SVG (string)
 async function generarSVGBarcode(codigo) {
   try {
@@ -689,8 +804,11 @@ function BarcodeDisplay({ codigo, small }) {
   );
 }
 
+// Extrae el color del campo descripcion ("TALLA: X · COLOR: Y")
+function extraerColor(desc){ const m=(desc||"").match(/COLOR:\s*([^·\n]+)/i); return m?m[1].trim():""; }
+
 // Abrevia nombres largos de productos para que entren en la etiqueta
-function abreviarNombre(nombre, maxLen = 60) {
+function abreviarNombre(nombre, maxLen = 90) {
   if (!nombre) return "";
   let n = nombre.trim();
   if (n.length <= maxLen) return n;
@@ -713,7 +831,7 @@ function abreviarNombre(nombre, maxLen = 60) {
 function expandirPorStock(items) {
   const out = [];
   for (const it of items) {
-    const n = Math.max(1, Number(it.stock) || 1);
+    const n = Math.max(0, Number(it.stock) || 0);
     for (let i = 0; i < n; i++) out.push(it);
   }
   return out;
@@ -737,22 +855,26 @@ async function imprimirTicket(producto, marcaNombre) {
       overflow:hidden; display:flex; flex-direction:column; align-items:center; justify-content:center; }
     .top { display:flex; justify-content:space-between; align-items:center; width:100%;
       font-size:8.64px; letter-spacing:0.5px; text-transform:uppercase; color:#333; }
-    .producto { font-size:8px; font-weight:bold; text-align:center; width:100%;
-      text-transform:uppercase; line-height:1.1; margin:0.3mm 0;
-      display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2;
+    .producto { font-size:7.5px; font-weight:bold; text-align:center; width:100%;
+      text-transform:uppercase; line-height:1.15; margin:0.2mm 0;
+      display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:3;
       overflow:hidden; text-overflow:ellipsis; }
     .barcode-wrap { width:100%; display:flex; justify-content:center; }
-    .barcode-wrap svg { width:45mm!important; height:9mm!important; }
+    .barcode-wrap svg { width:45mm!important; height:8.5mm!important; }
+    .color-row { font-size:6.5px; color:#555; text-transform:uppercase; letter-spacing:0.5px;
+      text-align:center; width:100%; margin:0.1mm 0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .bottom-row { display:flex; justify-content:space-between; align-items:center; width:100%;
-      margin-top:0.3mm; }
-    .codigo { font-size:8.64px; color:#333; font-family:monospace; }
-    .precio { font-size:13.2px; font-weight:900; }
+      margin-top:0.1mm; }
+    .codigo { font-size:8px; color:#333; font-family:monospace; }
+    .precio { font-size:12px; font-weight:900; }
     @media print { body { print-color-adjust:exact; -webkit-print-color-adjust:exact; } }
   </style>
 </head>
 <body>
   <div class="top"><span>${marcaNombre}</span><span style="font-weight:bold">TOSCANA HOUSE</span></div>
   <div class="producto">${abreviarNombre(producto.nombre)}</div>
+  ${producto.descripcion?`<div class="color-row">${producto.descripcion.toUpperCase()}</div>`:""}
+  ${extraerColor(producto.descripcion)?`<div class="color-row">Color: ${extraerColor(producto.descripcion)}</div>`:""}
   <div class="barcode-wrap">
     <svg id="barcode"></svg>
   </div>
@@ -798,10 +920,14 @@ function imprimirEtiquetasLote(items) {
     const codigo  = (it.codigo || it.sku || "").toUpperCase();
     const precio  = it.precio || 0;
     const marca   = it.marcaNombre || it.marca || "";
+    const desc    = (it.descripcion||"").toUpperCase();
+    const color   = extraerColor(it.descripcion);
     return `
       <div class="label">
         <div class="top"><span>${marca.toUpperCase()}</span><span style="font-weight:bold">TOSCANA HOUSE</span></div>
         <div class="producto">${nombre}</div>
+        ${desc?`<div class="color-row">${desc}</div>`:""}
+        ${color?`<div class="color-row">Color: ${color}</div>`:""}
         <div class="barcode-wrap"><svg id="bc-${idx}"></svg></div>
         <div class="bottom-row">
           <span class="codigo">${codigo}</span>
@@ -838,16 +964,18 @@ function imprimirEtiquetasLote(items) {
       overflow:hidden; background:#fff; display:flex; flex-direction:column; align-items:center; justify-content:center; }
     .top { display:flex; justify-content:space-between; align-items:center; width:100%;
       font-size:8.64px; letter-spacing:0.5px; text-transform:uppercase; color:#333; }
-    .producto { font-size:8px; font-weight:bold; text-align:center; width:100%;
-      text-transform:uppercase; line-height:1.1; margin:0.3mm 0;
-      display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2;
+    .producto { font-size:7.5px; font-weight:bold; text-align:center; width:100%;
+      text-transform:uppercase; line-height:1.15; margin:0.2mm 0;
+      display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:3;
       overflow:hidden; text-overflow:ellipsis; }
     .barcode-wrap { width:100%; display:flex; justify-content:center; }
-    .barcode-wrap svg { width:45mm!important; height:9mm!important; }
+    .barcode-wrap svg { width:45mm!important; height:8.5mm!important; }
+    .color-row { font-size:6.5px; color:#555; text-transform:uppercase; letter-spacing:0.5px;
+      text-align:center; width:100%; margin:0.1mm 0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .bottom-row { display:flex; justify-content:space-between; align-items:center; width:100%;
-      margin-top:0.3mm; }
-    .codigo { font-size:8.64px; color:#333; font-family:monospace; }
-    .precio { font-size:13.2px; font-weight:900; }
+      margin-top:0.1mm; }
+    .codigo { font-size:8px; color:#333; font-family:monospace; }
+    .precio { font-size:12px; font-weight:900; }
     @media print {
       .controls { display:none!important; }
       .print-note { display:none!important; }
@@ -1073,7 +1201,6 @@ const ALQUILERES = {
   10: { alquiler: 800,  comision: 3 },   // Ellá
   11: { alquiler: 1950, comision: 3 },   // Magenta
   12: { alquiler: 1750, comision: 3 },   // Ikawi
-  13: { alquiler: 1200, comision: 0 },   // Romero Brand
   14: { alquiler: 1950, comision: 0 },   // Minimal
   15: { alquiler: 1950, comision: 3 },   // Comfy
   16: { alquiler: 1100, comision: 3 },   // Essenza
@@ -1111,8 +1238,6 @@ const MARCAS_SEED = [
    imagen:"data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PSIwIDAgMjAwIDIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgcng9IjEyIiBmaWxsPSIjRkFGQUY4Ii8+CiAgPHRleHQgeD0iMTAwIiB5PSI5NSIgZm9udC1mYW1pbHk9IidDb3Jtb3JhbnQgR2FyYW1vbmQnLEdlb3JnaWEsc2VyaWYiIGZvbnQtc2l6ZT0iMjgiIGZvbnQtd2VpZ2h0PSI2MDAiIGZvbnQtc3R5bGU9Im5vcm1hbCIgZmlsbD0iIzFBMTcxNCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZG9taW5hbnQtYmFzZWxpbmU9Im1pZGRsZSIgbGV0dGVyLXNwYWNpbmc9IjQiPk1BR0VOVEE8L3RleHQ+CiAgPHRleHQgeD0iMTAwIiB5PSIxNzYiIGZvbnQtZmFtaWx5PSInQ29ybW9yYW50IEdhcmFtb25kJyxHZW9yZ2lhLHNlcmlmIiBmb250LXNpemU9IjExIiBmb250LXdlaWdodD0iNDAwIiBmaWxsPSIjMUExNzE0IiBvcGFjaXR5PSIuMzUiIHRleHQtYW5jaG9yPSJtaWRkbGUiPjExLjwvdGV4dD4KPC9zdmc+"},
   {id:12, nombre:"Ikawi",         color:"#A8CCD4", emoji:"🌊",
    imagen:"data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PSIwIDAgMjAwIDIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgcng9IjEyIiBmaWxsPSIjRkFGQUY4Ii8+CiAgPHRleHQgeD0iMTAwIiB5PSI5NSIgZm9udC1mYW1pbHk9IidDb3Jtb3JhbnQgR2FyYW1vbmQnLEdlb3JnaWEsc2VyaWYiIGZvbnQtc2l6ZT0iMjgiIGZvbnQtd2VpZ2h0PSI0MDAiIGZvbnQtc3R5bGU9Im5vcm1hbCIgZmlsbD0iIzFBMTcxNCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZG9taW5hbnQtYmFzZWxpbmU9Im1pZGRsZSIgbGV0dGVyLXNwYWNpbmc9IjIiPkkgSyBBIFcgSTwvdGV4dD4KICA8dGV4dCB4PSIxMDAiIHk9IjE3NiIgZm9udC1mYW1pbHk9IidDb3Jtb3JhbnQgR2FyYW1vbmQnLEdlb3JnaWEsc2VyaWYiIGZvbnQtc2l6ZT0iMTEiIGZvbnQtd2VpZ2h0PSI0MDAiIGZpbGw9IiMxQTE3MTQiIG9wYWNpdHk9Ii4zNSIgdGV4dC1hbmNob3I9Im1pZGRsZSI+MTIuPC90ZXh0Pgo8L3N2Zz4="},
-  {id:13, nombre:"Romero Brand",  color:"#C4B89A", emoji:"⚡",
-   imagen:"data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PSIwIDAgMjAwIDIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgcng9IjEyIiBmaWxsPSIjRkFGQUY4Ii8+CiAgPGxpbmUgeDE9IjMwIiB5MT0iMTE4IiB4Mj0iODgiIHkyPSIxMTgiIHN0cm9rZT0iIzFBMTcxNCIgc3Ryb2tlLXdpZHRoPSIwLjgiIG9wYWNpdHk9Ii40Ii8+CiAgPGxpbmUgeDE9IjExMiIgeTE9IjExOCIgeDI9IjE3MCIgeTI9IjExOCIgc3Ryb2tlPSIjMUExNzE0IiBzdHJva2Utd2lkdGg9IjAuOCIgb3BhY2l0eT0iLjQiLz4KICA8dGV4dCB4PSIxMDAiIHk9Ijk1IiBmb250LWZhbWlseT0iJ0Nvcm1vcmFudCBHYXJhbW9uZCcsR2VvcmdpYSxzZXJpZiIgZm9udC1zaXplPSIzMCIgZm9udC13ZWlnaHQ9IjQwMCIgZm9udC1zdHlsZT0ibm9ybWFsIiBmaWxsPSIjMUExNzE0IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkb21pbmFudC1iYXNlbGluZT0ibWlkZGxlIiBsZXR0ZXItc3BhY2luZz0iNSI+Uk9NRVJPPC90ZXh0PgogIDx0ZXh0IHg9IjEwMCIgeT0iMTI0IiBmb250LWZhbWlseT0iJ0Nvcm1vcmFudCBHYXJhbW9uZCcsR2VvcmdpYSxzZXJpZiIgZm9udC1zaXplPSIxNCIgZm9udC13ZWlnaHQ9IjQwMCIgZmlsbD0iIzFBMTcxNCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZG9taW5hbnQtYmFzZWxpbmU9Im1pZGRsZSIgbGV0dGVyLXNwYWNpbmc9IjgiPkJSQU5EPC90ZXh0PgogIDx0ZXh0IHg9IjEwMCIgeT0iMTc2IiBmb250LWZhbWlseT0iJ0Nvcm1vcmFudCBHYXJhbW9uZCcsR2VvcmdpYSxzZXJpZiIgZm9udC1zaXplPSIxMSIgZm9udC13ZWlnaHQ9IjQwMCIgZmlsbD0iIzFBMTcxNCIgb3BhY2l0eT0iLjM1IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj4xMy48L3RleHQ+Cjwvc3ZnPg=="},
   {id:14, nombre:"Minimal",       color:"#C4C4C4", emoji:"◻",
    imagen:"data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PSIwIDAgMjAwIDIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgcng9IjEyIiBmaWxsPSIjRkFGQUY4Ii8+CiAgPHRleHQgeD0iMTAwIiB5PSI5NSIgZm9udC1mYW1pbHk9IidDb3Jtb3JhbnQgR2FyYW1vbmQnLEdlb3JnaWEsc2VyaWYiIGZvbnQtc2l6ZT0iMjQiIGZvbnQtd2VpZ2h0PSI0MDAiIGZvbnQtc3R5bGU9Im5vcm1hbCIgZmlsbD0iIzFBMTcxNCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZG9taW5hbnQtYmFzZWxpbmU9Im1pZGRsZSIgbGV0dGVyLXNwYWNpbmc9IjgiPk1JTklNQUw8L3RleHQ+CiAgPHRleHQgeD0iMTAwIiB5PSIxNzYiIGZvbnQtZmFtaWx5PSInQ29ybW9yYW50IEdhcmFtb25kJyxHZW9yZ2lhLHNlcmlmIiBmb250LXNpemU9IjExIiBmb250LXdlaWdodD0iNDAwIiBmaWxsPSIjMUExNzE0IiBvcGFjaXR5PSIuMzUiIHRleHQtYW5jaG9yPSJtaWRkbGUiPjE0LjwvdGV4dD4KPC9zdmc+"},
   {id:15, nombre:"Comfy",         color:"#C8B8A8", emoji:"☁",
@@ -1315,6 +1440,68 @@ function descargarArchivo(blob, nombre) {
   const a   = document.createElement("a");
   a.href = url; a.download = nombre; a.click();
   URL.revokeObjectURL(url);
+}
+
+// ── File System Access API — carpetas organizadas por marca ──────────────
+// Guarda/lee el handle de la carpeta base en IndexedDB (por dispositivo).
+function _fsaIdb(mode, value){
+  return new Promise(resolve=>{
+    const req=indexedDB.open("th_fsa",1);
+    req.onupgradeneeded=e=>e.target.result.createObjectStore("h");
+    req.onsuccess=e=>{
+      const db=e.target.result;
+      const tx=db.transaction("h",mode==="get"?"readonly":"readwrite");
+      const st=tx.objectStore("h");
+      const r=mode==="get"?st.get("base"):st.put(value,"base");
+      r.onsuccess=()=>resolve(r.result||null);
+      r.onerror=()=>resolve(null);
+    };
+    req.onerror=()=>resolve(null);
+  });
+}
+async function fsaGetBase(){
+  const h=await _fsaIdb("get");
+  if(!h) return null;
+  try{
+    const perm=await h.queryPermission({mode:"readwrite"});
+    if(perm==="granted") return h;
+    const req=await h.requestPermission({mode:"readwrite"});
+    return req==="granted"?h:null;
+  }catch{return null;}
+}
+async function fsaSetBase(){
+  if(!("showDirectoryPicker" in window)) return null;
+  try{
+    const h=await window.showDirectoryPicker({mode:"readwrite",
+      startIn:"downloads", id:"th-downloads"});
+    await _fsaIdb("set",h);
+    return h;
+  }catch{return null;}
+}
+async function fsaHasBase(){
+  const h=await _fsaIdb("get"); return !!h;
+}
+
+// Descarga un archivo a <carpetaBase>/<marcaCarpeta>/<nombre>
+// Si FSA no disponible o no configurado → download normal.
+async function descargarOrganizado(blob, nombre, marcaCarpeta, subcarpeta=null){
+  const base=await fsaGetBase();
+  if(base && marcaCarpeta){
+    try{
+      const carpeta=(marcaCarpeta||"General").replace(/[\/\\:*?"<>|]/g,"").trim()||"General";
+      let dir=await base.getDirectoryHandle(carpeta,{create:true});
+      if(subcarpeta){
+        const sub=subcarpeta.replace(/[\/\\:*?"<>|]/g,"").trim();
+        if(sub) dir=await dir.getDirectoryHandle(sub,{create:true});
+      }
+      const fh=await dir.getFileHandle(nombre,{create:true});
+      const wr=await fh.createWritable();
+      await wr.write(blob);
+      await wr.close();
+      return;
+    }catch(e){ /* fallback */ }
+  }
+  descargarArchivo(blob,nombre);
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -2041,7 +2228,7 @@ async function generarExcelMarca(marca, ventas, inventario, setGenerando) {
     wb.SheetNames.forEach(name => { aplicarBordesSheet(wb.Sheets[name], XLSX); });
     const wbOut = XLSX.write(wb, { bookType:"xlsx", type:"array" });
     const blob  = new Blob([wbOut], { type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
-    descargarArchivo(blob, `TH_${marca.nombre.replace(/ /g,"_")}_Historial.xlsx`);
+    descargarOrganizado(blob, `TH_${marca.nombre.replace(/ /g,"_")}_Historial.xlsx`, marca.nombre);
 
   } catch(e) {
     alert("Error generando Excel: " + e.message);
@@ -2395,7 +2582,7 @@ async function exportExcelLiquidacion(marca,ventas,mes,anio){
   XLSX.utils.book_append_sheet(wb, ws, "Liquidación");
   const buf  = XLSX.write(wb, {bookType:"xlsx", type:"array"});
   const blob = new Blob([buf], {type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
-  descargarArchivo(blob, `TH_${marca.nombre.replace(/ /g,"_")}_${MESES[mes]}_${anio}.xlsx`);
+  descargarOrganizado(blob, `TH_${marca.nombre.replace(/ /g,"_")}_Liquidacion_${MESES[mes]}_${anio}.xlsx`, marca.nombre);
 }
 
 // ── Excel: Cierre de inventario / auditoría (conteo físico vs sistema) ──
@@ -2585,7 +2772,7 @@ async function exportAuditoriaExcel(aud){
   XLSX.utils.book_append_sheet(wb, ws, "Verificacion Inventario");
   const buf  = XLSX.write(wb, {bookType:"xlsx", type:"array"});
   const blob = new Blob([buf], {type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
-  descargarArchivo(blob, `TH_VerificacionInventario_${marcaNombre.replace(/[^A-Za-z0-9]/g,"")}_${MESES[aud.mes]}_${aud.anio}_${aud.fecha.replace(/\//g,"-")}.xlsx`);
+  descargarOrganizado(blob, `TH_${marcaNombre}_Verificacion_${MESES[aud.mes]}_${aud.anio}_${aud.fecha.replace(/\//g,"-")}.xlsx`, marcaNombre);
 }
 
 // ── Exportar trazabilidad de cargas a inventario ──────────────────────────
@@ -2665,12 +2852,6 @@ function exportTodasCSV(ventas,mes,anio){
   const a=document.createElement("a");
   a.href=url;a.download=`TH_TODAS_${MESES[mes]}_${anio}.csv`;
   a.click();URL.revokeObjectURL(url);
-}
-
-function sendWA(venta){
-  const lines=venta.items.map(it=>{const m=MARCAS.find(x=>x.id===it.marcaId);return `• ${it.nombre} (${m?.nombre}) x${it.cantidad} = ${$(it.subtotal)}`;});
-  const msg=[`🏡 *TOSCANA HOUSE — ${venta.id}*`,`📅 ${venta.fecha} ${venta.hora}`,`💳 ${labelPago(venta.metodoPago)}${venta.descPct?` (-${venta.descPct}%)`:""}`,"",  ...lines,"",`💰 *TOTAL: ${$(venta.total)}*`].join("\n");
-  window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`,"_blank");
 }
 
 function sendFacturaWA(fac, venta, telefono){
@@ -2896,7 +3077,7 @@ function generarImagenLiquidacion(marca, mes, anio, liq){
     alquiler: liq.alquiler, gastos: liq.gastos, totalGastos: liq.totalGastos, neto: liq.neto,
     vMarca: liq.vMarca, marcaId: marca?.id,
   }).then(blob=>{
-    descargarArchivo(blob, `Liquidacion_${marca?.nombre||"marca"}_${MESES[mes]}_${anio}.png`);
+    descargarOrganizado(blob, `Liquidacion_${marca?.nombre||"marca"}_${MESES[mes]}_${anio}.png`, marca?.nombre);
   }).catch(()=>alert("No se pudo generar la imagen"));
 }
 
@@ -2922,11 +3103,11 @@ function ImagenLiqPreviewModal({data, onClose}){
         title:`Liquidación ${data.marca?.nombre||""} — ${MESES[data.mes]} ${data.anio}`,
       }).catch(()=>{});
     } else {
-      descargarArchivo(data.blob, data.nombre);
+      descargarOrganizado(data.blob, data.nombre, data.marca?.nombre);
     }
   }
   function descargar(){
-    descargarArchivo(data.blob, data.nombre);
+    descargarOrganizado(data.blob, data.nombre, data.marca?.nombre);
   }
   return (
     <Sheet open={!!data} onClose={onClose} title="Vista previa" tall>
@@ -2938,6 +3119,145 @@ function ImagenLiqPreviewModal({data, onClose}){
         </IOSBtn>
         <IOSBtn onPress={descargar} variant="fill" icon="⬇">
           Descargar imagen
+        </IOSBtn>
+      </div>
+    </Sheet>
+  );
+}
+
+// ── Generar imagen (captura) de la Nota de Venta ──────────────────────────────
+function construirImagenNotaVenta(venta, numSecuencial){
+  const num = numSecuencial || venta.id.replace(/\D/g,"").slice(-4).padStart(4,"0");
+  const fmt2 = n=>Number(n||0).toLocaleString("es-BO",{minimumFractionDigits:2,maximumFractionDigits:2});
+  const subtotalBruto = venta.items.reduce((s,i)=>s+i.precioUnit*i.cantidad,0);
+  const descAdicional = subtotalBruto-venta.total;
+
+  const width = 760;
+  const height = 380 + venta.items.length*32 + (descAdicional>0.01?28:0);
+
+  const rowsHtml = venta.items.map(it=>`
+    <tr>
+      <td style="padding:6px 8px;border:1px solid #ccc;font-size:11px">${it.nombre}${it.marcaNombre?" — "+it.marcaNombre:""}</td>
+      <td style="padding:6px 8px;border:1px solid #ccc;font-size:11px;text-align:center">${it.cantidad}</td>
+      <td style="padding:6px 8px;border:1px solid #ccc;font-size:11px;text-align:right">${fmt2(it.precioUnit)}</td>
+      <td style="padding:6px 8px;border:1px solid #ccc;font-size:11px;text-align:right;font-weight:600">${fmt2(it.subtotal)}</td>
+    </tr>`).join("");
+
+  const html = `<div xmlns="http://www.w3.org/1999/xhtml" style="font-family:Arial,sans-serif;color:#111;width:${width}px;padding:28px;box-sizing:border-box;background:#fff">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #111;padding-bottom:12px;margin-bottom:14px">
+      <div>
+        <div style="font-size:20px;font-weight:900;letter-spacing:3px;text-transform:uppercase">Toscana House</div>
+        <div style="font-size:9px;letter-spacing:5px;color:#666;margin-top:2px">CASA DE MODA</div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:15px;font-weight:700;text-transform:uppercase">Nota de venta</div>
+        <div style="font-size:11px;margin-top:3px">NIT ${NIT_EMPRESA}</div>
+        <div style="font-size:11px;margin-top:3px">N° <strong>${num}</strong></div>
+      </div>
+    </div>
+    <div style="font-size:13px;font-weight:700;text-transform:uppercase;border-bottom:1px solid #ccc;padding-bottom:6px;margin-bottom:12px">${PROPIETARIA}</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 20px;margin-bottom:14px;font-size:11px">
+      <div><div style="color:#666;font-size:9px;text-transform:uppercase;letter-spacing:.5px">Sucursal</div>${SUCURSAL_EMP}</div>
+      <div><div style="color:#666;font-size:9px;text-transform:uppercase;letter-spacing:.5px">Fecha</div>${venta.fecha} ${venta.hora||""}</div>
+      <div><div style="color:#666;font-size:9px;text-transform:uppercase;letter-spacing:.5px">Cliente</div>${venta.clienteNombre||"—"}</div>
+      <div><div style="color:#666;font-size:9px;text-transform:uppercase;letter-spacing:.5px">Método de pago</div>${labelPago(venta.metodoPago)}</div>
+    </div>
+    <table style="width:100%;border-collapse:collapse;margin-bottom:12px">
+      <thead><tr style="background:#f0f0f0">
+        <th style="padding:6px 8px;border:1px solid #ccc;font-size:9px;text-transform:uppercase;text-align:left">Descripción</th>
+        <th style="padding:6px 8px;border:1px solid #ccc;font-size:9px;text-transform:uppercase">Cant.</th>
+        <th style="padding:6px 8px;border:1px solid #ccc;font-size:9px;text-transform:uppercase;text-align:right">P. Unit.</th>
+        <th style="padding:6px 8px;border:1px solid #ccc;font-size:9px;text-transform:uppercase;text-align:right">Subtotal</th>
+      </tr></thead>
+      <tbody>${rowsHtml}</tbody>
+    </table>
+    <div style="display:flex;justify-content:flex-end;margin-bottom:12px">
+      <table style="width:280px;border-collapse:collapse">
+        <tr><td style="padding:3px 8px;font-size:11px;color:#555">Subtotal:</td><td style="padding:3px 8px;font-size:11px;text-align:right;font-weight:600">${fmt2(subtotalBruto)}</td></tr>
+        ${descAdicional>0.01?`<tr><td style="padding:3px 8px;font-size:11px;color:#555">Descuento:</td><td style="padding:3px 8px;font-size:11px;text-align:right;font-weight:600">- ${fmt2(descAdicional)}</td></tr>`:""}
+        <tr style="border-top:2px solid #111"><td style="padding:7px 8px;font-size:14px;font-weight:800">Total a pagar Bs</td><td style="padding:7px 8px;font-size:14px;font-weight:800;text-align:right">${fmt2(venta.total)}</td></tr>
+      </table>
+    </div>
+    <div style="background:#f8f8f8;border:1px solid #ccc;padding:8px 12px;border-radius:4px;font-size:10px;margin-bottom:14px">Son: <strong>${numeroALetras(venta.total)}</strong></div>
+    <div style="border-top:1px dashed #aaa;padding-top:8px;text-align:center;font-size:9px;color:#888;margin-top:12px">Toscana House · ${SUCURSAL_EMP} · ${TELEFONO_EMP} · ${CIUDAD_EMP}</div>
+  </div>`;
+
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">
+    <rect width="100%" height="100%" fill="#fff"/>
+    <foreignObject width="100%" height="100%">${html}</foreignObject>
+  </svg>`;
+
+  const dataUrl = "data:image/svg+xml;charset=utf-8;base64," + btoa(unescape(encodeURIComponent(svg)));
+
+  return new Promise((resolve, reject)=>{
+    const img = new Image();
+    img.onload = function(){
+      const scale = 2;
+      const canvas = document.createElement("canvas");
+      canvas.width = width*scale;
+      canvas.height = height*scale;
+      const ctx = canvas.getContext("2d");
+      ctx.scale(scale, scale);
+      ctx.fillStyle = "#fff";
+      ctx.fillRect(0, 0, width, height);
+      ctx.drawImage(img, 0, 0, width, height);
+      canvas.toBlob(blob=>blob?resolve(blob):reject(new Error("toBlob falló")));
+    };
+    img.onerror = ()=>reject(new Error("No se pudo generar la imagen"));
+    img.src = dataUrl;
+  });
+}
+
+// ── Genera la imagen de la Nota de Venta y abre la vista previa para enviar ────
+function generarVistaPreviaNotaVenta(venta, numSecuencial, setPreview){
+  const num = numSecuencial || venta.id.replace(/\D/g,"").slice(-4).padStart(4,"0");
+  const marcas = [...new Set((venta.items||[]).map(i=>i.marcaNombre).filter(Boolean))];
+  const marcaCarpeta = marcas.length === 1 ? marcas[0] : marcas.length > 1 ? "Multimarca" : null;
+  const fechaSlug = (venta.fecha||"").replace(/\//g,"-");
+  construirImagenNotaVenta(venta, num).then(blob=>{
+    const marcaSlug = marcas.map(m=>m.replace(/ /g,"_")).join("-") || "TH";
+    const nombre = `TH_${marcaSlug}_NotaVenta_N${num}_${fechaSlug}.png`;
+    const url = URL.createObjectURL(blob);
+    setPreview({url, blob, nombre, num, marcaNombre: marcaCarpeta});
+  }).catch(()=>alert("No se pudo generar la imagen de la nota"));
+}
+
+// ── Modal de vista previa de la Nota de Venta: enviar por WhatsApp o descargar ─
+function NotaImgPreviewModal({data, onClose}){
+  if(!data) return null;
+  function compartir(){
+    const file = new File([data.blob], data.nombre, {type:"image/png"});
+    if(navigator.canShare && navigator.canShare({files:[file]})){
+      navigator.share({files:[file], title:`Nota de Venta #${data.num}`}).catch(()=>{});
+    } else if(navigator.clipboard && window.ClipboardItem){
+      const a=document.createElement("a");
+      a.href="whatsapp://send?text=";
+      a.click();
+      navigator.clipboard.write([new ClipboardItem({"image/png":data.blob})])
+        .then(()=>alert("Imagen copiada — pega la imagen con Cmd+V en el chat de WhatsApp"))
+        .catch(()=>descargarOrganizado(data.blob, data.nombre, data.marcaNombre, "Notas de Ventas"));
+    } else {
+      descargarOrganizado(data.blob, data.nombre, data.marcaNombre, "Notas de Ventas");
+    }
+  }
+  function descargar(){
+    if(navigator.clipboard && window.ClipboardItem){
+      navigator.clipboard.write([new ClipboardItem({"image/png":data.blob})])
+        .then(()=>alert("Imagen copiada al portapapeles — pégala con Cmd+V en WhatsApp"))
+        .catch(()=>{});
+    }
+    descargarOrganizado(data.blob, data.nombre, data.marcaNombre, "Notas de Ventas");
+  }
+  return (
+    <Sheet open={!!data} onClose={onClose} title="Nota de venta">
+      <img src={data.url} alt="Nota de venta" style={{
+        width:"100%",borderRadius:12,marginBottom:16,border:`1px solid ${C.sep}`}}/>
+      <div style={{display:"flex",flexDirection:"column",gap:10}}>
+        <IOSBtn onPress={compartir} variant="fill" icon="📤">
+          Enviar por WhatsApp
+        </IOSBtn>
+        <IOSBtn onPress={descargar} variant="fill" icon="⬇">
+          Descargar y copiar imagen
         </IOSBtn>
       </div>
     </Sheet>
@@ -3082,6 +3402,84 @@ ${autoPrint?`<script>window.onload=function(){setTimeout(function(){window.print
 // Wrappers de conveniencia
 function imprimirNotaVenta(v,n){abrirNotaVenta(v,n,true);}
 function verNotaVenta(v,n){abrirNotaVenta(v,n,false);}
+
+// ── Nota de Retiro ────────────────────────────────────────
+function abrirNotaRetiro(r, autoPrint=false){
+  const win=window.open("","_blank","width=760,height=700");
+  if(!win){alert("Activa las ventanas emergentes para imprimir");return;}
+  const num=(r.id||"").replace(/\D/g,"").slice(-6).padStart(6,"0");
+  win.document.write(`<!DOCTYPE html>
+<html lang="es"><head>
+<meta charset="UTF-8">
+<title>Nota de Retiro N° ${num}</title>
+<style>
+  @page{size:A4;margin:20mm 18mm}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:Arial,sans-serif;font-size:11px;color:#111;background:#fff}
+  .hdr{display:flex;justify-content:space-between;align-items:flex-start;
+    padding-bottom:12px;border-bottom:2px solid #111;margin-bottom:14px}
+  .logo{font-size:20px;font-weight:900;letter-spacing:3px;text-transform:uppercase}
+  .logo-sub{font-size:7px;letter-spacing:5px;color:#666;margin-top:2px}
+  .nr-r{text-align:right}
+  .nr-r h2{font-size:15px;font-weight:700;text-transform:uppercase}
+  .nr-r p{font-size:11px;margin-top:3px}
+  .prop{font-size:13px;font-weight:700;text-transform:uppercase;
+    border-bottom:1px solid #ccc;padding-bottom:6px;margin-bottom:12px}
+  .info{display:grid;grid-template-columns:1fr 1fr;gap:4px 20px;margin-bottom:14px;font-size:11px}
+  .lbl{color:#666;font-size:9px;text-transform:uppercase;letter-spacing:.5px;margin-bottom:1px}
+  table{width:100%;border-collapse:collapse;margin-bottom:12px}
+  thead tr{background:#f0f0f0}
+  th,td{padding:6px 8px;border:1px solid #ccc;font-size:10px;vertical-align:middle}
+  th{font-weight:700;text-transform:uppercase;font-size:9px}
+  .motivo{background:#fff8f0;border:1px solid #e5c8a0;padding:8px 12px;border-radius:4px;font-size:10px;margin-bottom:14px}
+  .foot{border-top:1px dashed #aaa;padding-top:8px;text-align:center;font-size:9px;color:#888;margin-top:12px}
+  @media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+</style>
+</head>
+<body>
+<div class="hdr">
+  <div>
+    <div class="logo">Toscana House</div>
+    <div class="logo-sub">CASA DE MODA</div>
+  </div>
+  <div class="nr-r">
+    <h2>Nota de retiro</h2>
+    <p>NIT &nbsp; ${NIT_EMPRESA}</p>
+    <p>Retiro N° &nbsp; <strong>${num}</strong></p>
+  </div>
+</div>
+<div class="prop">${PROPIETARIA}</div>
+<div class="info">
+  <div><div class="lbl">Sucursal</div>${SUCURSAL_EMP}</div>
+  <div><div class="lbl">Lugar y fecha</div>${CIUDAD_EMP}, ${r.fecha} ${r.hora||""}</div>
+  <div><div class="lbl">Dirección</div>${DIRECCION_EMP}</div>
+  <div><div class="lbl">Destinatario</div>${r.destinatario||"—"}</div>
+</div>
+<table>
+  <thead>
+    <tr><th>Código</th><th>Descripción</th><th>Marca</th><th>Cant.</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>${r.codigo||"—"}</td>
+      <td>${r.nombre||"—"}</td>
+      <td>${r.marcaNombre||"—"}</td>
+      <td style="text-align:center">${r.cantidad}</td>
+    </tr>
+  </tbody>
+</table>
+${r.motivo?`<div class="motivo"><strong>Motivo:</strong> ${r.motivo}</div>`:""}
+<div style="margin-top:24px;display:grid;grid-template-columns:1fr 1fr;gap:40px">
+  <div style="text-align:center;padding-top:40px;border-top:1px solid #ccc;font-size:9px;color:#666">Firma Responsable</div>
+  <div style="text-align:center;padding-top:40px;border-top:1px solid #ccc;font-size:9px;color:#666">Firma Destinatario — ${r.destinatario||""}</div>
+</div>
+<div class="foot">Toscana House · ${SUCURSAL_EMP} · ${TELEFONO_EMP} · ${CIUDAD_EMP}</div>
+${autoPrint?`<script>window.onload=function(){setTimeout(function(){window.print();},600);}<\/script>`:""}
+</body></html>`);
+  win.document.close();
+}
+function verNotaRetiro(r){abrirNotaRetiro(r,false);}
+function imprimirNotaRetiro(r){abrirNotaRetiro(r,true);}
 
 // ══════════════════════════════════════════════════════════
 // iOS DESIGN ATOMS
@@ -3539,6 +3937,12 @@ function DesktopSidebar({tabs, active, onChange, user, logout, groups: customGro
         ))}
       </nav>
 
+      {/* FORGE branding */}
+      <div style={{padding:"8px 14px 4px",display:"flex",alignItems:"center",gap:6}}>
+        <span style={{fontSize:10.5,color:"#8a7f96",letterSpacing:".22em",fontFamily:FONT_DISPLAY,fontWeight:600,textTransform:"uppercase"}}>Powered by</span>
+        <span style={{fontSize:15.5,fontWeight:900,color:"#0c0c0f",letterSpacing:"-0.04em",fontFamily:FONT_DISPLAY,lineHeight:1}}>FORGE<span style={{color:"#7c6d8a"}}>.</span></span>
+      </div>
+
       {/* User footer */}
       <div style={{
         padding:"12px 14px",borderTop:`1px solid ${C.sep}`,
@@ -3821,14 +4225,12 @@ function StatCard({icon,label,value,sub,color=C.gold,compact}){
       padding: compact ? "14px 16px" : "16px 18px",
       border:`1px solid ${C.sep}`,
       boxShadow:"0 1px 3px rgba(0,0,0,0.06),0 1px 2px rgba(0,0,0,0.04)",
+      textAlign:"center",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",
     }}>
-      <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",marginBottom: compact ? 10 : 12}}>
-        <span style={{fontSize: compact ? 18 : 20}}>{icon}</span>
-        {sub&&<span style={{
-          fontSize:10,color:sub.startsWith?.("+")?C.green:sub.startsWith?.("-")?C.red:C.label3,
-          fontFamily:FONT,fontWeight:600,letterSpacing:"0.04em",
-        }}>{sub}</span>}
-      </div>
+      {sub&&<span style={{
+        fontSize:10,color:sub.startsWith?.("+")?C.green:sub.startsWith?.("-")?C.red:C.label3,
+        fontFamily:FONT,fontWeight:600,letterSpacing:"0.04em",marginBottom:4,
+      }}>{sub}</span>}
       <div style={{
         fontSize: compact ? 20 : 24,
         fontWeight:700,
@@ -4239,73 +4641,123 @@ function LiqModal({marcaId,ventas,mes,anio,MK,cierres,setCierres,onClose,syncCie
 // ── Usuarios autorizados ─────────────────────────────────
 // Para agregar usuarios: {usuario, password, nombre, rol}
 // rol: "admin" (acceso total) | "caja" (solo POS y ventas)
-const USUARIOS = [
-  { usuario: "toscana",  password: "casa2024",    nombre: "Toscana House",  rol: "admin" },
-  { usuario: "caja",     password: "caja2024",    nombre: "Vendedor Caja",  rol: "caja"  },
-  { usuario: "tatiana",  password: "toscana2024", nombre: "Tatiana",        rol: "admin" },
-];
-
 function useAuth() {
-  // ── Sesión SOLO en memoria React ────────────────────────────────────────────
-  // Sin localStorage, sin sessionStorage → cualquier recarga/cierre = login nuevo.
-  // Limpiar restos de versiones anteriores que pudieran quedar guardados.
-  try { localStorage.removeItem("th_user"); sessionStorage.removeItem("th_user"); } catch{}
-
   var _hN108 = useState(null); var user = _hN108[0]; var setUser = _hN108[1];
+  var _hN108b = useState(false); var authReady = _hN108b[0]; var setAuthReady = _hN108b[1];
 
-  // Safari bfcache: al restaurar página desde caché de memoria, React conserva
-  // su estado. El evento pageshow con persisted=true lo detecta y fuerza logout.
+  // Al montar: restaurar sesión existente de Supabase Auth
   useEffect(function(){
-    function onPageShow(e){ if(e.persisted) setUser(null); }
-    window.addEventListener("pageshow", onPageShow);
-    return function(){ window.removeEventListener("pageshow", onPageShow); };
+    var cancelled = false;
+    (async function(){
+      try {
+        const db = await getSupabase();
+        const { data: { session } } = await db.auth.getSession();
+        if (!cancelled && session) {
+          const perfil = await _perfilDesdeSession(db, session);
+          if (perfil) setUser(perfil);
+        }
+      } catch(e) { /* sin conexión → quedar en login */ }
+      if (!cancelled) setAuthReady(true);
+    })();
+    return function(){ cancelled = true; };
+  }, []);
+
+  // Escuchar cambios de sesión (token refresh, signout desde otra pestaña)
+  useEffect(function(){
+    var sub = null;
+    (async function(){
+      const db = await getSupabase();
+      const { data } = db.auth.onAuthStateChange(async function(event, session){
+        if (event === "SIGNED_OUT") { setUser(null); return; }
+        if (session) {
+          const perfil = await _perfilDesdeSession(db, session);
+          if (perfil) setUser(perfil);
+        }
+      });
+      sub = data.subscription;
+    })();
+    return function(){ if (sub) sub.unsubscribe(); };
   }, []);
 
   async function login(usuario, password) {
     const uLow = usuario.toLowerCase().trim();
     const pass  = password.trim();
 
-    // 1. Siempre verificar primero contra USUARIOS del código (garantizado)
-    const enCodigo = USUARIOS.find(u =>
-      u.usuario.toLowerCase() === uLow && u.password === pass
-    );
-    if (enCodigo) {
-      if (enCodigo.estado === "inactivo")
-        return { ok: false, error: "Cuenta desactivada. Contactá al administrador." };
-      setUser({ ...enCodigo, loginAt: Date.now() });
-      return { ok: true };
-    }
+    // Respaldo local mientras Supabase Auth se estabiliza
+    const FALLBACK = [
+      { usuario:"toscana",  password:"casa2024",    nombre:"Carolina Granier", rol:"admin" },
+      { usuario:"caja",     password:"caja2024",    nombre:"Vendedor Caja",    rol:"caja"  },
+      { usuario:"tatiana",  password:"toscana2024", nombre:"Tatiana",          rol:"admin" },
+      { usuario:"jpanezc",  password:"123456",      nombre:"Juan Pablo Anez",  rol:"admin" },
+      { usuario:"juanpa",   password:"123456",      nombre:"Jp",               rol:"marca" },
+    ];
 
-    // 2. Buscar en usuarios custom (localStorage + Supabase)
-    let lista = (() => {
-      try { return JSON.parse(localStorage.getItem("th_usuarios")||"null"); }
-      catch { return null; }
-    })();
-    // Intentar actualizar desde Supabase
-    const sbUsers = await sbCargarUsuarios();
-    if (sbUsers && sbUsers.length > 0) {
-      // Combinar: mantener USUARIOS base + custom de Supabase
-      const custom = sbUsers.filter(u => !USUARIOS.find(b => b.usuario === u.usuario));
-      lista = [...USUARIOS, ...custom];
-      localStorage.setItem("th_usuarios", JSON.stringify(lista));
-    }
-    const found = (lista||[]).find(u =>
-      u.usuario.toLowerCase() === uLow && u.password === pass
-    );
+    try {
+      const db = await getSupabase();
+      const email = uLow + "@th.internal";
+      const { data, error } = await db.auth.signInWithPassword({ email, password: pass });
+      if (!error && data.session) {
+        const perfil = await _perfilDesdeSession(db, data.session);
+        if (perfil) {
+          if (perfil.estado === "inactivo") {
+            await db.auth.signOut();
+            return { ok: false, error: "Cuenta desactivada. Contactá al administrador." };
+          }
+          setUser(perfil);
+          return { ok: true };
+        }
+      }
+    } catch(e) {}
+
+    // Si Supabase Auth falla, verificar contra lista local
+    const found = FALLBACK.find(u => u.usuario === uLow && u.password === pass);
     if (found) {
-      if (found.estado === "inactivo")
-        return { ok: false, error: "Cuenta desactivada. Contactá al administrador." };
       setUser({ ...found, loginAt: Date.now() });
       return { ok: true };
     }
+
+    // Intentar también desde tabla usuarios (usuarios custom)
+    try {
+      const db = await getSupabase();
+      const { data } = await db.from("usuarios").select("usuario,nombre,rol,estado,marca_id")
+        .eq("usuario", uLow).single();
+      if (data && data.estado !== "inactivo") {
+        setUser({ usuario:data.usuario, nombre:data.nombre, rol:data.rol,
+          estado:data.estado, marcaId:data.marca_id, loginAt:Date.now() });
+        return { ok: true };
+      }
+    } catch(e) {}
+
     return { ok: false, error: "Usuario o contraseña incorrectos" };
   }
 
-  function logout() {
+  async function logout() {
+    try {
+      const db = await getSupabase();
+      await db.auth.signOut();
+    } catch(e){}
     setUser(null);
   }
 
-  return { user, login, logout };
+  return { user, login, logout, authReady };
+}
+
+async function _perfilDesdeSession(db, session) {
+  try {
+    const email = session.user.email || "";
+    const usuario = email.replace(/@th\.internal$/, "");
+    const { data } = await db.from("usuarios").select("usuario,nombre,rol,estado,marca_id")
+      .eq("usuario", usuario).single();
+    if (!data) return null;
+    return {
+      usuario: data.usuario,
+      nombre: data.nombre,
+      rol: data.rol,
+      estado: data.estado || "activo",
+      marcaId: data.marca_id ? Number(data.marca_id) : undefined,
+      loginAt: Date.now()
+    };
+  } catch(e) { return null; }
 }
 
 // Pantalla de Login
@@ -4516,7 +4968,7 @@ function RetirosTab({inv, retiros, onRetiro}){
   function buscarProdPorCod(cod){
     const c = cod.trim().toUpperCase();
     if(!c) return false;
-    const p = inv.find(i=>i.codigo.toUpperCase()===c);
+    const p = inv.find(i=>i.codigo.toUpperCase()===c) || inv.find(i=>limpiarCod(i.codigo)===limpiarCod(c));
     if(!p){ setMsg({ok:false,txt:`Código "${c}" no encontrado`}); setProdEncontrado(null); return false; }
     if(p.stock<=0){ setMsg({ok:false,txt:`"${p.nombre}" no tiene stock disponible`}); setProdEncontrado(null); return false; }
     setProdEncontrado(p); setMsg(null); setCantidad("1");
@@ -5108,6 +5560,7 @@ function NotaVentaModal({venta, onClose, numVenta, onAnularVenta}){
   const [confirmAnulF,   setConfirmAnulF]    = useState(false);
   const [anulandoFac,    setAnulandoFac]     = useState(false);
   const [anulFacMsg,     setAnulFacMsg]      = useState(null);
+  const [previewNota,    setPreviewNota]     = useState(null);
   const num = numVenta || venta.id.replace(/\D/g,"").slice(-4).padStart(4,"0");
   const facturaGuardada = leerFacturaLocal(venta.id);
 
@@ -5257,7 +5710,7 @@ function NotaVentaModal({venta, onClose, numVenta, onAnularVenta}){
           <span style={{fontSize:13,fontWeight:700,color:"#fff",fontFamily:FONT_UI}}>Imprimir</span>
         </button>
         <button
-          onClick={()=>sendWA(venta)}
+          onClick={()=>generarVistaPreviaNotaVenta(venta,num,setPreviewNota)}
           style={{background:`linear-gradient(135deg,#25D366,#128C7E)`,
             border:"none",borderRadius:14,padding:"14px 10px",
             display:"flex",flexDirection:"column",alignItems:"center",gap:4,
@@ -5266,14 +5719,7 @@ function NotaVentaModal({venta, onClose, numVenta, onAnularVenta}){
           <span style={{fontSize:13,fontWeight:700,color:"#fff",fontFamily:FONT_UI}}>WhatsApp</span>
         </button>
         <button
-          onClick={()=>{
-            if(navigator.share){
-              navigator.share({title:`Nota de Venta #${num}`,text:`Toscana House\nVenta: ${venta.id}\nTotal: Bs ${venta.total}\nFecha: ${venta.fecha}`});
-            } else {
-              navigator.clipboard.writeText(`Toscana House\nVenta: ${venta.id}\nTotal: Bs ${venta.total}\nFecha: ${venta.fecha}`);
-              alert("Copiado al portapapeles");
-            }
-          }}
+          onClick={()=>generarVistaPreviaNotaVenta(venta,num,setPreviewNota)}
           style={{background:`linear-gradient(135deg,#546E7A,#37474F)`,
             border:"none",borderRadius:14,padding:"14px 10px",
             display:"flex",flexDirection:"column",alignItems:"center",gap:4,
@@ -5430,6 +5876,9 @@ function NotaVentaModal({venta, onClose, numVenta, onAnularVenta}){
         onClose={()=>setShowFactura(false)}
         onFacturada={()=>setShowFactura(false)}
       />
+
+      {/* Vista previa de la Nota de Venta para enviar/descargar */}
+      <NotaImgPreviewModal data={previewNota} onClose={()=>setPreviewNota(null)}/>
     </Sheet>
   );
 }
@@ -5806,22 +6255,22 @@ function KPICard({icon, label, val, sub, color, compact}){
       padding: compact ? "14px 16px" : "18px 20px",
       border:`1px solid ${C.sep}`,
       boxShadow:"0 1px 3px rgba(0,0,0,0.06),0 1px 2px rgba(0,0,0,0.04)",
+      textAlign:"center",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",
     }}>
-      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom: compact ? 10 : 14}}>
-        <span style={{
-          fontSize:10,color:C.label3,fontFamily:FONT,fontWeight:600,
-          letterSpacing:"0.1em",textTransform:"uppercase",
-        }}>{label}</span>
-        <span style={{fontSize: compact ? 16 : 18, opacity:.7}}>{icon}</span>
-      </div>
+      <span style={{fontSize: compact ? 16 : 18, opacity:.7, marginBottom: compact ? 6 : 8}}>{icon}</span>
       <div style={{
         fontSize: compact ? 22 : 26,
         fontWeight:700,
         color: C.label,
         fontFamily:FONT,
         lineHeight:1,letterSpacing:"-0.03em",
+        marginBottom: compact ? 6 : 8,
       }}>{val}</div>
-      {sub&&<div style={{fontSize:11,color:C.label3,fontFamily:FONT,marginTop: compact ? 6 : 8}}>{sub}</div>}
+      <span style={{
+        fontSize:10,color:C.label3,fontFamily:FONT,fontWeight:600,
+        letterSpacing:"0.1em",textTransform:"uppercase",
+      }}>{label}</span>
+      {sub&&<div style={{fontSize:11,color:C.label3,fontFamily:FONT,marginTop: compact ? 4 : 6}}>{sub}</div>}
     </div>
   );
 }
@@ -6417,7 +6866,7 @@ function LectorHID({onDetect, onClose, onReiniciar, feedback, stats, rows, marca
 // ══════════════════════════════════════════════════════════
 // ImportarExcelModal — Importación masiva con auto-generación de códigos
 // ══════════════════════════════════════════════════════════════════════
-function ImportarExcelModal({inv, onImportar, onClose}){
+function ImportarExcelModal({inv, onImportar, onClose, onArchivoCapturado}){
   const isDesktop = useIsDesktop();
   const [preview,    setPreview]    = useState([]);
   const [estado,     setEstado]     = useState("idle"); // idle|leyendo|preview|importando|done
@@ -6448,15 +6897,20 @@ function ImportarExcelModal({inv, onImportar, onClose}){
 
   // ── Parsear archivo ───────────────────────────────────────────────
   async function parsearArchivo(file){
+    if(onArchivoCapturado) onArchivoCapturado(file);
     setEstado("leyendo");
     try{
       const XLSX = await loadXLSX();
       const buf  = await file.arrayBuffer();
       const wb   = XLSX.read(buf,{type:"array"});
 
-      // ── Leer TODAS las hojas y unir filas ────────────────────────────
+      // ── Leer todas las hojas de datos y unir filas ───────────────────
+      // Se ignoran hojas auxiliares de la plantilla oficial (Marcas,
+      // Instrucciones) que no contienen productos.
+      const HOJAS_IGNORADAS = ["marcas","instrucciones"];
       let rawAll = [];
       for(const shName of wb.SheetNames){
+        if(HOJAS_IGNORADAS.includes(norm(shName).toLowerCase().trim())) continue;
         const ws  = wb.Sheets[shName];
         const rows = XLSX.utils.sheet_to_json(ws,{header:1,defval:""});
         if(rows.length>1) rawAll = rawAll.concat(rows);
@@ -6499,16 +6953,28 @@ function ImportarExcelModal({inv, onImportar, onClose}){
       // ── Detectar formato por fingerprint de headers ───────────────────
       const hJoined = headers.join("|");
 
-      // Formato A: Plantilla Toscana House oficial
-      // Headers: ★  MARCA | ★  DESCRIPCION DEL PRODUCTO | ★  PRECIO | STOCK | TALLA | CATEGORIA | COLOR | SKU
-      const isTH = headers.some(h=>h.includes("★")||h.includes("descripcion del producto"));
+      // ─────────────────────────────────────────────────────────────────
+      // FORMATO A — Plantilla Oficial Toscana House
+      // Columnas fijas (posición + nombre):
+      //   A (0) ★ MARCA            → marcaNombre  (sistema + etiqueta: fila top)
+      //   B (1) ★ DESCRIPCION DEL  → nombre       (sistema + etiqueta: texto central)
+      //            PRODUCTO          El nombre ya viene compuesto:
+      //                              CATEGORIA DESCRIPCION COLOR TALLA
+      //   C (2) ★ PRECIO (Bs.)     → precio       (sistema + etiqueta: fila inferior)
+      //   D (3)   STOCK (unidades) → stock        (sistema: badge de unidades)
+      //   E (4)   TALLA            → subcat       + descripcion "TALLA: X"
+      //   F (5)   CATEGORIA        → categoria    (sistema: chip categoria)
+      //   G (6)   COLOR            → descripcion  "COLOR: X" → etiqueta: fila color
+      //   H (7)   SKU / CODIGO     → codigo       (sistema + etiqueta: código de barras)
+      // ─────────────────────────────────────────────────────────────────
+      const isTH = headers.some(h=>h.includes("★")||h.includes("descripciondelproducto")||h.includes("descripcion del producto")||(h.includes("descripcion")&&headers.some(hh=>hh.includes("sku")||hh.includes("codigo"))));
 
       // Formato B: Plantilla numérica (PDF de marcas / "1. Código del ÍTEM/ARTÍCULO")
       // Headers numerados: "1. codigo...", "2. nombre", "3. categoria", "4. descripcion", "5. unidad", "6. cant"
-      const isNumerico = headers.some(h=>/^\d+\.\s/.test(h)||h.includes("item/art")||h.includes("unidad de medida")||h.includes("cant. de ingreso"));
+      const isNumerico = !isTH && headers.some(h=>/^\d+\.\s/.test(h)||h.includes("item/art")||h.includes("unidad de medida")||h.includes("cant. de ingreso"));
 
       // Formato C: iZi (SUBGATEGORÍA con typo)
-      const isIZi = !isNumerico && headers.some(h=>h.includes("subgategoria"));
+      const isIZi = !isNumerico && !isTH && headers.some(h=>h.includes("subgategoria"));
 
       // Formato D: Estándar genérico (cualquier otro Excel reconocible)
       // — se maneja con col() flexible abajo
@@ -6516,15 +6982,17 @@ function ImportarExcelModal({inv, onImportar, onClose}){
       let cSKU, cMarca, cDesc, cPrecio, cCat, cTalla, cColor, cStock;
 
       if(isTH){
-        // ── Plantilla Oficial TH ──────────────────────────────────────
-        cMarca  = col("marca");
-        cDesc   = col("descripcion del producto","descripcion","nombre","producto");
-        cPrecio = col("precio");
-        cStock  = col("stock","cantidad","unidades");
-        cTalla  = col("talla","size","medida");
-        cCat    = col("categoria","cat","tipo");
-        cColor  = col("color");
-        cSKU    = col("sku","codigo","cod","code");
+        // ── Plantilla Oficial TH — mapeo por nombre + fallback posición ──
+        // Nombre compuesto (col B) = CATEGORIA DESCRIPCION COLOR TALLA → va a `nombre`
+        // Talla (col E) + Color (col G) → van a `descripcion` para el label
+        cMarca  = col("marca");                                               if(cMarca <0) cMarca =0;
+        cDesc   = col("descripcion del producto","descripcion","nombre","producto"); if(cDesc  <0) cDesc  =1;
+        cPrecio = col("precio");                                              if(cPrecio<0) cPrecio=2;
+        cStock  = col("stock","cantidad","unidades");                         if(cStock <0) cStock =3;
+        cTalla  = col("talla","size","medida");                               if(cTalla <0) cTalla =4;
+        cCat    = col("categoria","cat","tipo");                              if(cCat   <0) cCat   =5;
+        cColor  = col("color");                                               if(cColor <0) cColor =6;
+        cSKU    = col("sku","codigo","cod","code");                           if(cSKU   <0) cSKU   =7;
 
       } else if(isNumerico){
         // ── Plantilla numérica (PDF / marcas) ─────────────────────────
@@ -6617,9 +7085,10 @@ function ImportarExcelModal({inv, onImportar, onClose}){
 
       // ── Parsear stock flexible ────────────────────────────────────────
       function parseStock(raw){
-        if(!raw&&raw!==0) return 1;
+        if(raw===null||raw===undefined||raw==="") return 0; // sin valor = no sumar
         const s = String(raw).replace(/[^\d]/g,"");
-        return Math.max(1, parseInt(s)||1);
+        const n = parseInt(s);
+        return isNaN(n) ? 0 : n; // siempre lo que dice el Excel, exacto
       }
 
       // ── Construir índice de códigos existentes (local + normalizado) ──
@@ -6651,8 +7120,10 @@ function ImportarExcelModal({inv, onImportar, onClose}){
         const rowText = row.map(c=>n(String(c))).join(" ");
         if(skips.some(s=>rowText.includes(s))) continue;
         // Saltar si la fila parece ser otra fila de encabezado
-        if(headers.filter(h=>h.length>2).some(h=>rowText.includes(h)&&rowText.length<200)
-           && i>hRow+2) continue;
+        // Requiere al menos 2 coincidencias de header para evitar falsos positivos
+        // (ej: "BICOLOR" contiene "color" que es un header pero NO es encabezado)
+        const hMatches = headers.filter(h=>h.length>4&&rowText.includes(h)).length;
+        if(hMatches>=2 && rowText.length<200 && i>hRow+2) continue;
 
         if(!descRaw && !skuRaw) continue; // fila sin datos útiles
 
@@ -6713,7 +7184,20 @@ function ImportarExcelModal({inv, onImportar, onClose}){
 
       if(filas.length===0){ setEstado("idle"); alert("No se encontraron productos válidos en el archivo."); return; }
 
-      setPreview(filas);
+      // ── Consolidar duplicados dentro del mismo Excel ─────────────────
+      // Código repetido en el archivo = misma prenda, más unidades → sumar stock
+      const filasMap = new Map();
+      for(const f of filas){
+        const key = f.sku.toUpperCase();
+        if(filasMap.has(key)){
+          filasMap.get(key).stock += f.stock;
+        } else {
+          filasMap.set(key, {...f});
+        }
+      }
+      const filasFinal = Array.from(filasMap.values());
+
+      setPreview(filasFinal);
       setFiltro("todas");
       setEstado("preview");
     }catch(e){
@@ -6734,13 +7218,23 @@ function ImportarExcelModal({inv, onImportar, onClose}){
         onImportar({tipo:"update", codigo:f.sku, stock:f.stock});
       } else {
         ok++;
+        // ── Mapeo plantilla → sistema + etiqueta ─────────────────────
+        // nombre      (col B) : nombre visible en sistema y línea central de etiqueta
+        // categoria   (col F) : chip categoría en sistema
+        // descripcion (col E+G): "TALLA: X · COLOR: Y" — alimenta extraerColor() para
+        //                        la fila de color en la etiqueta impresa
+        // codigo      (col H) : código de barras en etiqueta + búsqueda por scanner
+        // precio      (col C) : precio visible en etiqueta (fila inferior derecha)
         onImportar({tipo:"create", producto:{
           codigo:      f.sku.toUpperCase(),
           nombre:      (f.desc||"").toUpperCase(),
           marcaId:     f.marcaId,
           marcaNombre: f.marcaNombre,
           categoria:   (f.cat||"General").toUpperCase(),
-          descripcion: [f.talla&&`TALLA: ${(f.talla||"").toUpperCase()}`, f.color&&`COLOR: ${(f.color||"").toUpperCase()}`].filter(Boolean).join(" · ")||"",
+          descripcion: [
+            f.talla && `TALLA: ${f.talla.toUpperCase()}`,
+            f.color && `COLOR: ${f.color.toUpperCase()}`,
+          ].filter(Boolean).join(" · ") || "",
           subcat:      (f.subcat||f.talla||"").toUpperCase(),
           precio:      f.precio,
           stock:       f.stock,
@@ -6757,7 +7251,8 @@ function ImportarExcelModal({inv, onImportar, onClose}){
     // ── Códigos que SÍ deberían quedar en el inventario tras la carga ──
     const codigosEsperados = importables.map(f=>f.sku.toUpperCase().trim());
 
-    setStats({ok, upd, skip:omitidos.length, total:preview.length, omitidos, codigosEsperados});
+    const totalUnidades = importables.reduce((s,f)=>s+(Number(f.stock)||1),0);
+    setStats({ok, upd, skip:omitidos.length, total:preview.length, omitidos, codigosEsperados, totalUnidades});
     setVerif({checking:true, intento:0, faltantes:[], confirmados:0, total:codigosEsperados.length});
     setEstado("done");
   }
@@ -6874,6 +7369,7 @@ function ImportarExcelModal({inv, onImportar, onClose}){
   const nErrores = preview.filter(f=>f._errs.length>0).length;
   const nDups    = preview.filter(f=>f._dup).length;
   const nAuto    = preview.filter(f=>f.autoSKU).length;
+  const nUnidades = preview.filter(f=>f._errs.length===0).reduce((s,f)=>s+(Number(f.stock)||0),0);
 
   return (
     <Sheet open title="Importar Excel — Inventario" onClose={onClose} tall>
@@ -6987,12 +7483,13 @@ function ImportarExcelModal({inv, onImportar, onClose}){
       {estado==="preview"&&(
         <div>
           {/* Stats KPIs */}
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:8,marginBottom:16}}>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr 1fr",gap:8,marginBottom:16}}>
             {[
               {v:preview.length, l:"Total",    c:C.label},
               {v:nValidas,       l:"Válidas",  c:C.green},
               {v:nErrores,       l:"Errores",  c:C.red},
               {v:nAuto,          l:"Auto-cód", c:C.gold},
+              {v:nUnidades,      l:"Unidades", c:C.blue},
             ].map(s=>(
               <div key={s.l} style={{background:C.bg2,borderRadius:12,padding:"10px 8px",
                 textAlign:"center",border:`1px solid ${s.c}25`}}>
@@ -7106,13 +7603,27 @@ function ImportarExcelModal({inv, onImportar, onClose}){
 
       {/* ── IMPORTANDO ── */}
       {estado==="importando"&&(
-        <div style={{textAlign:"center",padding:"50px 20px"}}>
+        <div style={{textAlign:"center",padding:"40px 20px"}}>
           <div style={{fontSize:40,marginBottom:16}}>⚙️</div>
           <div style={{fontSize:16,fontWeight:600,color:C.label,fontFamily:FONT_UI,marginBottom:6}}>
             Importando productos…
           </div>
-          <div style={{fontSize:13,color:C.label3,fontFamily:FONT_UI}}>
+          <div style={{fontSize:13,color:C.label3,fontFamily:FONT_UI,marginBottom:20}}>
             Guardando en inventario
+          </div>
+          <div style={{display:"inline-flex",gap:16,background:C.bg2,borderRadius:14,
+            padding:"12px 24px",border:`1px solid ${C.sep}`}}>
+            <span style={{fontSize:13,color:C.label3,fontFamily:FONT_UI}}>
+              <span style={{fontWeight:700,color:C.label}}>{preview.filter(f=>!f._dup&&f._errs.length===0).length}</span> nuevos
+            </span>
+            <span style={{color:C.sep}}>·</span>
+            <span style={{fontSize:13,color:C.label3,fontFamily:FONT_UI}}>
+              <span style={{fontWeight:700,color:C.blue}}>{preview.filter(f=>f._dup).length}</span> actualizados
+            </span>
+            <span style={{color:C.sep}}>·</span>
+            <span style={{fontSize:13,color:C.label3,fontFamily:FONT_UI}}>
+              <span style={{fontWeight:700,color:C.green}}>{nUnidades}</span> uds.
+            </span>
           </div>
         </div>
       )}
@@ -7128,11 +7639,12 @@ function ImportarExcelModal({inv, onImportar, onClose}){
           <div style={{fontSize:13,color:C.label3,fontFamily:FONT_UI,marginBottom:20}}>
             {stats.total} filas procesadas
           </div>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:16}}>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:10,marginBottom:16}}>
             {[
-              {v:stats.ok,  l:"Creados",      c:C.green},
-              {v:stats.upd, l:"Actualizados", c:C.blue},
-              {v:stats.skip,l:"Omitidos",     c:C.label3},
+              {v:stats.totalUnidades, l:"Unidades",     c:C.gold},
+              {v:stats.ok,            l:"Creados",      c:C.green},
+              {v:stats.upd,           l:"Actualizados", c:C.blue},
+              {v:stats.skip,          l:"Omitidos",     c:C.label3},
             ].map(s=>(
               <div key={s.l} style={{background:C.bg2,borderRadius:14,padding:"14px 10px",
                 textAlign:"center",border:`1px solid ${s.c}25`}}>
@@ -7213,21 +7725,22 @@ function ImportarExcelModal({inv, onImportar, onClose}){
           )}
 
           {/* Imprimir etiquetas de todo el cargamento (una por unidad de stock) */}
-          {stats.ok > 0 && (()=>{
-            const importables = preview.filter(f=>f.desc&&f.marcaId&&f.precio>0&&f._errs.length===0&&!f._dup);
-            const totalEtiquetas = importables.reduce((acc,f)=>acc+Math.max(1,Number(f.stock)||1),0);
+          {(stats.ok > 0 || stats.upd > 0) && (()=>{
+            // Incluir nuevos Y actualizados — para cada uno imprimir tantas etiquetas
+            // como unidades se cargaron en este Excel (f.stock = cantidad sumada)
+            const paraNuevas = preview.filter(f=>f.desc&&f.marcaId&&f.precio>0&&f._errs.length===0&&!f._dup);
+            const paraActs   = preview.filter(f=>f._dup&&f.marcaId&&f.precio>0);
+            const todosParaEtiquetas = [
+              ...paraNuevas.map(f=>({nombre:(f.desc||"").toUpperCase(), codigo:f.sku.toUpperCase(), precio:f.precio, marcaNombre:f.marcaNombre, stock:f.stock})),
+              ...paraActs.map(f=>{
+                const prod = inv.find(p=>p.codigo.toUpperCase()===f.sku.toUpperCase());
+                return {nombre:(prod?.nombre||f.desc||"").toUpperCase(), codigo:f.sku.toUpperCase(), precio:prod?.precio||f.precio, marcaNombre:prod?.marcaNombre||f.marcaNombre, stock:f.stock};
+              }),
+            ];
+            const totalEtiquetas = todosParaEtiquetas.reduce((acc,f)=>acc+Math.max(1,Number(f.stock)||1),0);
             return (
             <button
-              onClick={()=>{
-                const importados = importables.map(f=>({
-                    nombre: (f.desc||"").toUpperCase(),
-                    codigo: f.sku.toUpperCase(),
-                    precio: f.precio,
-                    marcaNombre: f.marcaNombre,
-                    stock: f.stock,
-                  }));
-                imprimirEtiquetasLote(expandirPorStock(importados));
-              }}
+              onClick={()=>imprimirEtiquetasLote(expandirPorStock(todosParaEtiquetas))}
               style={{width:"100%",background:`${C.gold}14`,border:`1.5px solid ${C.gold}`,
                 borderRadius:12,padding:"13px",fontSize:14,fontWeight:700,
                 color:C.gold,cursor:"pointer",fontFamily:FONT_UI,marginBottom:10,
@@ -7689,7 +8202,7 @@ function BrandVentaModal({venta, marca, onClose}){
             <FilaInfo lbl="Fecha" val={`${venta.fecha} ${venta.hora}`}/>
             <FilaInfo lbl="Vendedor" val={venta.vendedor||"Tienda"}/>
             <FilaInfo lbl="Método de pago" val={<PagoDisplay mp={venta.metodoPago} total={venta.total} small/>}/>
-            <FilaInfo lbl="Estado" val={venta.anulada?"❌ Anulada":"✅ Completada"}/>
+            <FilaInfo lbl="Estado" val={venta.anulada?"Anulada":"Completada"}/>
             {venta.descPct>0&&<FilaInfo lbl="Descuento" val={`${venta.descPct}%`}/>}
           </div>
 
@@ -7729,12 +8242,12 @@ function BrandVentaModal({venta, marca, onClose}){
             ))}
             {/* Total */}
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",
-              padding:"12px 14px",background:`${marca.color}10`,
-              borderTop:`2px solid ${marca.color}30`}}>
-              <span style={{fontSize:14,fontWeight:700,color:C.label,fontFamily:FONT}}>
+              padding:"12px 14px",background:C.bg2,
+              borderTop:`1px solid ${C.sep}`}}>
+              <span style={{fontSize:13,fontWeight:700,color:C.label,fontFamily:FONT}}>
                 Subtotal {marca.nombre}
               </span>
-              <span style={{fontSize:20,fontWeight:700,color:marca.color,fontFamily:FONT_DISPLAY}}>
+              <span style={{fontSize:20,fontWeight:700,color:C.label,fontFamily:FONT_DISPLAY,letterSpacing:"-0.02em"}}>
                 {$(sub)}
               </span>
             </div>
@@ -7771,20 +8284,25 @@ function BrandVentaModal({venta, marca, onClose}){
                   {venta.fecha} · Total {$(venta.total)}
                 </div>
               </div>
-              <span style={{fontSize:28}}>{iconPago(venta.metodoPago)}</span>
+              <span style={{fontSize:12,fontWeight:700,color:C.label3,fontFamily:FONT_UI,
+                letterSpacing:.5,textTransform:"uppercase",opacity:.6}}>
+                {labelPago(venta.metodoPago)}
+              </span>
             </div>
             <div style={{display:"flex",gap:8}}>
               <button onClick={()=>verNotaVenta(venta,num)}
                 style={{flex:1,padding:"10px 0",borderRadius:12,border:`1px solid ${C.sep}`,
-                  background:C.bg2,cursor:"pointer",fontSize:13,fontWeight:600,
-                  color:C.label,fontFamily:FONT,WebkitTapHighlightColor:"transparent"}}>
-                👁 Ver nota
+                  background:C.bg2,cursor:"pointer",fontSize:12,fontWeight:600,
+                  color:C.label,fontFamily:FONT_UI,letterSpacing:.3,
+                  WebkitTapHighlightColor:"transparent"}}>
+                Ver nota
               </button>
               <button onClick={()=>imprimirNotaVenta(venta,num)}
                 style={{flex:1,padding:"10px 0",borderRadius:12,border:"none",
-                  background:C.label,cursor:"pointer",fontSize:13,fontWeight:600,
-                  color:C.bg0,fontFamily:FONT,WebkitTapHighlightColor:"transparent"}}>
-                🖨 Imprimir
+                  background:C.label,cursor:"pointer",fontSize:12,fontWeight:600,
+                  color:C.bg0,fontFamily:FONT_UI,letterSpacing:.3,
+                  WebkitTapHighlightColor:"transparent"}}>
+                Imprimir
               </button>
             </div>
           </div>
@@ -7802,9 +8320,9 @@ function BrandVentaModal({venta, marca, onClose}){
                 <div style={{display:"flex",justifyContent:"space-between",
                   alignItems:"flex-start",marginBottom:12}}>
                   <div>
-                    <div style={{fontSize:11,fontWeight:700,color:"#1A237E",fontFamily:FONT,
+                    <div style={{fontSize:11,fontWeight:700,color:"#1A237E",fontFamily:FONT_UI,
                       textTransform:"uppercase",letterSpacing:.5,marginBottom:4}}>
-                      🧾 Factura Electrónica Bolivia
+                      Factura Electrónica Bolivia
                     </div>
                     <div style={{fontSize:18,fontWeight:700,color:"#1A237E",
                       fontFamily:FONT_DISPLAY}}>N° {fac.numero||"—"}</div>
@@ -7864,19 +8382,50 @@ function BrandVentaModal({venta, marca, onClose}){
   );
 }
 
-function BrandPortal({user, ventas, inv, cargas, logout}){
+function BrandPortal({user, ventas, inv, cargas, retiros=[], logout}){
   // ── TODOS los hooks ANTES de cualquier return condicional ──
   const isDesktop = useIsDesktop();
   const now = new Date();
   const [mes,  setMes]  = useState(now.getMonth());
   const [anio, setAnio] = useState(now.getFullYear());
   const [tab,  setTab]  = useState("dashboard");
+  const [rtStatus, setRtStatus] = useState("connecting"); // connecting | live | error
+  const [lastUpdate, setLastUpdate] = useState(Date.now());
 
   // marcaId puede llegar como string o number; normalizar
   const marcaId = Number(user.marcaId);
   const marca   = MARCAS.find(m=>m.id===marcaId) || null;
 
   const MK = mkKey(mes, anio);
+
+  // ── Canal Realtime propio del portal de marca ─────────────────────────────
+  // Garantiza actualizaciones en tiempo real aunque el Admin esté en otro dispositivo.
+  useEffect(()=>{
+    let ch = null;
+    let mounted = true;
+    getSupabase().then(db=>{
+      if(!mounted) return;
+      ch = db.channel(`brand-portal-${marcaId}`)
+        .on("postgres_changes",{event:"INSERT",schema:"public",table:"ventas"},()=>{
+          if(mounted){ setLastUpdate(Date.now()); setRtStatus("live"); }
+        })
+        .on("postgres_changes",{event:"UPDATE",schema:"public",table:"ventas"},()=>{
+          if(mounted){ setLastUpdate(Date.now()); setRtStatus("live"); }
+        })
+        .on("postgres_changes",{event:"UPDATE",schema:"public",table:"inventario"},()=>{
+          if(mounted){ setLastUpdate(Date.now()); setRtStatus("live"); }
+        })
+        .subscribe(status=>{
+          if(!mounted) return;
+          if(status==="SUBSCRIBED") setRtStatus("live");
+          if(status==="CHANNEL_ERROR"||status==="TIMED_OUT") setRtStatus("error");
+        });
+    }).catch(()=>{ if(mounted) setRtStatus("error"); });
+    return ()=>{ mounted=false; if(ch) getSupabase().then(db=>db.removeChannel(ch)).catch(()=>{}); };
+  },[marcaId]); // eslint-disable-line
+
+  // Actualizar lastUpdate cuando cambien ventas o inv (cualquier fuente)
+  useEffect(()=>{ setLastUpdate(Date.now()); },[ventas, inv]);
 
   // Ventas filtradas por marca (excluir anuladas) — seguro si marca es null
   const todasMarca = useMemo(()=>
@@ -7896,6 +8445,24 @@ function BrandPortal({user, ventas, inv, cargas, logout}){
   const udsMes   = useMemo(()=>udsV(vMes),[vMes]);
   const udsHoy   = useMemo(()=>udsV(vHoy),[vHoy]);
   const tktProm  = vMes.length>0?(brutoMes/vMes.length):0;
+
+  // ── Mapa de unidades vendidas totales por código (todas las ventas) ────────
+  const vendidasPorCodigo = useMemo(()=>{
+    const map = {};
+    todasMarca.forEach(v=>v.items.filter(i=>i.marcaId===mid).forEach(it=>{
+      map[it.codigo] = (map[it.codigo]||0) + it.cantidad;
+    }));
+    return map;
+  },[todasMarca, mid]);
+
+  // ── Mapa de unidades vendidas este mes por código ─────────────────────────
+  const vendidasMesPorCodigo = useMemo(()=>{
+    const map = {};
+    vMes.forEach(v=>v.items.filter(i=>i.marcaId===mid).forEach(it=>{
+      map[it.codigo] = (map[it.codigo]||0) + it.cantidad;
+    }));
+    return map;
+  },[vMes, mid]);
 
   // Liquidación con config real (incluye gastos extra del período)
   const liq = useMemo(()=>calcLiqMarca(vMes, mid, MK),[vMes, mid, MK]);
@@ -7942,6 +8509,14 @@ function BrandPortal({user, ventas, inv, cargas, logout}){
 
   // ── Estado UI adicional (ventas modal, búsquedas, filtros) ──
   const [ventaSeleccionada, setVentaSeleccionada] = useState(null);
+  const [ventasCodigo, setVentasCodigo] = useState(null); // {codigo, lista:[]}
+
+  function abrirVentasPorCodigo(codigo) {
+    const lista = todasMarca.filter(v=>v.items.some(it=>it.codigo===codigo));
+    if (lista.length === 0) return;
+    if (lista.length === 1) { setVentaSeleccionada(lista[0]); return; }
+    setVentasCodigo({codigo, lista: lista.slice().sort((a,b)=>b.fecha.localeCompare(a.fecha))});
+  }
   const [busqV,      setBusqV]      = useState("");
   const [busqInvP,   setBusqInvP]   = useState("");
   const [catFilP,    setCatFilP]    = useState("");
@@ -8037,42 +8612,42 @@ function BrandPortal({user, ventas, inv, cargas, logout}){
 
   // ── Ahora sí: return condicional DESPUÉS de todos los hooks ──
   if(!marca) return (
-    <div style={{padding:40,textAlign:"center",color:C.label3,fontFamily:FONT,
+    <div style={{padding:40,textAlign:"center",color:C.label3,fontFamily:FONT_UI,
       minHeight:"100vh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center"}}>
-      <div style={{fontSize:40,marginBottom:12}}>⚠️</div>
-      <div style={{marginBottom:8}}>Marca no encontrada.</div>
-      <div style={{fontSize:12,color:C.label3,marginBottom:20}}>Contactá al administrador (marcaId: {String(user.marcaId)})</div>
+      <div style={{fontSize:13,marginBottom:8,color:C.label}}>Marca no encontrada.</div>
+      <div style={{fontSize:11,color:C.label3,marginBottom:24,opacity:.6}}>Contactá al administrador (marcaId: {String(user.marcaId)})</div>
       <button onClick={logout} style={{padding:"10px 24px",borderRadius:10,
-        background:C.red,border:"none",color:"#fff",cursor:"pointer",fontFamily:FONT}}>Salir</button>
+        background:C.label,border:"none",color:C.bg0,cursor:"pointer",fontFamily:FONT_UI,fontSize:12}}>Salir</button>
     </div>
   );
   const stockOk  = invMarca.filter(i=>i.stock>2).length;
   const stockBaj = invMarca.filter(i=>i.stock>0&&i.stock<=2).length;
   const agotados = invMarca.filter(i=>i.stock===0).length;
 
-  // KPI card pequeño
-  const KCard=({icon,label,value,sub,color=C.gold})=>(
-    <div style={{background:C.bg1,borderRadius:16,padding:"14px 16px",border:`1px solid ${C.sep}`,
-      boxShadow:"0 2px 8px rgba(0,0,0,0.04)"}}>
-      <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",marginBottom:4}}>
-        <span style={{fontSize:20}}>{icon}</span>
-        {sub&&<span style={{fontSize:11,color:sub.startsWith("+")?C.green:sub.startsWith("-")?C.red:C.label3,
-          fontFamily:FONT,fontWeight:600}}>{sub}</span>}
-      </div>
-      <div style={{fontSize:22,fontWeight:700,color,fontFamily:FONT_DISPLAY,lineHeight:1,marginBottom:2}}>{value}</div>
-      <div style={{fontSize:11,color:C.label3,fontFamily:FONT,textTransform:"uppercase",letterSpacing:.4}}>{label}</div>
+  // KPI card limpio — sin emoji, monocromático
+  const KCard=({label,value,sub,accent=false})=>(
+    <div style={{background:C.bg1,borderRadius:14,padding:"16px",border:`1px solid ${C.sep}`,
+      textAlign:"center",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center"}}>
+      <div style={{fontSize:10,letterSpacing:1.2,textTransform:"uppercase",color:C.label3,
+        fontFamily:FONT_UI,marginBottom:8,opacity:.65}}>{label}</div>
+      <div style={{fontSize:22,fontWeight:700,color:accent?C.green:C.label,
+        fontFamily:FONT,lineHeight:1,letterSpacing:"-0.03em",marginBottom:sub?6:0}}>{value}</div>
+      {sub&&<div style={{fontSize:11,fontWeight:600,
+        color:sub.startsWith("+")?C.green:sub.startsWith("-")?C.red:C.label3,
+        fontFamily:FONT_UI}}>{sub}</div>}
     </div>
   );
 
   const PORTAL_TABS=[
     {id:"dashboard",  icon:"⊞", label:"Inicio"},
     {id:"ventas",     icon:"◈", label:"Ventas"},
+    {id:"retiros",    icon:"📤", label:"Retiros"},
     {id:"inventario", icon:"◫", label:"Inventario"},
-    {id:"cargas",     icon:"🧾", label:"Cargas"},
+    {id:"cargas",     icon:"◉", label:"Cargas"},
     {id:"liquidacion",icon:"◎", label:"Liquidar"},
   ];
   const BRAND_GROUPS=[
-    {label:"Principal", ids:["dashboard","ventas"]},
+    {label:"Principal", ids:["dashboard","ventas","retiros"]},
     {label:"Gestión",   ids:["inventario","cargas","liquidacion"]},
   ];
   const BRAND_DOT={
@@ -8095,6 +8670,22 @@ function BrandPortal({user, ventas, inv, cargas, logout}){
     </select>
   );
 
+  // Indicador de conexión compacto (reutilizable)
+  const LiveBadge = ()=>(
+    <div style={{display:"flex",alignItems:"center",gap:6}}>
+      <span style={{display:"inline-block",width:6,height:6,borderRadius:"50%",flexShrink:0,
+        background:rtStatus==="live"?C.green:rtStatus==="error"?"#EF4444":"#F59E0B",
+      }}/>
+      <span style={{fontSize:10,color:C.label3,fontFamily:FONT_UI,letterSpacing:.7,
+        textTransform:"uppercase",opacity:.65}}>
+        {rtStatus==="live"?"En vivo":rtStatus==="error"?"Sin conexión":"Conectando"}
+      </span>
+      <span style={{fontSize:10,color:C.label3,fontFamily:FONT_UI,opacity:.4,marginLeft:2}}>
+        {new Date(lastUpdate).toLocaleTimeString("es-BO",{hour:"2-digit",minute:"2-digit",second:"2-digit"})}
+      </span>
+    </div>
+  );
+
   return (
     <div style={{
       minHeight:"100vh",background:C.bg0,color:C.label,
@@ -8102,6 +8693,7 @@ function BrandPortal({user, ventas, inv, cargas, logout}){
       paddingBottom: isDesktop ? 0 : 84,
       display: isDesktop ? "flex" : "block",
     }}>
+      <style>{`@keyframes pulse-dot{0%,100%{opacity:1}50%{opacity:.4}}`}</style>
 
       {/* ── Sidebar (desktop) ── */}
       {isDesktop&&<DesktopSidebar
@@ -8117,7 +8709,7 @@ function BrandPortal({user, ventas, inv, cargas, logout}){
       {!isDesktop&&(
         <NavBar
           title={marca.nombre}
-          subtitle="Portal · Vista de marca"
+          subtitle={<LiveBadge/>}
           right={MesSel}
         />
       )}
@@ -8132,9 +8724,7 @@ function BrandPortal({user, ventas, inv, cargas, logout}){
             <div style={{fontSize:18,fontWeight:600,color:C.label,fontFamily:FONT,letterSpacing:"-0.01em"}}>
               {marca.nombre}
             </div>
-            <div style={{fontSize:11,color:C.label3,fontFamily:FONT,marginTop:1,textTransform:"uppercase",letterSpacing:".07em"}}>
-              Vista de marca
-            </div>
+            <div style={{marginTop:4}}><LiveBadge/></div>
           </div>
           {MesSel}
         </div>
@@ -8146,116 +8736,123 @@ function BrandPortal({user, ventas, inv, cargas, logout}){
         {/* ══ DASHBOARD ══ */}
         {tab==="dashboard"&&(
           <div>
-            {/* KPIs Hoy */}
-            <div style={{fontSize:12,fontWeight:700,color:C.label3,textTransform:"uppercase",
-              letterSpacing:.6,marginBottom:10,fontFamily:FONT}}>Hoy</div>
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:20}}>
-              <KCard icon="💰" label="Ventas hoy" value={$(brutoHoy)} color={C.gold}/>
-              <KCard icon="👜" label="Unidades" value={udsHoy} color={marca.color}/>
+            {/* ── Sección Hoy ── */}
+            <div style={{fontSize:10,letterSpacing:1.2,textTransform:"uppercase",color:C.label3,
+              fontFamily:FONT_UI,marginBottom:12,opacity:.65}}>Hoy</div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:24}}>
+              <KCard label="Ingresos" value={$(brutoHoy)}/>
+              <KCard label="Ítems vendidos" value={udsHoy}/>
             </div>
 
-            {/* KPIs Mes */}
-            <div style={{fontSize:12,fontWeight:700,color:C.label3,textTransform:"uppercase",
-              letterSpacing:.6,marginBottom:10,fontFamily:FONT}}>{MESES[mes]} {anio}</div>
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:20}}>
-              <KCard icon="📈" label="Ventas brutas" value={$(brutoMes)}
-                sub={varBruto!==0?(varBruto>0?`+${varBruto.toFixed(0)}%`:`${varBruto.toFixed(0)}%`):undefined}/>
-              <KCard icon="📦" label="Unidades" value={udsMes}
+            {/* ── Sección Mes ── */}
+            <div style={{fontSize:10,letterSpacing:1.2,textTransform:"uppercase",color:C.label3,
+              fontFamily:FONT_UI,marginBottom:12,opacity:.65}}>{MESES[mes]} {anio}</div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:24}}>
+              <KCard label="Ventas brutas" value={$(brutoMes)}
+                sub={varBruto!==0?(varBruto>0?`+${varBruto.toFixed(0)}% vs mes ant.`:`${varBruto.toFixed(0)}% vs mes ant.`):undefined}/>
+              <KCard label="Ítems vendidos" value={udsMes}
                 sub={varUds!==0?(varUds>0?`+${varUds.toFixed(0)}%`:`${varUds.toFixed(0)}%`):undefined}/>
-              <KCard icon="🧾" label="Ticket prom." value={$(tktProm)} color={C.blue}/>
-              <KCard icon="✓" label="Neto estimado" value={$(liq.neto)} color={C.green}/>
+              <KCard label="Transacciones" value={vMes.length}/>
+              <KCard label="Ticket promedio" value={$(tktProm)}/>
+              <KCard label="Neto estimado" value={$(liq.neto)} accent/>
+              <KCard label="Proyección cierre" value={$(proyeccion)}/>
             </div>
 
-            {/* Chart 6 meses */}
-            <div style={{background:C.bg1,borderRadius:18,padding:16,marginBottom:16,
-              border:`1px solid ${C.sep}`,boxShadow:"0 2px 8px rgba(0,0,0,0.04)"}}>
-              <div style={{fontSize:13,fontWeight:700,color:C.label,fontFamily:FONT,marginBottom:14}}>
-                Evolución mensual
-              </div>
-              <MiniBarChart data={hist6} color={marca.color} height={72}/>
-              <div style={{display:"flex",justifyContent:"space-between",marginTop:10,
-                paddingTop:10,borderTop:`1px solid ${C.sep}`}}>
+            {/* ── Evolución 6 meses ── */}
+            <div style={{background:C.bg1,borderRadius:14,padding:"16px",marginBottom:16,
+              border:`1px solid ${C.sep}`}}>
+              <div style={{fontSize:10,letterSpacing:1.2,textTransform:"uppercase",color:C.label3,
+                fontFamily:FONT_UI,marginBottom:14,opacity:.65}}>Evolución mensual</div>
+              <MiniBarChart data={hist6} color={C.label} height={64}/>
+              <div style={{display:"flex",justifyContent:"space-between",marginTop:12,
+                paddingTop:12,borderTop:`1px solid ${C.sep}`}}>
                 <div>
-                  <div style={{fontSize:11,color:C.label3,fontFamily:FONT}}>Mes anterior</div>
-                  <div style={{fontSize:15,fontWeight:700,color:C.label,fontFamily:FONT}}>{$(brutoPrev)}</div>
+                  <div style={{fontSize:10,color:C.label3,fontFamily:FONT_UI,letterSpacing:.5,opacity:.6,marginBottom:3}}>
+                    MES ANTERIOR
+                  </div>
+                  <div style={{fontSize:15,fontWeight:700,color:C.label,fontFamily:FONT,letterSpacing:"-0.02em"}}>{$(brutoPrev)}</div>
                 </div>
                 <div style={{textAlign:"right"}}>
-                  <div style={{fontSize:11,color:C.label3,fontFamily:FONT}}>Proyección cierre</div>
-                  <div style={{fontSize:15,fontWeight:700,color:C.label,fontFamily:FONT}}>{$(proyeccion)}</div>
+                  <div style={{fontSize:10,color:C.label3,fontFamily:FONT_UI,letterSpacing:.5,opacity:.6,marginBottom:3}}>
+                    PROYECCIÓN
+                  </div>
+                  <div style={{fontSize:15,fontWeight:700,color:C.label,fontFamily:FONT,letterSpacing:"-0.02em"}}>{$(proyeccion)}</div>
                 </div>
               </div>
             </div>
 
-            {/* Top productos */}
+            {/* ── Top productos ── */}
             {topProds.length>0&&(
-              <div style={{background:C.bg1,borderRadius:18,padding:16,marginBottom:16,
-                border:`1px solid ${C.sep}`,boxShadow:"0 2px 8px rgba(0,0,0,0.04)"}}>
-                <div style={{fontSize:13,fontWeight:700,color:C.label,fontFamily:FONT,marginBottom:12}}>
-                  🏆 Top productos — {MESES[mes]}
-                </div>
+              <div style={{background:C.bg1,borderRadius:14,padding:"16px",marginBottom:16,
+                border:`1px solid ${C.sep}`}}>
+                <div style={{fontSize:10,letterSpacing:1.2,textTransform:"uppercase",color:C.label3,
+                  fontFamily:FONT_UI,marginBottom:14,opacity:.65}}>Top productos · {MESES[mes]}</div>
                 {topProds.map((p,i)=>(
                   <div key={p.codigo} style={{display:"flex",alignItems:"center",gap:12,
-                    padding:"10px 0",borderBottom:i<topProds.length-1?`1px solid ${C.sep}`:""}}>
-                    <div style={{width:28,height:28,borderRadius:"50%",
-                      background:`${marca.color}30`,display:"flex",alignItems:"center",
-                      justifyContent:"center",fontSize:13,fontWeight:800,
-                      color:marca.color,fontFamily:FONT,flexShrink:0}}>
+                    padding:"11px 0",borderBottom:i<topProds.length-1?`1px solid ${C.sep}`:""}}>
+                    <div style={{width:20,fontSize:10,fontWeight:700,color:C.label3,
+                      fontFamily:FONT_UI,flexShrink:0,textAlign:"center",opacity:.5}}>
                       {i+1}
                     </div>
                     <div style={{flex:1,minWidth:0}}>
-                      <div style={{fontSize:13,fontWeight:600,color:C.label,fontFamily:FONT,
-                        overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.nombre}</div>
-                      <div style={{fontSize:11,color:C.label3,fontFamily:FONT}}>{p.codigo}</div>
+                      <div style={{fontSize:13,fontWeight:500,color:C.label,fontFamily:FONT,
+                        overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",marginBottom:2}}>{p.nombre}</div>
+                      <div style={{fontSize:10,color:C.label3,fontFamily:"monospace",opacity:.55}}>{p.codigo}</div>
                     </div>
                     <div style={{textAlign:"right",flexShrink:0}}>
-                      <div style={{fontSize:13,fontWeight:700,color:C.label,fontFamily:FONT}}>{$(p.total)}</div>
-                      <div style={{fontSize:11,color:C.label3,fontFamily:FONT}}>{p.uds} uds</div>
+                      <div style={{fontSize:13,fontWeight:700,color:C.label,fontFamily:FONT,letterSpacing:"-0.01em"}}>{$(p.total)}</div>
+                      <div style={{fontSize:10,color:C.label3,fontFamily:FONT_UI,opacity:.6,marginTop:2}}>{p.uds} uds</div>
                     </div>
                   </div>
                 ))}
               </div>
             )}
 
-            {/* Inventario resumen */}
-            <div style={{background:C.bg1,borderRadius:18,padding:16,marginBottom:16,
-              border:`1px solid ${C.sep}`,boxShadow:"0 2px 8px rgba(0,0,0,0.04)"}}>
-              <div style={{fontSize:13,fontWeight:700,color:C.label,fontFamily:FONT,marginBottom:12}}>
-                📦 Stock actual
-              </div>
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
+            {/* ── Stock ── */}
+            <div style={{background:C.bg1,borderRadius:14,padding:"16px",marginBottom:16,
+              border:`1px solid ${C.sep}`}}>
+              <div style={{fontSize:10,letterSpacing:1.2,textTransform:"uppercase",color:C.label3,
+                fontFamily:FONT_UI,marginBottom:14,opacity:.65}}>Stock actual</div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:1,
+                borderRadius:10,overflow:"hidden",border:`1px solid ${C.sep}`}}>
                 {[
-                  {label:"En stock",  value:stockOk,  color:C.green,  bg:C.greenBg},
-                  {label:"Bajo stock",value:stockBaj, color:C.amber,  bg:C.amberBg},
-                  {label:"Agotados",  value:agotados, color:C.red,    bg:C.redBg},
-                ].map(s=>(
-                  <div key={s.label} style={{background:s.bg,borderRadius:12,padding:"12px 10px",textAlign:"center"}}>
-                    <div style={{fontSize:22,fontWeight:700,color:s.color,fontFamily:FONT}}>{s.value}</div>
-                    <div style={{fontSize:10,color:s.color,fontFamily:FONT,marginTop:2,
-                      textTransform:"uppercase",letterSpacing:.4}}>{s.label}</div>
+                  {label:"En stock",   value:stockOk,  color:C.green},
+                  {label:"Bajo stock", value:stockBaj, color:C.amber},
+                  {label:"Agotados",   value:agotados, color:C.red},
+                ].map((s,si)=>(
+                  <div key={s.label} style={{
+                    padding:"14px 8px",textAlign:"center",background:C.bg0,
+                    borderRight:si<2?`1px solid ${C.sep}`:"none",
+                  }}>
+                    <div style={{fontSize:20,fontWeight:700,color:C.label,
+                      fontFamily:FONT,letterSpacing:"-0.02em",marginBottom:4}}>{s.value}</div>
+                    <div style={{fontSize:9,color:C.label3,fontFamily:FONT_UI,
+                      textTransform:"uppercase",letterSpacing:.8,opacity:.55}}>{s.label}</div>
+                    <div style={{width:24,height:2,background:s.color,borderRadius:1,
+                      margin:"6px auto 0",opacity:.6}}/>
                   </div>
                 ))}
               </div>
             </div>
 
-            {/* Comparativo mes anterior */}
-            <div style={{background:C.bg1,borderRadius:18,padding:16,marginBottom:16,
-              border:`1px solid ${C.sep}`,boxShadow:"0 2px 8px rgba(0,0,0,0.04)"}}>
-              <div style={{fontSize:13,fontWeight:700,color:C.label,fontFamily:FONT,marginBottom:12}}>
-                📊 vs {MESES[mPrev]}
-              </div>
+            {/* ── Comparativo mes anterior ── */}
+            <div style={{background:C.bg1,borderRadius:14,padding:"16px",marginBottom:16,
+              border:`1px solid ${C.sep}`}}>
+              <div style={{fontSize:10,letterSpacing:1.2,textTransform:"uppercase",color:C.label3,
+                fontFamily:FONT_UI,marginBottom:14,opacity:.65}}>vs {MESES[mPrev]}</div>
               {[
-                ["Ventas brutas", $(brutoPrev), $(brutoMes), varBruto],
-                ["Unidades",      udsPrev,      udsMes,      varUds],
-                ["Transacciones", vMesPrev.length, vMes.length, vMesPrev.length>0?((vMes.length-vMesPrev.length)/vMesPrev.length*100):0],
+                ["Ventas brutas",  $(brutoPrev), $(brutoMes), varBruto],
+                ["Ítems vendidos", udsPrev,      udsMes,      varUds],
+                ["Transacciones",  vMesPrev.length, vMes.length, vMesPrev.length>0?((vMes.length-vMesPrev.length)/vMesPrev.length*100):0],
               ].map(([label,prev,curr,pct])=>(
                 <div key={label} style={{display:"flex",justifyContent:"space-between",
-                  alignItems:"center",padding:"10px 0",borderBottom:`1px solid ${C.sep}`}}>
+                  alignItems:"center",padding:"11px 0",borderBottom:`1px solid ${C.sep}`}}>
                   <div style={{fontSize:13,color:C.label2,fontFamily:FONT}}>{label}</div>
                   <div style={{display:"flex",gap:12,alignItems:"center"}}>
-                    <div style={{fontSize:12,color:C.label3,fontFamily:FONT}}>{prev}</div>
-                    <div style={{fontSize:14,fontWeight:700,color:C.label,fontFamily:FONT}}>{curr}</div>
-                    <div style={{fontSize:12,fontWeight:700,
-                      color:pct>0?C.green:pct<0?C.red:C.label3,fontFamily:FONT,minWidth:42,textAlign:"right"}}>
+                    <div style={{fontSize:12,color:C.label3,fontFamily:FONT,opacity:.6}}>{prev}</div>
+                    <div style={{fontSize:14,fontWeight:700,color:C.label,fontFamily:FONT,letterSpacing:"-0.01em"}}>{curr}</div>
+                    <div style={{fontSize:11,fontWeight:700,minWidth:40,textAlign:"right",
+                      color:pct>0?C.green:pct<0?C.red:C.label3,fontFamily:FONT_UI}}>
                       {pct>0?"+":""}{pct.toFixed(0)}%
                     </div>
                   </div>
@@ -8270,16 +8867,13 @@ function BrandPortal({user, ventas, inv, cargas, logout}){
           <div>
             {/* ── Buscador ventas ── */}
             <div style={{position:"relative",marginBottom:12}}>
-              <span style={{position:"absolute",left:13,top:"50%",transform:"translateY(-50%)",
-                fontSize:15,pointerEvents:"none"}}>🔍</span>
               <input
                 value={busqV}
                 onChange={e=>setBusqV(e.target.value)}
                 placeholder={`Buscar en ${MESES[mes]}…`}
-                style={{width:"100%",padding:"10px 14px 10px 38px",borderRadius:12,
+                style={{width:"100%",padding:"10px 14px",borderRadius:12,
                   border:`1px solid ${C.sep}`,background:C.bg1,fontSize:13,
-                  color:C.label,fontFamily:FONT,outline:"none",boxSizing:"border-box",
-                  WebkitAppearance:"none"}}
+                  color:C.label,fontFamily:FONT,outline:"none",boxSizing:"border-box"}}
               />
               {busqV&&(
                 <button onClick={()=>setBusqV("")} style={{position:"absolute",right:10,
@@ -8290,23 +8884,22 @@ function BrandPortal({user, ventas, inv, cargas, logout}){
 
             {/* ── Stats bar ── */}
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",
-              marginBottom:14}}>
-              <span style={{fontSize:12,color:C.label3,fontFamily:FONT}}>
+              marginBottom:14,paddingBottom:12,borderBottom:`1px solid ${C.sep}`}}>
+              <span style={{fontSize:12,color:C.label3,fontFamily:FONT_UI,letterSpacing:.3}}>
                 {vMesFiltradas.length} {vMesFiltradas.length===1?"venta":"ventas"}
                 {busqV&&` · "${busqV}"`}
+                {" · "}{udsMes} ítems
               </span>
-              <span style={{fontSize:13,fontWeight:700,color:marca.color,fontFamily:FONT}}>
+              <span style={{fontSize:14,fontWeight:700,color:C.label,fontFamily:FONT,letterSpacing:"-0.02em"}}>
                 {$(brutoMes)}
               </span>
             </div>
 
             {/* ── Lista ventas ── */}
             {vMesFiltradas.length===0
-              ? <div style={{textAlign:"center",padding:"48px 0",color:C.label3}}>
-                  <div style={{fontSize:40,marginBottom:8}}>🛍</div>
-                  <div style={{fontFamily:FONT}}>
-                    {busqV ? `Sin resultados para "${busqV}"` : `Sin ventas en ${MESES[mes]}`}
-                  </div>
+              ? <div style={{textAlign:"center",padding:"48px 0",color:C.label3,fontFamily:FONT_UI,
+                  fontSize:13,opacity:.5}}>
+                  {busqV ? `Sin resultados para "${busqV}"` : `Sin ventas en ${MESES[mes]}`}
                 </div>
               : vMesFiltradas.map(v=>{
                   const citems = v.items.filter(i=>i.marcaId===marca.id);
@@ -8315,12 +8908,10 @@ function BrandPortal({user, ventas, inv, cargas, logout}){
                   return (
                     <div key={v.id}
                       onClick={()=>setVentaSeleccionada(v)}
-                      style={{background:C.bg1,borderRadius:10,padding:"6px 11px",
-                        marginBottom:3,border:`1px solid ${C.sep}`,
-                        boxShadow:"0 1px 3px rgba(0,0,0,0.03)",
+                      style={{background:C.bg1,borderRadius:10,padding:"12px 14px",
+                        marginBottom:1,borderBottom:`1px solid ${C.sep}`,
                         cursor:"pointer",WebkitTapHighlightColor:"transparent",
-                        transition:"all .15s",
-                        borderLeft:`3px solid ${v.anulada?C.red:marca.color}`}}>
+                        transition:"all .15s",opacity:v.anulada?.55:1}}>
                       {/* Fila única — precio + metadata compactos */}
                       <div style={{display:"flex",justifyContent:"space-between",
                         alignItems:"center",gap:10}}>
@@ -8342,7 +8933,7 @@ function BrandPortal({user, ventas, inv, cargas, logout}){
                             <span style={{fontSize:9,color:C.label3,fontFamily:FONT,opacity:.75}}>
                               {v.metodoPago?.startsWith("mixto|")
                                 ? <PagoDisplay mp={v.metodoPago} total={csub} inline/>
-                                : `${iconPago(v.metodoPago)} ${labelPago(v.metodoPago)}`}
+                                : labelPago(v.metodoPago)}
                             </span>
                             {v.anulada&&(
                               <span style={{fontSize:8,background:C.redBg,color:C.red,
@@ -8375,13 +8966,11 @@ function BrandPortal({user, ventas, inv, cargas, logout}){
           <div>
             {/* ── Buscador ── */}
             <div style={{position:"relative",marginBottom:10}}>
-              <span style={{position:"absolute",left:13,top:"50%",transform:"translateY(-50%)",
-                fontSize:15,pointerEvents:"none"}}>🔍</span>
               <input
                 value={busqInvP}
                 onChange={e=>setBusqInvP(e.target.value)}
                 placeholder="SKU, nombre o categoría…"
-                style={{width:"100%",padding:"10px 14px 10px 38px",borderRadius:12,
+                style={{width:"100%",padding:"10px 14px",borderRadius:12,
                   border:`1px solid ${C.sep}`,background:C.bg1,fontSize:13,
                   color:C.label,fontFamily:FONT,outline:"none",boxSizing:"border-box"}}
               />
@@ -8414,89 +9003,208 @@ function BrandPortal({user, ventas, inv, cargas, logout}){
             </div>
 
             {/* ── Stats + acciones ── */}
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",
-              marginBottom:14,gap:8,flexWrap:"wrap"}}>
-              <span style={{fontSize:12,color:C.label3,fontFamily:FONT}}>
-                {invFiltrado.length} de {invMarca.length} productos ·{" "}
-                {$(invFiltrado.reduce((s,i)=>s+i.precio*i.stock,0))} en stock
-              </span>
-              <div style={{display:"flex",gap:8,alignItems:"center"}}>
-                {(busqInvP||catFilP||fechaDesde||fechaHasta)&&(
-                  <button onClick={()=>{setBusqInvP("");setCatFilP("");setFechaDesde("");setFechaHasta("");}}
-                    style={{padding:"6px 12px",borderRadius:10,border:`1px solid ${C.sep}`,
-                      background:C.bg2,cursor:"pointer",fontSize:11,color:C.label3,fontFamily:FONT}}>
-                    Limpiar filtros
-                  </button>
-                )}
-                <button onClick={descargarExcelInvMarca} disabled={xlsxCarg}
-                  style={{padding:"6px 14px",borderRadius:10,border:"none",
-                    background:xlsxCarg?C.label3:C.green,cursor:xlsxCarg?"not-allowed":"pointer",
-                    fontSize:12,fontWeight:700,color:"#fff",fontFamily:FONT,
-                    display:"flex",alignItems:"center",gap:6,
-                    WebkitTapHighlightColor:"transparent"}}>
-                  {xlsxCarg?"⏳":"📊"} {xlsxCarg?"Generando…":"Excel"}
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:8,marginBottom:12}}>
+              {[
+                {label:"SKUs",          value:invFiltrado.length,                                              color:C.label},
+                {label:"Uds. en stock", value:invFiltrado.reduce((s,i)=>s+i.stock,0),                        color:C.green},
+                {label:"Vendidas",      value:invFiltrado.reduce((s,i)=>s+(vendidasPorCodigo[i.codigo]||0),0),color:C.blue},
+                {label:"Agotados",      value:invFiltrado.filter(i=>i.stock===0).length,                      color:C.red},
+              ].map(s=>(
+                <div key={s.label} style={{background:C.bg1,borderRadius:12,padding:"10px 8px",
+                  border:`1px solid ${C.sep}`,textAlign:"center"}}>
+                  <div style={{fontSize:18,fontWeight:700,color:s.color,fontFamily:FONT,marginBottom:2}}>{s.value}</div>
+                  <div style={{fontSize:9,color:C.label3,fontFamily:FONT_UI,textTransform:"uppercase",letterSpacing:.7}}>{s.label}</div>
+                </div>
+              ))}
+            </div>
+            {/* Total general siempre visible */}
+            <div style={{fontSize:11,color:C.label3,fontFamily:FONT_UI,textAlign:"right",
+              marginBottom:6,paddingRight:2}}>
+              Total marca:&nbsp;
+              <span style={{color:C.label,fontWeight:700}}>{invMarca.length} SKUs</span>
+              &nbsp;·&nbsp;
+              <span style={{color:C.green,fontWeight:700}}>{invMarca.reduce((s,i)=>s+i.stock,0)} uds.</span>
+            </div>
+            <div style={{display:"flex",justifyContent:"flex-end",alignItems:"center",
+              marginBottom:14,gap:8}}>
+              {(busqInvP||catFilP||fechaDesde||fechaHasta)&&(
+                <button onClick={()=>{setBusqInvP("");setCatFilP("");setFechaDesde("");setFechaHasta("");}}
+                  style={{padding:"6px 12px",borderRadius:10,border:`1px solid ${C.sep}`,
+                    background:C.bg2,cursor:"pointer",fontSize:11,color:C.label3,fontFamily:FONT}}>
+                  Limpiar filtros
                 </button>
-              </div>
+              )}
+              <button onClick={descargarExcelInvMarca} disabled={xlsxCarg}
+                style={{padding:"6px 14px",borderRadius:10,border:"none",
+                  background:xlsxCarg?C.label3:C.green,cursor:xlsxCarg?"not-allowed":"pointer",
+                  fontSize:12,fontWeight:700,color:"#fff",fontFamily:FONT,
+                  display:"flex",alignItems:"center",gap:6,
+                  WebkitTapHighlightColor:"transparent"}}>
+                {xlsxCarg?"Generando…":"Excel"}
+              </button>
             </div>
 
             {/* ── Lista inventario ── */}
             {invMarca.length===0
-              ? <div style={{textAlign:"center",padding:"48px 0",color:C.label3}}>
-                  <div style={{fontSize:40,marginBottom:8}}>📦</div>
-                  <div style={{fontFamily:FONT}}>Sin productos registrados</div>
-                </div>
+              ? <div style={{textAlign:"center",padding:"48px 0",color:C.label3,
+                  fontFamily:FONT_UI,fontSize:13,opacity:.5}}>Sin productos registrados</div>
               : invFiltrado.length===0
-              ? <div style={{textAlign:"center",padding:"48px 0",color:C.label3}}>
-                  <div style={{fontSize:32,marginBottom:8}}>🔍</div>
-                  <div style={{fontFamily:FONT}}>Sin resultados con los filtros aplicados</div>
-                </div>
+              ? <div style={{textAlign:"center",padding:"48px 0",color:C.label3,
+                  fontFamily:FONT_UI,fontSize:13,opacity:.5}}>Sin resultados con los filtros aplicados</div>
               : [
-                  {label:"🔴 Agotados",   prods:invFiltrado.filter(i=>i.stock===0),           color:C.red},
-                  {label:"🟡 Bajo stock", prods:invFiltrado.filter(i=>i.stock>0&&i.stock<=2), color:C.amber},
-                  {label:"🟢 En stock",   prods:invFiltrado.filter(i=>i.stock>2),              color:C.green},
+                  {label:"Agotados",   prods:invFiltrado.filter(i=>i.stock===0),           color:C.red},
+                  {label:"Bajo stock", prods:invFiltrado.filter(i=>i.stock>0&&i.stock<=2), color:C.amber},
+                  {label:"En stock",   prods:invFiltrado.filter(i=>i.stock>2),              color:C.green},
                 ].filter(g=>g.prods.length>0).map(g=>(
-                    <div key={g.label} style={{marginBottom:16}}>
-                      <div style={{fontSize:11,fontWeight:700,color:g.color,fontFamily:FONT,
-                        textTransform:"uppercase",letterSpacing:.5,marginBottom:8}}>
-                        {g.label} ({g.prods.length})
+                    <div key={g.label} style={{marginBottom:20}}>
+                      <div style={{fontSize:10,letterSpacing:1.2,textTransform:"uppercase",
+                        color:C.label3,fontFamily:FONT_UI,marginBottom:10,opacity:.65,
+                        display:"flex",alignItems:"center",gap:8}}>
+                        <span style={{display:"inline-block",width:6,height:6,borderRadius:"50%",
+                          background:g.color,opacity:.7}}/>
+                        {g.label} · {g.prods.length}
                       </div>
-                      {g.prods.map(p=>(
-                        <div key={p.id} style={{background:C.bg1,borderRadius:10,
-                          padding:"9px 12px",marginBottom:5,border:`1px solid ${C.sep}`,
-                          borderLeft:`3px solid ${g.color}`,
-                          boxShadow:"0 1px 3px rgba(0,0,0,0.03)"}}>
-                          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                      {g.prods.map(p=>{
+                        const vendTot = vendidasPorCodigo[p.codigo]||0;
+                        const vendMes = vendidasMesPorCodigo[p.codigo]||0;
+                        const stockReal = p.stock;
+                        const pct = (p.stockInicial||0)>0 ? Math.round((stockReal/(p.stockInicial))*100) : stockReal>0?100:0;
+                        return (
+                        <div key={p.id} style={{padding:"14px 0",borderBottom:`1px solid ${C.sep}`}}>
+                          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10}}>
                             <div style={{flex:1,minWidth:0}}>
-                              <div style={{fontSize:13,fontWeight:600,color:C.label,fontFamily:FONT,
-                                overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",lineHeight:"1.3"}}>
+                              <div style={{fontSize:13,fontWeight:500,color:C.label,fontFamily:FONT,
+                                lineHeight:"1.3",marginBottom:3,wordBreak:"break-word"}}>
                                 {p.nombre}
                               </div>
-                              <div style={{fontSize:10,color:C.label3,fontFamily:FONT,marginTop:1,opacity:.65}}>
-                                {p.codigo} · {p.categoria||"General"}
-                                {p.fecha&&<span> · {p.fecha}</span>}
+                              <div style={{display:"flex",alignItems:"center",gap:6,marginTop:3,flexWrap:"wrap"}}>
+                                <span style={{fontSize:10,fontWeight:600,color:C.label2,fontFamily:"monospace",
+                                  background:C.bg2,border:`1px solid ${C.sep}`,borderRadius:5,
+                                  padding:"2px 6px",letterSpacing:.3}}>{p.codigo}</span>
+                                {p.categoria&&p.categoria!=="GENERAL"&&(
+                                  <span style={{fontSize:10,color:C.label3,fontFamily:FONT_UI,
+                                    letterSpacing:.5,textTransform:"uppercase"}}>{p.categoria}</span>
+                                )}
                               </div>
                             </div>
-                            <div style={{textAlign:"right",flexShrink:0,marginLeft:10}}>
+                            <div style={{textAlign:"right",flexShrink:0,marginLeft:16}}>
                               <div style={{fontSize:14,fontWeight:700,color:C.label,fontFamily:FONT,letterSpacing:"-0.01em"}}>
                                 {$(p.precio)}
                               </div>
-                              <div style={{fontSize:10,fontWeight:600,color:g.color,fontFamily:FONT,marginTop:1}}>
-                                {p.stock} / {p.stockInicial||p.stock} uds
+                              <div style={{fontSize:11,fontWeight:600,marginTop:2,
+                                color:stockReal===0?C.red:stockReal<=2?C.amber:C.green,fontFamily:FONT}}>
+                                {stockReal===0?"Agotado":`${stockReal} en stock`}
                               </div>
                             </div>
                           </div>
-                          <div style={{marginTop:7,height:3,background:`${g.color}20`,borderRadius:2}}>
-                            <div style={{height:"100%",background:g.color,borderRadius:2,
-                              width:`${(p.stockInicial||p.stock)>0?Math.round((p.stock/(p.stockInicial||p.stock))*100):0}%`,
-                              transition:"width .3s"}}/>
+                          {/* Barra de stock */}
+                          <div style={{height:2,background:C.sep,borderRadius:1,marginBottom:8,overflow:"hidden"}}>
+                            <div style={{height:"100%",borderRadius:1,transition:"width .4s",
+                              background:stockReal===0?C.red:stockReal<=2?C.amber:C.label,
+                              width:`${Math.min(100,pct)}%`}}/>
+                          </div>
+                          {/* Stats cruzadas */}
+                          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginTop:4}}>
+                            <div onClick={vendTot>0?()=>abrirVentasPorCodigo(p.codigo):undefined}
+                              style={{background:C.bg0,borderRadius:8,padding:"8px 10px",
+                              border:`1px solid ${vendTot>0?C.label+"30":C.sep}`,
+                              cursor:vendTot>0?"pointer":"default",
+                              transition:"background .15s"}}>
+                              <div style={{fontSize:9,letterSpacing:.9,textTransform:"uppercase",
+                                color:C.label3,fontFamily:FONT_UI,marginBottom:4}}>Vendidas total</div>
+                              <div style={{fontSize:16,fontWeight:700,
+                                color:vendTot>0?C.label:C.label3,fontFamily:FONT,letterSpacing:"-0.02em"}}>
+                                {vendTot}
+                              </div>
+                              {vendTot>0&&<div style={{fontSize:8,color:C.label3,fontFamily:FONT_UI,marginTop:2}}>ver nota →</div>}
+                            </div>
+                            <div style={{background:vendMes>0?`${C.green}10`:C.bg0,borderRadius:8,
+                              padding:"8px 10px",border:`1px solid ${vendMes>0?C.green+"30":C.sep}`}}>
+                              <div style={{fontSize:9,letterSpacing:.9,textTransform:"uppercase",
+                                color:vendMes>0?C.green:C.label3,fontFamily:FONT_UI,marginBottom:4}}>Este mes</div>
+                              <div style={{fontSize:16,fontWeight:700,
+                                color:vendMes>0?C.green:C.label3,fontFamily:FONT,letterSpacing:"-0.02em"}}>
+                                {vendMes}
+                              </div>
+                            </div>
+                            <div style={{background:C.bg0,borderRadius:8,padding:"8px 10px",
+                              border:`1px solid ${C.sep}`}}>
+                              <div style={{fontSize:9,letterSpacing:.9,textTransform:"uppercase",
+                                color:C.label3,fontFamily:FONT_UI,marginBottom:4}}>Ingresaron</div>
+                              <div style={{fontSize:16,fontWeight:700,color:C.label3,
+                                fontFamily:FONT,letterSpacing:"-0.02em"}}>
+                                {p.stockInicial||stockReal+vendTot||"—"}
+                              </div>
+                            </div>
                           </div>
                         </div>
-                      ))}
+                        );
+                      })}
                     </div>
                 ))
             }
           </div>
         )}
+
+        {/* ══ RETIROS ══ */}
+        {tab==="retiros"&&(()=>{
+          const retirosMarca = retiros.filter(r=>{
+            if(Number(r.marcaId)===mid) return true;
+            if(r.marcaNombre && marca && r.marcaNombre.toLowerCase()===marca.nombre.toLowerCase()) return true;
+            const prod = inv.find(p=>p.codigo===r.codigo);
+            return prod ? Number(prod.marcaId)===mid : false;
+          }).slice().reverse();
+          return (
+            <div style={{background:C.bg1,borderRadius:16,padding:20,
+              border:`1px solid ${C.sep}`,boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}>
+              <div style={{fontSize:16,fontWeight:700,color:C.label,fontFamily:FONT,marginBottom:16,
+                display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+                <span>📤 Retiros — {marca?.nombre}</span>
+                <span style={{fontSize:13,color:C.label3,fontWeight:400}}>{retirosMarca.length} retiro{retirosMarca.length!==1?"s":""}</span>
+              </div>
+              {retirosMarca.length===0
+                ? <div style={{textAlign:"center",padding:30,color:C.label3,fontFamily:FONT,fontSize:13}}>
+                    Sin retiros registrados para esta marca
+                  </div>
+                : retirosMarca.map((r,ri)=>(
+                  <div key={r.id} style={{
+                    borderBottom:ri<retirosMarca.length-1?`1px solid ${C.sep}`:"none",
+                    padding:"12px 0",display:"flex",justifyContent:"space-between",
+                    alignItems:"flex-start",gap:12}}>
+                    <div style={{flex:1}}>
+                      <div style={{fontSize:14,fontWeight:600,color:C.label,fontFamily:FONT}}>
+                        {r.nombre}
+                      </div>
+                      <div style={{fontSize:12,color:C.label3,fontFamily:FONT,marginTop:2}}>
+                        {r.codigo} · ×{r.cantidad}
+                      </div>
+                      <div style={{fontSize:12,color:C.blue,fontFamily:FONT,marginTop:3,fontWeight:500}}>
+                        Para: {r.destinatario}
+                      </div>
+                      {r.motivo&&<div style={{fontSize:11,color:C.label3,fontFamily:FONT,marginTop:2,fontStyle:"italic"}}>
+                        {r.motivo}
+                      </div>}
+                    </div>
+                    <div style={{textAlign:"right",flexShrink:0}}>
+                      <div style={{fontSize:12,fontFamily:"monospace",color:C.amber,fontWeight:600}}>
+                        {r.fecha}
+                      </div>
+                      <div style={{fontSize:11,color:C.label3,fontFamily:FONT}}>{r.hora}</div>
+                      <div style={{marginTop:4}}>
+                        <button onClick={()=>verNotaRetiro(r)}
+                          style={{background:`${C.amber}18`,color:C.amber,border:"none",
+                            fontSize:10,fontWeight:700,padding:"3px 8px",borderRadius:20,
+                            fontFamily:FONT,cursor:"pointer"}}>
+                          📄 Nota
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              }
+            </div>
+          );
+        })()}
 
         {/* ══ CARGAS — trazabilidad de cargas a inventario de esta marca ══ */}
         {tab==="cargas"&&(
@@ -8506,63 +9214,55 @@ function BrandPortal({user, ventas, inv, cargas, logout}){
         {/* ══ LIQUIDACIÓN ══ */}
         {tab==="liquidacion"&&(
           <div>
-            <div style={{background:`${marca.color}15`,borderRadius:18,padding:16,
-              marginBottom:16,border:`1px solid ${marca.color}30`}}>
-              <div style={{fontSize:13,fontWeight:700,color:C.label,fontFamily:FONT,marginBottom:4}}>
-                {marca.emoji} Liquidación estimada — {MESES[mes]} {anio}
-              </div>
-              <div style={{fontSize:11,color:C.label3,fontFamily:FONT}}>
-                Basado en la configuración de comisiones de Toscana House
+            <div style={{marginBottom:24}}>
+              <div style={{fontSize:10,letterSpacing:1.2,textTransform:"uppercase",color:C.label3,
+                fontFamily:FONT_UI,marginBottom:4,opacity:.65}}>Liquidación estimada</div>
+              <div style={{fontSize:13,color:C.label2,fontFamily:FONT}}>
+                {MESES[mes]} {anio} · Basado en configuración Toscana House
               </div>
             </div>
 
             {/* Desglose */}
-            <div style={{background:C.bg1,borderRadius:18,overflow:"hidden",
-              border:`1px solid ${C.sep}`,marginBottom:16,boxShadow:"0 2px 8px rgba(0,0,0,0.04)"}}>
+            <div style={{marginBottom:24}}>
               {[
-                {label:"Ventas brutas",                                  value:liq.bruto,      sign:"",  color:C.label, bold:false},
-                {label:"Efectivo",                                        value:liq.brutoEf,    sign:"",  color:C.label3,bold:false,sub:true},
-                {label:"QR",                                              value:liq.brutoQR,    sign:"",  color:C.label3,bold:false,sub:true},
-                {label:"Tarjeta",                                         value:liq.brutoTJ,    sign:"",  color:C.label3,bold:false,sub:true},
-                ...(gcMarca>0?[{label:"Gift Cards",                       value:gcMarca,        sign:"",  color:"#7C3AED",bold:false,sub:true}]:[]),
-                {label:`Desc. Tarjeta (${liq.cfg.pctTarjeta}%)`,         value:-liq.descTJ,    sign:"−", color:C.red,   bold:false},
-                {label:`Subtotal -${liq.cfg.pctTarjeta}%`,                value:liq.subBanco,   sign:"",  color:C.blue,  bold:true},
-                {label:`Comisión Toscana (${liq.cfg.pctComision}%)`,      value:-liq.comision,  sign:"−", color:C.red,   bold:false},
-                {label:"Alquiler",                                        value:-liq.alquiler,  sign:"−", color:C.red,   bold:false},
+                {label:"Ventas brutas",                                 value:liq.bruto,     sign:"",  muted:false, bold:false},
+                {label:"Efectivo",                                       value:liq.brutoEf,   sign:"",  muted:true,  bold:false,sub:true},
+                {label:"QR",                                             value:liq.brutoQR,   sign:"",  muted:true,  bold:false,sub:true},
+                {label:"Tarjeta",                                        value:liq.brutoTJ,   sign:"",  muted:true,  bold:false,sub:true},
+                ...(gcMarca>0?[{label:"Gift Cards",value:gcMarca,sign:"",muted:true,bold:false,sub:true}]:[]),
+                {label:`− Desc. Tarjeta (${liq.cfg.pctTarjeta}%)`,      value:liq.descTJ,    sign:"−", muted:false, bold:false,red:true},
+                {label:`= Subtotal`,                                     value:liq.subBanco,  sign:"",  muted:false, bold:false},
+                {label:`− Comisión Toscana (${liq.cfg.pctComision}%)`,   value:liq.comision,  sign:"−", muted:false, bold:false,red:true},
+                ...(liq.alquiler>0?[{label:"− Alquiler",value:liq.alquiler,sign:"−",muted:false,bold:false,red:true}]:[]),
                 ...gastos.filter(g=>g.desc||Number(g.monto)>0).map(g=>(
-                  {label:g.desc||"Gasto extra", value:-(Number(g.monto)||0), sign:"−", color:C.red, bold:false, sub:true}
+                  {label:`− ${g.desc||"Gasto extra"}`,value:Number(g.monto)||0,sign:"−",muted:false,bold:false,red:true,sub:true}
                 )),
+                {label:"Neto a liquidar",                               value:liq.neto,      sign:"",  muted:false, bold:true},
               ].map((row,i,arr)=>(
                 <div key={row.label} style={{
                   display:"flex",justifyContent:"space-between",alignItems:"center",
-                  padding:`${row.sub?"8px":"12px"} 16px ${row.sub?"8px":"12px"} ${row.sub?"28px":"16px"}`,
-                  borderBottom:i<arr.length-1?`1px solid ${C.sep}`:"",
-                  background:row.bold?`${C.blue}08`:undefined,
+                  padding:row.bold?"18px 0":"11px 0",
+                  paddingLeft:row.sub?16:0,
+                  borderBottom:i<arr.length-1?`1px solid ${C.sep}`:"none",
+                  borderTop:row.bold?`1px solid ${C.sep}`:"none",
+                  marginTop:row.bold?4:0,
                 }}>
-                  <span style={{fontSize:row.sub?12:13,color:row.color||C.label2,fontFamily:FONT,
-                    fontWeight:row.bold?700:400}}>{row.label}</span>
-                  <span style={{fontSize:row.sub?12:14,fontWeight:row.bold?700:500,
-                    color:row.color||C.label,fontFamily:FONT}}>
+                  <span style={{fontSize:row.bold?15:row.sub?12:13,
+                    color:row.muted?C.label3:C.label2,
+                    fontFamily:row.bold?FONT:FONT_UI,fontWeight:row.bold?700:400}}>{row.label}</span>
+                  <span style={{fontSize:row.bold?20:row.sub?12:14,fontWeight:row.bold?700:500,
+                    color:row.bold?C.green:row.red?C.red:C.label,
+                    fontFamily:FONT,letterSpacing:row.bold?"-0.02em":0}}>
                     {row.sign} {$(Math.abs(row.value))}
                   </span>
                 </div>
               ))}
-              {/* Neto final */}
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",
-                padding:"16px",background:`${C.green}12`,borderTop:`2px solid ${C.green}30`}}>
-                <span style={{fontSize:15,fontWeight:700,color:C.green,fontFamily:FONT}}>
-                  💚 Total Neto Estimado
-                </span>
-                <span style={{fontSize:22,fontWeight:700,color:C.green,fontFamily:FONT_DISPLAY}}>
-                  {$(liq.neto)}
-                </span>
-              </div>
             </div>
 
-            <div style={{background:C.bg2,borderRadius:14,padding:12,border:`1px solid ${C.sep}`}}>
-              <div style={{fontSize:11,color:C.label3,fontFamily:FONT,lineHeight:1.6}}>
-                ℹ️ Esta liquidación es una estimación automática. El monto final puede variar
-                según revisión de Toscana House. Contactá a la administración para confirmar.
+            <div style={{padding:"12px 14px",borderRadius:10,border:`1px solid ${C.sep}`,
+              background:C.bg1}}>
+              <div style={{fontSize:11,color:C.label3,fontFamily:FONT_UI,lineHeight:1.7,opacity:.7}}>
+                Estimación automática. El monto final puede variar según revisión de Toscana House.
               </div>
             </div>
           </div>
@@ -8577,6 +9277,35 @@ function BrandPortal({user, ventas, inv, cargas, logout}){
           marca={marca}
           onClose={()=>setVentaSeleccionada(null)}
         />
+      )}
+
+      {/* ── Picker cuando el mismo código tiene múltiples ventas ── */}
+      {ventasCodigo&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.55)",zIndex:1100,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}
+          onClick={()=>setVentasCodigo(null)}>
+          <div style={{background:C.bg,borderRadius:16,padding:24,maxWidth:360,width:"100%",boxShadow:"0 8px 40px rgba(0,0,0,.3)"}}
+            onClick={e=>e.stopPropagation()}>
+            <div style={{fontSize:11,letterSpacing:.8,textTransform:"uppercase",color:C.label3,fontFamily:FONT_UI,marginBottom:4}}>Ventas del código</div>
+            <div style={{fontSize:15,fontWeight:700,color:C.label,fontFamily:FONT,marginBottom:16}}>{ventasCodigo.codigo}</div>
+            {ventasCodigo.lista.map((v,i)=>(
+              <div key={v.id||i} onClick={()=>{setVentaSeleccionada(v);setVentasCodigo(null);}}
+                style={{display:"flex",justifyContent:"space-between",alignItems:"center",
+                  padding:"12px 14px",borderRadius:10,marginBottom:8,cursor:"pointer",
+                  background:C.bg2,border:`1px solid ${C.sep}`}}>
+                <div>
+                  <div style={{fontSize:13,fontWeight:600,color:C.label,fontFamily:FONT}}>{v.fecha}</div>
+                  <div style={{fontSize:11,color:C.label3,fontFamily:FONT_UI,marginTop:2}}>{v.hora||""}</div>
+                </div>
+                <div style={{fontSize:14,fontWeight:700,color:C.label,fontFamily:FONT}}>Bs {v.total}</div>
+              </div>
+            ))}
+            <button onClick={()=>setVentasCodigo(null)}
+              style={{width:"100%",marginTop:8,padding:"10px 0",borderRadius:10,border:"none",
+                background:C.bg2,color:C.label3,fontFamily:FONT_UI,fontSize:13,cursor:"pointer"}}>
+              Cancelar
+            </button>
+          </div>
+        </div>
       )}
 
       </div>{/* fin main area */}
@@ -10169,8 +10898,53 @@ function GiftCardsTab() {
   );
 }
 
+function DescargarTodasNotasBtn({ventas}){
+  var _d=useState(false); var descargando=_d[0]; var setDescargando=_d[1];
+  var _p=useState(null);  var progreso=_p[0];    var setProgreso=_p[1];
+  async function descargarTodasNotas(){
+    if(!ventas.length){ alert("No hay ventas registradas"); return; }
+    const hasDir=await fsaGetBase();
+    if(!hasDir){ alert("Primero configura la carpeta de descargas en Config → Carpeta de Archivos"); return; }
+    setDescargando(true);
+    let ok=0, err=0;
+    for(let i=0;i<ventas.length;i++){
+      const vf=ventas[i];
+      try{
+        const num=vf.id.replace(/\D/g,"").slice(-4).padStart(4,"0");
+        const marcas=[...new Set((vf.items||[]).map(it=>it.marcaNombre).filter(Boolean))];
+        const marcaCarpeta=marcas.length===1?marcas[0]:marcas.length>1?"Multimarca":null;
+        const marcaSlug=marcas.map(m=>m.replace(/ /g,"_")).join("-")||"TH";
+        const fechaSlug=(vf.fecha||"").replace(/\//g,"-");
+        const nombre=`TH_${marcaSlug}_NotaVenta_N${num}_${fechaSlug}.png`;
+        const blob=await construirImagenNotaVenta(vf,num);
+        await descargarOrganizado(blob,nombre,marcaCarpeta,"Notas de Ventas");
+        ok++;
+      }catch(e){ err++; }
+      setProgreso(`${i+1}/${ventas.length}`);
+    }
+    setDescargando(false);
+    setProgreso(null);
+    alert(`✓ ${ok} notas guardadas${err>0?` · ${err} con error`:""}`);
+  }
+  return (
+    <div style={{background:"rgba(63,81,181,.07)",borderRadius:16,padding:"16px",
+      marginBottom:20,border:"1px solid rgba(63,81,181,.25)"}}>
+      <div style={{fontSize:15,fontWeight:600,marginBottom:6,fontFamily:FONT}}>
+        🧾 Descargar todas las notas de venta
+      </div>
+      <p style={{fontSize:12,color:"#888",fontFamily:FONT,margin:"0 0 12px",lineHeight:1.5}}>
+        Genera y guarda las notas de <strong>{ventas.length} ventas</strong> en la carpeta
+        <strong> Notas de Ventas</strong> dentro de cada marca.
+      </p>
+      <IOSBtn disabled={descargando} onPress={descargarTodasNotas} variant="fill" full icon="⬇">
+        {descargando?`Descargando… ${progreso||""}`:`Descargar ${ventas.length} notas`}
+      </IOSBtn>
+    </div>
+  );
+}
+
 function App(){
-  const { user, login, logout } = useAuth();
+  const { user, login, logout, authReady } = useAuth();
   const isDesktop = useIsDesktop();
   const sync = useSyncStatus();
   const now=new Date();
@@ -10196,8 +10970,10 @@ function App(){
   const[bajaMotivo,setBajaMotivo]=useState("");
   const[bajaMsg,setBajaMsg] =useState(null);
   const[sheetReponer,setShReponer]=useState(false);
+  const[repTab,setRepTab]   =useState("stock"); // "stock" | "precio"
   const[repCod,setRepCod]   =useState("");
   const[repCant,setRepCant] =useState("");
+  const[repPrecio,setRepPrecio]=useState("");
   const[repMsg,setRepMsg]   =useState(null);
   const[bajasLista,setBajasLista]=useState([]);
   const[busqInv,setBusqInv] =useState("");
@@ -10206,7 +10982,7 @@ function App(){
   const[generando,setGenerando]=useState(false);
   const[retiros,setRetiros]    =useState(()=>{ try{return JSON.parse(localStorage.getItem("th_retiros_v1")||"[]");}catch{return[];} });
   const[auditorias,setAuditorias]=useState(()=>{ try{return JSON.parse(localStorage.getItem("th_auditorias")||"[]");}catch{return[];} });
-  const[cargas,setCargas]=useState([]);
+  const[cargas,setCargas]=useState(()=>{ try{return JSON.parse(localStorage.getItem("th_cargas")||"[]");}catch{return[];} });
   const[ventaDetalle,setVentaDetalle]=useState(null);
   const[shImportarExcel,setShImportarExcel]=useState(false);
   const[modalNuevaMarca,setModalNuevaMarca]=useState(false);
@@ -10245,6 +11021,7 @@ function App(){
   useEffect(()=>{ try{localStorage.setItem("th_cierres",JSON.stringify(cierres));}catch{} },[cierres]);
   useEffect(()=>{ try{localStorage.setItem("th_retiros_v1",JSON.stringify(retiros));}catch{} },[retiros]);
   useEffect(()=>{ try{localStorage.setItem("th_auditorias",JSON.stringify(auditorias));}catch{} },[auditorias]);
+  useEffect(()=>{ try{localStorage.setItem("th_cargas",JSON.stringify(cargas));}catch{} },[cargas]);
 
   // ── Realtime sync — cualquier cambio en Supabase (otro dispositivo) actualiza aquí ──
   useRealtimeSync(setVentas, setInv, setRetiros);
@@ -10292,7 +11069,13 @@ function App(){
 
   // Cargar trazabilidad de cargas a inventario desde Supabase al inicio
   useEffect(()=>{
-    sbCargarCargas().then(data=>{ if(data.length>0) setCargas(data); });
+    sbCargarCargas().then(data=>{
+      if(data.length>0) setCargas(prev=>{
+        const sbIds=new Set(data.map(c=>c.id));
+        const locales=prev.filter(c=>!sbIds.has(c.id));
+        return [...data,...locales];
+      });
+    });
   },[]);
 
   // ── Realtime: cargas registradas en otros dispositivos ──
@@ -10363,9 +11146,43 @@ function App(){
     syncConRespaldo("auditoria", aud, ()=>sbGuardarAuditoria(aud));
   }
 
-  function registrarCarga(carga){
-    setCargas(prev=>[carga, ...prev]);
-    syncConRespaldo("carga", carga, ()=>sbGuardarCarga(carga));
+  function actualizarAuditoria(aud){
+    setAuditorias(prev=>prev.map(a=>a.id===aud.id?aud:a));
+    syncConRespaldo("auditoria", aud, ()=>sbGuardarAuditoria(aud));
+  }
+
+  function cuadrarConAuditoria(aud){
+    // Para cada ítem de la auditoría con diferencia ≠ 0, actualiza el stock
+    // del inventario al valor contado y registra un log de auditoría.
+    const cambios = (aud.detalle||[]).filter(d=>d.diferencia!==0 && d.contado>=0);
+    if(cambios.length===0) return;
+    const lineas = cambios.map(d=>`• ${d.codigo} ${d.nombre}: ${d.sistema} → ${d.contado} (${d.diferencia>0?"+":""}${d.diferencia})`).join("\n");
+    if(!window.confirm(`¿Cuadrar inventario con esta verificación?\n\nSe actualizarán ${cambios.length} producto(s):\n\n${lineas}\n\nEsta acción no se puede deshacer.`)) return;
+    setInv(prev=>{
+      const next=[...prev];
+      cambios.forEach(d=>{
+        const idx=next.findIndex(p=>p.codigo===d.codigo);
+        if(idx<0) return;
+        next[idx]={...next[idx], stock:d.contado};
+        syncConRespaldo("producto",next[idx],()=>sbGuardarProducto(next[idx]));
+      });
+      return next;
+    });
+    logAudit("CUADRE_AUDITORIA",{
+      resumen:`Cuadre de inventario desde verificación ${aud.id} · ${cambios.length} producto(s) ajustados`,
+      auditoriaId:aud.id, mes:aud.mes, anio:aud.anio, marcaId:aud.marcaId,
+      cambios:cambios.map(d=>({codigo:d.codigo,nombre:d.nombre,antes:d.sistema,despues:d.contado})),
+    },user);
+  }
+
+  async function registrarCarga(carga, archivoBlob=null, archivoNombre=null){
+    let cargaFinal = {...carga};
+    if(archivoBlob && archivoNombre){
+      const url = await sbSubirEvidencia(archivoBlob, archivoNombre, carga.id);
+      if(url){ cargaFinal.archivoUrl = url; cargaFinal.archivoNombre = archivoNombre; }
+    }
+    setCargas(prev=>[cargaFinal, ...prev]);
+    syncConRespaldo("carga", cargaFinal, ()=>sbGuardarCarga(cargaFinal));
   }
 
   function registrarRetiro(r){
@@ -10498,14 +11315,18 @@ function App(){
         marca:prod.marcaNombre, marcaId:prod.marcaId,
         stock:prod.stock, precio:prod.precio, categoria:prod.categoria}],
     }, user);
-    registrarCarga(crearCarga("MANUAL", user, {
+    const cargaManual = crearCarga("MANUAL", user, {
       marcaId: prod.marcaId, marcaNombre: prod.marcaNombre,
       resumen: `Carga manual: ${prod.nombre} (${prod.codigo})`,
       totalItems:1, nuevos:1, actualizados:0,
       items:[{tipo:"create", codigo:prod.codigo, nombre:prod.nombre,
         marca:prod.marcaNombre, marcaId:prod.marcaId,
         stock:prod.stock, precio:prod.precio, categoria:prod.categoria}],
-    }));
+    });
+    generarExcelEvidenciaManual([{...prod}], prod.marcaNombre).then(blob=>{
+      const nombre = `manual_${prod.codigo}_${hoy().replace(/\//g,"-")}.xlsx`;
+      registrarCarga(cargaManual, blob, nombre);
+    });
     setFInv({marcaId:"",nombre:"",categoria:"",precio:"",stock:"",fecha:hoy(),codigoManual:""});
     setShInv(false);
     setTimeout(()=>imprimirTicket(prod, marca?.nombre||"Toscana House"), 300);
@@ -10513,7 +11334,16 @@ function App(){
 
   function darBaja(){
     const cod=bajaCod.trim().toUpperCase();
-    const prod=inv.find(i=>i.codigo.toUpperCase()===cod);
+    let prod=inv.find(i=>i.codigo.toUpperCase()===cod)||inv.find(i=>limpiarCod(i.codigo)===limpiarCod(cod));
+    // Fallback: si no existe exacto, buscar variantes con ese prefijo (-A, -B, -C...)
+    if(!prod){
+      const variantes=inv.filter(i=>(i.codigo||"").toUpperCase().startsWith(cod+"-") && i.stock>0);
+      if(variantes.length===1) prod=variantes[0];
+      else if(variantes.length>1){
+        setBajaMsg({ok:false,msg:`Hay ${variantes.length} variantes: ${variantes.map(v=>v.codigo).join(", ")} — especificá el código completo`});
+        return;
+      }
+    }
     if(!prod){setBajaMsg({ok:false,msg:`"${cod}" no encontrado`});return;}
     if(prod.stock<=0){setBajaMsg({ok:false,msg:`"${prod.nombre}" ya está agotado`});return;}
     const stockAntes = prod.stock;
@@ -10521,7 +11351,7 @@ function App(){
     const cant = bajaCant.trim()==="" ? stockAntes : Number(bajaCant);
     if(!cant||cant<=0||cant>stockAntes){setBajaMsg({ok:false,msg:`Cantidad inválida (stock actual: ${stockAntes})`});return;}
     const motivo = bajaMotivo.trim();
-    const stockDespues = stockAntes - cant;
+    const stockDespues = Math.max(0, stockAntes - cant);
     if(!window.confirm(`¿Confirmar baja de "${prod.nombre}" (${cod})?\nStock actual: ${stockAntes} → ${stockDespues}${motivo?`\nMotivo: ${motivo}`:""}`)){
       return;
     }
@@ -10533,7 +11363,7 @@ function App(){
   // Dar de baja — SOLO Inventario. No genera retiro (eso es exclusivo de Caja).
   // Permite baja parcial (ej. para corregir stock duplicado) y un motivo/detalle.
   function registrarBaja(prod, stockAntes, cant, motivo){
-    const stockDespues = stockAntes - cant;
+    const stockDespues = Math.max(0, stockAntes - cant);
     setInv(p=>p.map(i=>i.id===prod.id?{...i,stock:stockDespues}:i));
     syncConRespaldo("stock", {prodId:prod.id, stock:stockDespues}, ()=>sbActualizarStock(prod.id, stockDespues));
     logAudit("BAJA", {
@@ -10550,7 +11380,7 @@ function App(){
   // un producto nuevo ni una etiqueta nueva, solo suma unidades).
   function reponerStock(){
     const cod=repCod.trim().toUpperCase();
-    const prod=inv.find(i=>i.codigo.toUpperCase()===cod);
+    const prod=inv.find(i=>i.codigo.toUpperCase()===cod)||inv.find(i=>limpiarCod(i.codigo)===limpiarCod(cod));
     if(!prod){setRepMsg({ok:false,msg:`"${cod}" no encontrado`});return;}
     const cant=Number(repCant);
     if(!cant||cant<=0){setRepMsg({ok:false,msg:"Ingresa una cantidad válida"});return;}
@@ -10568,8 +11398,35 @@ function App(){
     setRepCod(""); setRepCant("");
   }
 
+  function modificarPrecio(){
+    const cod=repCod.trim().toUpperCase();
+    const prod=inv.find(i=>i.codigo.toUpperCase()===cod)||inv.find(i=>limpiarCod(i.codigo)===limpiarCod(cod));
+    if(!prod){setRepMsg({ok:false,msg:`"${cod}" no encontrado`});return;}
+    const nuevoPrecio=Number(repPrecio);
+    if(!nuevoPrecio||nuevoPrecio<=0){setRepMsg({ok:false,msg:"Ingresa un precio válido"});return;}
+    const precioAntes=prod.precio||0;
+    const prodActualizado={...prod,precio:nuevoPrecio};
+    setInv(p=>p.map(i=>i.id===prod.id?prodActualizado:i));
+    syncConRespaldo("producto", prodActualizado, ()=>sbGuardarProducto(prodActualizado));
+    logAudit("PRECIO_EDIT", {
+      resumen: `Modificación de precio: ${prod.nombre} (${prod.codigo}) Bs ${precioAntes} → Bs ${nuevoPrecio}`,
+      codigo: prod.codigo, nombre: prod.nombre,
+      marca: prod.marcaNombre||"—",
+      precioAntes, precioNuevo: nuevoPrecio,
+    }, user);
+    setRepMsg({ok:true,msg:`✓ "${prod.nombre}": precio Bs ${precioAntes} → Bs ${nuevoPrecio}`});
+    setRepCod(""); setRepPrecio("");
+  }
+
   // Buffer de importación para consolidar en un solo evento de auditoría
-  const _importBuf = useRef({items:[], ts:0, timer:null});
+  const _importBuf = useRef({items:[], sbItems:[], ts:0, timer:null, archivo:null, archivoNombre:null});
+
+  function handleVerificarCarga(cargaId, verificado){
+    setCargas(prev=>prev.map(c=>c.id===cargaId
+      ? {...c, verificado, verificadoTs:verificado?new Date().toISOString():null, verificadoPor:verificado?user.nombre:null}
+      : c));
+    sbMarcarCargaVerificada(cargaId, verificado, user.nombre);
+  }
 
   function handleImportarExcel({tipo, codigo, stock, producto}){
     if(tipo==="update"){
@@ -10585,20 +11442,21 @@ function App(){
       const localId = Date.now() * 1000 + Math.floor(Math.random()*999);
       const newProd = { id: localId, ...producto };
       setInv(prev=>[...prev, newProd]);
-      syncConRespaldo("producto", newProd, ()=>sbGuardarProducto(newProd).then(sbId=>{
-        if(sbId && sbId !== localId){
-          setInv(prev=>prev.map(p=>p.id===localId ? {...p, id:sbId} : p));
-        }
-        return !!sbId;
-      }));
+      // Buffer para batch — no disparar request individual por cada producto
+      _importBuf.current.sbItems.push(newProd);
       // buffer audit
       _importBuf.current.items.push({tipo:"create", codigo:producto.codigo,
         nombre:producto.nombre, marca:producto.marcaNombre||"—", marcaId:producto.marcaId??null,
         stock:producto.stock, precio:producto.precio, categoria:producto.categoria});
     }
-    // Flush audit después de 800ms sin más llamadas (importación por lotes)
+    // Flush: batch Supabase + audit después de 800ms sin más llamadas
     clearTimeout(_importBuf.current.timer);
-    _importBuf.current.timer = setTimeout(()=>{
+    _importBuf.current.timer = setTimeout(async ()=>{
+      // ── Batch sync a Supabase (grupos de 50) ──────────────────────
+      const sbItems = _importBuf.current.sbItems.splice(0);
+      for(let i=0; i<sbItems.length; i+=50){
+        await sbGuardarProductosBatch(sbItems.slice(i, i+50));
+      }
       const buf = _importBuf.current.items;
       if(buf.length===0) return;
       const nuevos = buf.filter(i=>i.tipo==="create").length;
@@ -10612,14 +11470,44 @@ function App(){
         marcas,
         items: buf,
       }, user);
-      registrarCarga(crearCarga("IMPORT", user, {
+      const carga = crearCarga("IMPORT", user, {
         marcaId: marcaIds.length===1 ? marcaIds[0] : null,
         marcaNombre: marcas,
         resumen: `Importación: ${nuevos} nuevos + ${actualizados} actualizados · ${marcas}`,
         nuevos, actualizados, totalItems: buf.length, items: buf,
-      }));
+      });
+      const archivoBlob = _importBuf.current.archivo;
+      const archivoNombre = _importBuf.current.archivoNombre;
+      registrarCarga(carga, archivoBlob, archivoNombre);
       _importBuf.current.items = [];
-    }, 800);
+      _importBuf.current.archivo = null;
+      _importBuf.current.archivoNombre = null;
+    }, 1200);
+  }
+
+  // ── Bajar inventario completo desde Supabase → reemplaza localStorage ──
+  async function recargarDesdeSupabase(){
+    const data = await sbCargarTodo();
+    if(!data) return false;
+    if(data.inv && data.inv.length > 0){
+      setInv(data.inv);
+    }
+    return true;
+  }
+
+  // ── Forzar sincronización completa del inventario local → Supabase ─────
+  // Útil cuando importaciones previas no llegaron a la nube.
+  async function forzarSyncInventario(onProgress){
+    const productos = inv;
+    let ok = 0, fail = 0;
+    const CHUNK = 50;
+    for(let i=0; i<productos.length; i+=CHUNK){
+      const chunk = productos.slice(i, i+CHUNK);
+      const res = await sbGuardarProductosBatch(chunk);
+      if(res) ok += chunk.length; else fail += chunk.length;
+      if(onProgress) onProgress(Math.min(i+CHUNK, productos.length), productos.length);
+    }
+    return { ok, fail, total: productos.length };
   }
 
   function handleVenta(v){
@@ -10737,10 +11625,19 @@ function App(){
   // Pasar dbStatus al NavBar via closure (ya está en scope)
 
   // Early return si no hay sesión
+  if (!authReady) return (
+    <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",
+      background:"#f5f5f7",fontFamily:FONT}}>
+      <div style={{textAlign:"center",color:"#999"}}>
+        <div style={{fontSize:28,marginBottom:12}}>🔐</div>
+        <div style={{fontSize:14}}>Verificando sesión…</div>
+      </div>
+    </div>
+  );
   if (!user) return <LoginScreen onLogin={login}/>;
 
   // Portal de marca (lectura)
-  if (user.rol === "marca") return <BrandPortal user={user} ventas={ventas} inv={inv} cargas={cargasCompletas} logout={logout}/>;
+  if (user.rol === "marca") return <BrandPortal user={user} ventas={ventas} inv={inv} cargas={cargasCompletas} retiros={retiros} logout={logout}/>;
 
   // ── Liquidaciones: métricas pre-calculadas — mixto distribuido ─────────────
   const _liqPagos   = sumPagos(vMes);
@@ -10881,18 +11778,22 @@ function App(){
 
         {/* INVENTARIO — por marca */}
         {tab==="inventario" && (
-          <InventarioPorMarca inv={inv} ventas={ventas} onRecibir={()=>setShInv(true)} onBaja={()=>{setShBaja(true);setBajaMsg(null);setBajaCod("");setBajaCant("");setBajaMotivo("");}} onImportarExcel={()=>setShImportarExcel(true)} onReponer={()=>{setShReponer(true);setRepMsg(null);setRepCod("");setRepCant("");}}/>
+          <InventarioPorMarca inv={inv} ventas={ventas} retiros={retiros} onRecibir={()=>setShInv(true)} onBaja={()=>{setShBaja(true);setBajaMsg(null);setBajaCod("");setBajaCant("");setBajaMotivo("");}} onImportarExcel={()=>setShImportarExcel(true)} onReponer={()=>{setShReponer(true);setRepMsg(null);setRepCod("");setRepCant("");setRepPrecio("");setRepTab("stock");}} onSyncCompleto={forzarSyncInventario} onRecargarDesdeSupabase={recargarDesdeSupabase}/>
         )}
 
         {/* AUDITORÍA — cierre de inventario mensual (conteo físico vs sistema) */}
-        {tab==="auditoria" && (
+        {/* VERIFICACIÓN — siempre montada para no perder el conteo ni el scanner */}
+        <div style={{display: tab==="auditoria" ? "block" : "none"}}>
           <AuditoriaInventario inv={inv} ventas={ventas} cargas={cargasCompletas} mes={mes} anio={anio} MK={MK}
-            auditorias={auditorias} onGuardarAuditoria={registrarAuditoria} user={user}/>
-        )}
+            auditorias={auditorias} onGuardarAuditoria={registrarAuditoria} onActualizarAuditoria={actualizarAuditoria}
+            onCuadrarConAuditoria={cuadrarConAuditoria} user={user}
+            onGoVerif={()=>setTab("auditoria")}
+            tabActual={tab}/>
+        </div>
 
         {/* CARGAS — trazabilidad de cargas a inventario (manuales + importaciones) */}
         {tab==="cargas" && (
-          <RegistroCargas cargas={cargasCompletas} marcas={MARCAS}/>
+          <RegistroCargas cargas={cargasCompletas} marcas={MARCAS} onVerificar={handleVerificarCarga} user={user}/>
         )}
 
         {/* MARCAS — lista */}
@@ -11018,6 +11919,11 @@ function App(){
             mes={mes} anio={anio} MK={MK}
             cierres={cierres} setCierres={setCierres}
             getHist={getHist} getLiq={getLiq}
+            auditorias={auditorias}
+            onActualizarAuditoria={actualizarAuditoria}
+            user={user}
+            retiros={retiros}
+            onVentaClick={v=>setVentaDetalle(v)}
           />
         )}
 
@@ -11221,7 +12127,7 @@ function App(){
 
         {/* CONFIG */}
         {tab==="config" && (
-          <ConfigTab user={user} logout={logout}/>
+          <ConfigTab user={user} logout={logout} onRecargarDesdeSupabase={recargarDesdeSupabase} onSyncCompleto={forzarSyncInventario}/>
         )}
       </div>
 
@@ -11273,28 +12179,66 @@ function App(){
         <IOSBtn onPress={darBaja} variant="danger" full disabled={!bajaCod.trim()}>Dar de Baja</IOSBtn>
       </Sheet>
 
-      {/* Sheet: Reponer Stock (etiquetas existentes) */}
+      {/* Sheet: Reponer Stock / Modificar Precio */}
       <Sheet open={sheetReponer} onClose={()=>setShReponer(false)} title="Reponer Stock">
-        <p style={{color:C.label2,fontFamily:FONT,fontSize:15,margin:"0 0 16px"}}>
-          Suma unidades a un producto que ya tiene etiqueta/código generado — sin crear un producto nuevo.
-        </p>
-        <IOSInput label="Código del producto" value={repCod}
-          onChange={e=>{setRepCod(e.target.value.toUpperCase());setRepMsg(null);}}
-          placeholder="Ej: RAM-39-08283"
-          style={{fontFamily:"monospace",textTransform:"uppercase"}}/>
-        <IOSInput label="Unidades a agregar" type="number" value={repCant}
-          onChange={e=>{setRepCant(e.target.value);setRepMsg(null);}} placeholder="0"/>
-        {repMsg&&(
-          <div style={{padding:"12px 14px",borderRadius:12,marginBottom:12,
-            background:repMsg.ok?`${C.green}15`:`${C.red}15`,
-            border:`1px solid ${(repMsg.ok?C.green:C.red)}40`,
-            color:repMsg.ok?C.green:C.red,fontSize:14,fontFamily:FONT}}>{repMsg.msg}</div>
-        )}
-        <IOSBtn onPress={reponerStock} variant="primary" full disabled={!repCod.trim()||!repCant}>Reponer Stock</IOSBtn>
+        {/* Pestañas */}
+        <div style={{display:"flex",gap:6,marginBottom:20}}>
+          {[{id:"stock",l:"📦 Reponer Stock"},{id:"precio",l:"💰 Modificar Precio"}].map(t=>(
+            <button key={t.id} onClick={()=>{setRepTab(t.id);setRepMsg(null);setRepCod("");setRepCant("");setRepPrecio("");}}
+              style={{flex:1,padding:"10px 8px",borderRadius:14,fontSize:13,fontWeight:700,
+                fontFamily:FONT_UI,cursor:"pointer",transition:"all .15s",border:"none",
+                background:repTab===t.id?C.label:"transparent",
+                color:repTab===t.id?C.bg0:C.label3,
+                boxShadow:repTab===t.id?"0 2px 8px rgba(0,0,0,.12)":"none"}}>
+              {t.l}
+            </button>
+          ))}
+        </div>
+
+        {repTab==="stock"&&(<>
+          <p style={{color:C.label2,fontFamily:FONT,fontSize:14,margin:"0 0 16px"}}>
+            Suma unidades a un producto que ya tiene etiqueta/código generado — sin crear un producto nuevo.
+          </p>
+          <IOSInput label="Código del producto" value={repCod}
+            onChange={e=>{setRepCod(e.target.value.toUpperCase());setRepMsg(null);}}
+            placeholder="Ej: RAM-39-08283"
+            style={{fontFamily:"monospace",textTransform:"uppercase"}}/>
+          <IOSInput label="Unidades a agregar" type="number" value={repCant}
+            onChange={e=>{setRepCant(e.target.value);setRepMsg(null);}} placeholder="0"/>
+          {repMsg&&(
+            <div style={{padding:"12px 14px",borderRadius:12,marginBottom:12,
+              background:repMsg.ok?`${C.green}15`:`${C.red}15`,
+              border:`1px solid ${(repMsg.ok?C.green:C.red)}40`,
+              color:repMsg.ok?C.green:C.red,fontSize:14,fontFamily:FONT}}>{repMsg.msg}</div>
+          )}
+          <IOSBtn onPress={reponerStock} variant="primary" full disabled={!repCod.trim()||!repCant}>Reponer Stock</IOSBtn>
+        </>)}
+
+        {repTab==="precio"&&(<>
+          <p style={{color:C.label2,fontFamily:FONT,fontSize:14,margin:"0 0 16px"}}>
+            Actualiza el precio de venta de un producto existente. El cambio queda registrado en auditoría.
+          </p>
+          <IOSInput label="Código del producto" value={repCod}
+            onChange={e=>{setRepCod(e.target.value.toUpperCase());setRepMsg(null);}}
+            placeholder="Ej: RAM-39-08283"
+            style={{fontFamily:"monospace",textTransform:"uppercase"}}/>
+          <IOSInput label="Nuevo precio (Bs.)" type="number" value={repPrecio}
+            onChange={e=>{setRepPrecio(e.target.value);setRepMsg(null);}} placeholder="0.00"/>
+          {repMsg&&(
+            <div style={{padding:"12px 14px",borderRadius:12,marginBottom:12,
+              background:repMsg.ok?`${C.green}15`:`${C.red}15`,
+              border:`1px solid ${(repMsg.ok?C.green:C.red)}40`,
+              color:repMsg.ok?C.green:C.red,fontSize:14,fontFamily:FONT}}>{repMsg.msg}</div>
+          )}
+          <IOSBtn onPress={modificarPrecio} variant="primary" full disabled={!repCod.trim()||!repPrecio}>Actualizar Precio</IOSBtn>
+        </>)}
       </Sheet>
 
       {/* ══ DRIVE CONFIG SHEET ══ */}
       <Sheet open={sheetDrive} onClose={()=>setShDrive(false)} title="☁ Google Drive" tall>
+        {/* ── Descargar TODAS las notas de venta ── */}
+        <DescargarTodasNotasBtn ventas={ventas}/>
+
         {/* Respaldo redundante en Excel */}
         <div style={{background:`${C.gold}10`,borderRadius:16,padding:"16px",
           marginBottom:20,border:`1px solid ${C.gold}30`}}>
@@ -11411,7 +12355,7 @@ function App(){
       />
 
       {/* Modal: Importar Excel */}
-      {shImportarExcel && <ImportarExcelModal inv={inv} onImportar={handleImportarExcel} onClose={()=>setShImportarExcel(false)}/>}
+      {shImportarExcel && <ImportarExcelModal inv={inv} onImportar={handleImportarExcel} onClose={()=>setShImportarExcel(false)} onArchivoCapturado={f=>{_importBuf.current.archivo=f;_importBuf.current.archivoNombre=f.name;}}/>}
 
       {/* Modal: Nueva / Editar Marca */}
       {modalNuevaMarca && (
@@ -11544,6 +12488,22 @@ function POS({inv,onVenta,onVerNota}){
   const qrRefVenta = useMemo(()=>"TH"+Date.now().toString(36).toUpperCase(), [showPago]);
   var _hNm1 = useState(false); var pagoMixto = _hNm1[0]; var setPagoMixto = _hNm1[1];
   var _hNm2 = useState({efectivo:"", qr:"", tarjeta:""}); var montosMixtos = _hNm2[0]; var setMontosMixtos = _hNm2[1];
+  const [previewNota, setPreviewNota] = useState(null);
+
+  function autoDescargarNota(vf){
+    try {
+      const num = vf.id.replace(/\D/g,"").slice(-4).padStart(4,"0");
+      const marcas = [...new Set((vf.items||[]).map(i=>i.marcaNombre).filter(Boolean))];
+      const marcaCarpeta = marcas.length===1 ? marcas[0] : marcas.length>1 ? "Multimarca" : null;
+      const marcaSlug = marcas.map(m=>m.replace(/ /g,"_")).join("-")||"TH";
+      const fechaSlug = (vf.fecha||"").replace(/\//g,"-");
+      const nombre = `TH_${marcaSlug}_NotaVenta_N${num}_${fechaSlug}.png`;
+      construirImagenNotaVenta(vf, num).then(blob=>{
+        descargarOrganizado(blob, nombre, marcaCarpeta, "Notas de Ventas");
+      }).catch(()=>{});
+    } catch(e){}
+  }
+
   // Gift Card payment state
   const [pagoGC,       setPagoGC]       = useState(false);
   const [gcCodigo,     setGcCodigo]     = useState("");
@@ -11593,7 +12553,11 @@ function POS({inv,onVenta,onVerNota}){
     });
     setBusq("");
   }
-  function cambiar(prodId,d){setCarrito(p=>p.map(x=>x.prodId===prodId?{...x,cantidad:Math.max(1,x.cantidad+d)}:x));}
+  function cambiar(prodId,d){setCarrito(p=>p.map(x=>{
+    if(x.prodId!==prodId)return x;
+    const maxQ=inv.find(i=>i.id===prodId)?.stock??1;
+    return{...x,cantidad:Math.min(maxQ,Math.max(1,x.cantidad+d))};
+  }));}
   function quitar(prodId){setCarrito(p=>p.filter(x=>x.prodId!==prodId));}
   async function handleEtiqueta(e){
     const f=e.target.files?.[0];
@@ -11610,7 +12574,7 @@ function POS({inv,onVenta,onVerNota}){
         setScanStatus("ok");
         setScanMsg(`Código detectado: ${codigo}`);
         // Buscar el producto en el inventario por código
-        const prod = inv.find(i=>i.codigo.toUpperCase()===codigo.toUpperCase());
+        const prod = inv.find(i=>i.codigo.toUpperCase()===codigo.toUpperCase())||inv.find(i=>limpiarCod(i.codigo)===limpiarCod(codigo));
         if(prod){
           // Agregar directamente al carrito
           add(prod);
@@ -11663,6 +12627,8 @@ function POS({inv,onVenta,onVerNota}){
 
   function cobrar(){
     if(!carrito.length) return;
+    const sinStock=carrito.filter(it=>{const s=inv.find(i=>i.id===it.prodId)?.stock||0;return it.cantidad>s;});
+    if(sinStock.length){alert(`Stock insuficiente:\n${sinStock.map(it=>{const s=inv.find(i=>i.id===it.prodId)?.stock||0;return`• ${it.nombre}: pedís ${it.cantidad}, hay ${s}`;}).join("\n")}`);return;}
     const factor=1-descPct/100;
     const items=carrito.map(it=>({
       prodId:it.prodId,codigo:it.codigo,nombre:it.nombre,
@@ -11700,6 +12666,7 @@ function POS({inv,onVenta,onVerNota}){
         gcId:gcEncontrado.codigo, gcUsado, gcAllocations,
       });
       setUltima(vf);setShowOk(true);setShowPago(false);
+      autoDescargarNota(vf);
       setCarrito([]);setDescExtra(0);setBusq("");setEtiqueta(null);setCliente("");
       setPagoGC(false);setGcCodigo("");setGcEncontrado(null);setGcBusqMsg(null);setGcMontoUsar("");
       return;
@@ -11720,6 +12687,7 @@ function POS({inv,onVenta,onVerNota}){
     }
     const vf=onVenta({items,total,subtotal,descPct,metodoPago:metodoPagoFinal,vendedor:vendedor||"Tienda",clienteNombre:cliente,etiquetaImg:etiqueta});
     setUltima(vf);setShowOk(true);setShowPago(false);
+    autoDescargarNota(vf);
     setCarrito([]);setDescExtra(0);setBusq("");setEtiqueta(null);setCliente("");
     setPagoMixto(false);setMontosMixtos({efectivo:"",qr:"",tarjeta:""});
   }
@@ -11970,12 +12938,13 @@ function POS({inv,onVenta,onVerNota}){
               style={{background:`linear-gradient(135deg,#1A237E,#283593)`}}>
               Emitir Factura SIAT
             </IOSBtn>
-            <IOSBtn onPress={()=>sendWA(ultima)} variant="fill" full small icon="📲">
+            <IOSBtn onPress={()=>generarVistaPreviaNotaVenta(ultima,undefined,setPreviewNota)} variant="fill" full small icon="📲">
               Enviar por WhatsApp
             </IOSBtn>
           </div>
         </div>
       )}
+      <NotaImgPreviewModal data={previewNota} onClose={()=>setPreviewNota(null)}/>
       {/* Factura POS */}
       <FacturaModal
         venta={ultima}
@@ -12439,7 +13408,7 @@ function SheetRecibir({open, onClose, inv, onAdd, fInv, setFInv}){
 // ══════════════════════════════════════════════════════════
 // AUDITORÍA — Cierre de inventario mensual (conteo físico vs sistema)
 // ══════════════════════════════════════════════════════════
-function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, onGuardarAuditoria, user}){
+function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, onGuardarAuditoria, onActualizarAuditoria, onCuadrarConAuditoria, user, onGoVerif, tabActual}){
   const isDesktop = useIsDesktop();
   // El trabajo en curso (vista, marca seleccionada, doble conteo) se guarda
   // en localStorage para que NO se pierda si el usuario cambia de pestaña
@@ -12462,6 +13431,9 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
   const[scanMsg,setScanMsg]=useState(null); // {ok,txt}
   const[codManual,setCodManual]=useState("");
   const[auditoriaAbierta,setAuditoriaAbierta]=useState(null);
+  const[agregandoA,setAgregandoA]=useState(null); // id de auditoria en modo "agregar ítems"
+  const[codAgregar,setCodAgregar]=useState("");
+  const[msgAgregar,setMsgAgregar]=useState(null);
   const[cruceVerTodo,setCruceVerTodo]=useState(false); // mostrar todo el inventario en Cruce (incluye no contados como faltante)
 
   // ── Inventario base congelado al abrir el cierre ────────────────────
@@ -12551,13 +13523,16 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
   // Suma 1 unidad respetando el stock del sistema. Si el mismo código se
   // escanea más veces de las unidades que existen, NO suma (devuelve ok:false)
   // para avisar "repetido sin más stock". `repetido` = ya se había escaneado.
+  // Excepción: si sistemaP=0 (stock agotado en sistema) SÍ se permite contar
+  // porque el ítem puede existir físicamente → aparece como SOBRANTE en el cruce.
   function intentarContar(p){
     const sistemaP=sistemaDe(p);
     let res={ok:false,sistemaP,cantNueva:0,repetido:false};
     setConteo(prev=>{
       const ya=prev[p.id]||0;
-      if(ya+1>sistemaP){ res={ok:false,sistemaP,cantNueva:ya,repetido:ya>0}; return prev; }
-      res={ok:true,sistemaP,cantNueva:ya+1,repetido:ya>0};
+      // Solo bloquear si sistemaP>0 y ya alcanzamos el máximo
+      if(sistemaP>0 && ya+1>sistemaP){ res={ok:false,sistemaP,cantNueva:ya,repetido:ya>0}; return prev; }
+      res={ok:true,sistemaP,cantNueva:ya+1,repetido:ya>0,sobrante:sistemaP===0};
       return {...prev,[p.id]:ya+1};
     });
     if(res.ok){
@@ -12572,28 +13547,58 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
   function buscarYAgregar(codigo){
     const c=(codigo||"").trim().toUpperCase().replace(/'/g,"-");
     if(!c) return false;
-    const cAlnum=c.replace(/[^A-Z0-9]/g,"");
-    const p=baseInv.find(i=>i.codigo.toUpperCase()===c) || baseInv.find(i=>i.codigo.toUpperCase().replace(/[^A-Z0-9]/g,"")===cAlnum);
-    if(!p){ flash(false, `Código "${c}" no encontrado en inventario`); return false; }
-    if(!enAlcance(p)){ flash(false, `"${p.codigo}" es de ${p.marcaNombre||"otra marca"} — la verificación está filtrada por ${marcaSelNombre}`); setCodManual(""); return false; }
+    const p=buscarEnInv(c);
+    if(!p){ beepError(); flash(false, `Código "${c}" no encontrado en inventario`); return false; }
+    if(!enAlcance(p)){ beepError(); flash(false, `"${p.codigo}" es de ${p.marcaNombre||"otra marca"} — la verificación está filtrada por ${marcaSelNombre}`); setCodManual(""); return false; }
     const r=intentarContar(p);
     if(!r.ok){
+      beepError();
       flash(false, r.sistemaP<=1
         ? `${p.codigo}: repetido · solo ${r.sistemaP} en sistema, ya escaneado (no se suma)`
         : `${p.codigo}: repetido · ya contaste las ${r.sistemaP} unidades (no se suma)`);
     } else {
-      flash(true, r.repetido
-        ? `Repetido OK · unidad ${r.cantNueva}/${r.sistemaP} · ${(p.nombre||"").toUpperCase()}`
-        : `+1 · ${(p.nombre||"").toUpperCase()} (${p.codigo})`);
+      beep();
+      flash(true, r.sobrante
+        ? `⚠ SOBRANTE · ${(p.nombre||"").toUpperCase()} (${p.codigo}) — stock sistema: 0`
+        : r.repetido
+          ? `Repetido OK · unidad ${r.cantNueva}/${r.sistemaP} · ${(p.nombre||"").toUpperCase()}`
+          : `+1 · ${(p.nombre||"").toUpperCase()} (${p.codigo})`);
     }
     setCodManual("");
     return r.ok;
   }
 
+  function buscarEnInv(codigo){
+    const c=(codigo||"").trim().toUpperCase().replace(/'/g,"-");
+    const cAlnum=c.replace(/[^A-Z0-9]/g,"");
+
+    const encontrarEn = (lista) =>
+      lista.find(i=>(i.codigo||"").toUpperCase()===c)
+      || (cAlnum.length>=3 && lista.find(i=>(i.codigo||"").toUpperCase().replace(/[^A-Z0-9]/g,"")===cAlnum));
+
+    const exacto = encontrarEn(baseInv) || encontrarEn(inv);
+    if(exacto) return exacto;
+
+    // Fallback: si el barcode impreso es el código base (ej: GLOW-PRO-058) pero en el
+    // sistema existen variantes con sufijo (-A, -B, -C...), contar la primera
+    // variante que aún tenga unidades disponibles (o la primera si todas están agotadas)
+    const prefijo = c + "-";
+    const variantes = [...baseInv, ...inv.filter(i=>!baseInv.find(b=>b.id===i.id))]
+      .filter(i=>(i.codigo||"").toUpperCase().startsWith(prefijo));
+    if(variantes.length===0) return null;
+    // Preferir la que tenga unidades sin contar todavía
+    const disponible = variantes.find(v=>{
+      const ya = conteo[v.id]||0;
+      const sis = sistemaDe(v);
+      return sis===0 || ya < sis;
+    });
+    return disponible || variantes[0];
+  }
+
   // ── Verificación rápida: escaneo continuo con lector USB ──
   function onDetectCierreRapido(codigo){
     const c=(codigo||"").trim().toUpperCase();
-    const p=baseInv.find(i=>i.codigo.toUpperCase()===c);
+    const p=buscarEnInv(c);
     if(!p){
       setLiveFeedback({ts:Date.now(),ok:false,title:"Código no encontrado",sub:c});
       return false;
@@ -12610,6 +13615,7 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
         : r.sistemaP===1
           ? "solo hay 1 unidad y ya fue escaneada — no se cuenta de nuevo"
           : `ya contaste las ${r.sistemaP} unidades — repetido no contabilizado`;
+      if(r.sistemaP<=1) beepError();
       setLiveFeedback({ts:Date.now(),ok:false,code:p.codigo,repetido:true,
         title:`Repetido · ${(p.nombre||"").toUpperCase()}`, sub:`${p.codigo} · ${motivo}`});
       return false;
@@ -12700,7 +13706,7 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
       const contado = conteo[p.id]||0;
       const diferencia = contado - sistema;
       return {...p, sistema, sistemaBase:p.stock, ajuste, contado, diferencia,
-        estado: diferencia===0 ? "OK" : diferencia<0 ? "FALTANTE" : "SOBRANTE"};
+        estado: diferencia<=0 ? (diferencia===0 ? "OK" : "FALTANTE") : "OK"};
     })
     .filter(r=>r.sistema>0 || r.contado>0)
     .sort((a,b)=> Math.abs(b.diferencia)-Math.abs(a.diferencia) || (a.nombre||"").localeCompare(b.nombre||""));
@@ -12785,12 +13791,11 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
 
   function confirmarCierre(){
     if(itemsContados===0){ flash(false,"Escanea o agrega al menos un producto antes de confirmar el cierre"); return; }
-    if(!todoVerificado){
-      flash(false,`Faltan ${discrepancias.length-verificadosCount} discrepancia(s) por verificar (doble conteo) antes de confirmar`);
-      setVista("verificacion");
-      return;
-    }
-    if(!window.confirm(`¿Guardar esta verificación de inventario de ${MESES[mes]} ${anio}?\n\nAlcance: ${marcaSelec?`Solo ${marcaSelNombre}`:"Todas las marcas"}\n${cruce.length} productos verificados · ${faltantesFinal.length} faltante(s) · ${sobrantesFinal.length} sobrante(s)\n\nEs solo un cruce de control: NO modifica el stock ni cierra contabilidad.\nBase de inventario tomada: ${baseTs.toLocaleString("es-BO")}`)) return;
+    const pendientesSinVerificar = discrepancias.length-verificadosCount;
+    const avisoVerif = pendientesSinVerificar>0
+      ? `\n⚠ ${pendientesSinVerificar} discrepancia(s) sin doble conteo — se guardarán igual.\n`
+      : "";
+    if(!window.confirm(`¿Guardar esta verificación de inventario de ${MESES[mes]} ${anio}?\n\nAlcance: ${marcaSelec?`Solo ${marcaSelNombre}`:"Todas las marcas"}\n${cruce.length} productos verificados · ${faltantesFinal.length} faltante(s) · ${sobrantesFinal.length} sobrante(s)\n${avisoVerif}\nEs solo un cruce de control: NO modifica el stock ni cierra contabilidad.\nBase de inventario tomada: ${baseTs.toLocaleString("es-BO")}`)) return;
     const aud = {
       id:`AUD-${MK}-${Date.now()}`, mk:MK, mes, anio, fecha:hoy(), hora:hora(),
       usuario:user?.nombre||"—", marcaId:marcaSelec,
@@ -12823,8 +13828,37 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
     SOBRANTE: {label:"↑ Sobrante",  color:C.blue,  bg:"#EEF2FF"},
   };
 
+  // Botón flotante cuando el usuario está en otra pestaña
+  const totalContado = Object.values(conteo).reduce((s,v)=>s+(v||0),0);
+  const hayConteoActivo = totalContado > 0;
+  const minimizado = tabActual && tabActual !== "auditoria";
+
   return (
     <div>
+      {/* ── Botón flotante cuando se minimiza ── */}
+      {minimizado && hayConteoActivo && onGoVerif && (
+        <div onClick={onGoVerif} style={{
+          position:"fixed", bottom:80, right:16, zIndex:900,
+          background:"#3F51B5", borderRadius:24, padding:"10px 18px",
+          display:"flex", alignItems:"center", gap:10,
+          boxShadow:"0 4px 20px rgba(63,81,181,0.45)",
+          cursor:"pointer", userSelect:"none",
+          WebkitTapHighlightColor:"transparent",
+        }}>
+          <div style={{
+            width:10, height:10, borderRadius:"50%", background:"#69f0ae", flexShrink:0,
+            boxShadow:"0 0 0 3px rgba(105,240,174,0.3)"
+          }}/>
+          <div style={{lineHeight:1.3}}>
+            <div style={{fontSize:12,fontWeight:700,color:"#fff",fontFamily:FONT}}>Verificación activa</div>
+            <div style={{fontSize:11,color:"rgba(255,255,255,0.8)",fontFamily:FONT}}>
+              {totalContado} ítem{totalContado!==1?"s":""} escaneado{totalContado!==1?"s":""}
+            </div>
+          </div>
+          <div style={{fontSize:11,color:"rgba(255,255,255,0.7)",fontFamily:FONT,marginLeft:4}}>Volver ›</div>
+        </div>
+      )}
+
       {/* ── Encabezado ── */}
       <div style={{background:C.bg1,borderRadius:16,padding:18,marginBottom:14,
         border:`1px solid ${C.sep}`,boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}>
@@ -12959,7 +13993,7 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
           stats={{productos:itemsContados, unidades:unidadesContadas}}
           rows={cruce}
           marcaNombre={marcaSelec?`Solo ${marcaSelNombre}`:"Todas las marcas"}
-          onClose={()=>setModoCierre(false)}
+          onClose={()=>{ setModoCierre(false); confirmarCierre(); }}
           onReiniciar={finalizarYEmpezarDeNuevo}
         />
       )}
@@ -13089,7 +14123,6 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
           <div style={{display:"grid",gridTemplateColumns: isDesktop?"1fr 1fr 1fr 1fr 1fr":"1fr 1fr",gap:8,marginBottom:14}}>
             <StatCard icon="✓" label="Coinciden" value={okCount} color={C.green} compact={isDesktop}/>
             <StatCard icon="⚠" label="Faltantes" value={faltantes.length} color={C.red} compact={isDesktop}/>
-            <StatCard icon="↑" label="Sobrantes" value={sobrantes.length} color={C.blue} compact={isDesktop}/>
             <StatCard icon="💰" label="Valor en fuga" value={$(Math.round(valorFuga))} color={C.red} compact={isDesktop}/>
             <StatCard icon="⏳" label="Unidades sin contar" value={unidadesPendientes} sub={`${pendientes.length} prod.`} color={C.label3} compact={isDesktop}/>
           </div>
@@ -13154,21 +14187,13 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
               </div>
           }
 
-          {(faltantes.length>0||sobrantes.length>0)&&(
+          {faltantes.length>0&&(
             <div style={{background:C.bg1,borderRadius:14,padding:16,marginBottom:16,
               border:`1px solid ${C.sep}`,display:"flex",flexDirection:"column",gap:8}}>
-              {faltantes.length>0&&(
-                <div style={{display:"flex",justifyContent:"space-between",fontSize:13,fontFamily:FONT}}>
-                  <span style={{color:C.label2}}>Valor estimado de fuga ({faltantes.length} ítem{faltantes.length!==1?"s":""})</span>
-                  <span style={{fontWeight:700,color:C.red}}>-{$(Math.round(valorFuga))}</span>
-                </div>
-              )}
-              {sobrantes.length>0&&(
-                <div style={{display:"flex",justifyContent:"space-between",fontSize:13,fontFamily:FONT}}>
-                  <span style={{color:C.label2}}>Valor de sobrantes ({sobrantes.length} ítem{sobrantes.length!==1?"s":""})</span>
-                  <span style={{fontWeight:700,color:C.blue}}>+{$(Math.round(valorSobrante))}</span>
-                </div>
-              )}
+              <div style={{display:"flex",justifyContent:"space-between",fontSize:13,fontFamily:FONT}}>
+                <span style={{color:C.label2}}>Valor estimado de fuga ({faltantes.length} ítem{faltantes.length!==1?"s":""})</span>
+                <span style={{fontWeight:700,color:C.red}}>-{$(Math.round(valorFuga))}</span>
+              </div>
             </div>
           )}
 
@@ -13179,8 +14204,8 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
               background:C.redBg,border:`1px solid ${C.red}33`}}>
               <span style={{fontSize:18}}>⚠</span>
               <div style={{flex:1,fontSize:12,color:C.red,fontFamily:FONT,lineHeight:1.4}}>
-                <b>{discrepancias.length-verificadosCount} discrepancia(s) sin verificar.</b> Antes de
-                confirmar el cierre se requiere una segunda revisión (doble conteo) — toca para ir a Verificación.
+                <b>{discrepancias.length-verificadosCount} discrepancia(s) sin verificar.</b> Opcional:
+                toca para hacer una segunda revisión (doble conteo) antes de guardar.
               </div>
             </div>
           )}
@@ -13198,8 +14223,8 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
                 marcaNombre:r.marcaNombre||MARCAS.find(m=>m.id===r.marcaId)?.nombre,
                 sistema:r.sistema,contado:r.contado,diferencia:r.diferencia,estado:r.estado,precio:r.precio})),
             })} variant="fill" full icon="⬇" disabled={cruceContados.length===0}>Exportar Excel</IOSBtn>
-            <IOSBtn onPress={confirmarCierre} variant="success" full icon="✓" disabled={itemsContados===0||!todoVerificado}>
-              {todoVerificado ? "Guardar Verificación y Generar Excel" : `Revisa ${discrepancias.length-verificadosCount} discrepancia(s) primero`}
+            <IOSBtn onPress={confirmarCierre} variant="success" full icon="✓" disabled={itemsContados===0}>
+              Guardar Verificación y Generar Excel
             </IOSBtn>
           </div>
         </div>
@@ -13286,7 +14311,61 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
       )}
 
       {/* ── HISTORIAL ── */}
-      {vista==="historial" && (
+      {vista==="historial" && (() => {
+        function agregarItem(aud){
+          const cod = codAgregar.trim().toUpperCase();
+          if(!cod){ setMsgAgregar({ok:false,txt:"Ingresá un código"}); return; }
+          const prod = inv.find(p=>(p.codigo||"").toUpperCase()===cod);
+          if(!prod){ setMsgAgregar({ok:false,txt:`"${cod}" no encontrado en inventario`}); return; }
+          const idxExistente = (aud.detalle||[]).findIndex(d=>(d.codigo||"").toUpperCase()===cod);
+          let nuevoDetalle;
+          let msgOk;
+          if(idxExistente>=0){
+            const dExistente = aud.detalle[idxExistente];
+            const yaContado = dExistente.contado||0;
+            const stockSistema = dExistente.sistema||0;
+            // Bloquear si ya contó todas las unidades que hay en sistema
+            if(stockSistema>0 && yaContado>=stockSistema){
+              setMsgAgregar({ok:false,txt:`"${prod.nombre}": ya contaste las ${stockSistema} unidad${stockSistema!==1?"es":""} en sistema — no se suma`});
+              return;
+            }
+            // Código ya en verificación → sumar 1 unidad al contado
+            nuevoDetalle = (aud.detalle||[]).map((d,i)=>{
+              if(i!==idxExistente) return d;
+              const nuevoContado = yaContado+1;
+              const nuevaDif = nuevoContado-(d.sistema||0);
+              return {...d, contado:nuevoContado, diferencia:nuevaDif,
+                estado:nuevaDif===0?"OK":nuevaDif>0?"SOBRANTE":"FALTANTE",
+                ultimoAgregoPost:true, ultimoAgregoPor:user?.nombre||"—", ultimoAgregoTs:new Date().toISOString()};
+            });
+            const item=nuevoDetalle[idxExistente];
+            msgOk=`✓ "${prod.nombre}": contado ${item.contado-1} → ${item.contado}`;
+          } else {
+            // Código nuevo → agregar fila
+            nuevoDetalle = [...(aud.detalle||[]), {
+              codigo:prod.codigo, nombre:prod.nombre, marcaId:prod.marcaId,
+              marca:prod.marcaNombre||"—", precio:prod.precio,
+              sistema:prod.stock, contado:1, diferencia:1-prod.stock,
+              estado:1-prod.stock===0?"OK":1-prod.stock>0?"SOBRANTE":"FALTANTE",
+              agregadoPost:true, agregadoPor:user?.nombre||"—", agregadoTs:new Date().toISOString(),
+            }];
+            msgOk=`✓ "${prod.nombre}" agregado`;
+          }
+          const faltantes=nuevoDetalle.filter(d=>d.estado==="FALTANTE").length;
+          const sobrantes=nuevoDetalle.filter(d=>d.estado==="SOBRANTE").length;
+          const okCount=nuevoDetalle.filter(d=>d.estado==="OK").length;
+          const audActualizada = {...aud,
+            detalle: nuevoDetalle,
+            totalProductos: nuevoDetalle.length,
+            ok: okCount, faltantes, sobrantes,
+            marcadoOkPor: user?.nombre||"—",
+            marcadoOkTs: new Date().toISOString(),
+          };
+          onActualizarAuditoria(audActualizada);
+          setMsgAgregar({ok:true,txt:msgOk});
+          setCodAgregar("");
+        }
+        return (
         auditorias.length===0
           ? <EmptyState icon="🗂" title="Sin verificaciones de inventario registradas"
               sub="Cuando guardes una verificación, aparecerá aquí con su resumen"/>
@@ -13309,8 +14388,7 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
                       </div>
                       <div style={{display:"flex",gap:6,flexShrink:0}}>
                         {a.faltantes>0&&<Chip color={C.red} small>{a.faltantes} faltante{a.faltantes!==1?"s":""}</Chip>}
-                        {a.sobrantes>0&&<Chip color={C.blue} small>{a.sobrantes} sobrante{a.sobrantes!==1?"s":""}</Chip>}
-                        {a.faltantes===0&&a.sobrantes===0&&<Chip color={C.green} small>✓ OK</Chip>}
+                        {a.faltantes===0&&<Chip color={C.green} small>✓ OK</Chip>}
                       </div>
                     </div>
                     {abierta&&(
@@ -13320,19 +14398,150 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
                           <span style={{color:C.label2}}>Valor estimado de fuga</span>
                           <span style={{fontWeight:700,color:C.red}}>-{$(Math.round(a.valorFuga||0))}</span>
                         </div>
-                        <div style={{display:"flex",justifyContent:"space-between",fontSize:13,fontFamily:FONT,
-                          padding:"4px 0 10px"}}>
-                          <span style={{color:C.label2}}>Valor de sobrantes</span>
-                          <span style={{fontWeight:700,color:C.blue}}>+{$(Math.round(a.valorSobrante||0))}</span>
+                        {a.marcadoOkPor&&(
+                          <div style={{fontSize:11,color:C.label3,fontFamily:FONT_UI,marginBottom:8,textAlign:"center"}}>
+                            Marcado OK por <b>{a.marcadoOkPor}</b> · {a.marcadoOkTs ? new Date(a.marcadoOkTs).toLocaleString("es-BO",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"}) : "—"}
+                          </div>
+                        )}
+                        {onActualizarAuditoria&&a.faltantes>0&&(
+                          <IOSBtn onPress={()=>{
+                            if(!window.confirm(`¿Marcar esta verificación de ${MESES[a.mes]} ${a.anio} como OK?\n\nSe registrará que los faltantes/sobrantes fueron verificados físicamente y están conformes.`)) return;
+                            onActualizarAuditoria({...a, faltantes:0, sobrantes:0, valorFuga:0, valorSobrante:0, marcadoOkPor:user?.nombre||"—", marcadoOkTs:new Date().toISOString()});
+                          }} full small icon="✓" variant="success" style={{marginBottom:8}}>
+                            Marcar como OK — todo conforme
+                          </IOSBtn>
+                        )}
+                        {/* ── Agregar ítems post-verificación ── */}
+                        {onActualizarAuditoria&&(
+                          <div style={{marginTop:10,borderTop:`1px dashed ${C.sep}`,paddingTop:10}}>
+                            {agregandoA===a.id ? (
+                              <div>
+                                <div style={{fontSize:11,fontWeight:700,color:C.label,fontFamily:FONT_UI,
+                                  textTransform:"uppercase",letterSpacing:.6,marginBottom:8}}>
+                                  Agregar ítems nuevos a esta verificación
+                                </div>
+                                <div style={{display:"flex",gap:8,marginBottom:8}}>
+                                  <input
+                                    autoFocus
+                                    value={codAgregar}
+                                    onChange={e=>{setCodAgregar(e.target.value.toUpperCase());setMsgAgregar(null);}}
+                                    onKeyDown={e=>{if(e.key==="Enter") agregarItem(a);}}
+                                    placeholder="Código del producto"
+                                    style={{flex:1,padding:"10px 12px",borderRadius:10,border:`1px solid ${C.sep}`,
+                                      fontSize:14,fontFamily:"monospace",background:C.bg2,color:C.label,outline:"none"}}/>
+                                  <button onClick={()=>agregarItem(a)}
+                                    style={{padding:"10px 16px",borderRadius:10,border:"none",background:C.label,
+                                      color:C.bg0,fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:FONT_UI}}>
+                                    + Agregar
+                                  </button>
+                                </div>
+                                {msgAgregar&&(
+                                  <div style={{fontSize:12,fontWeight:600,marginBottom:8,padding:"8px 10px",borderRadius:8,
+                                    background:msgAgregar.ok?`${C.green}15`:`${C.red}15`,
+                                    color:msgAgregar.ok?C.green:C.red,fontFamily:FONT_UI}}>
+                                    {msgAgregar.txt}
+                                  </div>
+                                )}
+                                {(a.detalle||[]).length>0&&(
+                                  <div style={{marginBottom:8,maxHeight:260,overflowY:"auto"}}>
+                                    <div style={{fontSize:11,fontWeight:700,color:C.label3,fontFamily:FONT_UI,
+                                      textTransform:"uppercase",letterSpacing:.5,marginBottom:6}}>
+                                      Ítems en esta verificación ({(a.detalle||[]).length})
+                                    </div>
+                                    {(a.detalle||[]).map((d,i)=>{
+                                      const estadoColor = d.estado==="FALTANTE"?C.red:C.green;
+                                      return (
+                                      <div key={(d.codigo||"")+i} style={{display:"flex",alignItems:"center",gap:8,
+                                        padding:"7px 10px",borderRadius:9,background:C.bg0,marginBottom:4,
+                                        border:`1px solid ${d.estado==="OK"?C.sep:estadoColor+"44"}`}}>
+                                        <div style={{flex:1,minWidth:0}}>
+                                          <div style={{fontSize:12,fontWeight:600,color:C.label,fontFamily:FONT,
+                                            whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>
+                                            {d.nombre}
+                                          </div>
+                                          <div style={{fontSize:10,color:C.label3,fontFamily:"monospace",marginTop:2}}>
+                                            {d.codigo} · contado {d.contado} / sistema {d.sistema}
+                                            {d.diferencia!==0&&<span style={{color:estadoColor,fontWeight:700}}>
+                                              {" "}({d.diferencia>0?"+":""}{d.diferencia})
+                                            </span>}
+                                          </div>
+                                        </div>
+                                        <span style={{fontSize:9,fontWeight:700,color:estadoColor,
+                                          background:estadoColor+"18",borderRadius:5,padding:"2px 6px",
+                                          fontFamily:FONT_UI,flexShrink:0}}>
+                                          {d.estado||"—"}
+                                        </span>
+                                        <button
+                                          onClick={()=>{
+                                            if(!window.confirm(`¿Quitar "${d.nombre}" (${d.codigo}) de esta verificación?`)) return;
+                                            const detalleNuevo=(a.detalle||[]).filter((_,j)=>j!==i);
+                                            const okC=detalleNuevo.filter(x=>x.estado==="OK").length;
+                                            const faltC=detalleNuevo.filter(x=>x.estado==="FALTANTE").length;
+                                            const sobrC=detalleNuevo.filter(x=>x.estado==="SOBRANTE").length;
+                                            onActualizarAuditoria({...a,
+                                              detalle:detalleNuevo,
+                                              totalProductos:detalleNuevo.length,
+                                              ok:okC,faltantes:faltC,sobrantes:sobrC,
+                                            });
+                                          }}
+                                          style={{flexShrink:0,width:24,height:24,borderRadius:"50%",border:"none",
+                                            background:`${C.red}20`,color:C.red,fontSize:14,fontWeight:700,
+                                            cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",
+                                            lineHeight:1}}>
+                                          ×
+                                        </button>
+                                      </div>
+                                      );
+                                    })}
+                                  </div>
+                                )}
+                                <button onClick={()=>{setAgregandoA(null);setCodAgregar("");setMsgAgregar(null);}}
+                                  style={{width:"100%",padding:"8px",borderRadius:10,border:`1px solid ${C.sep}`,
+                                    background:"transparent",color:C.label3,fontSize:12,cursor:"pointer",fontFamily:FONT_UI}}>
+                                  Cerrar
+                                </button>
+                              </div>
+                            ):(
+                              <button onClick={e=>{e.stopPropagation();setAgregandoA(a.id);setCodAgregar("");setMsgAgregar(null);}}
+                                style={{width:"100%",padding:"9px",borderRadius:10,
+                                  border:`1.5px dashed ${C.label3}`,background:"transparent",
+                                  color:C.label3,fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:FONT_UI}}>
+                                + Agregar ítems nuevos a esta verificación
+                              </button>
+                            )}
+                          </div>
+                        )}
+                        {onCuadrarConAuditoria && (a.detalle||[]).some(d=>d.diferencia!==0)&&(
+                          <div style={{marginTop:10,borderTop:`1px dashed ${C.sep}`,paddingTop:10}}>
+                            {(()=>{
+                              const conDif=(a.detalle||[]).filter(d=>d.diferencia!==0);
+                              const falt=conDif.filter(d=>d.diferencia<0).length;
+                              const sobr=conDif.filter(d=>d.diferencia>0).length;
+                              return (
+                                <div>
+                                  <div style={{fontSize:11,color:C.label3,fontFamily:FONT_UI,marginBottom:8,textAlign:"center"}}>
+                                    {conDif.length} producto(s) con diferencia
+                                    {falt>0&&<span style={{color:C.red}}> · {falt} faltante{falt!==1?"s":""}</span>}
+                                  </div>
+                                  <IOSBtn onPress={()=>onCuadrarConAuditoria(a)} full small icon="⚖️" variant="warning">
+                                    Cuadrar inventario con esta verificación
+                                  </IOSBtn>
+                                </div>
+                              );
+                            })()}
+                          </div>
+                        )}
+                        <div style={{marginTop:10}}>
+                          <IOSBtn onPress={()=>exportAuditoriaExcel(a)} full small icon="⬇">Exportar Excel</IOSBtn>
                         </div>
-                        <IOSBtn onPress={()=>exportAuditoriaExcel(a)} full small icon="⬇">Exportar Excel</IOSBtn>
                       </div>
                     )}
                   </div>
                 );
               })}
             </div>
-      )}
+        );
+      })()}
     </div>
   );
 }
@@ -13340,7 +14549,7 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
 // ══════════════════════════════════════════════════════════
 // CARGAS — trazabilidad de cargas a inventario (manuales + importaciones)
 // ══════════════════════════════════════════════════════════
-function RegistroCargas({cargas, marcas, marcaId=null}){
+function RegistroCargas({cargas, marcas, marcaId=null, onVerificar=null, user=null}){
   const isDesktop = useIsDesktop();
   const fijaMarca = marcaId!=null;
   const[marcaSelec,setMarcaSelec]=useState(marcaId);
@@ -13501,7 +14710,15 @@ function RegistroCargas({cargas, marcas, marcaId=null}){
                         {c.fecha} · {c.hora} · {c.nombre} ({c.rol}) · {items.length} ítem{items.length!==1?"s":""}
                       </div>
                     </div>
-                    <Chip color={tipoInfo.color} small>{tipoInfo.icon} {tipoInfo.label}</Chip>
+                    <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:4,flexShrink:0}}>
+                      <Chip color={tipoInfo.color} small>{tipoInfo.icon} {tipoInfo.label}</Chip>
+                      {c.verificado&&(
+                        <span style={{fontSize:10,fontWeight:700,color:C.green,background:`${C.green}18`,
+                          padding:"2px 8px",borderRadius:8,letterSpacing:.3,fontFamily:FONT_UI}}>
+                          ✓ VERIFICADO
+                        </span>
+                      )}
+                    </div>
                   </div>
                   {abierto && (
                     <div style={{padding:"0 14px 14px"}}>
@@ -13536,6 +14753,34 @@ function RegistroCargas({cargas, marcas, marcaId=null}){
                           ))
                         }
                       </div>
+                      {c.archivoUrl&&(
+                        <a href={c.archivoUrl} download={c.archivoNombre||"evidencia.xlsx"}
+                          onClick={e=>e.stopPropagation()}
+                          style={{display:"flex",alignItems:"center",justifyContent:"center",gap:6,
+                            marginTop:10,padding:"9px",borderRadius:10,textDecoration:"none",
+                            border:`1.5px solid ${C.indigo}`,background:`${C.indigo}10`,
+                            color:C.indigo,fontSize:12,fontWeight:700,fontFamily:FONT_UI}}>
+                          📄 Descargar Excel de evidencia
+                        </a>
+                      )}
+                      {onVerificar&&(
+                        <div style={{marginTop:10}}>
+                          {c.verificado&&c.verificadoPor&&(
+                            <div style={{fontSize:11,color:C.label3,fontFamily:FONT_UI,marginBottom:6,textAlign:"center"}}>
+                              Verificado por <b>{c.verificadoPor}</b> · {c.verificadoTs ? new Date(c.verificadoTs).toLocaleString("es-BO",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"}) : "—"}
+                            </div>
+                          )}
+                          <button onClick={e=>{e.stopPropagation();onVerificar(c.id,!c.verificado);}}
+                            style={{width:"100%",padding:"9px",borderRadius:10,
+                              border:`1.5px solid ${c.verificado?C.green:C.sep}`,
+                              background:c.verificado?`${C.green}12`:"transparent",
+                              color:c.verificado?C.green:C.label3,
+                              fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:FONT_UI,
+                              transition:"all .15s"}}>
+                            {c.verificado?"✓ Verificado — quitar marca":"Marcar como verificado ✓"}
+                          </button>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -13550,8 +14795,9 @@ function RegistroCargas({cargas, marcas, marcaId=null}){
 // ══════════════════════════════════════════════════════════
 // INVENTARIO POR MARCA — pestaña con scroll horizontal
 // ══════════════════════════════════════════════════════════
-function InventarioPorMarca({inv, ventas, onRecibir, onBaja, onImportarExcel, onReponer}){
+function InventarioPorMarca({inv, ventas, retiros=[], onRecibir, onBaja, onImportarExcel, onReponer, onSyncCompleto, onRecargarDesdeSupabase}){
   const isDesktop = useIsDesktop();
+  const [syncMsg, setSyncMsg] = useState(null); // null | {prog, total} | "ok" | "err"
   // null = "TODOS"
   var _hN149 = useState(null); var marcaSelec = _hN149[0]; var setMarcaSelec = _hN149[1];;
   var _hInvBq = useState(""); var invBusq = _hInvBq[0]; var setInvBusq = _hInvBq[1];;
@@ -13569,6 +14815,64 @@ function InventarioPorMarca({inv, ventas, onRecibir, onBaja, onImportarExcel, on
     }));
     return map;
   },[ventas]);
+
+  // Calcular retiros por código
+  const retirosPorCodigo = useMemo(()=>{
+    const map = {};
+    retiros.forEach(r=>{
+      if(r.codigo) map[r.codigo] = (map[r.codigo]||[]).concat(r);
+    });
+    return map;
+  },[retiros]);
+
+  const [retiroAbierto, setRetiroAbierto] = useState(null); // {codigo, lista:[]}
+  const dragRefR = React.useRef({dragging:false, ox:0, oy:0});
+  const [dragPosR, setDragPosR] = React.useState(null);
+  const [notaRetiroAbierta, setNotaRetiroAbierta] = useState(null); // retiro individual
+  const dragRefNR = React.useRef({dragging:false, ox:0, oy:0});
+  const [dragPosNR, setDragPosNR] = React.useState(null);
+  function onDragStartNR(e){
+    const el = e.currentTarget.closest('[data-drag-window-nr]');
+    const rect = el.getBoundingClientRect();
+    dragRefNR.current = {dragging:true, ox:e.clientX-rect.left, oy:e.clientY-rect.top};
+    const onMove = ev=>{ if(!dragRefNR.current.dragging) return; setDragPosNR({x:ev.clientX-dragRefNR.current.ox, y:ev.clientY-dragRefNR.current.oy}); };
+    const onUp = ()=>{ dragRefNR.current.dragging=false; window.removeEventListener('mousemove',onMove); window.removeEventListener('mouseup',onUp); };
+    window.addEventListener('mousemove',onMove);
+    window.addEventListener('mouseup',onUp);
+  }
+  function onDragStartR(e){
+    const el = e.currentTarget.closest('[data-drag-window-r]');
+    const rect = el.getBoundingClientRect();
+    dragRefR.current = {dragging:true, ox:e.clientX-rect.left, oy:e.clientY-rect.top};
+    const onMove = ev=>{ if(!dragRefR.current.dragging) return; setDragPosR({x:ev.clientX-dragRefR.current.ox, y:ev.clientY-dragRefR.current.oy}); };
+    const onUp = ()=>{ dragRefR.current.dragging=false; window.removeEventListener('mousemove',onMove); window.removeEventListener('mouseup',onUp); };
+    window.addEventListener('mousemove',onMove);
+    window.addEventListener('mouseup',onUp);
+  }
+
+  const [ventasCodigoInv, setVentasCodigoInv] = useState(null);
+  function abrirVentasPorCodigoInv(prod) {
+    const lista = ventas.filter(v=>v.items.some(it=>it.prodId===prod.id||it.codigo===prod.codigo));
+    if (lista.length===0) return;
+    const sorted = lista.slice().sort((a,b)=>b.fecha.localeCompare(a.fecha));
+    if (lista.length===1) { setVentaAbiertaInv({...sorted[0], _codigoOrigen:prod.codigo}); return; }
+    setVentasCodigoInv({codigo:prod.codigo, lista: sorted});
+  }
+  const [ventaAbiertaInv, setVentaAbiertaInv] = useState(null);
+  const dragRef = React.useRef({dragging:false, ox:0, oy:0, x:null, y:null});
+  const [dragPos, setDragPos] = React.useState(null);
+  function onDragStart(e){
+    const el = e.currentTarget.closest('[data-drag-window]');
+    const rect = el.getBoundingClientRect();
+    dragRef.current = {dragging:true, ox:e.clientX-rect.left, oy:e.clientY-rect.top};
+    const onMove = ev=>{
+      if(!dragRef.current.dragging) return;
+      setDragPos({x:ev.clientX-dragRef.current.ox, y:ev.clientY-dragRef.current.oy});
+    };
+    const onUp = ()=>{ dragRef.current.dragging=false; window.removeEventListener('mousemove',onMove); window.removeEventListener('mouseup',onUp); };
+    window.addEventListener('mousemove',onMove);
+    window.addEventListener('mouseup',onUp);
+  }
 
   // Búsqueda SIEMPRE global — filtra sobre todo el inventario
   const productos = useMemo(()=>{
@@ -13715,20 +15019,45 @@ function InventarioPorMarca({inv, ventas, onRecibir, onBaja, onImportarExcel, on
       </div>
 
       {/* Stats */}
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8, marginBottom:14}}>
-        {[
-          {icon:"📦",label:"En stock",value:totalStock,color:C.green},
-          {icon:"✅",label:"Vendidas",value:totalVendidas,color:C.blue},
-          {icon:"❌",label:"Agotados",value:agotados,color:C.red},
-        ].map(s=>(
-          <div key={s.label} style={{background:C.bg2,borderRadius:14,padding: isDesktop ? "10px 8px" : "12px 10px",
-            border:`1px solid ${C.sep}`,textAlign:"center"}}>
-            <div style={{fontSize:20,marginBottom:4}}>{s.icon}</div>
-            <div style={{fontSize:18,fontWeight:700,color:s.color,fontFamily:FONT}}>{s.value}</div>
-            <div style={{fontSize:10,color:C.label3,fontFamily:FONT,textTransform:"uppercase",letterSpacing:.5}}>{s.label}</div>
+      {(()=>{
+        const totalSkusGlobal = inv.length;
+        const totalUdsGlobal  = inv.reduce((s,p)=>s+p.stock,0);
+        const hayFiltroActivo = hayFiltro || marcaSelec;
+        return (<>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:8, marginBottom: hayFiltroActivo ? 6 : 14}}>
+          {[
+            {label:"SKUs",          value:productos.length, color:C.label},
+            {label:"Uds. en stock", value:totalStock,       color:C.green},
+            {label:"Vendidas",      value:totalVendidas,    color:C.blue},
+            {label:"Agotados",      value:agotados,         color:C.red},
+          ].map(s=>(
+            <div key={s.label} style={{background:C.bg2,borderRadius:14,padding: isDesktop ? "10px 8px" : "12px 10px",
+              border:`1px solid ${C.sep}`,textAlign:"center"}}>
+              <div style={{fontSize:18,fontWeight:700,color:s.color,fontFamily:FONT,marginBottom:2}}>{s.value}</div>
+              <div style={{fontSize:9,color:C.label3,fontFamily:FONT_UI,textTransform:"uppercase",letterSpacing:.7}}>{s.label}</div>
+            </div>
+          ))}
+        </div>
+        {/* Total general siempre visible cuando hay filtro activo */}
+        {hayFiltroActivo && (
+          <div style={{fontSize:11,color:C.label3,fontFamily:FONT_UI,textAlign:"right",
+            marginBottom:12,paddingRight:2}}>
+            Total inventario:&nbsp;
+            <span style={{color:C.label,fontWeight:700}}>{totalSkusGlobal} SKUs</span>
+            &nbsp;·&nbsp;
+            <span style={{color:C.green,fontWeight:700}}>{totalUdsGlobal} uds.</span>
           </div>
-        ))}
-      </div>
+        )}
+        {/* Sin filtro: mostrar total siempre como línea discreta */}
+        {!hayFiltroActivo && (
+          <div style={{fontSize:11,color:C.label3,fontFamily:FONT_UI,textAlign:"right",
+            marginBottom:12,paddingRight:2}}>
+            Total:&nbsp;
+            <span style={{color:C.green,fontWeight:700}}>{totalUdsGlobal} uds.</span>
+          </div>
+        )}
+        </>);
+      })()}
 
       {/* ── Lista profesional de productos ── */}
       {productos.length===0
@@ -13794,12 +15123,27 @@ function InventarioPorMarca({inv, ventas, onRecibir, onBaja, onImportarExcel, on
                       {prod.categoria&&<span style={{fontSize:10,color:C.label3,fontFamily:FONT}}>{prod.categoria}</span>}
                       {prod.fecha&&<span style={{fontSize:9,color:C.label3,fontFamily:FONT_MONO,opacity:.7}}>{prod.fecha}</span>}
                     </div>
+                    {prod.descripcion&&<div style={{fontSize:10,color:C.label3,fontFamily:FONT,marginTop:2,lineHeight:1.3}}>{prod.descripcion}</div>}
                   </div>
 
                   {/* Precio */}
                   <div style={{textAlign:"right",fontFamily:FONT,paddingRight:8}}>
                     <div style={{fontSize:14,fontWeight:700,color:C.label,letterSpacing:"-0.02em"}}>{$(prod.precio)}</div>
-                    {vendidas>0&&<div style={{fontSize:10,color:C.blue,fontFamily:FONT}}>↑{vendidas} vend.</div>}
+                    <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:3,marginTop:3}}>
+                      {vendidas>0&&<div onClick={()=>abrirVentasPorCodigoInv(prod)}
+                        style={{display:"inline-flex",alignItems:"center",gap:4,
+                          padding:"3px 8px",borderRadius:6,cursor:"pointer",
+                          background:`${C.blue}15`,border:`1px solid ${C.blue}30`}}>
+                        <span style={{fontSize:10,color:C.blue,fontFamily:FONT_UI,fontWeight:600}}>🧾 {vendidas} vend.</span>
+                      </div>}
+                      {(retirosPorCodigo[prod.codigo]||[]).length>0&&<div
+                        onClick={()=>{ setRetiroAbierto({codigo:prod.codigo, lista:retirosPorCodigo[prod.codigo]}); setDragPosR(null); }}
+                        style={{display:"inline-flex",alignItems:"center",gap:4,
+                          padding:"3px 8px",borderRadius:6,cursor:"pointer",
+                          background:`${C.amber}15`,border:`1px solid ${C.amber}30`}}>
+                        <span style={{fontSize:10,color:C.amber,fontFamily:FONT_UI,fontWeight:600}}>↩ {retirosPorCodigo[prod.codigo].length} ret.</span>
+                      </div>}
+                    </div>
                   </div>
 
                   {/* Stock badge */}
@@ -13850,6 +15194,15 @@ function InventarioPorMarca({inv, ventas, onRecibir, onBaja, onImportarExcel, on
         <div style={{display:"flex",gap:8,marginBottom:8}}>
           <IOSBtn onPress={onReponer} variant="fill" full small icon="📦">Reponer Stock</IOSBtn>
         </div>
+        {syncMsg && (
+          <div style={{background:syncMsg==="ok"?"#e8f5e9":syncMsg==="err"?"#ffebee":"#e3f2fd",
+            borderRadius:10,padding:"8px 12px",marginBottom:8,fontSize:13,fontFamily:FONT,
+            color:syncMsg==="ok"?"#2e7d32":syncMsg==="err"?"#c62828":"#1565c0",textAlign:"center"}}>
+            {syncMsg==="ok" ? "✅ Inventario sincronizado con Supabase"
+              : syncMsg==="err" ? "⚠️ Algunos productos no se pudieron sincronizar"
+              : `Sincronizando… ${syncMsg.prog}/${syncMsg.total}`}
+          </div>
+        )}
         <div style={{display:"flex",gap:8}}>
           <IOSBtn onPress={onImportarExcel} variant="fill" full small icon="📥">Importar Excel</IOSBtn>
           <IOSBtn onPress={async()=>{ try{await generarPlantillaXLSX();}catch(e){alert("Error: "+e.message);} }}
@@ -13860,9 +15213,250 @@ function InventarioPorMarca({inv, ventas, onRecibir, onBaja, onImportarExcel, on
               if(productos.length===0){ alert("No hay productos para imprimir"); return; }
               imprimirEtiquetasLote(expandirPorStock(productos));
             }}
-            full small icon="🏷">{`Imprimir ${productos.reduce((acc,p)=>acc+Math.max(1,Number(p.stock)||1),0)} etiqueta${productos.length!==1?'s':''} (código de barras)`}</IOSBtn>
+            full small icon="🏷">{`Imprimir ${productos.reduce((acc,p)=>acc+Math.max(0,Number(p.stock)||0),0)} etiqueta${productos.length!==1?'s':''} (código de barras)`}</IOSBtn>
         </div>
       </div>
+
+      {/* ── Ventana arrastrable nota de venta ── */}
+    {(ventasCodigoInv||ventaAbiertaInv)&&(()=>{
+      const cerrarTodo = ()=>{ setVentaAbiertaInv(null); setVentasCodigoInv(null); setDragPos(null); };
+      const codigo = ventaAbiertaInv?._codigoOrigen || ventasCodigoInv?.codigo || "";
+      const winStyle = {
+        position:"fixed",
+        left: dragPos ? dragPos.x : "50%",
+        top:  dragPos ? dragPos.y : "50%",
+        transform: dragPos ? "none" : "translate(-50%,-50%)",
+        width:380, zIndex:1300,
+        background:C.bg0,
+        border:`1px solid ${C.sep}`,
+        borderRadius:14,
+        overflow:"hidden",
+        userSelect:"none",
+      };
+      const titleBar = (label, onClose)=>(
+        <div onMouseDown={onDragStart}
+          style={{display:"flex",justifyContent:"space-between",alignItems:"center",
+            padding:"11px 14px",background:C.bg2,borderBottom:`1px solid ${C.sep}`,
+            cursor:"grab"}}>
+          <span style={{fontSize:11,fontWeight:700,letterSpacing:1,textTransform:"uppercase",
+            color:C.label3,fontFamily:FONT_UI}}>{label}</span>
+          <button onClick={onClose}
+            style={{background:"none",border:"none",cursor:"pointer",color:C.label3,
+              fontSize:16,lineHeight:1,padding:"2px 4px",borderRadius:4}}>✕</button>
+        </div>
+      );
+
+      if (ventaAbiertaInv) {
+        const v = ventaAbiertaInv;
+        const itemDelCodigo = v.items?.find(it=>it.codigo===codigo);
+        const vendedor = v.vendedor||"—";
+        const iniciales = vendedor!=="—" ? vendedor.trim().split(/\s+/).map(w=>w[0]).join("").toUpperCase().slice(0,2) : "—";
+        return (
+          <div data-drag-window style={winStyle}>
+            {titleBar("Nota de venta", cerrarTodo)}
+            <div style={{padding:"16px 18px",borderBottom:`1px solid ${C.sep}`}}>
+              <div style={{fontSize:13,fontWeight:700,color:C.label,fontFamily:FONT,lineHeight:1.35,marginBottom:6}}>
+                {itemDelCodigo?.nombre||codigo}
+              </div>
+              <span style={{fontSize:10,fontFamily:"monospace",color:C.label3,
+                background:C.bg2,padding:"2px 8px",borderRadius:5,border:`1px solid ${C.sep}`}}>{codigo}</span>
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:0}}>
+              {[
+                {label:"Fecha", val:v.fecha, sub:v.hora||"—"},
+                {label:"Vendió", vendedor, iniciales},
+                {label:"Total", val:`Bs ${v.total}`},
+                {label:"Método de pago", val:v.metodoPago||"—"},
+              ].map((f,i)=>(
+                <div key={i} style={{padding:"12px 18px",borderBottom:`1px solid ${C.sep}`,
+                  borderRight:i%2===0?`1px solid ${C.sep}`:"none"}}>
+                  <div style={{fontSize:9,textTransform:"uppercase",letterSpacing:.8,
+                    color:C.label3,fontFamily:FONT_UI,marginBottom:5}}>{f.label}</div>
+                  {f.vendedor!==undefined ? (
+                    <div style={{display:"flex",alignItems:"center",gap:8}}>
+                      <div style={{width:28,height:28,borderRadius:"50%",background:C.bg2,
+                        border:`1px solid ${C.sep}`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                        <span style={{fontSize:11,fontWeight:700,color:C.label,fontFamily:FONT_UI}}>{f.iniciales}</span>
+                      </div>
+                      <span style={{fontSize:13,fontWeight:700,color:C.label,fontFamily:FONT}}>{f.vendedor}</span>
+                    </div>
+                  ) : (
+                    <div>
+                      <div style={{fontSize:14,fontWeight:700,color:C.label,fontFamily:FONT}}>{f.val}</div>
+                      {f.sub&&<div style={{fontSize:11,color:C.label3,fontFamily:FONT_UI,marginTop:2}}>{f.sub}</div>}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+            <div style={{padding:"12px 18px"}}>
+              <button onClick={()=>verNotaVenta(v, v.numSecuencial||1)}
+                style={{width:"100%",padding:"11px 0",borderRadius:8,
+                  border:`1px solid ${C.sep}`,background:C.bg2,
+                  color:C.label,fontFamily:FONT_UI,fontSize:12,fontWeight:700,
+                  cursor:"pointer",letterSpacing:.3}}>
+                🧾 Abrir nota de venta completa
+              </button>
+            </div>
+          </div>
+        );
+      }
+
+      const {lista} = ventasCodigoInv;
+      return (
+        <div data-drag-window style={winStyle}>
+          {titleBar(`${lista.length} ventas — ${codigo}`, cerrarTodo)}
+          <div style={{padding:"0 18px"}}>
+            {lista.map((v,i)=>(
+              <div key={v.id||i}
+                onClick={()=>setVentaAbiertaInv({...v, _codigoOrigen:codigo})}
+                style={{display:"flex",justifyContent:"space-between",alignItems:"center",
+                  padding:"13px 0",borderBottom:i<lista.length-1?`1px solid ${C.sep}`:"none",
+                  cursor:"pointer"}}>
+                <div>
+                  <div style={{fontSize:13,fontWeight:700,color:C.label,fontFamily:FONT}}>{v.fecha}</div>
+                  <div style={{fontSize:11,color:C.label3,fontFamily:FONT_UI,marginTop:2}}>
+                    {v.vendedor||"—"} · {v.metodoPago||"—"} · {v.hora||"—"}
+                  </div>
+                </div>
+                <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
+                  <span style={{fontSize:14,fontWeight:700,color:C.label,fontFamily:FONT}}>Bs {v.total}</span>
+                  <span style={{fontSize:18,color:C.label3}}>›</span>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div style={{height:12}}/>
+        </div>
+      );
+    })()}
+      {/* ── Ventana arrastrable retiros ── */}
+      {retiroAbierto&&(()=>{
+        const {codigo, lista} = retiroAbierto;
+        const winStyle = {
+          position:"fixed",
+          left: dragPosR ? dragPosR.x : "50%",
+          top:  dragPosR ? dragPosR.y : "50%",
+          transform: dragPosR ? "none" : "translate(-50%,-50%)",
+          width:380, zIndex:1300,
+          background:C.bg0,
+          border:`1px solid ${C.sep}`,
+          borderRadius:14,
+          overflow:"hidden",
+          userSelect:"none",
+        };
+        return (
+          <div data-drag-window-r style={winStyle}>
+            <div onMouseDown={onDragStartR}
+              style={{display:"flex",justifyContent:"space-between",alignItems:"center",
+                padding:"11px 14px",background:C.bg2,borderBottom:`1px solid ${C.sep}`,cursor:"grab"}}>
+              <span style={{fontSize:11,fontWeight:700,letterSpacing:1,textTransform:"uppercase",
+                color:C.amber,fontFamily:FONT_UI}}>Retirados · {codigo}</span>
+              <button onClick={()=>{setRetiroAbierto(null);setDragPosR(null);}}
+                style={{background:"none",border:"none",cursor:"pointer",color:C.label3,fontSize:16,padding:"2px 4px"}}>✕</button>
+            </div>
+            <div style={{padding:"0 18px"}}>
+              {lista.map((r,i)=>(
+                <div key={r.id||i} style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",
+                  padding:"13px 0",borderBottom:i<lista.length-1?`1px solid ${C.sep}`:"none"}}>
+                  <div>
+                    <div style={{fontSize:13,fontWeight:700,color:C.label,fontFamily:FONT}}>{r.fecha}</div>
+                    <div style={{fontSize:11,color:C.label3,fontFamily:FONT_UI,marginTop:2}}>
+                      {r.hora||"—"} · {r.destinatario||"—"}
+                    </div>
+                    {r.motivo&&<div style={{fontSize:11,color:C.amber,fontFamily:FONT_UI,marginTop:2}}>{r.motivo}</div>}
+                  </div>
+                  <div style={{textAlign:"right",flexShrink:0,marginLeft:12,display:"flex",flexDirection:"column",alignItems:"flex-end",gap:6}}>
+                    <div style={{fontSize:13,fontWeight:700,color:C.label,fontFamily:FONT}}>{r.cantidad} ud{r.cantidad!==1?"s":""}</div>
+                    <button onClick={()=>{ setNotaRetiroAbierta(r); setDragPosNR(null); }}
+                      style={{fontSize:10,color:C.amber,background:"none",border:`1px solid ${C.amber}40`,
+                        borderRadius:6,padding:"3px 8px",cursor:"pointer",fontFamily:FONT_UI,fontWeight:600}}>
+                      📄 Nota de retiro
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div style={{height:12}}/>
+          </div>
+        );
+      })()}
+
+      {/* ── Ventana arrastrable nota de retiro ── */}
+      {notaRetiroAbierta&&(()=>{
+        const r = notaRetiroAbierta;
+        const cerrarNR = ()=>{ setNotaRetiroAbierta(null); setDragPosNR(null); };
+        const winStyleNR = {
+          position:"fixed",
+          left: dragPosNR ? dragPosNR.x : "50%",
+          top:  dragPosNR ? dragPosNR.y : "50%",
+          transform: dragPosNR ? "none" : "translate(-50%,-50%)",
+          width:380, zIndex:1400,
+          background:C.bg0,
+          border:`1px solid ${C.sep}`,
+          borderRadius:14,
+          overflow:"hidden",
+          userSelect:"none",
+          boxShadow:"0 8px 32px rgba(0,0,0,0.12)",
+        };
+        return (
+          <div data-drag-window-nr style={winStyleNR}>
+            {/* title bar */}
+            <div onMouseDown={onDragStartNR}
+              style={{display:"flex",justifyContent:"space-between",alignItems:"center",
+                padding:"11px 14px",background:C.bg2,borderBottom:`1px solid ${C.sep}`,cursor:"grab"}}>
+              <span style={{fontSize:11,fontWeight:700,letterSpacing:1,textTransform:"uppercase",
+                color:C.label3,fontFamily:FONT_UI}}>Nota de retiro</span>
+              <button onClick={cerrarNR}
+                style={{background:"none",border:"none",cursor:"pointer",color:C.label3,
+                  fontSize:16,lineHeight:1,padding:"2px 4px",borderRadius:4}}>✕</button>
+            </div>
+            {/* producto */}
+            <div style={{padding:"16px 18px",borderBottom:`1px solid ${C.sep}`}}>
+              <div style={{fontSize:13,fontWeight:700,color:C.label,fontFamily:FONT,lineHeight:1.35,marginBottom:6}}>
+                {r.nombre||r.codigo}
+              </div>
+              <span style={{fontSize:10,fontFamily:"monospace",color:C.label3,
+                background:C.bg2,padding:"2px 8px",borderRadius:5,border:`1px solid ${C.sep}`}}>{r.codigo}</span>
+            </div>
+            {/* grid de datos */}
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:0}}>
+              {[
+                {label:"Fecha", val:r.fecha, sub:r.hora||"—"},
+                {label:"Destinatario", val:r.destinatario||"—"},
+                {label:"Cantidad", val:`${r.cantidad} ud${r.cantidad!==1?"s":""}`},
+                {label:"Marca", val:r.marcaNombre||"—"},
+              ].map((f,i)=>(
+                <div key={i} style={{padding:"12px 18px",borderBottom:`1px solid ${C.sep}`,
+                  borderRight:i%2===0?`1px solid ${C.sep}`:"none"}}>
+                  <div style={{fontSize:9,textTransform:"uppercase",letterSpacing:.8,
+                    color:C.label3,fontFamily:FONT_UI,marginBottom:5}}>{f.label}</div>
+                  <div style={{fontSize:14,fontWeight:700,color:C.label,fontFamily:FONT}}>{f.val}</div>
+                  {f.sub&&<div style={{fontSize:11,color:C.label3,fontFamily:FONT_UI,marginTop:2}}>{f.sub}</div>}
+                </div>
+              ))}
+            </div>
+            {/* motivo (si hay) */}
+            {r.motivo&&(
+              <div style={{padding:"12px 18px",borderBottom:`1px solid ${C.sep}`}}>
+                <div style={{fontSize:9,textTransform:"uppercase",letterSpacing:.8,
+                  color:C.label3,fontFamily:FONT_UI,marginBottom:5}}>Motivo</div>
+                <div style={{fontSize:13,color:C.amber,fontFamily:FONT_UI,fontWeight:600}}>{r.motivo}</div>
+              </div>
+            )}
+            {/* botón imprimir */}
+            <div style={{padding:"12px 18px"}}>
+              <button onClick={()=>imprimirNotaRetiro(r)}
+                style={{width:"100%",padding:"11px 0",borderRadius:8,
+                  border:`1px solid ${C.sep}`,background:C.bg2,
+                  color:C.label,fontFamily:FONT_UI,fontSize:12,fontWeight:700,
+                  cursor:"pointer",letterSpacing:.3}}>
+                📄 Imprimir nota de retiro
+              </button>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
@@ -13870,286 +15464,447 @@ function InventarioPorMarca({inv, ventas, onRecibir, onBaja, onImportarExcel, on
 // ══════════════════════════════════════════════════════════
 // MARCA DETALLE — iOS navigation push style
 // ══════════════════════════════════════════════════════════
-function MarcaDetalle({marcaId,inv,ventas,vMes,mes,anio,MK,cierres,setCierres,getHist,getLiq}){
+function MarcaDetalle({marcaId,inv,ventas,vMes,mes,anio,MK,cierres,setCierres,getHist,getLiq,auditorias=[],onActualizarAuditoria,user,retiros=[],onVentaClick}){
   const isDesktop = useIsDesktop();
   var _hN150 = useState("historial"); var sub = _hN150[0]; var setSub = _hN150[1];;
+  const [agregandoA, setAgregandoA] = useState(null);
+  const [codAgregar, setCodAgregar] = useState("");
+  const [msgAgregar, setMsgAgregar] = useState(null);
   var _hN151 = useState(""); var filtroMk = _hN151[0]; var setFMk = _hN151[1];;
   const [imgPreview, setImgPreview] = useState(null);
+  const [notaRetiroMD, setNotaRetiroMD] = useState(null);
   const marca   =MARCAS.find(m=>m.id===marcaId);
   const liq     =getLiq(marcaId);
   const cerrado =cierres[`${MK}-${marcaId}`]?.cerrado;
   const historial=getHist(marcaId);
   const prods   =inv.filter(i=>i.marcaId===marcaId);
-  const histFil =filtroMk?historial.filter(h=>h.mk===filtroMk):historial;
+  // Retiros de esta marca — comparación con coerción numérica para evitar string/int mismatch
+  const retirosMarca = retiros.filter(r=>{
+    if(Number(r.marcaId)===Number(marcaId)) return true;
+    if(r.marcaNombre && marca &&
+      r.marcaNombre.toLowerCase()===marca.nombre.toLowerCase()) return true;
+    // fallback: cruzar por código con inventario
+    const prod = inv.find(p=>p.codigo===r.codigo ||
+      (r.codigo && p.codigo && limpiarCod(p.codigo)===limpiarCod(r.codigo)));
+    return prod ? Number(prod.marcaId)===Number(marcaId) : false;
+  });
+  // Parsea fecha en formato ISO "2026-06-13" O "13/6/2026" → {anio, mes0, mk}
+  function parseFechaRetiro(fecha){
+    if(!fecha) return null;
+    if(fecha.includes("-")){
+      const p = fecha.split("-");
+      if(p.length<2) return null;
+      // ISO: YYYY-MM-DD
+      const anio=parseInt(p[0]), mes1=parseInt(p[1]);
+      if(anio>1000) return {anio, mes0:mes1-1, mk:`${p[0]}-${p[1].padStart(2,"0")}`};
+    }
+    if(fecha.includes("/")){
+      const p = fecha.split("/");
+      if(p.length<3) return null;
+      // DD/M/YYYY o DD/MM/YYYY
+      const anio=parseInt(p[2]), mes1=parseInt(p[1]);
+      return {anio, mes0:mes1-1, mk:`${p[2]}-${String(mes1).padStart(2,"0")}`};
+    }
+    return null;
+  }
+  // Períodos adicionales que solo tienen retiros (sin ventas registradas)
+  const histConRetiros = (()=>{
+    const base = historial.map(h=>({...h}));
+    const mkSet = new Set(base.map(h=>h.mk));
+    retirosMarca.forEach(r=>{
+      const pf = parseFechaRetiro(r.fecha);
+      if(!pf) return;
+      if(!mkSet.has(pf.mk)){
+        mkSet.add(pf.mk);
+        base.push({mk:pf.mk, mes:pf.mes0, anio:pf.anio, ventas:[], bruto:0});
+      }
+    });
+    return base.sort((a,b)=>b.mk.localeCompare(a.mk));
+  })();
+  const histFil =filtroMk?histConRetiros.filter(h=>h.mk===filtroMk):histConRetiros;
   const totalHist=historial.reduce((s,h)=>s+h.bruto,0);
   // ── Gift Card summary para liquidación (evita IIFE en JSX) ──────────────
   const gcTotal  = liq.vMarca.reduce((s,v)=>{const a=v.gcAllocations?.find(x=>x.marcaId===marcaId);return s+(a?.gcAmount||0);},0);
   const gcVentas = liq.vMarca.filter(v=>v.gcAllocations?.some(x=>x.marcaId===marcaId&&x.gcAmount>0)).length;
 
+  // ── label de sección editorial ──────────────────────────
+  const SLabel = ({children})=>(
+    <div style={{fontSize:10,fontWeight:700,letterSpacing:1.4,textTransform:"uppercase",
+      color:C.label3,fontFamily:FONT_UI,marginBottom:14,opacity:.7}}>
+      {children}
+    </div>
+  );
+
   return (
     <>
-    <div>
-      {/* Stats */}
-      <div style={{display:"grid",gridTemplateColumns: isDesktop ? "1fr 1fr 1fr 1fr" : "1fr 1fr", gap: isDesktop ? 8 : 10, marginBottom: isDesktop ? 14 : 20}}>
-        <StatCard icon={marca?.imagen?<MarcaIcon marca={marca} size={22} radius={6}/>:(marca?.emoji||"◆")} label="Total histórico" value={$(totalHist)}
-          sub={`${historial.reduce((s,h)=>s+h.ventas.length,0)} ventas`} color={marca?.color} compact={isDesktop}/>
-        <StatCard icon="📅" label={MESES[mes]} value={$(liq.bruto)}
-          sub={`${liq.vMarca.length} ventas`} color={C.gold} compact={isDesktop}/>
-        <StatCard icon="📦" label="Productos" value={prods.filter(p=>p.stock>0).length}
-          sub={`${prods.reduce((s,p)=>s+p.stock,0)} uds`} color={C.blue} compact={isDesktop}/>
-        <StatCard icon="🗓" label="Períodos" value={historial.length} color={C.indigo} compact={isDesktop}/>
+    <div style={{paddingTop:4}}>
+
+      {/* ── STATS BAR ──────────────────────────────────────── */}
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:1,
+        borderRadius:16,overflow:"hidden",border:`1px solid ${C.sep}`,marginBottom:24}}>
+        {[
+          {label:"Histórico",   val:$(totalHist),    sub:`${historial.reduce((s,h)=>s+h.ventas.length,0)} ventas`},
+          {label:MESES[mes],    val:$(liq.bruto),    sub:`${liq.vMarca.length} ventas`},
+          {label:"Disponibles", val:prods.filter(p=>p.stock>0).length, sub:`${prods.reduce((s,p)=>s+p.stock,0)} uds`},
+          {label:"Períodos",    val:historial.length, sub:"registros"},
+        ].map((s,i)=>(
+          <div key={s.label} style={{
+            background: i===0 ? `${marca?.color||C.gold}18` : C.bg2,
+            padding:"16px 14px",textAlign:"center",
+            borderRight: i<3 ? `1px solid ${C.sep}` : "none",
+          }}>
+            <div style={{fontSize:10,letterSpacing:1,textTransform:"uppercase",
+              color:C.label3,fontFamily:FONT_UI,marginBottom:6,opacity:.65}}>{s.label}</div>
+            <div style={{fontSize:18,fontWeight:700,color:C.label,fontFamily:FONT,
+              letterSpacing:"-0.02em",lineHeight:1}}>{s.val}</div>
+            <div style={{fontSize:10,color:C.label3,fontFamily:FONT_UI,marginTop:5,opacity:.5}}>{s.sub}</div>
+          </div>
+        ))}
       </div>
 
-      {/* Segmented */}
-      <div style={{marginBottom:16}}>
-        <SegControl
-          options={[{value:"historial",label:"Historial"},{value:"productos",label:"Productos"},{value:"liquidacion",label:"Liquidación"}]}
-          value={sub} onChange={setSub}
-        />
+      {/* ── TABS ────────────────────────────────────────────── */}
+      <div style={{display:"flex",gap:0,marginBottom:28,
+        borderBottom:`1px solid ${C.sep}`}}>
+        {[
+          {value:"historial",   label:"Historial"},
+          {value:"productos",   label:"Productos"},
+          {value:"liquidacion", label:"Liquidación"},
+          {value:"verificacion",label:`Verificación${auditorias.filter(a=>a.marcaId===marcaId).length?` · ${auditorias.filter(a=>a.marcaId===marcaId).length}`:""}`},
+        ].map(t=>(
+          <button key={t.value} onClick={()=>setSub(t.value)} style={{
+            flex:1,padding:"10px 4px",border:"none",background:"transparent",cursor:"pointer",
+            fontSize:12,fontWeight:sub===t.value?700:400,fontFamily:FONT_UI,
+            color:sub===t.value?C.label:C.label3,
+            borderBottom:sub===t.value?`2px solid ${C.label}`:"2px solid transparent",
+            transition:"all .15s",letterSpacing:.2,
+          }}>{t.label}</button>
+        ))}
       </div>
 
-      {/* HISTORIAL */}
+      {/* ── HISTORIAL ────────────────────────────────────────── */}
       {sub==="historial"&&(
         <div>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
-            <span style={{fontSize:13,color:C.label3,fontFamily:FONT}}>{historial.length} período{historial.length!==1?"s":""}</span>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
+            <SLabel>{historial.length} período{historial.length!==1?"s":""}</SLabel>
             <select value={filtroMk} onChange={e=>setFMk(e.target.value)}
-              style={{background:C.bg2,border:`1px solid ${C.sep}`,color:C.label,
-                borderRadius:10,padding:"6px 12px",fontSize:13,fontFamily:FONT,cursor:"pointer",
-                outline:"none",WebkitAppearance:"none"}}>
-              <option value="">Todo</option>
+              style={{background:"transparent",border:"none",color:C.label3,
+                fontSize:12,fontFamily:FONT_UI,cursor:"pointer",outline:"none",WebkitAppearance:"none",
+                letterSpacing:.5}}>
+              <option value="">Todos los períodos</option>
               {historial.map(h=><option key={h.mk} value={h.mk}>{MESES[h.mes]} {h.anio}</option>)}
             </select>
           </div>
           {histFil.length===0
             ? <EmptyState icon="📋" title="Sin ventas registradas" sub={`No hay ventas para ${marca?.nombre}`}/>
             : histFil.map(periodo=>(
-                <div key={periodo.mk} style={{background:C.bg2,borderRadius:14,overflow:"hidden",marginBottom: isDesktop ? 6 : 10}}>
-                  {/* Header período */}
-                  <div style={{padding: isDesktop ? "9px 14px" : "12px 14px", borderBottom:`1px solid ${C.sep}`,
-                    display:"flex",justifyContent:"space-between",alignItems:"center",
-                    background:`${marca?.color}10`}}>
+                <div key={periodo.mk} style={{marginBottom:28}}>
+                  {/* Período heading */}
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",
+                    paddingBottom:10,borderBottom:`1px solid ${C.sep}`,marginBottom:0}}>
                     <div>
-                      <div style={{fontSize: isDesktop ? 13 : 15, fontWeight:600,color:C.label,fontFamily:FONT}}>
+                      <span style={{fontSize:15,fontWeight:600,color:C.label,fontFamily:FONT,letterSpacing:".3px"}}>
                         {MESES[periodo.mes]} {periodo.anio}
-                      </div>
-                      <div style={{fontSize: isDesktop ? 11 : 12, color:C.label3,fontFamily:FONT,opacity:.65}}>
-                        {periodo.ventas.length} transacciones
-                      </div>
+                      </span>
+                      <span style={{fontSize:11,color:C.label3,fontFamily:FONT_UI,marginLeft:10,opacity:.6}}>
+                        {(()=>{
+                          const nRet=retirosMarca.filter(r=>{
+                            const pf=parseFechaRetiro(r.fecha);
+                            return pf&&pf.mes0===periodo.mes&&pf.anio===periodo.anio;
+                          }).length;
+                          return `${periodo.ventas.length} venta${periodo.ventas.length!==1?"s":""}${nRet>0?` · ${nRet} retiro${nRet!==1?"s":""}`:""}`
+                        })()}
+                      </span>
                     </div>
-                    <div style={{textAlign:"right"}}>
-                      <div style={{fontSize: isDesktop ? 17 : 20, fontWeight:700,color:C.label,fontFamily:FONT,letterSpacing:"-0.02em"}}>
+                    <div style={{display:"flex",alignItems:"center",gap:8}}>
+                      {cierres[`${periodo.mk}-${marcaId}`]?.cerrado&&(
+                        <span style={{fontSize:10,color:C.green,fontFamily:FONT_UI,letterSpacing:.5}}>✓ CERRADO</span>
+                      )}
+                      <span style={{fontSize:17,fontWeight:700,color:C.label,fontFamily:FONT,letterSpacing:"-0.02em"}}>
                         {$(periodo.bruto)}
-                      </div>
-                      {cierres[`${periodo.mk}-${marcaId}`]?.cerrado&&<Chip color={C.green} small>✓ Cerrado</Chip>}
+                      </span>
                     </div>
                   </div>
-                  {/* Ventas del período */}
-                  {periodo.ventas.map((v,i)=>(
-                    <div key={v.id} style={{padding: isDesktop ? "8px 14px" : "10px 14px",
-                      borderBottom:i<periodo.ventas.length-1?`1px solid ${C.sep}`:""}}>
-                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom: isDesktop ? 2 : 4}}>
-                        <div style={{display:"flex",alignItems:"center",gap:7}}>
-                          <span style={{fontFamily:"monospace",fontSize:11,color:C.gold,fontWeight:600}}>{v.id}</span>
-                          <PagoDisplay mp={v.metodoPago} total={v.total} small/>
-                        </div>
-                        <span style={{fontSize: isDesktop ? 14 : 15, fontWeight:700,color:C.label,fontFamily:FONT,letterSpacing:"-0.01em"}}>{$(v.subMarca)}</span>
-                      </div>
-                      <div style={{fontSize:11,color:C.label3,fontFamily:FONT,marginBottom: isDesktop ? 2 : 4,opacity:.65}}>
-                        {v.fecha} {v.hora}
-                      </div>
-                      {v.itsMarca.map((it,ii)=>(
-                        <div key={`${v.id}-${it.prodId}-${ii}`} style={{fontSize:12,color:C.label2,fontFamily:FONT,lineHeight:"1.3"}}>
-                          · {it.nombre}{" "}
-                          <span style={{fontFamily:"monospace",fontSize:10,color:C.label3,opacity:.7}}>{it.codigo}</span>
-                          {" "}×{it.cantidad}
-                        </div>
-                      ))}
-                    </div>
-                  ))}
+                  {/* Ventas + Retiros mezclados por fecha */}
+                  {(()=>{
+                                    const retirosPeriodo = retirosMarca.filter(r=>{
+                      const pf = parseFechaRetiro(r.fecha);
+                      if(!pf) return false;
+                      return pf.mes0===periodo.mes && pf.anio===periodo.anio;
+                    });
+                    const items = [
+                      ...periodo.ventas.map(v=>({tipo:"venta",fecha:v.fecha,hora:v.hora||"",data:v})),
+                      ...retirosPeriodo.map(r=>({tipo:"retiro",fecha:r.fecha,hora:r.hora||"",data:r})),
+                    ].sort((a,b)=>{
+                      const fa=`${a.fecha} ${a.hora}`, fb=`${b.fecha} ${b.hora}`;
+                      return fb.localeCompare(fa);
+                    });
+                    return items.map((item,i)=>{
+                      if(item.tipo==="venta"){
+                        const v=item.data;
+                        return (
+                          <div key={v.id}
+                            onClick={()=>onVentaClick&&onVentaClick(v)}
+                            style={{padding:"14px 0",borderBottom:i<items.length-1?`1px solid ${C.sep}`:"none",
+                              cursor:onVentaClick?"pointer":"default"}}>
+                            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+                              <div>
+                                <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:5}}>
+                                  <span style={{fontFamily:"monospace",fontSize:11,color:C.gold,fontWeight:600,
+                                    background:`${C.gold}18`,padding:"2px 7px",borderRadius:5}}>{v.id}</span>
+                                  <PagoDisplay mp={v.metodoPago} total={v.total} small/>
+                                </div>
+                                <div style={{fontSize:11,color:C.label3,fontFamily:FONT_UI,opacity:.55,marginBottom:6}}>
+                                  {v.fecha} · {v.hora}
+                                </div>
+                                {v.itsMarca.map((it,ii)=>(
+                                  <div key={`${v.id}-${it.prodId}-${ii}`}
+                                    style={{fontSize:12,color:C.label2,fontFamily:FONT,lineHeight:"1.8"}}>
+                                    {it.nombre}
+                                    <span style={{fontFamily:"monospace",fontSize:10,color:C.label3,opacity:.55,marginLeft:5}}>
+                                      {it.codigo}
+                                    </span>
+                                    <span style={{color:C.label3,marginLeft:4,opacity:.6}}>×{it.cantidad}</span>
+                                  </div>
+                                ))}
+                              </div>
+                              <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0,paddingLeft:12}}>
+                                <span style={{fontSize:16,fontWeight:700,color:C.label,fontFamily:FONT,
+                                  letterSpacing:"-0.02em"}}>
+                                  {$(v.subMarca)}
+                                </span>
+                                {onVentaClick&&<span style={{fontSize:18,color:C.label3}}>›</span>}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      } else {
+                        const r=item.data;
+                        return (
+                          <div key={r.id||`ret-${i}`} style={{padding:"14px 0",borderBottom:i<items.length-1?`1px solid ${C.sep}`:"none"}}>
+                            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+                              <div style={{flex:1}}>
+                                <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:5}}>
+                                  <span style={{fontFamily:"monospace",fontSize:11,color:C.amber,fontWeight:600,
+                                    background:`${C.amber}15`,padding:"2px 7px",borderRadius:5,border:`1px solid ${C.amber}30`}}>RETIRO</span>
+                                </div>
+                                <div style={{fontSize:11,color:C.label3,fontFamily:FONT_UI,opacity:.55,marginBottom:6}}>
+                                  {r.fecha} · {r.hora||"—"} · {r.destinatario||"—"}
+                                </div>
+                                <div style={{fontSize:12,color:C.label2,fontFamily:FONT,lineHeight:"1.8"}}>
+                                  {r.nombre}
+                                  <span style={{fontFamily:"monospace",fontSize:10,color:C.label3,opacity:.55,marginLeft:5}}>{r.codigo}</span>
+                                  <span style={{color:C.label3,marginLeft:4,opacity:.6}}>×{r.cantidad}</span>
+                                </div>
+                                {r.motivo&&<div style={{fontSize:11,color:C.amber,fontFamily:FONT_UI,marginTop:3}}>{r.motivo}</div>}
+                              </div>
+                              <button onClick={()=>setNotaRetiroMD(r)}
+                                style={{flexShrink:0,marginLeft:12,padding:"5px 10px",borderRadius:7,
+                                  border:`1px solid ${C.amber}40`,background:"none",
+                                  color:C.amber,fontSize:10,fontFamily:FONT_UI,fontWeight:700,cursor:"pointer"}}>
+                                📄 Nota
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      }
+                    });
+                  })()}
                 </div>
               ))
           }
         </div>
       )}
 
-      {/* PRODUCTOS */}
+      {/* ── PRODUCTOS ────────────────────────────────────────── */}
       {sub==="productos"&&(
-        <div style={{
-          display: isDesktop ? "grid" : "flex",
-          gridTemplateColumns: isDesktop ? "1fr 1fr 1fr" : undefined,
-          flexDirection: isDesktop ? undefined : "column",
-          gap: isDesktop ? 6 : 0,
-        }}>
+        <div>
           {prods.length===0
             ? <EmptyState icon="📦" title="Sin productos" sub={`No hay ítems registrados para ${marca?.nombre}`}/>
-            : prods.map((p,i)=>{
-                const vendidas=p.stockInicial-p.stock;
-                return (
-                  <div key={p.id} style={{
-                    background:C.bg2,
-                    borderRadius: isDesktop ? 12 : (i===0?"14px 14px 2px 2px":i===prods.length-1?"2px 2px 14px 14px":"2px"),
-                    padding: isDesktop ? "10px 12px" : "14px 16px",
-                    borderBottom: isDesktop ? "none" : (i<prods.length-1?`1px solid ${C.sep}`:""),
-                    border: isDesktop ? `1px solid ${C.sep}` : undefined,
-                  }}>
-                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
-                      <div style={{flex:1}}>
-                        <div style={{fontSize: isDesktop ? 13 : 15, fontWeight:500,color:C.label,fontFamily:FONT,marginBottom: isDesktop ? 3 : 4}}>
+            : (
+              <>
+                <div style={{display:"flex",justifyContent:"space-between",marginBottom:16}}>
+                  <SLabel>{prods.length} productos · {prods.reduce((s,p)=>s+p.stock,0)} uds</SLabel>
+                  <span style={{fontSize:10,fontFamily:FONT_UI,color:C.label3,opacity:.5,letterSpacing:.5,textTransform:"uppercase"}}>
+                    {prods.filter(p=>p.stock===0).length} agotados
+                  </span>
+                </div>
+                {/* Encabezado tabla */}
+                <div style={{display:"grid",gridTemplateColumns:"1fr auto auto",gap:"0 16px",
+                  paddingBottom:8,borderBottom:`1px solid ${C.sep}`,marginBottom:0}}>
+                  <span style={{fontSize:10,letterSpacing:1,textTransform:"uppercase",color:C.label3,fontFamily:FONT_UI,opacity:.5}}>Producto</span>
+                  <span style={{fontSize:10,letterSpacing:1,textTransform:"uppercase",color:C.label3,fontFamily:FONT_UI,opacity:.5,textAlign:"right"}}>Precio</span>
+                  <span style={{fontSize:10,letterSpacing:1,textTransform:"uppercase",color:C.label3,fontFamily:FONT_UI,opacity:.5,textAlign:"right",minWidth:52}}>Stock</span>
+                </div>
+                {prods.map((p,i)=>{
+                  const vendidas=p.stockInicial-p.stock;
+                  return (
+                    <div key={p.id} style={{
+                      display:"grid",gridTemplateColumns:"1fr auto auto",gap:"0 16px",
+                      padding:"13px 0",alignItems:"center",
+                      borderBottom:i<prods.length-1?`1px solid ${C.sep}`:"none",
+                    }}>
+                      <div>
+                        <div style={{fontSize:13,fontWeight:500,color:C.label,fontFamily:FONT,marginBottom:3,lineHeight:1.3}}>
                           {p.nombre}
                         </div>
-                        <span style={{fontFamily:"monospace",fontSize:11,color:C.gold,
-                          background:`${C.gold}18`,padding:"1px 7px",borderRadius:5}}>{p.codigo}</span>
+                        <span style={{fontFamily:"monospace",fontSize:10,color:C.label3,opacity:.6}}>
+                          {p.codigo}
+                          {vendidas>0&&<span style={{marginLeft:8,color:C.label3}}>· {vendidas} vendidas</span>}
+                        </span>
                       </div>
-                      <div style={{textAlign:"right"}}>
-                        <div style={{fontSize: isDesktop ? 14 : 16, fontWeight:700,color:C.label,fontFamily:FONT}}>{$(p.precio)}</div>
-                        <div style={{fontSize: isDesktop ? 12 : 13, fontFamily:FONT,marginTop:2,
+                      <div style={{textAlign:"right",fontSize:13,fontWeight:600,color:C.label,fontFamily:FONT}}>
+                        {$(p.precio)}
+                      </div>
+                      <div style={{textAlign:"right",minWidth:52}}>
+                        <span style={{fontSize:13,fontWeight:600,fontFamily:FONT,
                           color:p.stock===0?C.red:p.stock<3?C.amber:C.green}}>
-                          {p.stock===0?"Agotado":p.stock<3?`${p.stock} (bajo)`:`${p.stock} disp.`}
-                        </div>
-                        {vendidas>0&&<div style={{fontSize:12,color:C.label3,fontFamily:FONT}}>{vendidas} vend.</div>}
+                          {p.stock===0?"—":p.stock}
+                        </span>
+                        {p.stock===0&&<div style={{fontSize:9,color:C.red,fontFamily:FONT_UI,letterSpacing:.5}}>AGOTADO</div>}
                       </div>
                     </div>
-                  </div>
-                );
-              })
+                  );
+                })}
+              </>
+            )
           }
         </div>
       )}
 
-      {/* LIQUIDACIÓN */}
+      {/* ── LIQUIDACIÓN ──────────────────────────────────────── */}
       {sub==="liquidacion"&&(
         <div>
           {cerrado&&(
-            <div style={{padding:"12px 16px",background:`${C.green}15`,borderRadius:14,
-              border:`1px solid ${C.green}30`,marginBottom:16,fontSize:15,
-              color:C.green,fontFamily:FONT,textAlign:"center",fontWeight:600}}>
+            <div style={{padding:"10px 16px",background:`${C.green}10`,borderRadius:10,
+              marginBottom:24,fontSize:12,color:C.green,fontFamily:FONT_UI,
+              letterSpacing:.5,textTransform:"uppercase",textAlign:"center"}}>
               ✓ Cierre de {MESES[mes]} confirmado
             </div>
           )}
-          <div style={{background:C.bg2,borderRadius:16,overflow:"hidden",marginBottom:16}}>
-            {gcTotal>0&&(
-              <div key="gc-summary" style={{display:"flex",justifyContent:"space-between",alignItems:"center",
-                padding:"10px 16px",background:"#7C3AED08",borderBottom:`1px solid ${C.sep}`}}>
-                <span style={{fontSize:13,color:"#7C3AED",fontFamily:FONT}}>
-                  🎁 Gift Card ({gcVentas} venta{gcVentas!==1?"s":""})
-                </span>
-                <span style={{fontSize:13,fontWeight:600,color:"#7C3AED",fontFamily:FONT}}>{$(gcTotal)}</span>
-              </div>
-            )}
-            <div style={{padding:"12px 16px",borderBottom:`1px solid ${C.sep}`}}>
-              <div style={{fontSize:11,fontWeight:700,color:C.label3,textTransform:"uppercase",
-                letterSpacing:.6,marginBottom:8,fontFamily:FONT}}>Desglose por método de pago</div>
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
-                {[
-                  {label:"Efectivo",val:liq.brutoEf,color:C.green},
-                  {label:"QR",val:liq.brutoQR,color:C.blue},
-                  {label:`Tarjeta (-${liq.cfg?.pctTarjeta ?? 0}%)`,val:liq.brutoTJ,color:C.amber},
-                ].map(s=>(
-                  <div key={s.label} style={{textAlign:"center",padding:"9px 8px",
-                    background:`${s.color}10`,borderRadius:12}}>
-                    <div style={{fontSize:14,fontWeight:700,color:C.label,fontFamily:FONT,letterSpacing:"-0.01em"}}>{$(Math.round(s.val))}</div>
-                    <div style={{fontSize:10,color:C.label3,fontFamily:FONT,marginTop:2,opacity:.7}}>{s.label}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
+
+          {/* Métodos de pago */}
+          <SLabel>Por método de pago</SLabel>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:28}}>
             {[
-              ["Ventas brutas", $(liq.bruto), C.label, false],
-              [`− Desc. Tarjeta (${liq.cfg?.pctTarjeta ?? 0}%)`, `-${$(liq.descTJ)}`, C.red, false],
-              [`= Subtotal -${liq.cfg?.pctTarjeta ?? 0}%`, $(liq.subBanco), C.label2, false],
-              [`− Comisión ventas (${liq.cfg?.pctComision ?? 0}%)`, `-${$(liq.comision)}`, C.red, false],
-              (liq.alquiler > 0)
-                ? [`− Alquiler`, `-${$(liq.alquiler)}`, C.amber, false]
-                : null,
-              ...liq.gastos.filter(g=>g.desc||Number(g.monto)>0).map(g=>
-                [`− ${g.desc||"Gasto extra"}`, `-${$(Math.round(Number(g.monto)||0))}`, C.red, false]
-              ),
-              ["Neto a liquidar", $(liq.neto), C.green, true],
-            ].filter(Boolean).map(([k,v,c,bold],i,arr)=>(
-              <div key={k} style={{display:"flex",justifyContent:"space-between",alignItems:"center",
-                padding:"13px 16px",borderBottom:i<arr.length-1?`1px solid ${C.sep}`:"",
-                background: bold ? `${C.green}08` : "transparent"}}>
-                <span style={{fontSize:14,color:bold?C.green:C.label2,fontFamily:FONT,fontWeight:bold?600:400}}>{k}</span>
-                <span style={{fontSize:15,fontWeight:bold?700:600,color:c,fontFamily:FONT}}>{v}</span>
+              {label:"Efectivo",val:liq.brutoEf,color:C.green},
+              {label:"QR",val:liq.brutoQR,color:C.blue},
+              {label:`Tarjeta`,val:liq.brutoTJ,color:C.amber},
+            ].map(s=>(
+              <div key={s.label} style={{padding:"16px 12px",borderRadius:12,
+                background:C.bg2,border:`1px solid ${C.sep}`,textAlign:"center"}}>
+                <div style={{fontSize:15,fontWeight:700,color:C.label,fontFamily:FONT,
+                  letterSpacing:"-0.02em",marginBottom:5}}>{$(Math.round(s.val))}</div>
+                <div style={{fontSize:10,color:C.label3,fontFamily:FONT_UI,letterSpacing:.5,
+                  textTransform:"uppercase",opacity:.6}}>{s.label}</div>
               </div>
             ))}
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",
-              padding:"18px 16px",background:`${C.gold}12`}}>
-              <span style={{fontSize:16,fontWeight:700,color:C.label,fontFamily:FONT}}>TOTAL A PAGAR</span>
-              <span style={{fontSize:24,fontWeight:700,color:C.label,fontFamily:FONT}}>{$(liq.neto)}</span>
-            </div>
           </div>
 
-          <div style={{display:"flex",flexDirection:"column",gap:10}}>
-            <div style={{display:"flex",gap:10}}>
-              <IOSBtn onPress={()=>generarVistaPreviaLiquidacion(marca,mes,anio,{
-                bruto: liq.bruto, brutoEfect: liq.brutoEf, brutoQR: liq.brutoQR, brutoTarjeta: liq.brutoTJ,
-                descTarjeta: liq.descTJ, pctTarjeta: liq.cfg?.pctTarjeta ?? 0,
-                subtotalBanco: liq.subBanco, pctComision: liq.cfg?.pctComision ?? 0, comision: liq.comision,
-                alquiler: liq.alquiler, gastos: liq.gastos, totalGastos: liq.totalGastos, neto: liq.neto,
-                vMarca: liq.vMarca, marcaId,
-              },setImgPreview)} variant="fill" full icon="📤">
-                Compartir
-              </IOSBtn>
-              <IOSBtn onPress={()=>imprimirLiquidacion(marca,mes,anio,liq)} variant="fill" full icon="🖨">
-                Imprimir
-              </IOSBtn>
+          {/* Gift Card */}
+          {gcTotal>0&&(
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",
+              padding:"12px 0",borderBottom:`1px solid ${C.sep}`,marginBottom:0}}>
+              <span style={{fontSize:12,color:"#7C3AED",fontFamily:FONT_UI,letterSpacing:.3}}>
+                Gift Card · {gcVentas} venta{gcVentas!==1?"s":""}
+              </span>
+              <span style={{fontSize:13,fontWeight:600,color:"#7C3AED",fontFamily:FONT}}>{$(gcTotal)}</span>
             </div>
-            <IOSBtn onPress={()=>generarImagenLiquidacion(marca,mes,anio,liq)} variant="fill" full icon="📷">
-              Exportar Imagen
-            </IOSBtn>
-            <IOSBtn onPress={()=>exportExcelLiquidacion(MARCAS.find(m=>m.id===marcaId),ventas,mes,anio)} variant="fill" full icon="⬇">
-              Exportar Excel
-            </IOSBtn>
-            {!cerrado
-              ? <IOSBtn variant="success" full icon="✓"
-                  onPress={()=>setCierres(p=>({...p,[`${MK}-${marcaId}`]:{cerrado:true,fecha:hoy(),mk:MK}}))}>
-                  Confirmar Cierre Mensual
-                </IOSBtn>
-              : <IOSBtn variant="danger" full
-                  onPress={()=>setCierres(p=>({...p,[`${MK}-${marcaId}`]:{cerrado:false,mk:MK}}))}>
-                  Reabrir Liquidación
-                </IOSBtn>
-            }
+          )}
+
+          {/* Desglose */}
+          <div style={{marginBottom:28}}>
+            {[
+              ["Ventas brutas", $(liq.bruto), false, false],
+              [`− Desc. Tarjeta (${liq.cfg?.pctTarjeta ?? 0}%)`, `-${$(liq.descTJ)}`, true, false],
+              [`= Subtotal`, $(liq.subBanco), false, false],
+              [`− Comisión (${liq.cfg?.pctComision ?? 0}%)`, `-${$(liq.comision)}`, true, false],
+              (liq.alquiler > 0) ? [`− Alquiler`, `-${$(liq.alquiler)}`, true, false] : null,
+              ...liq.gastos.filter(g=>g.desc||Number(g.monto)>0).map(g=>
+                [`− ${g.desc||"Gasto extra"}`, `-${$(Math.round(Number(g.monto)||0))}`, true, false]
+              ),
+              ["Neto a liquidar", $(liq.neto), false, true],
+            ].filter(Boolean).map(([k,v,muted,bold],i,arr)=>(
+              <div key={k} style={{display:"flex",justifyContent:"space-between",alignItems:"center",
+                padding:bold?"18px 0":"13px 0",
+                borderBottom:i<arr.length-1?`1px solid ${C.sep}`:"none",
+                borderTop:bold?`1px solid ${C.sep}`:"none",
+                marginTop:bold?4:0,
+              }}>
+                <span style={{fontSize:bold?15:13,color:bold?C.label:muted?C.label3:C.label2,
+                  fontFamily:bold?FONT:FONT_UI,fontWeight:bold?700:400,letterSpacing:bold?.3:0}}>{k}</span>
+                <span style={{fontSize:bold?20:14,fontWeight:bold?700:500,
+                  color:bold?C.green:muted?C.red:C.label,fontFamily:FONT,letterSpacing:"-0.02em"}}>{v}</span>
+              </div>
+            ))}
           </div>
+
+          {/* Acciones */}
+          <SLabel>Acciones</SLabel>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+            <IOSBtn onPress={()=>generarVistaPreviaLiquidacion(marca,mes,anio,{
+              bruto:liq.bruto,brutoEfect:liq.brutoEf,brutoQR:liq.brutoQR,brutoTarjeta:liq.brutoTJ,
+              descTarjeta:liq.descTJ,pctTarjeta:liq.cfg?.pctTarjeta??0,
+              subtotalBanco:liq.subBanco,pctComision:liq.cfg?.pctComision??0,comision:liq.comision,
+              alquiler:liq.alquiler,gastos:liq.gastos,totalGastos:liq.totalGastos,neto:liq.neto,
+              vMarca:liq.vMarca,marcaId,
+            },setImgPreview)} variant="fill" full icon="📤">Compartir</IOSBtn>
+            <IOSBtn onPress={()=>imprimirLiquidacion(marca,mes,anio,liq)} variant="fill" full icon="🖨">Imprimir</IOSBtn>
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:16}}>
+            <IOSBtn onPress={()=>generarImagenLiquidacion(marca,mes,anio,liq)} variant="fill" full icon="📷">Imagen</IOSBtn>
+            <IOSBtn onPress={()=>exportExcelLiquidacion(MARCAS.find(m=>m.id===marcaId),ventas,mes,anio)} variant="fill" full icon="⬇">Excel</IOSBtn>
+          </div>
+          {!cerrado
+            ? <IOSBtn variant="success" full icon="✓"
+                onPress={()=>setCierres(p=>({...p,[`${MK}-${marcaId}`]:{cerrado:true,fecha:hoy(),mk:MK}}))}>
+                Confirmar Cierre Mensual
+              </IOSBtn>
+            : <IOSBtn variant="danger" full
+                onPress={()=>setCierres(p=>({...p,[`${MK}-${marcaId}`]:{cerrado:false,mk:MK}}))}>
+                Reabrir Liquidación
+              </IOSBtn>
+          }
 
           {/* Detalle ventas */}
           {liq.vMarca.length>0&&(
-            <div style={{marginTop:20}}>
-              <div style={{fontSize:13,fontWeight:600,color:C.label3,textTransform:"uppercase",
-                letterSpacing:.6,marginBottom:12}}>Ventas del período</div>
-              {liq.vMarca.map(v=>{
+            <div style={{marginTop:32}}>
+              <SLabel>Ventas del período · {liq.vMarca.length}</SLabel>
+              {liq.vMarca.map((v,vi)=>{
                 const its=v.items.filter(i=>i.marcaId===marcaId);
                 const sub2=its.reduce((s,i)=>s+i.subtotal,0);
-                // GC allocation for this brand in this venta
                 const gcAlloc=v.gcAllocations?.find(a=>a.marcaId===marcaId);
                 return (
-                  <div key={v.id} style={{background:C.bg2,borderRadius:10,padding:"10px 14px",marginBottom:5,
-                    border:v.gcId?`1px solid #7C3AED20`:`1px solid ${C.sep}`}}>
-                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:3}}>
-                      <div style={{display:"flex",alignItems:"center",gap:6}}>
-                        <span style={{fontFamily:"monospace",fontSize:11,color:C.gold,fontWeight:600}}>{v.id}</span>
-                        {v.gcId&&<span style={{fontSize:9,background:"#7C3AED15",color:"#7C3AED",
-                          fontWeight:700,padding:"2px 5px",borderRadius:6,fontFamily:FONT_UI}}>🎁 GC</span>}
+                  <div key={v.id} style={{
+                    padding:"14px 0",
+                    borderBottom:vi<liq.vMarca.length-1?`1px solid ${C.sep}`:"none",
+                  }}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+                      <div style={{flex:1}}>
+                        <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:4}}>
+                          <span style={{fontFamily:"monospace",fontSize:11,color:C.gold,fontWeight:600}}>{v.id}</span>
+                          {v.gcId&&<span style={{fontSize:9,background:"#7C3AED15",color:"#7C3AED",
+                            fontWeight:700,padding:"2px 6px",borderRadius:5,fontFamily:FONT_UI}}>GC</span>}
+                        </div>
+                        <div style={{fontSize:11,color:C.label3,fontFamily:FONT_UI,opacity:.55,marginBottom:6}}>
+                          {v.fecha} · {v.hora} · {v.metodoPago?.startsWith("mixto|")?<PagoDisplay mp={v.metodoPago} total={sub2} inline/>:labelPago(v.metodoPago)}
+                        </div>
+                        {gcAlloc&&(
+                          <div style={{fontSize:11,color:"#7C3AED",fontFamily:FONT_UI,marginBottom:4}}>
+                            GC {$(gcAlloc.gcAmount)}{gcAlloc.extraAmount>0.01?` + ${$(gcAlloc.extraAmount)} extra`:""}
+                          </div>
+                        )}
+                        {its.map((it,ii)=>(
+                          <div key={`liq-${v.id}-${it.prodId}-${ii}`}
+                            style={{fontSize:12,color:C.label2,fontFamily:FONT,lineHeight:"1.8"}}>
+                            {it.nombre}
+                            <span style={{color:C.label3,fontFamily:FONT_UI,marginLeft:5,opacity:.6}}>×{it.cantidad}</span>
+                            <span style={{color:C.label3,marginLeft:5,opacity:.6}}>{$(it.subtotal)}</span>
+                          </div>
+                        ))}
                       </div>
-                      <span style={{fontSize:15,fontWeight:700,color:C.label,fontFamily:FONT,letterSpacing:"-0.01em"}}>{$(sub2)}</span>
+                      <span style={{fontSize:15,fontWeight:700,color:C.label,fontFamily:FONT,
+                        letterSpacing:"-0.02em",paddingLeft:12,flexShrink:0}}>{$(sub2)}</span>
                     </div>
-                    <div style={{fontSize:11,color:C.label3,fontFamily:FONT,marginBottom:gcAlloc?3:0,opacity:.65}}>
-                      {v.fecha} {v.hora} · {v.metodoPago?.startsWith("mixto|")?<PagoDisplay mp={v.metodoPago} total={sub2} inline/>:labelPago(v.metodoPago)}
-                    </div>
-                    {gcAlloc&&(
-                      <div style={{display:"flex",gap:10,fontSize:11,fontFamily:FONT_UI,marginBottom:3,
-                        padding:"4px 8px",background:"#7C3AED08",borderRadius:6}}>
-                        <span style={{color:"#7C3AED",fontWeight:600}}>🎁 GC: {$(gcAlloc.gcAmount)}</span>
-                        {gcAlloc.extraAmount>0.01&&<span style={{color:C.amber,fontWeight:600}}>+ {$(gcAlloc.extraAmount)} extra</span>}
-                      </div>
-                    )}
-                    {its.map((it,ii)=>(
-                      <div key={`liq-${v.id}-${it.prodId}-${ii}`} style={{fontSize:12,color:C.label2,fontFamily:FONT,lineHeight:"1.3"}}>
-                        · {it.nombre} ×{it.cantidad} = {$(it.subtotal)}
-                      </div>
-                    ))}
                   </div>
                 );
               })}
@@ -14162,6 +15917,225 @@ function MarcaDetalle({marcaId,inv,ventas,vMes,mes,anio,MK,cierres,setCierres,ge
       if(imgPreview) URL.revokeObjectURL(imgPreview.url);
       setImgPreview(null);
     }}/>
+
+      {/* ── VERIFICACIÓN ─────────────────────────────────────── */}
+      {sub==="verificacion"&&(()=>{
+        const auds = auditorias.filter(a=>a.marcaId===marcaId).sort((a,b)=>b.id.localeCompare(a.id));
+        function agregarItemMarca(aud){
+          const cod = codAgregar.trim().toUpperCase();
+          if(!cod){ setMsgAgregar({ok:false,txt:"Ingresá un código"}); return; }
+          const prod = inv.find(p=>(p.codigo||"").toUpperCase()===cod && p.marcaId===marcaId);
+          if(!prod){ setMsgAgregar({ok:false,txt:`"${cod}" no encontrado en ${marca?.nombre||"esta marca"}`}); return; }
+          const idxExistente = (aud.detalle||[]).findIndex(d=>(d.codigo||"").toUpperCase()===cod);
+          let nuevoDetalle, msgOk;
+          if(idxExistente>=0){
+            nuevoDetalle = (aud.detalle||[]).map((d,i)=>{
+              if(i!==idxExistente) return d;
+              const nuevoContado=(d.contado||0)+1;
+              const nuevaDif=nuevoContado-(d.sistema||0);
+              return {...d,contado:nuevoContado,diferencia:nuevaDif,
+                estado:nuevaDif===0?"OK":nuevaDif>0?"SOBRANTE":"FALTANTE",
+                ultimoAgregoPor:user?.nombre||"—",ultimoAgregoTs:new Date().toISOString()};
+            });
+            const item=nuevoDetalle[idxExistente];
+            msgOk=`✓ "${prod.nombre}": contado ${item.contado-1} → ${item.contado}`;
+          } else {
+            nuevoDetalle=[...(aud.detalle||[]),{
+              codigo:prod.codigo,nombre:prod.nombre,marcaId:prod.marcaId,
+              marca:prod.marcaNombre||"—",precio:prod.precio,
+              sistema:prod.stock,contado:1,diferencia:1-prod.stock,
+              estado:1-prod.stock===0?"OK":1-prod.stock>0?"SOBRANTE":"FALTANTE",
+              agregadoPost:true,agregadoPor:user?.nombre||"—",agregadoTs:new Date().toISOString(),
+            }];
+            msgOk=`✓ "${prod.nombre}" agregado`;
+          }
+          const faltantes=nuevoDetalle.filter(d=>d.estado==="FALTANTE").length;
+          const sobrantes=nuevoDetalle.filter(d=>d.estado==="SOBRANTE").length;
+          const okCount=nuevoDetalle.filter(d=>d.estado==="OK").length;
+          onActualizarAuditoria&&onActualizarAuditoria({...aud,
+            detalle:nuevoDetalle,totalProductos:nuevoDetalle.length,
+            ok:okCount,faltantes,sobrantes,
+            marcadoOkPor:user?.nombre||"—",marcadoOkTs:new Date().toISOString(),
+          });
+          setMsgAgregar({ok:true,txt:msgOk});
+          setCodAgregar("");
+        }
+        return (
+          <div style={{paddingTop:4}}>
+            {auds.length===0
+              ? <EmptyState icon="⌖" title="Sin verificaciones" sub={`No hay verificaciones guardadas para ${marca?.nombre}`}/>
+              : auds.map(a=>{
+                  const abierta=agregandoA===a.id;
+                  return (
+                    <div key={a.id} style={{marginBottom:24}}>
+                      {/* Heading verificación */}
+                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",
+                        paddingBottom:10,borderBottom:`1px solid ${C.sep}`,marginBottom:14}}>
+                        <div>
+                          <span style={{fontSize:14,fontWeight:600,color:C.label,fontFamily:FONT}}>
+                            {MESES[a.mes]} {a.anio}
+                          </span>
+                          <span style={{fontSize:11,color:C.label3,fontFamily:FONT_UI,marginLeft:10,opacity:.55}}>
+                            {a.fecha} · {a.usuario}
+                          </span>
+                        </div>
+                        <div style={{display:"flex",gap:10,alignItems:"center"}}>
+                          {a.ok>0&&<span style={{fontSize:11,color:C.green,fontFamily:FONT_UI}}>✓ {a.ok}</span>}
+                          {a.faltantes>0&&<span style={{fontSize:11,color:C.red,fontFamily:FONT_UI}}>↓ {a.faltantes}</span>}
+                          {a.sobrantes>0&&<span style={{fontSize:11,color:C.blue,fontFamily:FONT_UI}}>↑ {a.sobrantes}</span>}
+                        </div>
+                      </div>
+
+                      {/* Ítems agregados post */}
+                      {(a.detalle||[]).filter(d=>d.agregadoPost).length>0&&(
+                        <div style={{marginBottom:14}}>
+                          <div style={{fontSize:10,letterSpacing:1,textTransform:"uppercase",color:C.label3,
+                            fontFamily:FONT_UI,opacity:.55,marginBottom:10}}>
+                            Agregados · {(a.detalle||[]).filter(d=>d.agregadoPost).length}
+                          </div>
+                          {(a.detalle||[]).filter(d=>d.agregadoPost).map((d,i)=>(
+                            <div key={d.codigo+i} style={{display:"flex",alignItems:"center",gap:10,
+                              padding:"10px 0",
+                              borderBottom:`1px solid ${C.sep}`}}>
+                              <div style={{flex:1,minWidth:0}}>
+                                <div style={{fontSize:13,fontWeight:500,color:C.label,fontFamily:FONT,
+                                  whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",marginBottom:2}}>
+                                  {d.nombre}
+                                </div>
+                                <div style={{fontSize:10,color:C.label3,fontFamily:"monospace",opacity:.6}}>
+                                  {d.codigo} · {d.contado} ud
+                                </div>
+                              </div>
+                              <button onClick={()=>{
+                                if(!window.confirm(`¿Eliminar "${d.nombre}" de esta verificación?`)) return;
+                                const detalleNuevo=(a.detalle||[]).filter(x=>x!==d);
+                                onActualizarAuditoria&&onActualizarAuditoria({...a,
+                                  detalle:detalleNuevo,totalProductos:detalleNuevo.length,
+                                  ok:detalleNuevo.filter(x=>x.estado==="OK").length,
+                                  faltantes:detalleNuevo.filter(x=>x.estado==="FALTANTE").length,
+                                  sobrantes:detalleNuevo.filter(x=>x.estado==="SOBRANTE").length,
+                                });
+                              }} style={{flexShrink:0,width:26,height:26,borderRadius:"50%",border:"none",
+                                background:`${C.red}15`,color:C.red,fontSize:14,fontWeight:700,
+                                cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",opacity:.7}}>
+                                ×
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Input agregar */}
+                      {onActualizarAuditoria&&(
+                        abierta ? (
+                          <div style={{paddingTop:4}}>
+                            <div style={{display:"flex",gap:8,marginBottom:10}}>
+                              <input autoFocus value={codAgregar}
+                                onChange={e=>{setCodAgregar(e.target.value.toUpperCase());setMsgAgregar(null);}}
+                                onKeyDown={e=>{if(e.key==="Enter")agregarItemMarca(a);}}
+                                placeholder="Código del producto"
+                                style={{flex:1,padding:"11px 14px",borderRadius:10,border:`1px solid ${C.sep}`,
+                                  fontSize:14,fontFamily:"monospace",background:C.bg2,color:C.label,outline:"none"}}/>
+                              <button onClick={()=>agregarItemMarca(a)}
+                                style={{padding:"11px 18px",borderRadius:10,border:"none",background:C.label,
+                                  color:C.bg0,fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:FONT_UI,letterSpacing:.3}}>
+                                Agregar
+                              </button>
+                            </div>
+                            {msgAgregar&&(
+                              <div style={{fontSize:12,marginBottom:10,padding:"10px 12px",borderRadius:8,
+                                background:msgAgregar.ok?`${C.green}12`:`${C.red}12`,
+                                color:msgAgregar.ok?C.green:C.red,fontFamily:FONT_UI}}>
+                                {msgAgregar.txt}
+                              </div>
+                            )}
+                            <button onClick={()=>{setAgregandoA(null);setCodAgregar("");setMsgAgregar(null);}}
+                              style={{width:"100%",padding:"9px",borderRadius:10,border:`1px solid ${C.sep}`,
+                                background:"transparent",color:C.label3,fontSize:11,cursor:"pointer",
+                                fontFamily:FONT_UI,letterSpacing:.5}}>
+                              Cerrar
+                            </button>
+                          </div>
+                        ) : (
+                          <button onClick={()=>{setAgregandoA(a.id);setCodAgregar("");setMsgAgregar(null);}}
+                            style={{width:"100%",padding:"10px",borderRadius:10,
+                              border:`1px dashed ${C.sep}`,background:"transparent",
+                              color:C.label3,fontSize:11,fontWeight:500,cursor:"pointer",
+                              fontFamily:FONT_UI,letterSpacing:.5,marginTop:4}}>
+                            + Agregar ítems
+                          </button>
+                        )
+                      )}
+                    </div>
+                  );
+                })
+            }
+          </div>
+        );
+      })()}
+
+    <>
+      {/* ── Modal nota de retiro desde historial ── */}
+      {notaRetiroMD&&(
+        <div style={{position:"fixed",inset:0,zIndex:2000,display:"flex",alignItems:"center",justifyContent:"center"}}>
+          <div onClick={()=>setNotaRetiroMD(null)}
+            style={{position:"absolute",inset:0,background:"rgba(0,0,0,0.18)"}}/>
+          <div style={{position:"relative",width:360,background:C.bg0,borderRadius:16,
+            overflow:"hidden",border:`1px solid ${C.sep}`,boxShadow:"0 8px 32px rgba(0,0,0,0.14)"}}>
+            {/* title */}
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",
+              padding:"11px 16px",background:C.bg2,borderBottom:`1px solid ${C.sep}`}}>
+              <span style={{fontSize:11,fontWeight:700,letterSpacing:1,textTransform:"uppercase",
+                color:C.label3,fontFamily:FONT_UI}}>Nota de retiro</span>
+              <button onClick={()=>setNotaRetiroMD(null)}
+                style={{background:"none",border:"none",cursor:"pointer",color:C.label3,fontSize:16,padding:"2px 4px"}}>✕</button>
+            </div>
+            {/* producto */}
+            <div style={{padding:"16px 18px",borderBottom:`1px solid ${C.sep}`}}>
+              <div style={{fontSize:13,fontWeight:700,color:C.label,fontFamily:FONT,lineHeight:1.35,marginBottom:6}}>
+                {notaRetiroMD.nombre||notaRetiroMD.codigo}
+              </div>
+              <span style={{fontSize:10,fontFamily:"monospace",color:C.label3,
+                background:C.bg2,padding:"2px 8px",borderRadius:5,border:`1px solid ${C.sep}`}}>
+                {notaRetiroMD.codigo}
+              </span>
+            </div>
+            {/* grid */}
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:0}}>
+              {[
+                {label:"Fecha", val:notaRetiroMD.fecha, sub:notaRetiroMD.hora||"—"},
+                {label:"Destinatario", val:notaRetiroMD.destinatario||"—"},
+                {label:"Cantidad", val:`${notaRetiroMD.cantidad} ud${notaRetiroMD.cantidad!==1?"s":""}`},
+                {label:"Marca", val:notaRetiroMD.marcaNombre||"—"},
+              ].map((f,i)=>(
+                <div key={i} style={{padding:"12px 18px",borderBottom:`1px solid ${C.sep}`,
+                  borderRight:i%2===0?`1px solid ${C.sep}`:"none"}}>
+                  <div style={{fontSize:9,textTransform:"uppercase",letterSpacing:.8,
+                    color:C.label3,fontFamily:FONT_UI,marginBottom:5}}>{f.label}</div>
+                  <div style={{fontSize:14,fontWeight:700,color:C.label,fontFamily:FONT}}>{f.val}</div>
+                  {f.sub&&<div style={{fontSize:11,color:C.label3,fontFamily:FONT_UI,marginTop:2}}>{f.sub}</div>}
+                </div>
+              ))}
+            </div>
+            {notaRetiroMD.motivo&&(
+              <div style={{padding:"12px 18px",borderBottom:`1px solid ${C.sep}`}}>
+                <div style={{fontSize:9,textTransform:"uppercase",letterSpacing:.8,color:C.label3,fontFamily:FONT_UI,marginBottom:5}}>Motivo</div>
+                <div style={{fontSize:13,color:C.amber,fontFamily:FONT_UI,fontWeight:600}}>{notaRetiroMD.motivo}</div>
+              </div>
+            )}
+            <div style={{padding:"12px 18px"}}>
+              <button onClick={()=>imprimirNotaRetiro(notaRetiroMD)}
+                style={{width:"100%",padding:"11px 0",borderRadius:8,
+                  border:`1px solid ${C.sep}`,background:C.bg2,
+                  color:C.label,fontFamily:FONT_UI,fontSize:12,fontWeight:700,
+                  cursor:"pointer",letterSpacing:.3}}>
+                📄 Imprimir nota de retiro
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
     </>
   );
 }
@@ -15395,7 +17369,7 @@ function Row({k,v}){
 }
 
 // ── Sistema Tab con Factory Reset ────────────────────────────────────────────
-function SistemaTab({user, logout}){
+function SistemaTab({user, logout, onRecargarDesdeSupabase, onSyncCompleto}){
   const [resetState, setResetState] = useState("idle"); // idle | confirm1 | confirm2 | running | done | error
   const [resetLog, setResetLog]   = useState([]);
   const [inputVal, setInputVal]   = useState("");
@@ -15477,6 +17451,112 @@ function SistemaTab({user, logout}){
           </div>
         ))}
       </div>
+
+      {/* Carpeta de descargas organizada por marca */}
+      {(()=>{
+        const [carpetaNombre, setCarpetaNombre] = React.useState(null);
+        const [fsaOk, setFsaOk] = React.useState("showDirectoryPicker" in window);
+        React.useEffect(()=>{
+          _fsaIdb("get").then(h=>{ if(h) setCarpetaNombre(h.name||"Carpeta configurada"); });
+        },[]);
+        return (
+          <div style={{background:C.bg1,borderRadius:16,border:`1px solid ${C.sep}`,
+            padding:"16px",marginBottom:12,boxShadow:"0 1px 6px rgba(0,0,0,0.04)"}}>
+            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
+              <span style={{fontSize:16}}>📁</span>
+              <span style={{fontSize:13,fontWeight:700,color:C.label,fontFamily:FONT}}>
+                Carpeta de descargas organizada
+              </span>
+            </div>
+            <div style={{fontSize:12,color:C.label3,fontFamily:FONT,lineHeight:1.6,marginBottom:12}}>
+              {fsaOk
+                ? "Seleccioná una carpeta base en este dispositivo. Cada descarga (liquidaciones, verificaciones, historiales) se guardará automáticamente en una subcarpeta con el nombre de la marca."
+                : "Tu navegador no soporta esta función. Las descargas usarán el nombre de archivo organizado y se guardarán en la carpeta de descargas del sistema."}
+            </div>
+            {fsaOk && (
+              <>
+                {carpetaNombre && (
+                  <div style={{display:"flex",alignItems:"center",gap:8,padding:"9px 12px",
+                    borderRadius:10,background:`${C.green}12`,border:`1px solid ${C.green}30`,marginBottom:10}}>
+                    <span style={{fontSize:14}}>✓</span>
+                    <div style={{flex:1}}>
+                      <div style={{fontSize:12,fontWeight:600,color:C.green,fontFamily:FONT}}>
+                        Carpeta configurada
+                      </div>
+                      <div style={{fontSize:11,color:C.label3,fontFamily:"monospace",marginTop:2}}>
+                        {carpetaNombre}
+                      </div>
+                    </div>
+                    <button onClick={async()=>{
+                      await _fsaIdb("set",null);
+                      setCarpetaNombre(null);
+                    }} style={{background:"none",border:"none",color:C.label3,fontSize:18,
+                      cursor:"pointer",padding:"0 4px"}}>×</button>
+                  </div>
+                )}
+                <button onClick={async()=>{
+                  const h=await fsaSetBase();
+                  if(h) setCarpetaNombre(h.name||"Carpeta configurada");
+                }} style={{
+                  width:"100%",padding:"11px",borderRadius:10,
+                  border:`1.5px solid ${C.indigo}40`,background:`${C.indigo}10`,
+                  cursor:"pointer",fontSize:13,fontWeight:600,color:C.indigo,
+                  fontFamily:FONT,WebkitTapHighlightColor:"transparent"}}>
+                  {carpetaNombre ? "🔄 Cambiar carpeta base" : "📁 Seleccionar carpeta base"}
+                </button>
+              </>
+            )}
+          </div>
+        );
+      })()}
+
+      {/* Sincronización con Supabase */}
+      {(onRecargarDesdeSupabase||onSyncCompleto) && (()=>{
+        const [sbMsg, setSbMsg] = React.useState(null);
+        return (
+          <div style={{background:C.bg1,borderRadius:16,border:`1px solid ${C.sep}`,
+            padding:"16px",marginBottom:12,boxShadow:"0 1px 6px rgba(0,0,0,0.04)"}}>
+            <div style={{fontSize:13,fontWeight:700,color:C.label,fontFamily:FONT,marginBottom:4}}>
+              ☁️ Sincronización con Supabase
+            </div>
+            <div style={{fontSize:12,color:C.label3,fontFamily:FONT,marginBottom:12,lineHeight:1.5}}>
+              Recargar baja los datos actuales desde la nube al dispositivo. Sincronizar sube los datos locales a la nube.
+            </div>
+            {sbMsg && (
+              <div style={{fontSize:12,fontWeight:600,color:sbMsg==="ok"?C.green:sbMsg==="err"?C.red:C.indigo,
+                marginBottom:10,textAlign:"center"}}>
+                {sbMsg==="ok"?"✅ Datos recargados desde Supabase":sbMsg==="err"?"⚠️ Error al conectar":sbMsg}
+              </div>
+            )}
+            <div style={{display:"flex",gap:8}}>
+              {onRecargarDesdeSupabase&&(
+                <button onClick={async()=>{
+                  setSbMsg("Cargando desde Supabase…");
+                  const ok = await onRecargarDesdeSupabase();
+                  setSbMsg(ok?"ok":"err");
+                  setTimeout(()=>setSbMsg(null),4000);
+                }} style={{flex:1,padding:"11px",borderRadius:10,border:`1.5px solid ${C.indigo}40`,
+                  background:`${C.indigo}10`,cursor:"pointer",fontSize:13,fontWeight:600,
+                  color:C.indigo,fontFamily:FONT,WebkitTapHighlightColor:"transparent"}}>
+                  ⬇️ Recargar desde Supabase
+                </button>
+              )}
+              {onSyncCompleto&&(
+                <button onClick={async()=>{
+                  setSbMsg("Sincronizando…");
+                  const r = await onSyncCompleto(()=>{});
+                  setSbMsg(r.fail>0?"err":"ok");
+                  setTimeout(()=>setSbMsg(null),4000);
+                }} style={{flex:1,padding:"11px",borderRadius:10,border:`1.5px solid ${C.sep}`,
+                  background:C.bg2,cursor:"pointer",fontSize:13,fontWeight:600,
+                  color:C.label2,fontFamily:FONT,WebkitTapHighlightColor:"transparent"}}>
+                  ☁️ Subir a Supabase
+                </button>
+              )}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Cache local (siempre visible) */}
       <div style={{background:C.bg1,borderRadius:16,border:`1px solid ${C.sep}`,
@@ -15710,7 +17790,7 @@ function SistemaTab({user, logout}){
 }
 
 // ── Panel configuración principal ─────────────────────────────────────────────
-function ConfigTab({user, logout}){
+function ConfigTab({user, logout, onRecargarDesdeSupabase, onSyncCompleto}){
   const [subTab, setSubTab] = useState("perfil");
   const [usuarios, setUsuarios] = useState(()=>{
     try{return JSON.parse(localStorage.getItem("th_usuarios")||"null")||USUARIOS;}
@@ -15845,12 +17925,9 @@ function ConfigTab({user, logout}){
   // acciones
   function handleResetPass(u){
     const temp=generarTempPassword();
-    guardarUsuarios(
-      usuarios.map(x=>x.usuario===u.usuario?{...x,password:temp}:x),
-      `Reset contraseña → [oculto]`, u.usuario,
-      `Contraseña de @${u.usuario} reseteada`
-    );
-    setTempPass({usuario:u.usuario,nombre:u.nombre,password:temp});
+    // Con Supabase Auth, el reset de contraseña debe hacerse desde el dashboard de Supabase
+    // o via service_role. Aquí mostramos la contraseña temporal para que el admin la ingrese allí.
+    setTempPass({usuario:u.usuario,nombre:u.nombre,password:temp,soloManual:true});
     setConfirmAct(null); setMenuAbierto(null);
   }
   function handleToggle(u){
@@ -15863,7 +17940,8 @@ function ConfigTab({user, logout}){
     setConfirmAct(null); setMenuAbierto(null);
   }
   function handleEliminar(u){
-    sbEliminarUsuario(u.usuario); // borrar de Supabase (upsert no lo elimina solo)
+    sbEliminarUsuario(u.usuario);
+    sbEliminarAuthUsuario(u.usuario);
     guardarUsuarios(
       usuarios.filter(x=>x.usuario!==u.usuario),
       "Eliminó usuario", u.usuario,
@@ -15873,15 +17951,17 @@ function ConfigTab({user, logout}){
   }
   function handleGuardarUsuario(data,isNew){
     if(isNew){
+      const nuevoUsuario = {...data,estado:"activo",marcaId:data.marcaId?Number(data.marcaId):undefined};
       guardarUsuarios(
-        [...usuarios,{...data,estado:"activo",marcaId:data.marcaId?Number(data.marcaId):undefined}],
+        [...usuarios, nuevoUsuario],
         "Creó usuario", data.usuario,
         `Usuario @${data.usuario} creado correctamente`
       );
+      // Crear también en Supabase Auth
+      if(data.password) sbCrearAuthUsuario(data.usuario, data.password, data.nombre, data.rol, data.marcaId);
     } else {
-      // Si el campo password viene vacío, conservar la contraseña existente
       const update = {...data, marcaId:data.marcaId?Number(data.marcaId):undefined};
-      if(!update.password) delete update.password;
+      delete update.password; // contraseña no se guarda en tabla usuarios
       guardarUsuarios(
         usuarios.map(u=>u.usuario===data.usuario ? {...u,...update} : u),
         "Editó usuario", data.usuario,
@@ -16144,7 +18224,7 @@ create policy "allow all usuarios" on usuarios
 
       {/* ════ SISTEMA ════ */}
       {subTab==="sistema"&&(
-        <SistemaTab user={user} logout={logout}/>
+        <SistemaTab user={user} logout={logout} onRecargarDesdeSupabase={onRecargarDesdeSupabase} onSyncCompleto={onSyncCompleto}/>
       )}
 
       {/* ════ FACTURACIÓN ════ */}
@@ -16247,9 +18327,11 @@ create policy "allow all usuarios" on usuarios
               textAlign:"center",marginBottom:6}}>Contraseña temporal</div>
             <div style={{fontSize:13,color:C.label3,fontFamily:FONT,
               textAlign:"center",marginBottom:20,lineHeight:1.5}}>
-              Entregá esta contraseña a{" "}
-              <strong style={{color:C.label}}>{tempPass.nombre}</strong>.
-              Solo se muestra una vez.
+              {tempPass.soloManual ? (
+                <>Ingresá esta contraseña manualmente en <strong style={{color:C.label}}>Supabase → Authentication → Users</strong> para <strong style={{color:C.label}}>{tempPass.nombre}</strong>. El sistema no puede cambiarla automáticamente.</>
+              ) : (
+                <>Entregá esta contraseña a <strong style={{color:C.label}}>{tempPass.nombre}</strong>. Solo se muestra una vez.</>
+              )}
             </div>
             <div style={{background:C.bg0,borderRadius:16,padding:"18px 20px",
               textAlign:"center",marginBottom:16,
@@ -16652,6 +18734,7 @@ function VentasTab({vMes, totalVtas, mes, anio, onVentaClick}){
   const isDesktop = useIsDesktop();
   var _hN166 = useState("marcas"); var vistaActiva = _hN166[0]; var setVistaActiva = _hN166[1];; // "marcas" | "historial"
   var _hN167 = useState(null); var marcaFiltro = _hN167[0]; var setMarcaFiltro = _hN167[1];; // id marca o null = todas
+  const [previewNota, setPreviewNota] = useState(null);
 
   // Ventas activas (excluye anuladas) — para totales, montos y desglose por marca
   const vMesActivas = useMemo(()=>vMes.filter(v=>!v.anulada),[vMes]);
@@ -16688,6 +18771,7 @@ function VentasTab({vMes, totalVtas, mes, anio, onVentaClick}){
   },[vMes, marcaFiltro]);
 
   return (
+    <>
     <div>
       {/* Stats globales */}
       <div style={{display:"grid",gridTemplateColumns: isDesktop ? "2fr 1fr 1fr 1fr" : "1fr 1fr",gap: isDesktop ? 8 : 10,marginBottom: isDesktop ? 12 : 16}}>
@@ -16895,7 +18979,7 @@ function VentasTab({vMes, totalVtas, mes, anio, onVentaClick}){
                       </div>
                     ))}
                     {!isDesktop && (
-                      <IOSBtn onPress={()=>sendWA(v)} variant="fill" small full icon="📲">
+                      <IOSBtn onPress={()=>generarVistaPreviaNotaVenta(v,undefined,setPreviewNota)} variant="fill" small full icon="📲">
                         Enviar por WhatsApp
                       </IOSBtn>
                     )}
@@ -16908,6 +18992,8 @@ function VentasTab({vMes, totalVtas, mes, anio, onVentaClick}){
         </div>
       )}
     </div>
+    <NotaImgPreviewModal data={previewNota} onClose={()=>setPreviewNota(null)}/>
+    </>
   );
 }
 
