@@ -7731,10 +7731,10 @@ function ImportarExcelModal({inv, onImportar, onClose, onArchivoCapturado}){
             const paraNuevas = preview.filter(f=>f.desc&&f.marcaId&&f.precio>0&&f._errs.length===0&&!f._dup);
             const paraActs   = preview.filter(f=>f._dup&&f.marcaId&&f.precio>0);
             const todosParaEtiquetas = [
-              ...paraNuevas.map(f=>({nombre:(f.desc||"").toUpperCase(), codigo:f.sku.toUpperCase(), precio:f.precio, marcaNombre:f.marcaNombre, stock:f.stock})),
+              ...paraNuevas.map(f=>({nombre:(f.desc||"").toUpperCase(), codigo:f.sku.toUpperCase(), precio:f.precio, marcaNombre:f.marcaNombre, descripcion:f.desc||"", stock:f.stock})),
               ...paraActs.map(f=>{
                 const prod = inv.find(p=>p.codigo.toUpperCase()===f.sku.toUpperCase());
-                return {nombre:(prod?.nombre||f.desc||"").toUpperCase(), codigo:f.sku.toUpperCase(), precio:prod?.precio||f.precio, marcaNombre:prod?.marcaNombre||f.marcaNombre, stock:f.stock};
+                return {nombre:(prod?.nombre||f.desc||"").toUpperCase(), codigo:f.sku.toUpperCase(), precio:prod?.precio||f.precio, marcaNombre:prod?.marcaNombre||f.marcaNombre, descripcion:prod?.descripcion||f.desc||"", stock:f.stock};
               }),
             ];
             const totalEtiquetas = todosParaEtiquetas.reduce((acc,f)=>acc+Math.max(1,Number(f.stock)||1),0);
@@ -11329,7 +11329,7 @@ function App(){
     });
     setFInv({marcaId:"",nombre:"",categoria:"",precio:"",stock:"",fecha:hoy(),codigoManual:""});
     setShInv(false);
-    setTimeout(()=>imprimirTicket(prod, marca?.nombre||"Toscana House"), 300);
+    setTimeout(()=>imprimirEtiquetasLote(expandirPorStock([{...prod, marcaNombre:marca?.nombre||"Toscana House"}])), 300);
   }
 
   function darBaja(){
@@ -15169,7 +15169,7 @@ function InventarioPorMarca({inv, ventas, retiros=[], onRecibir, onBaja, onImpor
                   {/* Imprimir */}
                   <div style={{textAlign:"right"}}>
                     <button
-                      onClick={()=>imprimirTicket(prod, marcaProd?.nombre||prod.marcaNombre||"")}
+                      onClick={()=>imprimirEtiquetasLote(expandirPorStock([{...prod, marcaNombre:marcaProd?.nombre||prod.marcaNombre||""}]))}
                       style={{
                         padding:"5px 8px",borderRadius:7,border:`1px solid ${C.gold}40`,
                         background:`${C.gold}08`,color:C.gold,fontSize:11,fontFamily:FONT,

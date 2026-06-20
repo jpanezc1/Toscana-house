@@ -22403,69 +22403,6 @@
     }
     return out;
   }
-  async function imprimirTicket(producto, marcaNombre) {
-    const win = window.open("", "_blank", "width=400,height=500");
-    if (!win) {
-      alert("Activa las ventanas emergentes para imprimir");
-      return;
-    }
-    win.document.write(`<!DOCTYPE html>
-<html>
-<head>
-  <title>Etiqueta \u2014 ${producto.nombre}</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.5/JsBarcode.all.min.js"><\/script>
-  <style>
-    @page { size: 50mm 25mm; margin: 0; }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    html, body { width:50mm; height:25mm; }
-    body { font-family:'Courier New',monospace; padding:1mm 2mm; background:white; color:black;
-      overflow:hidden; display:flex; flex-direction:column; align-items:center; justify-content:center; }
-    .top { display:flex; justify-content:space-between; align-items:center; width:100%;
-      font-size:8.64px; letter-spacing:0.5px; text-transform:uppercase; color:#333; }
-    .producto { font-size:7.5px; font-weight:bold; text-align:center; width:100%;
-      text-transform:uppercase; line-height:1.15; margin:0.2mm 0;
-      display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:3;
-      overflow:hidden; text-overflow:ellipsis; }
-    .barcode-wrap { width:100%; display:flex; justify-content:center; }
-    .barcode-wrap svg { width:45mm!important; height:8.5mm!important; }
-    .color-row { font-size:6.5px; color:#555; text-transform:uppercase; letter-spacing:0.5px;
-      text-align:center; width:100%; margin:0.1mm 0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-    .bottom-row { display:flex; justify-content:space-between; align-items:center; width:100%;
-      margin-top:0.1mm; }
-    .codigo { font-size:8px; color:#333; font-family:monospace; }
-    .precio { font-size:12px; font-weight:900; }
-    @media print { body { print-color-adjust:exact; -webkit-print-color-adjust:exact; } }
-  </style>
-</head>
-<body>
-  <div class="top"><span>${marcaNombre}</span><span style="font-weight:bold">TOSCANA HOUSE</span></div>
-  <div class="producto">${abreviarNombre(producto.nombre)}</div>
-  ${producto.descripcion ? `<div class="color-row">${producto.descripcion.toUpperCase()}</div>` : ""}
-  ${extraerColor(producto.descripcion) ? `<div class="color-row">Color: ${extraerColor(producto.descripcion)}</div>` : ""}
-  <div class="barcode-wrap">
-    <svg id="barcode"></svg>
-  </div>
-  <div class="bottom-row">
-    <span class="codigo">${producto.codigo}</span>
-    <span class="precio">Bs ${Number(producto.precio).toLocaleString("es-BO")}</span>
-  </div>
-  <script>
-    window.onload = function() {
-      try {
-        JsBarcode("#barcode", "${producto.codigo}", {
-          format: "CODE128",
-          width: 1.56, height: 38.4,
-          displayValue: false,
-          margin: 0
-        });
-      } catch(e) {}
-      setTimeout(function() { window.print(); }, 800);
-    };
-  <\/script>
-</body>
-</html>`);
-    win.document.close();
-  }
   function imprimirEtiquetasLote(items) {
     if (!items || items.length === 0) return;
     const win = window.open("", "_blank", "width=900,height=700");
@@ -28098,8 +28035,10 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
         const codigo = await leerCodigoDeImagen(f);
         if (codigo) {
           const ok = onDetect(codigo);
-          if (ok === false) beepError2();
-          else beep2();
+          if (ok !== "handled") {
+            if (ok === false) beepError2();
+            else beep2();
+          }
           setModo(continuous ? "foto" : "leyendo");
         } else {
           setScanMsg("No se detect\xF3 c\xF3digo \u2014 intenta de nuevo");
@@ -28155,8 +28094,10 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
             if (res && !firedRef.current) {
               firedRef.current = true;
               const ok = onDetect(res.getText());
-              if (ok === false) beepError2();
-              else beep2();
+              if (ok !== "handled") {
+                if (ok === false) beepError2();
+                else beep2();
+              }
               if (continuous) {
                 cooldownRef.current = setTimeout(() => {
                   firedRef.current = false;
@@ -28503,8 +28444,10 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       if (idleRef.current) clearTimeout(idleRef.current);
       if (code.length < 2) return;
       const ok = onDetect(code);
-      if (ok === false) beepError();
-      else beep();
+      if (ok !== "handled") {
+        if (ok === false) beepError();
+        else beep();
+      }
     }
     function onChange(e) {
       const v = e.target.value;
@@ -29481,10 +29424,10 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       const paraNuevas = preview.filter((f) => f.desc && f.marcaId && f.precio > 0 && f._errs.length === 0 && !f._dup);
       const paraActs = preview.filter((f) => f._dup && f.marcaId && f.precio > 0);
       const todosParaEtiquetas = [
-        ...paraNuevas.map((f) => ({ nombre: (f.desc || "").toUpperCase(), codigo: f.sku.toUpperCase(), precio: f.precio, marcaNombre: f.marcaNombre, stock: f.stock })),
+        ...paraNuevas.map((f) => ({ nombre: (f.desc || "").toUpperCase(), codigo: f.sku.toUpperCase(), precio: f.precio, marcaNombre: f.marcaNombre, descripcion: f.desc || "", stock: f.stock })),
         ...paraActs.map((f) => {
           const prod = inv.find((p) => p.codigo.toUpperCase() === f.sku.toUpperCase());
-          return { nombre: (prod?.nombre || f.desc || "").toUpperCase(), codigo: f.sku.toUpperCase(), precio: prod?.precio || f.precio, marcaNombre: prod?.marcaNombre || f.marcaNombre, stock: f.stock };
+          return { nombre: (prod?.nombre || f.desc || "").toUpperCase(), codigo: f.sku.toUpperCase(), precio: prod?.precio || f.precio, marcaNombre: prod?.marcaNombre || f.marcaNombre, descripcion: prod?.descripcion || f.desc || "", stock: f.stock };
         })
       ];
       const totalEtiquetas = todosParaEtiquetas.reduce((acc, f) => acc + Math.max(1, Number(f.stock) || 1), 0);
@@ -33745,7 +33688,7 @@ Esta acci\xF3n no se puede deshacer.`)) return;
       });
       setFInv({ marcaId: "", nombre: "", categoria: "", precio: "", stock: "", fecha: hoy(), codigoManual: "" });
       setShInv(false);
-      setTimeout(() => imprimirTicket(prod, marca?.nombre || "Toscana House"), 300);
+      setTimeout(() => imprimirEtiquetasLote(expandirPorStock([{ ...prod, marcaNombre: marca?.nombre || "Toscana House" }])), 300);
     }
     function darBaja() {
       const cod = bajaCod.trim().toUpperCase();
@@ -36372,16 +36315,18 @@ ${sinStock.map((it) => {
         });
         return false;
       }
+      const confirmado = r.cantNueva >= r.sistemaP;
+      if (confirmado) beep();
+      else beepError();
       setLiveFeedback({
         ts: Date.now(),
-        ok: true,
+        ok: confirmado,
         code: p.codigo,
         repetido: r.repetido,
-        sobrante: r.sobrante,
         title: (p.nombre || "").toUpperCase(),
-        sub: r.sobrante ? `\u26A0 SOBRANTE \xB7 ${p.codigo} \u2014 stock sistema: 0` : r.repetido ? `Repetido OK \xB7 unidad ${r.cantNueva} de ${r.sistemaP}` : `${p.codigo} \xB7 contabilizado (1 de ${r.sistemaP})`
+        sub: r.repetido ? `Repetido OK \xB7 unidad ${r.cantNueva} de ${r.sistemaP}` : `${p.codigo} \xB7 contabilizado (${r.cantNueva} de ${r.sistemaP})`
       });
-      return true;
+      return "handled";
     }
     function reiniciarConteo() {
       if (Object.keys(conteo).length === 0) return;
@@ -36510,6 +36455,7 @@ ${sinStock.map((it) => {
         return { ...prev, [r.id]: nuevo };
       });
       if (nuevo === r.contado) {
+        beep();
         setLiveFeedback({
           ts: Date.now(),
           ok: true,
@@ -36518,6 +36464,7 @@ ${sinStock.map((it) => {
           sub: `Doble conteo coincide: ${nuevo} unidad${nuevo !== 1 ? "es" : ""}`
         });
       } else if (nuevo > r.contado) {
+        beepError();
         setLiveFeedback({
           ts: Date.now(),
           ok: false,
@@ -36527,6 +36474,7 @@ ${sinStock.map((it) => {
           sub: `1ra pasada: ${r.contado} \xB7 2da pasada: ${nuevo} \u2014 recontar`
         });
       } else {
+        beep();
         setLiveFeedback({
           ts: Date.now(),
           ok: true,
@@ -36535,7 +36483,7 @@ ${sinStock.map((it) => {
           sub: `Verificando\u2026 ${nuevo} de ${r.contado}`
         });
       }
-      return true;
+      return "handled";
     }
     function confirmarCierre() {
       if (itemsContados === 0) {
@@ -38159,7 +38107,7 @@ Se registrar\xE1 que los faltantes/sobrantes fueron verificados f\xEDsicamente y
       } }, prod.stock === 0 ? "\u2717 0" : prod.stock < 3 ? `\u26A0 ${prod.stock}` : `\u2713 ${prod.stock}`)), /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "right" } }, /* @__PURE__ */ import_react.default.createElement(
         "button",
         {
-          onClick: () => imprimirTicket(prod, marcaProd?.nombre || prod.marcaNombre || ""),
+          onClick: () => imprimirEtiquetasLote(expandirPorStock([{ ...prod, marcaNombre: marcaProd?.nombre || prod.marcaNombre || "" }])),
           style: {
             padding: "5px 8px",
             borderRadius: 7,
