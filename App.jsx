@@ -11852,6 +11852,7 @@ function App(){
             auditorias={auditorias}
             onActualizarAuditoria={actualizarAuditoria}
             user={user}
+            retiros={retiros}
           />
         )}
 
@@ -15388,7 +15389,7 @@ function InventarioPorMarca({inv, ventas, retiros=[], onRecibir, onBaja, onImpor
 // ══════════════════════════════════════════════════════════
 // MARCA DETALLE — iOS navigation push style
 // ══════════════════════════════════════════════════════════
-function MarcaDetalle({marcaId,inv,ventas,vMes,mes,anio,MK,cierres,setCierres,getHist,getLiq,auditorias=[],onActualizarAuditoria,user}){
+function MarcaDetalle({marcaId,inv,ventas,vMes,mes,anio,MK,cierres,setCierres,getHist,getLiq,auditorias=[],onActualizarAuditoria,user,retiros=[]}){
   const isDesktop = useIsDesktop();
   var _hN150 = useState("historial"); var sub = _hN150[0]; var setSub = _hN150[1];;
   const [agregandoA, setAgregandoA] = useState(null);
@@ -15396,6 +15397,7 @@ function MarcaDetalle({marcaId,inv,ventas,vMes,mes,anio,MK,cierres,setCierres,ge
   const [msgAgregar, setMsgAgregar] = useState(null);
   var _hN151 = useState(""); var filtroMk = _hN151[0]; var setFMk = _hN151[1];;
   const [imgPreview, setImgPreview] = useState(null);
+  const [notaRetiroMD, setNotaRetiroMD] = useState(null);
   const marca   =MARCAS.find(m=>m.id===marcaId);
   const liq     =getLiq(marcaId);
   const cerrado =cierres[`${MK}-${marcaId}`]?.cerrado;
@@ -15486,7 +15488,14 @@ function MarcaDetalle({marcaId,inv,ventas,vMes,mes,anio,MK,cierres,setCierres,ge
                         {MESES[periodo.mes]} {periodo.anio}
                       </span>
                       <span style={{fontSize:11,color:C.label3,fontFamily:FONT_UI,marginLeft:10,opacity:.6}}>
-                        {periodo.ventas.length} transacciones
+                        {(()=>{
+                          const nRet=retiros.filter(r=>{
+                            if((r.marcaId||"")!==marcaId)return false;
+                            const [y,m]=(r.fecha||"").split("-");
+                            return parseInt(m)===periodo.mes&&parseInt(y)===periodo.anio;
+                          }).length;
+                          return `${periodo.ventas.length} venta${periodo.ventas.length!==1?"s":""}${nRet>0?` · ${nRet} retiro${nRet!==1?"s":""}`:""}`
+                        })()}
                       </span>
                     </div>
                     <div style={{display:"flex",alignItems:"center",gap:8}}>
@@ -15498,40 +15507,86 @@ function MarcaDetalle({marcaId,inv,ventas,vMes,mes,anio,MK,cierres,setCierres,ge
                       </span>
                     </div>
                   </div>
-                  {/* Ventas */}
-                  {periodo.ventas.map((v,i)=>(
-                    <div key={v.id} style={{
-                      padding:"14px 0",
-                      borderBottom:i<periodo.ventas.length-1?`1px solid ${C.sep}`:"none",
-                    }}>
-                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
-                        <div>
-                          <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:5}}>
-                            <span style={{fontFamily:"monospace",fontSize:11,color:C.gold,fontWeight:600,
-                              background:`${C.gold}18`,padding:"2px 7px",borderRadius:5}}>{v.id}</span>
-                            <PagoDisplay mp={v.metodoPago} total={v.total} small/>
-                          </div>
-                          <div style={{fontSize:11,color:C.label3,fontFamily:FONT_UI,opacity:.55,marginBottom:6}}>
-                            {v.fecha} · {v.hora}
-                          </div>
-                          {v.itsMarca.map((it,ii)=>(
-                            <div key={`${v.id}-${it.prodId}-${ii}`}
-                              style={{fontSize:12,color:C.label2,fontFamily:FONT,lineHeight:"1.8"}}>
-                              {it.nombre}
-                              <span style={{fontFamily:"monospace",fontSize:10,color:C.label3,opacity:.55,marginLeft:5}}>
-                                {it.codigo}
+                  {/* Ventas + Retiros mezclados por fecha */}
+                  {(()=>{
+                    const retirosPeriodo = retiros.filter(r=>{
+                      if((r.marcaId||"")!==marcaId) return false;
+                      const d = r.fecha||"";
+                      const [y,m] = d.split("-");
+                      return parseInt(m)===periodo.mes && parseInt(y)===periodo.anio;
+                    });
+                    const items = [
+                      ...periodo.ventas.map(v=>({tipo:"venta",fecha:v.fecha,hora:v.hora||"",data:v})),
+                      ...retirosPeriodo.map(r=>({tipo:"retiro",fecha:r.fecha,hora:r.hora||"",data:r})),
+                    ].sort((a,b)=>{
+                      const fa=`${a.fecha} ${a.hora}`, fb=`${b.fecha} ${b.hora}`;
+                      return fb.localeCompare(fa);
+                    });
+                    return items.map((item,i)=>{
+                      if(item.tipo==="venta"){
+                        const v=item.data;
+                        return (
+                          <div key={v.id} style={{padding:"14px 0",borderBottom:i<items.length-1?`1px solid ${C.sep}`:"none"}}>
+                            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+                              <div>
+                                <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:5}}>
+                                  <span style={{fontFamily:"monospace",fontSize:11,color:C.gold,fontWeight:600,
+                                    background:`${C.gold}18`,padding:"2px 7px",borderRadius:5}}>{v.id}</span>
+                                  <PagoDisplay mp={v.metodoPago} total={v.total} small/>
+                                </div>
+                                <div style={{fontSize:11,color:C.label3,fontFamily:FONT_UI,opacity:.55,marginBottom:6}}>
+                                  {v.fecha} · {v.hora}
+                                </div>
+                                {v.itsMarca.map((it,ii)=>(
+                                  <div key={`${v.id}-${it.prodId}-${ii}`}
+                                    style={{fontSize:12,color:C.label2,fontFamily:FONT,lineHeight:"1.8"}}>
+                                    {it.nombre}
+                                    <span style={{fontFamily:"monospace",fontSize:10,color:C.label3,opacity:.55,marginLeft:5}}>
+                                      {it.codigo}
+                                    </span>
+                                    <span style={{color:C.label3,marginLeft:4,opacity:.6}}>×{it.cantidad}</span>
+                                  </div>
+                                ))}
+                              </div>
+                              <span style={{fontSize:16,fontWeight:700,color:C.label,fontFamily:FONT,
+                                letterSpacing:"-0.02em",flexShrink:0,paddingLeft:12}}>
+                                {$(v.subMarca)}
                               </span>
-                              <span style={{color:C.label3,marginLeft:4,opacity:.6}}>×{it.cantidad}</span>
                             </div>
-                          ))}
-                        </div>
-                        <span style={{fontSize:16,fontWeight:700,color:C.label,fontFamily:FONT,
-                          letterSpacing:"-0.02em",flexShrink:0,paddingLeft:12}}>
-                          {$(v.subMarca)}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
+                          </div>
+                        );
+                      } else {
+                        const r=item.data;
+                        return (
+                          <div key={r.id||`ret-${i}`} style={{padding:"14px 0",borderBottom:i<items.length-1?`1px solid ${C.sep}`:"none"}}>
+                            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+                              <div style={{flex:1}}>
+                                <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:5}}>
+                                  <span style={{fontFamily:"monospace",fontSize:11,color:C.amber,fontWeight:600,
+                                    background:`${C.amber}15`,padding:"2px 7px",borderRadius:5,border:`1px solid ${C.amber}30`}}>RETIRO</span>
+                                </div>
+                                <div style={{fontSize:11,color:C.label3,fontFamily:FONT_UI,opacity:.55,marginBottom:6}}>
+                                  {r.fecha} · {r.hora||"—"} · {r.destinatario||"—"}
+                                </div>
+                                <div style={{fontSize:12,color:C.label2,fontFamily:FONT,lineHeight:"1.8"}}>
+                                  {r.nombre}
+                                  <span style={{fontFamily:"monospace",fontSize:10,color:C.label3,opacity:.55,marginLeft:5}}>{r.codigo}</span>
+                                  <span style={{color:C.label3,marginLeft:4,opacity:.6}}>×{r.cantidad}</span>
+                                </div>
+                                {r.motivo&&<div style={{fontSize:11,color:C.amber,fontFamily:FONT_UI,marginTop:3}}>{r.motivo}</div>}
+                              </div>
+                              <button onClick={()=>setNotaRetiroMD(r)}
+                                style={{flexShrink:0,marginLeft:12,padding:"5px 10px",borderRadius:7,
+                                  border:`1px solid ${C.amber}40`,background:"none",
+                                  color:C.amber,fontSize:10,fontFamily:FONT_UI,fontWeight:700,cursor:"pointer"}}>
+                                📄 Nota
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      }
+                    });
+                  })()}
                 </div>
               ))
           }
@@ -15897,6 +15952,68 @@ function MarcaDetalle({marcaId,inv,ventas,vMes,mes,anio,MK,cierres,setCierres,ge
         );
       })()}
 
+    <>
+      {/* ── Modal nota de retiro desde historial ── */}
+      {notaRetiroMD&&(
+        <div style={{position:"fixed",inset:0,zIndex:2000,display:"flex",alignItems:"center",justifyContent:"center"}}>
+          <div onClick={()=>setNotaRetiroMD(null)}
+            style={{position:"absolute",inset:0,background:"rgba(0,0,0,0.18)"}}/>
+          <div style={{position:"relative",width:360,background:C.bg0,borderRadius:16,
+            overflow:"hidden",border:`1px solid ${C.sep}`,boxShadow:"0 8px 32px rgba(0,0,0,0.14)"}}>
+            {/* title */}
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",
+              padding:"11px 16px",background:C.bg2,borderBottom:`1px solid ${C.sep}`}}>
+              <span style={{fontSize:11,fontWeight:700,letterSpacing:1,textTransform:"uppercase",
+                color:C.label3,fontFamily:FONT_UI}}>Nota de retiro</span>
+              <button onClick={()=>setNotaRetiroMD(null)}
+                style={{background:"none",border:"none",cursor:"pointer",color:C.label3,fontSize:16,padding:"2px 4px"}}>✕</button>
+            </div>
+            {/* producto */}
+            <div style={{padding:"16px 18px",borderBottom:`1px solid ${C.sep}`}}>
+              <div style={{fontSize:13,fontWeight:700,color:C.label,fontFamily:FONT,lineHeight:1.35,marginBottom:6}}>
+                {notaRetiroMD.nombre||notaRetiroMD.codigo}
+              </div>
+              <span style={{fontSize:10,fontFamily:"monospace",color:C.label3,
+                background:C.bg2,padding:"2px 8px",borderRadius:5,border:`1px solid ${C.sep}`}}>
+                {notaRetiroMD.codigo}
+              </span>
+            </div>
+            {/* grid */}
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:0}}>
+              {[
+                {label:"Fecha", val:notaRetiroMD.fecha, sub:notaRetiroMD.hora||"—"},
+                {label:"Destinatario", val:notaRetiroMD.destinatario||"—"},
+                {label:"Cantidad", val:`${notaRetiroMD.cantidad} ud${notaRetiroMD.cantidad!==1?"s":""}`},
+                {label:"Marca", val:notaRetiroMD.marcaNombre||"—"},
+              ].map((f,i)=>(
+                <div key={i} style={{padding:"12px 18px",borderBottom:`1px solid ${C.sep}`,
+                  borderRight:i%2===0?`1px solid ${C.sep}`:"none"}}>
+                  <div style={{fontSize:9,textTransform:"uppercase",letterSpacing:.8,
+                    color:C.label3,fontFamily:FONT_UI,marginBottom:5}}>{f.label}</div>
+                  <div style={{fontSize:14,fontWeight:700,color:C.label,fontFamily:FONT}}>{f.val}</div>
+                  {f.sub&&<div style={{fontSize:11,color:C.label3,fontFamily:FONT_UI,marginTop:2}}>{f.sub}</div>}
+                </div>
+              ))}
+            </div>
+            {notaRetiroMD.motivo&&(
+              <div style={{padding:"12px 18px",borderBottom:`1px solid ${C.sep}`}}>
+                <div style={{fontSize:9,textTransform:"uppercase",letterSpacing:.8,color:C.label3,fontFamily:FONT_UI,marginBottom:5}}>Motivo</div>
+                <div style={{fontSize:13,color:C.amber,fontFamily:FONT_UI,fontWeight:600}}>{notaRetiroMD.motivo}</div>
+              </div>
+            )}
+            <div style={{padding:"12px 18px"}}>
+              <button onClick={()=>imprimirNotaRetiro(notaRetiroMD)}
+                style={{width:"100%",padding:"11px 0",borderRadius:8,
+                  border:`1px solid ${C.sep}`,background:C.bg2,
+                  color:C.label,fontFamily:FONT_UI,fontSize:12,fontWeight:700,
+                  cursor:"pointer",letterSpacing:.3}}>
+                📄 Imprimir nota de retiro
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
     </>
   );
 }
