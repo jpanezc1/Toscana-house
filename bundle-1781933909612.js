@@ -38506,7 +38506,9 @@ Se registrar\xE1 que los faltantes/sobrantes fueron verificados f\xEDsicamente y
     const cerrado = cierres[`${MK}-${marcaId}`]?.cerrado;
     const historial = getHist(marcaId);
     const prods = inv.filter((i) => i.marcaId === marcaId);
-    const retirosMarca = retiros.filter((r) => Number(r.marcaId) === Number(marcaId));
+    const retirosMarca = retiros.filter(
+      (r) => Number(r.marcaId) === Number(marcaId) || !r.marcaId && r.marcaNombre && marca && r.marcaNombre.toLowerCase() === marca.nombre.toLowerCase()
+    );
     const histConRetiros = (() => {
       const base = historial.map((h) => ({ ...h }));
       const mkSet = new Set(base.map((h) => h.mk));

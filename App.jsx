@@ -15404,7 +15404,11 @@ function MarcaDetalle({marcaId,inv,ventas,vMes,mes,anio,MK,cierres,setCierres,ge
   const historial=getHist(marcaId);
   const prods   =inv.filter(i=>i.marcaId===marcaId);
   // Retiros de esta marca — comparación con coerción numérica para evitar string/int mismatch
-  const retirosMarca = retiros.filter(r=>Number(r.marcaId)===Number(marcaId));
+  const retirosMarca = retiros.filter(r=>
+    Number(r.marcaId)===Number(marcaId) ||
+    (!r.marcaId && r.marcaNombre && marca &&
+      r.marcaNombre.toLowerCase()===marca.nombre.toLowerCase())
+  );
   // Períodos adicionales que solo tienen retiros (sin ventas registradas)
   const histConRetiros = (()=>{
     const base = historial.map(h=>({...h})); // copia para no mutar
