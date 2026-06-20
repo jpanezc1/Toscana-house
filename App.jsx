@@ -14752,6 +14752,18 @@ function InventarioPorMarca({inv, ventas, retiros=[], onRecibir, onBaja, onImpor
   const [retiroAbierto, setRetiroAbierto] = useState(null); // {codigo, lista:[]}
   const dragRefR = React.useRef({dragging:false, ox:0, oy:0});
   const [dragPosR, setDragPosR] = React.useState(null);
+  const [notaRetiroAbierta, setNotaRetiroAbierta] = useState(null); // retiro individual
+  const dragRefNR = React.useRef({dragging:false, ox:0, oy:0});
+  const [dragPosNR, setDragPosNR] = React.useState(null);
+  function onDragStartNR(e){
+    const el = e.currentTarget.closest('[data-drag-window-nr]');
+    const rect = el.getBoundingClientRect();
+    dragRefNR.current = {dragging:true, ox:e.clientX-rect.left, oy:e.clientY-rect.top};
+    const onMove = ev=>{ if(!dragRefNR.current.dragging) return; setDragPosNR({x:ev.clientX-dragRefNR.current.ox, y:ev.clientY-dragRefNR.current.oy}); };
+    const onUp = ()=>{ dragRefNR.current.dragging=false; window.removeEventListener('mousemove',onMove); window.removeEventListener('mouseup',onUp); };
+    window.addEventListener('mousemove',onMove);
+    window.addEventListener('mouseup',onUp);
+  }
   function onDragStartR(e){
     const el = e.currentTarget.closest('[data-drag-window-r]');
     const rect = el.getBoundingClientRect();
@@ -15280,7 +15292,7 @@ function InventarioPorMarca({inv, ventas, retiros=[], onRecibir, onBaja, onImpor
                   </div>
                   <div style={{textAlign:"right",flexShrink:0,marginLeft:12,display:"flex",flexDirection:"column",alignItems:"flex-end",gap:6}}>
                     <div style={{fontSize:13,fontWeight:700,color:C.label,fontFamily:FONT}}>{r.cantidad} ud{r.cantidad!==1?"s":""}</div>
-                    <button onClick={()=>verNotaRetiro(r)}
+                    <button onClick={()=>{ setNotaRetiroAbierta(r); setDragPosNR(null); }}
                       style={{fontSize:10,color:C.amber,background:"none",border:`1px solid ${C.amber}40`,
                         borderRadius:6,padding:"3px 8px",cursor:"pointer",fontFamily:FONT_UI,fontWeight:600}}>
                       📄 Nota de retiro
@@ -15290,6 +15302,82 @@ function InventarioPorMarca({inv, ventas, retiros=[], onRecibir, onBaja, onImpor
               ))}
             </div>
             <div style={{height:12}}/>
+          </div>
+        );
+      })()}
+
+      {/* ── Ventana arrastrable nota de retiro ── */}
+      {notaRetiroAbierta&&(()=>{
+        const r = notaRetiroAbierta;
+        const cerrarNR = ()=>{ setNotaRetiroAbierta(null); setDragPosNR(null); };
+        const winStyleNR = {
+          position:"fixed",
+          left: dragPosNR ? dragPosNR.x : "50%",
+          top:  dragPosNR ? dragPosNR.y : "50%",
+          transform: dragPosNR ? "none" : "translate(-50%,-50%)",
+          width:380, zIndex:1400,
+          background:C.bg0,
+          border:`1px solid ${C.sep}`,
+          borderRadius:14,
+          overflow:"hidden",
+          userSelect:"none",
+          boxShadow:"0 8px 32px rgba(0,0,0,0.12)",
+        };
+        return (
+          <div data-drag-window-nr style={winStyleNR}>
+            {/* title bar */}
+            <div onMouseDown={onDragStartNR}
+              style={{display:"flex",justifyContent:"space-between",alignItems:"center",
+                padding:"11px 14px",background:C.bg2,borderBottom:`1px solid ${C.sep}`,cursor:"grab"}}>
+              <span style={{fontSize:11,fontWeight:700,letterSpacing:1,textTransform:"uppercase",
+                color:C.label3,fontFamily:FONT_UI}}>Nota de retiro</span>
+              <button onClick={cerrarNR}
+                style={{background:"none",border:"none",cursor:"pointer",color:C.label3,
+                  fontSize:16,lineHeight:1,padding:"2px 4px",borderRadius:4}}>✕</button>
+            </div>
+            {/* producto */}
+            <div style={{padding:"16px 18px",borderBottom:`1px solid ${C.sep}`}}>
+              <div style={{fontSize:13,fontWeight:700,color:C.label,fontFamily:FONT,lineHeight:1.35,marginBottom:6}}>
+                {r.nombre||r.codigo}
+              </div>
+              <span style={{fontSize:10,fontFamily:"monospace",color:C.label3,
+                background:C.bg2,padding:"2px 8px",borderRadius:5,border:`1px solid ${C.sep}`}}>{r.codigo}</span>
+            </div>
+            {/* grid de datos */}
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:0}}>
+              {[
+                {label:"Fecha", val:r.fecha, sub:r.hora||"—"},
+                {label:"Destinatario", val:r.destinatario||"—"},
+                {label:"Cantidad", val:`${r.cantidad} ud${r.cantidad!==1?"s":""}`},
+                {label:"Marca", val:r.marcaNombre||"—"},
+              ].map((f,i)=>(
+                <div key={i} style={{padding:"12px 18px",borderBottom:`1px solid ${C.sep}`,
+                  borderRight:i%2===0?`1px solid ${C.sep}`:"none"}}>
+                  <div style={{fontSize:9,textTransform:"uppercase",letterSpacing:.8,
+                    color:C.label3,fontFamily:FONT_UI,marginBottom:5}}>{f.label}</div>
+                  <div style={{fontSize:14,fontWeight:700,color:C.label,fontFamily:FONT}}>{f.val}</div>
+                  {f.sub&&<div style={{fontSize:11,color:C.label3,fontFamily:FONT_UI,marginTop:2}}>{f.sub}</div>}
+                </div>
+              ))}
+            </div>
+            {/* motivo (si hay) */}
+            {r.motivo&&(
+              <div style={{padding:"12px 18px",borderBottom:`1px solid ${C.sep}`}}>
+                <div style={{fontSize:9,textTransform:"uppercase",letterSpacing:.8,
+                  color:C.label3,fontFamily:FONT_UI,marginBottom:5}}>Motivo</div>
+                <div style={{fontSize:13,color:C.amber,fontFamily:FONT_UI,fontWeight:600}}>{r.motivo}</div>
+              </div>
+            )}
+            {/* botón imprimir */}
+            <div style={{padding:"12px 18px"}}>
+              <button onClick={()=>imprimirNotaRetiro(r)}
+                style={{width:"100%",padding:"11px 0",borderRadius:8,
+                  border:`1px solid ${C.sep}`,background:C.bg2,
+                  color:C.label,fontFamily:FONT_UI,fontSize:12,fontWeight:700,
+                  cursor:"pointer",letterSpacing:.3}}>
+                📄 Imprimir nota de retiro
+              </button>
+            </div>
           </div>
         );
       })()}

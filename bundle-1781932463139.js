@@ -25079,8 +25079,8 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
 </body></html>`);
     win.document.close();
   }
-  function verNotaRetiro(r) {
-    abrirNotaRetiro(r, false);
+  function imprimirNotaRetiro(r) {
+    abrirNotaRetiro(r, true);
   }
   var FONT = "'Inter', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif";
   var FONT_UI = "'Inter', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif";
@@ -37674,6 +37674,25 @@ Se registrar\xE1 que los faltantes/sobrantes fueron verificados f\xEDsicamente y
     const [retiroAbierto, setRetiroAbierto] = (0, import_react.useState)(null);
     const dragRefR = import_react.default.useRef({ dragging: false, ox: 0, oy: 0 });
     const [dragPosR, setDragPosR] = import_react.default.useState(null);
+    const [notaRetiroAbierta, setNotaRetiroAbierta] = (0, import_react.useState)(null);
+    const dragRefNR = import_react.default.useRef({ dragging: false, ox: 0, oy: 0 });
+    const [dragPosNR, setDragPosNR] = import_react.default.useState(null);
+    function onDragStartNR(e) {
+      const el = e.currentTarget.closest("[data-drag-window-nr]");
+      const rect = el.getBoundingClientRect();
+      dragRefNR.current = { dragging: true, ox: e.clientX - rect.left, oy: e.clientY - rect.top };
+      const onMove = (ev) => {
+        if (!dragRefNR.current.dragging) return;
+        setDragPosNR({ x: ev.clientX - dragRefNR.current.ox, y: ev.clientY - dragRefNR.current.oy });
+      };
+      const onUp = () => {
+        dragRefNR.current.dragging = false;
+        window.removeEventListener("mousemove", onMove);
+        window.removeEventListener("mouseup", onUp);
+      };
+      window.addEventListener("mousemove", onMove);
+      window.addEventListener("mouseup", onUp);
+    }
     function onDragStartR(e) {
       const el = e.currentTarget.closest("[data-drag-window-r]");
       const rect = el.getBoundingClientRect();
@@ -38336,7 +38355,10 @@ Se registrar\xE1 que los faltantes/sobrantes fueron verificados f\xEDsicamente y
       } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, fontWeight: 700, color: C.label, fontFamily: FONT } }, r.fecha), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT_UI, marginTop: 2 } }, r.hora || "\u2014", " \xB7 ", r.destinatario || "\u2014"), r.motivo && /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.amber, fontFamily: FONT_UI, marginTop: 2 } }, r.motivo)), /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "right", flexShrink: 0, marginLeft: 12, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, fontWeight: 700, color: C.label, fontFamily: FONT } }, r.cantidad, " ud", r.cantidad !== 1 ? "s" : ""), /* @__PURE__ */ import_react.default.createElement(
         "button",
         {
-          onClick: () => verNotaRetiro(r),
+          onClick: () => {
+            setNotaRetiroAbierta(r);
+            setDragPosNR(null);
+          },
           style: {
             fontSize: 10,
             color: C.amber,
@@ -38351,6 +38373,116 @@ Se registrar\xE1 que los faltantes/sobrantes fueron verificados f\xEDsicamente y
         },
         "\u{1F4C4} Nota de retiro"
       ))))), /* @__PURE__ */ import_react.default.createElement("div", { style: { height: 12 } }));
+    })(), notaRetiroAbierta && (() => {
+      const r = notaRetiroAbierta;
+      const cerrarNR = () => {
+        setNotaRetiroAbierta(null);
+        setDragPosNR(null);
+      };
+      const winStyleNR = {
+        position: "fixed",
+        left: dragPosNR ? dragPosNR.x : "50%",
+        top: dragPosNR ? dragPosNR.y : "50%",
+        transform: dragPosNR ? "none" : "translate(-50%,-50%)",
+        width: 380,
+        zIndex: 1400,
+        background: C.bg0,
+        border: `1px solid ${C.sep}`,
+        borderRadius: 14,
+        overflow: "hidden",
+        userSelect: "none",
+        boxShadow: "0 8px 32px rgba(0,0,0,0.12)"
+      };
+      return /* @__PURE__ */ import_react.default.createElement("div", { "data-drag-window-nr": true, style: winStyleNR }, /* @__PURE__ */ import_react.default.createElement(
+        "div",
+        {
+          onMouseDown: onDragStartNR,
+          style: {
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            padding: "11px 14px",
+            background: C.bg2,
+            borderBottom: `1px solid ${C.sep}`,
+            cursor: "grab"
+          }
+        },
+        /* @__PURE__ */ import_react.default.createElement("span", { style: {
+          fontSize: 11,
+          fontWeight: 700,
+          letterSpacing: 1,
+          textTransform: "uppercase",
+          color: C.label3,
+          fontFamily: FONT_UI
+        } }, "Nota de retiro"),
+        /* @__PURE__ */ import_react.default.createElement(
+          "button",
+          {
+            onClick: cerrarNR,
+            style: {
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              color: C.label3,
+              fontSize: 16,
+              lineHeight: 1,
+              padding: "2px 4px",
+              borderRadius: 4
+            }
+          },
+          "\u2715"
+        )
+      ), /* @__PURE__ */ import_react.default.createElement("div", { style: { padding: "16px 18px", borderBottom: `1px solid ${C.sep}` } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, fontWeight: 700, color: C.label, fontFamily: FONT, lineHeight: 1.35, marginBottom: 6 } }, r.nombre || r.codigo), /* @__PURE__ */ import_react.default.createElement("span", { style: {
+        fontSize: 10,
+        fontFamily: "monospace",
+        color: C.label3,
+        background: C.bg2,
+        padding: "2px 8px",
+        borderRadius: 5,
+        border: `1px solid ${C.sep}`
+      } }, r.codigo)), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 0 } }, [
+        { label: "Fecha", val: r.fecha, sub: r.hora || "\u2014" },
+        { label: "Destinatario", val: r.destinatario || "\u2014" },
+        { label: "Cantidad", val: `${r.cantidad} ud${r.cantidad !== 1 ? "s" : ""}` },
+        { label: "Marca", val: r.marcaNombre || "\u2014" }
+      ].map((f, i) => /* @__PURE__ */ import_react.default.createElement("div", { key: i, style: {
+        padding: "12px 18px",
+        borderBottom: `1px solid ${C.sep}`,
+        borderRight: i % 2 === 0 ? `1px solid ${C.sep}` : "none"
+      } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+        fontSize: 9,
+        textTransform: "uppercase",
+        letterSpacing: 0.8,
+        color: C.label3,
+        fontFamily: FONT_UI,
+        marginBottom: 5
+      } }, f.label), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 14, fontWeight: 700, color: C.label, fontFamily: FONT } }, f.val), f.sub && /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT_UI, marginTop: 2 } }, f.sub)))), r.motivo && /* @__PURE__ */ import_react.default.createElement("div", { style: { padding: "12px 18px", borderBottom: `1px solid ${C.sep}` } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+        fontSize: 9,
+        textTransform: "uppercase",
+        letterSpacing: 0.8,
+        color: C.label3,
+        fontFamily: FONT_UI,
+        marginBottom: 5
+      } }, "Motivo"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.amber, fontFamily: FONT_UI, fontWeight: 600 } }, r.motivo)), /* @__PURE__ */ import_react.default.createElement("div", { style: { padding: "12px 18px" } }, /* @__PURE__ */ import_react.default.createElement(
+        "button",
+        {
+          onClick: () => imprimirNotaRetiro(r),
+          style: {
+            width: "100%",
+            padding: "11px 0",
+            borderRadius: 8,
+            border: `1px solid ${C.sep}`,
+            background: C.bg2,
+            color: C.label,
+            fontFamily: FONT_UI,
+            fontSize: 12,
+            fontWeight: 700,
+            cursor: "pointer",
+            letterSpacing: 0.3
+          }
+        },
+        "\u{1F4C4} Imprimir nota de retiro"
+      )));
     })());
   }
   function MarcaDetalle({ marcaId, inv, ventas, vMes, mes, anio, MK, cierres, setCierres, getHist, getLiq, auditorias = [], onActualizarAuditoria, user }) {
