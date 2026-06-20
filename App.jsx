@@ -14662,6 +14662,15 @@ function InventarioPorMarca({inv, ventas, onRecibir, onBaja, onImportarExcel, on
     return map;
   },[ventas]);
 
+  const [ventasCodigoInv, setVentasCodigoInv] = useState(null); // {codigo, lista:[]}
+  function abrirVentasPorCodigoInv(prod) {
+    const lista = ventas.filter(v=>v.items.some(it=>it.prodId===prod.id||it.codigo===prod.codigo));
+    if (lista.length===0) return;
+    if (lista.length===1) { setVentasCodigoInv({codigo:prod.codigo, lista, abrirUna:true}); return; }
+    setVentasCodigoInv({codigo:prod.codigo, lista: lista.slice().sort((a,b)=>b.fecha.localeCompare(a.fecha))});
+  }
+  const [ventaAbiertaInv, setVentaAbiertaInv] = useState(null);
+
   // Búsqueda SIEMPRE global — filtra sobre todo el inventario
   const productos = useMemo(()=>{
     const q = invBusq.trim().toUpperCase();
@@ -14917,7 +14926,7 @@ function InventarioPorMarca({inv, ventas, onRecibir, onBaja, onImportarExcel, on
                   {/* Precio */}
                   <div style={{textAlign:"right",fontFamily:FONT,paddingRight:8}}>
                     <div style={{fontSize:14,fontWeight:700,color:C.label,letterSpacing:"-0.02em"}}>{$(prod.precio)}</div>
-                    {vendidas>0&&<div style={{fontSize:10,color:C.blue,fontFamily:FONT}}>↑{vendidas} vend.</div>}
+                    {vendidas>0&&<div onClick={()=>abrirVentasPorCodigoInv(prod)} style={{fontSize:10,color:C.blue,fontFamily:FONT,cursor:"pointer",textDecoration:"underline",display:"inline-block"}}>↑{vendidas} vend.</div>}
                   </div>
 
                   {/* Stock badge */}
@@ -14990,6 +14999,71 @@ function InventarioPorMarca({inv, ventas, onRecibir, onBaja, onImportarExcel, on
             full small icon="🏷">{`Imprimir ${productos.reduce((acc,p)=>acc+Math.max(0,Number(p.stock)||0),0)} etiqueta${productos.length!==1?'s':''} (código de barras)`}</IOSBtn>
         </div>
       </div>
+
+      {/* ── Modal nota de venta desde inventario ── */}
+    {ventasCodigoInv&&(()=>{
+      const {codigo, lista, abrirUna} = ventasCodigoInv;
+      if (abrirUna && !ventaAbiertaInv) {
+        setTimeout(()=>{setVentaAbiertaInv(lista[0]); setVentasCodigoInv(null);},0);
+        return null;
+      }
+      if (ventaAbiertaInv) return (
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.55)",zIndex:1200,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}
+          onClick={()=>setVentaAbiertaInv(null)}>
+          <div style={{background:C.bg,borderRadius:16,padding:24,maxWidth:380,width:"100%",boxShadow:"0 8px 40px rgba(0,0,0,.3)"}}
+            onClick={e=>e.stopPropagation()}>
+            <div style={{fontSize:11,letterSpacing:.8,textTransform:"uppercase",color:C.label3,fontFamily:FONT_UI,marginBottom:4}}>Nota de venta</div>
+            <div style={{fontSize:15,fontWeight:700,color:C.label,fontFamily:FONT,marginBottom:16}}>{codigo}</div>
+            <div style={{marginBottom:8}}><span style={{color:C.label3,fontSize:12}}>Fecha: </span><span style={{fontWeight:600,fontSize:13}}>{ventaAbiertaInv.fecha}</span></div>
+            <div style={{marginBottom:8}}><span style={{color:C.label3,fontSize:12}}>Hora: </span><span style={{fontWeight:600,fontSize:13}}>{ventaAbiertaInv.hora||"—"}</span></div>
+            <div style={{marginBottom:8}}><span style={{color:C.label3,fontSize:12}}>Total: </span><span style={{fontWeight:600,fontSize:13}}>Bs {ventaAbiertaInv.total}</span></div>
+            <div style={{marginBottom:16}}><span style={{color:C.label3,fontSize:12}}>Pago: </span><span style={{fontWeight:600,fontSize:13}}>{ventaAbiertaInv.metodoPago||"—"}</span></div>
+            {ventaAbiertaInv.items?.map((it,i)=>(
+              <div key={i} style={{fontSize:12,color:C.label3,padding:"4px 0",borderTop:`1px solid ${C.sep}`}}>
+                {it.nombre} — Bs {it.precioUnit}
+              </div>
+            ))}
+            <div style={{display:"flex",gap:8,marginTop:16}}>
+              <button onClick={()=>{const mk=MARCAS.find(m=>m.id===ventaAbiertaInv.mk);verNotaVenta(ventaAbiertaInv, ventaAbiertaInv.numSecuencial||1);}}
+                style={{flex:1,padding:"10px 0",borderRadius:10,border:`1px solid ${C.gold}`,background:`${C.gold}10`,color:C.gold,fontFamily:FONT_UI,fontSize:13,cursor:"pointer"}}>
+                Ver nota completa
+              </button>
+              <button onClick={()=>setVentaAbiertaInv(null)}
+                style={{flex:1,padding:"10px 0",borderRadius:10,border:"none",background:C.bg2,color:C.label3,fontFamily:FONT_UI,fontSize:13,cursor:"pointer"}}>
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+      return (
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.55)",zIndex:1200,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}
+          onClick={()=>setVentasCodigoInv(null)}>
+          <div style={{background:C.bg,borderRadius:16,padding:24,maxWidth:360,width:"100%",boxShadow:"0 8px 40px rgba(0,0,0,.3)"}}
+            onClick={e=>e.stopPropagation()}>
+            <div style={{fontSize:11,letterSpacing:.8,textTransform:"uppercase",color:C.label3,fontFamily:FONT_UI,marginBottom:4}}>Ventas del código</div>
+            <div style={{fontSize:15,fontWeight:700,color:C.label,fontFamily:FONT,marginBottom:16}}>{codigo}</div>
+            {lista.map((v,i)=>(
+              <div key={v.id||i} onClick={()=>{setVentaAbiertaInv(v); setVentasCodigoInv(null);}}
+                style={{display:"flex",justifyContent:"space-between",alignItems:"center",
+                  padding:"12px 14px",borderRadius:10,marginBottom:8,cursor:"pointer",
+                  background:C.bg2,border:`1px solid ${C.sep}`}}>
+                <div>
+                  <div style={{fontSize:13,fontWeight:600,color:C.label,fontFamily:FONT}}>{v.fecha}</div>
+                  <div style={{fontSize:11,color:C.label3,fontFamily:FONT_UI,marginTop:2}}>{v.hora||""}</div>
+                </div>
+                <div style={{fontSize:14,fontWeight:700,color:C.label,fontFamily:FONT}}>Bs {v.total}</div>
+              </div>
+            ))}
+            <button onClick={()=>setVentasCodigoInv(null)}
+              style={{width:"100%",marginTop:8,padding:"10px 0",borderRadius:10,border:"none",
+                background:C.bg2,color:C.label3,fontFamily:FONT_UI,fontSize:13,cursor:"pointer"}}>
+              Cancelar
+            </button>
+          </div>
+        </div>
+      );
+    })()}
     </div>
   );
 }
