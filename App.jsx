@@ -13437,9 +13437,18 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
   const[cruceVerTodo,setCruceVerTodo]=useState(false); // mostrar todo el inventario en Cruce (incluye no contados como faltante)
 
   // ── Inventario base congelado al abrir el cierre ────────────────────
-  // Garantiza que "sistema" no cambie a mitad del conteo si entran ventas
-  const[baseInv]=useState(()=> inv.map(p=>({...p})));
+  // Ventas no modifican "sistema" a mitad del conteo.
+  // Importaciones nuevas sí aparecen de inmediato (useEffect abajo).
+  const[baseInv,setBaseInv]=useState(()=> inv.map(p=>({...p})));
   const[baseTs] =useState(()=> new Date());
+
+  useEffect(()=>{
+    setBaseInv(prev=>{
+      const ids=new Set(prev.map(p=>p.id));
+      const nuevos=inv.filter(p=>!ids.has(p.id));
+      return nuevos.length ? [...prev, ...nuevos.map(p=>({...p}))] : prev;
+    });
+  },[inv]);
 
   const productos = useMemo(()=> marcaSelec ? baseInv.filter(p=>p.marcaId===marcaSelec) : baseInv, [baseInv,marcaSelec]);
   const marcaSelNombre = marcaSelec ? (MARCAS.find(m=>m.id===marcaSelec)?.nombre||"") : "";

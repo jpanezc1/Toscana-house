@@ -36181,8 +36181,15 @@ ${sinStock.map((it) => {
     const [codAgregar, setCodAgregar] = (0, import_react.useState)("");
     const [msgAgregar, setMsgAgregar] = (0, import_react.useState)(null);
     const [cruceVerTodo, setCruceVerTodo] = (0, import_react.useState)(false);
-    const [baseInv] = (0, import_react.useState)(() => inv.map((p) => ({ ...p })));
+    const [baseInv, setBaseInv] = (0, import_react.useState)(() => inv.map((p) => ({ ...p })));
     const [baseTs] = (0, import_react.useState)(() => /* @__PURE__ */ new Date());
+    (0, import_react.useEffect)(() => {
+      setBaseInv((prev) => {
+        const ids = new Set(prev.map((p) => p.id));
+        const nuevos = inv.filter((p) => !ids.has(p.id));
+        return nuevos.length ? [...prev, ...nuevos.map((p) => ({ ...p }))] : prev;
+      });
+    }, [inv]);
     const productos = (0, import_react.useMemo)(() => marcaSelec ? baseInv.filter((p) => p.marcaId === marcaSelec) : baseInv, [baseInv, marcaSelec]);
     const marcaSelNombre = marcaSelec ? MARCAS.find((m) => m.id === marcaSelec)?.nombre || "" : "";
     const enAlcance = (p) => !marcaSelec || p?.marcaId === marcaSelec;
