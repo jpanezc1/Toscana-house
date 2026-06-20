@@ -25079,6 +25079,9 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
 </body></html>`);
     win.document.close();
   }
+  function verNotaRetiro(r) {
+    abrirNotaRetiro(r, false);
+  }
   function imprimirNotaRetiro(r) {
     abrirNotaRetiro(r, true);
   }
@@ -30170,7 +30173,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       ))))))
     );
   }
-  function BrandPortal({ user, ventas, inv, cargas, logout }) {
+  function BrandPortal({ user, ventas, inv, cargas, retiros = [], logout }) {
     const isDesktop = useIsDesktop();
     const now = /* @__PURE__ */ new Date();
     const [mes, setMes] = (0, import_react.useState)(now.getMonth());
@@ -30428,12 +30431,13 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
     const PORTAL_TABS = [
       { id: "dashboard", icon: "\u229E", label: "Inicio" },
       { id: "ventas", icon: "\u25C8", label: "Ventas" },
+      { id: "retiros", icon: "\u{1F4E4}", label: "Retiros" },
       { id: "inventario", icon: "\u25EB", label: "Inventario" },
       { id: "cargas", icon: "\u25C9", label: "Cargas" },
       { id: "liquidacion", icon: "\u25CE", label: "Liquidar" }
     ];
     const BRAND_GROUPS = [
-      { label: "Principal", ids: ["dashboard", "ventas"] },
+      { label: "Principal", ids: ["dashboard", "ventas", "retiros"] },
       { label: "Gesti\xF3n", ids: ["inventario", "cargas", "liquidacion"] }
     ];
     const BRAND_DOT = {
@@ -31100,7 +31104,54 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
         fontFamily: FONT,
         letterSpacing: "-0.02em"
       } }, p.stockInicial || stockReal + vendTot || "\u2014"))));
-    })))), tab === "cargas" && /* @__PURE__ */ import_react.default.createElement(RegistroCargas, { cargas: cargas || [], marcas: MARCAS, marcaId: mid }), tab === "liquidacion" && /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 24 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+    })))), tab === "retiros" && (() => {
+      const retirosMarca = retiros.filter((r) => {
+        if (Number(r.marcaId) === mid) return true;
+        if (r.marcaNombre && marca && r.marcaNombre.toLowerCase() === marca.nombre.toLowerCase()) return true;
+        const prod = inv.find((p) => p.codigo === r.codigo);
+        return prod ? Number(prod.marcaId) === mid : false;
+      }).slice().reverse();
+      return /* @__PURE__ */ import_react.default.createElement("div", { style: {
+        background: C.bg1,
+        borderRadius: 16,
+        padding: 20,
+        border: `1px solid ${C.sep}`,
+        boxShadow: "0 1px 4px rgba(0,0,0,0.06)"
+      } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+        fontSize: 16,
+        fontWeight: 700,
+        color: C.label,
+        fontFamily: FONT,
+        marginBottom: 16,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between"
+      } }, /* @__PURE__ */ import_react.default.createElement("span", null, "\u{1F4E4} Retiros \u2014 ", marca?.nombre), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, color: C.label3, fontWeight: 400 } }, retirosMarca.length, " retiro", retirosMarca.length !== 1 ? "s" : "")), retirosMarca.length === 0 ? /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center", padding: 30, color: C.label3, fontFamily: FONT, fontSize: 13 } }, "Sin retiros registrados para esta marca") : retirosMarca.map((r, ri) => /* @__PURE__ */ import_react.default.createElement("div", { key: r.id, style: {
+        borderBottom: ri < retirosMarca.length - 1 ? `1px solid ${C.sep}` : "none",
+        padding: "12px 0",
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "flex-start",
+        gap: 12
+      } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 14, fontWeight: 600, color: C.label, fontFamily: FONT } }, r.nombre), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT, marginTop: 2 } }, r.codigo, " \xB7 \xD7", r.cantidad), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.blue, fontFamily: FONT, marginTop: 3, fontWeight: 500 } }, "Para: ", r.destinatario), r.motivo && /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT, marginTop: 2, fontStyle: "italic" } }, r.motivo)), /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "right", flexShrink: 0 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, fontFamily: "monospace", color: C.amber, fontWeight: 600 } }, r.fecha), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT } }, r.hora), /* @__PURE__ */ import_react.default.createElement("div", { style: { marginTop: 4 } }, /* @__PURE__ */ import_react.default.createElement(
+        "button",
+        {
+          onClick: () => verNotaRetiro(r),
+          style: {
+            background: `${C.amber}18`,
+            color: C.amber,
+            border: "none",
+            fontSize: 10,
+            fontWeight: 700,
+            padding: "3px 8px",
+            borderRadius: 20,
+            fontFamily: FONT,
+            cursor: "pointer"
+          }
+        },
+        "\u{1F4C4} Nota"
+      ))))));
+    })(), tab === "cargas" && /* @__PURE__ */ import_react.default.createElement(RegistroCargas, { cargas: cargas || [], marcas: MARCAS, marcaId: mid }), tab === "liquidacion" && /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 24 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
       fontSize: 10,
       letterSpacing: 1.2,
       textTransform: "uppercase",
@@ -34013,7 +34064,7 @@ Motivo: ${motivo}` : ""}`)) {
       fontFamily: FONT
     } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center", color: "#999" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 28, marginBottom: 12 } }, "\u{1F510}"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 14 } }, "Verificando sesi\xF3n\u2026")));
     if (!user) return /* @__PURE__ */ import_react.default.createElement(LoginScreen, { onLogin: login });
-    if (user.rol === "marca") return /* @__PURE__ */ import_react.default.createElement(BrandPortal, { user, ventas, inv, cargas: cargasCompletas, logout });
+    if (user.rol === "marca") return /* @__PURE__ */ import_react.default.createElement(BrandPortal, { user, ventas, inv, cargas: cargasCompletas, retiros, logout });
     const _liqPagos = sumPagos(vMes);
     const liqEf = _liqPagos.efectivo;
     const liqQr = _liqPagos.qr;

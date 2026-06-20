@@ -8379,7 +8379,7 @@ function BrandVentaModal({venta, marca, onClose}){
   );
 }
 
-function BrandPortal({user, ventas, inv, cargas, logout}){
+function BrandPortal({user, ventas, inv, cargas, retiros=[], logout}){
   // ── TODOS los hooks ANTES de cualquier return condicional ──
   const isDesktop = useIsDesktop();
   const now = new Date();
@@ -8638,12 +8638,13 @@ function BrandPortal({user, ventas, inv, cargas, logout}){
   const PORTAL_TABS=[
     {id:"dashboard",  icon:"⊞", label:"Inicio"},
     {id:"ventas",     icon:"◈", label:"Ventas"},
+    {id:"retiros",    icon:"📤", label:"Retiros"},
     {id:"inventario", icon:"◫", label:"Inventario"},
     {id:"cargas",     icon:"◉", label:"Cargas"},
     {id:"liquidacion",icon:"◎", label:"Liquidar"},
   ];
   const BRAND_GROUPS=[
-    {label:"Principal", ids:["dashboard","ventas"]},
+    {label:"Principal", ids:["dashboard","ventas","retiros"]},
     {label:"Gestión",   ids:["inventario","cargas","liquidacion"]},
   ];
   const BRAND_DOT={
@@ -9141,6 +9142,66 @@ function BrandPortal({user, ventas, inv, cargas, logout}){
             }
           </div>
         )}
+
+        {/* ══ RETIROS ══ */}
+        {tab==="retiros"&&(()=>{
+          const retirosMarca = retiros.filter(r=>{
+            if(Number(r.marcaId)===mid) return true;
+            if(r.marcaNombre && marca && r.marcaNombre.toLowerCase()===marca.nombre.toLowerCase()) return true;
+            const prod = inv.find(p=>p.codigo===r.codigo);
+            return prod ? Number(prod.marcaId)===mid : false;
+          }).slice().reverse();
+          return (
+            <div style={{background:C.bg1,borderRadius:16,padding:20,
+              border:`1px solid ${C.sep}`,boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}>
+              <div style={{fontSize:16,fontWeight:700,color:C.label,fontFamily:FONT,marginBottom:16,
+                display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+                <span>📤 Retiros — {marca?.nombre}</span>
+                <span style={{fontSize:13,color:C.label3,fontWeight:400}}>{retirosMarca.length} retiro{retirosMarca.length!==1?"s":""}</span>
+              </div>
+              {retirosMarca.length===0
+                ? <div style={{textAlign:"center",padding:30,color:C.label3,fontFamily:FONT,fontSize:13}}>
+                    Sin retiros registrados para esta marca
+                  </div>
+                : retirosMarca.map((r,ri)=>(
+                  <div key={r.id} style={{
+                    borderBottom:ri<retirosMarca.length-1?`1px solid ${C.sep}`:"none",
+                    padding:"12px 0",display:"flex",justifyContent:"space-between",
+                    alignItems:"flex-start",gap:12}}>
+                    <div style={{flex:1}}>
+                      <div style={{fontSize:14,fontWeight:600,color:C.label,fontFamily:FONT}}>
+                        {r.nombre}
+                      </div>
+                      <div style={{fontSize:12,color:C.label3,fontFamily:FONT,marginTop:2}}>
+                        {r.codigo} · ×{r.cantidad}
+                      </div>
+                      <div style={{fontSize:12,color:C.blue,fontFamily:FONT,marginTop:3,fontWeight:500}}>
+                        Para: {r.destinatario}
+                      </div>
+                      {r.motivo&&<div style={{fontSize:11,color:C.label3,fontFamily:FONT,marginTop:2,fontStyle:"italic"}}>
+                        {r.motivo}
+                      </div>}
+                    </div>
+                    <div style={{textAlign:"right",flexShrink:0}}>
+                      <div style={{fontSize:12,fontFamily:"monospace",color:C.amber,fontWeight:600}}>
+                        {r.fecha}
+                      </div>
+                      <div style={{fontSize:11,color:C.label3,fontFamily:FONT}}>{r.hora}</div>
+                      <div style={{marginTop:4}}>
+                        <button onClick={()=>verNotaRetiro(r)}
+                          style={{background:`${C.amber}18`,color:C.amber,border:"none",
+                            fontSize:10,fontWeight:700,padding:"3px 8px",borderRadius:20,
+                            fontFamily:FONT,cursor:"pointer"}}>
+                          📄 Nota
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              }
+            </div>
+          );
+        })()}
 
         {/* ══ CARGAS — trazabilidad de cargas a inventario de esta marca ══ */}
         {tab==="cargas"&&(
@@ -11573,7 +11634,7 @@ function App(){
   if (!user) return <LoginScreen onLogin={login}/>;
 
   // Portal de marca (lectura)
-  if (user.rol === "marca") return <BrandPortal user={user} ventas={ventas} inv={inv} cargas={cargasCompletas} logout={logout}/>;
+  if (user.rol === "marca") return <BrandPortal user={user} ventas={ventas} inv={inv} cargas={cargasCompletas} retiros={retiros} logout={logout}/>;
 
   // ── Liquidaciones: métricas pre-calculadas — mixto distribuido ─────────────
   const _liqPagos   = sumPagos(vMes);
