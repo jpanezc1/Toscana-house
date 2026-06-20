@@ -38517,7 +38517,7 @@ Se registrar\xE1 que los faltantes/sobrantes fueron verificados f\xEDsicamente y
         const mk = `${parts[0]}-${parts[1].padStart(2, "0")}`;
         if (!mkSet.has(mk)) {
           mkSet.add(mk);
-          base.push({ mk, mes: parseInt(parts[1]), anio: parseInt(parts[0]), ventas: [], bruto: 0 });
+          base.push({ mk, mes: parseInt(parts[1]) - 1, anio: parseInt(parts[0]), ventas: [], bruto: 0 });
         }
       });
       return base.sort((a, b) => b.mk.localeCompare(a.mk));
@@ -38624,7 +38624,7 @@ Se registrar\xE1 que los faltantes/sobrantes fueron verificados f\xEDsicamente y
     } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 15, fontWeight: 600, color: C.label, fontFamily: FONT, letterSpacing: ".3px" } }, MESES[periodo.mes], " ", periodo.anio), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 11, color: C.label3, fontFamily: FONT_UI, marginLeft: 10, opacity: 0.6 } }, (() => {
       const nRet = retirosMarca.filter((r) => {
         const p = (r.fecha || "").split("-");
-        return p.length >= 2 && parseInt(p[1]) === periodo.mes && parseInt(p[0]) === periodo.anio;
+        return p.length >= 2 && parseInt(p[1]) - 1 === periodo.mes && parseInt(p[0]) === periodo.anio;
       }).length;
       return `${periodo.ventas.length} venta${periodo.ventas.length !== 1 ? "s" : ""}${nRet > 0 ? ` \xB7 ${nRet} retiro${nRet !== 1 ? "s" : ""}` : ""}`;
     })())), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } }, cierres[`${periodo.mk}-${marcaId}`]?.cerrado && /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 10, color: C.green, fontFamily: FONT_UI, letterSpacing: 0.5 } }, "\u2713 CERRADO"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 17, fontWeight: 700, color: C.label, fontFamily: FONT, letterSpacing: "-0.02em" } }, $(periodo.bruto)))), (() => {
@@ -38632,7 +38632,7 @@ Se registrar\xE1 que los faltantes/sobrantes fueron verificados f\xEDsicamente y
         const d = r.fecha || "";
         const parts = d.split("-");
         if (parts.length < 2) return false;
-        return parseInt(parts[1]) === periodo.mes && parseInt(parts[0]) === periodo.anio;
+        return parseInt(parts[1]) - 1 === periodo.mes && parseInt(parts[0]) === periodo.anio;
       });
       const items = [
         ...periodo.ventas.map((v) => ({ tipo: "venta", fecha: v.fecha, hora: v.hora || "", data: v })),

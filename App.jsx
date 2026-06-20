@@ -15416,7 +15416,7 @@ function MarcaDetalle({marcaId,inv,ventas,vMes,mes,anio,MK,cierres,setCierres,ge
       const mk = `${parts[0]}-${parts[1].padStart(2,"0")}`;
       if(!mkSet.has(mk)){
         mkSet.add(mk);
-        base.push({mk, mes:parseInt(parts[1]), anio:parseInt(parts[0]), ventas:[], bruto:0});
+        base.push({mk, mes:parseInt(parts[1])-1, anio:parseInt(parts[0]), ventas:[], bruto:0});
       }
     });
     return base.sort((a,b)=>b.mk.localeCompare(a.mk));
@@ -15509,7 +15509,7 @@ function MarcaDetalle({marcaId,inv,ventas,vMes,mes,anio,MK,cierres,setCierres,ge
                         {(()=>{
                           const nRet=retirosMarca.filter(r=>{
                             const p=(r.fecha||"").split("-");
-                            return p.length>=2&&parseInt(p[1])===periodo.mes&&parseInt(p[0])===periodo.anio;
+                            return p.length>=2&&(parseInt(p[1])-1)===periodo.mes&&parseInt(p[0])===periodo.anio;
                           }).length;
                           return `${periodo.ventas.length} venta${periodo.ventas.length!==1?"s":""}${nRet>0?` · ${nRet} retiro${nRet!==1?"s":""}`:""}`
                         })()}
@@ -15526,11 +15526,12 @@ function MarcaDetalle({marcaId,inv,ventas,vMes,mes,anio,MK,cierres,setCierres,ge
                   </div>
                   {/* Ventas + Retiros mezclados por fecha */}
                   {(()=>{
-                    const retirosPeriodo = retirosMarca.filter(r=>{
+                                    const retirosPeriodo = retirosMarca.filter(r=>{
                       const d = r.fecha||"";
                       const parts = d.split("-");
                       if(parts.length<2) return false;
-                      return parseInt(parts[1])===periodo.mes && parseInt(parts[0])===periodo.anio;
+                      // periodo.mes es 0-indexed (Ene=0), parts[1] es "06" → 6
+                      return (parseInt(parts[1])-1)===periodo.mes && parseInt(parts[0])===periodo.anio;
                     });
                     const items = [
                       ...periodo.ventas.map(v=>({tipo:"venta",fecha:v.fecha,hora:v.hora||"",data:v})),
