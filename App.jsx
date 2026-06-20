@@ -5902,7 +5902,7 @@ function CameraScanner({onDetect, onClose, continuous, feedback, stats}){
       const codigo = await leerCodigoDeImagen(f);
       if(codigo){
         const ok = onDetect(codigo);
-        if(ok===false) beepError(); else beep();
+        if(ok!=="handled"){if(ok===false) beepError(); else beep();}
         setModo(continuous?"foto":"leyendo");
       } else {
         setScanMsg("No se detectó código — intenta de nuevo");
@@ -5957,7 +5957,7 @@ function CameraScanner({onDetect, onClose, continuous, feedback, stats}){
           if(res&&!firedRef.current){
             firedRef.current=true;
             const ok = onDetect(res.getText());
-            if(ok===false) beepError(); else beep();
+            if(ok!=="handled"){if(ok===false) beepError(); else beep();}
             if(continuous){
               cooldownRef.current=setTimeout(()=>{firedRef.current=false;},1300);
             }else{
@@ -6289,7 +6289,7 @@ function LectorHID({onDetect, onClose, onReiniciar, feedback, stats, rows, marca
     if(idleRef.current) clearTimeout(idleRef.current);
     if(code.length<2) return; // ignora ruido / Enter vacío
     const ok = onDetect(code);
-    if(ok===false) beepError(); else beep();
+    if(ok!=="handled"){if(ok===false) beepError(); else beep();}
   }
 
   function onChange(e){
@@ -12614,12 +12614,15 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
         title:`Repetido · ${(p.nombre||"").toUpperCase()}`, sub:`${p.codigo} · ${motivo}`});
       return false;
     }
-    setLiveFeedback({ts:Date.now(),ok:true,code:p.codigo,repetido:r.repetido,
+    // Sonido según resultado: negativo (aún faltante) → error, confirmado → positivo
+    const confirmado = r.cantNueva >= r.sistemaP;
+    if(confirmado) beep(); else beepError();
+    setLiveFeedback({ts:Date.now(),ok:confirmado,code:p.codigo,repetido:r.repetido,
       title:(p.nombre||"").toUpperCase(),
       sub: r.repetido
         ? `Repetido OK · unidad ${r.cantNueva} de ${r.sistemaP}`
-        : `${p.codigo} · contabilizado (1 de ${r.sistemaP})`});
-    return true;
+        : `${p.codigo} · contabilizado (${r.cantNueva} de ${r.sistemaP})`});
+    return "handled";
   }
 
   function reiniciarConteo(){
@@ -12762,19 +12765,22 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
       return {...prev,[r.id]:nuevo};
     });
     if(nuevo===r.contado){
+      beep();
       setLiveFeedback({ts:Date.now(),ok:true,code:r.codigo,
         title:`✓ Verificado · ${(r.nombre||"").toUpperCase()}`,
         sub:`Doble conteo coincide: ${nuevo} unidad${nuevo!==1?"es":""}`});
     }else if(nuevo>r.contado){
+      beepError();
       setLiveFeedback({ts:Date.now(),ok:false,code:r.codigo,repetido:true,
         title:`⚠ No coincide · ${(r.nombre||"").toUpperCase()}`,
         sub:`1ra pasada: ${r.contado} · 2da pasada: ${nuevo} — recontar`});
     }else{
+      beep();
       setLiveFeedback({ts:Date.now(),ok:true,code:r.codigo,
         title:(r.nombre||"").toUpperCase(),
         sub:`Verificando… ${nuevo} de ${r.contado}`});
     }
-    return true;
+    return "handled";
   }
 
   function confirmarCierre(){
