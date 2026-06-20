@@ -3894,6 +3894,10 @@ function DesktopSidebar({tabs, active, onChange, user, logout, groups: customGro
     }}>
       {/* Logo */}
       <div style={{padding:"22px 22px 18px",borderBottom:`1px solid ${C.sep}`,flexShrink:0}}>
+        <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:10}}>
+          <span style={{fontSize:10.5,color:C.label3,letterSpacing:".22em",fontFamily:FONT_DISPLAY,fontWeight:500,textTransform:"uppercase"}}>Powered by</span>
+          <span style={{fontSize:15.6,fontWeight:800,color:"#28282f",letterSpacing:"-0.04em",fontFamily:FONT_DISPLAY,lineHeight:1}}>FORGE<span style={{color:"#9b8fa0"}}>.</span></span>
+        </div>
         <div style={{fontFamily:FONT_DISPLAY,fontSize:22,fontWeight:400,color:C.label,letterSpacing:".14em",lineHeight:1}}>T H</div>
         <div style={{fontSize:9,letterSpacing:".22em",textTransform:"uppercase",color:C.label3,marginTop:3}}>Casa de Moda</div>
       </div>
