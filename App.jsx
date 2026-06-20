@@ -15413,18 +15413,35 @@ function MarcaDetalle({marcaId,inv,ventas,vMes,mes,anio,MK,cierres,setCierres,ge
       (r.codigo && p.codigo && limpiarCod(p.codigo)===limpiarCod(r.codigo)));
     return prod ? Number(prod.marcaId)===Number(marcaId) : false;
   });
+  // Parsea fecha en formato ISO "2026-06-13" O "13/6/2026" → {anio, mes0, mk}
+  function parseFechaRetiro(fecha){
+    if(!fecha) return null;
+    if(fecha.includes("-")){
+      const p = fecha.split("-");
+      if(p.length<2) return null;
+      // ISO: YYYY-MM-DD
+      const anio=parseInt(p[0]), mes1=parseInt(p[1]);
+      if(anio>1000) return {anio, mes0:mes1-1, mk:`${p[0]}-${p[1].padStart(2,"0")}`};
+    }
+    if(fecha.includes("/")){
+      const p = fecha.split("/");
+      if(p.length<3) return null;
+      // DD/M/YYYY o DD/MM/YYYY
+      const anio=parseInt(p[2]), mes1=parseInt(p[1]);
+      return {anio, mes0:mes1-1, mk:`${p[2]}-${String(mes1).padStart(2,"0")}`};
+    }
+    return null;
+  }
   // Períodos adicionales que solo tienen retiros (sin ventas registradas)
   const histConRetiros = (()=>{
-    const base = historial.map(h=>({...h})); // copia para no mutar
+    const base = historial.map(h=>({...h}));
     const mkSet = new Set(base.map(h=>h.mk));
     retirosMarca.forEach(r=>{
-      const d = r.fecha||"";
-      const parts = d.split("-");
-      if(parts.length<2) return;
-      const mk = `${parts[0]}-${parts[1].padStart(2,"0")}`;
-      if(!mkSet.has(mk)){
-        mkSet.add(mk);
-        base.push({mk, mes:parseInt(parts[1])-1, anio:parseInt(parts[0]), ventas:[], bruto:0});
+      const pf = parseFechaRetiro(r.fecha);
+      if(!pf) return;
+      if(!mkSet.has(pf.mk)){
+        mkSet.add(pf.mk);
+        base.push({mk:pf.mk, mes:pf.mes0, anio:pf.anio, ventas:[], bruto:0});
       }
     });
     return base.sort((a,b)=>b.mk.localeCompare(a.mk));
@@ -15516,8 +15533,8 @@ function MarcaDetalle({marcaId,inv,ventas,vMes,mes,anio,MK,cierres,setCierres,ge
                       <span style={{fontSize:11,color:C.label3,fontFamily:FONT_UI,marginLeft:10,opacity:.6}}>
                         {(()=>{
                           const nRet=retirosMarca.filter(r=>{
-                            const p=(r.fecha||"").split("-");
-                            return p.length>=2&&(parseInt(p[1])-1)===periodo.mes&&parseInt(p[0])===periodo.anio;
+                            const pf=parseFechaRetiro(r.fecha);
+                            return pf&&pf.mes0===periodo.mes&&pf.anio===periodo.anio;
                           }).length;
                           return `${periodo.ventas.length} venta${periodo.ventas.length!==1?"s":""}${nRet>0?` · ${nRet} retiro${nRet!==1?"s":""}`:""}`
                         })()}
@@ -15535,11 +15552,9 @@ function MarcaDetalle({marcaId,inv,ventas,vMes,mes,anio,MK,cierres,setCierres,ge
                   {/* Ventas + Retiros mezclados por fecha */}
                   {(()=>{
                                     const retirosPeriodo = retirosMarca.filter(r=>{
-                      const d = r.fecha||"";
-                      const parts = d.split("-");
-                      if(parts.length<2) return false;
-                      // periodo.mes es 0-indexed (Ene=0), parts[1] es "06" → 6
-                      return (parseInt(parts[1])-1)===periodo.mes && parseInt(parts[0])===periodo.anio;
+                      const pf = parseFechaRetiro(r.fecha);
+                      if(!pf) return false;
+                      return pf.mes0===periodo.mes && pf.anio===periodo.anio;
                     });
                     const items = [
                       ...periodo.ventas.map(v=>({tipo:"venta",fecha:v.fecha,hora:v.hora||"",data:v})),

@@ -38512,17 +38512,31 @@ Se registrar\xE1 que los faltantes/sobrantes fueron verificados f\xEDsicamente y
       const prod = inv.find((p) => p.codigo === r.codigo || r.codigo && p.codigo && limpiarCod(p.codigo) === limpiarCod(r.codigo));
       return prod ? Number(prod.marcaId) === Number(marcaId) : false;
     });
+    function parseFechaRetiro(fecha) {
+      if (!fecha) return null;
+      if (fecha.includes("-")) {
+        const p = fecha.split("-");
+        if (p.length < 2) return null;
+        const anio2 = parseInt(p[0]), mes1 = parseInt(p[1]);
+        if (anio2 > 1e3) return { anio: anio2, mes0: mes1 - 1, mk: `${p[0]}-${p[1].padStart(2, "0")}` };
+      }
+      if (fecha.includes("/")) {
+        const p = fecha.split("/");
+        if (p.length < 3) return null;
+        const anio2 = parseInt(p[2]), mes1 = parseInt(p[1]);
+        return { anio: anio2, mes0: mes1 - 1, mk: `${p[2]}-${String(mes1).padStart(2, "0")}` };
+      }
+      return null;
+    }
     const histConRetiros = (() => {
       const base = historial.map((h) => ({ ...h }));
       const mkSet = new Set(base.map((h) => h.mk));
       retirosMarca.forEach((r) => {
-        const d = r.fecha || "";
-        const parts = d.split("-");
-        if (parts.length < 2) return;
-        const mk = `${parts[0]}-${parts[1].padStart(2, "0")}`;
-        if (!mkSet.has(mk)) {
-          mkSet.add(mk);
-          base.push({ mk, mes: parseInt(parts[1]) - 1, anio: parseInt(parts[0]), ventas: [], bruto: 0 });
+        const pf = parseFechaRetiro(r.fecha);
+        if (!pf) return;
+        if (!mkSet.has(pf.mk)) {
+          mkSet.add(pf.mk);
+          base.push({ mk: pf.mk, mes: pf.mes0, anio: pf.anio, ventas: [], bruto: 0 });
         }
       });
       return base.sort((a, b) => b.mk.localeCompare(a.mk));
@@ -38628,16 +38642,15 @@ Se registrar\xE1 que los faltantes/sobrantes fueron verificados f\xEDsicamente y
       marginBottom: 0
     } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 15, fontWeight: 600, color: C.label, fontFamily: FONT, letterSpacing: ".3px" } }, MESES[periodo.mes], " ", periodo.anio), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 11, color: C.label3, fontFamily: FONT_UI, marginLeft: 10, opacity: 0.6 } }, (() => {
       const nRet = retirosMarca.filter((r) => {
-        const p = (r.fecha || "").split("-");
-        return p.length >= 2 && parseInt(p[1]) - 1 === periodo.mes && parseInt(p[0]) === periodo.anio;
+        const pf = parseFechaRetiro(r.fecha);
+        return pf && pf.mes0 === periodo.mes && pf.anio === periodo.anio;
       }).length;
       return `${periodo.ventas.length} venta${periodo.ventas.length !== 1 ? "s" : ""}${nRet > 0 ? ` \xB7 ${nRet} retiro${nRet !== 1 ? "s" : ""}` : ""}`;
     })())), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } }, cierres[`${periodo.mk}-${marcaId}`]?.cerrado && /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 10, color: C.green, fontFamily: FONT_UI, letterSpacing: 0.5 } }, "\u2713 CERRADO"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 17, fontWeight: 700, color: C.label, fontFamily: FONT, letterSpacing: "-0.02em" } }, $(periodo.bruto)))), (() => {
       const retirosPeriodo = retirosMarca.filter((r) => {
-        const d = r.fecha || "";
-        const parts = d.split("-");
-        if (parts.length < 2) return false;
-        return parseInt(parts[1]) - 1 === periodo.mes && parseInt(parts[0]) === periodo.anio;
+        const pf = parseFechaRetiro(r.fecha);
+        if (!pf) return false;
+        return pf.mes0 === periodo.mes && pf.anio === periodo.anio;
       });
       const items = [
         ...periodo.ventas.map((v) => ({ tipo: "venta", fecha: v.fecha, hora: v.hora || "", data: v })),
