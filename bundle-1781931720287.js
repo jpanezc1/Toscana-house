@@ -37588,13 +37588,32 @@ Se registrar\xE1 que los faltantes/sobrantes fueron verificados f\xEDsicamente y
     function abrirVentasPorCodigoInv(prod) {
       const lista = ventas.filter((v) => v.items.some((it) => it.prodId === prod.id || it.codigo === prod.codigo));
       if (lista.length === 0) return;
+      const sorted = lista.slice().sort((a, b) => b.fecha.localeCompare(a.fecha));
       if (lista.length === 1) {
-        setVentasCodigoInv({ codigo: prod.codigo, lista, abrirUna: true });
+        setVentaAbiertaInv({ ...sorted[0], _codigoOrigen: prod.codigo });
         return;
       }
-      setVentasCodigoInv({ codigo: prod.codigo, lista: lista.slice().sort((a, b) => b.fecha.localeCompare(a.fecha)) });
+      setVentasCodigoInv({ codigo: prod.codigo, lista: sorted });
     }
     const [ventaAbiertaInv, setVentaAbiertaInv] = (0, import_react.useState)(null);
+    const dragRef = import_react.default.useRef({ dragging: false, ox: 0, oy: 0, x: null, y: null });
+    const [dragPos, setDragPos] = import_react.default.useState(null);
+    function onDragStart(e) {
+      const el = e.currentTarget.closest("[data-drag-window]");
+      const rect = el.getBoundingClientRect();
+      dragRef.current = { dragging: true, ox: e.clientX - rect.left, oy: e.clientY - rect.top };
+      const onMove = (ev) => {
+        if (!dragRef.current.dragging) return;
+        setDragPos({ x: ev.clientX - dragRef.current.ox, y: ev.clientY - dragRef.current.oy });
+      };
+      const onUp = () => {
+        dragRef.current.dragging = false;
+        window.removeEventListener("mousemove", onMove);
+        window.removeEventListener("mouseup", onUp);
+      };
+      window.addEventListener("mousemove", onMove);
+      window.addEventListener("mouseup", onUp);
+    }
     const productos = (0, import_react.useMemo)(() => {
       const q = invBusq.trim().toUpperCase();
       const hayFiltro2 = q || invFechaDesde || invFechaHasta;
@@ -38002,37 +38021,60 @@ Se registrar\xE1 que los faltantes/sobrantes fueron verificados f\xEDsicamente y
       const cerrarTodo = () => {
         setVentaAbiertaInv(null);
         setVentasCodigoInv(null);
+        setDragPos(null);
       };
-      const codigo = ventasCodigoInv?.codigo || ventaAbiertaInv?._codigoOrigen || "";
-      const SheetOverlay = ({ onClose, children }) => /* @__PURE__ */ import_react.default.createElement(
+      const codigo = ventaAbiertaInv?._codigoOrigen || ventasCodigoInv?.codigo || "";
+      const winStyle = {
+        position: "fixed",
+        left: dragPos ? dragPos.x : "50%",
+        top: dragPos ? dragPos.y : "50%",
+        transform: dragPos ? "none" : "translate(-50%,-50%)",
+        width: 380,
+        zIndex: 1300,
+        background: C.bg,
+        border: `1px solid ${C.sep}`,
+        borderRadius: 14,
+        overflow: "hidden",
+        userSelect: "none"
+      };
+      const titleBar = (label, onClose) => /* @__PURE__ */ import_react.default.createElement(
         "div",
         {
-          onClick: onClose,
+          onMouseDown: onDragStart,
           style: {
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0,0,0,.72)",
-            zIndex: 1200,
             display: "flex",
-            alignItems: "flex-end",
-            justifyContent: "center"
+            justifyContent: "space-between",
+            alignItems: "center",
+            padding: "11px 14px",
+            background: C.bg2,
+            borderBottom: `1px solid ${C.sep}`,
+            cursor: "grab"
           }
         },
+        /* @__PURE__ */ import_react.default.createElement("span", { style: {
+          fontSize: 11,
+          fontWeight: 700,
+          letterSpacing: 1,
+          textTransform: "uppercase",
+          color: C.label3,
+          fontFamily: FONT_UI
+        } }, label),
         /* @__PURE__ */ import_react.default.createElement(
-          "div",
+          "button",
           {
-            onClick: (e) => e.stopPropagation(),
+            onClick: onClose,
             style: {
-              background: C.bg,
-              borderRadius: "20px 20px 0 0",
-              width: "100%",
-              borderTop: `0.5px solid ${C.sep}`,
-              borderLeft: `0.5px solid ${C.sep}`,
-              borderRight: `0.5px solid ${C.sep}`
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              color: C.label3,
+              fontSize: 16,
+              lineHeight: 1,
+              padding: "2px 4px",
+              borderRadius: 4
             }
           },
-          /* @__PURE__ */ import_react.default.createElement("div", { style: { width: 36, height: 4, background: C.sep, borderRadius: 2, margin: "12px auto 0" } }),
-          children
+          "\u2715"
         )
       );
       if (ventaAbiertaInv) {
@@ -38040,105 +38082,79 @@ Se registrar\xE1 que los faltantes/sobrantes fueron verificados f\xEDsicamente y
         const itemDelCodigo = v.items?.find((it) => it.codigo === codigo);
         const vendedor = v.vendedor || "\u2014";
         const iniciales = vendedor !== "\u2014" ? vendedor.trim().split(/\s+/).map((w) => w[0]).join("").toUpperCase().slice(0, 2) : "\u2014";
-        return /* @__PURE__ */ import_react.default.createElement(SheetOverlay, { onClose: cerrarTodo }, /* @__PURE__ */ import_react.default.createElement("div", { style: { padding: "16px 20px 10px", display: "flex", justifyContent: "space-between", alignItems: "flex-start", borderBottom: `0.5px solid ${C.sep}` } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1, minWidth: 0, paddingRight: 12 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, letterSpacing: 0.7, textTransform: "uppercase", color: C.label3, fontFamily: FONT_UI, marginBottom: 3 } }, "Nota de venta"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 15, fontWeight: 700, color: C.label, fontFamily: FONT, lineHeight: 1.3, marginBottom: 5 } }, itemDelCodigo?.nombre || codigo), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 11, color: C.label3, fontFamily: "monospace", background: C.bg2, padding: "2px 8px", borderRadius: 5 } }, codigo)), /* @__PURE__ */ import_react.default.createElement(
-          "button",
-          {
-            onClick: cerrarTodo,
-            style: {
-              background: C.bg2,
-              border: "none",
-              borderRadius: "50%",
-              width: 30,
-              height: 30,
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              flexShrink: 0,
-              color: C.label3,
-              fontSize: 16
-            }
-          },
-          "\u2715"
-        )), /* @__PURE__ */ import_react.default.createElement("div", { style: {
-          padding: "16px 20px",
-          borderBottom: `0.5px solid ${C.sep}`,
-          display: "grid",
-          gridTemplateColumns: "1fr 1fr",
-          gap: 16
-        } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, textTransform: "uppercase", letterSpacing: 0.6, color: C.label3, fontFamily: FONT_UI, marginBottom: 3 } }, "Fecha"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 14, fontWeight: 700, color: C.label, fontFamily: FONT } }, v.fecha), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT_UI, marginTop: 2 } }, v.hora || "\u2014")), /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, textTransform: "uppercase", letterSpacing: 0.6, color: C.label3, fontFamily: FONT_UI, marginBottom: 6 } }, "Vendi\xF3"), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
-          width: 32,
-          height: 32,
+        return /* @__PURE__ */ import_react.default.createElement("div", { "data-drag-window": true, style: winStyle }, titleBar("Nota de venta", cerrarTodo), /* @__PURE__ */ import_react.default.createElement("div", { style: { padding: "16px 18px", borderBottom: `1px solid ${C.sep}` } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, fontWeight: 700, color: C.label, fontFamily: FONT, lineHeight: 1.35, marginBottom: 6 } }, itemDelCodigo?.nombre || codigo), /* @__PURE__ */ import_react.default.createElement("span", { style: {
+          fontSize: 10,
+          fontFamily: "monospace",
+          color: C.label3,
+          background: C.bg2,
+          padding: "2px 8px",
+          borderRadius: 5,
+          border: `1px solid ${C.sep}`
+        } }, codigo)), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 0 } }, [
+          { label: "Fecha", val: v.fecha, sub: v.hora || "\u2014" },
+          { label: "Vendi\xF3", vendedor, iniciales },
+          { label: "Total", val: `Bs ${v.total}` },
+          { label: "M\xE9todo de pago", val: v.metodoPago || "\u2014" }
+        ].map((f, i) => /* @__PURE__ */ import_react.default.createElement("div", { key: i, style: {
+          padding: "12px 18px",
+          borderBottom: `1px solid ${C.sep}`,
+          borderRight: i % 2 === 0 ? `1px solid ${C.sep}` : "none"
+        } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+          fontSize: 9,
+          textTransform: "uppercase",
+          letterSpacing: 0.8,
+          color: C.label3,
+          fontFamily: FONT_UI,
+          marginBottom: 5
+        } }, f.label), f.vendedor !== void 0 ? /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+          width: 28,
+          height: 28,
           borderRadius: "50%",
-          background: `${C.blue}18`,
+          background: C.bg2,
+          border: `1px solid ${C.sep}`,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
           flexShrink: 0
-        } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 12, fontWeight: 700, color: C.blue, fontFamily: FONT_UI } }, iniciales)), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, fontWeight: 600, color: C.label, fontFamily: FONT } }, vendedor))), /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, textTransform: "uppercase", letterSpacing: 0.6, color: C.label3, fontFamily: FONT_UI, marginBottom: 3 } }, "Total"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 14, fontWeight: 700, color: C.label, fontFamily: FONT } }, "Bs ", v.total)), /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, textTransform: "uppercase", letterSpacing: 0.6, color: C.label3, fontFamily: FONT_UI, marginBottom: 3 } }, "M\xE9todo de pago"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 14, fontWeight: 700, color: C.label, fontFamily: FONT } }, v.metodoPago || "\u2014"))), /* @__PURE__ */ import_react.default.createElement("div", { style: { padding: "14px 20px 28px" } }, /* @__PURE__ */ import_react.default.createElement(
+        } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 11, fontWeight: 700, color: C.label, fontFamily: FONT_UI } }, f.iniciales)), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, fontWeight: 700, color: C.label, fontFamily: FONT } }, f.vendedor)) : /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 14, fontWeight: 700, color: C.label, fontFamily: FONT } }, f.val), f.sub && /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT_UI, marginTop: 2 } }, f.sub))))), /* @__PURE__ */ import_react.default.createElement("div", { style: { padding: "12px 18px" } }, /* @__PURE__ */ import_react.default.createElement(
           "button",
           {
             onClick: () => verNotaVenta(v, v.numSecuencial || 1),
             style: {
               width: "100%",
-              padding: "13px 0",
-              borderRadius: 12,
-              border: `0.5px solid ${C.sep}`,
+              padding: "11px 0",
+              borderRadius: 8,
+              border: `1px solid ${C.sep}`,
               background: C.bg2,
               color: C.label,
               fontFamily: FONT_UI,
-              fontSize: 13,
-              fontWeight: 600,
+              fontSize: 12,
+              fontWeight: 700,
               cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 8
+              letterSpacing: 0.3
             }
           },
           "\u{1F9FE} Abrir nota de venta completa"
         )));
       }
       const { lista } = ventasCodigoInv;
-      return /* @__PURE__ */ import_react.default.createElement(SheetOverlay, { onClose: cerrarTodo }, /* @__PURE__ */ import_react.default.createElement("div", { style: { padding: "16px 20px 14px", display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: `0.5px solid ${C.sep}` } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, letterSpacing: 0.7, textTransform: "uppercase", color: C.label3, fontFamily: FONT_UI, marginBottom: 2 } }, lista.length, " ventas registradas"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 14, fontWeight: 700, color: C.label, fontFamily: FONT } }, codigo)), /* @__PURE__ */ import_react.default.createElement(
-        "button",
+      return /* @__PURE__ */ import_react.default.createElement("div", { "data-drag-window": true, style: winStyle }, titleBar(`${lista.length} ventas \u2014 ${codigo}`, cerrarTodo), /* @__PURE__ */ import_react.default.createElement("div", { style: { padding: "0 18px" } }, lista.map((v, i) => /* @__PURE__ */ import_react.default.createElement(
+        "div",
         {
-          onClick: cerrarTodo,
+          key: v.id || i,
+          onClick: () => setVentaAbiertaInv({ ...v, _codigoOrigen: codigo }),
           style: {
-            background: C.bg2,
-            border: "none",
-            borderRadius: "50%",
-            width: 30,
-            height: 30,
-            cursor: "pointer",
             display: "flex",
+            justifyContent: "space-between",
             alignItems: "center",
-            justifyContent: "center",
-            color: C.label3,
-            fontSize: 16
+            padding: "13px 0",
+            borderBottom: i < lista.length - 1 ? `1px solid ${C.sep}` : "none",
+            cursor: "pointer"
           }
         },
-        "\u2715"
-      )), /* @__PURE__ */ import_react.default.createElement("div", { style: { padding: "4px 20px 28px" } }, lista.map((v, i) => {
-        const vendedor = v.vendedor || "\u2014";
-        return /* @__PURE__ */ import_react.default.createElement(
-          "div",
-          {
-            key: v.id || i,
-            onClick: () => setVentaAbiertaInv({ ...v, _codigoOrigen: codigo }),
-            style: {
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              padding: "13px 0",
-              borderBottom: i < lista.length - 1 ? `0.5px solid ${C.sep}` : "none",
-              cursor: "pointer"
-            }
-          },
-          /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, fontWeight: 600, color: C.label, fontFamily: FONT } }, v.fecha, " \xB7 ", v.hora || "\u2014"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT_UI, marginTop: 2 } }, vendedor, " \xB7 ", v.metodoPago || "\u2014")),
-          /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10, flexShrink: 0 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 14, fontWeight: 700, color: C.label, fontFamily: FONT } }, "Bs ", v.total), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 16, color: C.label3 } }, "\u203A"))
-        );
-      })));
+        /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, fontWeight: 700, color: C.label, fontFamily: FONT } }, v.fecha), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT_UI, marginTop: 2 } }, v.vendedor || "\u2014", " \xB7 ", v.metodoPago || "\u2014", " \xB7 ", v.hora || "\u2014")),
+        /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, flexShrink: 0 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 14, fontWeight: 700, color: C.label, fontFamily: FONT } }, "Bs ", v.total), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 18, color: C.label3 } }, "\u203A"))
+      ))), /* @__PURE__ */ import_react.default.createElement("div", { style: { height: 12 } }));
     })());
   }
   function MarcaDetalle({ marcaId, inv, ventas, vMes, mes, anio, MK, cierres, setCierres, getHist, getLiq, auditorias = [], onActualizarAuditoria, user }) {

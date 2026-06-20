@@ -14662,14 +14662,29 @@ function InventarioPorMarca({inv, ventas, onRecibir, onBaja, onImportarExcel, on
     return map;
   },[ventas]);
 
-  const [ventasCodigoInv, setVentasCodigoInv] = useState(null); // {codigo, lista:[]}
+  const [ventasCodigoInv, setVentasCodigoInv] = useState(null);
   function abrirVentasPorCodigoInv(prod) {
     const lista = ventas.filter(v=>v.items.some(it=>it.prodId===prod.id||it.codigo===prod.codigo));
     if (lista.length===0) return;
-    if (lista.length===1) { setVentasCodigoInv({codigo:prod.codigo, lista, abrirUna:true}); return; }
-    setVentasCodigoInv({codigo:prod.codigo, lista: lista.slice().sort((a,b)=>b.fecha.localeCompare(a.fecha))});
+    const sorted = lista.slice().sort((a,b)=>b.fecha.localeCompare(a.fecha));
+    if (lista.length===1) { setVentaAbiertaInv({...sorted[0], _codigoOrigen:prod.codigo}); return; }
+    setVentasCodigoInv({codigo:prod.codigo, lista: sorted});
   }
   const [ventaAbiertaInv, setVentaAbiertaInv] = useState(null);
+  const dragRef = React.useRef({dragging:false, ox:0, oy:0, x:null, y:null});
+  const [dragPos, setDragPos] = React.useState(null);
+  function onDragStart(e){
+    const el = e.currentTarget.closest('[data-drag-window]');
+    const rect = el.getBoundingClientRect();
+    dragRef.current = {dragging:true, ox:e.clientX-rect.left, oy:e.clientY-rect.top};
+    const onMove = ev=>{
+      if(!dragRef.current.dragging) return;
+      setDragPos({x:ev.clientX-dragRef.current.ox, y:ev.clientY-dragRef.current.oy});
+    };
+    const onUp = ()=>{ dragRef.current.dragging=false; window.removeEventListener('mousemove',onMove); window.removeEventListener('mouseup',onUp); };
+    window.addEventListener('mousemove',onMove);
+    window.addEventListener('mouseup',onUp);
+  }
 
   // Búsqueda SIEMPRE global — filtra sobre todo el inventario
   const productos = useMemo(()=>{
@@ -15005,21 +15020,32 @@ function InventarioPorMarca({inv, ventas, onRecibir, onBaja, onImportarExcel, on
         </div>
       </div>
 
-      {/* ── Bottom sheet nota de venta desde inventario ── */}
+      {/* ── Ventana arrastrable nota de venta ── */}
     {(ventasCodigoInv||ventaAbiertaInv)&&(()=>{
-      const cerrarTodo = ()=>{ setVentaAbiertaInv(null); setVentasCodigoInv(null); };
-      const codigo = ventasCodigoInv?.codigo || ventaAbiertaInv?._codigoOrigen || "";
-
-      const SheetOverlay = ({onClose, children})=>(
-        <div onClick={onClose}
-          style={{position:"fixed",inset:0,background:"rgba(0,0,0,.72)",zIndex:1200,
-            display:"flex",alignItems:"flex-end",justifyContent:"center"}}>
-          <div onClick={e=>e.stopPropagation()}
-            style={{background:C.bg,borderRadius:"20px 20px 0 0",width:"100%",
-              borderTop:`0.5px solid ${C.sep}`,borderLeft:`0.5px solid ${C.sep}`,borderRight:`0.5px solid ${C.sep}`}}>
-            <div style={{width:36,height:4,background:C.sep,borderRadius:2,margin:"12px auto 0"}}/>
-            {children}
-          </div>
+      const cerrarTodo = ()=>{ setVentaAbiertaInv(null); setVentasCodigoInv(null); setDragPos(null); };
+      const codigo = ventaAbiertaInv?._codigoOrigen || ventasCodigoInv?.codigo || "";
+      const winStyle = {
+        position:"fixed",
+        left: dragPos ? dragPos.x : "50%",
+        top:  dragPos ? dragPos.y : "50%",
+        transform: dragPos ? "none" : "translate(-50%,-50%)",
+        width:380, zIndex:1300,
+        background:C.bg,
+        border:`1px solid ${C.sep}`,
+        borderRadius:14,
+        overflow:"hidden",
+        userSelect:"none",
+      };
+      const titleBar = (label, onClose)=>(
+        <div onMouseDown={onDragStart}
+          style={{display:"flex",justifyContent:"space-between",alignItems:"center",
+            padding:"11px 14px",background:C.bg2,borderBottom:`1px solid ${C.sep}`,
+            cursor:"grab"}}>
+          <span style={{fontSize:11,fontWeight:700,letterSpacing:1,textTransform:"uppercase",
+            color:C.label3,fontFamily:FONT_UI}}>{label}</span>
+          <button onClick={onClose}
+            style={{background:"none",border:"none",cursor:"pointer",color:C.label3,
+              fontSize:16,lineHeight:1,padding:"2px 4px",borderRadius:4}}>✕</button>
         </div>
       );
 
@@ -15029,94 +15055,82 @@ function InventarioPorMarca({inv, ventas, onRecibir, onBaja, onImportarExcel, on
         const vendedor = v.vendedor||"—";
         const iniciales = vendedor!=="—" ? vendedor.trim().split(/\s+/).map(w=>w[0]).join("").toUpperCase().slice(0,2) : "—";
         return (
-          <SheetOverlay onClose={cerrarTodo}>
-            <div style={{padding:"16px 20px 10px",display:"flex",justifyContent:"space-between",alignItems:"flex-start",borderBottom:`0.5px solid ${C.sep}`}}>
-              <div style={{flex:1,minWidth:0,paddingRight:12}}>
-                <div style={{fontSize:10,letterSpacing:.7,textTransform:"uppercase",color:C.label3,fontFamily:FONT_UI,marginBottom:3}}>Nota de venta</div>
-                <div style={{fontSize:15,fontWeight:700,color:C.label,fontFamily:FONT,lineHeight:1.3,marginBottom:5}}>
-                  {itemDelCodigo?.nombre||codigo}
-                </div>
-                <span style={{fontSize:11,color:C.label3,fontFamily:"monospace",background:C.bg2,padding:"2px 8px",borderRadius:5}}>{codigo}</span>
+          <div data-drag-window style={winStyle}>
+            {titleBar("Nota de venta", cerrarTodo)}
+            <div style={{padding:"16px 18px",borderBottom:`1px solid ${C.sep}`}}>
+              <div style={{fontSize:13,fontWeight:700,color:C.label,fontFamily:FONT,lineHeight:1.35,marginBottom:6}}>
+                {itemDelCodigo?.nombre||codigo}
               </div>
-              <button onClick={cerrarTodo}
-                style={{background:C.bg2,border:"none",borderRadius:"50%",width:30,height:30,cursor:"pointer",
-                  display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,color:C.label3,fontSize:16}}>✕</button>
+              <span style={{fontSize:10,fontFamily:"monospace",color:C.label3,
+                background:C.bg2,padding:"2px 8px",borderRadius:5,border:`1px solid ${C.sep}`}}>{codigo}</span>
             </div>
-
-            <div style={{padding:"16px 20px",borderBottom:`0.5px solid ${C.sep}`,
-              display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
-              <div>
-                <div style={{fontSize:10,textTransform:"uppercase",letterSpacing:.6,color:C.label3,fontFamily:FONT_UI,marginBottom:3}}>Fecha</div>
-                <div style={{fontSize:14,fontWeight:700,color:C.label,fontFamily:FONT}}>{v.fecha}</div>
-                <div style={{fontSize:11,color:C.label3,fontFamily:FONT_UI,marginTop:2}}>{v.hora||"—"}</div>
-              </div>
-              <div>
-                <div style={{fontSize:10,textTransform:"uppercase",letterSpacing:.6,color:C.label3,fontFamily:FONT_UI,marginBottom:6}}>Vendió</div>
-                <div style={{display:"flex",alignItems:"center",gap:8}}>
-                  <div style={{width:32,height:32,borderRadius:"50%",background:`${C.blue}18`,
-                    display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                    <span style={{fontSize:12,fontWeight:700,color:C.blue,fontFamily:FONT_UI}}>{iniciales}</span>
-                  </div>
-                  <div style={{fontSize:13,fontWeight:600,color:C.label,fontFamily:FONT}}>{vendedor}</div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:0}}>
+              {[
+                {label:"Fecha", val:v.fecha, sub:v.hora||"—"},
+                {label:"Vendió", vendedor, iniciales},
+                {label:"Total", val:`Bs ${v.total}`},
+                {label:"Método de pago", val:v.metodoPago||"—"},
+              ].map((f,i)=>(
+                <div key={i} style={{padding:"12px 18px",borderBottom:`1px solid ${C.sep}`,
+                  borderRight:i%2===0?`1px solid ${C.sep}`:"none"}}>
+                  <div style={{fontSize:9,textTransform:"uppercase",letterSpacing:.8,
+                    color:C.label3,fontFamily:FONT_UI,marginBottom:5}}>{f.label}</div>
+                  {f.vendedor!==undefined ? (
+                    <div style={{display:"flex",alignItems:"center",gap:8}}>
+                      <div style={{width:28,height:28,borderRadius:"50%",background:C.bg2,
+                        border:`1px solid ${C.sep}`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                        <span style={{fontSize:11,fontWeight:700,color:C.label,fontFamily:FONT_UI}}>{f.iniciales}</span>
+                      </div>
+                      <span style={{fontSize:13,fontWeight:700,color:C.label,fontFamily:FONT}}>{f.vendedor}</span>
+                    </div>
+                  ) : (
+                    <div>
+                      <div style={{fontSize:14,fontWeight:700,color:C.label,fontFamily:FONT}}>{f.val}</div>
+                      {f.sub&&<div style={{fontSize:11,color:C.label3,fontFamily:FONT_UI,marginTop:2}}>{f.sub}</div>}
+                    </div>
+                  )}
                 </div>
-              </div>
-              <div>
-                <div style={{fontSize:10,textTransform:"uppercase",letterSpacing:.6,color:C.label3,fontFamily:FONT_UI,marginBottom:3}}>Total</div>
-                <div style={{fontSize:14,fontWeight:700,color:C.label,fontFamily:FONT}}>Bs {v.total}</div>
-              </div>
-              <div>
-                <div style={{fontSize:10,textTransform:"uppercase",letterSpacing:.6,color:C.label3,fontFamily:FONT_UI,marginBottom:3}}>Método de pago</div>
-                <div style={{fontSize:14,fontWeight:700,color:C.label,fontFamily:FONT}}>{v.metodoPago||"—"}</div>
-              </div>
+              ))}
             </div>
-
-            <div style={{padding:"14px 20px 28px"}}>
+            <div style={{padding:"12px 18px"}}>
               <button onClick={()=>verNotaVenta(v, v.numSecuencial||1)}
-                style={{width:"100%",padding:"13px 0",borderRadius:12,
-                  border:`0.5px solid ${C.sep}`,background:C.bg2,
-                  color:C.label,fontFamily:FONT_UI,fontSize:13,fontWeight:600,
-                  cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+                style={{width:"100%",padding:"11px 0",borderRadius:8,
+                  border:`1px solid ${C.sep}`,background:C.bg2,
+                  color:C.label,fontFamily:FONT_UI,fontSize:12,fontWeight:700,
+                  cursor:"pointer",letterSpacing:.3}}>
                 🧾 Abrir nota de venta completa
               </button>
             </div>
-          </SheetOverlay>
+          </div>
         );
       }
 
       const {lista} = ventasCodigoInv;
       return (
-        <SheetOverlay onClose={cerrarTodo}>
-          <div style={{padding:"16px 20px 14px",display:"flex",justifyContent:"space-between",alignItems:"center",borderBottom:`0.5px solid ${C.sep}`}}>
-            <div>
-              <div style={{fontSize:10,letterSpacing:.7,textTransform:"uppercase",color:C.label3,fontFamily:FONT_UI,marginBottom:2}}>{lista.length} ventas registradas</div>
-              <div style={{fontSize:14,fontWeight:700,color:C.label,fontFamily:FONT}}>{codigo}</div>
-            </div>
-            <button onClick={cerrarTodo}
-              style={{background:C.bg2,border:"none",borderRadius:"50%",width:30,height:30,cursor:"pointer",
-                display:"flex",alignItems:"center",justifyContent:"center",color:C.label3,fontSize:16}}>✕</button>
-          </div>
-          <div style={{padding:"4px 20px 28px"}}>
-            {lista.map((v,i)=>{
-              const vendedor = v.vendedor||"—";
-              return (
-                <div key={v.id||i}
-                  onClick={()=>setVentaAbiertaInv({...v, _codigoOrigen:codigo})}
-                  style={{display:"flex",justifyContent:"space-between",alignItems:"center",
-                    padding:"13px 0",borderBottom:i<lista.length-1?`0.5px solid ${C.sep}`:"none",
-                    cursor:"pointer"}}>
-                  <div>
-                    <div style={{fontSize:13,fontWeight:600,color:C.label,fontFamily:FONT}}>{v.fecha} · {v.hora||"—"}</div>
-                    <div style={{fontSize:12,color:C.label3,fontFamily:FONT_UI,marginTop:2}}>{vendedor} · {v.metodoPago||"—"}</div>
-                  </div>
-                  <div style={{display:"flex",alignItems:"center",gap:10,flexShrink:0}}>
-                    <div style={{fontSize:14,fontWeight:700,color:C.label,fontFamily:FONT}}>Bs {v.total}</div>
-                    <div style={{fontSize:16,color:C.label3}}>›</div>
+        <div data-drag-window style={winStyle}>
+          {titleBar(`${lista.length} ventas — ${codigo}`, cerrarTodo)}
+          <div style={{padding:"0 18px"}}>
+            {lista.map((v,i)=>(
+              <div key={v.id||i}
+                onClick={()=>setVentaAbiertaInv({...v, _codigoOrigen:codigo})}
+                style={{display:"flex",justifyContent:"space-between",alignItems:"center",
+                  padding:"13px 0",borderBottom:i<lista.length-1?`1px solid ${C.sep}`:"none",
+                  cursor:"pointer"}}>
+                <div>
+                  <div style={{fontSize:13,fontWeight:700,color:C.label,fontFamily:FONT}}>{v.fecha}</div>
+                  <div style={{fontSize:11,color:C.label3,fontFamily:FONT_UI,marginTop:2}}>
+                    {v.vendedor||"—"} · {v.metodoPago||"—"} · {v.hora||"—"}
                   </div>
                 </div>
-              );
-            })}
+                <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
+                  <span style={{fontSize:14,fontWeight:700,color:C.label,fontFamily:FONT}}>Bs {v.total}</span>
+                  <span style={{fontSize:18,color:C.label3}}>›</span>
+                </div>
+              </div>
+            ))}
           </div>
-        </SheetOverlay>
+          <div style={{height:12}}/>
+        </div>
       );
     })()}
     </div>
