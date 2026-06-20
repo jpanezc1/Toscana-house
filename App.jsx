@@ -15030,7 +15030,7 @@ function InventarioPorMarca({inv, ventas, onRecibir, onBaja, onImportarExcel, on
         top:  dragPos ? dragPos.y : "50%",
         transform: dragPos ? "none" : "translate(-50%,-50%)",
         width:380, zIndex:1300,
-        background:C.bg,
+        background:C.bg0,
         border:`1px solid ${C.sep}`,
         borderRadius:14,
         overflow:"hidden",
