@@ -11630,7 +11630,7 @@ function App(){
 
         {/* INVENTARIO — por marca */}
         {tab==="inventario" && (
-          <InventarioPorMarca inv={inv} ventas={ventas} onRecibir={()=>setShInv(true)} onBaja={()=>{setShBaja(true);setBajaMsg(null);setBajaCod("");setBajaCant("");setBajaMotivo("");}} onImportarExcel={()=>setShImportarExcel(true)} onReponer={()=>{setShReponer(true);setRepMsg(null);setRepCod("");setRepCant("");setRepPrecio("");setRepTab("stock");}} onSyncCompleto={forzarSyncInventario} onRecargarDesdeSupabase={recargarDesdeSupabase}/>
+          <InventarioPorMarca inv={inv} ventas={ventas} retiros={retiros} onRecibir={()=>setShInv(true)} onBaja={()=>{setShBaja(true);setBajaMsg(null);setBajaCod("");setBajaCant("");setBajaMotivo("");}} onImportarExcel={()=>setShImportarExcel(true)} onReponer={()=>{setShReponer(true);setRepMsg(null);setRepCod("");setRepCant("");setRepPrecio("");setRepTab("stock");}} onSyncCompleto={forzarSyncInventario} onRecargarDesdeSupabase={recargarDesdeSupabase}/>
         )}
 
         {/* AUDITORÍA — cierre de inventario mensual (conteo físico vs sistema) */}
@@ -14641,7 +14641,7 @@ function RegistroCargas({cargas, marcas, marcaId=null, onVerificar=null, user=nu
 // ══════════════════════════════════════════════════════════
 // INVENTARIO POR MARCA — pestaña con scroll horizontal
 // ══════════════════════════════════════════════════════════
-function InventarioPorMarca({inv, ventas, onRecibir, onBaja, onImportarExcel, onReponer, onSyncCompleto, onRecargarDesdeSupabase}){
+function InventarioPorMarca({inv, ventas, retiros=[], onRecibir, onBaja, onImportarExcel, onReponer, onSyncCompleto, onRecargarDesdeSupabase}){
   const isDesktop = useIsDesktop();
   const [syncMsg, setSyncMsg] = useState(null); // null | {prog, total} | "ok" | "err"
   // null = "TODOS"
@@ -14661,6 +14661,28 @@ function InventarioPorMarca({inv, ventas, onRecibir, onBaja, onImportarExcel, on
     }));
     return map;
   },[ventas]);
+
+  // Calcular retiros por código
+  const retirosPorCodigo = useMemo(()=>{
+    const map = {};
+    retiros.forEach(r=>{
+      if(r.codigo) map[r.codigo] = (map[r.codigo]||[]).concat(r);
+    });
+    return map;
+  },[retiros]);
+
+  const [retiroAbierto, setRetiroAbierto] = useState(null); // {codigo, lista:[]}
+  const dragRefR = React.useRef({dragging:false, ox:0, oy:0});
+  const [dragPosR, setDragPosR] = React.useState(null);
+  function onDragStartR(e){
+    const el = e.currentTarget.closest('[data-drag-window-r]');
+    const rect = el.getBoundingClientRect();
+    dragRefR.current = {dragging:true, ox:e.clientX-rect.left, oy:e.clientY-rect.top};
+    const onMove = ev=>{ if(!dragRefR.current.dragging) return; setDragPosR({x:ev.clientX-dragRefR.current.ox, y:ev.clientY-dragRefR.current.oy}); };
+    const onUp = ()=>{ dragRefR.current.dragging=false; window.removeEventListener('mousemove',onMove); window.removeEventListener('mouseup',onUp); };
+    window.addEventListener('mousemove',onMove);
+    window.addEventListener('mouseup',onUp);
+  }
 
   const [ventasCodigoInv, setVentasCodigoInv] = useState(null);
   function abrirVentasPorCodigoInv(prod) {
@@ -14941,12 +14963,21 @@ function InventarioPorMarca({inv, ventas, onRecibir, onBaja, onImportarExcel, on
                   {/* Precio */}
                   <div style={{textAlign:"right",fontFamily:FONT,paddingRight:8}}>
                     <div style={{fontSize:14,fontWeight:700,color:C.label,letterSpacing:"-0.02em"}}>{$(prod.precio)}</div>
-                    {vendidas>0&&<div onClick={()=>abrirVentasPorCodigoInv(prod)}
-                      style={{display:"inline-flex",alignItems:"center",gap:4,marginTop:4,
-                        padding:"3px 8px",borderRadius:6,cursor:"pointer",
-                        background:`${C.blue}15`,border:`1px solid ${C.blue}30`}}>
-                      <span style={{fontSize:10,color:C.blue,fontFamily:FONT_UI,fontWeight:600}}>🧾 {vendidas} vend.</span>
-                    </div>}
+                    <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:3,marginTop:3}}>
+                      {vendidas>0&&<div onClick={()=>abrirVentasPorCodigoInv(prod)}
+                        style={{display:"inline-flex",alignItems:"center",gap:4,
+                          padding:"3px 8px",borderRadius:6,cursor:"pointer",
+                          background:`${C.blue}15`,border:`1px solid ${C.blue}30`}}>
+                        <span style={{fontSize:10,color:C.blue,fontFamily:FONT_UI,fontWeight:600}}>🧾 {vendidas} vend.</span>
+                      </div>}
+                      {(retirosPorCodigo[prod.codigo]||[]).length>0&&<div
+                        onClick={()=>{ setRetiroAbierto({codigo:prod.codigo, lista:retirosPorCodigo[prod.codigo]}); setDragPosR(null); }}
+                        style={{display:"inline-flex",alignItems:"center",gap:4,
+                          padding:"3px 8px",borderRadius:6,cursor:"pointer",
+                          background:`${C.amber}15`,border:`1px solid ${C.amber}30`}}>
+                        <span style={{fontSize:10,color:C.amber,fontFamily:FONT_UI,fontWeight:600}}>↩ {retirosPorCodigo[prod.codigo].length} ret.</span>
+                      </div>}
+                    </div>
                   </div>
 
                   {/* Stock badge */}
@@ -15133,6 +15164,52 @@ function InventarioPorMarca({inv, ventas, onRecibir, onBaja, onImportarExcel, on
         </div>
       );
     })()}
+      {/* ── Ventana arrastrable retiros ── */}
+      {retiroAbierto&&(()=>{
+        const {codigo, lista} = retiroAbierto;
+        const winStyle = {
+          position:"fixed",
+          left: dragPosR ? dragPosR.x : "50%",
+          top:  dragPosR ? dragPosR.y : "50%",
+          transform: dragPosR ? "none" : "translate(-50%,-50%)",
+          width:380, zIndex:1300,
+          background:C.bg0,
+          border:`1px solid ${C.sep}`,
+          borderRadius:14,
+          overflow:"hidden",
+          userSelect:"none",
+        };
+        return (
+          <div data-drag-window-r style={winStyle}>
+            <div onMouseDown={onDragStartR}
+              style={{display:"flex",justifyContent:"space-between",alignItems:"center",
+                padding:"11px 14px",background:C.bg2,borderBottom:`1px solid ${C.sep}`,cursor:"grab"}}>
+              <span style={{fontSize:11,fontWeight:700,letterSpacing:1,textTransform:"uppercase",
+                color:C.amber,fontFamily:FONT_UI}}>Retirados · {codigo}</span>
+              <button onClick={()=>{setRetiroAbierto(null);setDragPosR(null);}}
+                style={{background:"none",border:"none",cursor:"pointer",color:C.label3,fontSize:16,padding:"2px 4px"}}>✕</button>
+            </div>
+            <div style={{padding:"0 18px"}}>
+              {lista.map((r,i)=>(
+                <div key={r.id||i} style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",
+                  padding:"13px 0",borderBottom:i<lista.length-1?`1px solid ${C.sep}`:"none"}}>
+                  <div>
+                    <div style={{fontSize:13,fontWeight:700,color:C.label,fontFamily:FONT}}>{r.fecha}</div>
+                    <div style={{fontSize:11,color:C.label3,fontFamily:FONT_UI,marginTop:2}}>
+                      {r.hora||"—"} · {r.destinatario||"—"}
+                    </div>
+                    {r.motivo&&<div style={{fontSize:11,color:C.amber,fontFamily:FONT_UI,marginTop:2}}>{r.motivo}</div>}
+                  </div>
+                  <div style={{textAlign:"right",flexShrink:0,marginLeft:12}}>
+                    <div style={{fontSize:13,fontWeight:700,color:C.label,fontFamily:FONT}}>{r.cantidad} ud{r.cantidad!==1?"s":""}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div style={{height:12}}/>
+          </div>
+        );
+      })()}
     </div>
   );
 }
