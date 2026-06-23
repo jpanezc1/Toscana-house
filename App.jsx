@@ -807,6 +807,18 @@ function BarcodeDisplay({ codigo, small }) {
 // Extrae el color del campo descripcion ("TALLA: X · COLOR: Y")
 function extraerColor(desc){ const m=(desc||"").match(/COLOR:\s*([^·\n]+)/i); return m?m[1].trim():""; }
 
+// Retorna el total real de una venta para display: precio lleno de los items
+// menos solo el descuento manual (nunca la comisión bancaria de tarjeta).
+function getDisplayTotal(v){
+  if(!v) return 0;
+  const items=(v.items||[]);
+  if(!items.length) return v.total||0;
+  const itemsSum=items.reduce((s,i)=>s+(i.precioUnit||0)*(i.cantidad||1),0);
+  if(!itemsSum) return v.total||0;
+  const manualDescPct=Math.max(0,(v.descPct||0)-(v.metodoPago==="tarjeta"?1.8:0));
+  return manualDescPct>0 ? +((itemsSum*(1-manualDescPct/100)).toFixed(2)) : itemsSum;
+}
+
 // Abrevia nombres largos de productos para que entren en la etiqueta
 function abreviarNombre(nombre, maxLen = 90) {
   if (!nombre) return "";
@@ -1846,10 +1858,13 @@ function calcLiqMarca(vMarca, marcaId, MK) {
   const cfg = leerCfgLiq(marcaId);
   let brutoEf = 0, brutoQR = 0, brutoTJ = 0;
   vMarca.forEach(v => {
-    const sub   = v.items.filter(i => i.marcaId === marcaId).reduce((s, i) => s + i.subtotal, 0);
-    const vTot  = v.total || sub;
+    // sub: precio lleno de items de esta marca menos solo descuento manual
+    const manualDescPct = Math.max(0, (v.descPct||0) - (v.metodoPago==="tarjeta" ? 1.8 : 0));
+    const sub = v.items.filter(i => i.marcaId === marcaId)
+      .reduce((s, i) => s + (i.precioUnit||0) * (i.cantidad||1) * (1 - manualDescPct/100), 0);
+    const vTot  = getDisplayTotal(v) || sub;
     const pct   = vTot > 0 ? sub / vTot : 1;
-    const m     = parseMixtoXls(v.metodoPago, v.total);
+    const m     = parseMixtoXls(v.metodoPago, getDisplayTotal(v));
     brutoEf += m.efectivo * pct;
     brutoQR += m.qr * pct;
     brutoTJ += m.tarjeta * pct;
@@ -5635,22 +5650,28 @@ function NotaVentaModal({venta, onClose, numVenta, onAnularVenta}){
             </div>
           </div>
         ))}
-        {/* Descuento si hay */}
-        {venta.descPct>0&&(
-          <div style={{display:"flex",justifyContent:"space-between",padding:"8px 14px",
-            background:`${C.amber}10`,borderTop:`1px solid ${C.sep}`}}>
-            <span style={{fontSize:13,color:C.amber,fontFamily:FONT}}>Descuento ({venta.descPct}%)</span>
-            <span style={{fontSize:13,color:C.amber,fontFamily:FONT,fontWeight:600}}>
-              -{$(venta.items.reduce((s,i)=>s+i.precioUnit*i.cantidad,0)-venta.total)}
-            </span>
-          </div>
-        )}
-        {/* Total */}
-        <div style={{display:"flex",justifyContent:"space-between",padding:"12px 14px",
-          background:`${C.gold}12`,borderTop:`2px solid ${C.sep}`}}>
-          <span style={{fontSize:15,fontWeight:700,color:C.label,fontFamily:FONT}}>Total</span>
-          <span style={{fontSize:18,fontWeight:700,color:C.label,fontFamily:FONT}}>{$(venta.total)}</span>
-        </div>
+        {/* Descuento si hay — solo descuento manual, nunca comisión bancaria tarjeta */}
+        {(()=>{
+          const manualDescPct=Math.max(0,(venta.descPct||0)-(venta.metodoPago==="tarjeta"?1.8:0));
+          const itemsSum=venta.items.reduce((s,i)=>s+i.precioUnit*i.cantidad,0);
+          const displayTotal=getDisplayTotal(venta);
+          return(<>
+            {manualDescPct>0&&(
+              <div style={{display:"flex",justifyContent:"space-between",padding:"8px 14px",
+                background:`${C.amber}10`,borderTop:`1px solid ${C.sep}`}}>
+                <span style={{fontSize:13,color:C.amber,fontFamily:FONT}}>Descuento ({manualDescPct}%)</span>
+                <span style={{fontSize:13,color:C.amber,fontFamily:FONT,fontWeight:600}}>
+                  -{$(itemsSum-displayTotal)}
+                </span>
+              </div>
+            )}
+            <div style={{display:"flex",justifyContent:"space-between",padding:"12px 14px",
+              background:`${C.gold}12`,borderTop:`2px solid ${C.sep}`}}>
+              <span style={{fontSize:15,fontWeight:700,color:C.label,fontFamily:FONT}}>Total</span>
+              <span style={{fontSize:18,fontWeight:700,color:C.label,fontFamily:FONT}}>{$(displayTotal)}</span>
+            </div>
+          </>);
+        })()}
       </div>
 
       {/* Gift Card allocation — si la venta usó GC */}
@@ -6111,20 +6132,24 @@ function imprimirComprobante(venta) {
   <div class="total-row">
     <table>
       <tr>
-        ${venta.descPct > 0 ? `
+        ${(()=>{
+          const manualDescPct=Math.max(0,(venta.descPct||0)-(venta.metodoPago==="tarjeta"?1.8:0));
+          const displayTotal=getDisplayTotal(venta);
+          const itemsSum=(venta.items||[]).reduce((s,i)=>s+(i.precioUnit||0)*(i.cantidad||1),0);
+          return (manualDescPct>0?`
         <tr>
           <td class="label">Subtotal</td>
-          <td style="text-align:right">Bs ${venta.subtotal?.toFixed(2)}</td>
+          <td style="text-align:right">Bs ${itemsSum.toFixed(2)}</td>
         </tr>
         <tr>
-          <td class="label">Descuento ${venta.descPct}%</td>
-          <td style="text-align:right;color:#c00">-Bs ${(venta.subtotal - venta.total)?.toFixed(2)}</td>
-        </tr>
-        ` : ''}
-        <tr>
+          <td class="label">Descuento ${manualDescPct}%</td>
+          <td style="text-align:right;color:#c00">-Bs ${(itemsSum-displayTotal).toFixed(2)}</td>
+        </tr>`:"")
+          +`<tr>
           <td class="total-label">TOTAL</td>
-          <td class="total-value">Bs ${venta.total?.toFixed(2)}</td>
-        </tr>
+          <td class="total-value">Bs ${displayTotal.toFixed(2)}</td>
+        </tr>`;
+        })()}
         <tr>
           <td class="label">Método de pago</td>
           <td style="text-align:right">${metodos[venta.metodoPago] || venta.metodoPago}</td>
@@ -8077,7 +8102,7 @@ function HomeDashboard({ventas, inv, vMes, mes, anio, onGoTab}){
               </div>
               <div style={{fontSize:14, fontWeight:700, color:v.anulada?C.label3:C.label, fontFamily:FONT_UI, marginLeft:12,
                 letterSpacing:"-0.01em", textDecoration:v.anulada?"line-through":"none"}}>
-                Bs {new Intl.NumberFormat("es-BO",{minimumFractionDigits:0,maximumFractionDigits:0}).format(v.total)}
+                Bs {new Intl.NumberFormat("es-BO",{minimumFractionDigits:0,maximumFractionDigits:0}).format(getDisplayTotal(v))}
               </div>
             </div>
           ))}
@@ -9296,7 +9321,7 @@ function BrandPortal({user, ventas, inv, cargas, retiros=[], logout}){
                   <div style={{fontSize:13,fontWeight:600,color:C.label,fontFamily:FONT}}>{v.fecha}</div>
                   <div style={{fontSize:11,color:C.label3,fontFamily:FONT_UI,marginTop:2}}>{v.hora||""}</div>
                 </div>
-                <div style={{fontSize:14,fontWeight:700,color:C.label,fontFamily:FONT}}>Bs {v.total}</div>
+                <div style={{fontSize:14,fontWeight:700,color:C.label,fontFamily:FONT}}>Bs {getDisplayTotal(v)}</div>
               </div>
             ))}
             <button onClick={()=>setVentasCodigo(null)}
@@ -15274,7 +15299,7 @@ function InventarioPorMarca({inv, ventas, retiros=[], onRecibir, onBaja, onImpor
               {[
                 {label:"Fecha", val:v.fecha, sub:v.hora||"—"},
                 {label:"Vendió", vendedor, iniciales},
-                {label:"Total", val:`Bs ${v.total}`},
+                {label:"Total", val:`Bs ${getDisplayTotal(v)}`},
                 {label:"Método de pago", val:v.metodoPago||"—"},
               ].map((f,i)=>(
                 <div key={i} style={{padding:"12px 18px",borderBottom:`1px solid ${C.sep}`,
@@ -15329,7 +15354,7 @@ function InventarioPorMarca({inv, ventas, retiros=[], onRecibir, onBaja, onImpor
                   </div>
                 </div>
                 <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
-                  <span style={{fontSize:14,fontWeight:700,color:C.label,fontFamily:FONT}}>Bs {v.total}</span>
+                  <span style={{fontSize:14,fontWeight:700,color:C.label,fontFamily:FONT}}>Bs {getDisplayTotal(v)}</span>
                   <span style={{fontSize:18,color:C.label3}}>›</span>
                 </div>
               </div>
