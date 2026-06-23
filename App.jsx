@@ -899,7 +899,8 @@ async function imprimirTicket(producto, marcaNombre) {
 </head>
 <body>
   <div class="top"><span>${marcaNombre}</span><span style="font-weight:bold">TOSCANA HOUSE</span></div>
-  <div class="producto">${abreviarNombre(lineaEtiqueta(producto.nombre, producto.descripcion))}</div>
+  <div class="producto">${abreviarNombre(producto.nombre)}</div>
+  ${producto.descripcion?`<div class="color-row">${producto.descripcion.toUpperCase()}</div>`:""}
   <div class="barcode-wrap">
     <svg id="barcode"></svg>
   </div>
@@ -947,7 +948,8 @@ function imprimirEtiquetasLote(items) {
     return `
       <div class="label">
         <div class="top"><span>${marca.toUpperCase()}</span><span style="font-weight:bold">TOSCANA HOUSE</span></div>
-        <div class="producto">${abreviarNombre(lineaEtiqueta(it.nombre||it.desc||"", it.descripcion||""))}</div>
+        <div class="producto">${abreviarNombre((it.nombre||it.desc||"").toUpperCase())}</div>
+        ${(it.descripcion||"")?`<div class="color-row">${(it.descripcion||"").toUpperCase()}</div>`:""}
         <div class="barcode-wrap"><svg id="bc-${idx}"></svg></div>
         <div class="bottom-row">
           <span class="codigo">${codigo}</span>

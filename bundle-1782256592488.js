@@ -22362,23 +22362,6 @@
       wordBreak: "break-all"
     } }, codigo));
   }
-  function extraerColor(desc) {
-    const m = (desc || "").match(/COLOR:\s*([^·\n]+)/i);
-    return m ? m[1].trim() : "";
-  }
-  function extraerTalla(desc) {
-    const m = (desc || "").match(/TALLA:\s*([^·\n]+)/i);
-    return m ? m[1].trim() : "";
-  }
-  function lineaEtiqueta(nombre, descripcion) {
-    const nom = (nombre || "").toUpperCase().trim();
-    const talla = extraerTalla(descripcion);
-    const color = extraerColor(descripcion);
-    const partes = [nom];
-    if (talla && !nom.includes(talla.toUpperCase())) partes.push("TALLA " + talla.toUpperCase());
-    if (color && !nom.includes(color.toUpperCase())) partes.push("COLOR " + color.toUpperCase());
-    return partes.join(" ");
-  }
   function getDisplayTotal(v) {
     if (!v) return 0;
     const items = v.items || [];
@@ -22446,7 +22429,8 @@
       return `
       <div class="label">
         <div class="top"><span>${marca.toUpperCase()}</span><span style="font-weight:bold">TOSCANA HOUSE</span></div>
-        <div class="producto">${abreviarNombre(lineaEtiqueta(it.nombre || it.desc || "", it.descripcion || ""))}</div>
+        <div class="producto">${abreviarNombre((it.nombre || it.desc || "").toUpperCase())}</div>
+        ${it.descripcion || "" ? `<div class="color-row">${(it.descripcion || "").toUpperCase()}</div>` : ""}
         <div class="barcode-wrap"><svg id="bc-${idx}"></svg></div>
         <div class="bottom-row">
           <span class="codigo">${codigo}</span>
