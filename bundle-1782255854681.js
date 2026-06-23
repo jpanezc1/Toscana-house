@@ -28669,7 +28669,8 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
           if (raw2 === null || raw2 === void 0 || raw2 === "") return 1;
           const s = String(raw2).replace(/[^\d]/g, "");
           const n2 = parseInt(s);
-          return isNaN(n2) || n2 <= 0 ? 1 : n2;
+          if (isNaN(n2)) return 1;
+          return n2;
         }, descKey = function(marca, nombre, talla, color) {
           const nk = (s) => norm(String(s || "")).toUpperCase().trim().replace(/\s+/g, " ");
           return [nk(marca), nk(nombre), nk(talla), nk(color)].join("|");

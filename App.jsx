@@ -7120,7 +7120,8 @@ function ImportarExcelModal({inv, onImportar, onClose, onArchivoCapturado}){
         if(raw===null||raw===undefined||raw==="") return 1; // celda vacía = 1 unidad
         const s = String(raw).replace(/[^\d]/g,"");
         const n = parseInt(s);
-        return isNaN(n)||n<=0 ? 1 : n; // mínimo 1 unidad por ítem listado
+        if(isNaN(n)) return 1;
+        return n; // 0 explícito = no suma; número positivo = exacto
       }
 
       // ── Construir índice de códigos existentes (local + normalizado) ──
