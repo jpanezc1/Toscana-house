@@ -7126,6 +7126,19 @@ function ImportarExcelModal({inv, onImportar, onClose, onArchivoCapturado}){
       // ── Construir índice de códigos existentes (local + normalizado) ──
       const codigosExistentes = new Set(inv.map(p=>p.codigo.toUpperCase().trim()));
 
+      // ── Índice de descripción existente → producto del inventario ─────
+      // Clave: marca|nombre|talla|color — permite detectar mismo item con código diferente
+      function descKey(marca, nombre, talla, color){
+        const n=s=>String(s||"").toUpperCase().trim().replace(/\s+/g," ");
+        return [n(marca),n(nombre),n(talla),n(color)].join("|");
+      }
+      const descExistente = new Map();
+      for(const p of inv){
+        const talla = (p.descripcion||"").match(/TALLA:\s*([^·\n]+)/i)?.[1]?.trim()||p.subcat||"";
+        const color = (p.descripcion||"").match(/COLOR:\s*([^·\n]+)/i)?.[1]?.trim()||"";
+        descExistente.set(descKey(p.marcaNombre,p.nombre,talla,color), p);
+      }
+
       // ── Iterar filas de datos ─────────────────────────────────────────
       const usadosSet = new Set();
       const filas     = [];
@@ -7208,8 +7221,18 @@ function ImportarExcelModal({inv, onImportar, onClose, onArchivoCapturado}){
         if(fila.precio<=0) fila._errs.push("Precio inválido o cero");
         if(!marcaEnc)      fila._errs.push(`Marca "${marcaRaw||"—"}" no encontrada`);
 
-        // ── Detectar duplicado por código exacto ─────────────────────
-        if(codigosExistentes.has(sku)) fila._dup=true;
+        // ── Detectar duplicado por código exacto O misma descripción ────
+        const dk = descKey(fila.marcaNombre, fila.desc, fila.talla, fila.color);
+        const prodExistente = codigosExistentes.has(sku)
+          ? inv.find(p=>p.codigo.toUpperCase()===sku)
+          : descExistente.get(dk) || null;
+
+        if(prodExistente){
+          fila._dup = true;
+          fila._prodExistente = prodExistente;
+          // Si el código vino del inventario (no del Excel), usar el código real
+          if(!codigosExistentes.has(sku)) fila.sku = prodExistente.codigo.toUpperCase();
+        }
 
         filas.push(fila);
       }
@@ -7217,14 +7240,20 @@ function ImportarExcelModal({inv, onImportar, onClose, onArchivoCapturado}){
       if(filas.length===0){ setEstado("idle"); alert("No se encontraron productos válidos en el archivo."); return; }
 
       // ── Consolidar duplicados dentro del mismo Excel ─────────────────
-      // Código repetido en el archivo = misma prenda, más unidades → sumar stock
+      // Código repetido O misma descripción = misma prenda → sumar stock
       const filasMap = new Map();
       for(const f of filas){
-        const key = f.sku.toUpperCase();
-        if(filasMap.has(key)){
-          filasMap.get(key).stock += f.stock;
+        const keyByCod = f.sku.toUpperCase();
+        const keyByDesc = descKey(f.marcaNombre, f.desc, f.talla, f.color);
+        // Priorizar match por código; si no, buscar por descripción
+        const matchKey = filasMap.has(keyByCod) ? keyByCod
+          : [...filasMap.entries()].find(([,v])=>
+              descKey(v.marcaNombre,v.desc,v.talla,v.color)===keyByDesc
+            )?.[0] || null;
+        if(matchKey){
+          filasMap.get(matchKey).stock += f.stock;
         } else {
-          filasMap.set(key, {...f});
+          filasMap.set(keyByCod, {...f});
         }
       }
       const filasFinal = Array.from(filasMap.values());

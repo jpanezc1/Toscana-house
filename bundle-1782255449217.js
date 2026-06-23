@@ -28670,6 +28670,9 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
           const s = String(raw2).replace(/[^\d]/g, "");
           const n2 = parseInt(s);
           return isNaN(n2) ? 0 : n2;
+        }, descKey = function(marca, nombre, talla, color) {
+          const n2 = (s) => String(s || "").toUpperCase().trim().replace(/\s+/g, " ");
+          return [n2(marca), n2(nombre), n2(talla), n2(color)].join("|");
         };
         const XLSX = await loadXLSX();
         const buf = await file.arrayBuffer();
@@ -28803,6 +28806,12 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
           });
         }
         const codigosExistentes = new Set(inv.map((p) => p.codigo.toUpperCase().trim()));
+        const descExistente = /* @__PURE__ */ new Map();
+        for (const p of inv) {
+          const talla = (p.descripcion || "").match(/TALLA:\s*([^·\n]+)/i)?.[1]?.trim() || p.subcat || "";
+          const color = (p.descripcion || "").match(/COLOR:\s*([^·\n]+)/i)?.[1]?.trim() || "";
+          descExistente.set(descKey(p.marcaNombre, p.nombre, talla, color), p);
+        }
         const usadosSet = /* @__PURE__ */ new Set();
         const filas = [];
         const fileMarcaFallback = matchMarca(file.name.replace(/\.[^.]+$/, "").replace(/[_\-]/g, " "));
@@ -28870,7 +28879,13 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
           if (!fila.desc) fila._errs.push("Sin descripci\xF3n");
           if (fila.precio <= 0) fila._errs.push("Precio inv\xE1lido o cero");
           if (!marcaEnc) fila._errs.push(`Marca "${marcaRaw || "\u2014"}" no encontrada`);
-          if (codigosExistentes.has(sku)) fila._dup = true;
+          const dk = descKey(fila.marcaNombre, fila.desc, fila.talla, fila.color);
+          const prodExistente = codigosExistentes.has(sku) ? inv.find((p) => p.codigo.toUpperCase() === sku) : descExistente.get(dk) || null;
+          if (prodExistente) {
+            fila._dup = true;
+            fila._prodExistente = prodExistente;
+            if (!codigosExistentes.has(sku)) fila.sku = prodExistente.codigo.toUpperCase();
+          }
           filas.push(fila);
         }
         if (filas.length === 0) {
@@ -28880,11 +28895,15 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
         }
         const filasMap = /* @__PURE__ */ new Map();
         for (const f of filas) {
-          const key = f.sku.toUpperCase();
-          if (filasMap.has(key)) {
-            filasMap.get(key).stock += f.stock;
+          const keyByCod = f.sku.toUpperCase();
+          const keyByDesc = descKey(f.marcaNombre, f.desc, f.talla, f.color);
+          const matchKey = filasMap.has(keyByCod) ? keyByCod : [...filasMap.entries()].find(
+            ([, v]) => descKey(v.marcaNombre, v.desc, v.talla, v.color) === keyByDesc
+          )?.[0] || null;
+          if (matchKey) {
+            filasMap.get(matchKey).stock += f.stock;
           } else {
-            filasMap.set(key, { ...f });
+            filasMap.set(keyByCod, { ...f });
           }
         }
         const filasFinal = Array.from(filasMap.values());
