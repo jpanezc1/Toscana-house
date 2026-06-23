@@ -21578,7 +21578,9 @@
         desc_pct: venta.descPct || 0,
         metodo_pago: venta.metodoPago,
         vendedor: venta.vendedor,
-        etiqueta_img: venta.etiquetaImg || null
+        etiqueta_img: venta.etiquetaImg || null,
+        cliente_nombre: venta.clienteNombre || null,
+        cliente_telefono: venta.clienteTelefono || null
       });
       if (errVenta) throw errVenta;
       const items = venta.items.map((it) => ({
@@ -21969,6 +21971,8 @@
         metodoPago: v.metodo_pago,
         vendedor: v.vendedor,
         etiquetaImg: v.etiqueta_img,
+        clienteNombre: v.cliente_nombre || "",
+        clienteTelefono: v.cliente_telefono || "",
         anulada: v.anulada || false,
         items: (items || []).filter((i) => i.venta_id === v.id).map((i) => ({
           prodId: i.prod_id,
@@ -27448,7 +27452,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       padding: "0 16px",
       marginBottom: 16,
       border: `1px solid ${C.sep}`
-    } }, filaInfo("Fecha", `${venta.fecha} ${venta.hora || ""}`), venta.clienteNombre && filaInfo("Cliente", venta.clienteNombre), filaInfo("Vendedor", venta.vendedor || "Tienda"), filaInfo("Sucursal", SUCURSAL_EMP), filaInfo("C\xF3digo", venta.id)), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+    } }, filaInfo("Fecha", `${venta.fecha} ${venta.hora || ""}`), venta.clienteNombre && filaInfo("Cliente", venta.clienteNombre), venta.clienteTelefono && filaInfo("Tel\xE9fono", venta.clienteTelefono), filaInfo("Vendedor", venta.vendedor || "Tienda"), filaInfo("Sucursal", SUCURSAL_EMP), filaInfo("C\xF3digo", venta.id)), /* @__PURE__ */ import_react.default.createElement("div", { style: {
       background: C.bg2,
       borderRadius: 14,
       overflow: "hidden",
@@ -35006,6 +35010,10 @@ Motivo: ${motivo}` : ""}`)) {
     var cliente = _hNcl[0];
     var setCliente = _hNcl[1];
     ;
+    var _hNct = (0, import_react.useState)("");
+    var clienteTel = _hNct[0];
+    var setClienteTel = _hNct[1];
+    ;
     var _hN139 = (0, import_react.useState)(0);
     var descExtra = _hN139[0];
     var setDescExtra = _hN139[1];
@@ -35250,6 +35258,7 @@ ${sinStock.map((it) => {
           metodoPago: metodoPagoFinal2,
           vendedor: vendedor || "Tienda",
           clienteNombre: cliente,
+          clienteTelefono: clienteTel,
           etiquetaImg: etiqueta,
           gcId: gcEncontrado.codigo,
           gcUsado,
@@ -35264,6 +35273,7 @@ ${sinStock.map((it) => {
         setBusq("");
         setEtiqueta(null);
         setCliente("");
+        setClienteTel("");
         setPagoGC(false);
         setGcCodigo("");
         setGcEncontrado(null);
@@ -35286,7 +35296,7 @@ ${sinStock.map((it) => {
         if (parseFloat(montosMixtos.tarjeta) > 0) partes.push("tarjeta:" + montosMixtos.tarjeta);
         metodoPagoFinal = partes.length > 0 ? "mixto|" + partes.join("|") : pago;
       }
-      const vf = onVenta({ items, total, subtotal, descPct, metodoPago: metodoPagoFinal, vendedor: vendedor || "Tienda", clienteNombre: cliente, etiquetaImg: etiqueta });
+      const vf = onVenta({ items, total, subtotal, descPct, metodoPago: metodoPagoFinal, vendedor: vendedor || "Tienda", clienteNombre: cliente, clienteTelefono: clienteTel, etiquetaImg: etiqueta });
       setUltima(vf);
       setShowOk(true);
       setShowPago(false);
@@ -35296,6 +35306,7 @@ ${sinStock.map((it) => {
       setBusq("");
       setEtiqueta(null);
       setCliente("");
+      setClienteTel("");
       setPagoMixto(false);
       setMontosMixtos({ efectivo: "", qr: "", tarjeta: "" });
     }
@@ -35854,6 +35865,15 @@ ${sinStock.map((it) => {
         value: cliente,
         onChange: (e) => setCliente(e.target.value),
         placeholder: "Ej: Mar\xEDa Garc\xEDa"
+      }
+    ), /* @__PURE__ */ import_react.default.createElement(
+      IOSInput,
+      {
+        label: "Tel\xE9fono del cliente (opcional)",
+        value: clienteTel,
+        onChange: (e) => setClienteTel(e.target.value),
+        placeholder: "Ej: 70000000",
+        type: "tel"
       }
     ), porMarca.length > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 16 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
       fontSize: 13,

@@ -135,7 +135,8 @@ async function sbGuardarVenta(venta) {
       mk: venta.mk, mes: venta.mes, anio: venta.anio,
       total: venta.total, subtotal: venta.subtotal,
       desc_pct: venta.descPct||0, metodo_pago: venta.metodoPago,
-      vendedor: venta.vendedor, etiqueta_img: venta.etiquetaImg||null
+      vendedor: venta.vendedor, etiqueta_img: venta.etiquetaImg||null,
+      cliente_nombre: venta.clienteNombre||null, cliente_telefono: venta.clienteTelefono||null
     });
     if (errVenta) throw errVenta;
     const items = venta.items.map(it => ({
@@ -431,6 +432,7 @@ async function sbCargarTodo() {
       mes: v.mes, anio: v.anio, total: v.total, subtotal: v.subtotal,
       descPct: v.desc_pct, metodoPago: v.metodo_pago,
       vendedor: v.vendedor, etiquetaImg: v.etiqueta_img,
+      clienteNombre: v.cliente_nombre||"", clienteTelefono: v.cliente_telefono||"",
       anulada: v.anulada || false,
       items: (items||[]).filter(i=>i.venta_id===v.id).map(i=>({
         prodId: i.prod_id, codigo: i.codigo, nombre: i.nombre,
@@ -5622,6 +5624,7 @@ function NotaVentaModal({venta, onClose, numVenta, onAnularVenta}){
         border:`1px solid ${C.sep}`}}>
         {filaInfo("Fecha", `${venta.fecha} ${venta.hora||""}`)}
         {venta.clienteNombre&&filaInfo("Cliente", venta.clienteNombre)}
+        {venta.clienteTelefono&&filaInfo("Teléfono", venta.clienteTelefono)}
         {filaInfo("Vendedor", venta.vendedor||"Tienda")}
         {filaInfo("Sucursal", SUCURSAL_EMP)}
         {filaInfo("Código", venta.id)}
@@ -6159,6 +6162,7 @@ function imprimirComprobante(venta) {
         </tr>
         ${venta.vendedor ? `<tr><td class="label">Atendido por</td><td style="text-align:right">${venta.vendedor}</td></tr>` : ''}
         ${venta.clienteNombre ? `<tr><td class="label">Cliente</td><td style="text-align:right">${venta.clienteNombre}</td></tr>` : ''}
+        ${venta.clienteTelefono ? `<tr><td class="label">Teléfono</td><td style="text-align:right">${venta.clienteTelefono}</td></tr>` : ''}
         ${venta.conFactura ? `<tr><td class="label">Factura a</td><td style="text-align:right">${venta.factNombre} · NIT: ${venta.factNit}</td></tr>` : ''}
       </tr>
     </table>
@@ -12506,6 +12510,7 @@ function POS({inv,onVenta,onVerNota}){
   var _hN137 = useState("efectivo"); var pago = _hN137[0]; var setPago = _hN137[1];;
   var _hN138 = useState(""); var vendedor = _hN138[0]; var setVendedor = _hN138[1];;
   var _hNcl  = useState(""); var cliente  = _hNcl[0];  var setCliente  = _hNcl[1];;
+  var _hNct  = useState(""); var clienteTel = _hNct[0]; var setClienteTel = _hNct[1];;
   var _hN139 = useState(0); var descExtra = _hN139[0]; var setDescExtra = _hN139[1];;
   var _hN140 = useState(null); var etiqueta = _hN140[0]; var setEtiqueta = _hN140[1];;
   var _hN141 = useState(null); var ultima = _hN141[0]; var setUltima = _hN141[1];;
@@ -12690,12 +12695,12 @@ function POS({inv,onVenta,onVerNota}){
 
       const vf=onVenta({items,total,subtotal,descPct,
         metodoPago:metodoPagoFinal,
-        vendedor:vendedor||"Tienda",clienteNombre:cliente,etiquetaImg:etiqueta,
+        vendedor:vendedor||"Tienda",clienteNombre:cliente,clienteTelefono:clienteTel,etiquetaImg:etiqueta,
         gcId:gcEncontrado.codigo, gcUsado, gcAllocations,
       });
       setUltima(vf);setShowOk(true);setShowPago(false);
       autoDescargarNota(vf);
-      setCarrito([]);setDescExtra(0);setBusq("");setEtiqueta(null);setCliente("");
+      setCarrito([]);setDescExtra(0);setBusq("");setEtiqueta(null);setCliente("");setClienteTel("");
       setPagoGC(false);setGcCodigo("");setGcEncontrado(null);setGcBusqMsg(null);setGcMontoUsar("");
       return;
     }
@@ -12713,10 +12718,10 @@ function POS({inv,onVenta,onVerNota}){
       if(parseFloat(montosMixtos.tarjeta)>0)  partes.push("tarjeta:"+montosMixtos.tarjeta);
       metodoPagoFinal=partes.length>0?"mixto|"+partes.join("|"):pago;
     }
-    const vf=onVenta({items,total,subtotal,descPct,metodoPago:metodoPagoFinal,vendedor:vendedor||"Tienda",clienteNombre:cliente,etiquetaImg:etiqueta});
+    const vf=onVenta({items,total,subtotal,descPct,metodoPago:metodoPagoFinal,vendedor:vendedor||"Tienda",clienteNombre:cliente,clienteTelefono:clienteTel,etiquetaImg:etiqueta});
     setUltima(vf);setShowOk(true);setShowPago(false);
     autoDescargarNota(vf);
-    setCarrito([]);setDescExtra(0);setBusq("");setEtiqueta(null);setCliente("");
+    setCarrito([]);setDescExtra(0);setBusq("");setEtiqueta(null);setCliente("");setClienteTel("");
     setPagoMixto(false);setMontosMixtos({efectivo:"",qr:"",tarjeta:""});
   }
 
@@ -13233,6 +13238,8 @@ function POS({inv,onVenta,onVerNota}){
           onChange={e=>setVendedor(e.target.value)} placeholder="Nombre del vendedor"/>
         <IOSInput label="Nombre del cliente (opcional)" value={cliente}
           onChange={e=>setCliente(e.target.value)} placeholder="Ej: María García"/>
+        <IOSInput label="Teléfono del cliente (opcional)" value={clienteTel}
+          onChange={e=>setClienteTel(e.target.value)} placeholder="Ej: 70000000" type="tel"/>
 
         {/* Apropiación */}
         {porMarca.length>0&&(
