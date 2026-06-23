@@ -3145,7 +3145,8 @@ function construirImagenNotaVenta(venta, numSecuencial){
   const num = numSecuencial || venta.id.replace(/\D/g,"").slice(-4).padStart(4,"0");
   const fmt2 = n=>Number(n||0).toLocaleString("es-BO",{minimumFractionDigits:2,maximumFractionDigits:2});
   const subtotalBruto = venta.items.reduce((s,i)=>s+i.precioUnit*i.cantidad,0);
-  const descAdicional = subtotalBruto-venta.total;
+  const displayTotal = getDisplayTotal(venta);
+  const descAdicional = subtotalBruto - displayTotal;
 
   const width = 760;
   const height = 380 + venta.items.length*32 + (descAdicional>0.01?28:0);
@@ -3190,10 +3191,10 @@ function construirImagenNotaVenta(venta, numSecuencial){
       <table style="width:280px;border-collapse:collapse">
         <tr><td style="padding:3px 8px;font-size:11px;color:#555">Subtotal:</td><td style="padding:3px 8px;font-size:11px;text-align:right;font-weight:600">${fmt2(subtotalBruto)}</td></tr>
         ${descAdicional>0.01?`<tr><td style="padding:3px 8px;font-size:11px;color:#555">Descuento:</td><td style="padding:3px 8px;font-size:11px;text-align:right;font-weight:600">- ${fmt2(descAdicional)}</td></tr>`:""}
-        <tr style="border-top:2px solid #111"><td style="padding:7px 8px;font-size:14px;font-weight:800">Total a pagar Bs</td><td style="padding:7px 8px;font-size:14px;font-weight:800;text-align:right">${fmt2(venta.total)}</td></tr>
+        <tr style="border-top:2px solid #111"><td style="padding:7px 8px;font-size:14px;font-weight:800">Total a pagar Bs</td><td style="padding:7px 8px;font-size:14px;font-weight:800;text-align:right">${fmt2(displayTotal)}</td></tr>
       </table>
     </div>
-    <div style="background:#f8f8f8;border:1px solid #ccc;padding:8px 12px;border-radius:4px;font-size:10px;margin-bottom:14px">Son: <strong>${numeroALetras(venta.total)}</strong></div>
+    <div style="background:#f8f8f8;border:1px solid #ccc;padding:8px 12px;border-radius:4px;font-size:10px;margin-bottom:14px">Son: <strong>${numeroALetras(displayTotal)}</strong></div>
     <div style="border-top:1px dashed #aaa;padding-top:8px;text-align:center;font-size:9px;color:#888;margin-top:12px">Toscana House · ${SUCURSAL_EMP} · ${TELEFONO_EMP} · ${CIUDAD_EMP}</div>
   </div>`;
 
@@ -3312,7 +3313,9 @@ function abrirNotaVenta(venta, numSecuencial, autoPrint=false){
   const num=numSecuencial||venta.id.replace(/\D/g,"").slice(-4).padStart(4,"0");
   const fmt2=n=>Number(n||0).toLocaleString("es-BO",{minimumFractionDigits:2,maximumFractionDigits:2});
   const subtotalBruto=venta.items.reduce((s,i)=>s+i.precioUnit*i.cantidad,0);
-  const descAdicional=subtotalBruto-venta.total;
+  const displayTotal=getDisplayTotal(venta);
+  const manualDescPct=Math.max(0,(venta.descPct||0)-(venta.metodoPago==="tarjeta"?1.8:0));
+  const descAdicional=subtotalBruto-displayTotal;
   const rows=venta.items.map(it=>`
     <tr>
       <td>${it.codigo}</td>
@@ -3320,8 +3323,8 @@ function abrirNotaVenta(venta, numSecuencial, autoPrint=false){
       <td style="text-align:center">UNIDAD (BIENES)</td>
       <td style="text-align:center">${it.cantidad}</td>
       <td style="text-align:right">${fmt2(it.precioUnit)}</td>
-      <td style="text-align:right">${venta.descPct?venta.descPct+"%":"—"}</td>
-      <td style="text-align:right">${fmt2(it.subtotal)}</td>
+      <td style="text-align:right">${manualDescPct?manualDescPct+"%":"—"}</td>
+      <td style="text-align:right">${fmt2(it.precioUnit*it.cantidad*(1-manualDescPct/100))}</td>
     </tr>`).join("");
   win.document.write(`<!DOCTYPE html>
 <html lang="es"><head>
@@ -3389,11 +3392,11 @@ function abrirNotaVenta(venta, numSecuencial, autoPrint=false){
   <table class="tots">
     <tr><td>Subtotal:</td><td>${fmt2(subtotalBruto)}</td></tr>
     ${descAdicional>0.01?`<tr><td>Descuento adicional:</td><td>- ${fmt2(descAdicional)}</td></tr>`:""}
-    <tr><td>Total Valor:</td><td>${fmt2(venta.total)}</td></tr>
-    <tr class="tf"><td>Monto a pagar Bs</td><td>${fmt2(venta.total)}</td></tr>
+    <tr><td>Total Valor:</td><td>${fmt2(displayTotal)}</td></tr>
+    <tr class="tf"><td>Monto a pagar Bs</td><td>${fmt2(displayTotal)}</td></tr>
   </table>
 </div>
-<div class="letras">Son: <strong>${numeroALetras(venta.total)}</strong></div>
+<div class="letras">Son: <strong>${numeroALetras(displayTotal)}</strong></div>
 ${(()=>{
   const fac=leerFacturaLocal(venta.id);
   if(!fac) return "";
@@ -5605,7 +5608,7 @@ function NotaVentaModal({venta, onClose, numVenta, onAnularVenta}){
         <span style={{fontFamily:"monospace",fontSize:14,fontWeight:700,color:C.label}}>
           # {num}
         </span>
-        <PagoDisplay mp={venta.metodoPago} total={venta.total}/>
+        <PagoDisplay mp={venta.metodoPago} total={getDisplayTotal(venta)}/>
         {venta.anulada
           ? <Chip color={C.red}>⊘ ANULADA</Chip>
           : <Chip color={C.green}>✓ Pagado</Chip>
@@ -8226,7 +8229,7 @@ function BrandVentaModal({venta, marca, onClose}){
             boxShadow:"0 1px 6px rgba(0,0,0,0.04)"}}>
             <FilaInfo lbl="Fecha" val={`${venta.fecha} ${venta.hora}`}/>
             <FilaInfo lbl="Vendedor" val={venta.vendedor||"Tienda"}/>
-            <FilaInfo lbl="Método de pago" val={<PagoDisplay mp={venta.metodoPago} total={venta.total} small/>}/>
+            <FilaInfo lbl="Método de pago" val={<PagoDisplay mp={venta.metodoPago} total={getDisplayTotal(venta)} small/>}/>
             <FilaInfo lbl="Estado" val={venta.anulada?"Anulada":"Completada"}/>
             {venta.descPct>0&&<FilaInfo lbl="Descuento" val={`${venta.descPct}%`}/>}
           </div>
@@ -8306,7 +8309,7 @@ function BrandVentaModal({venta, marca, onClose}){
                   N° {num}
                 </div>
                 <div style={{fontSize:12,color:C.label3,fontFamily:FONT,marginTop:2}}>
-                  {venta.fecha} · Total {$(venta.total)}
+                  {venta.fecha} · Total {$(getDisplayTotal(venta))}
                 </div>
               </div>
               <span style={{fontSize:12,fontWeight:700,color:C.label3,fontFamily:FONT_UI,
@@ -15685,7 +15688,7 @@ function MarcaDetalle({marcaId,inv,ventas,vMes,mes,anio,MK,cierres,setCierres,ge
                                 <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:5}}>
                                   <span style={{fontFamily:"monospace",fontSize:11,color:C.gold,fontWeight:600,
                                     background:`${C.gold}18`,padding:"2px 7px",borderRadius:5}}>{v.id}</span>
-                                  <PagoDisplay mp={v.metodoPago} total={v.total} small/>
+                                  <PagoDisplay mp={v.metodoPago} total={getDisplayTotal(v)} small/>
                                 </div>
                                 <div style={{fontSize:11,color:C.label3,fontFamily:FONT_UI,opacity:.55,marginBottom:6}}>
                                   {v.fecha} · {v.hora}
@@ -16413,7 +16416,7 @@ function HistorialTab({ventas, inv, cierres, onVentaClick}){
                     <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10}}>
                       <div style={{flex:1,minWidth:0}}>
                         <div style={{display:"flex",alignItems:"center",gap:5,marginBottom:2,flexWrap:"wrap"}}>
-                          <PagoDisplay mp={v.metodoPago} total={v.total} small/>
+                          <PagoDisplay mp={v.metodoPago} total={getDisplayTotal(v)} small/>
                           <span style={{fontSize:9,color:C.label3,fontFamily:FONT,opacity:.7}}>{v.fecha} {v.hora}</span>
                         </div>
                         {v.items.map((it,ii)=>{
@@ -16430,7 +16433,7 @@ function HistorialTab({ventas, inv, cierres, onVentaClick}){
                       </div>
                       <div style={{textAlign:"right",flexShrink:0}}>
                         <span style={{fontSize:15,fontWeight:700,color:C.label,fontFamily:FONT,
-                          letterSpacing:"-0.02em"}}>{$(v.total)}</span>
+                          letterSpacing:"-0.02em"}}>{$(getDisplayTotal(v))}</span>
                       </div>
                     </div>
                   </div>
@@ -18660,7 +18663,7 @@ function DashboardVentas({ventas, onVentaClick}){
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10}}>
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{display:"flex",alignItems:"center",gap:5,marginBottom:2,flexWrap:"wrap"}}>
-                        <PagoDisplay mp={v.metodoPago} total={v.total} small/>
+                        <PagoDisplay mp={v.metodoPago} total={getDisplayTotal(v)} small/>
                         <span style={{fontSize:9,color:C.label3,fontFamily:FONT,opacity:.7}}>
                           {v.fecha} · {v.vendedor||"Tienda"}
                         </span>
@@ -18677,7 +18680,7 @@ function DashboardVentas({ventas, onVentaClick}){
                     </div>
                     <div style={{textAlign:"right",flexShrink:0}}>
                       <div style={{fontSize:14,fontWeight:700,color:v.anulada?C.label3:C.label,fontFamily:FONT,
-                        letterSpacing:"-0.02em",textDecoration:v.anulada?"line-through":"none"}}>{$(v.total)}</div>
+                        letterSpacing:"-0.02em",textDecoration:v.anulada?"line-through":"none"}}>{$(getDisplayTotal(v))}</div>
                       <div style={{fontSize:9,color:C.label3,fontFamily:FONT,marginTop:1,opacity:.6}}>
                         {v.items.length} ítem{v.items.length!==1?"s":""}
                       </div>
@@ -18735,7 +18738,7 @@ function DashboardVentas({ventas, onVentaClick}){
                     <span style={{fontFamily:"monospace",fontSize:10,color:C.label3}}>{v.id}</span>
                     <div style={{fontSize:11,color:C.label3,fontFamily:FONT}}>{v.fecha} · {v.vendedor||"Tienda"}</div>
                   </div>
-                  <div style={{fontSize:14,fontWeight:700,color:C.label,fontFamily:FONT}}>{$(v.total)}</div>
+                  <div style={{fontSize:14,fontWeight:700,color:C.label,fontFamily:FONT}}>{$(getDisplayTotal(v))}</div>
                 </div>
                 <div style={{borderTop:`1px solid ${C.sep}`,paddingTop:5}}>
                   {itsMatch.map((it,i)=>(

@@ -24671,7 +24671,8 @@
     const num = numSecuencial || venta.id.replace(/\D/g, "").slice(-4).padStart(4, "0");
     const fmt2 = (n) => Number(n || 0).toLocaleString("es-BO", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     const subtotalBruto = venta.items.reduce((s, i) => s + i.precioUnit * i.cantidad, 0);
-    const descAdicional = subtotalBruto - venta.total;
+    const displayTotal = getDisplayTotal(venta);
+    const descAdicional = subtotalBruto - displayTotal;
     const width = 760;
     const height = 380 + venta.items.length * 32 + (descAdicional > 0.01 ? 28 : 0);
     const rowsHtml = venta.items.map((it) => `
@@ -24713,10 +24714,10 @@
       <table style="width:280px;border-collapse:collapse">
         <tr><td style="padding:3px 8px;font-size:11px;color:#555">Subtotal:</td><td style="padding:3px 8px;font-size:11px;text-align:right;font-weight:600">${fmt2(subtotalBruto)}</td></tr>
         ${descAdicional > 0.01 ? `<tr><td style="padding:3px 8px;font-size:11px;color:#555">Descuento:</td><td style="padding:3px 8px;font-size:11px;text-align:right;font-weight:600">- ${fmt2(descAdicional)}</td></tr>` : ""}
-        <tr style="border-top:2px solid #111"><td style="padding:7px 8px;font-size:14px;font-weight:800">Total a pagar Bs</td><td style="padding:7px 8px;font-size:14px;font-weight:800;text-align:right">${fmt2(venta.total)}</td></tr>
+        <tr style="border-top:2px solid #111"><td style="padding:7px 8px;font-size:14px;font-weight:800">Total a pagar Bs</td><td style="padding:7px 8px;font-size:14px;font-weight:800;text-align:right">${fmt2(displayTotal)}</td></tr>
       </table>
     </div>
-    <div style="background:#f8f8f8;border:1px solid #ccc;padding:8px 12px;border-radius:4px;font-size:10px;margin-bottom:14px">Son: <strong>${numeroALetras(venta.total)}</strong></div>
+    <div style="background:#f8f8f8;border:1px solid #ccc;padding:8px 12px;border-radius:4px;font-size:10px;margin-bottom:14px">Son: <strong>${numeroALetras(displayTotal)}</strong></div>
     <div style="border-top:1px dashed #aaa;padding-top:8px;text-align:center;font-size:9px;color:#888;margin-top:12px">Toscana House \xB7 ${SUCURSAL_EMP} \xB7 ${TELEFONO_EMP} \xB7 ${CIUDAD_EMP}</div>
   </div>`;
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">
@@ -24844,7 +24845,9 @@
     const num = numSecuencial || venta.id.replace(/\D/g, "").slice(-4).padStart(4, "0");
     const fmt2 = (n) => Number(n || 0).toLocaleString("es-BO", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     const subtotalBruto = venta.items.reduce((s, i) => s + i.precioUnit * i.cantidad, 0);
-    const descAdicional = subtotalBruto - venta.total;
+    const displayTotal = getDisplayTotal(venta);
+    const manualDescPct = Math.max(0, (venta.descPct || 0) - (venta.metodoPago === "tarjeta" ? 1.8 : 0));
+    const descAdicional = subtotalBruto - displayTotal;
     const rows = venta.items.map((it) => `
     <tr>
       <td>${it.codigo}</td>
@@ -24852,8 +24855,8 @@
       <td style="text-align:center">UNIDAD (BIENES)</td>
       <td style="text-align:center">${it.cantidad}</td>
       <td style="text-align:right">${fmt2(it.precioUnit)}</td>
-      <td style="text-align:right">${venta.descPct ? venta.descPct + "%" : "\u2014"}</td>
-      <td style="text-align:right">${fmt2(it.subtotal)}</td>
+      <td style="text-align:right">${manualDescPct ? manualDescPct + "%" : "\u2014"}</td>
+      <td style="text-align:right">${fmt2(it.precioUnit * it.cantidad * (1 - manualDescPct / 100))}</td>
     </tr>`).join("");
     win.document.write(`<!DOCTYPE html>
 <html lang="es"><head>
@@ -24921,11 +24924,11 @@
   <table class="tots">
     <tr><td>Subtotal:</td><td>${fmt2(subtotalBruto)}</td></tr>
     ${descAdicional > 0.01 ? `<tr><td>Descuento adicional:</td><td>- ${fmt2(descAdicional)}</td></tr>` : ""}
-    <tr><td>Total Valor:</td><td>${fmt2(venta.total)}</td></tr>
-    <tr class="tf"><td>Monto a pagar Bs</td><td>${fmt2(venta.total)}</td></tr>
+    <tr><td>Total Valor:</td><td>${fmt2(displayTotal)}</td></tr>
+    <tr class="tf"><td>Monto a pagar Bs</td><td>${fmt2(displayTotal)}</td></tr>
   </table>
 </div>
-<div class="letras">Son: <strong>${numeroALetras(venta.total)}</strong></div>
+<div class="letras">Son: <strong>${numeroALetras(displayTotal)}</strong></div>
 ${(() => {
       const fac = leerFacturaLocal(venta.id);
       if (!fac) return "";
@@ -27439,7 +27442,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       setAnulandoFac(false);
     }
     const filaInfo = (lbl, val) => /* @__PURE__ */ import_react.default.createElement("div", { style: { borderBottom: `1px solid ${C.sep}`, padding: "10px 0", display: "flex", justifyContent: "space-between", alignItems: "center" } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, color: C.label3, fontFamily: FONT } }, lbl), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, fontWeight: 500, color: C.label, fontFamily: FONT } }, val));
-    return /* @__PURE__ */ import_react.default.createElement(Sheet, { open: !!venta, onClose, title: "Detalle de Nota de venta", tall: true }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 16, flexWrap: "wrap" } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontFamily: "monospace", fontSize: 14, fontWeight: 700, color: C.label } }, "# ", num), /* @__PURE__ */ import_react.default.createElement(PagoDisplay, { mp: venta.metodoPago, total: venta.total }), venta.anulada ? /* @__PURE__ */ import_react.default.createElement(Chip, { color: C.red }, "\u2298 ANULADA") : /* @__PURE__ */ import_react.default.createElement(Chip, { color: C.green }, "\u2713 Pagado"), facturaGuardada && !facturaGuardada.anulada && /* @__PURE__ */ import_react.default.createElement(Chip, { color: C.blue }, "\u{1F9FE} Facturada"), facturaGuardada?.anulada && /* @__PURE__ */ import_react.default.createElement(Chip, { color: C.amber }, "\u{1F9FE} Factura anulada")), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+    return /* @__PURE__ */ import_react.default.createElement(Sheet, { open: !!venta, onClose, title: "Detalle de Nota de venta", tall: true }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 16, flexWrap: "wrap" } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontFamily: "monospace", fontSize: 14, fontWeight: 700, color: C.label } }, "# ", num), /* @__PURE__ */ import_react.default.createElement(PagoDisplay, { mp: venta.metodoPago, total: getDisplayTotal(venta) }), venta.anulada ? /* @__PURE__ */ import_react.default.createElement(Chip, { color: C.red }, "\u2298 ANULADA") : /* @__PURE__ */ import_react.default.createElement(Chip, { color: C.green }, "\u2713 Pagado"), facturaGuardada && !facturaGuardada.anulada && /* @__PURE__ */ import_react.default.createElement(Chip, { color: C.blue }, "\u{1F9FE} Facturada"), facturaGuardada?.anulada && /* @__PURE__ */ import_react.default.createElement(Chip, { color: C.amber }, "\u{1F9FE} Factura anulada")), /* @__PURE__ */ import_react.default.createElement("div", { style: {
       background: C.bg2,
       borderRadius: 14,
       padding: "0 16px",
@@ -29886,7 +29889,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
         border: `1px solid ${C.sep}`,
         marginBottom: 20,
         boxShadow: "0 1px 6px rgba(0,0,0,0.04)"
-      } }, /* @__PURE__ */ import_react.default.createElement(FilaInfo, { lbl: "Fecha", val: `${venta.fecha} ${venta.hora}` }), /* @__PURE__ */ import_react.default.createElement(FilaInfo, { lbl: "Vendedor", val: venta.vendedor || "Tienda" }), /* @__PURE__ */ import_react.default.createElement(FilaInfo, { lbl: "M\xE9todo de pago", val: /* @__PURE__ */ import_react.default.createElement(PagoDisplay, { mp: venta.metodoPago, total: venta.total, small: true }) }), /* @__PURE__ */ import_react.default.createElement(FilaInfo, { lbl: "Estado", val: venta.anulada ? "Anulada" : "Completada" }), venta.descPct > 0 && /* @__PURE__ */ import_react.default.createElement(FilaInfo, { lbl: "Descuento", val: `${venta.descPct}%` })), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      } }, /* @__PURE__ */ import_react.default.createElement(FilaInfo, { lbl: "Fecha", val: `${venta.fecha} ${venta.hora}` }), /* @__PURE__ */ import_react.default.createElement(FilaInfo, { lbl: "Vendedor", val: venta.vendedor || "Tienda" }), /* @__PURE__ */ import_react.default.createElement(FilaInfo, { lbl: "M\xE9todo de pago", val: /* @__PURE__ */ import_react.default.createElement(PagoDisplay, { mp: venta.metodoPago, total: getDisplayTotal(venta), small: true }) }), /* @__PURE__ */ import_react.default.createElement(FilaInfo, { lbl: "Estado", val: venta.anulada ? "Anulada" : "Completada" }), venta.descPct > 0 && /* @__PURE__ */ import_react.default.createElement(FilaInfo, { lbl: "Descuento", val: `${venta.descPct}%` })), /* @__PURE__ */ import_react.default.createElement("div", { style: {
         fontSize: 11,
         fontWeight: 700,
         color: C.label3,
@@ -29983,7 +29986,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
         justifyContent: "space-between",
         alignItems: "center",
         marginBottom: 12
-      } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 15, fontWeight: 700, color: C.label, fontFamily: FONT } }, "N\xB0 ", num), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT, marginTop: 2 } }, venta.fecha, " \xB7 Total ", $(venta.total))), /* @__PURE__ */ import_react.default.createElement("span", { style: {
+      } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 15, fontWeight: 700, color: C.label, fontFamily: FONT } }, "N\xB0 ", num), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT, marginTop: 2 } }, venta.fecha, " \xB7 Total ", $(getDisplayTotal(venta)))), /* @__PURE__ */ import_react.default.createElement("span", { style: {
         fontSize: 12,
         fontWeight: 700,
         color: C.label3,
@@ -38706,7 +38709,7 @@ Se registrar\xE1 que los faltantes/sobrantes fueron verificados f\xEDsicamente y
               background: `${C.gold}18`,
               padding: "2px 7px",
               borderRadius: 5
-            } }, v.id), /* @__PURE__ */ import_react.default.createElement(PagoDisplay, { mp: v.metodoPago, total: v.total, small: true })), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT_UI, opacity: 0.55, marginBottom: 6 } }, v.fecha, " \xB7 ", v.hora), v.itsMarca.map((it, ii) => /* @__PURE__ */ import_react.default.createElement(
+            } }, v.id), /* @__PURE__ */ import_react.default.createElement(PagoDisplay, { mp: v.metodoPago, total: getDisplayTotal(v), small: true })), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT_UI, opacity: 0.55, marginBottom: 6 } }, v.fecha, " \xB7 ", v.hora), v.itsMarca.map((it, ii) => /* @__PURE__ */ import_react.default.createElement(
               "div",
               {
                 key: `${v.id}-${it.prodId}-${ii}`,
@@ -39418,7 +39421,7 @@ Se registrar\xE1 que los faltantes/sobrantes fueron verificados f\xEDsicamente y
             borderLeft: `3px solid ${colorPago(v.metodoPago) || C.sep}`
           }
         },
-        /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 5, marginBottom: 2, flexWrap: "wrap" } }, /* @__PURE__ */ import_react.default.createElement(PagoDisplay, { mp: v.metodoPago, total: v.total, small: true }), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 9, color: C.label3, fontFamily: FONT, opacity: 0.7 } }, v.fecha, " ", v.hora)), v.items.map((it, ii) => {
+        /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 5, marginBottom: 2, flexWrap: "wrap" } }, /* @__PURE__ */ import_react.default.createElement(PagoDisplay, { mp: v.metodoPago, total: getDisplayTotal(v), small: true }), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 9, color: C.label3, fontFamily: FONT, opacity: 0.7 } }, v.fecha, " ", v.hora)), v.items.map((it, ii) => {
           const m = MARCAS.find((x) => x.id === it.marcaId);
           return /* @__PURE__ */ import_react.default.createElement("div", { key: ii, style: {
             fontSize: 11,
@@ -39436,7 +39439,7 @@ Se registrar\xE1 que los faltantes/sobrantes fueron verificados f\xEDsicamente y
           color: C.label,
           fontFamily: FONT,
           letterSpacing: "-0.02em"
-        } }, $(v.total))))
+        } }, $(getDisplayTotal(v)))))
       );
     })), vista === "stock" && /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT, marginBottom: 12 } }, "Inventario registrado \u2014 estado actual"), inv.length === 0 ? /* @__PURE__ */ import_react.default.createElement(EmptyState, { icon: "\u{1F4E6}", title: "Sin productos en inventario" }) : MARCAS.map((m) => {
       const prods = inv.filter((i) => i.marcaId === m.id);
@@ -41869,7 +41872,7 @@ Esta acci\xF3n no se puede deshacer.`,
           borderLeft: `3px solid ${v.anulada ? C.red : colorPago(v.metodoPago) || C.sep}`
         }
       },
-      /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 5, marginBottom: 2, flexWrap: "wrap" } }, /* @__PURE__ */ import_react.default.createElement(PagoDisplay, { mp: v.metodoPago, total: v.total, small: true }), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 9, color: C.label3, fontFamily: FONT, opacity: 0.7 } }, v.fecha, " \xB7 ", v.vendedor || "Tienda"), v.anulada && /* @__PURE__ */ import_react.default.createElement("span", { style: {
+      /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 5, marginBottom: 2, flexWrap: "wrap" } }, /* @__PURE__ */ import_react.default.createElement(PagoDisplay, { mp: v.metodoPago, total: getDisplayTotal(v), small: true }), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 9, color: C.label3, fontFamily: FONT, opacity: 0.7 } }, v.fecha, " \xB7 ", v.vendedor || "Tienda"), v.anulada && /* @__PURE__ */ import_react.default.createElement("span", { style: {
         fontSize: 8,
         background: C.redBg,
         color: C.red,
@@ -41894,7 +41897,7 @@ Esta acci\xF3n no se puede deshacer.`,
         fontFamily: FONT,
         letterSpacing: "-0.02em",
         textDecoration: v.anulada ? "line-through" : "none"
-      } }, $(v.total)), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 9, color: C.label3, fontFamily: FONT, marginTop: 1, opacity: 0.6 } }, v.items.length, " \xEDtem", v.items.length !== 1 ? "s" : "")))
+      } }, $(getDisplayTotal(v))), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 9, color: C.label3, fontFamily: FONT, marginTop: 1, opacity: 0.6 } }, v.items.length, " \xEDtem", v.items.length !== 1 ? "s" : "")))
     ))), vistaD === "busqueda" && /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { position: "relative", marginBottom: 14 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: {
       position: "absolute",
       left: 12,
@@ -41943,7 +41946,7 @@ Esta acci\xF3n no se puede deshacer.`,
             WebkitTapHighlightColor: "transparent"
           }
         },
-        /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 5 } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontFamily: "monospace", fontSize: 10, color: C.label3 } }, v.id), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT } }, v.fecha, " \xB7 ", v.vendedor || "Tienda")), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 14, fontWeight: 700, color: C.label, fontFamily: FONT } }, $(v.total))),
+        /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 5 } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontFamily: "monospace", fontSize: 10, color: C.label3 } }, v.id), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT } }, v.fecha, " \xB7 ", v.vendedor || "Tienda")), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 14, fontWeight: 700, color: C.label, fontFamily: FONT } }, $(getDisplayTotal(v)))),
         /* @__PURE__ */ import_react.default.createElement("div", { style: { borderTop: `1px solid ${C.sep}`, paddingTop: 5 } }, itsMatch.map((it, i) => /* @__PURE__ */ import_react.default.createElement("div", { key: i, style: {
           display: "flex",
           justifyContent: "space-between",
