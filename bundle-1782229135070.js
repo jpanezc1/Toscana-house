@@ -22885,7 +22885,7 @@
   var PAGOS = [
     { id: "efectivo", label: "Efectivo", icon: "\u{1F4B5}", desc: 0, color: "#4A9B6F" },
     { id: "qr", label: "QR", icon: "\u{1F4F1}", desc: 0, color: "#5B8DB8" },
-    { id: "tarjeta", label: "Tarjeta", icon: "\u{1F4B3}", desc: 1.8, color: "#C8922A" }
+    { id: "tarjeta", label: "Tarjeta", icon: "\u{1F4B3}", desc: 0, color: "#C8922A" }
   ];
   function labelPago(mp) {
     if (!mp) return "\u2014";
@@ -34399,7 +34399,7 @@ Motivo: ${motivo}` : ""}`)) {
     } }, "Conciliaci\xF3n de pagos"), [
       { label: "Efectivo", val: liqEf, n: vMes.filter((v) => v.metodoPago === "efectivo").length, color: C.green, icon: "\u{1F4B5}" },
       { label: "QR", val: liqQr, n: vMes.filter((v) => v.metodoPago === "qr").length, color: C.blue, icon: "\u{1F4F1}" },
-      { label: "Tarjeta (+1.8%)", val: liqTj, n: vMes.filter((v) => v.metodoPago === "tarjeta").length, color: C.amber, icon: "\u{1F4B3}" }
+      { label: "Tarjeta", val: liqTj, n: vMes.filter((v) => v.metodoPago === "tarjeta").length, color: C.amber, icon: "\u{1F4B3}" }
     ].map((p, i, arr) => /* @__PURE__ */ import_react.default.createElement("div", { key: p.label, style: {
       display: "flex",
       justifyContent: "space-between",
@@ -35644,7 +35644,7 @@ ${sinStock.map((it) => {
       fontSize: 13,
       color: C.amber,
       fontFamily: FONT
-    } }, "\u{1F4B3} Descuento 1.8% por tarjeta aplicado autom\xE1ticamente"), pago === "qr" && total > 0 && /* @__PURE__ */ import_react.default.createElement(QRPagoPanel, { total, refVenta: qrRefVenta })), pagoMixto && !pagoGC && /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 16 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { background: C.bg2, borderRadius: 14, padding: 16, border: `1px solid ${C.sep}`, marginBottom: 10 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT, marginBottom: 12, textAlign: "center" } }, "Total a cobrar: ", /* @__PURE__ */ import_react.default.createElement("strong", { style: { color: C.label } }, $(total)), " \u2014 distribuye entre los m\xE9todos"), PAGOS.map(function(p) {
+    } }, "\u{1F4B3} Comisi\xF3n bancaria 1.8% se descuenta de la liquidaci\xF3n de la marca"), pago === "qr" && total > 0 && /* @__PURE__ */ import_react.default.createElement(QRPagoPanel, { total, refVenta: qrRefVenta })), pagoMixto && !pagoGC && /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 16 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { background: C.bg2, borderRadius: 14, padding: 16, border: `1px solid ${C.sep}`, marginBottom: 10 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT, marginBottom: 12, textAlign: "center" } }, "Total a cobrar: ", /* @__PURE__ */ import_react.default.createElement("strong", { style: { color: C.label } }, $(total)), " \u2014 distribuye entre los m\xE9todos"), PAGOS.map(function(p) {
       var val = montosMixtos[p.id] || "";
       return /* @__PURE__ */ import_react.default.createElement("div", { key: p.id, style: { marginBottom: 12 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10, marginBottom: 6 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 20 } }, p.icon), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 14, fontWeight: 600, color: C.label, fontFamily: FONT } }, p.label)), /* @__PURE__ */ import_react.default.createElement("div", { style: { position: "relative" } }, /* @__PURE__ */ import_react.default.createElement("span", { style: {
         position: "absolute",
