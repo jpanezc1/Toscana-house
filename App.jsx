@@ -808,6 +808,19 @@ function BarcodeDisplay({ codigo, small }) {
 
 // Extrae el color del campo descripcion ("TALLA: X · COLOR: Y")
 function extraerColor(desc){ const m=(desc||"").match(/COLOR:\s*([^·\n]+)/i); return m?m[1].trim():""; }
+function extraerTalla(desc){ const m=(desc||"").match(/TALLA:\s*([^·\n]+)/i); return m?m[1].trim():""; }
+
+// Construye la línea completa para etiqueta e inventario: NOMBRE TALLA X COLOR Y
+// Igual en ambos lados — si el nombre ya incluye talla/color no los duplica
+function lineaEtiqueta(nombre, descripcion){
+  const nom = (nombre||"").toUpperCase().trim();
+  const talla = extraerTalla(descripcion);
+  const color = extraerColor(descripcion);
+  const partes = [nom];
+  if(talla && !nom.includes(talla.toUpperCase())) partes.push("TALLA "+talla.toUpperCase());
+  if(color && !nom.includes(color.toUpperCase())) partes.push("COLOR "+color.toUpperCase());
+  return partes.join(" ");
+}
 
 // Retorna el total real de una venta para display: precio lleno de los items
 // menos solo el descuento manual (nunca la comisión bancaria de tarjeta).
@@ -886,9 +899,7 @@ async function imprimirTicket(producto, marcaNombre) {
 </head>
 <body>
   <div class="top"><span>${marcaNombre}</span><span style="font-weight:bold">TOSCANA HOUSE</span></div>
-  <div class="producto">${abreviarNombre(producto.nombre)}</div>
-  ${producto.descripcion?`<div class="color-row">${producto.descripcion.toUpperCase()}</div>`:""}
-  ${extraerColor(producto.descripcion)?`<div class="color-row">Color: ${extraerColor(producto.descripcion)}</div>`:""}
+  <div class="producto">${abreviarNombre(lineaEtiqueta(producto.nombre, producto.descripcion))}</div>
   <div class="barcode-wrap">
     <svg id="barcode"></svg>
   </div>
@@ -930,18 +941,13 @@ function imprimirEtiquetasLote(items) {
   );
 
   const etiquetas = items.map((it, idx) => {
-    const nombre  = abreviarNombre((it.nombre || it.desc || "").toUpperCase());
     const codigo  = (it.codigo || it.sku || "").toUpperCase();
     const precio  = it.precio || 0;
     const marca   = it.marcaNombre || it.marca || "";
-    const desc    = (it.descripcion||"").toUpperCase();
-    const color   = extraerColor(it.descripcion);
     return `
       <div class="label">
         <div class="top"><span>${marca.toUpperCase()}</span><span style="font-weight:bold">TOSCANA HOUSE</span></div>
-        <div class="producto">${nombre}</div>
-        ${desc?`<div class="color-row">${desc}</div>`:""}
-        ${color?`<div class="color-row">Color: ${color}</div>`:""}
+        <div class="producto">${abreviarNombre(lineaEtiqueta(it.nombre||it.desc||"", it.descripcion||""))}</div>
         <div class="barcode-wrap"><svg id="bc-${idx}"></svg></div>
         <div class="bottom-row">
           <span class="codigo">${codigo}</span>
