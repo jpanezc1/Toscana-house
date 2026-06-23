@@ -28671,8 +28671,8 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
           const n2 = parseInt(s);
           return isNaN(n2) ? 0 : n2;
         }, descKey = function(marca, nombre, talla, color) {
-          const n2 = (s) => String(s || "").toUpperCase().trim().replace(/\s+/g, " ");
-          return [n2(marca), n2(nombre), n2(talla), n2(color)].join("|");
+          const nk = (s) => norm(String(s || "")).toUpperCase().trim().replace(/\s+/g, " ");
+          return [nk(marca), nk(nombre), nk(talla), nk(color)].join("|");
         };
         const XLSX = await loadXLSX();
         const buf = await file.arrayBuffer();

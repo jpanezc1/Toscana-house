@@ -7129,8 +7129,8 @@ function ImportarExcelModal({inv, onImportar, onClose, onArchivoCapturado}){
       // ── Índice de descripción existente → producto del inventario ─────
       // Clave: marca|nombre|talla|color — permite detectar mismo item con código diferente
       function descKey(marca, nombre, talla, color){
-        const n=s=>String(s||"").toUpperCase().trim().replace(/\s+/g," ");
-        return [n(marca),n(nombre),n(talla),n(color)].join("|");
+        const nk=s=>norm(String(s||"")).toUpperCase().trim().replace(/\s+/g," ");
+        return [nk(marca),nk(nombre),nk(talla),nk(color)].join("|");
       }
       const descExistente = new Map();
       for(const p of inv){
