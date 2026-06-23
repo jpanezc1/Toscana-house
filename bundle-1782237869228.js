@@ -25427,7 +25427,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
   }
   function DesktopSidebar({ tabs, active, onChange, user, logout, groups: customGroups, dotColors: customDot }) {
     const GROUPS = customGroups || [
-      { label: "Principal", ids: ["inicio", "pos", "ventas"] },
+      { label: "Principal", ids: ["inicio", "pos", "ventas", "cambios"] },
       { label: "Gesti\xF3n", ids: ["inventario", "marcas", "liquidaciones", "giftcards"] },
       { label: "Sistema", ids: ["auditoria", "cargas", "config"] }
     ];

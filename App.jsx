@@ -3897,7 +3897,7 @@ function NavBar({title, subtitle, back, onBack, right}){
 // ── Atelier Desktop Sidebar ──────────────────────────────────────────────────
 function DesktopSidebar({tabs, active, onChange, user, logout, groups: customGroups, dotColors: customDot}){
   const GROUPS = customGroups || [
-    {label:"Principal", ids:["inicio","pos","ventas"]},
+    {label:"Principal", ids:["inicio","pos","ventas","cambios"]},
     {label:"Gestión",   ids:["inventario","marcas","liquidaciones","giftcards"]},
     {label:"Sistema",   ids:["auditoria","cargas","config"]},
   ];
