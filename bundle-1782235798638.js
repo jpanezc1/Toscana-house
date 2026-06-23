@@ -33960,6 +33960,26 @@ Motivo: ${motivo}` : ""}`)) {
       }, user);
       return vf;
     }
+    function handleCambio(cambio) {
+      cambio.itemsDevueltos.forEach((it) => {
+        const prod = inv.find((i) => i.id === it.prodId);
+        if (!prod) return;
+        const nuevoStock = prod.stock + it.cantidad;
+        setInv((p) => p.map((i) => i.id === it.prodId ? { ...i, stock: nuevoStock } : i));
+        syncConRespaldo("stock", { prodId: it.prodId, stock: nuevoStock }, () => sbActualizarStock(it.prodId, nuevoStock));
+      });
+      cambio.itemsNuevos.forEach((it) => {
+        const prod = inv.find((i) => i.id === it.prodId);
+        if (!prod) return;
+        const nuevoStock = Math.max(0, prod.stock - it.cantidad);
+        setInv((p) => p.map((i) => i.id === it.prodId ? { ...i, stock: nuevoStock } : i));
+        syncConRespaldo("stock", { prodId: it.prodId, stock: nuevoStock }, () => sbActualizarStock(it.prodId, nuevoStock));
+      });
+      logAudit("CAMBIO", {
+        resumen: `Cambio ${cambio.id} \xB7 Venta origen ${cambio.ventaOriginalId} \xB7 Dif Bs ${cambio.diferencia.toFixed(2)}`,
+        ...cambio
+      }, user);
+    }
     function handleAnularVenta(ventaId) {
       const v = ventas.find((x) => x.id === ventaId);
       if (!v || v.anulada) return;
@@ -34017,11 +34037,12 @@ Motivo: ${motivo}` : ""}`)) {
       { id: "auditoria", icon: "\u2316", label: "Verificaci\xF3n" },
       { id: "cargas", icon: "\u{1F9FE}", label: "Cargas" },
       { id: "marcas", icon: "\u25C6", label: "Marcas" },
+      { id: "cambios", icon: "\u21A9", label: "Cambios" },
       { id: "liquidaciones", icon: "\u25CE", label: "Liquidar" },
       { id: "giftcards", icon: "\u{1F381}", label: "Gift" },
       { id: "config", icon: "\u2699", label: "Config" }
     ];
-    const TABS = user?.rol === "caja" ? TABS_ALL.filter((t) => ["inicio", "pos", "ventas"].includes(t.id)) : user?.rol === "admin" ? TABS_ALL : TABS_ALL.filter((t) => t.id !== "auditoria" && t.id !== "cargas");
+    const TABS = user?.rol === "caja" ? TABS_ALL.filter((t) => ["inicio", "pos", "ventas", "cambios"].includes(t.id)) : user?.rol === "admin" ? TABS_ALL : TABS_ALL.filter((t) => t.id !== "auditoria" && t.id !== "cargas");
     const showingDetail = tab === "marcas" && marcaDetalle;
     if (!authReady) return /* @__PURE__ */ import_react.default.createElement("div", { style: {
       minHeight: "100vh",
@@ -34233,7 +34254,7 @@ Motivo: ${motivo}` : ""}`)) {
         onGoVerif: () => setTab("auditoria"),
         tabActual: tab
       }
-    )), tab === "cargas" && /* @__PURE__ */ import_react.default.createElement(RegistroCargas, { cargas: cargasCompletas, marcas: MARCAS, onVerificar: handleVerificarCarga, user }), tab === "marcas" && !marcaDetalle && /* @__PURE__ */ import_react.default.createElement("div", null, marcasState.filter((m) => m.estado === "inactiva").length > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: {
+    )), tab === "cargas" && /* @__PURE__ */ import_react.default.createElement(RegistroCargas, { cargas: cargasCompletas, marcas: MARCAS, onVerificar: handleVerificarCarga, user }), tab === "cambios" && /* @__PURE__ */ import_react.default.createElement(CambiosTab, { inv, ventas, onCambio: handleCambio }), tab === "marcas" && !marcaDetalle && /* @__PURE__ */ import_react.default.createElement("div", null, marcasState.filter((m) => m.estado === "inactiva").length > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: {
       fontSize: 13,
       fontWeight: 600,
       color: C.label3,
@@ -37414,6 +37435,445 @@ Se registrar\xE1 que los faltantes/sobrantes fueron verificados f\xEDsicamente y
         })()), /* @__PURE__ */ import_react.default.createElement("div", { style: { marginTop: 10 } }, /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => exportAuditoriaExcel(a), full: true, small: true, icon: "\u2B07" }, "Exportar Excel"))));
       }));
     })());
+  }
+  function CambiosTab({ inv, ventas, onCambio }) {
+    const isDesktop = useIsDesktop();
+    const [paso, setPaso] = (0, import_react.useState)(1);
+    const [busqVenta, setBusqVenta] = (0, import_react.useState)("");
+    const [ventaOrigen, setVentaOrigen] = (0, import_react.useState)(null);
+    const [devueltos, setDevueltos] = (0, import_react.useState)([]);
+    const [nuevos, setNuevos] = (0, import_react.useState)([]);
+    const [busqNuevo, setBusqNuevo] = (0, import_react.useState)("");
+    const [metodoPago, setMetodoPago] = (0, import_react.useState)("efectivo");
+    const [vendedor, setVendedor] = (0, import_react.useState)("");
+    const [notas, setNotas] = (0, import_react.useState)("");
+    const [done, setDone] = (0, import_react.useState)(null);
+    const resultadosBusq = (0, import_react.useMemo)(() => {
+      const q = busqVenta.trim().toUpperCase();
+      if (!q) return [];
+      return ventas.filter(
+        (v) => !v.anulada && (v.id.toUpperCase().includes(q) || (v.items || []).some((it) => it.codigo.toUpperCase().includes(q) || it.nombre.toUpperCase().includes(q)))
+      ).slice(0, 6);
+    }, [ventas, busqVenta]);
+    const resultadosNuevo = (0, import_react.useMemo)(() => {
+      const q = busqNuevo.toLowerCase().replace(/'/g, "-");
+      if (!q || q.length < 2) return [];
+      return inv.filter((i) => i.stock > 0 && (i.nombre.toLowerCase().includes(q) || i.codigo.toLowerCase().includes(q) || (i.categoria || "").toLowerCase().includes(q))).slice(0, 6);
+    }, [inv, busqNuevo]);
+    const totalDev = devueltos.reduce((s, it) => s + it.precioUnit * (it.cantDev || 1), 0);
+    const totalNuevo = nuevos.reduce((s, it) => s + it.precio * it.cantidad, 0);
+    const diferencia = totalNuevo - totalDev;
+    function seleccionarVenta(v) {
+      setVentaOrigen(v);
+      setDevueltos(v.items.map((it) => ({ ...it, cantDev: it.cantidad, selec: true })));
+      setBusqVenta("");
+      setPaso(2);
+    }
+    function toggleDevuelto(prodId) {
+      setDevueltos((p) => p.map((it) => it.prodId === prodId ? { ...it, selec: !it.selec } : it));
+    }
+    function setCantDev(prodId, n) {
+      setDevueltos((p) => p.map((it) => it.prodId === prodId ? { ...it, cantDev: Math.max(1, Math.min(it.cantidad, n)) } : it));
+    }
+    function agregarNuevo(prod) {
+      setNuevos((p) => {
+        const ex = p.find((x) => x.id === prod.id);
+        if (ex) return p.map((x) => x.id === prod.id ? { ...x, cantidad: Math.min(prod.stock, x.cantidad + 1) } : x);
+        return [...p, { ...prod, cantidad: 1 }];
+      });
+      setBusqNuevo("");
+    }
+    function quitarNuevo(id) {
+      setNuevos((p) => p.filter((x) => x.id !== id));
+    }
+    function setCantNuevo(id, n) {
+      setNuevos((p) => p.map((x) => x.id === id ? { ...x, cantidad: Math.max(1, Math.min(inv.find((i) => i.id === id)?.stock || 1, n)) } : x));
+    }
+    function confirmar() {
+      const id = `CAM${Date.now()}`;
+      const itemsDevueltos = devueltos.filter((it) => it.selec).map((it) => ({
+        prodId: it.prodId,
+        codigo: it.codigo,
+        nombre: it.nombre,
+        marcaId: it.marcaId,
+        marcaNombre: it.marcaNombre,
+        cantidad: it.cantDev,
+        precioUnit: it.precioUnit
+      }));
+      const itemsNuevos = nuevos.map((it) => ({
+        prodId: it.id,
+        codigo: it.codigo,
+        nombre: it.nombre,
+        marcaId: it.marcaId,
+        marcaNombre: it.marcaNombre,
+        cantidad: it.cantidad,
+        precioUnit: it.precio
+      }));
+      const cambio = {
+        id,
+        fecha: hoy(),
+        hora: hora(),
+        ventaOriginalId: ventaOrigen.id,
+        itemsDevueltos,
+        itemsNuevos,
+        totalDevuelto: totalDev,
+        totalNuevo,
+        diferencia,
+        metodoPago: diferencia > 0 ? metodoPago : "\u2014",
+        vendedor: vendedor || "Tienda",
+        notas
+      };
+      onCambio(cambio);
+      setDone(cambio);
+    }
+    function reset() {
+      setPaso(1);
+      setVentaOrigen(null);
+      setDevueltos([]);
+      setNuevos([]);
+      setBusqVenta("");
+      setBusqNuevo("");
+      setMetodoPago("efectivo");
+      setVendedor("");
+      setNotas("");
+      setDone(null);
+    }
+    function imprimirNotaCambio(c) {
+      const win = window.open("", "_blank", "width=700,height=800");
+      if (!win) {
+        alert("Activ\xE1 las ventanas emergentes");
+        return;
+      }
+      const fmt2 = (n) => Number(n || 0).toLocaleString("es-BO", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      const rowsDev = c.itemsDevueltos.map((it) => `<tr><td>${it.nombre}</td><td style="text-align:center">${it.cantidad}</td><td style="text-align:right">Bs ${fmt2(it.precioUnit)}</td><td style="text-align:right">Bs ${fmt2(it.precioUnit * it.cantidad)}</td></tr>`).join("");
+      const rowsNuevo = c.itemsNuevos.map((it) => `<tr><td>${it.nombre}</td><td style="text-align:center">${it.cantidad}</td><td style="text-align:right">Bs ${fmt2(it.precioUnit)}</td><td style="text-align:right">Bs ${fmt2(it.precioUnit * it.cantidad)}</td></tr>`).join("");
+      win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Nota de Cambio ${c.id}</title>
+<style>@page{size:A5;margin:15mm} *{box-sizing:border-box;margin:0;padding:0} body{font-family:Arial,sans-serif;font-size:11px;color:#111}
+.hdr{display:flex;justify-content:space-between;border-bottom:2px solid #111;padding-bottom:10px;margin-bottom:12px}
+.logo{font-size:18px;font-weight:900;letter-spacing:2px} .logo-sub{font-size:7px;letter-spacing:4px;color:#666}
+h3{font-size:12px;font-weight:700;text-transform:uppercase;margin:12px 0 6px;border-bottom:1px solid #ddd;padding-bottom:4px}
+table{width:100%;border-collapse:collapse;margin-bottom:10px} th,td{padding:5px 6px;font-size:10px;border-bottom:1px solid #eee}
+th{background:#f5f5f5;text-transform:uppercase;font-size:9px} .tot{font-weight:800;font-size:13px}
+.dif{padding:8px 10px;border-radius:6px;margin:8px 0;font-size:13px;font-weight:700}
+.dif.paga{background:#fff3cd;border:1px solid #ffc107} .dif.devol{background:#d4edda;border:1px solid #28a745}
+.foot{text-align:center;font-size:9px;color:#888;margin-top:16px;border-top:1px dashed #ccc;padding-top:8px}
+@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}</style></head><body>
+<div class="hdr"><div><div class="logo">Toscana House</div><div class="logo-sub">CASA DE MODA</div></div>
+<div style="text-align:right"><strong>NOTA DE CAMBIO</strong><br/>${c.id}<br/>${c.fecha} ${c.hora}</div></div>
+<p style="margin-bottom:4px">Venta original: <strong>${c.ventaOriginalId}</strong> &nbsp;|&nbsp; Atendido por: <strong>${c.vendedor}</strong></p>
+${c.notas ? `<p style="color:#666;font-size:10px;margin-bottom:8px">Nota: ${c.notas}</p>` : ""}
+<h3>\u21A9 Prendas devueltas</h3>
+<table><thead><tr><th>Descripci\xF3n</th><th>Cant.</th><th>P.Unit.</th><th>Total</th></tr></thead><tbody>${rowsDev}</tbody>
+<tfoot><tr><td colspan="3" style="font-weight:700;text-align:right">Total devuelto</td><td style="font-weight:700;text-align:right">Bs ${fmt2(c.totalDevuelto)}</td></tr></tfoot></table>
+<h3>\u2726 Prendas nuevas</h3>
+<table><thead><tr><th>Descripci\xF3n</th><th>Cant.</th><th>P.Unit.</th><th>Total</th></tr></thead><tbody>${rowsNuevo}</tbody>
+<tfoot><tr><td colspan="3" style="font-weight:700;text-align:right">Total nuevo</td><td style="font-weight:700;text-align:right">Bs ${fmt2(c.totalNuevo)}</td></tr></tfoot></table>
+<div class="dif ${c.diferencia > 0.01 ? "paga" : "devol"}">
+${c.diferencia > 0.01 ? `Cliente paga diferencia: Bs ${fmt2(c.diferencia)} (${c.metodoPago})` : c.diferencia < -0.01 ? `Tienda devuelve: Bs ${fmt2(Math.abs(c.diferencia))}` : `Sin diferencia de precio`}</div>
+<div class="foot">Toscana House \xB7 Cambio procesado el ${c.fecha} a las ${c.hora}</div>
+<script>window.onload=function(){setTimeout(function(){window.print();},600);}<\/script></body></html>`);
+      win.document.close();
+    }
+    if (done) return /* @__PURE__ */ import_react.default.createElement("div", { style: { maxWidth: 560, margin: "0 auto", padding: 16 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { background: C.greenBg, border: `1.5px solid ${C.green}`, borderRadius: 16, padding: 24, textAlign: "center", marginBottom: 20 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 32, marginBottom: 8 } }, "\u2713"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 18, fontWeight: 700, color: C.label, fontFamily: FONT } }, "Cambio registrado"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.label2, fontFamily: FONT, marginTop: 4 } }, done.id, " \xB7 ", done.fecha), Math.abs(done.diferencia) > 0.01 && /* @__PURE__ */ import_react.default.createElement("div", { style: { marginTop: 10, fontSize: 14, fontWeight: 600, color: done.diferencia > 0 ? C.amber : C.green, fontFamily: FONT } }, done.diferencia > 0 ? `Cliente pag\xF3 Bs ${done.diferencia.toFixed(2)} adicional` : `Tienda devolvi\xF3 Bs ${Math.abs(done.diferencia).toFixed(2)}`)), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 10, marginBottom: 12 } }, /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => imprimirNotaCambio(done), variant: "fill", full: true, icon: "\u{1F5A8}" }, "Imprimir nota")), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: reset, full: true }, "Nuevo cambio"));
+    if (paso === 1) return /* @__PURE__ */ import_react.default.createElement("div", { style: { maxWidth: 560, margin: "0 auto", padding: 16 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.label3, fontFamily: FONT, marginBottom: 16 } }, "Busc\xE1 la venta original por ID o c\xF3digo / nombre de prenda."), /* @__PURE__ */ import_react.default.createElement(
+      IOSInput,
+      {
+        label: "Buscar venta",
+        value: busqVenta,
+        onChange: (e) => setBusqVenta(e.target.value),
+        placeholder: "ID de venta o nombre/c\xF3digo de prenda",
+        autoFocus: true
+      }
+    ), resultadosBusq.length > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: { background: C.bg2, borderRadius: 14, overflow: "hidden", border: `1px solid ${C.sep}`, marginTop: 4 } }, resultadosBusq.map((v, i) => /* @__PURE__ */ import_react.default.createElement(
+      "div",
+      {
+        key: v.id,
+        onClick: () => seleccionarVenta(v),
+        style: {
+          padding: "12px 16px",
+          borderBottom: i < resultadosBusq.length - 1 ? `1px solid ${C.sep}` : "",
+          cursor: "pointer",
+          WebkitTapHighlightColor: "transparent"
+        }
+      },
+      /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center" } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("span", { style: {
+        fontFamily: "monospace",
+        fontSize: 11,
+        color: C.gold,
+        fontWeight: 600,
+        background: `${C.gold}18`,
+        padding: "2px 6px",
+        borderRadius: 4
+      } }, v.id), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 12, color: C.label3, fontFamily: FONT, marginLeft: 8 } }, v.fecha)), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, fontWeight: 700, color: C.label, fontFamily: FONT } }, "Bs ", getDisplayTotal(v))),
+      /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label2, fontFamily: FONT, marginTop: 3 } }, (v.items || []).map((it) => it.nombre).join(" \xB7 ").slice(0, 80))
+    ))), busqVenta.trim() && resultadosBusq.length === 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center", padding: 24, color: C.label3, fontFamily: FONT, fontSize: 13 } }, 'Sin resultados para "', busqVenta, '"'));
+    if (paso === 2) return /* @__PURE__ */ import_react.default.createElement("div", { style: { maxWidth: 560, margin: "0 auto", padding: 16 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10, marginBottom: 16 } }, /* @__PURE__ */ import_react.default.createElement(
+      "button",
+      {
+        onClick: () => {
+          setPaso(1);
+          setVentaOrigen(null);
+        },
+        style: { background: "none", border: "none", fontSize: 20, cursor: "pointer", color: C.label2 }
+      },
+      "\u2039"
+    ), /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, fontWeight: 700, color: C.label, fontFamily: FONT } }, "Prendas a devolver"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT } }, "Venta ", ventaOrigen.id, " \xB7 ", ventaOrigen.fecha))), /* @__PURE__ */ import_react.default.createElement("div", { style: { background: C.bg2, borderRadius: 14, overflow: "hidden", border: `1px solid ${C.sep}`, marginBottom: 16 } }, devueltos.map((it, i) => /* @__PURE__ */ import_react.default.createElement("div", { key: it.prodId, style: {
+      padding: "12px 16px",
+      borderBottom: i < devueltos.length - 1 ? `1px solid ${C.sep}` : "",
+      opacity: it.selec ? 1 : 0.45,
+      transition: "opacity .15s"
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 12 } }, /* @__PURE__ */ import_react.default.createElement(
+      "input",
+      {
+        type: "checkbox",
+        checked: !!it.selec,
+        onChange: () => toggleDevuelto(it.prodId),
+        style: { width: 18, height: 18, cursor: "pointer", accentColor: C.gold }
+      }
+    ), /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      fontSize: 13,
+      fontWeight: 500,
+      color: C.label,
+      fontFamily: FONT,
+      overflow: "hidden",
+      textOverflow: "ellipsis",
+      whiteSpace: "nowrap"
+    } }, it.nombre), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT } }, it.marcaNombre, " \xB7 Bs ", it.precioUnit)), it.selec && /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6 } }, /* @__PURE__ */ import_react.default.createElement(
+      "button",
+      {
+        onClick: () => setCantDev(it.prodId, (it.cantDev || 1) - 1),
+        style: {
+          width: 28,
+          height: 28,
+          borderRadius: 8,
+          border: `1px solid ${C.sep}`,
+          background: C.bg1,
+          fontSize: 16,
+          cursor: "pointer",
+          color: C.label
+        }
+      },
+      "\u2212"
+    ), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 14, fontWeight: 600, color: C.label, fontFamily: FONT, minWidth: 16, textAlign: "center" } }, it.cantDev || 1), /* @__PURE__ */ import_react.default.createElement(
+      "button",
+      {
+        onClick: () => setCantDev(it.prodId, (it.cantDev || 1) + 1),
+        style: {
+          width: 28,
+          height: 28,
+          borderRadius: 8,
+          border: `1px solid ${C.sep}`,
+          background: C.bg1,
+          fontSize: 16,
+          cursor: "pointer",
+          color: C.label
+        }
+      },
+      "+"
+    )))))), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      background: `${C.amber}12`,
+      border: `1px solid ${C.amber}30`,
+      borderRadius: 12,
+      padding: "10px 14px",
+      marginBottom: 16,
+      fontSize: 13,
+      color: C.amber,
+      fontFamily: FONT
+    } }, "Total a devolver: ", /* @__PURE__ */ import_react.default.createElement("strong", null, "Bs ", totalDev.toFixed(2))), /* @__PURE__ */ import_react.default.createElement(
+      IOSBtn,
+      {
+        onPress: () => setPaso(3),
+        variant: "fill",
+        full: true,
+        disabled: devueltos.filter((it) => it.selec).length === 0
+      },
+      "Continuar \u2192 Elegir prendas nuevas"
+    ));
+    if (paso === 3) return /* @__PURE__ */ import_react.default.createElement("div", { style: { maxWidth: 560, margin: "0 auto", padding: 16 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10, marginBottom: 16 } }, /* @__PURE__ */ import_react.default.createElement(
+      "button",
+      {
+        onClick: () => setPaso(2),
+        style: { background: "none", border: "none", fontSize: 20, cursor: "pointer", color: C.label2 }
+      },
+      "\u2039"
+    ), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, fontWeight: 700, color: C.label, fontFamily: FONT } }, "Prendas nuevas")), /* @__PURE__ */ import_react.default.createElement(
+      IOSInput,
+      {
+        label: "Buscar prenda",
+        value: busqNuevo,
+        onChange: (e) => setBusqNuevo(e.target.value),
+        placeholder: "Nombre, c\xF3digo o categor\xEDa"
+      }
+    ), resultadosNuevo.length > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: { background: C.bg2, borderRadius: 14, overflow: "hidden", border: `1px solid ${C.sep}`, marginBottom: 12, marginTop: 4 } }, resultadosNuevo.map((p, i) => /* @__PURE__ */ import_react.default.createElement(
+      "div",
+      {
+        key: p.id,
+        onClick: () => agregarNuevo(p),
+        style: {
+          padding: "10px 14px",
+          borderBottom: i < resultadosNuevo.length - 1 ? `1px solid ${C.sep}` : "",
+          cursor: "pointer",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center"
+        }
+      },
+      /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, fontWeight: 500, color: C.label, fontFamily: FONT } }, p.nombre), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT } }, p.marcaNombre, " \xB7 stock ", p.stock)),
+      /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, fontWeight: 700, color: C.label, fontFamily: FONT } }, "Bs ", p.precio)
+    ))), nuevos.length > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: { background: C.bg2, borderRadius: 14, overflow: "hidden", border: `1px solid ${C.sep}`, marginBottom: 12 } }, nuevos.map((it, i) => /* @__PURE__ */ import_react.default.createElement("div", { key: it.id, style: {
+      padding: "12px 16px",
+      borderBottom: i < nuevos.length - 1 ? `1px solid ${C.sep}` : "",
+      display: "flex",
+      alignItems: "center",
+      gap: 12
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      fontSize: 13,
+      fontWeight: 500,
+      color: C.label,
+      fontFamily: FONT,
+      overflow: "hidden",
+      textOverflow: "ellipsis",
+      whiteSpace: "nowrap"
+    } }, it.nombre), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT } }, it.marcaNombre, " \xB7 Bs ", it.precio)), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6 } }, /* @__PURE__ */ import_react.default.createElement(
+      "button",
+      {
+        onClick: () => setCantNuevo(it.id, it.cantidad - 1),
+        style: {
+          width: 28,
+          height: 28,
+          borderRadius: 8,
+          border: `1px solid ${C.sep}`,
+          background: C.bg1,
+          fontSize: 16,
+          cursor: "pointer",
+          color: C.label
+        }
+      },
+      "\u2212"
+    ), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 14, fontWeight: 600, fontFamily: FONT, minWidth: 16, textAlign: "center" } }, it.cantidad), /* @__PURE__ */ import_react.default.createElement(
+      "button",
+      {
+        onClick: () => setCantNuevo(it.id, it.cantidad + 1),
+        style: {
+          width: 28,
+          height: 28,
+          borderRadius: 8,
+          border: `1px solid ${C.sep}`,
+          background: C.bg1,
+          fontSize: 16,
+          cursor: "pointer",
+          color: C.label
+        }
+      },
+      "+"
+    ), /* @__PURE__ */ import_react.default.createElement(
+      "button",
+      {
+        onClick: () => quitarNuevo(it.id),
+        style: {
+          width: 28,
+          height: 28,
+          borderRadius: 8,
+          border: `1px solid ${C.redBg}`,
+          background: C.redBg,
+          fontSize: 14,
+          cursor: "pointer",
+          color: C.red
+        }
+      },
+      "\u2715"
+    ))))), nuevos.length > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      background: `${C.green}15`,
+      border: `1px solid ${C.green}30`,
+      borderRadius: 12,
+      padding: "10px 14px",
+      marginBottom: 16,
+      fontSize: 13,
+      color: C.green,
+      fontFamily: FONT
+    } }, "Total prendas nuevas: ", /* @__PURE__ */ import_react.default.createElement("strong", null, "Bs ", totalNuevo.toFixed(2))), /* @__PURE__ */ import_react.default.createElement(
+      IOSBtn,
+      {
+        onPress: () => setPaso(4),
+        variant: "fill",
+        full: true,
+        disabled: nuevos.length === 0
+      },
+      "Continuar \u2192 Resumen"
+    ));
+    const devSel = devueltos.filter((it) => it.selec);
+    return /* @__PURE__ */ import_react.default.createElement("div", { style: { maxWidth: 560, margin: "0 auto", padding: 16 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10, marginBottom: 16 } }, /* @__PURE__ */ import_react.default.createElement(
+      "button",
+      {
+        onClick: () => setPaso(3),
+        style: { background: "none", border: "none", fontSize: 20, cursor: "pointer", color: C.label2 }
+      },
+      "\u2039"
+    ), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, fontWeight: 700, color: C.label, fontFamily: FONT } }, "Resumen del cambio")), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: C.label3, textTransform: "uppercase", letterSpacing: 0.7, fontFamily: FONT, marginBottom: 6 } }, "\u21A9 Devueltas"), /* @__PURE__ */ import_react.default.createElement("div", { style: { background: C.bg2, borderRadius: 12, overflow: "hidden", border: `1px solid ${C.sep}`, marginBottom: 12 } }, devSel.map((it, i) => /* @__PURE__ */ import_react.default.createElement("div", { key: it.prodId, style: {
+      display: "flex",
+      justifyContent: "space-between",
+      padding: "10px 14px",
+      borderBottom: i < devSel.length - 1 ? `1px solid ${C.sep}` : ""
+    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, color: C.label, fontFamily: FONT } }, it.nombre, " \xD7", it.cantDev), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, fontWeight: 600, color: C.label, fontFamily: FONT } }, "Bs ", (it.precioUnit * it.cantDev).toFixed(2)))), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      display: "flex",
+      justifyContent: "space-between",
+      padding: "10px 14px",
+      background: `${C.amber}10`,
+      borderTop: `1px solid ${C.sep}`
+    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, fontWeight: 700, color: C.label, fontFamily: FONT } }, "Total devuelto"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 14, fontWeight: 700, color: C.amber, fontFamily: FONT } }, "Bs ", totalDev.toFixed(2)))), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: C.label3, textTransform: "uppercase", letterSpacing: 0.7, fontFamily: FONT, marginBottom: 6 } }, "\u2726 Nuevas"), /* @__PURE__ */ import_react.default.createElement("div", { style: { background: C.bg2, borderRadius: 12, overflow: "hidden", border: `1px solid ${C.sep}`, marginBottom: 12 } }, nuevos.map((it, i) => /* @__PURE__ */ import_react.default.createElement("div", { key: it.id, style: {
+      display: "flex",
+      justifyContent: "space-between",
+      padding: "10px 14px",
+      borderBottom: i < nuevos.length - 1 ? `1px solid ${C.sep}` : ""
+    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, color: C.label, fontFamily: FONT } }, it.nombre, " \xD7", it.cantidad), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, fontWeight: 600, color: C.label, fontFamily: FONT } }, "Bs ", (it.precio * it.cantidad).toFixed(2)))), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      display: "flex",
+      justifyContent: "space-between",
+      padding: "10px 14px",
+      background: `${C.green}10`,
+      borderTop: `1px solid ${C.sep}`
+    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, fontWeight: 700, color: C.label, fontFamily: FONT } }, "Total nuevo"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 14, fontWeight: 700, color: C.green, fontFamily: FONT } }, "Bs ", totalNuevo.toFixed(2)))), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      borderRadius: 14,
+      padding: "14px 16px",
+      marginBottom: 16,
+      background: Math.abs(diferencia) < 0.01 ? `${C.green}15` : diferencia > 0 ? `${C.amber}15` : `${C.green}15`,
+      border: `1.5px solid ${Math.abs(diferencia) < 0.01 ? C.green : diferencia > 0 ? C.amber : C.green}`
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, fontWeight: 700, color: C.label, fontFamily: FONT, marginBottom: 4 } }, Math.abs(diferencia) < 0.01 ? "Sin diferencia de precio" : diferencia > 0 ? "Cliente paga diferencia" : "Tienda devuelve al cliente"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 22, fontWeight: 900, color: diferencia > 0 ? C.amber : C.green, fontFamily: FONT } }, "Bs ", Math.abs(diferencia).toFixed(2)), diferencia > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 8, marginTop: 10 } }, ["efectivo", "qr", "tarjeta"].map((m) => /* @__PURE__ */ import_react.default.createElement(
+      "button",
+      {
+        key: m,
+        onClick: () => setMetodoPago(m),
+        style: {
+          flex: 1,
+          padding: "8px 0",
+          borderRadius: 10,
+          border: `1.5px solid ${metodoPago === m ? C.gold : C.sep}`,
+          background: metodoPago === m ? `${C.gold}15` : C.bg1,
+          fontSize: 12,
+          fontWeight: metodoPago === m ? 700 : 400,
+          color: metodoPago === m ? C.gold : C.label2,
+          cursor: "pointer",
+          fontFamily: FONT,
+          textTransform: "capitalize"
+        }
+      },
+      m === "efectivo" ? "\u{1F4B5} Efectivo" : m === "qr" ? "\u{1F4F1} QR" : "\u{1F4B3} Tarjeta"
+    )))), /* @__PURE__ */ import_react.default.createElement(
+      IOSInput,
+      {
+        label: "Vendedor (opcional)",
+        value: vendedor,
+        onChange: (e) => setVendedor(e.target.value),
+        placeholder: "Nombre del vendedor"
+      }
+    ), /* @__PURE__ */ import_react.default.createElement(
+      IOSInput,
+      {
+        label: "Observaciones (opcional)",
+        value: notas,
+        onChange: (e) => setNotas(e.target.value),
+        placeholder: "Motivo del cambio, talla incorrecta, etc."
+      }
+    ), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: confirmar, variant: "fill", full: true, icon: "\u2713" }, "Confirmar cambio"));
   }
   function RegistroCargas({ cargas, marcas, marcaId = null, onVerificar = null, user = null }) {
     const isDesktop = useIsDesktop();
