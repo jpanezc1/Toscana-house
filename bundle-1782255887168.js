@@ -28666,11 +28666,10 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
           const s = String(raw2).replace(/bs\.?|bs|kit|\$|€|ufv|usd/gi, "").replace(/[^\d.,]/g, "").replace(",", ".");
           return parseFloat(s) || 0;
         }, parseStock = function(raw2) {
-          if (raw2 === null || raw2 === void 0 || raw2 === "") return 1;
+          if (raw2 === null || raw2 === void 0 || raw2 === "") return 0;
           const s = String(raw2).replace(/[^\d]/g, "");
           const n2 = parseInt(s);
-          if (isNaN(n2)) return 1;
-          return n2;
+          return isNaN(n2) ? 0 : n2;
         }, descKey = function(marca, nombre, talla, color) {
           const nk = (s) => norm(String(s || "")).toUpperCase().trim().replace(/\s+/g, " ");
           return [nk(marca), nk(nombre), nk(talla), nk(color)].join("|");

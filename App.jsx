@@ -7117,11 +7117,10 @@ function ImportarExcelModal({inv, onImportar, onClose, onArchivoCapturado}){
 
       // ── Parsear stock flexible ────────────────────────────────────────
       function parseStock(raw){
-        if(raw===null||raw===undefined||raw==="") return 1; // celda vacía = 1 unidad
+        if(raw===null||raw===undefined||raw==="") return 0; // vacío = no suma
         const s = String(raw).replace(/[^\d]/g,"");
         const n = parseInt(s);
-        if(isNaN(n)) return 1;
-        return n; // 0 explícito = no suma; número positivo = exacto
+        return isNaN(n) ? 0 : n; // 0 = no suma; número positivo = exacto
       }
 
       // ── Construir índice de códigos existentes (local + normalizado) ──
