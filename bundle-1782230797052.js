@@ -29494,8 +29494,8 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
     const isDesktop = useIsDesktop();
     const hoyStr = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
     const vHoy = ventas.filter((v) => v.fecha === hoyStr && !v.anulada);
-    const totalHoy = vHoy.reduce((s, v) => s + v.total, 0);
-    const totalMes = vMes.reduce((s, v) => s + v.total, 0);
+    const totalHoy = vHoy.reduce((s, v) => s + getDisplayTotal(v), 0);
+    const totalMes = vMes.reduce((s, v) => s + getDisplayTotal(v), 0);
     const stockTotal = inv.reduce((s, i) => s + (i.stock || 0), 0);
     const valorInventario = inv.reduce((s, i) => s + (i.stock || 0) * (i.precio || 0), 0);
     const last7 = (0, import_react.useMemo)(() => {
@@ -29504,7 +29504,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
         const d = /* @__PURE__ */ new Date();
         d.setDate(d.getDate() - i);
         const str = d.toISOString().slice(0, 10);
-        const total = ventas.filter((v) => v.fecha === str && !v.anulada).reduce((s, v) => s + v.total, 0);
+        const total = ventas.filter((v) => v.fecha === str && !v.anulada).reduce((s, v) => s + getDisplayTotal(v), 0);
         const label = d.toLocaleDateString("es-BO", { weekday: "short" }).slice(0, 3);
         days.push({ str, total, label });
       }
@@ -33627,7 +33627,7 @@ Esta acci\xF3n no se puede deshacer.`)) return;
     const vMes = (0, import_react.useMemo)(() => ventas.filter((v) => v.mk === MK && !v.anulada), [ventas, MK]);
     const vMesAll = (0, import_react.useMemo)(() => ventas.filter((v) => v.mk === MK), [ventas, MK]);
     const alqMes = (0, import_react.useMemo)(() => alq.filter((a) => a.mes === mes && a.anio === anio), [alq, mes, anio]);
-    const totalVtas = (0, import_react.useMemo)(() => vMes.reduce((s, v) => s + v.total, 0), [vMes]);
+    const totalVtas = (0, import_react.useMemo)(() => vMes.reduce((s, v) => s + getDisplayTotal(v), 0), [vMes]);
     const invFil = (0, import_react.useMemo)(() => {
       let r = inv;
       if (busqInv) {
@@ -34381,7 +34381,7 @@ Motivo: ${motivo}` : ""}`)) {
       marginBottom: 12,
       fontFamily: FONT_UI
     } }, MESES[mes], " ", anio), /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 8, marginBottom: 12 } }, [
-      { label: "Total mes", value: $(vMes.reduce((s, v) => s + v.total, 0)), color: C.label, bg: C.bg2 },
+      { label: "Total mes", value: $(vMes.reduce((s, v) => s + getDisplayTotal(v), 0)), color: C.label, bg: C.bg2 },
       { label: "Efectivo", value: $(liqEf), color: C.green, bg: `${C.green}10` },
       { label: "QR", value: $(liqQr), color: C.blue, bg: `${C.blue}10` },
       { label: "Tarjeta", value: $(liqTj), color: C.amber, bg: `${C.amber}10` }
@@ -39248,7 +39248,7 @@ Se registrar\xE1 que los faltantes/sobrantes fueron verificados f\xEDsicamente y
         return { mk, mes: Number(mes) - 1, anio: Number(anio) };
       });
     }, [ventas]);
-    const totalPer = ventasPerActivas.reduce((s, v) => s + v.total, 0);
+    const totalPer = ventasPerActivas.reduce((s, v) => s + getDisplayTotal(v), 0);
     const _pagPer = sumPagos(ventasPerActivas);
     const efectivoPer = _pagPer.efectivo;
     const qrPer = _pagPer.qr;
@@ -41666,7 +41666,7 @@ Esta acci\xF3n no se puede deshacer.`,
       );
     }, [ventas, codBusq]);
     const ventasFiltradasActivas = (0, import_react.useMemo)(() => ventasFiltradas.filter((v) => !v.anulada), [ventasFiltradas]);
-    const totalFil = ventasFiltradasActivas.reduce((s, v) => s + v.total, 0);
+    const totalFil = ventasFiltradasActivas.reduce((s, v) => s + getDisplayTotal(v), 0);
     const _pagFil = sumPagos(ventasFiltradasActivas);
     const efectivoFil = _pagFil.efectivo;
     const qrFil = _pagFil.qr;
@@ -41925,7 +41925,7 @@ Esta acci\xF3n no se puede deshacer.`,
           boxShadow: "0 1px 3px rgba(0,0,0,0.05)"
         }
       }
-    )), codBusq.trim() && /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 8, fontSize: 12, color: C.label3, fontFamily: FONT } }, ventasBusqueda.length, " resultado", ventasBusqueda.length !== 1 ? "s" : "", ventasBusqueda.length > 0 && ` \xB7 Total: ${$(ventasBusqueda.reduce((s, v) => s + v.total, 0))}`), !codBusq.trim() && /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center", padding: "40px 0", color: C.label3, fontFamily: FONT, fontSize: 13 } }, "Escribe un c\xF3digo o nombre para buscar en todas las ventas"), ventasBusqueda.map((v) => {
+    )), codBusq.trim() && /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 8, fontSize: 12, color: C.label3, fontFamily: FONT } }, ventasBusqueda.length, " resultado", ventasBusqueda.length !== 1 ? "s" : "", ventasBusqueda.length > 0 && ` \xB7 Total: ${$(ventasBusqueda.reduce((s, v) => s + getDisplayTotal(v), 0))}`), !codBusq.trim() && /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center", padding: "40px 0", color: C.label3, fontFamily: FONT, fontSize: 13 } }, "Escribe un c\xF3digo o nombre para buscar en todas las ventas"), ventasBusqueda.map((v) => {
       const itsMatch = v.items.filter((it) => {
         const q = codBusq.trim().toLowerCase();
         return it.codigo.toLowerCase().includes(q) || it.nombre.toLowerCase().includes(q);

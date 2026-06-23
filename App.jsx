@@ -7795,8 +7795,8 @@ function HomeDashboard({ventas, inv, vMes, mes, anio, onGoTab}){
 
   const hoyStr = new Date().toISOString().slice(0,10);
   const vHoy   = ventas.filter(v => v.fecha === hoyStr && !v.anulada);
-  const totalHoy = vHoy.reduce((s, v) => s + v.total, 0);
-  const totalMes  = vMes.reduce((s, v) => s + v.total, 0);
+  const totalHoy = vHoy.reduce((s, v) => s + getDisplayTotal(v), 0);
+  const totalMes  = vMes.reduce((s, v) => s + getDisplayTotal(v), 0);
   const stockTotal = inv.reduce((s, i) => s + (i.stock || 0), 0);
   const valorInventario = inv.reduce((s, i) => s + (i.stock || 0) * (i.precio || 0), 0);
 
@@ -7807,7 +7807,7 @@ function HomeDashboard({ventas, inv, vMes, mes, anio, onGoTab}){
       const d = new Date();
       d.setDate(d.getDate() - i);
       const str   = d.toISOString().slice(0,10);
-      const total = ventas.filter(v => v.fecha === str && !v.anulada).reduce((s,v) => s + v.total, 0);
+      const total = ventas.filter(v => v.fecha === str && !v.anulada).reduce((s,v) => s + getDisplayTotal(v), 0);
       const label = d.toLocaleDateString("es-BO", {weekday:"short"}).slice(0,3);
       days.push({str, total, label});
     }
@@ -11308,7 +11308,7 @@ function App(){
   // vMesAll incluye anuladas → se usa en historial/display
   const vMesAll =useMemo(()=>ventas.filter(v=>v.mk===MK),[ventas,MK]);
   const alqMes  =useMemo(()=>alq.filter(a=>a.mes===mes&&a.anio===anio),[alq,mes,anio]);
-  const totalVtas=useMemo(()=>vMes.reduce((s,v)=>s+v.total,0),[vMes]);
+  const totalVtas=useMemo(()=>vMes.reduce((s,v)=>s+getDisplayTotal(v),0),[vMes]);
 
   const invFil=useMemo(()=>{
     let r=inv;
@@ -11977,7 +11977,7 @@ function App(){
               <div>
                 <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:8,marginBottom:12}}>
                   {[
-                    {label:"Total mes",value:$(vMes.reduce((s,v)=>s+v.total,0)),color:C.label,bg:C.bg2},
+                    {label:"Total mes",value:$(vMes.reduce((s,v)=>s+getDisplayTotal(v),0)),color:C.label,bg:C.bg2},
                     {label:"Efectivo",value:$(liqEf),color:C.green,bg:`${C.green}10`},
                     {label:"QR",value:$(liqQr),color:C.blue,bg:`${C.blue}10`},
                     {label:"Tarjeta",value:$(liqTj),color:C.amber,bg:`${C.amber}10`},
@@ -16206,7 +16206,7 @@ function HistorialTab({ventas, inv, cierres, onVentaClick}){
   },[ventas]);
 
   // Stats del período
-  const totalPer    = ventasPerActivas.reduce((s,v)=>s+v.total,0);
+  const totalPer    = ventasPerActivas.reduce((s,v)=>s+getDisplayTotal(v),0);
   const _pagPer     = sumPagos(ventasPerActivas);
   const efectivoPer = _pagPer.efectivo;
   const qrPer       = _pagPer.qr;
@@ -18432,7 +18432,7 @@ function DashboardVentas({ventas, onVentaClick}){
   // Ventas activas (excluye anuladas) — para totales, KPIs y desgloses
   const ventasFiltradasActivas = useMemo(()=>ventasFiltradas.filter(v=>!v.anulada),[ventasFiltradas]);
 
-  const totalFil = ventasFiltradasActivas.reduce((s,v)=>s+v.total,0);
+  const totalFil = ventasFiltradasActivas.reduce((s,v)=>s+getDisplayTotal(v),0);
   const _pagFil  = sumPagos(ventasFiltradasActivas);
   const efectivoFil = _pagFil.efectivo;
   const qrFil       = _pagFil.qr;
@@ -18712,7 +18712,7 @@ function DashboardVentas({ventas, onVentaClick}){
           {codBusq.trim()&&(
             <div style={{marginBottom:8,fontSize:12,color:C.label3,fontFamily:FONT}}>
               {ventasBusqueda.length} resultado{ventasBusqueda.length!==1?"s":""}
-              {ventasBusqueda.length>0&&` · Total: ${$(ventasBusqueda.reduce((s,v)=>s+v.total,0))}`}
+              {ventasBusqueda.length>0&&` · Total: ${$(ventasBusqueda.reduce((s,v)=>s+getDisplayTotal(v),0))}`}
             </div>
           )}
 
