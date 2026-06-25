@@ -21563,6 +21563,17 @@
       return false;
     }
   }
+  async function sbActualizarProductoPatch(prodId, campos) {
+    try {
+      const db = await getSupabase();
+      const { error } = await db.from("inventario").update(campos).eq("id", prodId);
+      if (error) throw error;
+      return true;
+    } catch (e) {
+      console.warn("Supabase patch producto:", e.message);
+      return false;
+    }
+  }
   async function sbGuardarVenta(venta) {
     try {
       const db = await getSupabase();
@@ -22072,6 +22083,8 @@
         return !!await sbGuardarProducto(op.payload);
       case "stock":
         return await sbActualizarStock(op.payload.prodId, op.payload.stock);
+      case "producto_patch":
+        return await sbActualizarProductoPatch(op.payload.prodId, op.payload);
       case "venta":
         return await sbGuardarVenta(op.payload);
       case "anularVenta":
@@ -28950,7 +28963,17 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       for (const f of importables) {
         if (f._dup) {
           upd++;
-          onImportar({ tipo: "update", codigo: f.sku, stock: f.stock });
+          const descNueva = [
+            f.talla && `TALLA: ${f.talla.toUpperCase()}`,
+            f.color && `COLOR: ${f.color.toUpperCase()}`
+          ].filter(Boolean).join(" \xB7 ") || "";
+          onImportar({
+            tipo: "update",
+            codigo: f.sku,
+            stock: f.stock,
+            descripcion: descNueva || void 0,
+            subcat: f.talla ? f.talla.toUpperCase() : void 0
+          });
         } else {
           ok++;
           onImportar({ tipo: "create", producto: {
@@ -33914,13 +33937,21 @@ Motivo: ${motivo}` : ""}`)) {
       setCargas((prev) => prev.map((c) => c.id === cargaId ? { ...c, verificado, verificadoTs: verificado ? (/* @__PURE__ */ new Date()).toISOString() : null, verificadoPor: verificado ? user.nombre : null } : c));
       sbMarcarCargaVerificada(cargaId, verificado, user.nombre);
     }
-    function handleImportarExcel({ tipo, codigo, stock, producto }) {
+    function handleImportarExcel({ tipo, codigo, stock, producto, descripcion, subcat }) {
       if (tipo === "update") {
         const prod = inv.find((p) => p.codigo === codigo);
         const stockAntes = prod?.stock || 0;
         const stockNuevo = stockAntes + stock;
-        setInv((prev) => prev.map((p) => p.codigo === codigo ? { ...p, stock: stockNuevo } : p));
-        if (prod) syncConRespaldo("stock", { prodId: prod.id, stock: stockNuevo }, () => sbActualizarStock(prod.id, stockNuevo));
+        const patch = { stock: stockNuevo };
+        if (descripcion && !prod?.descripcion) patch.descripcion = descripcion;
+        if (subcat && !prod?.subcat) patch.subcat = subcat;
+        setInv((prev) => prev.map((p) => p.codigo === codigo ? { ...p, ...patch } : p));
+        if (prod) {
+          syncConRespaldo("stock", { prodId: prod.id, stock: stockNuevo }, () => sbActualizarStock(prod.id, stockNuevo));
+          if (patch.descripcion || patch.subcat) {
+            syncConRespaldo("producto_patch", { prodId: prod.id, ...patch }, () => sbActualizarProductoPatch(prod.id, patch));
+          }
+        }
         _importBuf.current.items.push({
           tipo: "update",
           codigo,
