@@ -28848,10 +28848,12 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
         }
         const codigosExistentes = new Set(inv.map((p) => p.codigo.toUpperCase().trim()));
         const descExistente = /* @__PURE__ */ new Map();
+        const descExistenteSinColor = /* @__PURE__ */ new Map();
         for (const p of inv) {
           const talla = (p.descripcion || "").match(/TALLA:\s*([^·\n]+)/i)?.[1]?.trim() || p.subcat || "";
           const color = (p.descripcion || "").match(/COLOR:\s*([^·\n]+)/i)?.[1]?.trim() || "";
           descExistente.set(descKey(p.marcaNombre, p.nombre, talla, color), p);
+          if (!color) descExistenteSinColor.set(descKey(p.marcaNombre, p.nombre, talla, ""), p);
         }
         const usadosSet = /* @__PURE__ */ new Set();
         const filas = [];
@@ -28921,7 +28923,8 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
           if (fila.precio <= 0) fila._errs.push("Precio inv\xE1lido o cero");
           if (!marcaEnc) fila._errs.push(`Marca "${marcaRaw || "\u2014"}" no encontrada`);
           const dk = descKey(fila.marcaNombre, fila.desc, fila.talla, fila.color);
-          const prodExistente = codigosExistentes.has(sku) ? inv.find((p) => p.codigo.toUpperCase() === sku) : descExistente.get(dk) || null;
+          const dkSinColor = descKey(fila.marcaNombre, fila.desc, fila.talla, "");
+          const prodExistente = codigosExistentes.has(sku) ? inv.find((p) => p.codigo.toUpperCase() === sku) : descExistente.get(dk) || descExistenteSinColor.get(dkSinColor) || null;
           if (prodExistente) {
             fila._dup = true;
             fila._prodExistente = prodExistente;

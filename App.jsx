@@ -7221,10 +7221,13 @@ function ImportarExcelModal({inv, onImportar, onClose, onArchivoCapturado}){
         return [nk(marca),nk(nombre),nk(talla),nk(color)].join("|");
       }
       const descExistente = new Map();
+      const descExistenteSinColor = new Map(); // fallback: match sin color (para productos sin color original)
       for(const p of inv){
         const talla = (p.descripcion||"").match(/TALLA:\s*([^·\n]+)/i)?.[1]?.trim()||p.subcat||"";
         const color = (p.descripcion||"").match(/COLOR:\s*([^·\n]+)/i)?.[1]?.trim()||"";
         descExistente.set(descKey(p.marcaNombre,p.nombre,talla,color), p);
+        // Solo indexar en fallback si el producto no tiene color (así no sobreescribe matches exactos)
+        if(!color) descExistenteSinColor.set(descKey(p.marcaNombre,p.nombre,talla,""), p);
       }
 
       // ── Iterar filas de datos ─────────────────────────────────────────
@@ -7311,9 +7314,10 @@ function ImportarExcelModal({inv, onImportar, onClose, onArchivoCapturado}){
 
         // ── Detectar duplicado por código exacto O misma descripción ────
         const dk = descKey(fila.marcaNombre, fila.desc, fila.talla, fila.color);
+        const dkSinColor = descKey(fila.marcaNombre, fila.desc, fila.talla, "");
         const prodExistente = codigosExistentes.has(sku)
           ? inv.find(p=>p.codigo.toUpperCase()===sku)
-          : descExistente.get(dk) || null;
+          : descExistente.get(dk) || descExistenteSinColor.get(dkSinColor) || null;
 
         if(prodExistente){
           fila._dup = true;
