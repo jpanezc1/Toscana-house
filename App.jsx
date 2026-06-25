@@ -19491,6 +19491,8 @@ function VentasTab({vMes, totalVtas, mes, anio, onVentaClick, retiros=[], bajas=
   var _hN166 = useState("marcas"); var vistaActiva = _hN166[0]; var setVistaActiva = _hN166[1];; // "marcas" | "historial" | "movimientos"
   var _hN167 = useState(null); var marcaFiltro = _hN167[0]; var setMarcaFiltro = _hN167[1];; // id marca o null = todas
   const [previewNota, setPreviewNota] = useState(null);
+  const [bajaSelec, setBajaSelec] = useState(null);
+  const [retiroSelec, setRetiroSelec] = useState(null);
 
   // Ventas activas (excluye anuladas) — para totales, montos y desglose por marca
   const vMesActivas = useMemo(()=>vMes.filter(v=>!v.anulada),[vMes]);
@@ -19868,8 +19870,9 @@ function VentasTab({vMes, totalVtas, mes, anio, onVentaClick, retiros=[], bajas=
                 {bajasRecientes.length===0
                   ? <div style={{padding:"24px 14px",textAlign:"center",color:C.label3,fontSize:12,fontFamily:FONT}}>Sin bajas registradas</div>
                   : bajasRecientes.map((b,i)=>(
-                    <div key={b.id||i} style={{padding:"10px 14px",borderBottom:`1px solid ${C.sep}`,
-                      transition:"background .1s"}}
+                    <div key={b.id||i} onClick={()=>setBajaSelec(b)}
+                      style={{padding:"10px 14px",borderBottom:`1px solid ${C.sep}`,
+                      cursor:"pointer",transition:"background .1s"}}
                       onMouseEnter={e=>e.currentTarget.style.background=C.sep}
                       onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
                       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:6}}>
@@ -19902,8 +19905,9 @@ function VentasTab({vMes, totalVtas, mes, anio, onVentaClick, retiros=[], bajas=
                 {retirosRecientes.length===0
                   ? <div style={{padding:"24px 14px",textAlign:"center",color:C.label3,fontSize:12,fontFamily:FONT}}>Sin retiros registrados</div>
                   : retirosRecientes.map((r,i)=>(
-                    <div key={r.id||i} style={{padding:"10px 14px",borderBottom:`1px solid ${C.sep}`,
-                      transition:"background .1s"}}
+                    <div key={r.id||i} onClick={()=>setRetiroSelec(r)}
+                      style={{padding:"10px 14px",borderBottom:`1px solid ${C.sep}`,
+                      cursor:"pointer",transition:"background .1s"}}
                       onMouseEnter={e=>e.currentTarget.style.background=C.sep}
                       onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
                       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:6}}>
@@ -19935,6 +19939,89 @@ function VentasTab({vMes, totalVtas, mes, anio, onVentaClick, retiros=[], bajas=
 
     </div>
     <NotaImgPreviewModal data={previewNota} onClose={()=>setPreviewNota(null)}/>
+
+    {/* ── Detalle Baja desde Movimientos ── */}
+    {bajaSelec&&(()=>{
+      const b = bajaSelec;
+      const fila=(lbl,val)=>(
+        <div style={{borderBottom:`1px solid ${C.sep}`,padding:"10px 0",display:"flex",justifyContent:"space-between"}}>
+          <span style={{fontSize:13,color:C.label3,fontFamily:FONT}}>{lbl}</span>
+          <span style={{fontSize:13,fontWeight:500,color:C.label,fontFamily:FONT}}>{val}</span>
+        </div>
+      );
+      return (
+        <Sheet open={true} onClose={()=>setBajaSelec(null)} title="Nota de Baja" tall>
+          <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:16}}>
+            <span style={{fontFamily:"monospace",fontSize:12,color:C.label3}}>{b.id}</span>
+            <Chip color="#C94C4C">🚫 BAJA</Chip>
+          </div>
+          <div style={{background:C.bg2,borderRadius:14,padding:"14px 16px",marginBottom:16,border:`1px solid ${C.sep}`}}>
+            <div style={{fontSize:15,fontWeight:700,color:C.label,fontFamily:FONT,marginBottom:4}}>{b.nombre||b.codigo}</div>
+            <span style={{fontSize:11,fontFamily:"monospace",color:C.label3,background:C.bg0,padding:"2px 8px",borderRadius:5,border:`1px solid ${C.sep}`}}>{b.codigo}</span>
+            {b.marca&&<span style={{fontSize:11,color:C.label3,fontFamily:FONT_UI,marginLeft:8}}>{b.marca}</span>}
+          </div>
+          <div style={{background:C.bg2,borderRadius:14,padding:"0 16px",marginBottom:16,border:`1px solid ${C.sep}`}}>
+            {fila("Fecha", `${b.fecha} ${b.hora||""}`)}
+            {fila("Operador", b.operador||b.usuario||"—")}
+            {fila("Cantidad baja", `${b.cantidad||1} ud${(b.cantidad||1)!==1?"s":""}`)}
+            {fila("Stock antes", b.stockAntes??'—')}
+            {fila("Stock después", b.stockDespues??'—')}
+            {b.motivo&&fila("Motivo", b.motivo)}
+          </div>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:16,
+            background:"#C94C4C10",border:"1px solid #C94C4C30",borderRadius:14,padding:"16px",marginBottom:16}}>
+            <div style={{textAlign:"center"}}>
+              <div style={{fontSize:10,color:C.label3,fontFamily:FONT_UI,textTransform:"uppercase",letterSpacing:.5,marginBottom:3}}>Antes</div>
+              <div style={{fontSize:24,fontWeight:700,color:C.label,fontFamily:FONT}}>{b.stockAntes??'—'}</div>
+            </div>
+            <div style={{fontSize:22,color:"#C94C4C",fontWeight:700}}>→</div>
+            <div style={{textAlign:"center"}}>
+              <div style={{fontSize:10,color:C.label3,fontFamily:FONT_UI,textTransform:"uppercase",letterSpacing:.5,marginBottom:3}}>Después</div>
+              <div style={{fontSize:24,fontWeight:700,color:"#C94C4C",fontFamily:FONT}}>{b.stockDespues??'—'}</div>
+            </div>
+            <div style={{textAlign:"center",marginLeft:8}}>
+              <div style={{fontSize:10,color:C.label3,fontFamily:FONT_UI,textTransform:"uppercase",letterSpacing:.5,marginBottom:3}}>Baja</div>
+              <div style={{fontSize:20,fontWeight:700,color:"#C94C4C",fontFamily:FONT}}>-{b.cantidad||1}</div>
+            </div>
+          </div>
+          <IOSBtn onPress={()=>setBajaSelec(null)} variant="fill" full>Cerrar</IOSBtn>
+        </Sheet>
+      );
+    })()}
+
+    {/* ── Detalle Retiro desde Movimientos ── */}
+    {retiroSelec&&(()=>{
+      const r = retiroSelec;
+      const fila=(lbl,val)=>(
+        <div style={{borderBottom:`1px solid ${C.sep}`,padding:"10px 0",display:"flex",justifyContent:"space-between"}}>
+          <span style={{fontSize:13,color:C.label3,fontFamily:FONT}}>{lbl}</span>
+          <span style={{fontSize:13,fontWeight:500,color:C.label,fontFamily:FONT}}>{val}</span>
+        </div>
+      );
+      return (
+        <Sheet open={true} onClose={()=>setRetiroSelec(null)} title="Nota de Retiro" tall>
+          <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:16}}>
+            <Chip color={C.amber}>↩ RETIRO</Chip>
+          </div>
+          <div style={{background:C.bg2,borderRadius:14,padding:"14px 16px",marginBottom:16,border:`1px solid ${C.sep}`}}>
+            <div style={{fontSize:15,fontWeight:700,color:C.label,fontFamily:FONT,marginBottom:4}}>{r.nombre||r.codigo}</div>
+            <span style={{fontSize:11,fontFamily:"monospace",color:C.label3,background:C.bg0,padding:"2px 8px",borderRadius:5,border:`1px solid ${C.sep}`}}>{r.codigo}</span>
+            {r.marcaNombre&&<span style={{fontSize:11,color:C.label3,fontFamily:FONT_UI,marginLeft:8}}>{r.marcaNombre}</span>}
+          </div>
+          <div style={{background:C.bg2,borderRadius:14,padding:"0 16px",marginBottom:16,border:`1px solid ${C.sep}`}}>
+            {fila("Fecha", `${r.fecha} ${r.hora||""}`)}
+            {fila("Destinatario", r.destinatario||"—")}
+            {fila("Cantidad", `${r.cantidad||1} ud${(r.cantidad||1)!==1?"s":""}`)}
+            {r.motivo&&fila("Motivo", r.motivo)}
+          </div>
+          <div style={{display:"flex",gap:10}}>
+            <IOSBtn onPress={()=>{imprimirNotaRetiro(r);}} variant="outline" full>📄 Imprimir</IOSBtn>
+            <IOSBtn onPress={()=>setRetiroSelec(null)} variant="fill" full>Cerrar</IOSBtn>
+          </div>
+        </Sheet>
+      );
+    })()}
+
     </>
   );
 }

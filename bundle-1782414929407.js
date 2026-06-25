@@ -42794,6 +42794,8 @@ Esta acci\xF3n no se puede deshacer.`,
     var setMarcaFiltro = _hN167[1];
     ;
     const [previewNota, setPreviewNota] = (0, import_react.useState)(null);
+    const [bajaSelec, setBajaSelec] = (0, import_react.useState)(null);
+    const [retiroSelec, setRetiroSelec] = (0, import_react.useState)(null);
     const vMesActivas = (0, import_react.useMemo)(() => vMes.filter((v) => !v.anulada), [vMes]);
     const porMarca = (0, import_react.useMemo)(() => {
       return MARCAS.map((m) => {
@@ -43132,9 +43134,11 @@ Esta acci\xF3n no se puede deshacer.`,
         "div",
         {
           key: b.id || i,
+          onClick: () => setBajaSelec(b),
           style: {
             padding: "10px 14px",
             borderBottom: `1px solid ${C.sep}`,
+            cursor: "pointer",
             transition: "background .1s"
           },
           onMouseEnter: (e) => e.currentTarget.style.background = C.sep,
@@ -43153,9 +43157,11 @@ Esta acci\xF3n no se puede deshacer.`,
         "div",
         {
           key: r.id || i,
+          onClick: () => setRetiroSelec(r),
           style: {
             padding: "10px 14px",
             borderBottom: `1px solid ${C.sep}`,
+            cursor: "pointer",
             transition: "background .1s"
           },
           onMouseEnter: (e) => e.currentTarget.style.background = C.sep,
@@ -43171,7 +43177,27 @@ Esta acci\xF3n no se puede deshacer.`,
           textOverflow: "ellipsis"
         } }, r.nombre || r.codigo), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT, marginTop: 2 } }, r.fecha, " ", r.hora || "", " \xB7 ", r.destinatario || "\u2014"), r.marcaNombre && /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: C.label3, fontFamily: FONT, marginTop: 1 } }, r.marcaNombre), r.motivo && /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: C.amber, fontFamily: FONT_UI, marginTop: 2, fontWeight: 600 } }, r.motivo)), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, fontWeight: 700, color: C.amber, fontFamily: FONT, flexShrink: 0 } }, r.cantidad || 1, " ud", (r.cantidad || 1) !== 1 ? "s" : ""))
       ))))));
-    })()), /* @__PURE__ */ import_react.default.createElement(NotaImgPreviewModal, { data: previewNota, onClose: () => setPreviewNota(null) }));
+    })()), /* @__PURE__ */ import_react.default.createElement(NotaImgPreviewModal, { data: previewNota, onClose: () => setPreviewNota(null) }), bajaSelec && (() => {
+      const b = bajaSelec;
+      const fila = (lbl, val) => /* @__PURE__ */ import_react.default.createElement("div", { style: { borderBottom: `1px solid ${C.sep}`, padding: "10px 0", display: "flex", justifyContent: "space-between" } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, color: C.label3, fontFamily: FONT } }, lbl), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, fontWeight: 500, color: C.label, fontFamily: FONT } }, val));
+      return /* @__PURE__ */ import_react.default.createElement(Sheet, { open: true, onClose: () => setBajaSelec(null), title: "Nota de Baja", tall: true }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 16 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontFamily: "monospace", fontSize: 12, color: C.label3 } }, b.id), /* @__PURE__ */ import_react.default.createElement(Chip, { color: "#C94C4C" }, "\u{1F6AB} BAJA")), /* @__PURE__ */ import_react.default.createElement("div", { style: { background: C.bg2, borderRadius: 14, padding: "14px 16px", marginBottom: 16, border: `1px solid ${C.sep}` } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 15, fontWeight: 700, color: C.label, fontFamily: FONT, marginBottom: 4 } }, b.nombre || b.codigo), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 11, fontFamily: "monospace", color: C.label3, background: C.bg0, padding: "2px 8px", borderRadius: 5, border: `1px solid ${C.sep}` } }, b.codigo), b.marca && /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 11, color: C.label3, fontFamily: FONT_UI, marginLeft: 8 } }, b.marca)), /* @__PURE__ */ import_react.default.createElement("div", { style: { background: C.bg2, borderRadius: 14, padding: "0 16px", marginBottom: 16, border: `1px solid ${C.sep}` } }, fila("Fecha", `${b.fecha} ${b.hora || ""}`), fila("Operador", b.operador || b.usuario || "\u2014"), fila("Cantidad baja", `${b.cantidad || 1} ud${(b.cantidad || 1) !== 1 ? "s" : ""}`), fila("Stock antes", b.stockAntes ?? "\u2014"), fila("Stock despu\xE9s", b.stockDespues ?? "\u2014"), b.motivo && fila("Motivo", b.motivo)), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 16,
+        background: "#C94C4C10",
+        border: "1px solid #C94C4C30",
+        borderRadius: 14,
+        padding: "16px",
+        marginBottom: 16
+      } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: C.label3, fontFamily: FONT_UI, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 3 } }, "Antes"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 24, fontWeight: 700, color: C.label, fontFamily: FONT } }, b.stockAntes ?? "\u2014")), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 22, color: "#C94C4C", fontWeight: 700 } }, "\u2192"), /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: C.label3, fontFamily: FONT_UI, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 3 } }, "Despu\xE9s"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 24, fontWeight: 700, color: "#C94C4C", fontFamily: FONT } }, b.stockDespues ?? "\u2014")), /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center", marginLeft: 8 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: C.label3, fontFamily: FONT_UI, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 3 } }, "Baja"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 20, fontWeight: 700, color: "#C94C4C", fontFamily: FONT } }, "-", b.cantidad || 1))), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => setBajaSelec(null), variant: "fill", full: true }, "Cerrar"));
+    })(), retiroSelec && (() => {
+      const r = retiroSelec;
+      const fila = (lbl, val) => /* @__PURE__ */ import_react.default.createElement("div", { style: { borderBottom: `1px solid ${C.sep}`, padding: "10px 0", display: "flex", justifyContent: "space-between" } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, color: C.label3, fontFamily: FONT } }, lbl), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, fontWeight: 500, color: C.label, fontFamily: FONT } }, val));
+      return /* @__PURE__ */ import_react.default.createElement(Sheet, { open: true, onClose: () => setRetiroSelec(null), title: "Nota de Retiro", tall: true }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 16 } }, /* @__PURE__ */ import_react.default.createElement(Chip, { color: C.amber }, "\u21A9 RETIRO")), /* @__PURE__ */ import_react.default.createElement("div", { style: { background: C.bg2, borderRadius: 14, padding: "14px 16px", marginBottom: 16, border: `1px solid ${C.sep}` } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 15, fontWeight: 700, color: C.label, fontFamily: FONT, marginBottom: 4 } }, r.nombre || r.codigo), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 11, fontFamily: "monospace", color: C.label3, background: C.bg0, padding: "2px 8px", borderRadius: 5, border: `1px solid ${C.sep}` } }, r.codigo), r.marcaNombre && /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 11, color: C.label3, fontFamily: FONT_UI, marginLeft: 8 } }, r.marcaNombre)), /* @__PURE__ */ import_react.default.createElement("div", { style: { background: C.bg2, borderRadius: 14, padding: "0 16px", marginBottom: 16, border: `1px solid ${C.sep}` } }, fila("Fecha", `${r.fecha} ${r.hora || ""}`), fila("Destinatario", r.destinatario || "\u2014"), fila("Cantidad", `${r.cantidad || 1} ud${(r.cantidad || 1) !== 1 ? "s" : ""}`), r.motivo && fila("Motivo", r.motivo)), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 10 } }, /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => {
+        imprimirNotaRetiro(r);
+      }, variant: "outline", full: true }, "\u{1F4C4} Imprimir"), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => setRetiroSelec(null), variant: "fill", full: true }, "Cerrar")));
+    })());
   }
   function EmptyState({ icon, title, sub }) {
     return /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center", padding: "48px 20px", color: C.label3 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 44, marginBottom: 12, opacity: 0.5 } }, icon), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 17, fontWeight: 600, color: C.label2, fontFamily: FONT, marginBottom: 6 } }, title), sub && /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 14, color: C.label3, fontFamily: FONT } }, sub));
