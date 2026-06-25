@@ -26350,6 +26350,11 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       setImgPreview(null);
     } }));
   }
+  var USUARIOS = [
+    { usuario: "toscana", password: "casa2024", nombre: "Toscana House", rol: "admin" },
+    { usuario: "caja", password: "caja2024", nombre: "Vendedor Caja", rol: "caja" },
+    { usuario: "tatiana", password: "toscana2024", nombre: "Tatiana", rol: "admin" }
+  ];
   function useAuth() {
     var _hN108 = (0, import_react.useState)(null);
     var user = _hN108[0];

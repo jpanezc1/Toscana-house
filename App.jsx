@@ -4679,6 +4679,11 @@ function LiqModal({marcaId,ventas,mes,anio,MK,cierres,setCierres,onClose,syncCie
 // ── Usuarios autorizados ─────────────────────────────────
 // Para agregar usuarios: {usuario, password, nombre, rol}
 // rol: "admin" (acceso total) | "caja" (solo POS y ventas)
+const USUARIOS = [
+  { usuario: "toscana",  password: "casa2024",    nombre: "Toscana House",  rol: "admin" },
+  { usuario: "caja",     password: "caja2024",    nombre: "Vendedor Caja",  rol: "caja"  },
+  { usuario: "tatiana",  password: "toscana2024", nombre: "Tatiana",        rol: "admin" },
+];
 function useAuth() {
   var _hN108 = useState(null); var user = _hN108[0]; var setUser = _hN108[1];
   var _hN108b = useState(false); var authReady = _hN108b[0]; var setAuthReady = _hN108b[1];
