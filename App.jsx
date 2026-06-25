@@ -7900,7 +7900,7 @@ function ImportarExcelModal({inv, onImportar, onClose, onArchivoCapturado}){
             const paraNuevas = preview.filter(f=>f.desc&&f.marcaId&&f.precio>0&&f._errs.length===0&&!f._dup);
             const paraActs   = preview.filter(f=>f._dup&&f.marcaId&&f.precio>0);
             const todosParaEtiquetas = [
-              ...paraNuevas.map(f=>({nombre:(f.desc||"").toUpperCase(), codigo:f.sku.toUpperCase(), precio:f.precio, marcaNombre:f.marcaNombre, descripcion:f.desc||"", stock:f.stock})),
+              ...paraNuevas.map(f=>({nombre:(f.desc||"").toUpperCase(), codigo:f.sku.toUpperCase(), precio:f.precio, marcaNombre:f.marcaNombre, descripcion:[f.talla&&`TALLA: ${f.talla.toUpperCase()}`,f.color&&`COLOR: ${f.color.toUpperCase()}`].filter(Boolean).join(" · ")||"", stock:f.stock})),
               ...paraActs.map(f=>{
                 const prod = inv.find(p=>p.codigo.toUpperCase()===f.sku.toUpperCase());
                 return {nombre:(prod?.nombre||f.desc||"").toUpperCase(), codigo:f.sku.toUpperCase(), precio:prod?.precio||f.precio, marcaNombre:prod?.marcaNombre||f.marcaNombre, descripcion:prod?.descripcion||f.desc||"", stock:f.stock};
