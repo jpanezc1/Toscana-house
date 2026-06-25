@@ -12125,6 +12125,7 @@ function App(){
         {/* VENTAS */}
         {tab==="ventas" && (
           <VentasTab vMes={vMesAll} totalVtas={totalVtas} mes={mes} anio={anio}
+            retiros={retiros} bajas={bajasLog}
             onVentaClick={v=>setVentaDetalle(v)}/>
         )}
 
@@ -19485,9 +19486,9 @@ function DashboardVentas({ventas, onVentaClick}){
 // ══════════════════════════════════════════════════════════
 // VENTAS TAB — totales globales + desglose por marca
 // ══════════════════════════════════════════════════════════
-function VentasTab({vMes, totalVtas, mes, anio, onVentaClick}){
+function VentasTab({vMes, totalVtas, mes, anio, onVentaClick, retiros=[], bajas=[]}){
   const isDesktop = useIsDesktop();
-  var _hN166 = useState("marcas"); var vistaActiva = _hN166[0]; var setVistaActiva = _hN166[1];; // "marcas" | "historial"
+  var _hN166 = useState("marcas"); var vistaActiva = _hN166[0]; var setVistaActiva = _hN166[1];; // "marcas" | "historial" | "movimientos"
   var _hN167 = useState(null); var marcaFiltro = _hN167[0]; var setMarcaFiltro = _hN167[1];; // id marca o null = todas
   const [previewNota, setPreviewNota] = useState(null);
 
@@ -19552,7 +19553,7 @@ function VentasTab({vMes, totalVtas, mes, anio, onVentaClick}){
       {/* Selector vista */}
       <div style={{marginBottom:16}}>
         <SegControl
-          options={[{value:"marcas",label:"Por Marca"},{value:"historial",label:"Historial"}]}
+          options={[{value:"marcas",label:"Por Marca"},{value:"historial",label:"Historial"},{value:"movimientos",label:"Movimientos"}]}
           value={vistaActiva} onChange={setVistaActiva}
         />
       </div>
@@ -19746,6 +19747,149 @@ function VentasTab({vMes, totalVtas, mes, anio, onVentaClick}){
           }
         </div>
       )}
+      {/* ── MOVIMIENTOS — 3 columnas ── */}
+      {vistaActiva==="movimientos"&&(()=>{
+        const ventasRecientes = [...vMes].reverse().slice(0,60);
+        const bajasRecientes  = [...bajas].slice(0,60);
+        const retirosRecientes= [...retiros].reverse().slice(0,60);
+
+        const ColHeader = ({icon, label, count, color})=>(
+          <div style={{display:"flex",alignItems:"center",gap:7,padding:"10px 14px",
+            borderBottom:`2px solid ${color}`,marginBottom:0}}>
+            <span style={{fontSize:14}}>{icon}</span>
+            <span style={{fontSize:12,fontWeight:700,color,fontFamily:FONT_UI,
+              textTransform:"uppercase",letterSpacing:.6}}>{label}</span>
+            <span style={{marginLeft:"auto",fontSize:11,fontWeight:700,
+              color,background:`${color}18`,padding:"2px 8px",borderRadius:10}}>{count}</span>
+          </div>
+        );
+
+        const colStyle = {
+          background:C.bg2, borderRadius:12, border:`1px solid ${C.sep}`,
+          overflow:"hidden", display:"flex", flexDirection:"column",
+          minHeight:400,
+        };
+        const scrollBody = {
+          overflowY:"auto", flex:1,
+          maxHeight: isDesktop ? 520 : 380,
+        };
+
+        return (
+          <div style={{display:"grid",
+            gridTemplateColumns: isDesktop ? "1fr 1fr 1fr" : "1fr",
+            gap:10}}>
+
+            {/* ── VENTAS ── */}
+            <div style={colStyle}>
+              <ColHeader icon="🧾" label="Ventas" count={ventasRecientes.length} color={C.blue}/>
+              <div style={scrollBody}>
+                {ventasRecientes.length===0
+                  ? <div style={{padding:"24px 14px",textAlign:"center",color:C.label3,fontSize:12,fontFamily:FONT}}>Sin ventas</div>
+                  : ventasRecientes.map(v=>(
+                    <div key={v.id} onClick={()=>onVentaClick&&onVentaClick(v)}
+                      style={{padding:"10px 14px",borderBottom:`1px solid ${C.sep}`,
+                        cursor:"pointer",opacity:v.anulada?.7:1,
+                        background:v.anulada?`${C.red}06`:"transparent",
+                        transition:"background .1s"}}
+                      onMouseEnter={e=>e.currentTarget.style.background=C.sep}
+                      onMouseLeave={e=>e.currentTarget.style.background=v.anulada?`${C.red}06`:"transparent"}>
+                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:6}}>
+                        <div style={{flex:1,minWidth:0}}>
+                          <div style={{display:"flex",alignItems:"center",gap:5,flexWrap:"wrap",marginBottom:3}}>
+                            {v.anulada
+                              ? <span style={{fontSize:9,color:C.red,fontWeight:700,fontFamily:FONT_UI}}>⊘ ANULADA</span>
+                              : <PagoDisplay mp={v.metodoPago} total={getDisplayTotal(v)} small/>
+                            }
+                          </div>
+                          <div style={{fontSize:11,color:C.label3,fontFamily:FONT}}>
+                            {v.fecha} {v.hora} · {v.vendedor||"Tienda"}
+                          </div>
+                          <div style={{fontSize:11,color:C.label2,fontFamily:FONT,marginTop:2}}>
+                            {v.items.map(i=>i.nombre).join(", ").slice(0,50)}{v.items.map(i=>i.nombre).join(", ").length>50?"…":""}
+                          </div>
+                        </div>
+                        <div style={{fontSize:13,fontWeight:700,color:v.anulada?C.label3:C.label,
+                          fontFamily:FONT,flexShrink:0,textDecoration:v.anulada?"line-through":"none"}}>
+                          {$(getDisplayTotal(v))}
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                }
+              </div>
+            </div>
+
+            {/* ── BAJAS ── */}
+            <div style={colStyle}>
+              <ColHeader icon="🚫" label="Bajas" count={bajasRecientes.length} color="#C94C4C"/>
+              <div style={scrollBody}>
+                {bajasRecientes.length===0
+                  ? <div style={{padding:"24px 14px",textAlign:"center",color:C.label3,fontSize:12,fontFamily:FONT}}>Sin bajas registradas</div>
+                  : bajasRecientes.map((b,i)=>(
+                    <div key={b.id||i} style={{padding:"10px 14px",borderBottom:`1px solid ${C.sep}`,
+                      transition:"background .1s"}}
+                      onMouseEnter={e=>e.currentTarget.style.background=C.sep}
+                      onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:6}}>
+                        <div style={{flex:1,minWidth:0}}>
+                          <div style={{fontSize:12,fontWeight:600,color:C.label,fontFamily:FONT,
+                            whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>
+                            {b.nombre||b.codigo}
+                          </div>
+                          <div style={{fontSize:11,color:C.label3,fontFamily:FONT,marginTop:2}}>
+                            {b.fecha} {b.hora} · {b.operador||b.usuario||"—"}
+                          </div>
+                          {b.marca&&<div style={{fontSize:10,color:C.label3,fontFamily:FONT,marginTop:1}}>{b.marca}</div>}
+                          {b.motivo&&<div style={{fontSize:10,color:"#C94C4C",fontFamily:FONT_UI,marginTop:2,fontWeight:600}}>{b.motivo}</div>}
+                        </div>
+                        <div style={{textAlign:"right",flexShrink:0}}>
+                          <div style={{fontSize:12,fontWeight:700,color:"#C94C4C",fontFamily:FONT}}>-{b.cantidad||1}</div>
+                          <div style={{fontSize:10,color:C.label3,fontFamily:FONT}}>{b.stockAntes}→{b.stockDespues}</div>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                }
+              </div>
+            </div>
+
+            {/* ── RETIROS ── */}
+            <div style={colStyle}>
+              <ColHeader icon="↩" label="Retiros" count={retirosRecientes.length} color={C.amber}/>
+              <div style={scrollBody}>
+                {retirosRecientes.length===0
+                  ? <div style={{padding:"24px 14px",textAlign:"center",color:C.label3,fontSize:12,fontFamily:FONT}}>Sin retiros registrados</div>
+                  : retirosRecientes.map((r,i)=>(
+                    <div key={r.id||i} style={{padding:"10px 14px",borderBottom:`1px solid ${C.sep}`,
+                      transition:"background .1s"}}
+                      onMouseEnter={e=>e.currentTarget.style.background=C.sep}
+                      onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:6}}>
+                        <div style={{flex:1,minWidth:0}}>
+                          <div style={{fontSize:12,fontWeight:600,color:C.label,fontFamily:FONT,
+                            whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>
+                            {r.nombre||r.codigo}
+                          </div>
+                          <div style={{fontSize:11,color:C.label3,fontFamily:FONT,marginTop:2}}>
+                            {r.fecha} {r.hora||""} · {r.destinatario||"—"}
+                          </div>
+                          {r.marcaNombre&&<div style={{fontSize:10,color:C.label3,fontFamily:FONT,marginTop:1}}>{r.marcaNombre}</div>}
+                          {r.motivo&&<div style={{fontSize:10,color:C.amber,fontFamily:FONT_UI,marginTop:2,fontWeight:600}}>{r.motivo}</div>}
+                        </div>
+                        <div style={{fontSize:12,fontWeight:700,color:C.amber,fontFamily:FONT,flexShrink:0}}>
+                          {r.cantidad||1} ud{(r.cantidad||1)!==1?"s":""}
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                }
+              </div>
+            </div>
+
+          </div>
+        );
+      })()}
+
     </div>
     <NotaImgPreviewModal data={previewNota} onClose={()=>setPreviewNota(null)}/>
     </>
