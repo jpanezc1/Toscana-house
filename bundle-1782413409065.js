@@ -22430,7 +22430,13 @@
       <div class="label">
         <div class="top"><span>${marca.toUpperCase()}</span><span style="font-weight:bold">TOSCANA HOUSE</span></div>
         <div class="producto">${abreviarNombre((it.nombre || it.desc || "").toUpperCase())}</div>
-        ${it.descripcion || "" ? `<div class="color-row">${(it.descripcion || "").toUpperCase()}</div>` : ""}
+        ${(() => {
+        const d = (it.descripcion || "").trim();
+        const s = (it.subcat || "").trim();
+        if (d) return `<div class="color-row">${d.toUpperCase()}</div>`;
+        if (s) return `<div class="color-row">TALLA ${s.toUpperCase()}</div>`;
+        return "";
+      })()}
         <div class="barcode-wrap"><svg id="bc-${idx}"></svg></div>
         <div class="bottom-row">
           <span class="codigo">${codigo}</span>
@@ -27407,6 +27413,36 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
         marginBottom: 16
       } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.red, fontFamily: FONT } }, "\u26A0 ", errMsg)), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: guardarManual, variant: "primary", full: true, icon: "\u{1F4BE}" }, "Guardar Factura")))
     ));
+  }
+  function NotaBajaModal({ baja, onClose }) {
+    if (!baja) return null;
+    const { prod, cant, motivo, stockAntes, stockDespues, fecha, hora: hora2, operador, id } = baja;
+    const fila = (lbl, val) => /* @__PURE__ */ import_react.default.createElement("div", { style: { borderBottom: `1px solid ${C.sep}`, padding: "10px 0", display: "flex", justifyContent: "space-between", alignItems: "center" } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, color: C.label3, fontFamily: FONT } }, lbl), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, fontWeight: 500, color: C.label, fontFamily: FONT } }, val));
+    return /* @__PURE__ */ import_react.default.createElement(Sheet, { open: !!baja, onClose, title: "Comprobante de Baja", tall: true }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 16, flexWrap: "wrap" } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontFamily: "monospace", fontSize: 13, fontWeight: 700, color: C.label } }, id), /* @__PURE__ */ import_react.default.createElement(Chip, { color: "#C94C4C" }, "\u{1F6AB} BAJA")), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      background: C.bg2,
+      borderRadius: 14,
+      padding: "14px 16px",
+      marginBottom: 16,
+      border: `1px solid ${C.sep}`
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 15, fontWeight: 700, color: C.label, fontFamily: FONT, marginBottom: 4 } }, prod.nombre), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" } }, /* @__PURE__ */ import_react.default.createElement("span", { style: {
+      fontSize: 11,
+      fontFamily: "monospace",
+      color: C.label3,
+      background: C.bg0,
+      padding: "2px 8px",
+      borderRadius: 5,
+      border: `1px solid ${C.sep}`
+    } }, prod.codigo), prod.marcaNombre && /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 11, color: C.label3, fontFamily: FONT_UI } }, prod.marcaNombre)), prod.descripcion && /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT, marginTop: 6 } }, prod.descripcion)), /* @__PURE__ */ import_react.default.createElement("div", { style: { background: C.bg2, borderRadius: 14, padding: "0 16px", marginBottom: 16, border: `1px solid ${C.sep}` } }, fila("Fecha", `${fecha} ${hora2}`), fila("Operador", operador), fila("Cantidad dada de baja", `${cant} ud${cant !== 1 ? "s" : ""}`), fila("Stock antes", stockAntes), fila("Stock despu\xE9s", stockDespues), motivo && fila("Motivo / detalle", motivo)), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 12,
+      background: `#C94C4C10`,
+      border: `1px solid #C94C4C30`,
+      borderRadius: 14,
+      padding: "16px",
+      marginBottom: 16
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT_UI, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 } }, "Antes"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 22, fontWeight: 700, color: C.label, fontFamily: FONT } }, stockAntes)), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 20, color: "#C94C4C", fontWeight: 700 } }, "\u2192"), /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT_UI, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 } }, "Despu\xE9s"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 22, fontWeight: 700, color: "#C94C4C", fontFamily: FONT } }, stockDespues)), /* @__PURE__ */ import_react.default.createElement("div", { style: { marginLeft: 8, textAlign: "center" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT_UI, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 } }, "Baja"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 18, fontWeight: 700, color: "#C94C4C", fontFamily: FONT } }, "-", cant))), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: onClose, variant: "fill", full: true }, "Cerrar"));
   }
   function NotaVentaModal({ venta, onClose, numVenta, onAnularVenta }) {
     if (!venta) return null;
@@ -33279,6 +33315,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
     const [repPrecio, setRepPrecio] = (0, import_react.useState)("");
     const [repMsg, setRepMsg] = (0, import_react.useState)(null);
     const [bajasLista, setBajasLista] = (0, import_react.useState)([]);
+    const [bajaDetalle, setBajaDetalle] = (0, import_react.useState)(null);
     const [busqInv, setBusqInv] = (0, import_react.useState)("");
     const [filInvM, setFilInvM] = (0, import_react.useState)("");
     const [driveUrl, setDriveUrlLocal] = (0, import_react.useState)(() => {
@@ -33760,6 +33797,18 @@ Motivo: ${motivo}` : ""}`)) {
       setBajaCod("");
       setBajaCant("");
       setBajaMotivo("");
+      setShBaja(false);
+      setBajaDetalle({
+        id: "BJ-" + Date.now(),
+        prod,
+        cant,
+        motivo,
+        stockAntes,
+        stockDespues,
+        fecha: hoy(),
+        hora: (/* @__PURE__ */ new Date()).toLocaleTimeString("es-BO", { hour: "2-digit", minute: "2-digit" }),
+        operador: user || "\u2014"
+      });
     }
     function registrarBaja(prod, stockAntes, cant, motivo) {
       const stockDespues = Math.max(0, stockAntes - cant);
@@ -34235,7 +34284,7 @@ Motivo: ${motivo}` : ""}`)) {
         anio,
         onGoTab: setTab
       }
-    ), tab === "pos" && /* @__PURE__ */ import_react.default.createElement(POSContainer, { inv, onVenta: handleVenta, retiros, onRetiro: registrarRetiro, onVerNota: (v) => setVentaDetalle(v) }), tab === "inventario" && /* @__PURE__ */ import_react.default.createElement(InventarioPorMarca, { inv, ventas, retiros, onRecibir: () => setShInv(true), onBaja: () => {
+    ), tab === "pos" && /* @__PURE__ */ import_react.default.createElement(POSContainer, { inv, onVenta: handleVenta, retiros, onRetiro: registrarRetiro, onVerNota: (v) => setVentaDetalle(v) }), tab === "inventario" && /* @__PURE__ */ import_react.default.createElement(InventarioPorMarca, { inv, ventas, retiros, bajas: auditorias.filter((a) => a.tipo === "BAJA"), onRecibir: () => setShInv(true), onBaja: () => {
       setShBaja(true);
       setBajaMsg(null);
       setBajaCod("");
@@ -34625,7 +34674,7 @@ Motivo: ${motivo}` : ""}`)) {
         onClose: () => setVentaDetalle(null),
         onAnularVenta: handleAnularVenta
       }
-    ), /* @__PURE__ */ import_react.default.createElement(
+    ), /* @__PURE__ */ import_react.default.createElement(NotaBajaModal, { baja: bajaDetalle, onClose: () => setBajaDetalle(null) }), /* @__PURE__ */ import_react.default.createElement(
       SheetRecibir,
       {
         open: sheetInv,
@@ -38155,7 +38204,7 @@ ${c.diferencia > 0.01 ? `Cliente paga diferencia: Bs ${fmt2(c.diferencia)} (${c.
       ))));
     })));
   }
-  function InventarioPorMarca({ inv, ventas, retiros = [], onRecibir, onBaja, onImportarExcel, onReponer, onSyncCompleto, onRecargarDesdeSupabase }) {
+  function InventarioPorMarca({ inv, ventas, retiros = [], bajas = [], onRecibir, onBaja, onImportarExcel, onReponer, onSyncCompleto, onRecargarDesdeSupabase }) {
     const isDesktop = useIsDesktop();
     const [syncMsg, setSyncMsg] = (0, import_react.useState)(null);
     var _hN149 = (0, import_react.useState)(null);
@@ -38191,6 +38240,51 @@ ${c.diferencia > 0.01 ? `Cliente paga diferencia: Bs ${fmt2(c.diferencia)} (${c.
       });
       return map;
     }, [retiros]);
+    const bajasPorCodigo = (0, import_react.useMemo)(() => {
+      const map = {};
+      bajas.forEach((b) => {
+        if (b.codigo) map[b.codigo] = (map[b.codigo] || []).concat(b);
+      });
+      return map;
+    }, [bajas]);
+    const [bajaAbierta, setBajaAbierta] = (0, import_react.useState)(null);
+    const dragRefB = import_react.default.useRef({ dragging: false, ox: 0, oy: 0 });
+    const [dragPosB, setDragPosB] = import_react.default.useState(null);
+    const [notaBajaAbiertoInv, setNotaBajaAbiertoInv] = (0, import_react.useState)(null);
+    const dragRefNB = import_react.default.useRef({ dragging: false, ox: 0, oy: 0 });
+    const [dragPosNB, setDragPosNB] = import_react.default.useState(null);
+    function onDragStartB(e) {
+      const el = e.currentTarget.closest("[data-drag-window-b]");
+      const rect = el.getBoundingClientRect();
+      dragRefB.current = { dragging: true, ox: e.clientX - rect.left, oy: e.clientY - rect.top };
+      const onMove = (ev) => {
+        if (!dragRefB.current.dragging) return;
+        setDragPosB({ x: ev.clientX - dragRefB.current.ox, y: ev.clientY - dragRefB.current.oy });
+      };
+      const onUp = () => {
+        dragRefB.current.dragging = false;
+        window.removeEventListener("mousemove", onMove);
+        window.removeEventListener("mouseup", onUp);
+      };
+      window.addEventListener("mousemove", onMove);
+      window.addEventListener("mouseup", onUp);
+    }
+    function onDragStartNB(e) {
+      const el = e.currentTarget.closest("[data-drag-window-nb]");
+      const rect = el.getBoundingClientRect();
+      dragRefNB.current = { dragging: true, ox: e.clientX - rect.left, oy: e.clientY - rect.top };
+      const onMove = (ev) => {
+        if (!dragRefNB.current.dragging) return;
+        setDragPosNB({ x: ev.clientX - dragRefNB.current.ox, y: ev.clientY - dragRefNB.current.oy });
+      };
+      const onUp = () => {
+        dragRefNB.current.dragging = false;
+        window.removeEventListener("mousemove", onMove);
+        window.removeEventListener("mouseup", onUp);
+      };
+      window.addEventListener("mousemove", onMove);
+      window.addEventListener("mouseup", onUp);
+    }
     const [retiroAbierto, setRetiroAbierto] = (0, import_react.useState)(null);
     const dragRefR = import_react.default.useRef({ dragging: false, ox: 0, oy: 0 });
     const [dragPosR, setDragPosR] = import_react.default.useState(null);
@@ -38603,6 +38697,25 @@ ${c.diferencia > 0.01 ? `Cliente paga diferencia: Bs ${fmt2(c.diferencia)} (${c.
           }
         },
         /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 10, color: C.amber, fontFamily: FONT_UI, fontWeight: 600 } }, "\u21A9 ", retirosPorCodigo[prod.codigo].length, " ret.")
+      ), (bajasPorCodigo[prod.codigo] || []).length > 0 && /* @__PURE__ */ import_react.default.createElement(
+        "div",
+        {
+          onClick: () => {
+            setBajaAbierta({ codigo: prod.codigo, lista: bajasPorCodigo[prod.codigo] });
+            setDragPosB(null);
+          },
+          style: {
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 4,
+            padding: "3px 8px",
+            borderRadius: 6,
+            cursor: "pointer",
+            background: "#C94C4C15",
+            border: "1px solid #C94C4C30"
+          }
+        },
+        /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 10, color: "#C94C4C", fontFamily: FONT_UI, fontWeight: 600 } }, "\u{1F6AB} ", bajasPorCodigo[prod.codigo].length, " baja", bajasPorCodigo[prod.codigo].length > 1 ? "s" : "")
       ))), /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center" } }, /* @__PURE__ */ import_react.default.createElement("span", { style: {
         display: "inline-block",
         fontFamily: FONT,
@@ -39002,6 +39115,191 @@ ${c.diferencia > 0.01 ? `Cliente paga diferencia: Bs ${fmt2(c.diferencia)} (${c.
           }
         },
         "\u{1F4C4} Imprimir nota de retiro"
+      )));
+    })(), bajaAbierta && (() => {
+      const { codigo, lista } = bajaAbierta;
+      return /* @__PURE__ */ import_react.default.createElement("div", { "data-drag-window-b": true, style: {
+        position: "fixed",
+        left: dragPosB ? dragPosB.x : "50%",
+        top: dragPosB ? dragPosB.y : "50%",
+        transform: dragPosB ? "none" : "translate(-50%,-50%)",
+        width: 380,
+        zIndex: 1300,
+        background: C.bg0,
+        border: `1px solid ${C.sep}`,
+        borderRadius: 14,
+        overflow: "hidden",
+        userSelect: "none",
+        boxShadow: "0 8px 32px rgba(0,0,0,0.12)"
+      } }, /* @__PURE__ */ import_react.default.createElement(
+        "div",
+        {
+          onMouseDown: onDragStartB,
+          style: {
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            padding: "11px 14px",
+            background: C.bg2,
+            borderBottom: `1px solid ${C.sep}`,
+            cursor: "grab"
+          }
+        },
+        /* @__PURE__ */ import_react.default.createElement("span", { style: {
+          fontSize: 11,
+          fontWeight: 700,
+          letterSpacing: 1,
+          textTransform: "uppercase",
+          color: "#C94C4C",
+          fontFamily: FONT_UI
+        } }, "Bajas \xB7 ", codigo),
+        /* @__PURE__ */ import_react.default.createElement(
+          "button",
+          {
+            onClick: () => {
+              setBajaAbierta(null);
+              setDragPosB(null);
+            },
+            style: { background: "none", border: "none", cursor: "pointer", color: C.label3, fontSize: 16, padding: "2px 4px" }
+          },
+          "\u2715"
+        )
+      ), /* @__PURE__ */ import_react.default.createElement("div", { style: { padding: "0 18px" } }, lista.map((b, i) => /* @__PURE__ */ import_react.default.createElement("div", { key: b.id || i, style: {
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "flex-start",
+        padding: "13px 0",
+        borderBottom: i < lista.length - 1 ? `1px solid ${C.sep}` : "none"
+      } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, fontWeight: 700, color: C.label, fontFamily: FONT } }, b.fecha || "\u2014"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT_UI, marginTop: 2 } }, b.hora || "\u2014", " \xB7 ", b.operador || b.usuario || "\u2014"), b.motivo && /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: "#C94C4C", fontFamily: FONT_UI, marginTop: 2 } }, b.motivo)), /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "right", flexShrink: 0, marginLeft: 12, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, fontWeight: 700, color: "#C94C4C", fontFamily: FONT } }, "-", b.cantidad || 1, " ud", (b.cantidad || 1) !== 1 ? "s" : ""), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT } }, b.stockAntes, "\u2192", b.stockDespues), /* @__PURE__ */ import_react.default.createElement(
+        "button",
+        {
+          onClick: () => {
+            setNotaBajaAbiertoInv(b);
+            setDragPosNB(null);
+          },
+          style: {
+            fontSize: 10,
+            color: "#C94C4C",
+            background: "none",
+            border: "1px solid #C94C4C40",
+            borderRadius: 6,
+            padding: "3px 8px",
+            cursor: "pointer",
+            fontFamily: FONT_UI,
+            fontWeight: 600
+          }
+        },
+        "\u{1F4C4} Nota de baja"
+      ))))), /* @__PURE__ */ import_react.default.createElement("div", { style: { height: 12 } }));
+    })(), notaBajaAbiertoInv && (() => {
+      const b = notaBajaAbiertoInv;
+      const cerrar = () => {
+        setNotaBajaAbiertoInv(null);
+        setDragPosNB(null);
+      };
+      return /* @__PURE__ */ import_react.default.createElement("div", { "data-drag-window-nb": true, style: {
+        position: "fixed",
+        left: dragPosNB ? dragPosNB.x : "50%",
+        top: dragPosNB ? dragPosNB.y : "50%",
+        transform: dragPosNB ? "none" : "translate(-50%,-50%)",
+        width: 380,
+        zIndex: 1400,
+        background: C.bg0,
+        border: `1px solid ${C.sep}`,
+        borderRadius: 14,
+        overflow: "hidden",
+        userSelect: "none",
+        boxShadow: "0 8px 32px rgba(0,0,0,0.12)"
+      } }, /* @__PURE__ */ import_react.default.createElement(
+        "div",
+        {
+          onMouseDown: onDragStartNB,
+          style: {
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            padding: "11px 14px",
+            background: C.bg2,
+            borderBottom: `1px solid ${C.sep}`,
+            cursor: "grab"
+          }
+        },
+        /* @__PURE__ */ import_react.default.createElement("span", { style: {
+          fontSize: 11,
+          fontWeight: 700,
+          letterSpacing: 1,
+          textTransform: "uppercase",
+          color: C.label3,
+          fontFamily: FONT_UI
+        } }, "Nota de baja"),
+        /* @__PURE__ */ import_react.default.createElement(
+          "button",
+          {
+            onClick: cerrar,
+            style: {
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              color: C.label3,
+              fontSize: 16,
+              lineHeight: 1,
+              padding: "2px 4px",
+              borderRadius: 4
+            }
+          },
+          "\u2715"
+        )
+      ), /* @__PURE__ */ import_react.default.createElement("div", { style: { padding: "16px 18px", borderBottom: `1px solid ${C.sep}` } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, fontWeight: 700, color: C.label, fontFamily: FONT, lineHeight: 1.35, marginBottom: 6 } }, b.nombre || b.codigo), /* @__PURE__ */ import_react.default.createElement("span", { style: {
+        fontSize: 10,
+        fontFamily: "monospace",
+        color: C.label3,
+        background: C.bg2,
+        padding: "2px 8px",
+        borderRadius: 5,
+        border: `1px solid ${C.sep}`
+      } }, b.codigo)), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 0 } }, [
+        { label: "Fecha", val: b.fecha || "\u2014", sub: b.hora || "\u2014" },
+        { label: "Operador", val: b.operador || b.usuario || "\u2014" },
+        { label: "Baja", val: `-${b.cantidad || 1} ud${(b.cantidad || 1) !== 1 ? "s" : ""}` },
+        { label: "Stock", val: `${b.stockAntes}\u2192${b.stockDespues}` },
+        { label: "Marca", val: b.marca || "\u2014" }
+      ].map((f, i) => /* @__PURE__ */ import_react.default.createElement("div", { key: i, style: {
+        padding: "12px 18px",
+        borderBottom: `1px solid ${C.sep}`,
+        borderRight: i % 2 === 0 ? `1px solid ${C.sep}` : "none"
+      } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+        fontSize: 9,
+        textTransform: "uppercase",
+        letterSpacing: 0.8,
+        color: C.label3,
+        fontFamily: FONT_UI,
+        marginBottom: 5
+      } }, f.label), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 14, fontWeight: 700, color: C.label, fontFamily: FONT } }, f.val), f.sub && /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT_UI, marginTop: 2 } }, f.sub)))), b.motivo && /* @__PURE__ */ import_react.default.createElement("div", { style: { padding: "12px 18px", borderBottom: `1px solid ${C.sep}` } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+        fontSize: 9,
+        textTransform: "uppercase",
+        letterSpacing: 0.8,
+        color: C.label3,
+        fontFamily: FONT_UI,
+        marginBottom: 5
+      } }, "Motivo"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: "#C94C4C", fontFamily: FONT_UI, fontWeight: 600 } }, b.motivo)), /* @__PURE__ */ import_react.default.createElement("div", { style: { padding: "12px 18px" } }, /* @__PURE__ */ import_react.default.createElement(
+        "button",
+        {
+          onClick: cerrar,
+          style: {
+            width: "100%",
+            padding: "11px 0",
+            borderRadius: 8,
+            border: `1px solid ${C.sep}`,
+            background: C.bg2,
+            color: C.label,
+            fontFamily: FONT_UI,
+            fontSize: 12,
+            fontWeight: 700,
+            cursor: "pointer",
+            letterSpacing: 0.3
+          }
+        },
+        "Cerrar"
       )));
     })());
   }

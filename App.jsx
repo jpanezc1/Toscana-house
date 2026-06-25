@@ -900,7 +900,7 @@ async function imprimirTicket(producto, marcaNombre) {
 <body>
   <div class="top"><span>${marcaNombre}</span><span style="font-weight:bold">TOSCANA HOUSE</span></div>
   <div class="producto">${abreviarNombre(producto.nombre)}</div>
-  ${producto.descripcion?`<div class="color-row">${producto.descripcion.toUpperCase()}</div>`:""}
+  ${(()=>{const d=(producto.descripcion||"").trim();const s=(producto.subcat||"").trim();if(d)return`<div class="color-row">${d.toUpperCase()}</div>`;if(s)return`<div class="color-row">TALLA ${s.toUpperCase()}</div>`;return"";})()}
   <div class="barcode-wrap">
     <svg id="barcode"></svg>
   </div>
@@ -949,7 +949,7 @@ function imprimirEtiquetasLote(items) {
       <div class="label">
         <div class="top"><span>${marca.toUpperCase()}</span><span style="font-weight:bold">TOSCANA HOUSE</span></div>
         <div class="producto">${abreviarNombre((it.nombre||it.desc||"").toUpperCase())}</div>
-        ${(it.descripcion||"")?`<div class="color-row">${(it.descripcion||"").toUpperCase()}</div>`:""}
+        ${(()=>{const d=(it.descripcion||"").trim();const s=(it.subcat||"").trim();if(d)return`<div class="color-row">${d.toUpperCase()}</div>`;if(s)return`<div class="color-row">TALLA ${s.toUpperCase()}</div>`;return"";})()}
         <div class="barcode-wrap"><svg id="bc-${idx}"></svg></div>
         <div class="bottom-row">
           <span class="codigo">${codigo}</span>
@@ -5573,6 +5573,76 @@ function FacturaModal({venta, open, onClose, onFacturada}){
           )}
         </>
       )}
+    </Sheet>
+  );
+}
+
+// ══════════════════════════════════════════════════════════
+// NOTA DE BAJA — Modal detalle
+// ══════════════════════════════════════════════════════════
+function NotaBajaModal({baja, onClose}){
+  if(!baja) return null;
+  const {prod, cant, motivo, stockAntes, stockDespues, fecha, hora, operador, id} = baja;
+  const fila = (lbl, val) => (
+    <div style={{borderBottom:`1px solid ${C.sep}`,padding:"10px 0",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+      <span style={{fontSize:13,color:C.label3,fontFamily:FONT}}>{lbl}</span>
+      <span style={{fontSize:13,fontWeight:500,color:C.label,fontFamily:FONT}}>{val}</span>
+    </div>
+  );
+  return (
+    <Sheet open={!!baja} onClose={onClose} title="Comprobante de Baja" tall>
+      {/* Encabezado */}
+      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:16,flexWrap:"wrap"}}>
+        <span style={{fontFamily:"monospace",fontSize:13,fontWeight:700,color:C.label}}>{id}</span>
+        <Chip color="#C94C4C">🚫 BAJA</Chip>
+      </div>
+
+      {/* Producto */}
+      <div style={{background:C.bg2,borderRadius:14,padding:"14px 16px",marginBottom:16,
+        border:`1px solid ${C.sep}`}}>
+        <div style={{fontSize:15,fontWeight:700,color:C.label,fontFamily:FONT,marginBottom:4}}>
+          {prod.nombre}
+        </div>
+        <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
+          <span style={{fontSize:11,fontFamily:"monospace",color:C.label3,
+            background:C.bg0,padding:"2px 8px",borderRadius:5,border:`1px solid ${C.sep}`}}>
+            {prod.codigo}
+          </span>
+          {prod.marcaNombre&&<span style={{fontSize:11,color:C.label3,fontFamily:FONT_UI}}>{prod.marcaNombre}</span>}
+        </div>
+        {prod.descripcion&&<div style={{fontSize:11,color:C.label3,fontFamily:FONT,marginTop:6}}>{prod.descripcion}</div>}
+      </div>
+
+      {/* Datos */}
+      <div style={{background:C.bg2,borderRadius:14,padding:"0 16px",marginBottom:16,border:`1px solid ${C.sep}`}}>
+        {fila("Fecha", `${fecha} ${hora}`)}
+        {fila("Operador", operador)}
+        {fila("Cantidad dada de baja", `${cant} ud${cant!==1?"s":""}`)}
+        {fila("Stock antes", stockAntes)}
+        {fila("Stock después", stockDespues)}
+        {motivo&&fila("Motivo / detalle", motivo)}
+      </div>
+
+      {/* Movimiento visual */}
+      <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:12,
+        background:`#C94C4C10`,border:`1px solid #C94C4C30`,borderRadius:14,
+        padding:"16px",marginBottom:16}}>
+        <div style={{textAlign:"center"}}>
+          <div style={{fontSize:11,color:C.label3,fontFamily:FONT_UI,textTransform:"uppercase",letterSpacing:.5,marginBottom:4}}>Antes</div>
+          <div style={{fontSize:22,fontWeight:700,color:C.label,fontFamily:FONT}}>{stockAntes}</div>
+        </div>
+        <div style={{fontSize:20,color:"#C94C4C",fontWeight:700}}>→</div>
+        <div style={{textAlign:"center"}}>
+          <div style={{fontSize:11,color:C.label3,fontFamily:FONT_UI,textTransform:"uppercase",letterSpacing:.5,marginBottom:4}}>Después</div>
+          <div style={{fontSize:22,fontWeight:700,color:"#C94C4C",fontFamily:FONT}}>{stockDespues}</div>
+        </div>
+        <div style={{marginLeft:8,textAlign:"center"}}>
+          <div style={{fontSize:11,color:C.label3,fontFamily:FONT_UI,textTransform:"uppercase",letterSpacing:.5,marginBottom:4}}>Baja</div>
+          <div style={{fontSize:18,fontWeight:700,color:"#C94C4C",fontFamily:FONT}}>-{cant}</div>
+        </div>
+      </div>
+
+      <IOSBtn onPress={onClose} variant="fill" full>Cerrar</IOSBtn>
     </Sheet>
   );
 }
@@ -11045,6 +11115,7 @@ function App(){
   const[repPrecio,setRepPrecio]=useState("");
   const[repMsg,setRepMsg]   =useState(null);
   const[bajasLista,setBajasLista]=useState([]);
+  const[bajaDetalle,setBajaDetalle]=useState(null);
   const[busqInv,setBusqInv] =useState("");
   const[filInvM,setFilInvM] =useState("");
   const[driveUrl,setDriveUrlLocal]=useState(()=>{ try{return localStorage.getItem("th_drive_url")||"";}catch{return "";} });
@@ -11427,6 +11498,15 @@ function App(){
     registrarBaja(prod, stockAntes, cant, motivo);
     setBajaMsg({ok:true,msg:`✓ "${prod.nombre}": stock ${stockAntes} → ${stockDespues}`});
     setBajaCod(""); setBajaCant(""); setBajaMotivo("");
+    setShBaja(false);
+    setBajaDetalle({
+      id:"BJ-"+Date.now(),
+      prod, cant, motivo,
+      stockAntes, stockDespues,
+      fecha: hoy(),
+      hora: new Date().toLocaleTimeString("es-BO",{hour:"2-digit",minute:"2-digit"}),
+      operador: user||"—",
+    });
   }
 
   // Dar de baja — SOLO Inventario. No genera retiro (eso es exclusivo de Caja).
@@ -11871,7 +11951,7 @@ function App(){
 
         {/* INVENTARIO — por marca */}
         {tab==="inventario" && (
-          <InventarioPorMarca inv={inv} ventas={ventas} retiros={retiros} onRecibir={()=>setShInv(true)} onBaja={()=>{setShBaja(true);setBajaMsg(null);setBajaCod("");setBajaCant("");setBajaMotivo("");}} onImportarExcel={()=>setShImportarExcel(true)} onReponer={()=>{setShReponer(true);setRepMsg(null);setRepCod("");setRepCant("");setRepPrecio("");setRepTab("stock");}} onSyncCompleto={forzarSyncInventario} onRecargarDesdeSupabase={recargarDesdeSupabase}/>
+          <InventarioPorMarca inv={inv} ventas={ventas} retiros={retiros} bajas={auditorias.filter(a=>a.tipo==="BAJA")} onRecibir={()=>setShInv(true)} onBaja={()=>{setShBaja(true);setBajaMsg(null);setBajaCod("");setBajaCant("");setBajaMotivo("");}} onImportarExcel={()=>setShImportarExcel(true)} onReponer={()=>{setShReponer(true);setRepMsg(null);setRepCod("");setRepCant("");setRepPrecio("");setRepTab("stock");}} onSyncCompleto={forzarSyncInventario} onRecargarDesdeSupabase={recargarDesdeSupabase}/>
         )}
 
         {/* AUDITORÍA — cierre de inventario mensual (conteo físico vs sistema) */}
@@ -12242,6 +12322,9 @@ function App(){
         onClose={()=>setVentaDetalle(null)}
         onAnularVenta={handleAnularVenta}
       />
+
+      {/* ── NOTA DE BAJA MODAL ── */}
+      <NotaBajaModal baja={bajaDetalle} onClose={()=>setBajaDetalle(null)}/>
 
       {/* ══ SHEETS ══ */}
 
@@ -15289,7 +15372,7 @@ function RegistroCargas({cargas, marcas, marcaId=null, onVerificar=null, user=nu
 // ══════════════════════════════════════════════════════════
 // INVENTARIO POR MARCA — pestaña con scroll horizontal
 // ══════════════════════════════════════════════════════════
-function InventarioPorMarca({inv, ventas, retiros=[], onRecibir, onBaja, onImportarExcel, onReponer, onSyncCompleto, onRecargarDesdeSupabase}){
+function InventarioPorMarca({inv, ventas, retiros=[], bajas=[], onRecibir, onBaja, onImportarExcel, onReponer, onSyncCompleto, onRecargarDesdeSupabase}){
   const isDesktop = useIsDesktop();
   const [syncMsg, setSyncMsg] = useState(null); // null | {prog, total} | "ok" | "err"
   // null = "TODOS"
@@ -15318,6 +15401,40 @@ function InventarioPorMarca({inv, ventas, retiros=[], onRecibir, onBaja, onImpor
     });
     return map;
   },[retiros]);
+
+  // Calcular bajas por código
+  const bajasPorCodigo = useMemo(()=>{
+    const map = {};
+    bajas.forEach(b=>{
+      if(b.codigo) map[b.codigo] = (map[b.codigo]||[]).concat(b);
+    });
+    return map;
+  },[bajas]);
+
+  const [bajaAbierta, setBajaAbierta] = useState(null); // {codigo, lista:[]}
+  const dragRefB = React.useRef({dragging:false, ox:0, oy:0});
+  const [dragPosB, setDragPosB] = React.useState(null);
+  const [notaBajaAbiertoInv, setNotaBajaAbiertoInv] = useState(null);
+  const dragRefNB = React.useRef({dragging:false, ox:0, oy:0});
+  const [dragPosNB, setDragPosNB] = React.useState(null);
+  function onDragStartB(e){
+    const el = e.currentTarget.closest('[data-drag-window-b]');
+    const rect = el.getBoundingClientRect();
+    dragRefB.current = {dragging:true, ox:e.clientX-rect.left, oy:e.clientY-rect.top};
+    const onMove = ev=>{ if(!dragRefB.current.dragging) return; setDragPosB({x:ev.clientX-dragRefB.current.ox, y:ev.clientY-dragRefB.current.oy}); };
+    const onUp = ()=>{ dragRefB.current.dragging=false; window.removeEventListener('mousemove',onMove); window.removeEventListener('mouseup',onUp); };
+    window.addEventListener('mousemove',onMove);
+    window.addEventListener('mouseup',onUp);
+  }
+  function onDragStartNB(e){
+    const el = e.currentTarget.closest('[data-drag-window-nb]');
+    const rect = el.getBoundingClientRect();
+    dragRefNB.current = {dragging:true, ox:e.clientX-rect.left, oy:e.clientY-rect.top};
+    const onMove = ev=>{ if(!dragRefNB.current.dragging) return; setDragPosNB({x:ev.clientX-dragRefNB.current.ox, y:ev.clientY-dragRefNB.current.oy}); };
+    const onUp = ()=>{ dragRefNB.current.dragging=false; window.removeEventListener('mousemove',onMove); window.removeEventListener('mouseup',onUp); };
+    window.addEventListener('mousemove',onMove);
+    window.addEventListener('mouseup',onUp);
+  }
 
   const [retiroAbierto, setRetiroAbierto] = useState(null); // {codigo, lista:[]}
   const dragRefR = React.useRef({dragging:false, ox:0, oy:0});
@@ -15637,6 +15754,13 @@ function InventarioPorMarca({inv, ventas, retiros=[], onRecibir, onBaja, onImpor
                           background:`${C.amber}15`,border:`1px solid ${C.amber}30`}}>
                         <span style={{fontSize:10,color:C.amber,fontFamily:FONT_UI,fontWeight:600}}>↩ {retirosPorCodigo[prod.codigo].length} ret.</span>
                       </div>}
+                      {(bajasPorCodigo[prod.codigo]||[]).length>0&&<div
+                        onClick={()=>{ setBajaAbierta({codigo:prod.codigo, lista:bajasPorCodigo[prod.codigo]}); setDragPosB(null); }}
+                        style={{display:"inline-flex",alignItems:"center",gap:4,
+                          padding:"3px 8px",borderRadius:6,cursor:"pointer",
+                          background:"#C94C4C15",border:"1px solid #C94C4C30"}}>
+                        <span style={{fontSize:10,color:"#C94C4C",fontFamily:FONT_UI,fontWeight:600}}>🚫 {bajasPorCodigo[prod.codigo].length} baja{bajasPorCodigo[prod.codigo].length>1?"s":""}</span>
+                      </div>}
                     </div>
                   </div>
 
@@ -15946,6 +16070,126 @@ function InventarioPorMarca({inv, ventas, retiros=[], onRecibir, onBaja, onImpor
                   color:C.label,fontFamily:FONT_UI,fontSize:12,fontWeight:700,
                   cursor:"pointer",letterSpacing:.3}}>
                 📄 Imprimir nota de retiro
+              </button>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* ── Ventana arrastrable lista de bajas por código ── */}
+      {bajaAbierta&&(()=>{
+        const {codigo, lista} = bajaAbierta;
+        return (
+          <div data-drag-window-b style={{
+            position:"fixed",
+            left: dragPosB ? dragPosB.x : "50%",
+            top:  dragPosB ? dragPosB.y : "50%",
+            transform: dragPosB ? "none" : "translate(-50%,-50%)",
+            width:380, zIndex:1300,
+            background:C.bg0,border:`1px solid ${C.sep}`,
+            borderRadius:14,overflow:"hidden",userSelect:"none",
+            boxShadow:"0 8px 32px rgba(0,0,0,0.12)",
+          }}>
+            <div onMouseDown={onDragStartB}
+              style={{display:"flex",justifyContent:"space-between",alignItems:"center",
+                padding:"11px 14px",background:C.bg2,borderBottom:`1px solid ${C.sep}`,cursor:"grab"}}>
+              <span style={{fontSize:11,fontWeight:700,letterSpacing:1,textTransform:"uppercase",
+                color:"#C94C4C",fontFamily:FONT_UI}}>Bajas · {codigo}</span>
+              <button onClick={()=>{setBajaAbierta(null);setDragPosB(null);}}
+                style={{background:"none",border:"none",cursor:"pointer",color:C.label3,fontSize:16,padding:"2px 4px"}}>✕</button>
+            </div>
+            <div style={{padding:"0 18px"}}>
+              {lista.map((b,i)=>(
+                <div key={b.id||i} style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",
+                  padding:"13px 0",borderBottom:i<lista.length-1?`1px solid ${C.sep}`:"none"}}>
+                  <div>
+                    <div style={{fontSize:13,fontWeight:700,color:C.label,fontFamily:FONT}}>{b.fecha||"—"}</div>
+                    <div style={{fontSize:11,color:C.label3,fontFamily:FONT_UI,marginTop:2}}>
+                      {b.hora||"—"} · {b.operador||b.usuario||"—"}
+                    </div>
+                    {b.motivo&&<div style={{fontSize:11,color:"#C94C4C",fontFamily:FONT_UI,marginTop:2}}>{b.motivo}</div>}
+                  </div>
+                  <div style={{textAlign:"right",flexShrink:0,marginLeft:12,display:"flex",flexDirection:"column",alignItems:"flex-end",gap:6}}>
+                    <div style={{fontSize:13,fontWeight:700,color:"#C94C4C",fontFamily:FONT}}>-{b.cantidad||1} ud{(b.cantidad||1)!==1?"s":""}</div>
+                    <div style={{fontSize:11,color:C.label3,fontFamily:FONT}}>
+                      {b.stockAntes}→{b.stockDespues}
+                    </div>
+                    <button onClick={()=>{ setNotaBajaAbiertoInv(b); setDragPosNB(null); }}
+                      style={{fontSize:10,color:"#C94C4C",background:"none",border:"1px solid #C94C4C40",
+                        borderRadius:6,padding:"3px 8px",cursor:"pointer",fontFamily:FONT_UI,fontWeight:600}}>
+                      📄 Nota de baja
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div style={{height:12}}/>
+          </div>
+        );
+      })()}
+
+      {/* ── Ventana arrastrable nota de baja individual ── */}
+      {notaBajaAbiertoInv&&(()=>{
+        const b = notaBajaAbiertoInv;
+        const cerrar = ()=>{ setNotaBajaAbiertoInv(null); setDragPosNB(null); };
+        return (
+          <div data-drag-window-nb style={{
+            position:"fixed",
+            left: dragPosNB ? dragPosNB.x : "50%",
+            top:  dragPosNB ? dragPosNB.y : "50%",
+            transform: dragPosNB ? "none" : "translate(-50%,-50%)",
+            width:380, zIndex:1400,
+            background:C.bg0,border:`1px solid ${C.sep}`,
+            borderRadius:14,overflow:"hidden",userSelect:"none",
+            boxShadow:"0 8px 32px rgba(0,0,0,0.12)",
+          }}>
+            <div onMouseDown={onDragStartNB}
+              style={{display:"flex",justifyContent:"space-between",alignItems:"center",
+                padding:"11px 14px",background:C.bg2,borderBottom:`1px solid ${C.sep}`,cursor:"grab"}}>
+              <span style={{fontSize:11,fontWeight:700,letterSpacing:1,textTransform:"uppercase",
+                color:C.label3,fontFamily:FONT_UI}}>Nota de baja</span>
+              <button onClick={cerrar}
+                style={{background:"none",border:"none",cursor:"pointer",color:C.label3,
+                  fontSize:16,lineHeight:1,padding:"2px 4px",borderRadius:4}}>✕</button>
+            </div>
+            <div style={{padding:"16px 18px",borderBottom:`1px solid ${C.sep}`}}>
+              <div style={{fontSize:13,fontWeight:700,color:C.label,fontFamily:FONT,lineHeight:1.35,marginBottom:6}}>
+                {b.nombre||b.codigo}
+              </div>
+              <span style={{fontSize:10,fontFamily:"monospace",color:C.label3,
+                background:C.bg2,padding:"2px 8px",borderRadius:5,border:`1px solid ${C.sep}`}}>{b.codigo}</span>
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:0}}>
+              {[
+                {label:"Fecha",    val:b.fecha||"—",    sub:b.hora||"—"},
+                {label:"Operador", val:b.operador||b.usuario||"—"},
+                {label:"Baja",     val:`-${b.cantidad||1} ud${(b.cantidad||1)!==1?"s":""}`},
+                {label:"Stock",    val:`${b.stockAntes}→${b.stockDespues}`},
+                {label:"Marca",    val:b.marca||"—"},
+              ].map((f,i)=>(
+                <div key={i} style={{padding:"12px 18px",borderBottom:`1px solid ${C.sep}`,
+                  borderRight:i%2===0?`1px solid ${C.sep}`:"none"}}>
+                  <div style={{fontSize:9,textTransform:"uppercase",letterSpacing:.8,
+                    color:C.label3,fontFamily:FONT_UI,marginBottom:5}}>{f.label}</div>
+                  <div style={{fontSize:14,fontWeight:700,color:C.label,fontFamily:FONT}}>{f.val}</div>
+                  {f.sub&&<div style={{fontSize:11,color:C.label3,fontFamily:FONT_UI,marginTop:2}}>{f.sub}</div>}
+                </div>
+              ))}
+            </div>
+            {b.motivo&&(
+              <div style={{padding:"12px 18px",borderBottom:`1px solid ${C.sep}`}}>
+                <div style={{fontSize:9,textTransform:"uppercase",letterSpacing:.8,
+                  color:C.label3,fontFamily:FONT_UI,marginBottom:5}}>Motivo</div>
+                <div style={{fontSize:13,color:"#C94C4C",fontFamily:FONT_UI,fontWeight:600}}>{b.motivo}</div>
+              </div>
+            )}
+            <div style={{padding:"12px 18px"}}>
+              <button onClick={cerrar}
+                style={{width:"100%",padding:"11px 0",borderRadius:8,
+                  border:`1px solid ${C.sep}`,background:C.bg2,
+                  color:C.label,fontFamily:FONT_UI,fontSize:12,fontWeight:700,
+                  cursor:"pointer",letterSpacing:.3}}>
+                Cerrar
               </button>
             </div>
           </div>
