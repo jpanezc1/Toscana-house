@@ -7671,10 +7671,11 @@ function ImportarExcelModal({inv, onImportar, onClose, onArchivoCapturado}){
           {/* Filtros */}
           <div style={{display:"flex",gap:6,marginBottom:12,flexWrap:"wrap"}}>
             {[
-              {id:"todas",  l:`Todas (${preview.length})`},
-              {id:"validas",l:`Válidas (${nValidas})`},
-              {id:"errores",l:`Errores (${nErrores})`},
-              {id:"dups",   l:`Duplicadas (${nDups})`},
+              {id:"todas",     l:`Todas (${preview.length})`},
+              {id:"validas",   l:`Válidas (${nValidas})`},
+              {id:"errores",   l:`Errores (${nErrores})`},
+              {id:"dups",      l:`Duplicadas (${nDups})`},
+              {id:"etiquetas", l:`🏷 Etiquetas`},
             ].map(ft=>(
               <button key={ft.id} onClick={()=>setFiltro(ft.id)}
                 style={{padding:"5px 12px",borderRadius:20,fontSize:11,fontWeight:600,fontFamily:FONT_UI,
@@ -7685,13 +7686,47 @@ function ImportarExcelModal({inv, onImportar, onClose, onArchivoCapturado}){
             ))}
           </div>
 
-          {/* Tabla preview */}
+          {/* Vista previa etiquetas */}
+          {filtro==="etiquetas" ? (
+            <div style={{maxHeight:320,overflowY:"auto",borderRadius:14,border:`1px solid ${C.sep}`,marginBottom:16,padding:12,background:C.bg2}}>
+              {preview.filter(f=>f._errs.length===0&&f.desc&&f.marcaId&&f.precio>0).length===0
+                ? <div style={{padding:24,textAlign:"center",color:C.label3,fontSize:13,fontFamily:FONT_UI}}>Sin productos válidos para mostrar</div>
+                : <div style={{display:"flex",flexWrap:"wrap",gap:10}}>
+                    {preview.filter(f=>f._errs.length===0&&f.desc&&f.marcaId&&f.precio>0).map((f,i)=>(
+                      <div key={i} style={{width:150,height:75,border:"1px dashed #aaa",borderRadius:4,
+                        padding:"4px 6px",background:"#fff",display:"flex",flexDirection:"column",
+                        justifyContent:"space-between",fontFamily:"'Courier New',monospace"}}>
+                        <div style={{display:"flex",justifyContent:"space-between",fontSize:7,color:"#333",textTransform:"uppercase"}}>
+                          <span>{(f.marcaNombre||"").toUpperCase().slice(0,14)}</span>
+                          <span style={{fontWeight:700}}>TOSCANA HOUSE</span>
+                        </div>
+                        <div style={{fontSize:8,fontWeight:700,textAlign:"center",lineHeight:1.2,color:"#000"}}>
+                          {(f.desc||"").toUpperCase().slice(0,28)}
+                        </div>
+                        {(f.talla||f.color)&&(
+                          <div style={{fontSize:7,textAlign:"center",color:"#444"}}>
+                            {[f.talla&&`TALLA: ${f.talla.toUpperCase()}`,f.color&&`COLOR: ${f.color.toUpperCase()}`].filter(Boolean).join(" · ")}
+                          </div>
+                        )}
+                        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-end"}}>
+                          <div>
+                            <div style={{fontSize:6,color:"#666",fontFamily:"monospace"}}>{(f.sku||"").toUpperCase()}</div>
+                            <div style={{fontSize:6.5,color:C.gold,fontWeight:700}}>×{f.stock||1} uds</div>
+                          </div>
+                          <div style={{fontSize:10,fontWeight:700,color:"#000"}}>Bs {f.precio}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+              }
+            </div>
+          ) : (
           <div style={{maxHeight:300,overflowY:"auto",borderRadius:14,border:`1px solid ${C.sep}`,marginBottom:16}}>
             {/* Header */}
-            <div style={{display:"grid",gridTemplateColumns:"2fr 1fr 1.5fr 1fr 1fr",
+            <div style={{display:"grid",gridTemplateColumns:"2fr 1fr 1.5fr 0.6fr 0.6fr 1fr",
               padding:"9px 12px",background:C.bg2,position:"sticky",top:0,
               borderBottom:`1px solid ${C.sep}`}}>
-              {["Código","Marca","Descripción","Precio","Estado"].map(h=>(
+              {["Código","Marca","Descripción","Precio","Uds","Estado"].map(h=>(
                 <div key={h} style={{fontSize:10,fontWeight:700,color:C.label3,
                   textTransform:"uppercase",letterSpacing:.6,fontFamily:FONT_UI}}>{h}</div>
               ))}
@@ -7706,7 +7741,7 @@ function ImportarExcelModal({inv, onImportar, onClose, onArchivoCapturado}){
                 ? {txt:"Actualiza stock", color:C.amber}
                 : {txt:"✓ Válido", color:C.green};
               return(
-                <div key={i} style={{display:"grid",gridTemplateColumns:"2fr 1fr 1.5fr 1fr 1fr",
+                <div key={i} style={{display:"grid",gridTemplateColumns:"2fr 1fr 1.5fr 0.6fr 0.6fr 1fr",
                   padding:"9px 12px",borderBottom:`1px solid ${C.sep}`,background:rowBg,
                   alignItems:"center"}}>
                   <div>
@@ -7730,6 +7765,9 @@ function ImportarExcelModal({inv, onImportar, onClose, onArchivoCapturado}){
                   <div style={{fontSize:11,fontWeight:600,color:f.precio>0?C.label:C.red,fontFamily:FONT_UI}}>
                     {f.precio>0?`Bs ${f.precio}`:"—"}
                   </div>
+                  <div style={{fontSize:11,fontWeight:700,color:C.blue,fontFamily:FONT_UI,textAlign:"center"}}>
+                    ×{f.stock||1}
+                  </div>
                   <div style={{fontSize:9,fontWeight:700,color:estadoChip.color,fontFamily:FONT_UI,
                     textTransform:"uppercase",letterSpacing:.3,lineHeight:1.3}}>
                     {estadoChip.txt.slice(0,20)}
@@ -7743,6 +7781,7 @@ function ImportarExcelModal({inv, onImportar, onClose, onArchivoCapturado}){
               </div>
             )}
           </div>
+          )}
 
           {/* Botones acción */}
           <div style={{display:"flex",flexDirection:"column",gap:8}}>

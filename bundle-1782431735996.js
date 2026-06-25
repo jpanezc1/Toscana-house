@@ -29270,7 +29270,8 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       { id: "todas", l: `Todas (${preview.length})` },
       { id: "validas", l: `V\xE1lidas (${nValidas})` },
       { id: "errores", l: `Errores (${nErrores})` },
-      { id: "dups", l: `Duplicadas (${nDups})` }
+      { id: "dups", l: `Duplicadas (${nDups})` },
+      { id: "etiquetas", l: `\u{1F3F7} Etiquetas` }
     ].map((ft) => /* @__PURE__ */ import_react.default.createElement(
       "button",
       {
@@ -29290,15 +29291,26 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
         }
       },
       ft.l
-    ))), /* @__PURE__ */ import_react.default.createElement("div", { style: { maxHeight: 300, overflowY: "auto", borderRadius: 14, border: `1px solid ${C.sep}`, marginBottom: 16 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+    ))), filtro === "etiquetas" ? /* @__PURE__ */ import_react.default.createElement("div", { style: { maxHeight: 320, overflowY: "auto", borderRadius: 14, border: `1px solid ${C.sep}`, marginBottom: 16, padding: 12, background: C.bg2 } }, preview.filter((f) => f._errs.length === 0 && f.desc && f.marcaId && f.precio > 0).length === 0 ? /* @__PURE__ */ import_react.default.createElement("div", { style: { padding: 24, textAlign: "center", color: C.label3, fontSize: 13, fontFamily: FONT_UI } }, "Sin productos v\xE1lidos para mostrar") : /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 10 } }, preview.filter((f) => f._errs.length === 0 && f.desc && f.marcaId && f.precio > 0).map((f, i) => /* @__PURE__ */ import_react.default.createElement("div", { key: i, style: {
+      width: 150,
+      height: 75,
+      border: "1px dashed #aaa",
+      borderRadius: 4,
+      padding: "4px 6px",
+      background: "#fff",
+      display: "flex",
+      flexDirection: "column",
+      justifyContent: "space-between",
+      fontFamily: "'Courier New',monospace"
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", fontSize: 7, color: "#333", textTransform: "uppercase" } }, /* @__PURE__ */ import_react.default.createElement("span", null, (f.marcaNombre || "").toUpperCase().slice(0, 14)), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontWeight: 700 } }, "TOSCANA HOUSE")), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 8, fontWeight: 700, textAlign: "center", lineHeight: 1.2, color: "#000" } }, (f.desc || "").toUpperCase().slice(0, 28)), (f.talla || f.color) && /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 7, textAlign: "center", color: "#444" } }, [f.talla && `TALLA: ${f.talla.toUpperCase()}`, f.color && `COLOR: ${f.color.toUpperCase()}`].filter(Boolean).join(" \xB7 ")), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "flex-end" } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 6, color: "#666", fontFamily: "monospace" } }, (f.sku || "").toUpperCase()), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 6.5, color: C.gold, fontWeight: 700 } }, "\xD7", f.stock || 1, " uds")), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, fontWeight: 700, color: "#000" } }, "Bs ", f.precio)))))) : /* @__PURE__ */ import_react.default.createElement("div", { style: { maxHeight: 300, overflowY: "auto", borderRadius: 14, border: `1px solid ${C.sep}`, marginBottom: 16 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
       display: "grid",
-      gridTemplateColumns: "2fr 1fr 1.5fr 1fr 1fr",
+      gridTemplateColumns: "2fr 1fr 1.5fr 0.6fr 0.6fr 1fr",
       padding: "9px 12px",
       background: C.bg2,
       position: "sticky",
       top: 0,
       borderBottom: `1px solid ${C.sep}`
-    } }, ["C\xF3digo", "Marca", "Descripci\xF3n", "Precio", "Estado"].map((h) => /* @__PURE__ */ import_react.default.createElement("div", { key: h, style: {
+    } }, ["C\xF3digo", "Marca", "Descripci\xF3n", "Precio", "Uds", "Estado"].map((h) => /* @__PURE__ */ import_react.default.createElement("div", { key: h, style: {
       fontSize: 10,
       fontWeight: 700,
       color: C.label3,
@@ -29311,7 +29323,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       const estadoChip = hasErr ? { txt: f._errs[0], color: C.red } : f._dup ? { txt: "Actualiza stock", color: C.amber } : { txt: "\u2713 V\xE1lido", color: C.green };
       return /* @__PURE__ */ import_react.default.createElement("div", { key: i, style: {
         display: "grid",
-        gridTemplateColumns: "2fr 1fr 1.5fr 1fr 1fr",
+        gridTemplateColumns: "2fr 1fr 1.5fr 0.6fr 0.6fr 1fr",
         padding: "9px 12px",
         borderBottom: `1px solid ${C.sep}`,
         background: rowBg,
@@ -29325,7 +29337,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
         letterSpacing: 0.4,
         opacity: 0.7,
         marginTop: 1
-      } }, "\u{1F916} auto")), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: f.marcaId ? C.label : C.red, fontFamily: FONT_UI, fontWeight: f.marcaId ? 400 : 600 } }, f.marcaNombre.slice(0, 12) || "\u2014"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label, fontFamily: FONT_UI } }, f.desc.slice(0, 22), f.desc.length > 22 ? "\u2026" : "", f.talla && /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 9, color: C.label3, marginLeft: 4 } }, f.talla)), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, fontWeight: 600, color: f.precio > 0 ? C.label : C.red, fontFamily: FONT_UI } }, f.precio > 0 ? `Bs ${f.precio}` : "\u2014"), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      } }, "\u{1F916} auto")), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: f.marcaId ? C.label : C.red, fontFamily: FONT_UI, fontWeight: f.marcaId ? 400 : 600 } }, f.marcaNombre.slice(0, 12) || "\u2014"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label, fontFamily: FONT_UI } }, f.desc.slice(0, 22), f.desc.length > 22 ? "\u2026" : "", f.talla && /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 9, color: C.label3, marginLeft: 4 } }, f.talla)), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, fontWeight: 600, color: f.precio > 0 ? C.label : C.red, fontFamily: FONT_UI } }, f.precio > 0 ? `Bs ${f.precio}` : "\u2014"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: C.blue, fontFamily: FONT_UI, textAlign: "center" } }, "\xD7", f.stock || 1), /* @__PURE__ */ import_react.default.createElement("div", { style: {
         fontSize: 9,
         fontWeight: 700,
         color: estadoChip.color,
