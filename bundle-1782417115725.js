@@ -33941,13 +33941,14 @@ Motivo: ${motivo}` : ""}`)) {
       if (tipo === "update") {
         const prod = inv.find((p) => p.codigo === codigo);
         const stockAntes = prod?.stock || 0;
-        const stockNuevo = stockAntes + stock;
+        const esParche = !!(descripcion && !prod?.descripcion);
+        const stockNuevo = stock > 0 && !esParche ? stockAntes + stock : stockAntes;
         const patch = { stock: stockNuevo };
         if (descripcion && !prod?.descripcion) patch.descripcion = descripcion;
         if (subcat && !prod?.subcat) patch.subcat = subcat;
         setInv((prev) => prev.map((p) => p.codigo === codigo ? { ...p, ...patch } : p));
         if (prod) {
-          syncConRespaldo("stock", { prodId: prod.id, stock: stockNuevo }, () => sbActualizarStock(prod.id, stockNuevo));
+          if (!esParche) syncConRespaldo("stock", { prodId: prod.id, stock: stockNuevo }, () => sbActualizarStock(prod.id, stockNuevo));
           if (patch.descripcion || patch.subcat) {
             syncConRespaldo("producto_patch", { prodId: prod.id, ...patch }, () => sbActualizarProductoPatch(prod.id, patch));
           }
