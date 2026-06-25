@@ -19749,9 +19749,24 @@ function VentasTab({vMes, totalVtas, mes, anio, onVentaClick, retiros=[], bajas=
       )}
       {/* ── MOVIMIENTOS — 3 columnas ── */}
       {vistaActiva==="movimientos"&&(()=>{
-        const ventasRecientes = [...vMes].reverse().slice(0,60);
-        const bajasRecientes  = [...bajas].slice(0,60);
-        const retirosRecientes= [...retiros].reverse().slice(0,60);
+        const [movMarca, setMovMarca] = [marcaFiltro, setMarcaFiltro];
+
+        // marcas con actividad en cualquier columna
+        const marcasActivas = MARCAS.filter(m=>
+          vMes.some(v=>v.items.some(i=>i.marcaId===m.id)) ||
+          bajas.some(b=>b.marca===m.nombre||b.marcaId===m.id) ||
+          retiros.some(r=>r.marcaId===m.id||r.marcaNombre===m.nombre)
+        );
+
+        const ventasRecientes = [...vMes].reverse()
+          .filter(v=>!movMarca||v.items.some(i=>i.marcaId===movMarca))
+          .slice(0,60);
+        const bajasRecientes  = [...bajas]
+          .filter(b=>!movMarca||(()=>{const m=MARCAS.find(x=>x.id===movMarca);return m&&(b.marca===m.nombre||b.marcaId===movMarca);})())
+          .slice(0,60);
+        const retirosRecientes= [...retiros].reverse()
+          .filter(r=>!movMarca||r.marcaId===movMarca||r.marcaNombre===(MARCAS.find(x=>x.id===movMarca)?.nombre))
+          .slice(0,60);
 
         const ColHeader = ({icon, label, count, color})=>(
           <div style={{display:"flex",alignItems:"center",gap:7,padding:"10px 14px",
@@ -19775,6 +19790,33 @@ function VentasTab({vMes, totalVtas, mes, anio, onVentaClick, retiros=[], bajas=
         };
 
         return (
+          <div>
+          {/* Filtro por marca */}
+          <div style={{display:"flex",gap:6,overflowX:"auto",paddingBottom:8,marginBottom:14,
+            scrollbarWidth:"none",WebkitOverflowScrolling:"touch"}}>
+            <button onClick={()=>setMovMarca(null)} style={{
+              flexShrink:0,padding:"6px 14px",borderRadius:20,
+              border:`1.5px solid ${!movMarca?C.gold:C.sep}`,
+              background:!movMarca?`${C.gold}20`:"transparent",
+              color:!movMarca?C.gold:C.label3,
+              fontSize:12,fontFamily:FONT,fontWeight:!movMarca?700:400,
+              cursor:"pointer",WebkitTapHighlightColor:"transparent",
+            }}>Todas</button>
+            {marcasActivas.map(m=>(
+              <button key={m.id} onClick={()=>setMovMarca(movMarca===m.id?null:m.id)} style={{
+                flexShrink:0,padding:"6px 12px",borderRadius:20,
+                border:`1.5px solid ${movMarca===m.id?m.color:C.sep}`,
+                background:movMarca===m.id?`${m.color}20`:"transparent",
+                color:movMarca===m.id?m.color:C.label3,
+                fontSize:12,fontFamily:FONT,fontWeight:movMarca===m.id?700:400,
+                cursor:"pointer",WebkitTapHighlightColor:"transparent",
+                display:"flex",alignItems:"center",gap:5,
+              }}>
+                <MarcaIcon marca={m} size={13} radius={3}/>{m.nombre}
+              </button>
+            ))}
+          </div>
+
           <div style={{display:"grid",
             gridTemplateColumns: isDesktop ? "1fr 1fr 1fr" : "1fr",
             gap:10}}>
@@ -19886,6 +19928,7 @@ function VentasTab({vMes, totalVtas, mes, anio, onVentaClick, retiros=[], bajas=
               </div>
             </div>
 
+          </div>
           </div>
         );
       })()}

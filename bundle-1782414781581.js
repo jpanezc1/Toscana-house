@@ -43018,9 +43018,16 @@ Esta acci\xF3n no se puede deshacer.`,
         )
       );
     })), vistaActiva === "movimientos" && (() => {
-      const ventasRecientes = [...vMes].reverse().slice(0, 60);
-      const bajasRecientes = [...bajas].slice(0, 60);
-      const retirosRecientes = [...retiros].reverse().slice(0, 60);
+      const [movMarca, setMovMarca] = [marcaFiltro, setMarcaFiltro];
+      const marcasActivas = MARCAS.filter(
+        (m) => vMes.some((v) => v.items.some((i) => i.marcaId === m.id)) || bajas.some((b) => b.marca === m.nombre || b.marcaId === m.id) || retiros.some((r) => r.marcaId === m.id || r.marcaNombre === m.nombre)
+      );
+      const ventasRecientes = [...vMes].reverse().filter((v) => !movMarca || v.items.some((i) => i.marcaId === movMarca)).slice(0, 60);
+      const bajasRecientes = [...bajas].filter((b) => !movMarca || (() => {
+        const m = MARCAS.find((x) => x.id === movMarca);
+        return m && (b.marca === m.nombre || b.marcaId === movMarca);
+      })()).slice(0, 60);
+      const retirosRecientes = [...retiros].reverse().filter((r) => !movMarca || r.marcaId === movMarca || r.marcaNombre === MARCAS.find((x) => x.id === movMarca)?.nombre).slice(0, 60);
       const ColHeader = ({ icon, label, count, color }) => /* @__PURE__ */ import_react.default.createElement("div", { style: {
         display: "flex",
         alignItems: "center",
@@ -43058,7 +43065,42 @@ Esta acci\xF3n no se puede deshacer.`,
         flex: 1,
         maxHeight: isDesktop ? 520 : 380
       };
-      return /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      return /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+        display: "flex",
+        gap: 6,
+        overflowX: "auto",
+        paddingBottom: 8,
+        marginBottom: 14,
+        scrollbarWidth: "none",
+        WebkitOverflowScrolling: "touch"
+      } }, /* @__PURE__ */ import_react.default.createElement("button", { onClick: () => setMovMarca(null), style: {
+        flexShrink: 0,
+        padding: "6px 14px",
+        borderRadius: 20,
+        border: `1.5px solid ${!movMarca ? C.gold : C.sep}`,
+        background: !movMarca ? `${C.gold}20` : "transparent",
+        color: !movMarca ? C.gold : C.label3,
+        fontSize: 12,
+        fontFamily: FONT,
+        fontWeight: !movMarca ? 700 : 400,
+        cursor: "pointer",
+        WebkitTapHighlightColor: "transparent"
+      } }, "Todas"), marcasActivas.map((m) => /* @__PURE__ */ import_react.default.createElement("button", { key: m.id, onClick: () => setMovMarca(movMarca === m.id ? null : m.id), style: {
+        flexShrink: 0,
+        padding: "6px 12px",
+        borderRadius: 20,
+        border: `1.5px solid ${movMarca === m.id ? m.color : C.sep}`,
+        background: movMarca === m.id ? `${m.color}20` : "transparent",
+        color: movMarca === m.id ? m.color : C.label3,
+        fontSize: 12,
+        fontFamily: FONT,
+        fontWeight: movMarca === m.id ? 700 : 400,
+        cursor: "pointer",
+        WebkitTapHighlightColor: "transparent",
+        display: "flex",
+        alignItems: "center",
+        gap: 5
+      } }, /* @__PURE__ */ import_react.default.createElement(MarcaIcon, { marca: m, size: 13, radius: 3 }), m.nombre))), /* @__PURE__ */ import_react.default.createElement("div", { style: {
         display: "grid",
         gridTemplateColumns: isDesktop ? "1fr 1fr 1fr" : "1fr",
         gap: 10
@@ -43128,7 +43170,7 @@ Esta acci\xF3n no se puede deshacer.`,
           overflow: "hidden",
           textOverflow: "ellipsis"
         } }, r.nombre || r.codigo), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT, marginTop: 2 } }, r.fecha, " ", r.hora || "", " \xB7 ", r.destinatario || "\u2014"), r.marcaNombre && /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: C.label3, fontFamily: FONT, marginTop: 1 } }, r.marcaNombre), r.motivo && /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: C.amber, fontFamily: FONT_UI, marginTop: 2, fontWeight: 600 } }, r.motivo)), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, fontWeight: 700, color: C.amber, fontFamily: FONT, flexShrink: 0 } }, r.cantidad || 1, " ud", (r.cantidad || 1) !== 1 ? "s" : ""))
-      )))));
+      ))))));
     })()), /* @__PURE__ */ import_react.default.createElement(NotaImgPreviewModal, { data: previewNota, onClose: () => setPreviewNota(null) }));
   }
   function EmptyState({ icon, title, sub }) {
