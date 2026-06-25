@@ -33848,7 +33848,7 @@ Motivo: ${motivo}` : ""}`)) {
         stockDespues,
         fecha: hoy(),
         hora: (/* @__PURE__ */ new Date()).toLocaleTimeString("es-BO", { hour: "2-digit", minute: "2-digit" }),
-        operador: user || "\u2014"
+        operador: user?.nombre || user?.usuario || "\u2014"
       });
     }
     function registrarBaja(prod, stockAntes, cant, motivo) {

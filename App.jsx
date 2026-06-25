@@ -11536,7 +11536,7 @@ function App(){
       stockAntes, stockDespues,
       fecha: hoy(),
       hora: new Date().toLocaleTimeString("es-BO",{hour:"2-digit",minute:"2-digit"}),
-      operador: user||"—",
+      operador: user?.nombre||user?.usuario||"—",
     });
   }
 
