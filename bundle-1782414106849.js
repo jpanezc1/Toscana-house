@@ -33340,6 +33340,13 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
         return [];
       }
     });
+    const [bajasLog, setBajasLog] = (0, import_react.useState)(() => {
+      try {
+        return JSON.parse(localStorage.getItem("th_audit_v2") || "[]").filter((e) => e.tipo === "BAJA");
+      } catch {
+        return [];
+      }
+    });
     const [cargas, setCargas] = (0, import_react.useState)(() => {
       try {
         return JSON.parse(localStorage.getItem("th_cargas") || "[]");
@@ -33814,8 +33821,26 @@ Motivo: ${motivo}` : ""}`)) {
       const stockDespues = Math.max(0, stockAntes - cant);
       setInv((p) => p.map((i) => i.id === prod.id ? { ...i, stock: stockDespues } : i));
       syncConRespaldo("stock", { prodId: prod.id, stock: stockDespues }, () => sbActualizarStock(prod.id, stockDespues));
-      logAudit("BAJA", {
+      const now2 = /* @__PURE__ */ new Date();
+      const bajaEvt = {
+        id: "EVT_" + Date.now() + "_" + Math.random().toString(36).slice(2, 6),
+        ts: Date.now(),
+        fecha: now2.toLocaleDateString("es-BO"),
+        hora: now2.toLocaleTimeString("es-BO", { hour: "2-digit", minute: "2-digit" }),
+        tipo: "BAJA",
         resumen: `Baja: ${prod.nombre} (${prod.codigo}) -${cant} \xB7 stock ${stockAntes}\u2192${stockDespues}${motivo ? ` \xB7 ${motivo}` : ""}`,
+        codigo: prod.codigo,
+        nombre: prod.nombre,
+        marca: prod.marcaNombre || "\u2014",
+        precio: prod.precio || 0,
+        cantidad: cant,
+        motivo,
+        stockAntes,
+        stockDespues,
+        operador: user?.usuario || user?.user || "\u2014"
+      };
+      logAudit("BAJA", {
+        resumen: bajaEvt.resumen,
         codigo: prod.codigo,
         nombre: prod.nombre,
         marca: prod.marcaNombre || "\u2014",
@@ -33825,6 +33850,7 @@ Motivo: ${motivo}` : ""}`)) {
         stockAntes,
         stockDespues
       }, user);
+      setBajasLog((prev) => [bajaEvt, ...prev]);
     }
     function reponerStock() {
       const cod = repCod.trim().toUpperCase();
@@ -34284,7 +34310,7 @@ Motivo: ${motivo}` : ""}`)) {
         anio,
         onGoTab: setTab
       }
-    ), tab === "pos" && /* @__PURE__ */ import_react.default.createElement(POSContainer, { inv, onVenta: handleVenta, retiros, onRetiro: registrarRetiro, onVerNota: (v) => setVentaDetalle(v) }), tab === "inventario" && /* @__PURE__ */ import_react.default.createElement(InventarioPorMarca, { inv, ventas, retiros, bajas: auditorias.filter((a) => a.tipo === "BAJA"), onRecibir: () => setShInv(true), onBaja: () => {
+    ), tab === "pos" && /* @__PURE__ */ import_react.default.createElement(POSContainer, { inv, onVenta: handleVenta, retiros, onRetiro: registrarRetiro, onVerNota: (v) => setVentaDetalle(v) }), tab === "inventario" && /* @__PURE__ */ import_react.default.createElement(InventarioPorMarca, { inv, ventas, retiros, bajas: bajasLog, onRecibir: () => setShInv(true), onBaja: () => {
       setShBaja(true);
       setBajaMsg(null);
       setBajaCod("");

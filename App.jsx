@@ -11122,6 +11122,7 @@ function App(){
   const[generando,setGenerando]=useState(false);
   const[retiros,setRetiros]    =useState(()=>{ try{return JSON.parse(localStorage.getItem("th_retiros_v1")||"[]");}catch{return[];} });
   const[auditorias,setAuditorias]=useState(()=>{ try{return JSON.parse(localStorage.getItem("th_auditorias")||"[]");}catch{return[];} });
+  const[bajasLog,setBajasLog]=useState(()=>{ try{return JSON.parse(localStorage.getItem("th_audit_v2")||"[]").filter(e=>e.tipo==="BAJA");}catch{return[];} });
   const[cargas,setCargas]=useState(()=>{ try{return JSON.parse(localStorage.getItem("th_cargas")||"[]");}catch{return[];} });
   const[ventaDetalle,setVentaDetalle]=useState(null);
   const[shImportarExcel,setShImportarExcel]=useState(false);
@@ -11515,14 +11516,30 @@ function App(){
     const stockDespues = Math.max(0, stockAntes - cant);
     setInv(p=>p.map(i=>i.id===prod.id?{...i,stock:stockDespues}:i));
     syncConRespaldo("stock", {prodId:prod.id, stock:stockDespues}, ()=>sbActualizarStock(prod.id, stockDespues));
-    logAudit("BAJA", {
+    const now = new Date();
+    const bajaEvt = {
+      id: "EVT_"+Date.now()+"_"+Math.random().toString(36).slice(2,6),
+      ts: Date.now(),
+      fecha: now.toLocaleDateString("es-BO"),
+      hora:  now.toLocaleTimeString("es-BO",{hour:"2-digit",minute:"2-digit"}),
+      tipo: "BAJA",
       resumen: `Baja: ${prod.nombre} (${prod.codigo}) -${cant} · stock ${stockAntes}→${stockDespues}${motivo?` · ${motivo}`:""}`,
       codigo: prod.codigo, nombre: prod.nombre,
       marca: prod.marcaNombre||"—",
       precio: prod.precio||0,
       cantidad: cant, motivo,
       stockAntes, stockDespues,
+      operador: user?.usuario||user?.user||"—",
+    };
+    logAudit("BAJA", {
+      resumen: bajaEvt.resumen,
+      codigo: prod.codigo, nombre: prod.nombre,
+      marca: prod.marcaNombre||"—",
+      precio: prod.precio||0,
+      cantidad: cant, motivo,
+      stockAntes, stockDespues,
     }, user);
+    setBajasLog(prev=>[bajaEvt,...prev]);
   }
 
   // Reposición de stock — para etiquetas/códigos ya existentes (no crea
@@ -11951,7 +11968,7 @@ function App(){
 
         {/* INVENTARIO — por marca */}
         {tab==="inventario" && (
-          <InventarioPorMarca inv={inv} ventas={ventas} retiros={retiros} bajas={auditorias.filter(a=>a.tipo==="BAJA")} onRecibir={()=>setShInv(true)} onBaja={()=>{setShBaja(true);setBajaMsg(null);setBajaCod("");setBajaCant("");setBajaMotivo("");}} onImportarExcel={()=>setShImportarExcel(true)} onReponer={()=>{setShReponer(true);setRepMsg(null);setRepCod("");setRepCant("");setRepPrecio("");setRepTab("stock");}} onSyncCompleto={forzarSyncInventario} onRecargarDesdeSupabase={recargarDesdeSupabase}/>
+          <InventarioPorMarca inv={inv} ventas={ventas} retiros={retiros} bajas={bajasLog} onRecibir={()=>setShInv(true)} onBaja={()=>{setShBaja(true);setBajaMsg(null);setBajaCod("");setBajaCant("");setBajaMotivo("");}} onImportarExcel={()=>setShImportarExcel(true)} onReponer={()=>{setShReponer(true);setRepMsg(null);setRepCod("");setRepCant("");setRepPrecio("");setRepTab("stock");}} onSyncCompleto={forzarSyncInventario} onRecargarDesdeSupabase={recargarDesdeSupabase}/>
         )}
 
         {/* AUDITORÍA — cierre de inventario mensual (conteo físico vs sistema) */}
