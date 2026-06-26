@@ -31234,7 +31234,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
         },
         "\u{1F4C4} Nota"
       ))))));
-    })(), tab === "cargas" && /* @__PURE__ */ import_react.default.createElement(RegistroCargas, { cargas: cargas || [], marcas: MARCAS, marcaId: mid }), tab === "liquidacion" && /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 24 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+    })(), tab === "cargas" && /* @__PURE__ */ import_react.default.createElement(RegistroCargas, { cargas: cargas || [], marcas: MARCAS, marcaId: mid, inv }), tab === "liquidacion" && /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 24 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
       fontSize: 10,
       letterSpacing: 1.2,
       textTransform: "uppercase",
@@ -34477,7 +34477,7 @@ Motivo: ${motivo}` : ""}`)) {
         onGoVerif: () => setTab("auditoria"),
         tabActual: tab
       }
-    )), tab === "cargas" && /* @__PURE__ */ import_react.default.createElement(RegistroCargas, { cargas: cargasCompletas, marcas: MARCAS, onVerificar: handleVerificarCarga, user, onEliminarCarga: handleEliminarCarga }), tab === "cambios" && /* @__PURE__ */ import_react.default.createElement(CambiosTab, { inv, ventas, onCambio: handleCambio }), tab === "ventas_ant" && user?.rol === "admin" && /* @__PURE__ */ import_react.default.createElement(VentasAntiguas, { inv, ventas, cargas: cargasCompletas, onVentaHistorica: handleVentaHistorica, user }), tab === "marcas" && !marcaDetalle && /* @__PURE__ */ import_react.default.createElement("div", null, marcasState.filter((m) => m.estado === "inactiva").length > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: {
+    )), tab === "cargas" && /* @__PURE__ */ import_react.default.createElement(RegistroCargas, { cargas: cargasCompletas, marcas: MARCAS, onVerificar: handleVerificarCarga, user, onEliminarCarga: handleEliminarCarga, inv }), tab === "cambios" && /* @__PURE__ */ import_react.default.createElement(CambiosTab, { inv, ventas, onCambio: handleCambio }), tab === "ventas_ant" && user?.rol === "admin" && /* @__PURE__ */ import_react.default.createElement(VentasAntiguas, { inv, ventas, cargas: cargasCompletas, onVentaHistorica: handleVentaHistorica, user }), tab === "marcas" && !marcaDetalle && /* @__PURE__ */ import_react.default.createElement("div", null, marcasState.filter((m) => m.estado === "inactiva").length > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: {
       fontSize: 13,
       fontWeight: 600,
       color: C.label3,
@@ -38665,7 +38665,7 @@ ${c.diferencia > 0.01 ? `Cliente paga diferencia: Bs ${fmt2(c.diferencia)} (${c.
       lineHeight: 1.5
     } }, /* @__PURE__ */ import_react.default.createElement("i", { className: "ti ti-info-circle", style: { fontSize: 14, flexShrink: 0, marginTop: 1 }, "aria-hidden": "true" }), /* @__PURE__ */ import_react.default.createElement("span", null, "Conflicto = la marca del \xEDtem ya estaba cargada en el sistema en esa fecha. Verde = seguro \xB7 Rojo = requiere verificaci\xF3n \xB7 Amarillo = verificado manualmente.")));
   }
-  function RegistroCargas({ cargas, marcas, marcaId = null, onVerificar = null, user = null, onEliminarCarga = null }) {
+  function RegistroCargas({ cargas, marcas, marcaId = null, onVerificar = null, user = null, onEliminarCarga = null, inv = [] }) {
     const isDesktop = useIsDesktop();
     const fijaMarca = marcaId != null;
     const [marcaSelec, setMarcaSelec] = (0, import_react.useState)(marcaId);
@@ -38886,13 +38886,18 @@ ${c.diferencia > 0.01 ? `Cliente paga diferencia: Bs ${fmt2(c.diferencia)} (${c.
         textOverflow: "ellipsis",
         whiteSpace: "nowrap"
       } }, (it.nombre || "").toUpperCase()), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: C.label3, fontFamily: FONT_MONO } }, it.codigo, " \xB7 ", it.marca || "\u2014")), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label2, fontFamily: FONT, textAlign: "right", flexShrink: 0 } }, it.tipo === "update" ? `${it.stockAntes} \u2192 ${it.stockNuevo} (+${it.stockSumado})` : `Stock ${it.stock}${it.precio ? ` \xB7 ${$(it.precio)}` : ""}`)))), items.filter((it) => it.codigo && it.nombre && Number(it.stock || it.stockNuevo || 1) > 0).length > 0 && (() => {
-        const paraImprimir = items.filter((it) => it.codigo && it.nombre).map((it) => ({
-          codigo: it.codigo,
-          nombre: it.nombre,
-          marcaNombre: it.marca || c.marcaNombre || "",
-          precio: it.precio || 0,
-          stock: Number(it.stockSumado || it.stock || it.stockNuevo || 1)
-        }));
+        const paraImprimir = items.filter((it) => it.codigo && it.nombre).map((it) => {
+          const prodInv = inv.find((p) => (p.codigo || "").toLowerCase() === (it.codigo || "").toLowerCase());
+          return {
+            codigo: it.codigo,
+            nombre: it.nombre,
+            marcaNombre: it.marca || c.marcaNombre || "",
+            precio: it.precio || prodInv?.precio || 0,
+            stock: Number(it.stockSumado || it.stock || it.stockNuevo || 1),
+            descripcion: prodInv?.descripcion || "",
+            subcat: prodInv?.subcat || ""
+          };
+        });
         const totalEtiq = paraImprimir.reduce((s, it) => s + Math.max(1, it.stock), 0);
         return /* @__PURE__ */ import_react.default.createElement(
           "button",

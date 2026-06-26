@@ -9434,7 +9434,7 @@ function BrandPortal({user, ventas, inv, cargas, retiros=[], logout}){
 
         {/* ══ CARGAS — trazabilidad de cargas a inventario de esta marca ══ */}
         {tab==="cargas"&&(
-          <RegistroCargas cargas={cargas||[]} marcas={MARCAS} marcaId={mid}/>
+          <RegistroCargas cargas={cargas||[]} marcas={MARCAS} marcaId={mid} inv={inv}/>
         )}
 
         {/* ══ LIQUIDACIÓN ══ */}
@@ -12139,7 +12139,7 @@ function App(){
 
         {/* CARGAS — trazabilidad de cargas a inventario (manuales + importaciones) */}
         {tab==="cargas" && (
-          <RegistroCargas cargas={cargasCompletas} marcas={MARCAS} onVerificar={handleVerificarCarga} user={user} onEliminarCarga={handleEliminarCarga}/>
+          <RegistroCargas cargas={cargasCompletas} marcas={MARCAS} onVerificar={handleVerificarCarga} user={user} onEliminarCarga={handleEliminarCarga} inv={inv}/>
         )}
 
         {/* CAMBIOS — cambio de prendas */}
@@ -15747,7 +15747,7 @@ function VentasAntiguas({inv, ventas, cargas, onVentaHistorica, user}){
 // ══════════════════════════════════════════════════════════
 // CARGAS — trazabilidad de cargas a inventario (manuales + importaciones)
 // ══════════════════════════════════════════════════════════
-function RegistroCargas({cargas, marcas, marcaId=null, onVerificar=null, user=null, onEliminarCarga=null}){
+function RegistroCargas({cargas, marcas, marcaId=null, onVerificar=null, user=null, onEliminarCarga=null, inv=[]}){
   const isDesktop = useIsDesktop();
   const fijaMarca = marcaId!=null;
   const[marcaSelec,setMarcaSelec]=useState(marcaId);
@@ -15955,13 +15955,18 @@ function RegistroCargas({cargas, marcas, marcaId=null, onVerificar=null, user=nu
                       {items.filter(it=>it.codigo&&it.nombre&&Number(it.stock||it.stockNuevo||1)>0).length>0&&(()=>{
                         const paraImprimir = items
                           .filter(it=>it.codigo&&it.nombre)
-                          .map(it=>({
-                            codigo: it.codigo,
-                            nombre: it.nombre,
-                            marcaNombre: it.marca||c.marcaNombre||"",
-                            precio: it.precio||0,
-                            stock: Number(it.stockSumado||it.stock||it.stockNuevo||1),
-                          }));
+                          .map(it=>{
+                            const prodInv = inv.find(p=>(p.codigo||"").toLowerCase()===(it.codigo||"").toLowerCase());
+                            return {
+                              codigo: it.codigo,
+                              nombre: it.nombre,
+                              marcaNombre: it.marca||c.marcaNombre||"",
+                              precio: it.precio||prodInv?.precio||0,
+                              stock: Number(it.stockSumado||it.stock||it.stockNuevo||1),
+                              descripcion: prodInv?.descripcion||"",
+                              subcat: prodInv?.subcat||"",
+                            };
+                          });
                         const totalEtiq = paraImprimir.reduce((s,it)=>s+Math.max(1,it.stock),0);
                         return (
                           <button
