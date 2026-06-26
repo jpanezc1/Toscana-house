@@ -34134,6 +34134,52 @@ Motivo: ${motivo}` : ""}`)) {
       }, user);
       return vf;
     }
+    function handleVentaHistorica(v) {
+      const id = `VH${Date.now()}`;
+      const fechaISO = v.fecha;
+      const [anioH, mesH] = fechaISO.split("-").map(Number);
+      const vf = {
+        ...v,
+        id,
+        fecha: fechaISO,
+        hora: v.turno || "\u2014",
+        mk: MK,
+        mes: mesH,
+        anio: anioH,
+        origen: "HISTORICA"
+      };
+      setVentas((p) => [...p, vf]);
+      const stockCambios = [];
+      v.items.forEach((it) => {
+        const stockAntes = inv.find((i) => i.id === it.prodId)?.stock || 0;
+        const stockDespues = Math.max(0, stockAntes - it.cantidad);
+        setInv((p) => p.map((i) => i.id === it.prodId ? { ...i, stock: stockDespues } : i));
+        syncConRespaldo("stock", { prodId: it.prodId, stock: stockDespues }, () => sbActualizarStock(it.prodId, stockDespues));
+        stockCambios.push({ prodId: it.prodId, codigo: it.codigo, nombre: it.nombre, stockAntes, stockDespues });
+      });
+      syncConRespaldo("venta", vf, () => sbGuardarVenta(vf));
+      const marcasNombres = [...new Set(v.items.map((i) => i.marcaNombre))].join(", ");
+      logAudit("VENTA_HISTORICA", {
+        resumen: `Venta hist\xF3rica ${fechaISO} \xB7 Bs ${v.total} \xB7 ${v.items.length} \xEDtem(s) \xB7 ${marcasNombres}`,
+        ventaId: id,
+        total: v.total,
+        subtotal: v.subtotal,
+        descuento: 0,
+        metodoPago: v.metodoPago,
+        vendedor: user?.nombre || "Admin",
+        marcas: marcasNombres,
+        items: v.items.map((it) => ({
+          codigo: it.codigo,
+          nombre: it.nombre,
+          marca: it.marcaNombre,
+          cantidad: it.cantidad,
+          precioUnit: it.precioUnit,
+          subtotal: it.subtotal
+        })),
+        stockCambios
+      }, user);
+      return vf;
+    }
     function handleCambio(cambio) {
       cambio.itemsDevueltos.forEach((it) => {
         const prod = inv.find((i) => i.id === it.prodId);
@@ -34214,9 +34260,10 @@ Motivo: ${motivo}` : ""}`)) {
       { id: "cambios", icon: "\u21A9", label: "Cambios" },
       { id: "liquidaciones", icon: "\u25CE", label: "Liquidar" },
       { id: "giftcards", icon: "\u{1F381}", label: "Gift" },
+      { id: "ventas_ant", icon: "\u23F1", label: "V.Antiguas" },
       { id: "config", icon: "\u2699", label: "Config" }
     ];
-    const TABS = user?.rol === "caja" ? TABS_ALL.filter((t) => ["inicio", "pos", "ventas", "cambios"].includes(t.id)) : user?.rol === "admin" ? TABS_ALL : TABS_ALL.filter((t) => t.id !== "auditoria" && t.id !== "cargas");
+    const TABS = user?.rol === "caja" ? TABS_ALL.filter((t) => ["inicio", "pos", "ventas", "cambios"].includes(t.id)) : user?.rol === "admin" ? TABS_ALL : TABS_ALL.filter((t) => t.id !== "auditoria" && t.id !== "cargas" && t.id !== "ventas_ant");
     const showingDetail = tab === "marcas" && marcaDetalle;
     if (!authReady) return /* @__PURE__ */ import_react.default.createElement("div", { style: {
       minHeight: "100vh",
@@ -34428,7 +34475,7 @@ Motivo: ${motivo}` : ""}`)) {
         onGoVerif: () => setTab("auditoria"),
         tabActual: tab
       }
-    )), tab === "cargas" && /* @__PURE__ */ import_react.default.createElement(RegistroCargas, { cargas: cargasCompletas, marcas: MARCAS, onVerificar: handleVerificarCarga, user, onEliminarCarga: handleEliminarCarga }), tab === "cambios" && /* @__PURE__ */ import_react.default.createElement(CambiosTab, { inv, ventas, onCambio: handleCambio }), tab === "marcas" && !marcaDetalle && /* @__PURE__ */ import_react.default.createElement("div", null, marcasState.filter((m) => m.estado === "inactiva").length > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: {
+    )), tab === "cargas" && /* @__PURE__ */ import_react.default.createElement(RegistroCargas, { cargas: cargasCompletas, marcas: MARCAS, onVerificar: handleVerificarCarga, user, onEliminarCarga: handleEliminarCarga }), tab === "cambios" && /* @__PURE__ */ import_react.default.createElement(CambiosTab, { inv, ventas, onCambio: handleCambio }), tab === "ventas_ant" && user?.rol === "admin" && /* @__PURE__ */ import_react.default.createElement(VentasAntiguas, { inv, onVentaHistorica: handleVentaHistorica }), tab === "marcas" && !marcaDetalle && /* @__PURE__ */ import_react.default.createElement("div", null, marcasState.filter((m) => m.estado === "inactiva").length > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: {
       fontSize: 13,
       fontWeight: 600,
       color: C.label3,
@@ -38050,6 +38097,333 @@ ${c.diferencia > 0.01 ? `Cliente paga diferencia: Bs ${fmt2(c.diferencia)} (${c.
         placeholder: "Motivo del cambio, talla incorrecta, etc."
       }
     ), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: confirmar, variant: "fill", full: true, icon: "\u2713" }, "Confirmar cambio"));
+  }
+  function VentasAntiguas({ inv, onVentaHistorica }) {
+    const isDesktop = useIsDesktop();
+    const hoyISO = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+    const [fecha, setFecha] = import_react.default.useState(hoyISO);
+    const [turno, setTurno] = import_react.default.useState("Tarde");
+    const [metodo, setMetodo] = import_react.default.useState("efectivo");
+    const [codInput, setCodInput] = import_react.default.useState("");
+    const [carrito, setCarrito] = import_react.default.useState([]);
+    const [busqueda, setBusqueda] = import_react.default.useState([]);
+    const [confirmado, setConfirmado] = import_react.default.useState(null);
+    const [guardando, setGuardando] = import_react.default.useState(false);
+    const inputRef = import_react.default.useRef(null);
+    const total = carrito.reduce((s, it) => s + it.subtotal, 0);
+    function buscarProducto(cod) {
+      if (!cod.trim()) return;
+      const q = cod.trim().toUpperCase();
+      const matches = inv.filter((p) => (p.codigo || "").toUpperCase() === q || (p.nombre || "").toUpperCase().includes(q));
+      if (matches.length === 1) {
+        agregarAlCarrito(matches[0]);
+        setCodInput("");
+        setBusqueda([]);
+      } else if (matches.length > 1) {
+        setBusqueda(matches);
+      } else {
+        setBusqueda([{ _noEncontrado: true, codigo: q }]);
+      }
+    }
+    function agregarAlCarrito(prod) {
+      if (!prod || prod.stock <= 0) return;
+      setCarrito((prev) => {
+        const idx = prev.findIndex((it) => it.prodId === prod.id);
+        if (idx >= 0) {
+          const upd = [...prev];
+          upd[idx] = { ...upd[idx], cantidad: upd[idx].cantidad + 1, subtotal: (upd[idx].cantidad + 1) * upd[idx].precioUnit };
+          return upd;
+        }
+        return [...prev, {
+          prodId: prod.id,
+          codigo: prod.codigo,
+          nombre: prod.nombre,
+          marcaId: prod.marcaId,
+          marcaNombre: prod.marcaNombre || prod.marca || "",
+          cantidad: 1,
+          precioUnit: prod.precio || 0,
+          subtotal: prod.precio || 0
+        }];
+      });
+      setBusqueda([]);
+      setCodInput("");
+      setTimeout(() => inputRef.current?.focus(), 50);
+    }
+    function quitarItem(prodId) {
+      setCarrito((prev) => prev.filter((it) => it.prodId !== prodId));
+    }
+    async function confirmarVenta() {
+      if (carrito.length === 0 || guardando) return;
+      setGuardando(true);
+      const venta = { fecha, turno, metodoPago: metodo, total, subtotal: total, items: carrito };
+      const vf = onVentaHistorica(venta);
+      setConfirmado({ ...vf, cantItems: carrito.length });
+      setCarrito([]);
+      setCodInput("");
+      setBusqueda([]);
+      setGuardando(false);
+    }
+    const METODOS = [
+      { v: "efectivo", label: "Efectivo" },
+      { v: "qr", label: "QR" },
+      { v: "tarjeta", label: "Tarjeta" }
+    ];
+    const TURNOS = ["Ma\xF1ana", "Tarde", "Noche"];
+    return /* @__PURE__ */ import_react.default.createElement("div", { style: { paddingBottom: 32 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10, marginBottom: 16 } }, /* @__PURE__ */ import_react.default.createElement("i", { className: "ti ti-clock-history", style: { fontSize: 20, color: C.label2 }, "aria-hidden": "true" }), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 15, fontWeight: 600, color: C.label, fontFamily: FONT } }, "Ventas antiguas"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 11, padding: "2px 8px", borderRadius: 4, background: "#EEEDFE", color: "#3C3489", fontWeight: 500, display: "inline-flex", alignItems: "center", gap: 4 } }, /* @__PURE__ */ import_react.default.createElement("i", { className: "ti ti-shield-lock", style: { fontSize: 11 }, "aria-hidden": "true" }), "Solo admin")), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      fontSize: 12,
+      color: C.label2,
+      background: C.bg1,
+      border: `1px solid ${C.sep}`,
+      borderRadius: 10,
+      padding: "9px 13px",
+      marginBottom: 14,
+      lineHeight: 1.5
+    } }, "Registra ventas realizadas antes del uso del sistema. Descuenta stock y genera trazabilidad marcada como ", /* @__PURE__ */ import_react.default.createElement("b", null, "hist\xF3rica"), "."), confirmado && /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      background: "#E8F5E9",
+      border: "1px solid #81C784",
+      borderRadius: 12,
+      padding: "12px 16px",
+      marginBottom: 14,
+      display: "flex",
+      alignItems: "center",
+      gap: 10
+    } }, /* @__PURE__ */ import_react.default.createElement("i", { className: "ti ti-circle-check", style: { fontSize: 20, color: "#388E3C" }, "aria-hidden": "true" }), /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, fontWeight: 600, color: "#2E7D32" } }, "Venta hist\xF3rica registrada"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: "#388E3C" } }, confirmado.fecha, " \xB7 ", confirmado.cantItems, " \xEDtem(s) \xB7 Bs ", confirmado.total)), /* @__PURE__ */ import_react.default.createElement(
+      "button",
+      {
+        onClick: () => setConfirmado(null),
+        style: { background: "none", border: "none", cursor: "pointer", color: "#388E3C", fontSize: 18, lineHeight: 1 }
+      },
+      /* @__PURE__ */ import_react.default.createElement("i", { className: "ti ti-x", style: { fontSize: 14 }, "aria-hidden": "true" })
+    )), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      background: C.bg1,
+      border: `1px solid ${C.sep}`,
+      borderRadius: 14,
+      padding: "14px 16px",
+      display: "flex",
+      flexDirection: "column",
+      gap: 12,
+      marginBottom: 12
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, fontWeight: 500, color: C.label2, marginBottom: 4 } }, /* @__PURE__ */ import_react.default.createElement("i", { className: "ti ti-calendar", style: { fontSize: 11 }, "aria-hidden": "true" }), " Fecha de la venta"), /* @__PURE__ */ import_react.default.createElement(
+      "input",
+      {
+        type: "date",
+        value: fecha,
+        max: hoyISO,
+        onChange: (e) => setFecha(e.target.value),
+        style: {
+          width: "100%",
+          padding: "7px 10px",
+          borderRadius: 8,
+          border: `1px solid ${C.sep}`,
+          background: C.bg0,
+          color: C.label,
+          fontSize: 13,
+          fontFamily: FONT_UI,
+          boxSizing: "border-box"
+        }
+      }
+    )), /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, fontWeight: 500, color: C.label2, marginBottom: 4 } }, /* @__PURE__ */ import_react.default.createElement("i", { className: "ti ti-clock", style: { fontSize: 11 }, "aria-hidden": "true" }), " Turno"), /* @__PURE__ */ import_react.default.createElement(
+      "select",
+      {
+        value: turno,
+        onChange: (e) => setTurno(e.target.value),
+        style: {
+          width: "100%",
+          padding: "7px 10px",
+          borderRadius: 8,
+          border: `1px solid ${C.sep}`,
+          background: C.bg0,
+          color: C.label,
+          fontSize: 13,
+          fontFamily: FONT_UI,
+          boxSizing: "border-box"
+        }
+      },
+      TURNOS.map((t) => /* @__PURE__ */ import_react.default.createElement("option", { key: t }, t))
+    ))), /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, fontWeight: 500, color: C.label2, marginBottom: 6 } }, /* @__PURE__ */ import_react.default.createElement("i", { className: "ti ti-credit-card", style: { fontSize: 11 }, "aria-hidden": "true" }), " M\xE9todo de pago"), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 6 } }, METODOS.map((m) => /* @__PURE__ */ import_react.default.createElement(
+      "button",
+      {
+        key: m.v,
+        onClick: () => setMetodo(m.v),
+        style: {
+          flex: 1,
+          padding: "7px 6px",
+          borderRadius: 8,
+          fontSize: 12,
+          fontFamily: FONT_UI,
+          fontWeight: 500,
+          cursor: "pointer",
+          transition: "all .15s",
+          border: metodo === m.v ? `2px solid ${C.blue}` : `1px solid ${C.sep}`,
+          background: metodo === m.v ? `${C.blue}12` : "transparent",
+          color: metodo === m.v ? C.blue : C.label2
+        }
+      },
+      m.label
+    )))), /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, fontWeight: 500, color: C.label2, marginBottom: 6 } }, /* @__PURE__ */ import_react.default.createElement("i", { className: "ti ti-barcode", style: { fontSize: 11 }, "aria-hidden": "true" }), " Agregar por c\xF3digo"), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 6 } }, /* @__PURE__ */ import_react.default.createElement(
+      "input",
+      {
+        ref: inputRef,
+        value: codInput,
+        onChange: (e) => {
+          setCodInput(e.target.value);
+          if (!e.target.value) setBusqueda([]);
+        },
+        onKeyDown: (e) => {
+          if (e.key === "Enter") buscarProducto(codInput);
+        },
+        placeholder: "Escanear o escribir c\xF3digo\u2026",
+        style: {
+          flex: 1,
+          padding: "8px 12px",
+          borderRadius: 8,
+          border: `1px solid ${C.sep}`,
+          background: C.bg0,
+          color: C.label,
+          fontSize: 13,
+          fontFamily: FONT_UI
+        }
+      }
+    ), /* @__PURE__ */ import_react.default.createElement(
+      "button",
+      {
+        onClick: () => buscarProducto(codInput),
+        style: {
+          padding: "8px 14px",
+          borderRadius: 8,
+          border: `1px solid ${C.sep}`,
+          background: C.bg0,
+          color: C.label,
+          fontSize: 13,
+          fontFamily: FONT_UI,
+          cursor: "pointer",
+          display: "flex",
+          alignItems: "center",
+          gap: 4
+        }
+      },
+      /* @__PURE__ */ import_react.default.createElement("i", { className: "ti ti-plus", style: { fontSize: 14 }, "aria-hidden": "true" })
+    )), busqueda.length > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      background: C.bg0,
+      border: `1px solid ${C.sep}`,
+      borderRadius: 10,
+      marginTop: 6,
+      overflow: "hidden",
+      maxHeight: 200,
+      overflowY: "auto"
+    } }, busqueda[0]?._noEncontrado ? /* @__PURE__ */ import_react.default.createElement("div", { style: { padding: "10px 14px", fontSize: 12, color: C.red, display: "flex", alignItems: "center", gap: 6 } }, /* @__PURE__ */ import_react.default.createElement("i", { className: "ti ti-alert-circle", style: { fontSize: 14 }, "aria-hidden": "true" }), 'C\xF3digo "', busqueda[0].codigo, '" no encontrado en inventario') : busqueda.map((p) => /* @__PURE__ */ import_react.default.createElement(
+      "div",
+      {
+        key: p.id,
+        onClick: () => agregarAlCarrito(p),
+        style: {
+          padding: "9px 14px",
+          cursor: "pointer",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          borderBottom: `1px solid ${C.sep}`,
+          background: "transparent",
+          transition: "background .1s"
+        },
+        onMouseEnter: (e) => e.currentTarget.style.background = C.bg1,
+        onMouseLeave: (e) => e.currentTarget.style.background = "transparent"
+      },
+      /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, fontWeight: 500, color: C.label } }, p.nombre), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label2 } }, p.codigo, " \xB7 ", p.marcaNombre || p.marca || "")),
+      /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "right" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, fontWeight: 500, color: C.label } }, "Bs ", p.precio), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: p.stock > 0 ? C.label2 : C.red } }, p.stock > 0 ? `${p.stock} disp.` : "Sin stock"))
+    ))))), carrito.length > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: { background: C.bg1, border: `1px solid ${C.sep}`, borderRadius: 14, overflow: "hidden", marginBottom: 12 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      padding: "9px 14px",
+      background: C.bg2,
+      borderBottom: `1px solid ${C.sep}`,
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center"
+    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 12, fontWeight: 500, color: C.label2 } }, "Carrito \u2014 ", carrito.length, " \xEDtem", carrito.length !== 1 ? "s" : ""), /* @__PURE__ */ import_react.default.createElement("span", { style: {
+      fontSize: 11,
+      padding: "2px 8px",
+      borderRadius: 4,
+      background: "#EEEDFE",
+      color: "#3C3489",
+      fontWeight: 500
+    } }, fecha)), carrito.map((it, idx) => /* @__PURE__ */ import_react.default.createElement("div", { key: it.prodId, style: {
+      padding: "10px 14px",
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+      borderBottom: idx < carrito.length - 1 ? `1px solid ${C.sep}` : "none"
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      fontSize: 13,
+      fontWeight: 500,
+      color: C.label,
+      overflow: "hidden",
+      textOverflow: "ellipsis",
+      whiteSpace: "nowrap"
+    } }, it.nombre), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 6, alignItems: "center", marginTop: 2 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: {
+      fontSize: 11,
+      fontFamily: FONT_MONO,
+      background: "#faeeda",
+      color: "#c07d10",
+      padding: "1px 6px",
+      borderRadius: 3
+    } }, it.codigo), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 11, color: C.label2 } }, it.marcaNombre))), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, fontWeight: 500, color: C.label } }, "Bs ", it.subtotal), /* @__PURE__ */ import_react.default.createElement(
+      "button",
+      {
+        onClick: () => quitarItem(it.prodId),
+        style: {
+          background: "none",
+          border: "none",
+          cursor: "pointer",
+          color: C.red,
+          padding: 4,
+          lineHeight: 1
+        }
+      },
+      /* @__PURE__ */ import_react.default.createElement("i", { className: "ti ti-x", style: { fontSize: 14 }, "aria-hidden": "true" })
+    )))), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      padding: "10px 14px",
+      background: C.bg2,
+      borderTop: `1px solid ${C.sep}`,
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center"
+    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 12, color: C.label2 } }, "Total"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 16, fontWeight: 600, color: C.label, fontFamily: FONT } }, "Bs ", total))), /* @__PURE__ */ import_react.default.createElement(
+      "button",
+      {
+        onClick: confirmarVenta,
+        disabled: carrito.length === 0 || guardando,
+        style: {
+          width: "100%",
+          padding: "13px 16px",
+          borderRadius: 12,
+          border: "none",
+          background: carrito.length === 0 ? "#ccc" : "#1a1714",
+          color: "#fff",
+          fontSize: 14,
+          fontWeight: 500,
+          fontFamily: FONT_UI,
+          cursor: carrito.length === 0 ? "not-allowed" : "pointer",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 8,
+          opacity: carrito.length === 0 ? 0.5 : 1,
+          transition: "opacity .15s"
+        }
+      },
+      /* @__PURE__ */ import_react.default.createElement("i", { className: "ti ti-clock-check", style: { fontSize: 16 }, "aria-hidden": "true" }),
+      guardando ? "Registrando\u2026" : `Registrar venta hist\xF3rica${total > 0 ? " \u2014 Bs " + total : ""}`
+    ), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      marginTop: 12,
+      background: "#EEEDFE",
+      borderRadius: 10,
+      padding: "10px 14px",
+      fontSize: 12,
+      color: "#3C3489",
+      display: "flex",
+      gap: 8,
+      alignItems: "flex-start",
+      lineHeight: 1.5
+    } }, /* @__PURE__ */ import_react.default.createElement("i", { className: "ti ti-info-circle", style: { fontSize: 14, flexShrink: 0, marginTop: 1 }, "aria-hidden": "true" }), /* @__PURE__ */ import_react.default.createElement("span", null, "Al confirmar: descuenta stock de cada art\xEDculo, guarda la venta con la fecha seleccionada y la marca como ", /* @__PURE__ */ import_react.default.createElement("b", null, "hist\xF3rica"), " en trazabilidad.")));
   }
   function RegistroCargas({ cargas, marcas, marcaId = null, onVerificar = null, user = null, onEliminarCarga = null }) {
     const isDesktop = useIsDesktop();

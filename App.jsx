@@ -11824,6 +11824,51 @@ function App(){
     return vf;
   }
 
+  function handleVentaHistorica(v){
+    const id = `VH${Date.now()}`;
+    // fecha viene del picker en formato YYYY-MM-DD; extraemos mes/anio para las liquidaciones
+    const fechaISO = v.fecha; // "2026-04-15"
+    const [anioH, mesH] = fechaISO.split("-").map(Number);
+    const vf = {
+      ...v,
+      id,
+      fecha: fechaISO,
+      hora: v.turno || "—",
+      mk: MK,
+      mes: mesH,
+      anio: anioH,
+      origen: "HISTORICA",
+    };
+    setVentas(p => [...p, vf]);
+    const stockCambios = [];
+    v.items.forEach(it => {
+      const stockAntes = inv.find(i => i.id === it.prodId)?.stock || 0;
+      const stockDespues = Math.max(0, stockAntes - it.cantidad);
+      setInv(p => p.map(i => i.id === it.prodId ? {...i, stock: stockDespues} : i));
+      syncConRespaldo("stock", {prodId: it.prodId, stock: stockDespues}, () => sbActualizarStock(it.prodId, stockDespues));
+      stockCambios.push({prodId: it.prodId, codigo: it.codigo, nombre: it.nombre, stockAntes, stockDespues});
+    });
+    syncConRespaldo("venta", vf, () => sbGuardarVenta(vf));
+    const marcasNombres = [...new Set(v.items.map(i => i.marcaNombre))].join(", ");
+    logAudit("VENTA_HISTORICA", {
+      resumen: `Venta histórica ${fechaISO} · Bs ${v.total} · ${v.items.length} ítem(s) · ${marcasNombres}`,
+      ventaId: id,
+      total: v.total,
+      subtotal: v.subtotal,
+      descuento: 0,
+      metodoPago: v.metodoPago,
+      vendedor: user?.nombre || "Admin",
+      marcas: marcasNombres,
+      items: v.items.map(it => ({
+        codigo: it.codigo, nombre: it.nombre,
+        marca: it.marcaNombre, cantidad: it.cantidad,
+        precioUnit: it.precioUnit, subtotal: it.subtotal,
+      })),
+      stockCambios,
+    }, user);
+    return vf;
+  }
+
   function handleCambio(cambio){
     // Restaurar stock de items devueltos
     cambio.itemsDevueltos.forEach(it=>{
@@ -11910,13 +11955,14 @@ function App(){
     {id:"cambios",       icon:"↩", label:"Cambios"},
     {id:"liquidaciones", icon:"◎", label:"Liquidar"},
     {id:"giftcards",     icon:"🎁", label:"Gift"},
+    {id:"ventas_ant",    icon:"⏱", label:"V.Antiguas"},
     {id:"config",        icon:"⚙", label:"Config"},
   ];
   // Caja: solo inicio + POS + ventas + cambios (no acceso a admin, marcas, config)
   const TABS = user?.rol==="caja"
     ? TABS_ALL.filter(t=>["inicio","pos","ventas","cambios"].includes(t.id))
     : user?.rol==="admin" ? TABS_ALL
-    : TABS_ALL.filter(t=>t.id!=="auditoria"&&t.id!=="cargas");
+    : TABS_ALL.filter(t=>t.id!=="auditoria"&&t.id!=="cargas"&&t.id!=="ventas_ant");
 
   // Pantallas con vista de detalle (back button)
   const showingDetail = tab==="marcas" && marcaDetalle;
@@ -12097,6 +12143,11 @@ function App(){
         {/* CAMBIOS — cambio de prendas */}
         {tab==="cambios" && (
           <CambiosTab inv={inv} ventas={ventas} onCambio={handleCambio}/>
+        )}
+
+        {/* VENTAS ANTIGUAS — solo admin */}
+        {tab==="ventas_ant" && user?.rol==="admin" && (
+          <VentasAntiguas inv={inv} onVentaHistorica={handleVentaHistorica}/>
         )}
 
         {/* MARCAS — lista */}
@@ -15245,6 +15296,284 @@ ${c.diferencia>0.01?`Cliente paga diferencia: Bs ${fmt2(c.diferencia)} (${c.meto
         onChange={e=>setNotas(e.target.value)} placeholder="Motivo del cambio, talla incorrecta, etc."/>
 
       <IOSBtn onPress={confirmar} variant="fill" full icon="✓">Confirmar cambio</IOSBtn>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════
+// VENTAS ANTIGUAS — registro histórico de ventas pre-sistema
+// ══════════════════════════════════════════════════════════
+function VentasAntiguas({inv, onVentaHistorica}){
+  const isDesktop = useIsDesktop();
+  const hoyISO = new Date().toISOString().slice(0,10);
+
+  const [fecha,     setFecha]     = React.useState(hoyISO);
+  const [turno,     setTurno]     = React.useState("Tarde");
+  const [metodo,    setMetodo]    = React.useState("efectivo");
+  const [codInput,  setCodInput]  = React.useState("");
+  const [carrito,   setCarrito]   = React.useState([]);
+  const [busqueda,  setBusqueda]  = React.useState([]);
+  const [confirmado,setConfirmado]= React.useState(null); // última venta confirmada
+  const [guardando, setGuardando] = React.useState(false);
+  const inputRef = React.useRef(null);
+
+  const total = carrito.reduce((s,it)=>s+it.subtotal,0);
+
+  function buscarProducto(cod){
+    if(!cod.trim()) return;
+    const q = cod.trim().toUpperCase();
+    const matches = inv.filter(p=>(p.codigo||"").toUpperCase()===q || (p.nombre||"").toUpperCase().includes(q));
+    if(matches.length===1){
+      agregarAlCarrito(matches[0]);
+      setCodInput("");
+      setBusqueda([]);
+    } else if(matches.length>1){
+      setBusqueda(matches);
+    } else {
+      setBusqueda([{_noEncontrado:true, codigo:q}]);
+    }
+  }
+
+  function agregarAlCarrito(prod){
+    if(!prod||prod.stock<=0) return;
+    setCarrito(prev=>{
+      const idx = prev.findIndex(it=>it.prodId===prod.id);
+      if(idx>=0){
+        const upd=[...prev];
+        upd[idx]={...upd[idx], cantidad:upd[idx].cantidad+1, subtotal:(upd[idx].cantidad+1)*upd[idx].precioUnit};
+        return upd;
+      }
+      return [...prev,{
+        prodId:prod.id, codigo:prod.codigo, nombre:prod.nombre,
+        marcaId:prod.marcaId, marcaNombre:prod.marcaNombre||prod.marca||"",
+        cantidad:1, precioUnit:prod.precio||0, subtotal:prod.precio||0,
+      }];
+    });
+    setBusqueda([]);
+    setCodInput("");
+    setTimeout(()=>inputRef.current?.focus(),50);
+  }
+
+  function quitarItem(prodId){
+    setCarrito(prev=>prev.filter(it=>it.prodId!==prodId));
+  }
+
+  async function confirmarVenta(){
+    if(carrito.length===0||guardando) return;
+    setGuardando(true);
+    const venta = {fecha, turno, metodoPago:metodo, total, subtotal:total, items:carrito};
+    const vf = onVentaHistorica(venta);
+    setConfirmado({...vf, cantItems:carrito.length});
+    setCarrito([]);
+    setCodInput("");
+    setBusqueda([]);
+    setGuardando(false);
+  }
+
+  const METODOS = [
+    {v:"efectivo", label:"Efectivo"},
+    {v:"qr",       label:"QR"},
+    {v:"tarjeta",  label:"Tarjeta"},
+  ];
+
+  const TURNOS = ["Mañana","Tarde","Noche"];
+
+  return (
+    <div style={{paddingBottom:32}}>
+      {/* Header */}
+      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16}}>
+        <i className="ti ti-clock-history" style={{fontSize:20,color:C.label2}} aria-hidden="true"/>
+        <span style={{fontSize:15,fontWeight:600,color:C.label,fontFamily:FONT}}>Ventas antiguas</span>
+        <span style={{fontSize:11,padding:"2px 8px",borderRadius:4,background:"#EEEDFE",color:"#3C3489",fontWeight:500,display:"inline-flex",alignItems:"center",gap:4}}>
+          <i className="ti ti-shield-lock" style={{fontSize:11}} aria-hidden="true"/>Solo admin
+        </span>
+      </div>
+
+      <div style={{fontSize:12,color:C.label2,background:C.bg1,border:`1px solid ${C.sep}`,
+        borderRadius:10,padding:"9px 13px",marginBottom:14,lineHeight:1.5}}>
+        Registra ventas realizadas antes del uso del sistema. Descuenta stock y genera trazabilidad marcada como <b>histórica</b>.
+      </div>
+
+      {/* Confirmación de última venta */}
+      {confirmado&&(
+        <div style={{background:"#E8F5E9",border:"1px solid #81C784",borderRadius:12,
+          padding:"12px 16px",marginBottom:14,display:"flex",alignItems:"center",gap:10}}>
+          <i className="ti ti-circle-check" style={{fontSize:20,color:"#388E3C"}} aria-hidden="true"/>
+          <div style={{flex:1}}>
+            <div style={{fontSize:13,fontWeight:600,color:"#2E7D32"}}>Venta histórica registrada</div>
+            <div style={{fontSize:12,color:"#388E3C"}}>{confirmado.fecha} · {confirmado.cantItems} ítem(s) · Bs {confirmado.total}</div>
+          </div>
+          <button onClick={()=>setConfirmado(null)}
+            style={{background:"none",border:"none",cursor:"pointer",color:"#388E3C",fontSize:18,lineHeight:1}}>
+            <i className="ti ti-x" style={{fontSize:14}} aria-hidden="true"/>
+          </button>
+        </div>
+      )}
+
+      {/* Form */}
+      <div style={{background:C.bg1,border:`1px solid ${C.sep}`,borderRadius:14,
+        padding:"14px 16px",display:"flex",flexDirection:"column",gap:12,marginBottom:12}}>
+
+        {/* Fecha + Turno */}
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+          <div>
+            <div style={{fontSize:11,fontWeight:500,color:C.label2,marginBottom:4}}>
+              <i className="ti ti-calendar" style={{fontSize:11}} aria-hidden="true"/> Fecha de la venta
+            </div>
+            <input type="date" value={fecha} max={hoyISO}
+              onChange={e=>setFecha(e.target.value)}
+              style={{width:"100%",padding:"7px 10px",borderRadius:8,border:`1px solid ${C.sep}`,
+                background:C.bg0,color:C.label,fontSize:13,fontFamily:FONT_UI,boxSizing:"border-box"}}/>
+          </div>
+          <div>
+            <div style={{fontSize:11,fontWeight:500,color:C.label2,marginBottom:4}}>
+              <i className="ti ti-clock" style={{fontSize:11}} aria-hidden="true"/> Turno
+            </div>
+            <select value={turno} onChange={e=>setTurno(e.target.value)}
+              style={{width:"100%",padding:"7px 10px",borderRadius:8,border:`1px solid ${C.sep}`,
+                background:C.bg0,color:C.label,fontSize:13,fontFamily:FONT_UI,boxSizing:"border-box"}}>
+              {TURNOS.map(t=><option key={t}>{t}</option>)}
+            </select>
+          </div>
+        </div>
+
+        {/* Método de pago */}
+        <div>
+          <div style={{fontSize:11,fontWeight:500,color:C.label2,marginBottom:6}}>
+            <i className="ti ti-credit-card" style={{fontSize:11}} aria-hidden="true"/> Método de pago
+          </div>
+          <div style={{display:"flex",gap:6}}>
+            {METODOS.map(m=>(
+              <button key={m.v} onClick={()=>setMetodo(m.v)}
+                style={{flex:1,padding:"7px 6px",borderRadius:8,fontSize:12,fontFamily:FONT_UI,
+                  fontWeight:500,cursor:"pointer",transition:"all .15s",
+                  border: metodo===m.v ? `2px solid ${C.blue}` : `1px solid ${C.sep}`,
+                  background: metodo===m.v ? `${C.blue}12` : "transparent",
+                  color: metodo===m.v ? C.blue : C.label2}}>
+                {m.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Buscador de código */}
+        <div>
+          <div style={{fontSize:11,fontWeight:500,color:C.label2,marginBottom:6}}>
+            <i className="ti ti-barcode" style={{fontSize:11}} aria-hidden="true"/> Agregar por código
+          </div>
+          <div style={{display:"flex",gap:6}}>
+            <input ref={inputRef}
+              value={codInput} onChange={e=>{setCodInput(e.target.value);if(!e.target.value)setBusqueda([]);}}
+              onKeyDown={e=>{if(e.key==="Enter")buscarProducto(codInput);}}
+              placeholder="Escanear o escribir código…"
+              style={{flex:1,padding:"8px 12px",borderRadius:8,border:`1px solid ${C.sep}`,
+                background:C.bg0,color:C.label,fontSize:13,fontFamily:FONT_UI}}/>
+            <button onClick={()=>buscarProducto(codInput)}
+              style={{padding:"8px 14px",borderRadius:8,border:`1px solid ${C.sep}`,
+                background:C.bg0,color:C.label,fontSize:13,fontFamily:FONT_UI,cursor:"pointer",
+                display:"flex",alignItems:"center",gap:4}}>
+              <i className="ti ti-plus" style={{fontSize:14}} aria-hidden="true"/>
+            </button>
+          </div>
+          {/* Resultados de búsqueda */}
+          {busqueda.length>0&&(
+            <div style={{background:C.bg0,border:`1px solid ${C.sep}`,borderRadius:10,
+              marginTop:6,overflow:"hidden",maxHeight:200,overflowY:"auto"}}>
+              {busqueda[0]?._noEncontrado ? (
+                <div style={{padding:"10px 14px",fontSize:12,color:C.red,display:"flex",alignItems:"center",gap:6}}>
+                  <i className="ti ti-alert-circle" style={{fontSize:14}} aria-hidden="true"/>
+                  Código "{busqueda[0].codigo}" no encontrado en inventario
+                </div>
+              ) : busqueda.map(p=>(
+                <div key={p.id} onClick={()=>agregarAlCarrito(p)}
+                  style={{padding:"9px 14px",cursor:"pointer",display:"flex",justifyContent:"space-between",
+                    alignItems:"center",borderBottom:`1px solid ${C.sep}`,
+                    background:"transparent",transition:"background .1s"}}
+                  onMouseEnter={e=>e.currentTarget.style.background=C.bg1}
+                  onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+                  <div>
+                    <div style={{fontSize:13,fontWeight:500,color:C.label}}>{p.nombre}</div>
+                    <div style={{fontSize:11,color:C.label2}}>{p.codigo} · {p.marcaNombre||p.marca||""}</div>
+                  </div>
+                  <div style={{textAlign:"right"}}>
+                    <div style={{fontSize:13,fontWeight:500,color:C.label}}>Bs {p.precio}</div>
+                    <div style={{fontSize:11,color:p.stock>0?C.label2:C.red}}>
+                      {p.stock>0?`${p.stock} disp.`:"Sin stock"}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Carrito */}
+      {carrito.length>0&&(
+        <div style={{background:C.bg1,border:`1px solid ${C.sep}`,borderRadius:14,overflow:"hidden",marginBottom:12}}>
+          <div style={{padding:"9px 14px",background:C.bg2,borderBottom:`1px solid ${C.sep}`,
+            display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+            <span style={{fontSize:12,fontWeight:500,color:C.label2}}>
+              Carrito — {carrito.length} ítem{carrito.length!==1?"s":""}
+            </span>
+            <span style={{fontSize:11,padding:"2px 8px",borderRadius:4,
+              background:"#EEEDFE",color:"#3C3489",fontWeight:500}}>
+              {fecha}
+            </span>
+          </div>
+          {carrito.map((it,idx)=>(
+            <div key={it.prodId} style={{padding:"10px 14px",display:"flex",
+              alignItems:"center",gap:10,
+              borderBottom:idx<carrito.length-1?`1px solid ${C.sep}`:"none"}}>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:13,fontWeight:500,color:C.label,
+                  overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                  {it.nombre}
+                </div>
+                <div style={{display:"flex",gap:6,alignItems:"center",marginTop:2}}>
+                  <span style={{fontSize:11,fontFamily:FONT_MONO,
+                    background:"#faeeda",color:"#c07d10",padding:"1px 6px",borderRadius:3}}>
+                    {it.codigo}
+                  </span>
+                  <span style={{fontSize:11,color:C.label2}}>{it.marcaNombre}</span>
+                </div>
+              </div>
+              <div style={{display:"flex",alignItems:"center",gap:8}}>
+                <span style={{fontSize:13,fontWeight:500,color:C.label}}>Bs {it.subtotal}</span>
+                <button onClick={()=>quitarItem(it.prodId)}
+                  style={{background:"none",border:"none",cursor:"pointer",
+                    color:C.red,padding:4,lineHeight:1}}>
+                  <i className="ti ti-x" style={{fontSize:14}} aria-hidden="true"/>
+                </button>
+              </div>
+            </div>
+          ))}
+          <div style={{padding:"10px 14px",background:C.bg2,borderTop:`1px solid ${C.sep}`,
+            display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+            <span style={{fontSize:12,color:C.label2}}>Total</span>
+            <span style={{fontSize:16,fontWeight:600,color:C.label,fontFamily:FONT}}>Bs {total}</span>
+          </div>
+        </div>
+      )}
+
+      {/* Botón confirmar */}
+      <button onClick={confirmarVenta}
+        disabled={carrito.length===0||guardando}
+        style={{width:"100%",padding:"13px 16px",borderRadius:12,border:"none",
+          background:carrito.length===0?"#ccc":"#1a1714",color:"#fff",
+          fontSize:14,fontWeight:500,fontFamily:FONT_UI,cursor:carrito.length===0?"not-allowed":"pointer",
+          display:"flex",alignItems:"center",justifyContent:"center",gap:8,
+          opacity:carrito.length===0?0.5:1,transition:"opacity .15s"}}>
+        <i className="ti ti-clock-check" style={{fontSize:16}} aria-hidden="true"/>
+        {guardando ? "Registrando…" : `Registrar venta histórica${total>0?" — Bs "+total:""}`}
+      </button>
+
+      {/* Info box */}
+      <div style={{marginTop:12,background:"#EEEDFE",borderRadius:10,padding:"10px 14px",
+        fontSize:12,color:"#3C3489",display:"flex",gap:8,alignItems:"flex-start",lineHeight:1.5}}>
+        <i className="ti ti-info-circle" style={{fontSize:14,flexShrink:0,marginTop:1}} aria-hidden="true"/>
+        <span>Al confirmar: descuenta stock de cada artículo, guarda la venta con la fecha seleccionada y la marca como <b>histórica</b> en trazabilidad.</span>
+      </div>
     </div>
   );
 }
