@@ -15390,6 +15390,16 @@ function VentasAntiguas({inv, ventas, cargas, onVentaHistorica, user}){
     setVerificados(prev=>{ const s=new Set(prev); s.delete(prodId); return s; });
   }
 
+  function cambiarCantidad(prodId, delta){
+    setCarrito(prev=>prev.map(it=>{
+      if(it.prodId!==prodId) return it;
+      const prod = inv.find(p=>p.id===prodId);
+      const maxStock = prod?.stock || it.cantidad;
+      const nuevaCant = Math.min(maxStock, Math.max(1, it.cantidad + delta));
+      return {...it, cantidad: nuevaCant, subtotal: nuevaCant * it.precioUnit};
+    }));
+  }
+
   function quitarConflictivos(){
     const conflictivos = new Set(carrito.filter(it=>getConflictoItem(it)&&!verificados.has(it.prodId)).map(it=>it.prodId));
     setCarrito(prev=>prev.filter(it=>!conflictivos.has(it.prodId)));
@@ -15641,8 +15651,30 @@ function VentasAntiguas({inv, ventas, cargas, onVentaHistorica, user}){
                       )}
                     </div>
                   </div>
-                  <div style={{display:"flex",alignItems:"center",gap:8}}>
-                    <span style={{fontSize:13,fontWeight:500,color:C.label}}>Bs {it.subtotal}</span>
+                  <div style={{display:"flex",alignItems:"center",gap:6}}>
+                    {/* Controles de cantidad */}
+                    <div style={{display:"flex",alignItems:"center",gap:0,
+                      border:`1px solid ${C.sep}`,borderRadius:8,overflow:"hidden"}}>
+                      <button onClick={()=>cambiarCantidad(it.prodId,-1)}
+                        style={{width:28,height:28,border:"none",background:C.bg2,
+                          color:C.label,cursor:"pointer",fontSize:16,lineHeight:1,
+                          display:"flex",alignItems:"center",justifyContent:"center"}}>
+                        <i className="ti ti-minus" style={{fontSize:11}} aria-hidden="true"/>
+                      </button>
+                      <span style={{minWidth:24,textAlign:"center",fontSize:13,
+                        fontWeight:600,color:C.label,padding:"0 4px"}}>
+                        {it.cantidad}
+                      </span>
+                      <button onClick={()=>cambiarCantidad(it.prodId,+1)}
+                        style={{width:28,height:28,border:"none",background:C.bg2,
+                          color:C.label,cursor:"pointer",fontSize:16,lineHeight:1,
+                          display:"flex",alignItems:"center",justifyContent:"center"}}>
+                        <i className="ti ti-plus" style={{fontSize:11}} aria-hidden="true"/>
+                      </button>
+                    </div>
+                    <span style={{fontSize:13,fontWeight:500,color:C.label,minWidth:52,textAlign:"right"}}>
+                      Bs {it.subtotal}
+                    </span>
                     <button onClick={()=>quitarItem(it.prodId)}
                       style={{background:"none",border:"none",cursor:"pointer",color:C.red,padding:4}}>
                       <i className="ti ti-x" style={{fontSize:14}} aria-hidden="true"/>

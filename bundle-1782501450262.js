@@ -38190,6 +38190,15 @@ ${c.diferencia > 0.01 ? `Cliente paga diferencia: Bs ${fmt2(c.diferencia)} (${c.
         return s;
       });
     }
+    function cambiarCantidad(prodId, delta) {
+      setCarrito((prev) => prev.map((it) => {
+        if (it.prodId !== prodId) return it;
+        const prod = inv.find((p) => p.id === prodId);
+        const maxStock = prod?.stock || it.cantidad;
+        const nuevaCant = Math.min(maxStock, Math.max(1, it.cantidad + delta));
+        return { ...it, cantidad: nuevaCant, subtotal: nuevaCant * it.precioUnit };
+      }));
+    }
     function quitarConflictivos() {
       const conflictivos = new Set(carrito.filter((it) => getConflictoItem(it) && !verificados.has(it.prodId)).map((it) => it.prodId));
       setCarrito((prev) => prev.filter((it) => !conflictivos.has(it.prodId)));
@@ -38501,7 +38510,59 @@ ${c.diferencia > 0.01 ? `Cliente paga diferencia: Bs ${fmt2(c.diferencia)} (${c.
         padding: "1px 6px",
         borderRadius: 3,
         fontWeight: 600
-      } }, "verificado"))), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, fontWeight: 500, color: C.label } }, "Bs ", it.subtotal), /* @__PURE__ */ import_react.default.createElement(
+      } }, "verificado"))), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 0,
+        border: `1px solid ${C.sep}`,
+        borderRadius: 8,
+        overflow: "hidden"
+      } }, /* @__PURE__ */ import_react.default.createElement(
+        "button",
+        {
+          onClick: () => cambiarCantidad(it.prodId, -1),
+          style: {
+            width: 28,
+            height: 28,
+            border: "none",
+            background: C.bg2,
+            color: C.label,
+            cursor: "pointer",
+            fontSize: 16,
+            lineHeight: 1,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center"
+          }
+        },
+        /* @__PURE__ */ import_react.default.createElement("i", { className: "ti ti-minus", style: { fontSize: 11 }, "aria-hidden": "true" })
+      ), /* @__PURE__ */ import_react.default.createElement("span", { style: {
+        minWidth: 24,
+        textAlign: "center",
+        fontSize: 13,
+        fontWeight: 600,
+        color: C.label,
+        padding: "0 4px"
+      } }, it.cantidad), /* @__PURE__ */ import_react.default.createElement(
+        "button",
+        {
+          onClick: () => cambiarCantidad(it.prodId, 1),
+          style: {
+            width: 28,
+            height: 28,
+            border: "none",
+            background: C.bg2,
+            color: C.label,
+            cursor: "pointer",
+            fontSize: 16,
+            lineHeight: 1,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center"
+          }
+        },
+        /* @__PURE__ */ import_react.default.createElement("i", { className: "ti ti-plus", style: { fontSize: 11 }, "aria-hidden": "true" })
+      )), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, fontWeight: 500, color: C.label, minWidth: 52, textAlign: "right" } }, "Bs ", it.subtotal), /* @__PURE__ */ import_react.default.createElement(
         "button",
         {
           onClick: () => quitarItem(it.prodId),
