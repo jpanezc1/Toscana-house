@@ -25462,7 +25462,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
     const GROUPS = customGroups || [
       { label: "Principal", ids: ["inicio", "pos", "ventas", "cambios"] },
       { label: "Gesti\xF3n", ids: ["inventario", "marcas", "liquidaciones", "giftcards"] },
-      { label: "Sistema", ids: ["auditoria", "cargas", "config"] }
+      { label: "Sistema", ids: ["auditoria", "cargas", "ventas_ant", "config"] }
     ];
     const DOT = customDot || {
       inicio: "#8A6418",

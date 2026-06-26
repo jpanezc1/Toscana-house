@@ -3935,7 +3935,7 @@ function DesktopSidebar({tabs, active, onChange, user, logout, groups: customGro
   const GROUPS = customGroups || [
     {label:"Principal", ids:["inicio","pos","ventas","cambios"]},
     {label:"Gestión",   ids:["inventario","marcas","liquidaciones","giftcards"]},
-    {label:"Sistema",   ids:["auditoria","cargas","config"]},
+    {label:"Sistema",   ids:["auditoria","cargas","ventas_ant","config"]},
   ];
   const DOT = customDot || {
     inicio:"#8A6418",pos:"#1A1714",ventas:"#1E3A5F",
