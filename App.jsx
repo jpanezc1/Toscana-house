@@ -15957,14 +15957,20 @@ function RegistroCargas({cargas, marcas, marcaId=null, onVerificar=null, user=nu
                           .filter(it=>it.codigo&&it.nombre)
                           .map(it=>{
                             const prodInv = inv.find(p=>(p.codigo||"").toLowerCase()===(it.codigo||"").toLowerCase());
+                            // Extraer talla del final del nombre (XS S M L XL XXL UNICA o numérica 36-60)
+                            const _palabras = (it.nombre||"").toUpperCase().split(/\s+/);
+                            const _tallas = ["UNICA","ÚNICA","XXL","XL","XS","S","M","L"];
+                            const _tallaDetect = _palabras.slice().reverse().find(p=>_tallas.includes(p)||(/^\d{2,3}$/.test(p)&&Number(p)>=30&&Number(p)<=60));
+                            const _desc = prodInv?.descripcion||"";
+                            const _sub  = prodInv?.subcat||_tallaDetect||"";
                             return {
                               codigo: it.codigo,
                               nombre: it.nombre,
                               marcaNombre: it.marca||c.marcaNombre||"",
                               precio: it.precio||prodInv?.precio||0,
                               stock: Number(it.stockSumado||it.stock||it.stockNuevo||1),
-                              descripcion: prodInv?.descripcion||"",
-                              subcat: prodInv?.subcat||"",
+                              descripcion: _desc,
+                              subcat: _sub,
                             };
                           });
                         const totalEtiq = paraImprimir.reduce((s,it)=>s+Math.max(1,it.stock),0);

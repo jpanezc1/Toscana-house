@@ -38888,14 +38888,19 @@ ${c.diferencia > 0.01 ? `Cliente paga diferencia: Bs ${fmt2(c.diferencia)} (${c.
       } }, (it.nombre || "").toUpperCase()), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: C.label3, fontFamily: FONT_MONO } }, it.codigo, " \xB7 ", it.marca || "\u2014")), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label2, fontFamily: FONT, textAlign: "right", flexShrink: 0 } }, it.tipo === "update" ? `${it.stockAntes} \u2192 ${it.stockNuevo} (+${it.stockSumado})` : `Stock ${it.stock}${it.precio ? ` \xB7 ${$(it.precio)}` : ""}`)))), items.filter((it) => it.codigo && it.nombre && Number(it.stock || it.stockNuevo || 1) > 0).length > 0 && (() => {
         const paraImprimir = items.filter((it) => it.codigo && it.nombre).map((it) => {
           const prodInv = inv.find((p) => (p.codigo || "").toLowerCase() === (it.codigo || "").toLowerCase());
+          const _palabras = (it.nombre || "").toUpperCase().split(/\s+/);
+          const _tallas = ["UNICA", "\xDANICA", "XXL", "XL", "XS", "S", "M", "L"];
+          const _tallaDetect = _palabras.slice().reverse().find((p) => _tallas.includes(p) || /^\d{2,3}$/.test(p) && Number(p) >= 30 && Number(p) <= 60);
+          const _desc = prodInv?.descripcion || "";
+          const _sub = prodInv?.subcat || _tallaDetect || "";
           return {
             codigo: it.codigo,
             nombre: it.nombre,
             marcaNombre: it.marca || c.marcaNombre || "",
             precio: it.precio || prodInv?.precio || 0,
             stock: Number(it.stockSumado || it.stock || it.stockNuevo || 1),
-            descripcion: prodInv?.descripcion || "",
-            subcat: prodInv?.subcat || ""
+            descripcion: _desc,
+            subcat: _sub
           };
         });
         const totalEtiq = paraImprimir.reduce((s, it) => s + Math.max(1, it.stock), 0);
