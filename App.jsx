@@ -12149,7 +12149,7 @@ function App(){
 
         {/* VENTAS ANTIGUAS — solo admin */}
         {tab==="ventas_ant" && user?.rol==="admin" && (
-          <VentasAntiguas inv={inv} ventas={ventas} onVentaHistorica={handleVentaHistorica} user={user}/>
+          <VentasAntiguas inv={inv} ventas={ventas} cargas={cargasCompletas} onVentaHistorica={handleVentaHistorica} user={user}/>
         )}
 
         {/* MARCAS — lista */}
@@ -15305,41 +15305,62 @@ ${c.diferencia>0.01?`Cliente paga diferencia: Bs ${fmt2(c.diferencia)} (${c.meto
 // ══════════════════════════════════════════════════════════
 // VENTAS ANTIGUAS — registro histórico de ventas pre-sistema
 // ══════════════════════════════════════════════════════════
-function VentasAntiguas({inv, ventas, onVentaHistorica, user}){
+function VentasAntiguas({inv, ventas, cargas, onVentaHistorica, user}){
   const hoyISO = new Date().toISOString().slice(0,10);
 
-  // ── Fecha de corte: primera venta real del sistema (no histórica) ──
-  const fechaCorte = React.useMemo(()=>{
-    const reales = (ventas||[]).filter(v=>v.origen!=="HISTORICA"&&v.fecha);
-    if(!reales.length) return null;
-    return reales.map(v=>v.fecha).sort()[0]; // la más antigua
-  },[ventas]);
+  // ── Fecha de primera carga por marcaId (desde cargasCompletas) ──────────
+  // Cargas tienen fecha en formato "DD/MM/YYYY" → convertir a ISO para comparar
+  const fechaCargaPorMarca = React.useMemo(()=>{
+    const map = {};
+    (cargas||[]).forEach(c=>{
+      if(!c.marcaId || !c.fecha || c.fecha==="—") return;
+      const p = c.fecha.split("/");
+      if(p.length!==3) return;
+      const iso = `${p[2]}-${p[1].padStart(2,"0")}-${p[0].padStart(2,"0")}`;
+      if(!map[c.marcaId] || iso < map[c.marcaId]) map[c.marcaId] = iso;
+    });
+    return map;
+  },[cargas]);
 
-  const [fecha,      setFecha]      = React.useState(hoyISO);
-  const [turno,      setTurno]      = React.useState("Tarde");
-  const [metodo,     setMetodo]     = React.useState("efectivo");
-  const [codInput,   setCodInput]   = React.useState("");
-  const [carrito,    setCarrito]    = React.useState([]);
-  const [busqueda,   setBusqueda]   = React.useState([]);
-  const [confirmado, setConfirmado] = React.useState(null);
-  const [guardando,  setGuardando]  = React.useState(false);
-  const [verificado, setVerificado] = React.useState(false); // checkbox de alerta
+  const [fecha,         setFecha]         = React.useState(hoyISO);
+  const [turno,         setTurno]         = React.useState("Tarde");
+  const [metodo,        setMetodo]        = React.useState("efectivo");
+  const [codInput,      setCodInput]      = React.useState("");
+  const [carrito,       setCarrito]       = React.useState([]);
+  const [busqueda,      setBusqueda]      = React.useState([]);
+  const [confirmado,    setConfirmado]    = React.useState(null);
+  const [guardando,     setGuardando]     = React.useState(false);
+  const [verificados,   setVerificados]   = React.useState(new Set()); // Set de prodIds verificados
   const inputRef = React.useRef(null);
 
   const total = carrito.reduce((s,it)=>s+it.subtotal,0);
 
-  // Hay conflicto si la fecha seleccionada es >= fecha de corte del sistema
-  const hayConflicto = fechaCorte && fecha >= fechaCorte;
-  // El botón confirmar está habilitado solo si: hay items, no está guardando, y si hay conflicto el checkbox está marcado
-  const puedeConfirmar = carrito.length>0 && !guardando && (!hayConflicto || verificado);
+  // Para cada ítem del carrito: ¿tiene conflicto con su fecha de carga?
+  function getConflictoItem(it){
+    const fc = fechaCargaPorMarca[it.marcaId];
+    if(!fc) return null; // sin registro de carga → sin conflicto
+    if(fecha >= fc) return fc; // fecha de venta >= primera carga → conflicto
+    return null;
+  }
 
-  // Reset verificado cuando cambia la fecha
-  function cambiarFecha(val){ setFecha(val); setVerificado(false); }
+  const itemsConConflicto = carrito.filter(it=>getConflictoItem(it)&&!verificados.has(it.prodId));
+  const hayConflictos     = itemsConConflicto.length > 0;
+  const puedeConfirmar    = carrito.length>0 && !guardando && !hayConflictos;
+
+  function cambiarFecha(val){ setFecha(val); setVerificados(new Set()); }
+
+  function toggleVerificado(prodId){
+    setVerificados(prev=>{
+      const s = new Set(prev);
+      s.has(prodId) ? s.delete(prodId) : s.add(prodId);
+      return s;
+    });
+  }
 
   function buscarProducto(cod){
     if(!cod.trim()) return;
     const q = cod.trim().toUpperCase();
-    const matches = inv.filter(p=>(p.codigo||"").toUpperCase()===q || (p.nombre||"").toUpperCase().includes(q));
+    const matches = inv.filter(p=>(p.codigo||"").toUpperCase()===q||(p.nombre||"").toUpperCase().includes(q));
     if(matches.length===1){ agregarAlCarrito(matches[0]); setCodInput(""); setBusqueda([]); }
     else if(matches.length>1){ setBusqueda(matches); }
     else { setBusqueda([{_noEncontrado:true, codigo:q}]); }
@@ -15364,28 +15385,52 @@ function VentasAntiguas({inv, ventas, onVentaHistorica, user}){
     setTimeout(()=>inputRef.current?.focus(),50);
   }
 
-  function quitarItem(prodId){ setCarrito(prev=>prev.filter(it=>it.prodId!==prodId)); }
+  function quitarItem(prodId){
+    setCarrito(prev=>prev.filter(it=>it.prodId!==prodId));
+    setVerificados(prev=>{ const s=new Set(prev); s.delete(prodId); return s; });
+  }
+
+  function quitarConflictivos(){
+    const conflictivos = new Set(carrito.filter(it=>getConflictoItem(it)&&!verificados.has(it.prodId)).map(it=>it.prodId));
+    setCarrito(prev=>prev.filter(it=>!conflictivos.has(it.prodId)));
+    setVerificados(prev=>{ const s=new Set(prev); conflictivos.forEach(id=>s.delete(id)); return s; });
+  }
 
   async function confirmarVenta(){
     if(!puedeConfirmar) return;
     setGuardando(true);
+    const itemsVerif = carrito.filter(it=>verificados.has(it.prodId)).map(it=>it.codigo);
     const venta = {
       fecha, turno, metodoPago:metodo, total, subtotal:total, items:carrito,
-      ...(hayConflicto ? {advertencia:"REGISTRADO_CON_ALERTA_FECHA", fechaCorte, verificadoPor: user?.nombre||"Admin"} : {}),
+      ...(verificados.size>0 ? {advertencia:"ITEMS_VERIFICADOS_MANUALMENTE", itemsVerificados:itemsVerif, verificadoPor:user?.nombre||"Admin"} : {}),
     };
     const vf = onVentaHistorica(venta);
-    setConfirmado({...vf, cantItems:carrito.length, conAlerta:hayConflicto});
-    setCarrito([]); setCodInput([]); setBusqueda([]); setVerificado(false);
+    setConfirmado({...vf, cantItems:carrito.length, conVerif:verificados.size>0});
+    setCarrito([]); setCodInput(""); setBusqueda([]); setVerificados(new Set());
     setGuardando(false);
   }
 
   const METODOS = [{v:"efectivo",label:"Efectivo"},{v:"qr",label:"QR"},{v:"tarjeta",label:"Tarjeta"}];
   const TURNOS  = ["Mañana","Tarde","Noche"];
 
+  // Resumen de fechas de carga por marca (para panel informativo)
+  const resumenCargas = React.useMemo(()=>{
+    return Object.entries(fechaCargaPorMarca)
+      .map(([marcaId, fechaISO])=>{
+        const marca = (inv.find(p=>String(p.marcaId)===String(marcaId)));
+        return {
+          nombre: marca?.marcaNombre||marca?.marca||`Marca ${marcaId}`,
+          fechaISO,
+          fechaDisplay: fechaISO.split("-").reverse().join("/"),
+        };
+      })
+      .sort((a,b)=>a.fechaISO.localeCompare(b.fechaISO));
+  },[fechaCargaPorMarca, inv]);
+
   return (
     <div style={{paddingBottom:32}}>
       {/* Header */}
-      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16}}>
+      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}>
         <i className="ti ti-clock-history" style={{fontSize:20,color:C.label2}} aria-hidden="true"/>
         <span style={{fontSize:15,fontWeight:600,color:C.label,fontFamily:FONT}}>Ventas antiguas</span>
         <span style={{fontSize:11,padding:"2px 8px",borderRadius:4,background:"#EEEDFE",color:"#3C3489",
@@ -15394,28 +15439,46 @@ function VentasAntiguas({inv, ventas, onVentaHistorica, user}){
         </span>
       </div>
 
-      {/* Chip de fecha de corte */}
-      {fechaCorte && (
-        <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12,
-          background:C.bg1,border:`1px solid ${C.sep}`,borderRadius:10,padding:"8px 13px"}}>
-          <i className="ti ti-calendar-event" style={{fontSize:13,color:C.label2}} aria-hidden="true"/>
-          <span style={{fontSize:12,color:C.label2}}>
-            Ventas válidas sin alerta: <b style={{color:C.label}}>hasta {fechaCorte.split("-").reverse().join("/")}</b>
-          </span>
-          <span style={{marginLeft:"auto",fontSize:11,color:C.label3}}>
-            Primera venta del sistema: {fechaCorte.split("-").reverse().join("/")}
-          </span>
-        </div>
+      {/* Panel de fechas de carga por marca */}
+      {resumenCargas.length>0&&(
+        <details style={{marginBottom:12}}>
+          <summary style={{fontSize:12,fontWeight:500,color:C.label2,cursor:"pointer",
+            background:C.bg1,border:`1px solid ${C.sep}`,borderRadius:10,padding:"8px 13px",
+            listStyle:"none",display:"flex",alignItems:"center",gap:6,userSelect:"none"}}>
+            <i className="ti ti-calendar-stats" style={{fontSize:13}} aria-hidden="true"/>
+            Fechas de primera carga por marca ({resumenCargas.length})
+            <i className="ti ti-chevron-down" style={{fontSize:11,marginLeft:"auto"}} aria-hidden="true"/>
+          </summary>
+          <div style={{background:C.bg0,border:`1px solid ${C.sep}`,borderTop:"none",
+            borderRadius:"0 0 10px 10px",overflow:"hidden"}}>
+            {resumenCargas.map((m,i)=>(
+              <div key={m.nombre} style={{display:"flex",justifyContent:"space-between",alignItems:"center",
+                padding:"7px 14px",borderBottom:i<resumenCargas.length-1?`1px solid ${C.sep}`:"none",
+                background: fecha>=m.fechaISO ? "#FFF5F5" : "transparent"}}>
+                <span style={{fontSize:12,color:C.label}}>{m.nombre}</span>
+                <div style={{display:"flex",alignItems:"center",gap:6}}>
+                  <span style={{fontSize:11,fontFamily:FONT_MONO,color:C.label2}}>{m.fechaDisplay}</span>
+                  {fecha>=m.fechaISO
+                    ? <span style={{fontSize:10,color:"#C62828",background:"#FFEBEE",
+                        padding:"1px 6px",borderRadius:3,fontWeight:600}}>CONFLICTO</span>
+                    : <span style={{fontSize:10,color:"#2E7D32",background:"#E8F5E9",
+                        padding:"1px 6px",borderRadius:3,fontWeight:600}}>SEGURO</span>
+                  }
+                </div>
+              </div>
+            ))}
+          </div>
+        </details>
       )}
 
-      {/* Confirmación de última venta */}
+      {/* Confirmación */}
       {confirmado&&(
         <div style={{background:"#E8F5E9",border:"1px solid #81C784",borderRadius:12,
           padding:"12px 16px",marginBottom:14,display:"flex",alignItems:"center",gap:10}}>
           <i className="ti ti-circle-check" style={{fontSize:20,color:"#388E3C"}} aria-hidden="true"/>
           <div style={{flex:1}}>
             <div style={{fontSize:13,fontWeight:600,color:"#2E7D32"}}>
-              Venta histórica registrada{confirmado.conAlerta?" · con alerta verificada":""}
+              Venta histórica registrada{confirmado.conVerif?" · ítems verificados manualmente":""}
             </div>
             <div style={{fontSize:12,color:"#388E3C"}}>
               {confirmado.fecha} · {confirmado.cantItems} ítem(s) · Bs {confirmado.total}
@@ -15428,22 +15491,20 @@ function VentasAntiguas({inv, ventas, onVentaHistorica, user}){
         </div>
       )}
 
-      {/* Form */}
-      <div style={{background:C.bg1,border:`1px solid ${hayConflicto?"#E53935":""+C.sep}`,
-        borderRadius:14,padding:"14px 16px",display:"flex",flexDirection:"column",gap:12,marginBottom:12,
-        transition:"border-color .2s"}}>
+      {/* Form principal */}
+      <div style={{background:C.bg1,border:`1px solid ${C.sep}`,borderRadius:14,
+        padding:"14px 16px",display:"flex",flexDirection:"column",gap:12,marginBottom:12}}>
 
         {/* Fecha + Turno */}
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
           <div>
-            <div style={{fontSize:11,fontWeight:500,color:hayConflicto?"#E53935":C.label2,marginBottom:4}}>
+            <div style={{fontSize:11,fontWeight:500,color:C.label2,marginBottom:4}}>
               <i className="ti ti-calendar" style={{fontSize:11}} aria-hidden="true"/> Fecha de la venta
             </div>
             <input type="date" value={fecha} max={hoyISO}
               onChange={e=>cambiarFecha(e.target.value)}
               style={{width:"100%",padding:"7px 10px",borderRadius:8,boxSizing:"border-box",
-                border:`1px solid ${hayConflicto?"#E53935":C.sep}`,
-                background:hayConflicto?"#FFF5F5":C.bg0,
+                border:`1px solid ${C.sep}`,background:C.bg0,
                 color:C.label,fontSize:13,fontFamily:FONT_UI}}/>
           </div>
           <div>
@@ -15458,32 +15519,6 @@ function VentasAntiguas({inv, ventas, onVentaHistorica, user}){
           </div>
         </div>
 
-        {/* ── ALERTA BLOQUEANTE ── */}
-        {hayConflicto&&(
-          <div style={{background:"#FFF3F3",border:"1.5px solid #E53935",borderRadius:10,padding:"12px 14px"}}>
-            <div style={{display:"flex",alignItems:"flex-start",gap:8,marginBottom:10}}>
-              <i className="ti ti-alert-triangle" style={{fontSize:16,color:"#E53935",flexShrink:0,marginTop:1}} aria-hidden="true"/>
-              <div>
-                <div style={{fontSize:13,fontWeight:600,color:"#C62828",marginBottom:3}}>
-                  Fecha dentro del período del sistema
-                </div>
-                <div style={{fontSize:12,color:"#B71C1C",lineHeight:1.5}}>
-                  El sistema registra ventas desde el <b>{fechaCorte.split("-").reverse().join("/")}</b>.
-                  Esta fecha podría generar ventas duplicadas y afectar el stock e inventario incorrectamente.
-                </div>
-              </div>
-            </div>
-            <label style={{display:"flex",alignItems:"flex-start",gap:10,cursor:"pointer",
-              background:"#FFEBEE",borderRadius:8,padding:"10px 12px",border:"1px solid #EF9A9A"}}>
-              <input type="checkbox" checked={verificado} onChange={e=>setVerificado(e.target.checked)}
-                style={{marginTop:2,width:16,height:16,accentColor:"#C62828",flexShrink:0,cursor:"pointer"}}/>
-              <span style={{fontSize:12,color:"#C62828",lineHeight:1.5,fontWeight:500}}>
-                Verifiqué manualmente que esta venta <b>NO está registrada</b> en el sistema y autorizo su ingreso
-              </span>
-            </label>
-          </div>
-        )}
-
         {/* Método de pago */}
         <div>
           <div style={{fontSize:11,fontWeight:500,color:C.label2,marginBottom:6}}>
@@ -15494,16 +15529,16 @@ function VentasAntiguas({inv, ventas, onVentaHistorica, user}){
               <button key={m.v} onClick={()=>setMetodo(m.v)}
                 style={{flex:1,padding:"7px 6px",borderRadius:8,fontSize:12,fontFamily:FONT_UI,
                   fontWeight:500,cursor:"pointer",transition:"all .15s",
-                  border: metodo===m.v ? `2px solid ${C.blue}` : `1px solid ${C.sep}`,
-                  background: metodo===m.v ? `${C.blue}12` : "transparent",
-                  color: metodo===m.v ? C.blue : C.label2}}>
+                  border: metodo===m.v?`2px solid ${C.blue}`:`1px solid ${C.sep}`,
+                  background: metodo===m.v?`${C.blue}12`:"transparent",
+                  color: metodo===m.v?C.blue:C.label2}}>
                 {m.label}
               </button>
             ))}
           </div>
         </div>
 
-        {/* Buscador de código */}
+        {/* Buscador */}
         <div>
           <div style={{fontSize:11,fontWeight:500,color:C.label2,marginBottom:6}}>
             <i className="ti ti-barcode" style={{fontSize:11}} aria-hidden="true"/> Agregar por código
@@ -15517,8 +15552,8 @@ function VentasAntiguas({inv, ventas, onVentaHistorica, user}){
                 background:C.bg0,color:C.label,fontSize:13,fontFamily:FONT_UI}}/>
             <button onClick={()=>buscarProducto(codInput)}
               style={{padding:"8px 14px",borderRadius:8,border:`1px solid ${C.sep}`,
-                background:C.bg0,color:C.label,fontSize:13,fontFamily:FONT_UI,cursor:"pointer",
-                display:"flex",alignItems:"center",gap:4}}>
+                background:C.bg0,color:C.label,fontSize:13,cursor:"pointer",
+                display:"flex",alignItems:"center"}}>
               <i className="ti ti-plus" style={{fontSize:14}} aria-hidden="true"/>
             </button>
           </div>
@@ -15528,12 +15563,13 @@ function VentasAntiguas({inv, ventas, onVentaHistorica, user}){
               {busqueda[0]?._noEncontrado ? (
                 <div style={{padding:"10px 14px",fontSize:12,color:C.red,display:"flex",alignItems:"center",gap:6}}>
                   <i className="ti ti-alert-circle" style={{fontSize:14}} aria-hidden="true"/>
-                  Código "{busqueda[0].codigo}" no encontrado en inventario
+                  Código "{busqueda[0].codigo}" no encontrado
                 </div>
               ) : busqueda.map(p=>(
                 <div key={p.id} onClick={()=>agregarAlCarrito(p)}
                   style={{padding:"9px 14px",cursor:"pointer",display:"flex",justifyContent:"space-between",
-                    alignItems:"center",borderBottom:`1px solid ${C.sep}`,background:"transparent",transition:"background .1s"}}
+                    alignItems:"center",borderBottom:`1px solid ${C.sep}`,
+                    background:"transparent",transition:"background .1s"}}
                   onMouseEnter={e=>e.currentTarget.style.background=C.bg1}
                   onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
                   <div>
@@ -15555,39 +15591,84 @@ function VentasAntiguas({inv, ventas, onVentaHistorica, user}){
 
       {/* Carrito */}
       {carrito.length>0&&(
-        <div style={{background:C.bg1,border:`1px solid ${C.sep}`,borderRadius:14,overflow:"hidden",marginBottom:12}}>
+        <div style={{background:C.bg1,border:`1px solid ${hayConflictos?"#E53935":C.sep}`,
+          borderRadius:14,overflow:"hidden",marginBottom:12,transition:"border-color .2s"}}>
+
           <div style={{padding:"9px 14px",background:C.bg2,borderBottom:`1px solid ${C.sep}`,
             display:"flex",justifyContent:"space-between",alignItems:"center"}}>
             <span style={{fontSize:12,fontWeight:500,color:C.label2}}>
               Carrito — {carrito.length} ítem{carrito.length!==1?"s":""}
+              {hayConflictos&&<span style={{color:"#C62828",marginLeft:6}}>
+                · {itemsConConflicto.length} con conflicto
+              </span>}
             </span>
-            <span style={{fontSize:11,padding:"2px 8px",borderRadius:4,
-              background:hayConflicto?"#FFEBEE":"#EEEDFE",
-              color:hayConflicto?"#C62828":"#3C3489",fontWeight:500}}>
+            <span style={{fontSize:11,padding:"2px 8px",borderRadius:4,fontWeight:500,
+              background:hayConflictos?"#FFEBEE":"#EEEDFE",
+              color:hayConflictos?"#C62828":"#3C3489"}}>
               {fecha}
             </span>
           </div>
-          {carrito.map((it,idx)=>(
-            <div key={it.prodId} style={{padding:"10px 14px",display:"flex",alignItems:"center",gap:10,
-              borderBottom:idx<carrito.length-1?`1px solid ${C.sep}`:"none"}}>
-              <div style={{flex:1,minWidth:0}}>
-                <div style={{fontSize:13,fontWeight:500,color:C.label,
-                  overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{it.nombre}</div>
-                <div style={{display:"flex",gap:6,alignItems:"center",marginTop:2}}>
-                  <span style={{fontSize:11,fontFamily:FONT_MONO,
-                    background:"#faeeda",color:"#c07d10",padding:"1px 6px",borderRadius:3}}>{it.codigo}</span>
-                  <span style={{fontSize:11,color:C.label2}}>{it.marcaNombre}</span>
+
+          {carrito.map((it,idx)=>{
+            const fc = getConflictoItem(it);
+            const esConflicto = !!fc;
+            const estaVerif   = verificados.has(it.prodId);
+            const mostrarAlerta = esConflicto && !estaVerif;
+            return (
+              <React.Fragment key={it.prodId}>
+                <div style={{padding:"10px 14px",display:"flex",alignItems:"center",gap:10,
+                  borderBottom:`1px solid ${C.sep}`,
+                  background: mostrarAlerta?"#FFF5F5": estaVerif?"#FFFDE7":"transparent"}}>
+                  {/* Indicador de estado */}
+                  <div style={{width:6,height:6,borderRadius:2,flexShrink:0,
+                    background: mostrarAlerta?"#E53935": estaVerif?"#F9A825":"#4CAF50"}}/>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontSize:13,fontWeight:500,color:C.label,
+                      overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{it.nombre}</div>
+                    <div style={{display:"flex",gap:6,alignItems:"center",marginTop:2,flexWrap:"wrap"}}>
+                      <span style={{fontSize:11,fontFamily:FONT_MONO,
+                        background:"#faeeda",color:"#c07d10",padding:"1px 6px",borderRadius:3}}>{it.codigo}</span>
+                      <span style={{fontSize:11,color:C.label2}}>{it.marcaNombre}</span>
+                      {esConflicto&&(
+                        <span style={{fontSize:10,color:"#C62828",background:"#FFEBEE",
+                          padding:"1px 6px",borderRadius:3,fontWeight:600}}>
+                          cargada {fc.split("-").reverse().join("/")}
+                        </span>
+                      )}
+                      {estaVerif&&(
+                        <span style={{fontSize:10,color:"#F57F17",background:"#FFFDE7",
+                          padding:"1px 6px",borderRadius:3,fontWeight:600}}>verificado</span>
+                      )}
+                    </div>
+                  </div>
+                  <div style={{display:"flex",alignItems:"center",gap:8}}>
+                    <span style={{fontSize:13,fontWeight:500,color:C.label}}>Bs {it.subtotal}</span>
+                    <button onClick={()=>quitarItem(it.prodId)}
+                      style={{background:"none",border:"none",cursor:"pointer",color:C.red,padding:4}}>
+                      <i className="ti ti-x" style={{fontSize:14}} aria-hidden="true"/>
+                    </button>
+                  </div>
                 </div>
-              </div>
-              <div style={{display:"flex",alignItems:"center",gap:8}}>
-                <span style={{fontSize:13,fontWeight:500,color:C.label}}>Bs {it.subtotal}</span>
-                <button onClick={()=>quitarItem(it.prodId)}
-                  style={{background:"none",border:"none",cursor:"pointer",color:C.red,padding:4,lineHeight:1}}>
-                  <i className="ti ti-x" style={{fontSize:14}} aria-hidden="true"/>
-                </button>
-              </div>
-            </div>
-          ))}
+                {/* Checkbox de verificación por ítem conflictivo */}
+                {esConflicto&&(
+                  <div style={{padding:"8px 14px 10px 14px",
+                    background: estaVerif?"#FFFDE7":"#FFF3F3",
+                    borderBottom:`1px solid ${C.sep}`}}>
+                    <label style={{display:"flex",alignItems:"flex-start",gap:8,cursor:"pointer"}}>
+                      <input type="checkbox" checked={estaVerif}
+                        onChange={()=>toggleVerificado(it.prodId)}
+                        style={{marginTop:2,width:14,height:14,
+                          accentColor: estaVerif?"#F9A825":"#C62828",cursor:"pointer",flexShrink:0}}/>
+                      <span style={{fontSize:11,color: estaVerif?"#F57F17":"#C62828",lineHeight:1.5}}>
+                        Verifiqué que <b>{it.nombre}</b> ({it.marcaNombre}) con fecha <b>{fecha}</b> no está registrado en el sistema
+                      </span>
+                    </label>
+                  </div>
+                )}
+              </React.Fragment>
+            );
+          })}
+
           <div style={{padding:"10px 14px",background:C.bg2,borderTop:`1px solid ${C.sep}`,
             display:"flex",justifyContent:"space-between",alignItems:"center"}}>
             <span style={{fontSize:12,color:C.label2}}>Total</span>
@@ -15596,25 +15677,36 @@ function VentasAntiguas({inv, ventas, onVentaHistorica, user}){
         </div>
       )}
 
+      {/* Botón quitar conflictivos (atajo rápido) */}
+      {hayConflictos&&(
+        <button onClick={quitarConflictivos}
+          style={{width:"100%",padding:"9px",borderRadius:10,border:"1px solid #EF9A9A",
+            background:"#FFEBEE",color:"#C62828",fontSize:12,fontFamily:FONT_UI,
+            cursor:"pointer",marginBottom:8,display:"flex",alignItems:"center",
+            justifyContent:"center",gap:6,fontWeight:500}}>
+          <i className="ti ti-trash" style={{fontSize:13}} aria-hidden="true"/>
+          Quitar {itemsConConflicto.length} ítem{itemsConConflicto.length!==1?"s":""}  conflictivo{itemsConConflicto.length!==1?"s":""} del carrito
+        </button>
+      )}
+
       {/* Botón confirmar */}
       <button onClick={confirmarVenta} disabled={!puedeConfirmar}
         style={{width:"100%",padding:"13px 16px",borderRadius:12,border:"none",
-          background: !puedeConfirmar ? "#ccc" : hayConflicto ? "#C62828" : "#1a1714",
+          background: !puedeConfirmar?"#ccc":"#1a1714",
           color:"#fff",fontSize:14,fontWeight:500,fontFamily:FONT_UI,
           cursor:!puedeConfirmar?"not-allowed":"pointer",
           display:"flex",alignItems:"center",justifyContent:"center",gap:8,
           opacity:!puedeConfirmar?0.5:1,transition:"all .15s"}}>
-        <i className={`ti ${hayConflicto?"ti-alert-triangle":"ti-clock-check"}`} style={{fontSize:16}} aria-hidden="true"/>
+        <i className="ti ti-clock-check" style={{fontSize:16}} aria-hidden="true"/>
         {guardando ? "Registrando…"
-          : !puedeConfirmar && hayConflicto && !verificado ? "Verificá el checkbox para continuar"
+          : hayConflictos ? `Verificá los ${itemsConConflicto.length} ítem${itemsConConflicto.length!==1?"s":""} en conflicto`
           : `Registrar venta histórica${total>0?" — Bs "+total:""}`}
       </button>
 
-      {/* Info box */}
       <div style={{marginTop:12,background:"#EEEDFE",borderRadius:10,padding:"10px 14px",
         fontSize:12,color:"#3C3489",display:"flex",gap:8,alignItems:"flex-start",lineHeight:1.5}}>
         <i className="ti ti-info-circle" style={{fontSize:14,flexShrink:0,marginTop:1}} aria-hidden="true"/>
-        <span>Al confirmar: descuenta stock, guarda la venta con fecha histórica y registra en trazabilidad.{hayConflicto&&" La verificación queda registrada en auditoría."}</span>
+        <span>Conflicto = la marca del ítem ya estaba cargada en el sistema en esa fecha. Verde = seguro · Rojo = requiere verificación · Amarillo = verificado manualmente.</span>
       </div>
     </div>
   );
