@@ -11440,26 +11440,14 @@ function App(){
     setDbStatus("connecting");
     sbCargarTodo().then(data=>{
       if(data){
-        // ── Inventario: merge — Supabase gana para ítems conocidos,
-        //    ítems locales no sincronizados se mantienen y se reintenta guardarlos
+        // ── Inventario: Supabase es fuente de verdad.
+        //    Si Supabase tiene datos, reemplazar cache local exactamente.
+        //    Solo si Supabase está vacío se mantienen datos locales (modo offline).
         setInv(prev=>{
-          const sbIds = new Set(data.inv.map(i=>String(i.id)));
-          const sbCodigos = new Set(data.inv.map(i=>(i.codigo||"").toUpperCase()));
-          // Ítems que están en local pero NO en Supabase = sin sincronizar.
-          // Si ya existe otro producto con el mismo código en Supabase, es un
-          // duplicado obsoleto (p.ej. borrado intencionalmente) — no reinsertar.
-          const pendientes = prev.filter(i=>!sbIds.has(String(i.id)) && !sbCodigos.has((i.codigo||"").toUpperCase()));
-          // Reintentar guardar ítems pendientes
-          pendientes.forEach(p=>sbGuardarProducto(p).then(sbId=>{
-            if(sbId && sbId!==p.id) setInv(x=>x.map(i=>i.id===p.id?{...i,id:sbId}:i));
-          }));
           if(data.inv.length===0 && prev.length>0){
-            // Supabase vacío pero tenemos datos locales — guardar todo
-            prev.forEach(p=>sbGuardarProducto(p));
-            return prev; // mantener datos locales
+            return prev; // Supabase vacío = offline, mantener local
           }
-          // Combinar: Supabase + pendientes locales
-          return pendientes.length>0 ? [...data.inv, ...pendientes] : data.inv;
+          return data.inv; // Supabase tiene datos → usarlo tal cual
         });
 
         // ── Ventas: misma lógica

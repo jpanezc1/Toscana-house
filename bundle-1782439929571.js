@@ -33702,17 +33702,10 @@ Esta acci\xF3n no se puede deshacer.`)) return;
       sbCargarTodo().then((data) => {
         if (data) {
           setInv((prev) => {
-            const sbIds = new Set(data.inv.map((i) => String(i.id)));
-            const sbCodigos = new Set(data.inv.map((i) => (i.codigo || "").toUpperCase()));
-            const pendientes = prev.filter((i) => !sbIds.has(String(i.id)) && !sbCodigos.has((i.codigo || "").toUpperCase()));
-            pendientes.forEach((p) => sbGuardarProducto(p).then((sbId) => {
-              if (sbId && sbId !== p.id) setInv((x) => x.map((i) => i.id === p.id ? { ...i, id: sbId } : i));
-            }));
             if (data.inv.length === 0 && prev.length > 0) {
-              prev.forEach((p) => sbGuardarProducto(p));
               return prev;
             }
-            return pendientes.length > 0 ? [...data.inv, ...pendientes] : data.inv;
+            return data.inv;
           });
           setVentas((prev) => {
             if (data.ventas.length === 0 && prev.length > 0) return prev;
