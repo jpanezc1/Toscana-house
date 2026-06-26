@@ -38888,11 +38888,14 @@ ${c.diferencia > 0.01 ? `Cliente paga diferencia: Bs ${fmt2(c.diferencia)} (${c.
       } }, (it.nombre || "").toUpperCase()), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: C.label3, fontFamily: FONT_MONO } }, it.codigo, " \xB7 ", it.marca || "\u2014")), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label2, fontFamily: FONT, textAlign: "right", flexShrink: 0 } }, it.tipo === "update" ? `${it.stockAntes} \u2192 ${it.stockNuevo} (+${it.stockSumado})` : `Stock ${it.stock}${it.precio ? ` \xB7 ${$(it.precio)}` : ""}`)))), items.filter((it) => it.codigo && it.nombre && Number(it.stock || it.stockNuevo || 1) > 0).length > 0 && (() => {
         const paraImprimir = items.filter((it) => it.codigo && it.nombre).map((it) => {
           const prodInv = inv.find((p) => (p.codigo || "").toLowerCase() === (it.codigo || "").toLowerCase());
+          const _segs = (it.codigo || "").toUpperCase().split("-");
+          const _midSeg = _segs.length >= 3 ? _segs[_segs.length - 2] : "";
+          const _tallaFromSku = /^[A-Za-z]{1,5}$/.test(_midSeg) ? _midSeg : "";
           const _palabras = (it.nombre || "").toUpperCase().split(/\s+/);
-          const _tallas = ["UNICA", "\xDANICA", "XXL", "XL", "XS", "S", "M", "L"];
-          const _tallaDetect = _palabras.slice().reverse().find((p) => _tallas.includes(p) || /^\d{2,3}$/.test(p) && Number(p) >= 30 && Number(p) <= 60);
+          const _tallasList = ["UNICA", "\xDANICA", "XXL", "XL", "XS", "S", "M", "L"];
+          const _tallaFromNombre = _palabras.slice().reverse().find((p) => _tallasList.includes(p) || /^\d{2,3}$/.test(p) && Number(p) >= 30 && Number(p) <= 60);
           const _desc = prodInv?.descripcion || "";
-          const _sub = prodInv?.subcat || _tallaDetect || "";
+          const _sub = prodInv?.subcat || _tallaFromSku || _tallaFromNombre || "";
           return {
             codigo: it.codigo,
             nombre: it.nombre,

@@ -15957,12 +15957,16 @@ function RegistroCargas({cargas, marcas, marcaId=null, onVerificar=null, user=nu
                           .filter(it=>it.codigo&&it.nombre)
                           .map(it=>{
                             const prodInv = inv.find(p=>(p.codigo||"").toLowerCase()===(it.codigo||"").toLowerCase());
-                            // Extraer talla del final del nombre (XS S M L XL XXL UNICA o numérica 36-60)
+                            // 1. Intentar extraer talla del segmento del medio del código (ej: MIN-M-001 → "M", MIN-XSS-002 → "XSS")
+                            const _segs = (it.codigo||"").toUpperCase().split("-");
+                            const _midSeg = _segs.length >= 3 ? _segs[_segs.length-2] : "";
+                            const _tallaFromSku = /^[A-Za-z]{1,5}$/.test(_midSeg) ? _midSeg : "";
+                            // 2. Fallback: buscar talla al final del nombre
                             const _palabras = (it.nombre||"").toUpperCase().split(/\s+/);
-                            const _tallas = ["UNICA","ÚNICA","XXL","XL","XS","S","M","L"];
-                            const _tallaDetect = _palabras.slice().reverse().find(p=>_tallas.includes(p)||(/^\d{2,3}$/.test(p)&&Number(p)>=30&&Number(p)<=60));
+                            const _tallasList = ["UNICA","ÚNICA","XXL","XL","XS","S","M","L"];
+                            const _tallaFromNombre = _palabras.slice().reverse().find(p=>_tallasList.includes(p)||(/^\d{2,3}$/.test(p)&&Number(p)>=30&&Number(p)<=60));
                             const _desc = prodInv?.descripcion||"";
-                            const _sub  = prodInv?.subcat||_tallaDetect||"";
+                            const _sub  = prodInv?.subcat||_tallaFromSku||_tallaFromNombre||"";
                             return {
                               codigo: it.codigo,
                               nombre: it.nombre,
