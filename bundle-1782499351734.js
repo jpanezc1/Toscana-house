@@ -34477,7 +34477,7 @@ Motivo: ${motivo}` : ""}`)) {
         onGoVerif: () => setTab("auditoria"),
         tabActual: tab
       }
-    )), tab === "cargas" && /* @__PURE__ */ import_react.default.createElement(RegistroCargas, { cargas: cargasCompletas, marcas: MARCAS, onVerificar: handleVerificarCarga, user, onEliminarCarga: handleEliminarCarga }), tab === "cambios" && /* @__PURE__ */ import_react.default.createElement(CambiosTab, { inv, ventas, onCambio: handleCambio }), tab === "ventas_ant" && user?.rol === "admin" && /* @__PURE__ */ import_react.default.createElement(VentasAntiguas, { inv, onVentaHistorica: handleVentaHistorica }), tab === "marcas" && !marcaDetalle && /* @__PURE__ */ import_react.default.createElement("div", null, marcasState.filter((m) => m.estado === "inactiva").length > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: {
+    )), tab === "cargas" && /* @__PURE__ */ import_react.default.createElement(RegistroCargas, { cargas: cargasCompletas, marcas: MARCAS, onVerificar: handleVerificarCarga, user, onEliminarCarga: handleEliminarCarga }), tab === "cambios" && /* @__PURE__ */ import_react.default.createElement(CambiosTab, { inv, ventas, onCambio: handleCambio }), tab === "ventas_ant" && user?.rol === "admin" && /* @__PURE__ */ import_react.default.createElement(VentasAntiguas, { inv, ventas, onVentaHistorica: handleVentaHistorica, user }), tab === "marcas" && !marcaDetalle && /* @__PURE__ */ import_react.default.createElement("div", null, marcasState.filter((m) => m.estado === "inactiva").length > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: {
       fontSize: 13,
       fontWeight: 600,
       color: C.label3,
@@ -38100,9 +38100,13 @@ ${c.diferencia > 0.01 ? `Cliente paga diferencia: Bs ${fmt2(c.diferencia)} (${c.
       }
     ), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: confirmar, variant: "fill", full: true, icon: "\u2713" }, "Confirmar cambio"));
   }
-  function VentasAntiguas({ inv, onVentaHistorica }) {
-    const isDesktop = useIsDesktop();
+  function VentasAntiguas({ inv, ventas, onVentaHistorica, user }) {
     const hoyISO = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+    const fechaCorte = import_react.default.useMemo(() => {
+      const reales = (ventas || []).filter((v) => v.origen !== "HISTORICA" && v.fecha);
+      if (!reales.length) return null;
+      return reales.map((v) => v.fecha).sort()[0];
+    }, [ventas]);
     const [fecha, setFecha] = import_react.default.useState(hoyISO);
     const [turno, setTurno] = import_react.default.useState("Tarde");
     const [metodo, setMetodo] = import_react.default.useState("efectivo");
@@ -38111,8 +38115,15 @@ ${c.diferencia > 0.01 ? `Cliente paga diferencia: Bs ${fmt2(c.diferencia)} (${c.
     const [busqueda, setBusqueda] = import_react.default.useState([]);
     const [confirmado, setConfirmado] = import_react.default.useState(null);
     const [guardando, setGuardando] = import_react.default.useState(false);
+    const [verificado, setVerificado] = import_react.default.useState(false);
     const inputRef = import_react.default.useRef(null);
     const total = carrito.reduce((s, it) => s + it.subtotal, 0);
+    const hayConflicto = fechaCorte && fecha >= fechaCorte;
+    const puedeConfirmar = carrito.length > 0 && !guardando && (!hayConflicto || verificado);
+    function cambiarFecha(val) {
+      setFecha(val);
+      setVerificado(false);
+    }
     function buscarProducto(cod) {
       if (!cod.trim()) return;
       const q = cod.trim().toUpperCase();
@@ -38155,32 +38166,47 @@ ${c.diferencia > 0.01 ? `Cliente paga diferencia: Bs ${fmt2(c.diferencia)} (${c.
       setCarrito((prev) => prev.filter((it) => it.prodId !== prodId));
     }
     async function confirmarVenta() {
-      if (carrito.length === 0 || guardando) return;
+      if (!puedeConfirmar) return;
       setGuardando(true);
-      const venta = { fecha, turno, metodoPago: metodo, total, subtotal: total, items: carrito };
+      const venta = {
+        fecha,
+        turno,
+        metodoPago: metodo,
+        total,
+        subtotal: total,
+        items: carrito,
+        ...hayConflicto ? { advertencia: "REGISTRADO_CON_ALERTA_FECHA", fechaCorte, verificadoPor: user?.nombre || "Admin" } : {}
+      };
       const vf = onVentaHistorica(venta);
-      setConfirmado({ ...vf, cantItems: carrito.length });
+      setConfirmado({ ...vf, cantItems: carrito.length, conAlerta: hayConflicto });
       setCarrito([]);
-      setCodInput("");
+      setCodInput([]);
       setBusqueda([]);
+      setVerificado(false);
       setGuardando(false);
     }
-    const METODOS = [
-      { v: "efectivo", label: "Efectivo" },
-      { v: "qr", label: "QR" },
-      { v: "tarjeta", label: "Tarjeta" }
-    ];
+    const METODOS = [{ v: "efectivo", label: "Efectivo" }, { v: "qr", label: "QR" }, { v: "tarjeta", label: "Tarjeta" }];
     const TURNOS = ["Ma\xF1ana", "Tarde", "Noche"];
-    return /* @__PURE__ */ import_react.default.createElement("div", { style: { paddingBottom: 32 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10, marginBottom: 16 } }, /* @__PURE__ */ import_react.default.createElement("i", { className: "ti ti-clock-history", style: { fontSize: 20, color: C.label2 }, "aria-hidden": "true" }), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 15, fontWeight: 600, color: C.label, fontFamily: FONT } }, "Ventas antiguas"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 11, padding: "2px 8px", borderRadius: 4, background: "#EEEDFE", color: "#3C3489", fontWeight: 500, display: "inline-flex", alignItems: "center", gap: 4 } }, /* @__PURE__ */ import_react.default.createElement("i", { className: "ti ti-shield-lock", style: { fontSize: 11 }, "aria-hidden": "true" }), "Solo admin")), /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      fontSize: 12,
-      color: C.label2,
+    return /* @__PURE__ */ import_react.default.createElement("div", { style: { paddingBottom: 32 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10, marginBottom: 16 } }, /* @__PURE__ */ import_react.default.createElement("i", { className: "ti ti-clock-history", style: { fontSize: 20, color: C.label2 }, "aria-hidden": "true" }), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 15, fontWeight: 600, color: C.label, fontFamily: FONT } }, "Ventas antiguas"), /* @__PURE__ */ import_react.default.createElement("span", { style: {
+      fontSize: 11,
+      padding: "2px 8px",
+      borderRadius: 4,
+      background: "#EEEDFE",
+      color: "#3C3489",
+      fontWeight: 500,
+      display: "inline-flex",
+      alignItems: "center",
+      gap: 4
+    } }, /* @__PURE__ */ import_react.default.createElement("i", { className: "ti ti-shield-lock", style: { fontSize: 11 }, "aria-hidden": "true" }), "Solo admin")), fechaCorte && /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      marginBottom: 12,
       background: C.bg1,
       border: `1px solid ${C.sep}`,
       borderRadius: 10,
-      padding: "9px 13px",
-      marginBottom: 14,
-      lineHeight: 1.5
-    } }, "Registra ventas realizadas antes del uso del sistema. Descuenta stock y genera trazabilidad marcada como ", /* @__PURE__ */ import_react.default.createElement("b", null, "hist\xF3rica"), "."), confirmado && /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      padding: "8px 13px"
+    } }, /* @__PURE__ */ import_react.default.createElement("i", { className: "ti ti-calendar-event", style: { fontSize: 13, color: C.label2 }, "aria-hidden": "true" }), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 12, color: C.label2 } }, "Ventas v\xE1lidas sin alerta: ", /* @__PURE__ */ import_react.default.createElement("b", { style: { color: C.label } }, "hasta ", fechaCorte.split("-").reverse().join("/"))), /* @__PURE__ */ import_react.default.createElement("span", { style: { marginLeft: "auto", fontSize: 11, color: C.label3 } }, "Primera venta del sistema: ", fechaCorte.split("-").reverse().join("/"))), confirmado && /* @__PURE__ */ import_react.default.createElement("div", { style: {
       background: "#E8F5E9",
       border: "1px solid #81C784",
       borderRadius: 12,
@@ -38189,39 +38215,40 @@ ${c.diferencia > 0.01 ? `Cliente paga diferencia: Bs ${fmt2(c.diferencia)} (${c.
       display: "flex",
       alignItems: "center",
       gap: 10
-    } }, /* @__PURE__ */ import_react.default.createElement("i", { className: "ti ti-circle-check", style: { fontSize: 20, color: "#388E3C" }, "aria-hidden": "true" }), /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, fontWeight: 600, color: "#2E7D32" } }, "Venta hist\xF3rica registrada"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: "#388E3C" } }, confirmado.fecha, " \xB7 ", confirmado.cantItems, " \xEDtem(s) \xB7 Bs ", confirmado.total)), /* @__PURE__ */ import_react.default.createElement(
+    } }, /* @__PURE__ */ import_react.default.createElement("i", { className: "ti ti-circle-check", style: { fontSize: 20, color: "#388E3C" }, "aria-hidden": "true" }), /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, fontWeight: 600, color: "#2E7D32" } }, "Venta hist\xF3rica registrada", confirmado.conAlerta ? " \xB7 con alerta verificada" : ""), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: "#388E3C" } }, confirmado.fecha, " \xB7 ", confirmado.cantItems, " \xEDtem(s) \xB7 Bs ", confirmado.total)), /* @__PURE__ */ import_react.default.createElement(
       "button",
       {
         onClick: () => setConfirmado(null),
-        style: { background: "none", border: "none", cursor: "pointer", color: "#388E3C", fontSize: 18, lineHeight: 1 }
+        style: { background: "none", border: "none", cursor: "pointer", color: "#388E3C" }
       },
       /* @__PURE__ */ import_react.default.createElement("i", { className: "ti ti-x", style: { fontSize: 14 }, "aria-hidden": "true" })
     )), /* @__PURE__ */ import_react.default.createElement("div", { style: {
       background: C.bg1,
-      border: `1px solid ${C.sep}`,
+      border: `1px solid ${hayConflicto ? "#E53935" : "" + C.sep}`,
       borderRadius: 14,
       padding: "14px 16px",
       display: "flex",
       flexDirection: "column",
       gap: 12,
-      marginBottom: 12
-    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, fontWeight: 500, color: C.label2, marginBottom: 4 } }, /* @__PURE__ */ import_react.default.createElement("i", { className: "ti ti-calendar", style: { fontSize: 11 }, "aria-hidden": "true" }), " Fecha de la venta"), /* @__PURE__ */ import_react.default.createElement(
+      marginBottom: 12,
+      transition: "border-color .2s"
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, fontWeight: 500, color: hayConflicto ? "#E53935" : C.label2, marginBottom: 4 } }, /* @__PURE__ */ import_react.default.createElement("i", { className: "ti ti-calendar", style: { fontSize: 11 }, "aria-hidden": "true" }), " Fecha de la venta"), /* @__PURE__ */ import_react.default.createElement(
       "input",
       {
         type: "date",
         value: fecha,
         max: hoyISO,
-        onChange: (e) => setFecha(e.target.value),
+        onChange: (e) => cambiarFecha(e.target.value),
         style: {
           width: "100%",
           padding: "7px 10px",
           borderRadius: 8,
-          border: `1px solid ${C.sep}`,
-          background: C.bg0,
+          boxSizing: "border-box",
+          border: `1px solid ${hayConflicto ? "#E53935" : C.sep}`,
+          background: hayConflicto ? "#FFF5F5" : C.bg0,
           color: C.label,
           fontSize: 13,
-          fontFamily: FONT_UI,
-          boxSizing: "border-box"
+          fontFamily: FONT_UI
         }
       }
     )), /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, fontWeight: 500, color: C.label2, marginBottom: 4 } }, /* @__PURE__ */ import_react.default.createElement("i", { className: "ti ti-clock", style: { fontSize: 11 }, "aria-hidden": "true" }), " Turno"), /* @__PURE__ */ import_react.default.createElement(
@@ -38242,7 +38269,24 @@ ${c.diferencia > 0.01 ? `Cliente paga diferencia: Bs ${fmt2(c.diferencia)} (${c.
         }
       },
       TURNOS.map((t) => /* @__PURE__ */ import_react.default.createElement("option", { key: t }, t))
-    ))), /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, fontWeight: 500, color: C.label2, marginBottom: 6 } }, /* @__PURE__ */ import_react.default.createElement("i", { className: "ti ti-credit-card", style: { fontSize: 11 }, "aria-hidden": "true" }), " M\xE9todo de pago"), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 6 } }, METODOS.map((m) => /* @__PURE__ */ import_react.default.createElement(
+    ))), hayConflicto && /* @__PURE__ */ import_react.default.createElement("div", { style: { background: "#FFF3F3", border: "1.5px solid #E53935", borderRadius: 10, padding: "12px 14px" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "flex-start", gap: 8, marginBottom: 10 } }, /* @__PURE__ */ import_react.default.createElement("i", { className: "ti ti-alert-triangle", style: { fontSize: 16, color: "#E53935", flexShrink: 0, marginTop: 1 }, "aria-hidden": "true" }), /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, fontWeight: 600, color: "#C62828", marginBottom: 3 } }, "Fecha dentro del per\xEDodo del sistema"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: "#B71C1C", lineHeight: 1.5 } }, "El sistema registra ventas desde el ", /* @__PURE__ */ import_react.default.createElement("b", null, fechaCorte.split("-").reverse().join("/")), ". Esta fecha podr\xEDa generar ventas duplicadas y afectar el stock e inventario incorrectamente."))), /* @__PURE__ */ import_react.default.createElement("label", { style: {
+      display: "flex",
+      alignItems: "flex-start",
+      gap: 10,
+      cursor: "pointer",
+      background: "#FFEBEE",
+      borderRadius: 8,
+      padding: "10px 12px",
+      border: "1px solid #EF9A9A"
+    } }, /* @__PURE__ */ import_react.default.createElement(
+      "input",
+      {
+        type: "checkbox",
+        checked: verificado,
+        onChange: (e) => setVerificado(e.target.checked),
+        style: { marginTop: 2, width: 16, height: 16, accentColor: "#C62828", flexShrink: 0, cursor: "pointer" }
+      }
+    ), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 12, color: "#C62828", lineHeight: 1.5, fontWeight: 500 } }, "Verifiqu\xE9 manualmente que esta venta ", /* @__PURE__ */ import_react.default.createElement("b", null, "NO est\xE1 registrada"), " en el sistema y autorizo su ingreso"))), /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, fontWeight: 500, color: C.label2, marginBottom: 6 } }, /* @__PURE__ */ import_react.default.createElement("i", { className: "ti ti-credit-card", style: { fontSize: 11 }, "aria-hidden": "true" }), " M\xE9todo de pago"), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 6 } }, METODOS.map((m) => /* @__PURE__ */ import_react.default.createElement(
       "button",
       {
         key: m.v,
@@ -38344,8 +38388,8 @@ ${c.diferencia > 0.01 ? `Cliente paga diferencia: Bs ${fmt2(c.diferencia)} (${c.
       fontSize: 11,
       padding: "2px 8px",
       borderRadius: 4,
-      background: "#EEEDFE",
-      color: "#3C3489",
+      background: hayConflicto ? "#FFEBEE" : "#EEEDFE",
+      color: hayConflicto ? "#C62828" : "#3C3489",
       fontWeight: 500
     } }, fecha)), carrito.map((it, idx) => /* @__PURE__ */ import_react.default.createElement("div", { key: it.prodId, style: {
       padding: "10px 14px",
@@ -38371,14 +38415,7 @@ ${c.diferencia > 0.01 ? `Cliente paga diferencia: Bs ${fmt2(c.diferencia)} (${c.
       "button",
       {
         onClick: () => quitarItem(it.prodId),
-        style: {
-          background: "none",
-          border: "none",
-          cursor: "pointer",
-          color: C.red,
-          padding: 4,
-          lineHeight: 1
-        }
+        style: { background: "none", border: "none", cursor: "pointer", color: C.red, padding: 4, lineHeight: 1 }
       },
       /* @__PURE__ */ import_react.default.createElement("i", { className: "ti ti-x", style: { fontSize: 14 }, "aria-hidden": "true" })
     )))), /* @__PURE__ */ import_react.default.createElement("div", { style: {
@@ -38392,28 +38429,28 @@ ${c.diferencia > 0.01 ? `Cliente paga diferencia: Bs ${fmt2(c.diferencia)} (${c.
       "button",
       {
         onClick: confirmarVenta,
-        disabled: carrito.length === 0 || guardando,
+        disabled: !puedeConfirmar,
         style: {
           width: "100%",
           padding: "13px 16px",
           borderRadius: 12,
           border: "none",
-          background: carrito.length === 0 ? "#ccc" : "#1a1714",
+          background: !puedeConfirmar ? "#ccc" : hayConflicto ? "#C62828" : "#1a1714",
           color: "#fff",
           fontSize: 14,
           fontWeight: 500,
           fontFamily: FONT_UI,
-          cursor: carrito.length === 0 ? "not-allowed" : "pointer",
+          cursor: !puedeConfirmar ? "not-allowed" : "pointer",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
           gap: 8,
-          opacity: carrito.length === 0 ? 0.5 : 1,
-          transition: "opacity .15s"
+          opacity: !puedeConfirmar ? 0.5 : 1,
+          transition: "all .15s"
         }
       },
-      /* @__PURE__ */ import_react.default.createElement("i", { className: "ti ti-clock-check", style: { fontSize: 16 }, "aria-hidden": "true" }),
-      guardando ? "Registrando\u2026" : `Registrar venta hist\xF3rica${total > 0 ? " \u2014 Bs " + total : ""}`
+      /* @__PURE__ */ import_react.default.createElement("i", { className: `ti ${hayConflicto ? "ti-alert-triangle" : "ti-clock-check"}`, style: { fontSize: 16 }, "aria-hidden": "true" }),
+      guardando ? "Registrando\u2026" : !puedeConfirmar && hayConflicto && !verificado ? "Verific\xE1 el checkbox para continuar" : `Registrar venta hist\xF3rica${total > 0 ? " \u2014 Bs " + total : ""}`
     ), /* @__PURE__ */ import_react.default.createElement("div", { style: {
       marginTop: 12,
       background: "#EEEDFE",
@@ -38425,7 +38462,7 @@ ${c.diferencia > 0.01 ? `Cliente paga diferencia: Bs ${fmt2(c.diferencia)} (${c.
       gap: 8,
       alignItems: "flex-start",
       lineHeight: 1.5
-    } }, /* @__PURE__ */ import_react.default.createElement("i", { className: "ti ti-info-circle", style: { fontSize: 14, flexShrink: 0, marginTop: 1 }, "aria-hidden": "true" }), /* @__PURE__ */ import_react.default.createElement("span", null, "Al confirmar: descuenta stock de cada art\xEDculo, guarda la venta con la fecha seleccionada y la marca como ", /* @__PURE__ */ import_react.default.createElement("b", null, "hist\xF3rica"), " en trazabilidad.")));
+    } }, /* @__PURE__ */ import_react.default.createElement("i", { className: "ti ti-info-circle", style: { fontSize: 14, flexShrink: 0, marginTop: 1 }, "aria-hidden": "true" }), /* @__PURE__ */ import_react.default.createElement("span", null, "Al confirmar: descuenta stock, guarda la venta con fecha hist\xF3rica y registra en trazabilidad.", hayConflicto && " La verificaci\xF3n queda registrada en auditor\xEDa.")));
   }
   function RegistroCargas({ cargas, marcas, marcaId = null, onVerificar = null, user = null, onEliminarCarga = null }) {
     const isDesktop = useIsDesktop();
