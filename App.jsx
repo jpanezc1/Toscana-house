@@ -7402,6 +7402,8 @@ function ImportarExcelModal({inv, onImportar, onClose, onArchivoCapturado}){
           tipo:"update", codigo:f.sku, stock:f.stock,
           descripcion: descNueva||undefined,
           subcat: f.talla ? f.talla.toUpperCase() : undefined,
+          talla: (f.talla||"").toUpperCase(),
+          color: (f.color||"").toUpperCase(),
         });
       } else {
         ok++;
@@ -11690,7 +11692,15 @@ function App(){
     sbMarcarCargaVerificada(cargaId, verificado, user.nombre);
   }
 
-  function handleImportarExcel({tipo, codigo, stock, producto, descripcion, subcat}){
+  function handleImportarExcel({tipo, codigo, stock, producto, descripcion, subcat, color="", talla=""}){
+    // Helper: extrae talla y color de un string "TALLA: X · COLOR: Y"
+    function _parseDescTC(d){
+      const ps=(d||"").split("·").map(s=>s.trim());
+      return {
+        t:ps.find(p=>p.startsWith("TALLA:"))?.replace("TALLA:","").trim()||"",
+        c:ps.find(p=>p.startsWith("COLOR:"))?.replace("COLOR:","").trim()||"",
+      };
+    }
     if(tipo==="update"){
       const prod = inv.find(p=>p.codigo===codigo);
       const stockAntes = prod?.stock||0;
@@ -11709,19 +11719,23 @@ function App(){
           syncConRespaldo("producto_patch", {prodId:prod.id,...patch}, ()=>sbActualizarProductoPatch(prod.id, patch));
         }
       }
-      // buffer audit
+      // buffer audit — incluir talla y color para que RegistroCargas pueda imprimir correctamente
+      const {t:_t, c:_c} = _parseDescTC(descripcion);
       _importBuf.current.items.push({tipo:"update", codigo, nombre:prod?.nombre||codigo,
-        marca:prod?.marcaNombre||"—", marcaId:prod?.marcaId??null, stockAntes, stockNuevo, stockSumado:stock});
+        marca:prod?.marcaNombre||"—", marcaId:prod?.marcaId??null, stockAntes, stockNuevo, stockSumado:stock,
+        talla:talla||_t||subcat||"", color:color||_c||""});
     } else if(tipo==="create"){
       const localId = Date.now() * 1000 + Math.floor(Math.random()*999);
       const newProd = { id: localId, ...producto };
       setInv(prev=>[...prev, newProd]);
       // Buffer para batch — no disparar request individual por cada producto
       _importBuf.current.sbItems.push(newProd);
-      // buffer audit
+      // buffer audit — incluir talla y color
+      const {t:_t, c:_c} = _parseDescTC(producto.descripcion);
       _importBuf.current.items.push({tipo:"create", codigo:producto.codigo,
         nombre:producto.nombre, marca:producto.marcaNombre||"—", marcaId:producto.marcaId??null,
-        stock:producto.stock, precio:producto.precio, categoria:producto.categoria});
+        stock:producto.stock, precio:producto.precio, categoria:producto.categoria,
+        talla:_t||producto.subcat||"", color:_c||""});
     }
     // Flush: batch Supabase + audit después de 800ms sin más llamadas
     clearTimeout(_importBuf.current.timer);
@@ -15957,16 +15971,22 @@ function RegistroCargas({cargas, marcas, marcaId=null, onVerificar=null, user=nu
                           .filter(it=>it.codigo&&it.nombre)
                           .map(it=>{
                             const prodInv = inv.find(p=>(p.codigo||"").toLowerCase()===(it.codigo||"").toLowerCase());
-                            // 1. Intentar extraer talla del segmento del medio del código (ej: MIN-M-001 → "M", MIN-XSS-002 → "XSS")
+                            // Talla: del item de carga → del producto en inv → del segmento medio del SKU → del nombre
                             const _segs = (it.codigo||"").toUpperCase().split("-");
                             const _midSeg = _segs.length >= 3 ? _segs[_segs.length-2] : "";
                             const _tallaFromSku = /^[A-Za-z]{1,5}$/.test(_midSeg) ? _midSeg : "";
-                            // 2. Fallback: buscar talla al final del nombre
                             const _palabras = (it.nombre||"").toUpperCase().split(/\s+/);
                             const _tallasList = ["UNICA","ÚNICA","XXL","XL","XS","S","M","L"];
-                            const _tallaFromNombre = _palabras.slice().reverse().find(p=>_tallasList.includes(p)||(/^\d{2,3}$/.test(p)&&Number(p)>=30&&Number(p)<=60));
-                            const _desc = prodInv?.descripcion||"";
-                            const _sub  = prodInv?.subcat||_tallaFromSku||_tallaFromNombre||"";
+                            const _tallaFromNombre = _palabras.slice().reverse().find(p=>_tallasList.includes(p)||(/^\d{2,3}$/.test(p)&&Number(p)>=30&&Number(p)<=60))||"";
+                            const _talla = it.talla||prodInv?.subcat||_tallaFromSku||_tallaFromNombre||"";
+                            // Color: del item de carga → del producto en inv (descripcion)
+                            const _colorFromInv = (prodInv?.descripcion||"").split("·").map(s=>s.trim()).find(p=>p.startsWith("COLOR:"))?.replace("COLOR:","").trim()||"";
+                            const _color = it.color||_colorFromInv||"";
+                            // descripcion final para la fila de color en etiqueta
+                            const _desc = prodInv?.descripcion||[
+                              _talla&&`TALLA: ${_talla}`,
+                              _color&&`COLOR: ${_color}`,
+                            ].filter(Boolean).join(" · ")||"";
                             return {
                               codigo: it.codigo,
                               nombre: it.nombre,
@@ -15974,7 +15994,7 @@ function RegistroCargas({cargas, marcas, marcaId=null, onVerificar=null, user=nu
                               precio: it.precio||prodInv?.precio||0,
                               stock: Number(it.stockSumado||it.stock||it.stockNuevo||1),
                               descripcion: _desc,
-                              subcat: _sub,
+                              subcat: _talla,
                             };
                           });
                         const totalEtiq = paraImprimir.reduce((s,it)=>s+Math.max(1,it.stock),0);

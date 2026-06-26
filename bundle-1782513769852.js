@@ -29005,7 +29005,9 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
             codigo: f.sku,
             stock: f.stock,
             descripcion: descNueva || void 0,
-            subcat: f.talla ? f.talla.toUpperCase() : void 0
+            subcat: f.talla ? f.talla.toUpperCase() : void 0,
+            talla: (f.talla || "").toUpperCase(),
+            color: (f.color || "").toUpperCase()
           });
         } else {
           ok++;
@@ -33993,7 +33995,14 @@ Motivo: ${motivo}` : ""}`)) {
       setCargas((prev) => prev.map((c) => c.id === cargaId ? { ...c, verificado, verificadoTs: verificado ? (/* @__PURE__ */ new Date()).toISOString() : null, verificadoPor: verificado ? user.nombre : null } : c));
       sbMarcarCargaVerificada(cargaId, verificado, user.nombre);
     }
-    function handleImportarExcel({ tipo, codigo, stock, producto, descripcion, subcat }) {
+    function handleImportarExcel({ tipo, codigo, stock, producto, descripcion, subcat, color = "", talla = "" }) {
+      function _parseDescTC(d) {
+        const ps = (d || "").split("\xB7").map((s) => s.trim());
+        return {
+          t: ps.find((p) => p.startsWith("TALLA:"))?.replace("TALLA:", "").trim() || "",
+          c: ps.find((p) => p.startsWith("COLOR:"))?.replace("COLOR:", "").trim() || ""
+        };
+      }
       if (tipo === "update") {
         const prod = inv.find((p) => p.codigo === codigo);
         const stockAntes = prod?.stock || 0;
@@ -34009,6 +34018,7 @@ Motivo: ${motivo}` : ""}`)) {
             syncConRespaldo("producto_patch", { prodId: prod.id, ...patch }, () => sbActualizarProductoPatch(prod.id, patch));
           }
         }
+        const { t: _t, c: _c } = _parseDescTC(descripcion);
         _importBuf.current.items.push({
           tipo: "update",
           codigo,
@@ -34017,13 +34027,16 @@ Motivo: ${motivo}` : ""}`)) {
           marcaId: prod?.marcaId ?? null,
           stockAntes,
           stockNuevo,
-          stockSumado: stock
+          stockSumado: stock,
+          talla: talla || _t || subcat || "",
+          color: color || _c || ""
         });
       } else if (tipo === "create") {
         const localId = Date.now() * 1e3 + Math.floor(Math.random() * 999);
         const newProd = { id: localId, ...producto };
         setInv((prev) => [...prev, newProd]);
         _importBuf.current.sbItems.push(newProd);
+        const { t: _t, c: _c } = _parseDescTC(producto.descripcion);
         _importBuf.current.items.push({
           tipo: "create",
           codigo: producto.codigo,
@@ -34032,7 +34045,9 @@ Motivo: ${motivo}` : ""}`)) {
           marcaId: producto.marcaId ?? null,
           stock: producto.stock,
           precio: producto.precio,
-          categoria: producto.categoria
+          categoria: producto.categoria,
+          talla: _t || producto.subcat || "",
+          color: _c || ""
         });
       }
       clearTimeout(_importBuf.current.timer);
@@ -38893,9 +38908,14 @@ ${c.diferencia > 0.01 ? `Cliente paga diferencia: Bs ${fmt2(c.diferencia)} (${c.
           const _tallaFromSku = /^[A-Za-z]{1,5}$/.test(_midSeg) ? _midSeg : "";
           const _palabras = (it.nombre || "").toUpperCase().split(/\s+/);
           const _tallasList = ["UNICA", "\xDANICA", "XXL", "XL", "XS", "S", "M", "L"];
-          const _tallaFromNombre = _palabras.slice().reverse().find((p) => _tallasList.includes(p) || /^\d{2,3}$/.test(p) && Number(p) >= 30 && Number(p) <= 60);
-          const _desc = prodInv?.descripcion || "";
-          const _sub = prodInv?.subcat || _tallaFromSku || _tallaFromNombre || "";
+          const _tallaFromNombre = _palabras.slice().reverse().find((p) => _tallasList.includes(p) || /^\d{2,3}$/.test(p) && Number(p) >= 30 && Number(p) <= 60) || "";
+          const _talla = it.talla || prodInv?.subcat || _tallaFromSku || _tallaFromNombre || "";
+          const _colorFromInv = (prodInv?.descripcion || "").split("\xB7").map((s) => s.trim()).find((p) => p.startsWith("COLOR:"))?.replace("COLOR:", "").trim() || "";
+          const _color = it.color || _colorFromInv || "";
+          const _desc = prodInv?.descripcion || [
+            _talla && `TALLA: ${_talla}`,
+            _color && `COLOR: ${_color}`
+          ].filter(Boolean).join(" \xB7 ") || "";
           return {
             codigo: it.codigo,
             nombre: it.nombre,
@@ -38903,7 +38923,7 @@ ${c.diferencia > 0.01 ? `Cliente paga diferencia: Bs ${fmt2(c.diferencia)} (${c.
             precio: it.precio || prodInv?.precio || 0,
             stock: Number(it.stockSumado || it.stock || it.stockNuevo || 1),
             descripcion: _desc,
-            subcat: _sub
+            subcat: _talla
           };
         });
         const totalEtiq = paraImprimir.reduce((s, it) => s + Math.max(1, it.stock), 0);
