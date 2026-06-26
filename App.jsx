@@ -11826,15 +11826,17 @@ function App(){
 
   function handleVentaHistorica(v){
     const id = `VH${Date.now()}`;
-    // fecha viene del picker en formato YYYY-MM-DD; extraemos mes/anio para las liquidaciones
     const fechaISO = v.fecha; // "2026-04-15"
-    const [anioH, mesH] = fechaISO.split("-").map(Number);
+    // ISO month is 1-indexed; app state mes is 0-indexed → subtract 1 for mk and mes fields
+    const [anioH, mesISO] = fechaISO.split("-").map(Number);
+    const mesH = mesISO - 1; // 0-indexed para consistencia con el resto del sistema
+    const mkH  = mkKey(mesH, anioH); // mk correcto para liquidaciones históricas
     const vf = {
       ...v,
       id,
       fecha: fechaISO,
       hora: v.turno || "—",
-      mk: MK,
+      mk: mkH,
       mes: mesH,
       anio: anioH,
       origen: "HISTORICA",

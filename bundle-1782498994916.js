@@ -34137,13 +34137,15 @@ Motivo: ${motivo}` : ""}`)) {
     function handleVentaHistorica(v) {
       const id = `VH${Date.now()}`;
       const fechaISO = v.fecha;
-      const [anioH, mesH] = fechaISO.split("-").map(Number);
+      const [anioH, mesISO] = fechaISO.split("-").map(Number);
+      const mesH = mesISO - 1;
+      const mkH = mkKey(mesH, anioH);
       const vf = {
         ...v,
         id,
         fecha: fechaISO,
         hora: v.turno || "\u2014",
-        mk: MK,
+        mk: mkH,
         mes: mesH,
         anio: anioH,
         origen: "HISTORICA"
