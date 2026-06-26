@@ -21574,6 +21574,28 @@
       return false;
     }
   }
+  async function sbEliminarProducto(prodId) {
+    try {
+      const db = await getSupabase();
+      const { error } = await db.from("inventario").delete().eq("id", prodId);
+      if (error) throw error;
+      return true;
+    } catch (e) {
+      console.warn("Supabase eliminar producto:", e.message);
+      return false;
+    }
+  }
+  async function sbEliminarCarga(cargaId) {
+    try {
+      const db = await getSupabase();
+      const { error } = await db.from("cargas_inventario").delete().eq("id", cargaId);
+      if (error) throw error;
+      return true;
+    } catch (e) {
+      console.warn("Supabase eliminar carga:", e.message);
+      return false;
+    }
+  }
   async function sbGuardarVenta(venta) {
     try {
       const db = await getSupabase();
@@ -33956,6 +33978,24 @@ Motivo: ${motivo}` : ""}`)) {
       setRepPrecio("");
     }
     const _importBuf = (0, import_react.useRef)({ items: [], sbItems: [], ts: 0, timer: null, archivo: null, archivoNombre: null });
+    async function handleEditarProducto(prodId, campos) {
+      setInv((prev) => prev.map((p) => p.id === prodId ? { ...p, ...campos } : p));
+      await sbActualizarProductoPatch(prodId, campos);
+      const inv2 = JSON.parse(localStorage.getItem("th_inv") || "[]");
+      localStorage.setItem("th_inv", JSON.stringify(inv2.map((p) => p.id === prodId ? { ...p, ...campos } : p)));
+    }
+    async function handleEliminarProducto(prodId) {
+      setInv((prev) => prev.filter((p) => p.id !== prodId));
+      await sbEliminarProducto(prodId);
+      const inv2 = JSON.parse(localStorage.getItem("th_inv") || "[]");
+      localStorage.setItem("th_inv", JSON.stringify(inv2.filter((p) => p.id !== prodId)));
+    }
+    async function handleEliminarCarga(cargaId) {
+      setCargas((prev) => prev.filter((c) => c.id !== cargaId));
+      await sbEliminarCarga(cargaId);
+      const c2 = JSON.parse(localStorage.getItem("th_cargas") || "[]");
+      localStorage.setItem("th_cargas", JSON.stringify(c2.filter((c) => c.id !== cargaId)));
+    }
     function handleVerificarCarga(cargaId, verificado) {
       setCargas((prev) => prev.map((c) => c.id === cargaId ? { ...c, verificado, verificadoTs: verificado ? (/* @__PURE__ */ new Date()).toISOString() : null, verificadoPor: verificado ? user.nombre : null } : c));
       sbMarcarCargaVerificada(cargaId, verificado, user.nombre);
@@ -34378,7 +34418,7 @@ Motivo: ${motivo}` : ""}`)) {
       setRepCant("");
       setRepPrecio("");
       setRepTab("stock");
-    }, onSyncCompleto: forzarSyncInventario, onRecargarDesdeSupabase: recargarDesdeSupabase }), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: tab === "auditoria" ? "block" : "none" } }, /* @__PURE__ */ import_react.default.createElement(
+    }, onSyncCompleto: forzarSyncInventario, onRecargarDesdeSupabase: recargarDesdeSupabase, onEditarProducto: handleEditarProducto, onEliminarProducto: handleEliminarProducto, user }), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: tab === "auditoria" ? "block" : "none" } }, /* @__PURE__ */ import_react.default.createElement(
       AuditoriaInventario,
       {
         inv,
@@ -34395,7 +34435,7 @@ Motivo: ${motivo}` : ""}`)) {
         onGoVerif: () => setTab("auditoria"),
         tabActual: tab
       }
-    )), tab === "cargas" && /* @__PURE__ */ import_react.default.createElement(RegistroCargas, { cargas: cargasCompletas, marcas: MARCAS, onVerificar: handleVerificarCarga, user }), tab === "cambios" && /* @__PURE__ */ import_react.default.createElement(CambiosTab, { inv, ventas, onCambio: handleCambio }), tab === "marcas" && !marcaDetalle && /* @__PURE__ */ import_react.default.createElement("div", null, marcasState.filter((m) => m.estado === "inactiva").length > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: {
+    )), tab === "cargas" && /* @__PURE__ */ import_react.default.createElement(RegistroCargas, { cargas: cargasCompletas, marcas: MARCAS, onVerificar: handleVerificarCarga, user, onEliminarCarga: handleEliminarCarga }), tab === "cambios" && /* @__PURE__ */ import_react.default.createElement(CambiosTab, { inv, ventas, onCambio: handleCambio }), tab === "marcas" && !marcaDetalle && /* @__PURE__ */ import_react.default.createElement("div", null, marcasState.filter((m) => m.estado === "inactiva").length > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: {
       fontSize: 13,
       fontWeight: 600,
       color: C.label3,
@@ -38018,7 +38058,7 @@ ${c.diferencia > 0.01 ? `Cliente paga diferencia: Bs ${fmt2(c.diferencia)} (${c.
       }
     ), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: confirmar, variant: "fill", full: true, icon: "\u2713" }, "Confirmar cambio"));
   }
-  function RegistroCargas({ cargas, marcas, marcaId = null, onVerificar = null, user = null }) {
+  function RegistroCargas({ cargas, marcas, marcaId = null, onVerificar = null, user = null, onEliminarCarga = null }) {
     const isDesktop = useIsDesktop();
     const fijaMarca = marcaId != null;
     const [marcaSelec, setMarcaSelec] = (0, import_react.useState)(marcaId);
@@ -38284,12 +38324,40 @@ ${c.diferencia > 0.01 ? `Cliente paga diferencia: Bs ${fmt2(c.diferencia)} (${c.
           }
         },
         c.verificado ? "\u2713 Verificado \u2014 quitar marca" : "Marcar como verificado \u2713"
-      ))));
+      )), user?.rol === "admin" && onEliminarCarga && c.tipo !== "HISTORICO" && /* @__PURE__ */ import_react.default.createElement(
+        "button",
+        {
+          onClick: (e) => {
+            e.stopPropagation();
+            if (window.confirm(`\xBFEliminar este registro de carga?
+${c.resumen || c.id}`)) onEliminarCarga(c.id);
+          },
+          style: {
+            width: "100%",
+            marginTop: 10,
+            padding: "9px",
+            borderRadius: 10,
+            border: `1.5px solid #C94C4C`,
+            background: "#C94C4C10",
+            color: "#C94C4C",
+            fontSize: 12,
+            fontWeight: 700,
+            cursor: "pointer",
+            fontFamily: FONT_UI
+          }
+        },
+        "\u{1F5D1} Eliminar registro de carga"
+      )));
     })));
   }
-  function InventarioPorMarca({ inv, ventas, retiros = [], bajas = [], onRecibir, onBaja, onImportarExcel, onReponer, onSyncCompleto, onRecargarDesdeSupabase }) {
+  function InventarioPorMarca({ inv, ventas, retiros = [], bajas = [], onRecibir, onBaja, onImportarExcel, onReponer, onSyncCompleto, onRecargarDesdeSupabase, onEditarProducto, onEliminarProducto, user }) {
     const isDesktop = useIsDesktop();
     const [syncMsg, setSyncMsg] = (0, import_react.useState)(null);
+    const [editProd, setEditProd] = (0, import_react.useState)(null);
+    const [editNombre, setEditNombre] = (0, import_react.useState)("");
+    const [editPrecio, setEditPrecio] = (0, import_react.useState)("");
+    const [editDesc, setEditDesc] = (0, import_react.useState)("");
+    const [editGuardando, setEditGuardando] = (0, import_react.useState)(false);
     var _hN149 = (0, import_react.useState)(null);
     var marcaSelec = _hN149[0];
     var setMarcaSelec = _hN149[1];
@@ -38309,6 +38377,24 @@ ${c.diferencia > 0.01 ? `Cliente paga diferencia: Bs ${fmt2(c.diferencia)} (${c.
     var setInvFechaHasta = _hInvFh[1];
     ;
     const marca = marcaSelec ? MARCAS.find((m) => m.id === marcaSelec) : null;
+    function abrirEditar(prod) {
+      setEditProd(prod);
+      setEditNombre(prod.nombre || "");
+      setEditPrecio(String(prod.precio || ""));
+      setEditDesc(prod.descripcion || "");
+    }
+    async function guardarEdicion() {
+      if (!editProd || !onEditarProducto) return;
+      setEditGuardando(true);
+      const campos = {
+        nombre: editNombre.toUpperCase().trim(),
+        precio: Number(editPrecio) || editProd.precio,
+        descripcion: editDesc.trim()
+      };
+      await onEditarProducto(editProd.id, campos);
+      setEditGuardando(false);
+      setEditProd(null);
+    }
     const vendidosPorProd = (0, import_react.useMemo)(() => {
       const map = {};
       ventas.forEach((v) => v.items.forEach((it) => {
@@ -38710,7 +38796,7 @@ ${c.diferencia > 0.01 ? `Cliente paga diferencia: Bs ${fmt2(c.diferencia)} (${c.
       const stockColor = prod.stock === 0 ? C.red : prod.stock < 3 ? C.amber : C.green;
       const stockBg = prod.stock === 0 ? C.redBg : prod.stock < 3 ? C.amberBg : C.greenBg;
       const showBrand = hayFiltro || !marcaSelec;
-      return /* @__PURE__ */ import_react.default.createElement("div", { key: prod.id, style: {
+      return /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, { key: prod.id }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
         display: "grid",
         gridTemplateColumns: showBrand ? "140px 1fr 90px 80px 72px" : "1fr 90px 80px 72px",
         gap: 0,
@@ -38827,8 +38913,152 @@ ${c.diferencia > 0.01 ? `Cliente paga diferencia: Bs ${fmt2(c.diferencia)} (${c.
           }
         },
         "\u{1F5A8}"
+      ))), user?.rol === "admin" && /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 6, padding: "4px 12px 10px", justifyContent: "flex-end" } }, /* @__PURE__ */ import_react.default.createElement(
+        "button",
+        {
+          onClick: () => abrirEditar(prod),
+          style: {
+            padding: "4px 12px",
+            borderRadius: 7,
+            border: `1px solid ${C.sep}`,
+            background: C.bg2,
+            color: C.label2,
+            fontSize: 11,
+            fontFamily: FONT,
+            fontWeight: 600,
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            gap: 4
+          }
+        },
+        "\u270F\uFE0F Editar"
+      ), /* @__PURE__ */ import_react.default.createElement(
+        "button",
+        {
+          onClick: () => {
+            if (window.confirm(`\xBFEliminar ${prod.nombre} (${prod.codigo})?`)) onEliminarProducto && onEliminarProducto(prod.id);
+          },
+          style: {
+            padding: "4px 12px",
+            borderRadius: 7,
+            border: `1px solid #C94C4C`,
+            background: "#C94C4C10",
+            color: "#C94C4C",
+            fontSize: 11,
+            fontFamily: FONT,
+            fontWeight: 600,
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            gap: 4
+          }
+        },
+        "\u{1F5D1} Eliminar"
       )));
-    })), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+    })), editProd && /* @__PURE__ */ import_react.default.createElement("div", { onClick: () => setEditProd(null), style: { position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center" } }, /* @__PURE__ */ import_react.default.createElement("div", { onClick: (e) => e.stopPropagation(), style: { background: C.bg0, borderRadius: 18, width: 340, maxWidth: "92vw", overflow: "hidden", border: `1px solid ${C.sep}` } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { padding: "14px 18px", borderBottom: `1px solid ${C.sep}`, display: "flex", alignItems: "center", justifyContent: "space-between" } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 14, fontWeight: 700, color: C.label, fontFamily: FONT } }, "Editar producto"), /* @__PURE__ */ import_react.default.createElement("button", { onClick: () => setEditProd(null), style: { background: "none", border: "none", fontSize: 18, cursor: "pointer", color: C.label3 } }, "\u2715")), /* @__PURE__ */ import_react.default.createElement("div", { style: { padding: 16, display: "flex", flexDirection: "column", gap: 12 } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT, marginBottom: 4, fontWeight: 600 } }, "Nombre"), /* @__PURE__ */ import_react.default.createElement(
+      "input",
+      {
+        value: editNombre,
+        onChange: (e) => setEditNombre(e.target.value),
+        style: {
+          width: "100%",
+          padding: "8px 10px",
+          borderRadius: 10,
+          border: `1px solid ${C.sep}`,
+          background: C.bg2,
+          color: C.label,
+          fontSize: 13,
+          fontFamily: FONT
+        }
+      }
+    )), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT, marginBottom: 4, fontWeight: 600 } }, "Precio (Bs)"), /* @__PURE__ */ import_react.default.createElement(
+      "input",
+      {
+        value: editPrecio,
+        onChange: (e) => setEditPrecio(e.target.value),
+        type: "number",
+        style: {
+          width: "100%",
+          padding: "8px 10px",
+          borderRadius: 10,
+          border: `1px solid ${C.sep}`,
+          background: C.bg2,
+          color: C.label,
+          fontSize: 13,
+          fontFamily: FONT
+        }
+      }
+    )), /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT, marginBottom: 4, fontWeight: 600 } }, "C\xF3digo"), /* @__PURE__ */ import_react.default.createElement(
+      "input",
+      {
+        value: editProd.codigo,
+        disabled: true,
+        style: {
+          width: "100%",
+          padding: "8px 10px",
+          borderRadius: 10,
+          border: `1px solid ${C.sep}`,
+          background: C.bg1,
+          color: C.label3,
+          fontSize: 12,
+          fontFamily: FONT_MONO,
+          opacity: 0.7
+        }
+      }
+    ))), /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT, marginBottom: 4, fontWeight: 600 } }, "Descripci\xF3n (talla / color)"), /* @__PURE__ */ import_react.default.createElement(
+      "input",
+      {
+        value: editDesc,
+        onChange: (e) => setEditDesc(e.target.value),
+        placeholder: "Ej: TALLA: XS \xB7 COLOR: NEGRO",
+        style: {
+          width: "100%",
+          padding: "8px 10px",
+          borderRadius: 10,
+          border: `1px solid ${C.sep}`,
+          background: C.bg2,
+          color: C.label,
+          fontSize: 13,
+          fontFamily: FONT
+        }
+      }
+    ))), /* @__PURE__ */ import_react.default.createElement("div", { style: { padding: "12px 16px", borderTop: `1px solid ${C.sep}`, display: "flex", gap: 8, justifyContent: "flex-end" } }, /* @__PURE__ */ import_react.default.createElement(
+      "button",
+      {
+        onClick: () => setEditProd(null),
+        style: {
+          padding: "8px 16px",
+          borderRadius: 10,
+          border: `1px solid ${C.sep}`,
+          background: "none",
+          color: C.label3,
+          fontSize: 13,
+          cursor: "pointer",
+          fontFamily: FONT
+        }
+      },
+      "Cancelar"
+    ), /* @__PURE__ */ import_react.default.createElement(
+      "button",
+      {
+        onClick: guardarEdicion,
+        disabled: editGuardando,
+        style: {
+          padding: "8px 20px",
+          borderRadius: 10,
+          border: "none",
+          background: C.label,
+          color: C.bg0,
+          fontSize: 13,
+          fontWeight: 700,
+          cursor: editGuardando ? "not-allowed" : "pointer",
+          fontFamily: FONT,
+          opacity: editGuardando ? 0.6 : 1
+        }
+      },
+      editGuardando ? "Guardando\u2026" : "Guardar cambios"
+    )))), /* @__PURE__ */ import_react.default.createElement("div", { style: {
       position: "sticky",
       bottom: isDesktop ? 0 : 84,
       zIndex: 50,

@@ -136,6 +136,24 @@ async function sbActualizarProductoPatch(prodId, campos) {
   } catch(e) { console.warn("Supabase patch producto:", e.message); return false; }
 }
 
+async function sbEliminarProducto(prodId) {
+  try {
+    const db = await getSupabase();
+    const { error } = await db.from("inventario").delete().eq("id", prodId);
+    if (error) throw error;
+    return true;
+  } catch(e) { console.warn("Supabase eliminar producto:", e.message); return false; }
+}
+
+async function sbEliminarCarga(cargaId) {
+  try {
+    const db = await getSupabase();
+    const { error } = await db.from("cargas_inventario").delete().eq("id", cargaId);
+    if (error) throw error;
+    return true;
+  } catch(e) { console.warn("Supabase eliminar carga:", e.message); return false; }
+}
+
 async function sbGuardarVenta(venta) {
   try {
     const db = await getSupabase();
@@ -11656,6 +11674,27 @@ function App(){
   // Buffer de importación para consolidar en un solo evento de auditoría
   const _importBuf = useRef({items:[], sbItems:[], ts:0, timer:null, archivo:null, archivoNombre:null});
 
+  async function handleEditarProducto(prodId, campos){
+    setInv(prev=>prev.map(p=>p.id===prodId?{...p,...campos}:p));
+    await sbActualizarProductoPatch(prodId, campos);
+    const inv2 = JSON.parse(localStorage.getItem("th_inv")||"[]");
+    localStorage.setItem("th_inv", JSON.stringify(inv2.map(p=>p.id===prodId?{...p,...campos}:p)));
+  }
+
+  async function handleEliminarProducto(prodId){
+    setInv(prev=>prev.filter(p=>p.id!==prodId));
+    await sbEliminarProducto(prodId);
+    const inv2 = JSON.parse(localStorage.getItem("th_inv")||"[]");
+    localStorage.setItem("th_inv", JSON.stringify(inv2.filter(p=>p.id!==prodId)));
+  }
+
+  async function handleEliminarCarga(cargaId){
+    setCargas(prev=>prev.filter(c=>c.id!==cargaId));
+    await sbEliminarCarga(cargaId);
+    const c2 = JSON.parse(localStorage.getItem("th_cargas")||"[]");
+    localStorage.setItem("th_cargas", JSON.stringify(c2.filter(c=>c.id!==cargaId)));
+  }
+
   function handleVerificarCarga(cargaId, verificado){
     setCargas(prev=>prev.map(c=>c.id===cargaId
       ? {...c, verificado, verificadoTs:verificado?new Date().toISOString():null, verificadoPor:verificado?user.nombre:null}
@@ -12049,7 +12088,7 @@ function App(){
 
         {/* INVENTARIO — por marca */}
         {tab==="inventario" && (
-          <InventarioPorMarca inv={inv} ventas={ventas} retiros={retiros} bajas={bajasLog} onRecibir={()=>setShInv(true)} onBaja={()=>{setShBaja(true);setBajaMsg(null);setBajaCod("");setBajaCant("");setBajaMotivo("");}} onImportarExcel={()=>setShImportarExcel(true)} onReponer={()=>{setShReponer(true);setRepMsg(null);setRepCod("");setRepCant("");setRepPrecio("");setRepTab("stock");}} onSyncCompleto={forzarSyncInventario} onRecargarDesdeSupabase={recargarDesdeSupabase}/>
+          <InventarioPorMarca inv={inv} ventas={ventas} retiros={retiros} bajas={bajasLog} onRecibir={()=>setShInv(true)} onBaja={()=>{setShBaja(true);setBajaMsg(null);setBajaCod("");setBajaCant("");setBajaMotivo("");}} onImportarExcel={()=>setShImportarExcel(true)} onReponer={()=>{setShReponer(true);setRepMsg(null);setRepCod("");setRepCant("");setRepPrecio("");setRepTab("stock");}} onSyncCompleto={forzarSyncInventario} onRecargarDesdeSupabase={recargarDesdeSupabase} onEditarProducto={handleEditarProducto} onEliminarProducto={handleEliminarProducto} user={user}/>
         )}
 
         {/* AUDITORÍA — cierre de inventario mensual (conteo físico vs sistema) */}
@@ -12064,7 +12103,7 @@ function App(){
 
         {/* CARGAS — trazabilidad de cargas a inventario (manuales + importaciones) */}
         {tab==="cargas" && (
-          <RegistroCargas cargas={cargasCompletas} marcas={MARCAS} onVerificar={handleVerificarCarga} user={user}/>
+          <RegistroCargas cargas={cargasCompletas} marcas={MARCAS} onVerificar={handleVerificarCarga} user={user} onEliminarCarga={handleEliminarCarga}/>
         )}
 
         {/* CAMBIOS — cambio de prendas */}
@@ -15225,7 +15264,7 @@ ${c.diferencia>0.01?`Cliente paga diferencia: Bs ${fmt2(c.diferencia)} (${c.meto
 // ══════════════════════════════════════════════════════════
 // CARGAS — trazabilidad de cargas a inventario (manuales + importaciones)
 // ══════════════════════════════════════════════════════════
-function RegistroCargas({cargas, marcas, marcaId=null, onVerificar=null, user=null}){
+function RegistroCargas({cargas, marcas, marcaId=null, onVerificar=null, user=null, onEliminarCarga=null}){
   const isDesktop = useIsDesktop();
   const fijaMarca = marcaId!=null;
   const[marcaSelec,setMarcaSelec]=useState(marcaId);
@@ -15457,6 +15496,14 @@ function RegistroCargas({cargas, marcas, marcaId=null, onVerificar=null, user=nu
                           </button>
                         </div>
                       )}
+                      {user?.rol==="admin"&&onEliminarCarga&&c.tipo!=="HISTORICO"&&(
+                        <button onClick={e=>{e.stopPropagation();if(window.confirm(`¿Eliminar este registro de carga?\n${c.resumen||c.id}`)) onEliminarCarga(c.id);}}
+                          style={{width:"100%",marginTop:10,padding:"9px",borderRadius:10,
+                            border:`1.5px solid #C94C4C`,background:"#C94C4C10",
+                            color:"#C94C4C",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:FONT_UI}}>
+                          🗑 Eliminar registro de carga
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>
@@ -15471,17 +15518,41 @@ function RegistroCargas({cargas, marcas, marcaId=null, onVerificar=null, user=nu
 // ══════════════════════════════════════════════════════════
 // INVENTARIO POR MARCA — pestaña con scroll horizontal
 // ══════════════════════════════════════════════════════════
-function InventarioPorMarca({inv, ventas, retiros=[], bajas=[], onRecibir, onBaja, onImportarExcel, onReponer, onSyncCompleto, onRecargarDesdeSupabase}){
+function InventarioPorMarca({inv, ventas, retiros=[], bajas=[], onRecibir, onBaja, onImportarExcel, onReponer, onSyncCompleto, onRecargarDesdeSupabase, onEditarProducto, onEliminarProducto, user}){
   const isDesktop = useIsDesktop();
-  const [syncMsg, setSyncMsg] = useState(null); // null | {prog, total} | "ok" | "err"
-  // null = "TODOS"
+  const [syncMsg, setSyncMsg] = useState(null);
+  const [editProd, setEditProd] = useState(null); // producto en edición o null
+  const [editNombre, setEditNombre] = useState("");
+  const [editPrecio, setEditPrecio] = useState("");
+  const [editDesc, setEditDesc] = useState("");
+  const [editGuardando, setEditGuardando] = useState(false);
   var _hN149 = useState(null); var marcaSelec = _hN149[0]; var setMarcaSelec = _hN149[1];;
   var _hInvBq = useState(""); var invBusq = _hInvBq[0]; var setInvBusq = _hInvBq[1];;
   const invBusqRef = useRef(null);
-  const invEsScanRef = useRef(false); // true si el último cambio vino de un lector de código de barras
+  const invEsScanRef = useRef(false);
   var _hInvFd = useState(""); var invFechaDesde = _hInvFd[0]; var setInvFechaDesde = _hInvFd[1];;
   var _hInvFh = useState(""); var invFechaHasta = _hInvFh[0]; var setInvFechaHasta = _hInvFh[1];;
   const marca = marcaSelec ? MARCAS.find(m=>m.id===marcaSelec) : null;
+
+  function abrirEditar(prod){
+    setEditProd(prod);
+    setEditNombre(prod.nombre||"");
+    setEditPrecio(String(prod.precio||""));
+    setEditDesc(prod.descripcion||"");
+  }
+
+  async function guardarEdicion(){
+    if(!editProd||!onEditarProducto) return;
+    setEditGuardando(true);
+    const campos = {
+      nombre: editNombre.toUpperCase().trim(),
+      precio: Number(editPrecio)||editProd.precio,
+      descripcion: editDesc.trim(),
+    };
+    await onEditarProducto(editProd.id, campos);
+    setEditGuardando(false);
+    setEditProd(null);
+  }
 
   // Calcular unidades vendidas por producto
   const vendidosPorProd = useMemo(()=>{
@@ -15800,7 +15871,8 @@ function InventarioPorMarca({inv, ventas, retiros=[], bajas=[], onRecibir, onBaj
               const showBrand = hayFiltro || !marcaSelec;
 
               return (
-                <div key={prod.id} style={{
+                <React.Fragment key={prod.id}>
+                <div style={{
                   display:"grid",
                   gridTemplateColumns: showBrand ? "140px 1fr 90px 80px 72px" : "1fr 90px 80px 72px",
                   gap:0,padding:"11px 14px",
@@ -15888,10 +15960,82 @@ function InventarioPorMarca({inv, ventas, retiros=[], bajas=[], onRecibir, onBaj
                     </button>
                   </div>
                 </div>
+                {/* Botones admin editar/eliminar */}
+                {user?.rol==="admin"&&(
+                  <div style={{display:"flex",gap:6,padding:"4px 12px 10px",justifyContent:"flex-end"}}>
+                    <button onClick={()=>abrirEditar(prod)}
+                      style={{padding:"4px 12px",borderRadius:7,border:`1px solid ${C.sep}`,
+                        background:C.bg2,color:C.label2,fontSize:11,fontFamily:FONT,
+                        fontWeight:600,cursor:"pointer",display:"flex",alignItems:"center",gap:4}}>
+                      ✏️ Editar
+                    </button>
+                    <button onClick={()=>{if(window.confirm(`¿Eliminar ${prod.nombre} (${prod.codigo})?`)) onEliminarProducto&&onEliminarProducto(prod.id);}}
+                      style={{padding:"4px 12px",borderRadius:7,border:`1px solid #C94C4C`,
+                        background:"#C94C4C10",color:"#C94C4C",fontSize:11,fontFamily:FONT,
+                        fontWeight:600,cursor:"pointer",display:"flex",alignItems:"center",gap:4}}>
+                      🗑 Eliminar
+                    </button>
+                  </div>
+                )}
+                </React.Fragment>
               );
             })}
           </div>
       }
+
+      {/* Modal edición admin */}
+      {editProd&&(
+        <div onClick={()=>setEditProd(null)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.45)",zIndex:200,display:"flex",alignItems:"center",justifyContent:"center"}}>
+          <div onClick={e=>e.stopPropagation()} style={{background:C.bg0,borderRadius:18,width:340,maxWidth:"92vw",overflow:"hidden",border:`1px solid ${C.sep}`}}>
+            <div style={{padding:"14px 18px",borderBottom:`1px solid ${C.sep}`,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+              <span style={{fontSize:14,fontWeight:700,color:C.label,fontFamily:FONT}}>Editar producto</span>
+              <button onClick={()=>setEditProd(null)} style={{background:"none",border:"none",fontSize:18,cursor:"pointer",color:C.label3}}>✕</button>
+            </div>
+            <div style={{padding:16,display:"flex",flexDirection:"column",gap:12}}>
+              <div>
+                <div style={{fontSize:11,color:C.label3,fontFamily:FONT,marginBottom:4,fontWeight:600}}>Nombre</div>
+                <input value={editNombre} onChange={e=>setEditNombre(e.target.value)}
+                  style={{width:"100%",padding:"8px 10px",borderRadius:10,border:`1px solid ${C.sep}`,
+                    background:C.bg2,color:C.label,fontSize:13,fontFamily:FONT}}/>
+              </div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                <div>
+                  <div style={{fontSize:11,color:C.label3,fontFamily:FONT,marginBottom:4,fontWeight:600}}>Precio (Bs)</div>
+                  <input value={editPrecio} onChange={e=>setEditPrecio(e.target.value)} type="number"
+                    style={{width:"100%",padding:"8px 10px",borderRadius:10,border:`1px solid ${C.sep}`,
+                      background:C.bg2,color:C.label,fontSize:13,fontFamily:FONT}}/>
+                </div>
+                <div>
+                  <div style={{fontSize:11,color:C.label3,fontFamily:FONT,marginBottom:4,fontWeight:600}}>Código</div>
+                  <input value={editProd.codigo} disabled
+                    style={{width:"100%",padding:"8px 10px",borderRadius:10,border:`1px solid ${C.sep}`,
+                      background:C.bg1,color:C.label3,fontSize:12,fontFamily:FONT_MONO,opacity:.7}}/>
+                </div>
+              </div>
+              <div>
+                <div style={{fontSize:11,color:C.label3,fontFamily:FONT,marginBottom:4,fontWeight:600}}>Descripción (talla / color)</div>
+                <input value={editDesc} onChange={e=>setEditDesc(e.target.value)}
+                  placeholder="Ej: TALLA: XS · COLOR: NEGRO"
+                  style={{width:"100%",padding:"8px 10px",borderRadius:10,border:`1px solid ${C.sep}`,
+                    background:C.bg2,color:C.label,fontSize:13,fontFamily:FONT}}/>
+              </div>
+            </div>
+            <div style={{padding:"12px 16px",borderTop:`1px solid ${C.sep}`,display:"flex",gap:8,justifyContent:"flex-end"}}>
+              <button onClick={()=>setEditProd(null)}
+                style={{padding:"8px 16px",borderRadius:10,border:`1px solid ${C.sep}`,
+                  background:"none",color:C.label3,fontSize:13,cursor:"pointer",fontFamily:FONT}}>
+                Cancelar
+              </button>
+              <button onClick={guardarEdicion} disabled={editGuardando}
+                style={{padding:"8px 20px",borderRadius:10,border:"none",
+                  background:C.label,color:C.bg0,fontSize:13,fontWeight:700,
+                  cursor:editGuardando?"not-allowed":"pointer",fontFamily:FONT,opacity:editGuardando?.6:1}}>
+                {editGuardando?"Guardando…":"Guardar cambios"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Barra de acciones sticky — siempre visible ── */}
       <div style={{
