@@ -15951,6 +15951,32 @@ function RegistroCargas({cargas, marcas, marcaId=null, onVerificar=null, user=nu
                           ))
                         }
                       </div>
+                      {/* ── Imprimir etiquetas de esta carga ── */}
+                      {items.filter(it=>it.codigo&&it.nombre&&Number(it.stock||it.stockNuevo||1)>0).length>0&&(()=>{
+                        const paraImprimir = items
+                          .filter(it=>it.codigo&&it.nombre)
+                          .map(it=>({
+                            codigo: it.codigo,
+                            nombre: it.nombre,
+                            marcaNombre: it.marca||c.marcaNombre||"",
+                            precio: it.precio||0,
+                            stock: Number(it.stockSumado||it.stock||it.stockNuevo||1),
+                          }));
+                        const totalEtiq = paraImprimir.reduce((s,it)=>s+Math.max(1,it.stock),0);
+                        return (
+                          <button
+                            onClick={e=>{e.stopPropagation(); imprimirEtiquetasLote(expandirPorStock(paraImprimir));}}
+                            style={{width:"100%",marginTop:10,padding:"9px",borderRadius:10,
+                              border:`1.5px solid ${C.gold}`,background:`${C.gold}10`,
+                              color:C.gold,fontSize:12,fontWeight:700,cursor:"pointer",
+                              fontFamily:FONT_UI,display:"flex",alignItems:"center",
+                              justifyContent:"center",gap:6}}>
+                            <i className="ti ti-printer" style={{fontSize:14}} aria-hidden="true"/>
+                            Imprimir {totalEtiq} etiqueta{totalEtiq!==1?"s":""} de esta carga
+                          </button>
+                        );
+                      })()}
+
                       {c.archivoUrl&&(
                         <a href={c.archivoUrl} download={c.archivoNombre||"evidencia.xlsx"}
                           onClick={e=>e.stopPropagation()}

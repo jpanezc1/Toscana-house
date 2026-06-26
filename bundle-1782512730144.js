@@ -38885,7 +38885,48 @@ ${c.diferencia > 0.01 ? `Cliente paga diferencia: Bs ${fmt2(c.diferencia)} (${c.
         overflow: "hidden",
         textOverflow: "ellipsis",
         whiteSpace: "nowrap"
-      } }, (it.nombre || "").toUpperCase()), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: C.label3, fontFamily: FONT_MONO } }, it.codigo, " \xB7 ", it.marca || "\u2014")), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label2, fontFamily: FONT, textAlign: "right", flexShrink: 0 } }, it.tipo === "update" ? `${it.stockAntes} \u2192 ${it.stockNuevo} (+${it.stockSumado})` : `Stock ${it.stock}${it.precio ? ` \xB7 ${$(it.precio)}` : ""}`)))), c.archivoUrl && /* @__PURE__ */ import_react.default.createElement(
+      } }, (it.nombre || "").toUpperCase()), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: C.label3, fontFamily: FONT_MONO } }, it.codigo, " \xB7 ", it.marca || "\u2014")), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label2, fontFamily: FONT, textAlign: "right", flexShrink: 0 } }, it.tipo === "update" ? `${it.stockAntes} \u2192 ${it.stockNuevo} (+${it.stockSumado})` : `Stock ${it.stock}${it.precio ? ` \xB7 ${$(it.precio)}` : ""}`)))), items.filter((it) => it.codigo && it.nombre && Number(it.stock || it.stockNuevo || 1) > 0).length > 0 && (() => {
+        const paraImprimir = items.filter((it) => it.codigo && it.nombre).map((it) => ({
+          codigo: it.codigo,
+          nombre: it.nombre,
+          marcaNombre: it.marca || c.marcaNombre || "",
+          precio: it.precio || 0,
+          stock: Number(it.stockSumado || it.stock || it.stockNuevo || 1)
+        }));
+        const totalEtiq = paraImprimir.reduce((s, it) => s + Math.max(1, it.stock), 0);
+        return /* @__PURE__ */ import_react.default.createElement(
+          "button",
+          {
+            onClick: (e) => {
+              e.stopPropagation();
+              imprimirEtiquetasLote(expandirPorStock(paraImprimir));
+            },
+            style: {
+              width: "100%",
+              marginTop: 10,
+              padding: "9px",
+              borderRadius: 10,
+              border: `1.5px solid ${C.gold}`,
+              background: `${C.gold}10`,
+              color: C.gold,
+              fontSize: 12,
+              fontWeight: 700,
+              cursor: "pointer",
+              fontFamily: FONT_UI,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 6
+            }
+          },
+          /* @__PURE__ */ import_react.default.createElement("i", { className: "ti ti-printer", style: { fontSize: 14 }, "aria-hidden": "true" }),
+          "Imprimir ",
+          totalEtiq,
+          " etiqueta",
+          totalEtiq !== 1 ? "s" : "",
+          " de esta carga"
+        );
+      })(), c.archivoUrl && /* @__PURE__ */ import_react.default.createElement(
         "a",
         {
           href: c.archivoUrl,
