@@ -38340,13 +38340,18 @@ ${c.resumen || c.id}`)) onEliminarCarga(c.id);
             border: `1.5px solid #C94C4C`,
             background: "#C94C4C10",
             color: "#C94C4C",
-            fontSize: 12,
+            fontSize: 11,
             fontWeight: 700,
             cursor: "pointer",
-            fontFamily: FONT_UI
+            fontFamily: FONT_UI,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 4
           }
         },
-        "\u{1F5D1} Eliminar registro de carga"
+        /* @__PURE__ */ import_react.default.createElement("i", { className: "ti ti-trash", style: { fontSize: 13 }, "aria-hidden": "true" }),
+        "Eliminar registro de carga"
       )));
     })));
   }
@@ -38913,26 +38918,27 @@ ${c.resumen || c.id}`)) onEliminarCarga(c.id);
           }
         },
         "\u{1F5A8}"
-      ))), user?.rol === "admin" && /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 6, padding: "4px 12px 10px", justifyContent: "flex-end" } }, /* @__PURE__ */ import_react.default.createElement(
+      ))), user?.rol === "admin" && /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 5, padding: "2px 12px 8px", justifyContent: "flex-end" } }, /* @__PURE__ */ import_react.default.createElement(
         "button",
         {
           onClick: () => abrirEditar(prod),
           style: {
-            padding: "4px 12px",
-            borderRadius: 7,
+            padding: "3px 9px",
+            borderRadius: 6,
             border: `1px solid ${C.sep}`,
             background: C.bg2,
             color: C.label2,
-            fontSize: 11,
+            fontSize: 10,
             fontFamily: FONT,
             fontWeight: 600,
             cursor: "pointer",
             display: "flex",
             alignItems: "center",
-            gap: 4
+            gap: 3
           }
         },
-        "\u270F\uFE0F Editar"
+        /* @__PURE__ */ import_react.default.createElement("i", { className: "ti ti-pencil", style: { fontSize: 12 }, "aria-hidden": "true" }),
+        "Editar"
       ), /* @__PURE__ */ import_react.default.createElement(
         "button",
         {
@@ -38940,21 +38946,22 @@ ${c.resumen || c.id}`)) onEliminarCarga(c.id);
             if (window.confirm(`\xBFEliminar ${prod.nombre} (${prod.codigo})?`)) onEliminarProducto && onEliminarProducto(prod.id);
           },
           style: {
-            padding: "4px 12px",
-            borderRadius: 7,
+            padding: "3px 9px",
+            borderRadius: 6,
             border: `1px solid #C94C4C`,
             background: "#C94C4C10",
             color: "#C94C4C",
-            fontSize: 11,
+            fontSize: 10,
             fontFamily: FONT,
             fontWeight: 600,
             cursor: "pointer",
             display: "flex",
             alignItems: "center",
-            gap: 4
+            gap: 3
           }
         },
-        "\u{1F5D1} Eliminar"
+        /* @__PURE__ */ import_react.default.createElement("i", { className: "ti ti-trash", style: { fontSize: 12 }, "aria-hidden": "true" }),
+        "Eliminar"
       )));
     })), editProd && /* @__PURE__ */ import_react.default.createElement("div", { onClick: () => setEditProd(null), style: { position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center" } }, /* @__PURE__ */ import_react.default.createElement("div", { onClick: (e) => e.stopPropagation(), style: { background: C.bg0, borderRadius: 18, width: 340, maxWidth: "92vw", overflow: "hidden", border: `1px solid ${C.sep}` } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { padding: "14px 18px", borderBottom: `1px solid ${C.sep}`, display: "flex", alignItems: "center", justifyContent: "space-between" } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 14, fontWeight: 700, color: C.label, fontFamily: FONT } }, "Editar producto"), /* @__PURE__ */ import_react.default.createElement("button", { onClick: () => setEditProd(null), style: { background: "none", border: "none", fontSize: 18, cursor: "pointer", color: C.label3 } }, "\u2715")), /* @__PURE__ */ import_react.default.createElement("div", { style: { padding: 16, display: "flex", flexDirection: "column", gap: 12 } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT, marginBottom: 4, fontWeight: 600 } }, "Nombre"), /* @__PURE__ */ import_react.default.createElement(
       "input",

@@ -15500,8 +15500,9 @@ function RegistroCargas({cargas, marcas, marcaId=null, onVerificar=null, user=nu
                         <button onClick={e=>{e.stopPropagation();if(window.confirm(`¿Eliminar este registro de carga?\n${c.resumen||c.id}`)) onEliminarCarga(c.id);}}
                           style={{width:"100%",marginTop:10,padding:"9px",borderRadius:10,
                             border:`1.5px solid #C94C4C`,background:"#C94C4C10",
-                            color:"#C94C4C",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:FONT_UI}}>
-                          🗑 Eliminar registro de carga
+                            color:"#C94C4C",fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:FONT_UI,
+                            display:"flex",alignItems:"center",justifyContent:"center",gap:4}}>
+                          <i className="ti ti-trash" style={{fontSize:13}} aria-hidden="true"/>Eliminar registro de carga
                         </button>
                       )}
                     </div>
@@ -15962,18 +15963,18 @@ function InventarioPorMarca({inv, ventas, retiros=[], bajas=[], onRecibir, onBaj
                 </div>
                 {/* Botones admin editar/eliminar */}
                 {user?.rol==="admin"&&(
-                  <div style={{display:"flex",gap:6,padding:"4px 12px 10px",justifyContent:"flex-end"}}>
+                  <div style={{display:"flex",gap:5,padding:"2px 12px 8px",justifyContent:"flex-end"}}>
                     <button onClick={()=>abrirEditar(prod)}
-                      style={{padding:"4px 12px",borderRadius:7,border:`1px solid ${C.sep}`,
-                        background:C.bg2,color:C.label2,fontSize:11,fontFamily:FONT,
-                        fontWeight:600,cursor:"pointer",display:"flex",alignItems:"center",gap:4}}>
-                      ✏️ Editar
+                      style={{padding:"3px 9px",borderRadius:6,border:`1px solid ${C.sep}`,
+                        background:C.bg2,color:C.label2,fontSize:10,fontFamily:FONT,
+                        fontWeight:600,cursor:"pointer",display:"flex",alignItems:"center",gap:3}}>
+                      <i className="ti ti-pencil" style={{fontSize:12}} aria-hidden="true"/>Editar
                     </button>
                     <button onClick={()=>{if(window.confirm(`¿Eliminar ${prod.nombre} (${prod.codigo})?`)) onEliminarProducto&&onEliminarProducto(prod.id);}}
-                      style={{padding:"4px 12px",borderRadius:7,border:`1px solid #C94C4C`,
-                        background:"#C94C4C10",color:"#C94C4C",fontSize:11,fontFamily:FONT,
-                        fontWeight:600,cursor:"pointer",display:"flex",alignItems:"center",gap:4}}>
-                      🗑 Eliminar
+                      style={{padding:"3px 9px",borderRadius:6,border:`1px solid #C94C4C`,
+                        background:"#C94C4C10",color:"#C94C4C",fontSize:10,fontFamily:FONT,
+                        fontWeight:600,cursor:"pointer",display:"flex",alignItems:"center",gap:3}}>
+                      <i className="ti ti-trash" style={{fontSize:12}} aria-hidden="true"/>Eliminar
                     </button>
                   </div>
                 )}
