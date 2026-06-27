@@ -397,6 +397,27 @@ async function sbCargarUsuarios() {
   } catch(e) { console.warn("Supabase load usuarios:", e.message); return null; }
 }
 
+async function sbGuardarMarcas(lista) {
+  try {
+    const db = await getSupabase();
+    const { error } = await db.from("config").upsert(
+      { key: "marcas", value: lista, updated_at: new Date().toISOString() },
+      { onConflict: "key" }
+    );
+    if (error) throw error;
+    return true;
+  } catch(e) { console.warn("Supabase save marcas:", e.message); return false; }
+}
+
+async function sbCargarMarcas() {
+  try {
+    const db = await getSupabase();
+    const { data, error } = await db.from("config").select("value").eq("key","marcas").single();
+    if (error) throw error;
+    return Array.isArray(data?.value) ? data.value : null;
+  } catch(e) { console.warn("Supabase load marcas:", e.message); return null; }
+}
+
 async function sbCrearAuthUsuario(usuario, password, nombre, rol, marcaId) {
   try {
     const db = await getSupabase();
@@ -551,6 +572,7 @@ async function ejecutarOpOutbox(op){
     case "auditoria":   return await sbGuardarAuditoria(op.payload);
     case "auditLog":    return await sbGuardarAuditLog(op.payload);
     case "usuarios":    return await sbGuardarUsuarios(op.payload);
+    case "marcas":      return await sbGuardarMarcas(op.payload);
     default: return true; // tipo desconocido — no bloquear la cola
   }
 }
@@ -11268,14 +11290,15 @@ function App(){
   const[marcasState,setMarcasState]       =useState(()=>cargarMarcas());
   const drive = useDriveSync();
 
-  // Guarda marca nueva o editada → actualiza React state + global + localStorage
+  // Guarda marca nueva o editada → actualiza React state + global + localStorage + Supabase
   function onMarcaGuardada(marca, isNew, nuevoUsuario){
     setMarcasState(prev => {
       const lista = isNew
         ? [...prev, marca]
         : prev.map(m => m.id===marca.id ? {...m,...marca} : m);
       localStorage.setItem("th_marcas", JSON.stringify(lista));
-      MARCAS = lista; // mantener global en sync para genCod, calcLiqMarca, etc.
+      MARCAS = lista;
+      syncConRespaldo("marcas", lista, ()=>sbGuardarMarcas(lista));
       return lista;
     });
     // Si se pidió crear usuario brand, añadirlo y sincronizar a Supabase
@@ -11376,6 +11399,48 @@ function App(){
     }).catch(()=>{});
     return ()=>{ mounted=false; if(channel) getSupabase().then(db=>db.removeChannel(channel)).catch(()=>{}); };
   },[]);
+
+  // ── Cargar marcas custom desde Supabase al inicio ──
+  useEffect(()=>{
+    sbCargarMarcas().then(data=>{
+      if(!Array.isArray(data) || data.length===0) return;
+      setMarcasState(prev=>{
+        const merged = data.map(m=>{
+          const seed = MARCAS_SEED.find(s=>s.id===m.id);
+          return (seed && !m.imagenPersonalizada) ? {...m, imagen: seed.imagen||m.imagen} : m;
+        });
+        MARCAS_SEED.forEach(s=>{ if(!merged.find(m=>m.id===s.id)) merged.push(s); });
+        try{ localStorage.setItem("th_marcas", JSON.stringify(merged)); }catch{}
+        MARCAS = merged;
+        return merged;
+      });
+    });
+  },[]);// eslint-disable-line
+
+  // ── Realtime: marcas creadas/editadas en otro dispositivo ──
+  useEffect(()=>{
+    let channel=null, mounted=true;
+    getSupabase().then(db=>{
+      if(!mounted) return;
+      channel = db.channel("toscana-marcas-v1")
+        .on("postgres_changes", {event:"*", schema:"public", table:"config", filter:"key=eq.marcas"}, payload=>{
+          const nuevaLista = payload.new?.value;
+          if(!Array.isArray(nuevaLista) || !mounted) return;
+          setMarcasState(prev=>{
+            const merged = nuevaLista.map(m=>{
+              const seed = MARCAS_SEED.find(s=>s.id===m.id);
+              return (seed && !m.imagenPersonalizada) ? {...m, imagen: seed.imagen||m.imagen} : m;
+            });
+            MARCAS_SEED.forEach(s=>{ if(!merged.find(m=>m.id===s.id)) merged.push(s); });
+            try{ localStorage.setItem("th_marcas", JSON.stringify(merged)); }catch{}
+            MARCAS = merged;
+            return merged;
+          });
+        })
+        .subscribe();
+    }).catch(()=>{});
+    return ()=>{ mounted=false; if(channel) getSupabase().then(db=>db.removeChannel(channel)).catch(()=>{}); };
+  },[]);// eslint-disable-line
 
   // Cargas históricas: productos de inventario que ya existían antes de
   // habilitar la trazabilidad. Se calculan al vuelo (no se guardan en

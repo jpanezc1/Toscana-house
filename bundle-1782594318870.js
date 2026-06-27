@@ -21937,6 +21937,31 @@
       return null;
     }
   }
+  async function sbGuardarMarcas(lista) {
+    try {
+      const db = await getSupabase();
+      const { error } = await db.from("config").upsert(
+        { key: "marcas", value: lista, updated_at: (/* @__PURE__ */ new Date()).toISOString() },
+        { onConflict: "key" }
+      );
+      if (error) throw error;
+      return true;
+    } catch (e) {
+      console.warn("Supabase save marcas:", e.message);
+      return false;
+    }
+  }
+  async function sbCargarMarcas() {
+    try {
+      const db = await getSupabase();
+      const { data, error } = await db.from("config").select("value").eq("key", "marcas").single();
+      if (error) throw error;
+      return Array.isArray(data?.value) ? data.value : null;
+    } catch (e) {
+      console.warn("Supabase load marcas:", e.message);
+      return null;
+    }
+  }
   async function sbCrearAuthUsuario(usuario, password, nombre, rol, marcaId) {
     try {
       const db = await getSupabase();
@@ -22123,6 +22148,8 @@
         return await sbGuardarAuditLog(op.payload);
       case "usuarios":
         return await sbGuardarUsuarios(op.payload);
+      case "marcas":
+        return await sbGuardarMarcas(op.payload);
       default:
         return true;
     }
@@ -33468,6 +33495,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
         const lista = isNew ? [...prev, marca] : prev.map((m) => m.id === marca.id ? { ...m, ...marca } : m);
         localStorage.setItem("th_marcas", JSON.stringify(lista));
         MARCAS = lista;
+        syncConRespaldo("marcas", lista, () => sbGuardarMarcas(lista));
         return lista;
       });
       if (nuevoUsuario) {
@@ -33598,6 +33626,57 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
           };
           if (!mounted) return;
           setCargas((prev) => prev.some((x) => x.id === carga.id) ? prev : [carga, ...prev]);
+        }).subscribe();
+      }).catch(() => {
+      });
+      return () => {
+        mounted = false;
+        if (channel) getSupabase().then((db) => db.removeChannel(channel)).catch(() => {
+        });
+      };
+    }, []);
+    (0, import_react.useEffect)(() => {
+      sbCargarMarcas().then((data) => {
+        if (!Array.isArray(data) || data.length === 0) return;
+        setMarcasState((prev) => {
+          const merged = data.map((m) => {
+            const seed = MARCAS_SEED.find((s) => s.id === m.id);
+            return seed && !m.imagenPersonalizada ? { ...m, imagen: seed.imagen || m.imagen } : m;
+          });
+          MARCAS_SEED.forEach((s) => {
+            if (!merged.find((m) => m.id === s.id)) merged.push(s);
+          });
+          try {
+            localStorage.setItem("th_marcas", JSON.stringify(merged));
+          } catch {
+          }
+          MARCAS = merged;
+          return merged;
+        });
+      });
+    }, []);
+    (0, import_react.useEffect)(() => {
+      let channel = null, mounted = true;
+      getSupabase().then((db) => {
+        if (!mounted) return;
+        channel = db.channel("toscana-marcas-v1").on("postgres_changes", { event: "*", schema: "public", table: "config", filter: "key=eq.marcas" }, (payload) => {
+          const nuevaLista = payload.new?.value;
+          if (!Array.isArray(nuevaLista) || !mounted) return;
+          setMarcasState((prev) => {
+            const merged = nuevaLista.map((m) => {
+              const seed = MARCAS_SEED.find((s) => s.id === m.id);
+              return seed && !m.imagenPersonalizada ? { ...m, imagen: seed.imagen || m.imagen } : m;
+            });
+            MARCAS_SEED.forEach((s) => {
+              if (!merged.find((m) => m.id === s.id)) merged.push(s);
+            });
+            try {
+              localStorage.setItem("th_marcas", JSON.stringify(merged));
+            } catch {
+            }
+            MARCAS = merged;
+            return merged;
+          });
         }).subscribe();
       }).catch(() => {
       });
