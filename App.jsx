@@ -398,12 +398,13 @@ async function sbCargarUsuarios() {
 }
 
 async function sbGuardarMarcas(lista) {
+  // Solo guarda las marcas custom (no las del seed — están en el código)
+  const custom = lista.filter(m => !MARCAS_SEED.find(s => s.id === m.id));
   try {
     const db = await getSupabase();
-    const { error } = await db.from("config").upsert(
-      { key: "marcas", value: lista, updated_at: new Date().toISOString() },
-      { onConflict: "key" }
-    );
+    if (custom.length === 0) return true;
+    const rows = custom.map(m => ({ id: m.id, data: m }));
+    const { error } = await db.from("marcas").upsert(rows, { onConflict: "id" });
     if (error) throw error;
     return true;
   } catch(e) { console.warn("Supabase save marcas:", e.message); return false; }
@@ -412,9 +413,9 @@ async function sbGuardarMarcas(lista) {
 async function sbCargarMarcas() {
   try {
     const db = await getSupabase();
-    const { data, error } = await db.from("config").select("value").eq("key","marcas").single();
+    const { data, error } = await db.from("marcas").select("data");
     if (error) throw error;
-    return Array.isArray(data?.value) ? data.value : null;
+    return (data || []).map(r => r.data).filter(Boolean);
   } catch(e) { console.warn("Supabase load marcas:", e.message); return null; }
 }
 
@@ -11401,17 +11402,13 @@ function App(){
     return ()=>{ mounted=false; if(channel) getSupabase().then(db=>db.removeChannel(channel)).catch(()=>{}); };
   },[]);
 
-  // ── Sync marcas con Supabase al inicio ──
+  // ── Sync marcas custom con Supabase al inicio ──
   useEffect(()=>{
-    const local = cargarMarcas();
-    const localCustom = local.filter(m=>!MARCAS_SEED.find(s=>s.id===m.id));
+    const localCustom = cargarMarcas().filter(m=>!MARCAS_SEED.find(s=>s.id===m.id));
 
-    function applyLista(lista){
-      const merged = lista.map(m=>{
-        const seed = MARCAS_SEED.find(s=>s.id===m.id);
-        return (seed && !m.imagenPersonalizada) ? {...m, imagen: seed.imagen||m.imagen} : m;
-      });
-      MARCAS_SEED.forEach(s=>{ if(!merged.find(m=>m.id===s.id)) merged.push(s); });
+    function applyCustom(custom){
+      const merged = [...MARCAS_SEED];
+      custom.forEach(m=>{ if(!merged.find(x=>x.id===m.id)) merged.push(m); });
       try{ localStorage.setItem("th_marcas", JSON.stringify(merged)); }catch{}
       MARCAS = merged;
       setMarcasState(merged);
@@ -11419,42 +11416,35 @@ function App(){
 
     sbCargarMarcas().then(remoto=>{
       if(!Array.isArray(remoto) || remoto.length===0){
-        // Nube vacía → subir locales (primera vez o después de nuclear)
-        if(localCustom.length > 0) sbGuardarMarcas(local);
+        if(localCustom.length > 0) sbGuardarMarcas(localCustom);
         return;
       }
-      const remotoCustom = remoto.filter(m=>!MARCAS_SEED.find(s=>s.id===m.id));
-      if(localCustom.length > remotoCustom.length){
-        // Local tiene marcas que la nube no tiene → subir y aplicar local
-        sbGuardarMarcas(local);
-        applyLista(local);
+      if(localCustom.length > remoto.length){
+        sbGuardarMarcas(localCustom);
+        applyCustom(localCustom);
       } else {
-        // Nube es fuente de verdad
-        applyLista(remoto);
+        applyCustom(remoto);
       }
     }).catch(()=>{});
   },[]);// eslint-disable-line
 
-  // ── Realtime: marcas actualizadas en otro dispositivo ──
-  // Sin filtro de fila para evitar problemas con REPLICA IDENTITY
+  // ── Realtime: marca nueva/editada en otro dispositivo ──
   useEffect(()=>{
     let channel=null, mounted=true;
     getSupabase().then(db=>{
       if(!mounted) return;
-      channel = db.channel("toscana-marcas-v3")
-        .on("postgres_changes", {event:"*", schema:"public", table:"config"}, payload=>{
+      channel = db.channel("toscana-marcas-v4")
+        .on("postgres_changes", {event:"*", schema:"public", table:"marcas"}, ()=>{
           if(!mounted) return;
-          if(payload.new?.key !== "marcas") return;
-          const nuevaLista = payload.new?.value;
-          if(!Array.isArray(nuevaLista)) return;
-          const merged = nuevaLista.map(m=>{
-            const seed = MARCAS_SEED.find(s=>s.id===m.id);
-            return (seed && !m.imagenPersonalizada) ? {...m, imagen: seed.imagen||m.imagen} : m;
+          // Recargar todas las custom desde Supabase
+          sbCargarMarcas().then(remoto=>{
+            if(!Array.isArray(remoto) || !mounted) return;
+            const merged = [...MARCAS_SEED];
+            remoto.forEach(m=>{ if(!merged.find(x=>x.id===m.id)) merged.push(m); });
+            try{ localStorage.setItem("th_marcas", JSON.stringify(merged)); }catch{}
+            MARCAS = merged;
+            setMarcasState(merged);
           });
-          MARCAS_SEED.forEach(s=>{ if(!merged.find(m=>m.id===s.id)) merged.push(s); });
-          try{ localStorage.setItem("th_marcas", JSON.stringify(merged)); }catch{}
-          MARCAS = merged;
-          setMarcasState(merged);
         })
         .subscribe();
     }).catch(()=>{});
