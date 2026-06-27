@@ -7421,16 +7421,8 @@ function ImportarExcelModal({inv, onImportar, onClose, onArchivoCapturado}){
                 )?.[0] || null)
               : null);
         if(matchKey){
-          const existing = filasMap.get(matchKey);
-          // Mismo código explícito pero distinta categoría o precio → producto distinto.
-          // Generar variante del código en vez de sumar stock.
-          if(!f.autoSKU && (existing.cat !== f.cat || existing.precio !== f.precio)){
-            let varSku = f.sku; let n2=2;
-            while(filasMap.has(varSku.toUpperCase())) varSku = `${f.sku}-${n2++}`;
-            filasMap.set(varSku.toUpperCase(), {...f, sku:varSku});
-          } else {
-            existing.stock += f.stock;
-          }
+          // Mismo código → mismo producto, sumar stock
+          filasMap.get(matchKey).stock += f.stock;
         } else {
           filasMap.set(keyByCod, {...f});
         }

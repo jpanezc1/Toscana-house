@@ -29019,15 +29019,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
             ([, v]) => descKey(v.marcaNombre, v.desc, v.talla, v.color) === keyByDesc
           )?.[0] || null : null;
           if (matchKey) {
-            const existing = filasMap.get(matchKey);
-            if (!f.autoSKU && (existing.cat !== f.cat || existing.precio !== f.precio)) {
-              let varSku = f.sku;
-              let n2 = 2;
-              while (filasMap.has(varSku.toUpperCase())) varSku = `${f.sku}-${n2++}`;
-              filasMap.set(varSku.toUpperCase(), { ...f, sku: varSku });
-            } else {
-              existing.stock += f.stock;
-            }
+            filasMap.get(matchKey).stock += f.stock;
           } else {
             filasMap.set(keyByCod, { ...f });
           }
