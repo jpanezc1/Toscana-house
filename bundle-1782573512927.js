@@ -29648,6 +29648,12 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
     const today = /* @__PURE__ */ new Date();
     const dayNames = ["Dom", "Lun", "Mar", "Mi\xE9", "Jue", "Vie", "S\xE1b"];
     const dateStr = `${dayNames[today.getDay()]}, ${today.getDate()} de ${MESES[today.getMonth()]} ${today.getFullYear()}`;
+    const diaActual = today.getDate();
+    const diasEnMes = new Date(anio, mes + 1, 0).getDate();
+    const proyeccionCierre = diaActual > 0 ? Math.round(totalMes / diaActual * diasEnMes) : 0;
+    const progresoDias = Math.round(diaActual / diasEnMes * 100);
+    const diasRestantes = diasEnMes - diaActual;
+    const fmtBs = (n) => `Bs ${new Intl.NumberFormat("es-BO", { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(n)}`;
     const cardStyle = {
       background: C.bg1,
       borderRadius: 16,
@@ -29740,7 +29746,34 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
         sub: "a precio de venta",
         color: "#6D4C41"
       }
-    )), (() => {
+    )), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      background: C.bg1,
+      borderRadius: 16,
+      padding: isDesktop ? "14px 18px" : "16px 18px",
+      border: `1px solid ${C.sep}`,
+      marginBottom: isDesktop ? 10 : 14
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      fontSize: 10,
+      fontWeight: 700,
+      color: C.label3,
+      fontFamily: FONT_UI,
+      textTransform: "uppercase",
+      letterSpacing: 1.2,
+      marginBottom: 4
+    } }, "Proyecci\xF3n de cierre \u2014 ", MESES[mes], " ", anio), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      fontSize: isDesktop ? 26 : 30,
+      fontWeight: 700,
+      color: C.gold,
+      fontFamily: FONT,
+      letterSpacing: "-0.03em",
+      lineHeight: 1
+    } }, fmtBs(proyeccionCierre)), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT_UI, marginTop: 4 } }, "Basado en ", fmtBs(totalMes), " en ", diaActual, " d\xEDa", diaActual !== 1 ? "s" : "", " \xB7 ", diasRestantes, " d\xEDa", diasRestantes !== 1 ? "s" : "", " restantes")), /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "right", flexShrink: 0 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 22, fontWeight: 700, color: C.label, fontFamily: FONT } }, progresoDias, "%"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: C.label3, fontFamily: FONT_UI } }, "del mes transcurrido"))), /* @__PURE__ */ import_react.default.createElement("div", { style: { background: C.sep, borderRadius: 99, height: 6, overflow: "hidden" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      width: `${progresoDias}%`,
+      height: "100%",
+      borderRadius: 99,
+      background: `linear-gradient(90deg, ${C.gold}99, ${C.gold})`,
+      transition: "width .4s ease"
+    } })), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", marginTop: 5 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: C.label3, fontFamily: FONT_UI } }, "1 ", MESES[mes].slice(0, 3)), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: C.label3, fontFamily: FONT_UI } }, diasEnMes, " ", MESES[mes].slice(0, 3)))), (() => {
       const feed = [
         ...ultVentas.slice(0, 6).map((v) => ({
           id: v.id,
