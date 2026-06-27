@@ -7324,8 +7324,13 @@ function ImportarExcelModal({inv, onImportar, onClose, onArchivoCapturado}){
         // Si la descripción está vacía, construirla desde otras columnas
         let desc = descRaw;
         if(!desc && skuRaw){
-          // Reconstruir desde código: MAT-S-870 → info contextual
-          desc = [catRaw, tallaRaw, colorRaw].filter(Boolean).join(" ").trim() || skuRaw;
+          // Reconstruir desde columnas disponibles
+          const partes = [catRaw, tallaRaw, colorRaw].filter(Boolean).join(" ").trim();
+          // Si no hay talla/color que diferencien, agregar precio para evitar agrupar
+          // productos distintos que comparten solo categoría (ej: ARETES Bs.50 vs ARETES Bs.65)
+          desc = partes
+            ? (partes === catRaw && precio > 0 ? `${catRaw} BS. ${precio}` : partes)
+            : skuRaw;
         }
 
         // ── Buscar marca ─────────────────────────────────────────────
@@ -7388,10 +7393,15 @@ function ImportarExcelModal({inv, onImportar, onClose, onArchivoCapturado}){
         const keyByCod = f.sku.toUpperCase();
         const keyByDesc = descKey(f.marcaNombre, f.desc, f.talla, f.color);
         // Priorizar match por código; si no, buscar por descripción
+        // Si el SKU viene explícito del Excel, solo consolidar por código exacto.
+        // No agrupar por descripción — puede haber múltiples items con la misma
+        // categoría y diferentes precios/códigos (ej: ARETES A-050, ARETES A-065).
         const matchKey = filasMap.has(keyByCod) ? keyByCod
-          : [...filasMap.entries()].find(([,v])=>
-              descKey(v.marcaNombre,v.desc,v.talla,v.color)===keyByDesc
-            )?.[0] || null;
+          : (f.autoSKU
+              ? ([...filasMap.entries()].find(([,v])=>
+                  descKey(v.marcaNombre,v.desc,v.talla,v.color)===keyByDesc
+                )?.[0] || null)
+              : null);
         if(matchKey){
           filasMap.get(matchKey).stock += f.stock;
         } else {

@@ -28947,7 +28947,8 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
           const stock = parseStock(stockRaw);
           let desc = descRaw;
           if (!desc && skuRaw) {
-            desc = [catRaw, tallaRaw, colorRaw].filter(Boolean).join(" ").trim() || skuRaw;
+            const partes = [catRaw, tallaRaw, colorRaw].filter(Boolean).join(" ").trim();
+            desc = partes ? partes === catRaw && precio > 0 ? `${catRaw} BS. ${precio}` : partes : skuRaw;
           }
           let marcaEnc = matchMarca(marcaRaw) || fileMarcaFallback;
           if (!marcaEnc && skuRaw) {
@@ -28998,9 +28999,9 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
         for (const f of filas) {
           const keyByCod = f.sku.toUpperCase();
           const keyByDesc = descKey(f.marcaNombre, f.desc, f.talla, f.color);
-          const matchKey = filasMap.has(keyByCod) ? keyByCod : [...filasMap.entries()].find(
+          const matchKey = filasMap.has(keyByCod) ? keyByCod : f.autoSKU ? [...filasMap.entries()].find(
             ([, v]) => descKey(v.marcaNombre, v.desc, v.talla, v.color) === keyByDesc
-          )?.[0] || null;
+          )?.[0] || null : null;
           if (matchKey) {
             filasMap.get(matchKey).stock += f.stock;
           } else {
