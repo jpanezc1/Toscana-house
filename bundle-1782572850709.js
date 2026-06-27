@@ -33986,6 +33986,36 @@ Motivo: ${motivo}` : ""}`)) {
       localStorage.setItem("th_inv", JSON.stringify(inv2.filter((p) => p.id !== prodId)));
     }
     async function handleEliminarCarga(cargaId) {
+      const carga = cargas.find((c) => c.id === cargaId);
+      const items = carga?.items || [];
+      const nuevos = items.filter((it) => it.tipo === "create");
+      const updates = items.filter((it) => it.tipo === "update");
+      const resumen = [
+        nuevos.length && `Eliminar ${nuevos.length} producto${nuevos.length !== 1 ? "s" : ""} nuevos`,
+        updates.length && `Restaurar stock anterior de ${updates.length} producto${updates.length !== 1 ? "s" : ""}`
+      ].filter(Boolean).join("\n");
+      const msg = resumen ? `\xBFEliminar esta carga?
+
+Esto revertir\xE1 el inventario:
+${resumen}
+
+Esta acci\xF3n no se puede deshacer.` : "\xBFEliminar esta carga? Esta acci\xF3n no se puede deshacer.";
+      if (!window.confirm(msg)) return;
+      for (const it of nuevos) {
+        const prod = inv.find((p) => p.codigo === it.codigo);
+        if (prod) {
+          setInv((prev) => prev.filter((p) => p.codigo !== it.codigo));
+          await sbEliminarProducto(prod.id);
+        }
+      }
+      for (const it of updates) {
+        const prod = inv.find((p) => p.codigo === it.codigo);
+        if (prod) {
+          const stockRestaurado = it.stockAntes ?? Math.max(0, (prod.stock || 0) - (it.stockSumado || 0));
+          setInv((prev) => prev.map((p) => p.codigo === it.codigo ? { ...p, stock: stockRestaurado } : p));
+          syncConRespaldo("stock", { prodId: prod.id, stock: stockRestaurado }, () => sbActualizarStock(prod.id, stockRestaurado));
+        }
+      }
       setCargas((prev) => prev.filter((c) => c.id !== cargaId));
       await sbEliminarCarga(cargaId);
       const c2 = JSON.parse(localStorage.getItem("th_cargas") || "[]");
