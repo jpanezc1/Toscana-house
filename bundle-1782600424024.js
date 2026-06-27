@@ -33535,7 +33535,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       localStorage.setItem("th_marcas", JSON.stringify(lista));
       MARCAS = lista;
       setMarcasState(lista);
-      sbGuardarMarcas(lista);
+      syncConRespaldo("marcas", lista, () => sbGuardarMarcas(lista));
       if (nuevoUsuario) {
         const listaU = (() => {
           try {
@@ -33688,17 +33688,23 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
         setMarcasState(merged);
       }
       sbCargarMarcas().then((remoto) => {
-        if (!Array.isArray(remoto) || remoto.length === 0) {
-          if (localCustom.length > 0) sbGuardarMarcas(localCustom);
+        if (!Array.isArray(remoto)) {
+          if (localCustom.length > 0) applyCustom(localCustom);
           return;
         }
-        if (localCustom.length > remoto.length) {
-          sbGuardarMarcas(localCustom);
-          applyCustom(localCustom);
-        } else {
-          applyCustom(remoto);
+        const byId = /* @__PURE__ */ new Map();
+        remoto.forEach((m) => {
+          if (m && m.id != null) byId.set(m.id, m);
+        });
+        const soloLocales = localCustom.filter((m) => !byId.has(m.id));
+        soloLocales.forEach((m) => byId.set(m.id, m));
+        const union = [...byId.values()];
+        applyCustom(union);
+        if (soloLocales.length > 0) {
+          syncConRespaldo("marcas", union, () => sbGuardarMarcas(union));
         }
       }).catch(() => {
+        if (localCustom.length > 0) applyCustom(localCustom);
       });
     }, []);
     (0, import_react.useEffect)(() => {

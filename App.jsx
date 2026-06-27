@@ -11356,8 +11356,10 @@ function App(){
     localStorage.setItem("th_marcas", JSON.stringify(lista));
     MARCAS = lista;
     setMarcasState(lista);
-    // Guardar directo a Supabase (fuera del setState, sin pasar por outbox)
-    sbGuardarMarcas(lista);
+    // Guardar a Supabase con reintento garantizado vía outbox.
+    // Si falla la red o RLS, la operación queda en cola y se reintenta hasta
+    // confirmar — así la marca SIEMPRE llega a la nube y a las demás sesiones.
+    syncConRespaldo("marcas", lista, ()=>sbGuardarMarcas(lista));
     // Si se pidió crear usuario brand, añadirlo y sincronizar a Supabase
     if(nuevoUsuario){
       const listaU = (() => {
@@ -11470,17 +11472,23 @@ function App(){
     }
 
     sbCargarMarcas().then(remoto=>{
-      if(!Array.isArray(remoto) || remoto.length===0){
-        if(localCustom.length > 0) sbGuardarMarcas(localCustom);
+      if(!Array.isArray(remoto)){
+        // Supabase no respondió → conservar locales, no perder nada
+        if(localCustom.length > 0) applyCustom(localCustom);
         return;
       }
-      if(localCustom.length > remoto.length){
-        sbGuardarMarcas(localCustom);
-        applyCustom(localCustom);
-      } else {
-        applyCustom(remoto);
+      // Unión por id: la nube manda en conflictos, se conservan las locales que falten.
+      const byId = new Map();
+      remoto.forEach(m=>{ if(m && m.id!=null) byId.set(m.id, m); });
+      const soloLocales = localCustom.filter(m=>!byId.has(m.id));
+      soloLocales.forEach(m=>byId.set(m.id, m));
+      const union = [...byId.values()];
+      applyCustom(union);
+      // Subir las que solo existían en este dispositivo (con reintento garantizado)
+      if(soloLocales.length > 0){
+        syncConRespaldo("marcas", union, ()=>sbGuardarMarcas(union));
       }
-    }).catch(()=>{});
+    }).catch(()=>{ if(localCustom.length > 0) applyCustom(localCustom); });
   },[]);// eslint-disable-line
 
   // ── Realtime: marca nueva/editada en otro dispositivo ──
