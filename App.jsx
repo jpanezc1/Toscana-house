@@ -11293,15 +11293,15 @@ function App(){
 
   // Guarda marca nueva o editada → actualiza React state + global + localStorage + Supabase
   function onMarcaGuardada(marca, isNew, nuevoUsuario){
-    setMarcasState(prev => {
-      const lista = isNew
-        ? [...prev, marca]
-        : prev.map(m => m.id===marca.id ? {...m,...marca} : m);
-      localStorage.setItem("th_marcas", JSON.stringify(lista));
-      MARCAS = lista;
-      syncConRespaldo("marcas", lista, ()=>sbGuardarMarcas(lista));
-      return lista;
-    });
+    const prev = marcasState;
+    const lista = isNew
+      ? [...prev, marca]
+      : prev.map(m => m.id===marca.id ? {...m,...marca} : m);
+    localStorage.setItem("th_marcas", JSON.stringify(lista));
+    MARCAS = lista;
+    setMarcasState(lista);
+    // Guardar directo a Supabase (fuera del setState, sin pasar por outbox)
+    sbGuardarMarcas(lista);
     // Si se pidió crear usuario brand, añadirlo y sincronizar a Supabase
     if(nuevoUsuario){
       const listaU = (() => {
@@ -11402,48 +11402,49 @@ function App(){
   },[]);
 
   // ── Sync marcas con Supabase al inicio ──
-  // Si la nube está vacía → sube las locales (migración de marcas pre-sync).
-  // Si la nube tiene datos → las usa como fuente de verdad.
-  // Si la nube tiene MENOS marcas custom que el local → sube la lista local (el admin
-  // creó marcas antes de que existiera el sync).
   useEffect(()=>{
     const local = cargarMarcas();
     const localCustom = local.filter(m=>!MARCAS_SEED.find(s=>s.id===m.id));
+
+    function applyLista(lista){
+      const merged = lista.map(m=>{
+        const seed = MARCAS_SEED.find(s=>s.id===m.id);
+        return (seed && !m.imagenPersonalizada) ? {...m, imagen: seed.imagen||m.imagen} : m;
+      });
+      MARCAS_SEED.forEach(s=>{ if(!merged.find(m=>m.id===s.id)) merged.push(s); });
+      try{ localStorage.setItem("th_marcas", JSON.stringify(merged)); }catch{}
+      MARCAS = merged;
+      setMarcasState(merged);
+    }
+
     sbCargarMarcas().then(remoto=>{
-      function applyRemoto(lista){
-        const merged = lista.map(m=>{
-          const seed = MARCAS_SEED.find(s=>s.id===m.id);
-          return (seed && !m.imagenPersonalizada) ? {...m, imagen: seed.imagen||m.imagen} : m;
-        });
-        MARCAS_SEED.forEach(s=>{ if(!merged.find(m=>m.id===s.id)) merged.push(s); });
-        try{ localStorage.setItem("th_marcas", JSON.stringify(merged)); }catch{}
-        MARCAS = merged;
-        setMarcasState(merged);
-      }
       if(!Array.isArray(remoto) || remoto.length===0){
-        // Nube vacía → subir marcas locales para que todos las vean
-        sbGuardarMarcas(local);
+        // Nube vacía → subir locales (primera vez o después de nuclear)
+        if(localCustom.length > 0) sbGuardarMarcas(local);
         return;
       }
       const remotoCustom = remoto.filter(m=>!MARCAS_SEED.find(s=>s.id===m.id));
       if(localCustom.length > remotoCustom.length){
-        // Local tiene más marcas custom (creadas antes del sync) → subir y aplicar
+        // Local tiene marcas que la nube no tiene → subir y aplicar local
         sbGuardarMarcas(local);
-        applyRemoto(local);
+        applyLista(local);
       } else {
-        applyRemoto(remoto);
+        // Nube es fuente de verdad
+        applyLista(remoto);
       }
-    });
+    }).catch(()=>{});
   },[]);// eslint-disable-line
 
-  // ── Realtime: marcas creadas/editadas en otro dispositivo ──
+  // ── Realtime: marcas actualizadas en otro dispositivo ──
+  // Sin filtro de fila para evitar problemas con REPLICA IDENTITY
   useEffect(()=>{
     let channel=null, mounted=true;
     getSupabase().then(db=>{
       if(!mounted) return;
-      channel = db.channel("toscana-marcas-v2")
-        .on("postgres_changes", {event:"*", schema:"public", table:"config", filter:"key=eq.marcas"}, payload=>{
+      channel = db.channel("toscana-marcas-v3")
+        .on("postgres_changes", {event:"*", schema:"public", table:"config"}, payload=>{
           if(!mounted) return;
+          if(payload.new?.key !== "marcas") return;
           const nuevaLista = payload.new?.value;
           if(!Array.isArray(nuevaLista)) return;
           const merged = nuevaLista.map(m=>{

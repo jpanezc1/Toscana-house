@@ -33491,13 +33491,12 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
     const [marcasState, setMarcasState] = (0, import_react.useState)(() => cargarMarcas());
     const drive = useDriveSync();
     function onMarcaGuardada(marca, isNew, nuevoUsuario) {
-      setMarcasState((prev) => {
-        const lista = isNew ? [...prev, marca] : prev.map((m) => m.id === marca.id ? { ...m, ...marca } : m);
-        localStorage.setItem("th_marcas", JSON.stringify(lista));
-        MARCAS = lista;
-        syncConRespaldo("marcas", lista, () => sbGuardarMarcas(lista));
-        return lista;
-      });
+      const prev = marcasState;
+      const lista = isNew ? [...prev, marca] : prev.map((m) => m.id === marca.id ? { ...m, ...marca } : m);
+      localStorage.setItem("th_marcas", JSON.stringify(lista));
+      MARCAS = lista;
+      setMarcasState(lista);
+      sbGuardarMarcas(lista);
       if (nuevoUsuario) {
         const listaU = (() => {
           try {
@@ -33638,41 +33637,43 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
     (0, import_react.useEffect)(() => {
       const local = cargarMarcas();
       const localCustom = local.filter((m) => !MARCAS_SEED.find((s) => s.id === m.id));
-      sbCargarMarcas().then((remoto) => {
-        function applyRemoto(lista) {
-          const merged = lista.map((m) => {
-            const seed = MARCAS_SEED.find((s) => s.id === m.id);
-            return seed && !m.imagenPersonalizada ? { ...m, imagen: seed.imagen || m.imagen } : m;
-          });
-          MARCAS_SEED.forEach((s) => {
-            if (!merged.find((m) => m.id === s.id)) merged.push(s);
-          });
-          try {
-            localStorage.setItem("th_marcas", JSON.stringify(merged));
-          } catch {
-          }
-          MARCAS = merged;
-          setMarcasState(merged);
+      function applyLista(lista) {
+        const merged = lista.map((m) => {
+          const seed = MARCAS_SEED.find((s) => s.id === m.id);
+          return seed && !m.imagenPersonalizada ? { ...m, imagen: seed.imagen || m.imagen } : m;
+        });
+        MARCAS_SEED.forEach((s) => {
+          if (!merged.find((m) => m.id === s.id)) merged.push(s);
+        });
+        try {
+          localStorage.setItem("th_marcas", JSON.stringify(merged));
+        } catch {
         }
+        MARCAS = merged;
+        setMarcasState(merged);
+      }
+      sbCargarMarcas().then((remoto) => {
         if (!Array.isArray(remoto) || remoto.length === 0) {
-          sbGuardarMarcas(local);
+          if (localCustom.length > 0) sbGuardarMarcas(local);
           return;
         }
         const remotoCustom = remoto.filter((m) => !MARCAS_SEED.find((s) => s.id === m.id));
         if (localCustom.length > remotoCustom.length) {
           sbGuardarMarcas(local);
-          applyRemoto(local);
+          applyLista(local);
         } else {
-          applyRemoto(remoto);
+          applyLista(remoto);
         }
+      }).catch(() => {
       });
     }, []);
     (0, import_react.useEffect)(() => {
       let channel = null, mounted = true;
       getSupabase().then((db) => {
         if (!mounted) return;
-        channel = db.channel("toscana-marcas-v2").on("postgres_changes", { event: "*", schema: "public", table: "config", filter: "key=eq.marcas" }, (payload) => {
+        channel = db.channel("toscana-marcas-v3").on("postgres_changes", { event: "*", schema: "public", table: "config" }, (payload) => {
           if (!mounted) return;
+          if (payload.new?.key !== "marcas") return;
           const nuevaLista = payload.new?.value;
           if (!Array.isArray(nuevaLista)) return;
           const merged = nuevaLista.map((m) => {
