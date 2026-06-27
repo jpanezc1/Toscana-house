@@ -21585,6 +21585,17 @@
       return false;
     }
   }
+  async function sbEliminarProductoPorCodigo(codigo) {
+    try {
+      const db = await getSupabase();
+      const { error } = await db.from("inventario").delete().eq("codigo", codigo);
+      if (error) throw error;
+      return true;
+    } catch (e) {
+      console.warn("Supabase eliminar producto por c\xF3digo:", e.message);
+      return false;
+    }
+  }
   async function sbEliminarCarga(cargaId) {
     try {
       const db = await getSupabase();
@@ -22150,6 +22161,10 @@
         return await sbGuardarUsuarios(op.payload);
       case "marcas":
         return await sbGuardarMarcas(op.payload);
+      case "eliminarProductoCodigo":
+        return await sbEliminarProductoPorCodigo(op.payload.codigo);
+      case "eliminarCarga":
+        return await sbEliminarCarga(op.payload.cargaId);
       default:
         return true;
     }
@@ -34120,8 +34135,13 @@ Motivo: ${motivo}` : ""}`)) {
       localStorage.setItem("th_inv", JSON.stringify(inv2.map((p) => p.id === prodId ? { ...p, ...campos } : p)));
     }
     async function handleEliminarProducto(prodId) {
+      const prod = inv.find((p) => p.id === prodId);
       setInv((prev) => prev.filter((p) => p.id !== prodId));
-      await sbEliminarProducto(prodId);
+      if (prod?.codigo) {
+        syncConRespaldo("eliminarProductoCodigo", { codigo: prod.codigo }, () => sbEliminarProductoPorCodigo(prod.codigo));
+      } else {
+        await sbEliminarProducto(prodId);
+      }
       const inv2 = JSON.parse(localStorage.getItem("th_inv") || "[]");
       localStorage.setItem("th_inv", JSON.stringify(inv2.filter((p) => p.id !== prodId)));
     }
@@ -34145,7 +34165,7 @@ Esta acci\xF3n no se puede deshacer.` : "\xBFEliminar esta carga? Esta acci\xF3n
         const prod = inv.find((p) => p.codigo === it.codigo);
         if (prod) {
           setInv((prev) => prev.filter((p) => p.codigo !== it.codigo));
-          await sbEliminarProducto(prod.id);
+          syncConRespaldo("eliminarProductoCodigo", { codigo: it.codigo }, () => sbEliminarProductoPorCodigo(it.codigo));
         }
       }
       for (const it of updates) {
@@ -34157,7 +34177,7 @@ Esta acci\xF3n no se puede deshacer.` : "\xBFEliminar esta carga? Esta acci\xF3n
         }
       }
       setCargas((prev) => prev.filter((c) => c.id !== cargaId));
-      await sbEliminarCarga(cargaId);
+      syncConRespaldo("eliminarCarga", { cargaId }, () => sbEliminarCarga(cargaId));
       const c2 = JSON.parse(localStorage.getItem("th_cargas") || "[]");
       localStorage.setItem("th_cargas", JSON.stringify(c2.filter((c) => c.id !== cargaId)));
     }

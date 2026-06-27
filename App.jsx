@@ -145,6 +145,18 @@ async function sbEliminarProducto(prodId) {
   } catch(e) { console.warn("Supabase eliminar producto:", e.message); return false; }
 }
 
+// Eliminar por CÓDIGO — robusto frente a IDs temporales que aún no se
+// sincronizaron con Supabase (el batch upsert genera su propio id serial).
+// El código de barras siempre coincide entre local y la nube (onConflict:"codigo").
+async function sbEliminarProductoPorCodigo(codigo) {
+  try {
+    const db = await getSupabase();
+    const { error } = await db.from("inventario").delete().eq("codigo", codigo);
+    if (error) throw error;
+    return true;
+  } catch(e) { console.warn("Supabase eliminar producto por código:", e.message); return false; }
+}
+
 async function sbEliminarCarga(cargaId) {
   try {
     const db = await getSupabase();
@@ -574,6 +586,8 @@ async function ejecutarOpOutbox(op){
     case "auditLog":    return await sbGuardarAuditLog(op.payload);
     case "usuarios":    return await sbGuardarUsuarios(op.payload);
     case "marcas":      return await sbGuardarMarcas(op.payload);
+    case "eliminarProductoCodigo": return await sbEliminarProductoPorCodigo(op.payload.codigo);
+    case "eliminarCarga":          return await sbEliminarCarga(op.payload.cargaId);
     default: return true; // tipo desconocido — no bloquear la cola
   }
 }
@@ -11833,8 +11847,14 @@ function App(){
   }
 
   async function handleEliminarProducto(prodId){
+    const prod = inv.find(p=>p.id===prodId);
     setInv(prev=>prev.filter(p=>p.id!==prodId));
-    await sbEliminarProducto(prodId);
+    // Eliminar por código (robusto frente a ids temporales) con reintento vía outbox
+    if(prod?.codigo){
+      syncConRespaldo("eliminarProductoCodigo", {codigo:prod.codigo}, ()=>sbEliminarProductoPorCodigo(prod.codigo));
+    } else {
+      await sbEliminarProducto(prodId);
+    }
     const inv2 = JSON.parse(localStorage.getItem("th_inv")||"[]");
     localStorage.setItem("th_inv", JSON.stringify(inv2.filter(p=>p.id!==prodId)));
   }
@@ -11853,12 +11873,15 @@ function App(){
       : "¿Eliminar esta carga? Esta acción no se puede deshacer.";
     if(!window.confirm(msg)) return;
 
-    // Revertir stock: borrar productos nuevos, restaurar stock anterior en updates
+    // Revertir stock: borrar productos nuevos, restaurar stock anterior en updates.
+    // Se elimina por CÓDIGO (no por id) porque el id local puede ser temporal y no
+    // coincidir con el id serial de Supabase → el DELETE por id fallaría silenciosamente.
     for(const it of nuevos){
       const prod = inv.find(p=>p.codigo===it.codigo);
       if(prod){
         setInv(prev=>prev.filter(p=>p.codigo!==it.codigo));
-        await sbEliminarProducto(prod.id);
+        // syncConRespaldo garantiza reintento vía outbox si falla la red
+        syncConRespaldo("eliminarProductoCodigo", {codigo:it.codigo}, ()=>sbEliminarProductoPorCodigo(it.codigo));
       }
     }
     for(const it of updates){
@@ -11871,7 +11894,7 @@ function App(){
     }
 
     setCargas(prev=>prev.filter(c=>c.id!==cargaId));
-    await sbEliminarCarga(cargaId);
+    syncConRespaldo("eliminarCarga", {cargaId}, ()=>sbEliminarCarga(cargaId));
     const c2 = JSON.parse(localStorage.getItem("th_cargas")||"[]");
     localStorage.setItem("th_cargas", JSON.stringify(c2.filter(c=>c.id!==cargaId)));
   }
