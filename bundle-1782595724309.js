@@ -33636,10 +33636,11 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       };
     }, []);
     (0, import_react.useEffect)(() => {
-      sbCargarMarcas().then((data) => {
-        if (!Array.isArray(data) || data.length === 0) return;
-        setMarcasState((prev) => {
-          const merged = data.map((m) => {
+      const local = cargarMarcas();
+      const localCustom = local.filter((m) => !MARCAS_SEED.find((s) => s.id === m.id));
+      sbCargarMarcas().then((remoto) => {
+        function applyRemoto(lista) {
+          const merged = lista.map((m) => {
             const seed = MARCAS_SEED.find((s) => s.id === m.id);
             return seed && !m.imagenPersonalizada ? { ...m, imagen: seed.imagen || m.imagen } : m;
           });
@@ -33651,8 +33652,19 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
           } catch {
           }
           MARCAS = merged;
-          return merged;
-        });
+          setMarcasState(merged);
+        }
+        if (!Array.isArray(remoto) || remoto.length === 0) {
+          sbGuardarMarcas(local);
+          return;
+        }
+        const remotoCustom = remoto.filter((m) => !MARCAS_SEED.find((s) => s.id === m.id));
+        if (localCustom.length > remotoCustom.length) {
+          sbGuardarMarcas(local);
+          applyRemoto(local);
+        } else {
+          applyRemoto(remoto);
+        }
       });
     }, []);
     (0, import_react.useEffect)(() => {

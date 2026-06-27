@@ -11400,20 +11400,38 @@ function App(){
     return ()=>{ mounted=false; if(channel) getSupabase().then(db=>db.removeChannel(channel)).catch(()=>{}); };
   },[]);
 
-  // ── Cargar marcas custom desde Supabase al inicio ──
+  // ── Sync marcas con Supabase al inicio ──
+  // Si la nube está vacía → sube las locales (migración de marcas pre-sync).
+  // Si la nube tiene datos → las usa como fuente de verdad.
+  // Si la nube tiene MENOS marcas custom que el local → sube la lista local (el admin
+  // creó marcas antes de que existiera el sync).
   useEffect(()=>{
-    sbCargarMarcas().then(data=>{
-      if(!Array.isArray(data) || data.length===0) return;
-      setMarcasState(prev=>{
-        const merged = data.map(m=>{
+    const local = cargarMarcas();
+    const localCustom = local.filter(m=>!MARCAS_SEED.find(s=>s.id===m.id));
+    sbCargarMarcas().then(remoto=>{
+      function applyRemoto(lista){
+        const merged = lista.map(m=>{
           const seed = MARCAS_SEED.find(s=>s.id===m.id);
           return (seed && !m.imagenPersonalizada) ? {...m, imagen: seed.imagen||m.imagen} : m;
         });
         MARCAS_SEED.forEach(s=>{ if(!merged.find(m=>m.id===s.id)) merged.push(s); });
         try{ localStorage.setItem("th_marcas", JSON.stringify(merged)); }catch{}
         MARCAS = merged;
-        return merged;
-      });
+        setMarcasState(merged);
+      }
+      if(!Array.isArray(remoto) || remoto.length===0){
+        // Nube vacía → subir marcas locales para que todos las vean
+        sbGuardarMarcas(local);
+        return;
+      }
+      const remotoCustom = remoto.filter(m=>!MARCAS_SEED.find(s=>s.id===m.id));
+      if(localCustom.length > remotoCustom.length){
+        // Local tiene más marcas custom (creadas antes del sync) → subir y aplicar
+        sbGuardarMarcas(local);
+        applyRemoto(local);
+      } else {
+        applyRemoto(remoto);
+      }
     });
   },[]);// eslint-disable-line
 
