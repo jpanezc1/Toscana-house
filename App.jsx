@@ -11300,12 +11300,6 @@ function App(){
       localStorage.setItem("th_marcas", JSON.stringify(lista));
       MARCAS = lista;
       syncConRespaldo("marcas", lista, ()=>sbGuardarMarcas(lista));
-      // Broadcast por el canal ya suscrito (único modo que funciona en Supabase)
-      if(_marcasBroadcastCh){
-        _marcasBroadcastCh.send({
-          type:"broadcast", event:"marcas_updated", payload:{lista}
-        }).catch(()=>{});
-      }
       return lista;
     });
     // Si se pidió crear usuario brand, añadirlo y sincronizar a Supabase
@@ -11442,15 +11436,15 @@ function App(){
     });
   },[]);// eslint-disable-line
 
-  // ── Realtime: marcas creadas/editadas en otro dispositivo (Broadcast) ──
+  // ── Realtime: marcas creadas/editadas en otro dispositivo ──
   useEffect(()=>{
     let channel=null, mounted=true;
     getSupabase().then(db=>{
       if(!mounted) return;
-      channel = db.channel("toscana-marcas-v1", {config:{broadcast:{self:false}}})
-        .on("broadcast", {event:"marcas_updated"}, ({payload})=>{
+      channel = db.channel("toscana-marcas-v2")
+        .on("postgres_changes", {event:"*", schema:"public", table:"config", filter:"key=eq.marcas"}, payload=>{
           if(!mounted) return;
-          const nuevaLista = payload?.lista;
+          const nuevaLista = payload.new?.value;
           if(!Array.isArray(nuevaLista)) return;
           const merged = nuevaLista.map(m=>{
             const seed = MARCAS_SEED.find(s=>s.id===m.id);
@@ -11461,15 +11455,9 @@ function App(){
           MARCAS = merged;
           setMarcasState(merged);
         })
-        .subscribe((status)=>{
-          if(status==="SUBSCRIBED") _marcasBroadcastCh = channel;
-        });
+        .subscribe();
     }).catch(()=>{});
-    return ()=>{
-      mounted=false;
-      _marcasBroadcastCh=null;
-      if(channel) getSupabase().then(db=>db.removeChannel(channel)).catch(()=>{});
-    };
+    return ()=>{ mounted=false; if(channel) getSupabase().then(db=>db.removeChannel(channel)).catch(()=>{}); };
   },[]);// eslint-disable-line
 
   // Cargas históricas: productos de inventario que ya existían antes de

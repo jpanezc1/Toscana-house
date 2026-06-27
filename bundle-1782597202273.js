@@ -22941,7 +22941,6 @@
     return [...MARCAS_SEED];
   }
   var MARCAS = cargarMarcas();
-  var _marcasBroadcastCh = null;
   var MESES = [
     "Enero",
     "Febrero",
@@ -33497,14 +33496,6 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
         localStorage.setItem("th_marcas", JSON.stringify(lista));
         MARCAS = lista;
         syncConRespaldo("marcas", lista, () => sbGuardarMarcas(lista));
-        if (_marcasBroadcastCh) {
-          _marcasBroadcastCh.send({
-            type: "broadcast",
-            event: "marcas_updated",
-            payload: { lista }
-          }).catch(() => {
-          });
-        }
         return lista;
       });
       if (nuevoUsuario) {
@@ -33680,9 +33671,9 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       let channel = null, mounted = true;
       getSupabase().then((db) => {
         if (!mounted) return;
-        channel = db.channel("toscana-marcas-v1", { config: { broadcast: { self: false } } }).on("broadcast", { event: "marcas_updated" }, ({ payload }) => {
+        channel = db.channel("toscana-marcas-v2").on("postgres_changes", { event: "*", schema: "public", table: "config", filter: "key=eq.marcas" }, (payload) => {
           if (!mounted) return;
-          const nuevaLista = payload?.lista;
+          const nuevaLista = payload.new?.value;
           if (!Array.isArray(nuevaLista)) return;
           const merged = nuevaLista.map((m) => {
             const seed = MARCAS_SEED.find((s) => s.id === m.id);
@@ -33697,14 +33688,11 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
           }
           MARCAS = merged;
           setMarcasState(merged);
-        }).subscribe((status) => {
-          if (status === "SUBSCRIBED") _marcasBroadcastCh = channel;
-        });
+        }).subscribe();
       }).catch(() => {
       });
       return () => {
         mounted = false;
-        _marcasBroadcastCh = null;
         if (channel) getSupabase().then((db) => db.removeChannel(channel)).catch(() => {
         });
       };
