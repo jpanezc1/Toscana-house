@@ -978,6 +978,24 @@ async function imprimirTicket(producto, marcaNombre) {
 }
 
 
+// ── Impresión con selección de cantidad ──────────────────────────────────────
+// Cuando el producto tiene más de 1 unidad, pregunta cuántas etiquetas imprimir.
+function imprimirConCantidad(prod, marcaNombre){
+  const stock = Math.max(1, Number(prod.stock) || 1);
+  const item = {...prod, marcaNombre: marcaNombre||prod.marcaNombre||""};
+  if(stock <= 1){
+    imprimirEtiquetasLote([{...item, stock:1}]);
+    return;
+  }
+  const input = window.prompt(
+    `¿Cuántas etiquetas de "${prod.nombre||prod.codigo}" querés imprimir?\n(Unidades en stock: ${stock})`,
+    String(stock)
+  );
+  if(input === null) return;
+  const cant = Math.max(1, Math.min(parseInt(input)||1, 9999));
+  imprimirEtiquetasLote(expandirPorStock([{...item, stock:cant}]));
+}
+
 // ── Impresión de etiquetas en lote (un solo popup para todo el cargamento) ──
 function imprimirEtiquetasLote(items) {
   if (!items || items.length === 0) return;
@@ -11677,7 +11695,7 @@ function App(){
     });
     setFInv({marcaId:"",nombre:"",categoria:"",precio:"",stock:"",fecha:hoy(),codigoManual:""});
     setShInv(false);
-    setTimeout(()=>imprimirEtiquetasLote(expandirPorStock([{...prod, marcaNombre:marca?.nombre||"Toscana House"}])), 300);
+    setTimeout(()=>imprimirConCantidad(prod, marca?.nombre||"Toscana House"), 300);
   }
 
   function darBaja(){
@@ -16652,7 +16670,7 @@ function InventarioPorMarca({inv, ventas, retiros=[], bajas=[], onRecibir, onBaj
                   {/* Imprimir */}
                   <div style={{textAlign:"right"}}>
                     <button
-                      onClick={()=>imprimirEtiquetasLote(expandirPorStock([{...prod, marcaNombre:marcaProd?.nombre||prod.marcaNombre||""}]))}
+                      onClick={()=>imprimirConCantidad(prod, marcaProd?.nombre||prod.marcaNombre||"")}
                       style={{
                         padding:"5px 8px",borderRadius:7,border:`1px solid ${C.gold}40`,
                         background:`${C.gold}08`,color:C.gold,fontSize:11,fontFamily:FONT,

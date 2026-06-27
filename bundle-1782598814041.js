@@ -22474,6 +22474,22 @@
     }
     return out;
   }
+  function imprimirConCantidad(prod, marcaNombre) {
+    const stock = Math.max(1, Number(prod.stock) || 1);
+    const item = { ...prod, marcaNombre: marcaNombre || prod.marcaNombre || "" };
+    if (stock <= 1) {
+      imprimirEtiquetasLote([{ ...item, stock: 1 }]);
+      return;
+    }
+    const input = window.prompt(
+      `\xBFCu\xE1ntas etiquetas de "${prod.nombre || prod.codigo}" quer\xE9s imprimir?
+(Unidades en stock: ${stock})`,
+      String(stock)
+    );
+    if (input === null) return;
+    const cant = Math.max(1, Math.min(parseInt(input) || 1, 9999));
+    imprimirEtiquetasLote(expandirPorStock([{ ...item, stock: cant }]));
+  }
   function imprimirEtiquetasLote(items) {
     if (!items || items.length === 0) return;
     const win = window.open("", "_blank", "width=900,height=700");
@@ -33945,7 +33961,7 @@ Esta acci\xF3n no se puede deshacer.`)) return;
       });
       setFInv({ marcaId: "", nombre: "", categoria: "", precio: "", stock: "", fecha: hoy(), codigoManual: "" });
       setShInv(false);
-      setTimeout(() => imprimirEtiquetasLote(expandirPorStock([{ ...prod, marcaNombre: marca?.nombre || "Toscana House" }])), 300);
+      setTimeout(() => imprimirConCantidad(prod, marca?.nombre || "Toscana House"), 300);
     }
     function darBaja() {
       const cod = bajaCod.trim().toUpperCase();
@@ -39732,7 +39748,7 @@ ${c.resumen || c.id}`)) onEliminarCarga(c.id);
       } }, prod.stock === 0 ? "\u2717 0" : prod.stock < 3 ? `\u26A0 ${prod.stock}` : `\u2713 ${prod.stock}`)), /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "right" } }, /* @__PURE__ */ import_react.default.createElement(
         "button",
         {
-          onClick: () => imprimirEtiquetasLote(expandirPorStock([{ ...prod, marcaNombre: marcaProd?.nombre || prod.marcaNombre || "" }])),
+          onClick: () => imprimirConCantidad(prod, marcaProd?.nombre || prod.marcaNombre || ""),
           style: {
             padding: "5px 8px",
             borderRadius: 7,
