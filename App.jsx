@@ -1353,6 +1353,7 @@ function cargarMarcas(){
 // Variable mutable — se actualiza cuando el admin crea/edita marcas.
 // Todo el código que lee MARCAS verá los cambios tras el siguiente render.
 let MARCAS = cargarMarcas();
+let _marcasBroadcastCh = null; // canal suscrito para broadcast de marcas
 
 const MESES = ["Enero","Febrero","Marzo","Abril","Mayo","Junio",
                "Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
@@ -11299,12 +11300,12 @@ function App(){
       localStorage.setItem("th_marcas", JSON.stringify(lista));
       MARCAS = lista;
       syncConRespaldo("marcas", lista, ()=>sbGuardarMarcas(lista));
-      // Broadcast para notificar a todas las sesiones abiertas en tiempo real
-      getSupabase().then(db=>{
-        db.channel("toscana-marcas-v1").send({
+      // Broadcast por el canal ya suscrito (único modo que funciona en Supabase)
+      if(_marcasBroadcastCh){
+        _marcasBroadcastCh.send({
           type:"broadcast", event:"marcas_updated", payload:{lista}
         }).catch(()=>{});
-      });
+      }
       return lista;
     });
     // Si se pidió crear usuario brand, añadirlo y sincronizar a Supabase
@@ -11446,7 +11447,7 @@ function App(){
     let channel=null, mounted=true;
     getSupabase().then(db=>{
       if(!mounted) return;
-      channel = db.channel("toscana-marcas-v1")
+      channel = db.channel("toscana-marcas-v1", {config:{broadcast:{self:false}}})
         .on("broadcast", {event:"marcas_updated"}, ({payload})=>{
           if(!mounted) return;
           const nuevaLista = payload?.lista;
@@ -11460,9 +11461,15 @@ function App(){
           MARCAS = merged;
           setMarcasState(merged);
         })
-        .subscribe();
+        .subscribe((status)=>{
+          if(status==="SUBSCRIBED") _marcasBroadcastCh = channel;
+        });
     }).catch(()=>{});
-    return ()=>{ mounted=false; if(channel) getSupabase().then(db=>db.removeChannel(channel)).catch(()=>{}); };
+    return ()=>{
+      mounted=false;
+      _marcasBroadcastCh=null;
+      if(channel) getSupabase().then(db=>db.removeChannel(channel)).catch(()=>{});
+    };
   },[]);// eslint-disable-line
 
   // Cargas históricas: productos de inventario que ya existían antes de
