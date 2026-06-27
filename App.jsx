@@ -15967,21 +15967,23 @@ function RegistroCargas({cargas, marcas, marcaId=null, onVerificar=null, user=nu
                       </div>
                       {/* ── Imprimir etiquetas de esta carga ── */}
                       {items.filter(it=>it.codigo&&it.nombre&&Number(it.stock||it.stockNuevo||1)>0).length>0&&(()=>{
+                        const _COLORES = new Set(["NEGRO","NEGRA","NEGROS","NEGRAS","BLANCO","BLANCA","BLANCOS","BLANCAS","BEIGE","ROSA","ROJO","ROJA","AZUL","VERDE","GRIS","CAFE","CAFÉ","MARRON","MARRÓN","MORADO","MORADA","LILA","LILA","AMARILLO","AMARILLA","NARANJA","CELESTE","TURQUESA","CREMA","NATURAL","NUDE","CORAL","SALMON","SALMÓN","BORDO","BORDÓ","VINO","MARFIL","IVORY","KHAKI","KAKI","MOSTAZA","TERRACOTA","MAGENTA","VIOLETA","PLATEADO","PLATEADA","DORADO","DORADA","ARENA","INDIGO","ÍNDIGO","MARENGO","AQUA","MENTA","LAVANDA","DURAZNO","NUDE","CAMEL","TOSTADO","TOSTADA","CHOCOLATE","PERLA","CIELO","PIEDRA","HUESO","COBRE","BRONCE","GRAFITO","ESMERALDA","BURDEOS","FRESA","MELON","MELÓN","LIMA","CANELA","GRANATE","NAVY"]);
                         const paraImprimir = items
                           .filter(it=>it.codigo&&it.nombre)
                           .map(it=>{
                             const prodInv = inv.find(p=>(p.codigo||"").toLowerCase()===(it.codigo||"").toLowerCase());
-                            // Talla: del item de carga → del producto en inv → del segmento medio del SKU → del nombre
+                            const _palabras = (it.nombre||"").toUpperCase().split(/\s+/);
+                            // Talla: item carga → inv.subcat → segmento medio SKU → del nombre
                             const _segs = (it.codigo||"").toUpperCase().split("-");
                             const _midSeg = _segs.length >= 3 ? _segs[_segs.length-2] : "";
                             const _tallaFromSku = /^[A-Za-z]{1,5}$/.test(_midSeg) ? _midSeg : "";
-                            const _palabras = (it.nombre||"").toUpperCase().split(/\s+/);
                             const _tallasList = ["UNICA","ÚNICA","XXL","XL","XS","S","M","L"];
                             const _tallaFromNombre = _palabras.slice().reverse().find(p=>_tallasList.includes(p)||(/^\d{2,3}$/.test(p)&&Number(p)>=30&&Number(p)<=60))||"";
                             const _talla = it.talla||prodInv?.subcat||_tallaFromSku||_tallaFromNombre||"";
-                            // Color: del item de carga → del producto en inv (descripcion)
+                            // Color: item carga → inv.descripcion → detectar en nombre
                             const _colorFromInv = (prodInv?.descripcion||"").split("·").map(s=>s.trim()).find(p=>p.startsWith("COLOR:"))?.replace("COLOR:","").trim()||"";
-                            const _color = it.color||_colorFromInv||"";
+                            const _colorFromNombre = _palabras.find(p=>_COLORES.has(p))||"";
+                            const _color = it.color||_colorFromInv||_colorFromNombre||"";
                             // descripcion final para la fila de color en etiqueta
                             const _desc = prodInv?.descripcion||[
                               _talla&&`TALLA: ${_talla}`,

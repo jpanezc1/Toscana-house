@@ -38901,17 +38901,19 @@ ${c.diferencia > 0.01 ? `Cliente paga diferencia: Bs ${fmt2(c.diferencia)} (${c.
         textOverflow: "ellipsis",
         whiteSpace: "nowrap"
       } }, (it.nombre || "").toUpperCase()), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: C.label3, fontFamily: FONT_MONO } }, it.codigo, " \xB7 ", it.marca || "\u2014")), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label2, fontFamily: FONT, textAlign: "right", flexShrink: 0 } }, it.tipo === "update" ? `${it.stockAntes} \u2192 ${it.stockNuevo} (+${it.stockSumado})` : `Stock ${it.stock}${it.precio ? ` \xB7 ${$(it.precio)}` : ""}`)))), items.filter((it) => it.codigo && it.nombre && Number(it.stock || it.stockNuevo || 1) > 0).length > 0 && (() => {
+        const _COLORES = /* @__PURE__ */ new Set(["NEGRO", "NEGRA", "NEGROS", "NEGRAS", "BLANCO", "BLANCA", "BLANCOS", "BLANCAS", "BEIGE", "ROSA", "ROJO", "ROJA", "AZUL", "VERDE", "GRIS", "CAFE", "CAF\xC9", "MARRON", "MARR\xD3N", "MORADO", "MORADA", "LILA", "LILA", "AMARILLO", "AMARILLA", "NARANJA", "CELESTE", "TURQUESA", "CREMA", "NATURAL", "NUDE", "CORAL", "SALMON", "SALM\xD3N", "BORDO", "BORD\xD3", "VINO", "MARFIL", "IVORY", "KHAKI", "KAKI", "MOSTAZA", "TERRACOTA", "MAGENTA", "VIOLETA", "PLATEADO", "PLATEADA", "DORADO", "DORADA", "ARENA", "INDIGO", "\xCDNDIGO", "MARENGO", "AQUA", "MENTA", "LAVANDA", "DURAZNO", "NUDE", "CAMEL", "TOSTADO", "TOSTADA", "CHOCOLATE", "PERLA", "CIELO", "PIEDRA", "HUESO", "COBRE", "BRONCE", "GRAFITO", "ESMERALDA", "BURDEOS", "FRESA", "MELON", "MEL\xD3N", "LIMA", "CANELA", "GRANATE", "NAVY"]);
         const paraImprimir = items.filter((it) => it.codigo && it.nombre).map((it) => {
           const prodInv = inv.find((p) => (p.codigo || "").toLowerCase() === (it.codigo || "").toLowerCase());
+          const _palabras = (it.nombre || "").toUpperCase().split(/\s+/);
           const _segs = (it.codigo || "").toUpperCase().split("-");
           const _midSeg = _segs.length >= 3 ? _segs[_segs.length - 2] : "";
           const _tallaFromSku = /^[A-Za-z]{1,5}$/.test(_midSeg) ? _midSeg : "";
-          const _palabras = (it.nombre || "").toUpperCase().split(/\s+/);
           const _tallasList = ["UNICA", "\xDANICA", "XXL", "XL", "XS", "S", "M", "L"];
           const _tallaFromNombre = _palabras.slice().reverse().find((p) => _tallasList.includes(p) || /^\d{2,3}$/.test(p) && Number(p) >= 30 && Number(p) <= 60) || "";
           const _talla = it.talla || prodInv?.subcat || _tallaFromSku || _tallaFromNombre || "";
           const _colorFromInv = (prodInv?.descripcion || "").split("\xB7").map((s) => s.trim()).find((p) => p.startsWith("COLOR:"))?.replace("COLOR:", "").trim() || "";
-          const _color = it.color || _colorFromInv || "";
+          const _colorFromNombre = _palabras.find((p) => _COLORES.has(p)) || "";
+          const _color = it.color || _colorFromInv || _colorFromNombre || "";
           const _desc = prodInv?.descripcion || [
             _talla && `TALLA: ${_talla}`,
             _color && `COLOR: ${_color}`
