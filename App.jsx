@@ -12048,7 +12048,7 @@ function App(){
   ];
   // Caja: solo inicio + POS + ventas + cambios (no acceso a admin, marcas, config)
   const TABS = user?.rol==="caja"
-    ? TABS_ALL.filter(t=>["inicio","pos","ventas","cambios"].includes(t.id))
+    ? TABS_ALL.filter(t=>["inicio","pos","ventas","cambios","inventario"].includes(t.id))
     : user?.rol==="admin" ? TABS_ALL
     : TABS_ALL.filter(t=>t.id!=="auditoria"&&t.id!=="cargas"&&t.id!=="ventas_ant");
 
@@ -16668,12 +16668,14 @@ function InventarioPorMarca({inv, ventas, retiros=[], bajas=[], onRecibir, onBaj
         boxShadow:"0 -4px 16px rgba(0,0,0,0.06)",
       }}>
         <div style={{display:"flex",gap:8,marginBottom:8}}>
-          <IOSBtn onPress={onBaja}    variant="fill" full small icon="🗑">Dar de Baja</IOSBtn>
+          {user?.rol!=="caja"&&<IOSBtn onPress={onBaja} variant="fill" full small icon="🗑">Dar de Baja</IOSBtn>}
           <IOSBtn onPress={onRecibir} full small icon="+">Recibir</IOSBtn>
         </div>
+        {user?.rol!=="caja"&&(
         <div style={{display:"flex",gap:8,marginBottom:8}}>
           <IOSBtn onPress={onReponer} variant="fill" full small icon="📦">Reponer Stock</IOSBtn>
         </div>
+        )}
         {syncMsg && (
           <div style={{background:syncMsg==="ok"?"#e8f5e9":syncMsg==="err"?"#ffebee":"#e3f2fd",
             borderRadius:10,padding:"8px 12px",marginBottom:8,fontSize:13,fontFamily:FONT,
