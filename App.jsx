@@ -7421,8 +7421,13 @@ function ImportarExcelModal({inv, onImportar, onClose, onArchivoCapturado}){
                 )?.[0] || null)
               : null);
         if(matchKey){
+          const existing = filasMap.get(matchKey);
           // Mismo código → mismo producto, sumar stock
-          filasMap.get(matchKey).stock += f.stock;
+          existing.stock += f.stock;
+          // Alerta si la categoría difiere (posible error en el Excel)
+          if(f.cat && existing.cat && f.cat !== existing.cat){
+            existing._conflictoCat = `Categoría "${f.cat}" difiere de "${existing.cat}"`;
+          }
         } else {
           filasMap.set(keyByCod, {...f});
         }
@@ -7807,9 +7812,11 @@ function ImportarExcelModal({inv, onImportar, onClose, onArchivoCapturado}){
             {/* Filas */}
             {previstaFiltrada.map((f,i)=>{
               const hasErr = f._errs.length>0;
-              const rowBg  = hasErr?`${C.red}07`:f._dup?`${C.amber}07`:"transparent";
+              const rowBg  = hasErr?`${C.red}07`:f._conflictoCat?`${C.amber}12`:f._dup?`${C.amber}07`:"transparent";
               const estadoChip = hasErr
                 ? {txt:f._errs[0], color:C.red}
+                : f._conflictoCat
+                ? {txt:`⚠ ${f._conflictoCat}`, color:C.amber}
                 : f._dup
                 ? {txt:"Actualiza stock", color:C.amber}
                 : {txt:"✓ Válido", color:C.green};

@@ -29019,7 +29019,11 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
             ([, v]) => descKey(v.marcaNombre, v.desc, v.talla, v.color) === keyByDesc
           )?.[0] || null : null;
           if (matchKey) {
-            filasMap.get(matchKey).stock += f.stock;
+            const existing = filasMap.get(matchKey);
+            existing.stock += f.stock;
+            if (f.cat && existing.cat && f.cat !== existing.cat) {
+              existing._conflictoCat = `Categor\xEDa "${f.cat}" difiere de "${existing.cat}"`;
+            }
           } else {
             filasMap.set(keyByCod, { ...f });
           }
@@ -29387,8 +29391,8 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       fontFamily: FONT_UI
     } }, h))), previstaFiltrada.map((f, i) => {
       const hasErr = f._errs.length > 0;
-      const rowBg = hasErr ? `${C.red}07` : f._dup ? `${C.amber}07` : "transparent";
-      const estadoChip = hasErr ? { txt: f._errs[0], color: C.red } : f._dup ? { txt: "Actualiza stock", color: C.amber } : { txt: "\u2713 V\xE1lido", color: C.green };
+      const rowBg = hasErr ? `${C.red}07` : f._conflictoCat ? `${C.amber}12` : f._dup ? `${C.amber}07` : "transparent";
+      const estadoChip = hasErr ? { txt: f._errs[0], color: C.red } : f._conflictoCat ? { txt: `\u26A0 ${f._conflictoCat}`, color: C.amber } : f._dup ? { txt: "Actualiza stock", color: C.amber } : { txt: "\u2713 V\xE1lido", color: C.green };
       return /* @__PURE__ */ import_react.default.createElement("div", { key: i, style: {
         display: "grid",
         gridTemplateColumns: "2fr 1fr 1.5fr 0.6fr 0.6fr 1fr",
