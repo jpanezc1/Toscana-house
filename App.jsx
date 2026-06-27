@@ -157,6 +157,22 @@ async function sbEliminarProductoPorCodigo(codigo) {
   } catch(e) { console.warn("Supabase eliminar producto por código:", e.message); return false; }
 }
 
+// Eliminar MUCHOS productos en UN solo request (DELETE ... WHERE codigo IN (...)).
+// Confiable frente a borrados masivos: no genera ráfaga de N requests.
+async function sbEliminarProductosPorCodigos(codigos) {
+  if (!codigos || codigos.length === 0) return true;
+  try {
+    const db = await getSupabase();
+    // En chunks de 200 para no exceder límites de la query string
+    for (let i = 0; i < codigos.length; i += 200) {
+      const chunk = codigos.slice(i, i + 200);
+      const { error } = await db.from("inventario").delete().in("codigo", chunk);
+      if (error) throw error;
+    }
+    return true;
+  } catch(e) { console.warn("Supabase eliminar productos (bulk):", e.message); return false; }
+}
+
 async function sbEliminarCarga(cargaId) {
   try {
     const db = await getSupabase();
@@ -521,6 +537,25 @@ async function sbCargarTodo() {
   }
 }
 
+// Recarga SOLO el inventario desde Supabase (fuente de verdad).
+// Se usa cuando se elimina una carga en otro dispositivo: en vez de depender
+// de recibir N eventos DELETE individuales (que el realtime descarta en ráfaga),
+// se vuelve a leer la lista completa y queda 100% sincronizada.
+async function sbCargarInventario() {
+  try {
+    const db = await getSupabase();
+    const { data, error } = await db.from("inventario").select("*");
+    if (error) throw error;
+    return (data || []).map(p => ({
+      id: p.id, codigo: p.codigo, marcaId: p.marca_id,
+      marcaNombre: p.marca_nombre, nombre: p.nombre,
+      categoria: p.categoria, precio: p.precio,
+      descripcion: p.descripcion||"", subcat: p.subcat||"",
+      stock: p.stock, stockInicial: p.stock_inicial, fecha: p.fecha
+    }));
+  } catch(e) { console.warn("Supabase recargar inventario:", e.message); return null; }
+}
+
 // ── Auditoría forense en la nube (sync en tiempo real entre dispositivos) ──
 async function sbGuardarAuditLog(evento) {
   try {
@@ -587,6 +622,7 @@ async function ejecutarOpOutbox(op){
     case "usuarios":    return await sbGuardarUsuarios(op.payload);
     case "marcas":      return await sbGuardarMarcas(op.payload);
     case "eliminarProductoCodigo": return await sbEliminarProductoPorCodigo(op.payload.codigo);
+    case "eliminarProductosCodigos": return await sbEliminarProductosPorCodigos(op.payload.codigos);
     case "eliminarCarga":          return await sbEliminarCarga(op.payload.cargaId);
     default: return true; // tipo desconocido — no bloquear la cola
   }
@@ -11454,6 +11490,18 @@ function App(){
           if(!mounted) return;
           setCargas(prev=>prev.some(x=>x.id===carga.id) ? prev : [carga, ...prev]);
         })
+        // ── Carga eliminada en otro dispositivo ──────────────────────────
+        // Quita la carga local y RECARGA el inventario completo desde Supabase.
+        // Esto garantiza el borrado 100% sin depender de N eventos DELETE de
+        // inventario (que el realtime descarta en ráfaga → borrado parcial).
+        .on("postgres_changes", {event:"DELETE", schema:"public", table:"cargas_inventario"}, payload=>{
+          if(!mounted) return;
+          const cargaId = payload.old?.id;
+          if(cargaId) setCargas(prev=>prev.filter(c=>c.id!==cargaId));
+          sbCargarInventario().then(lista=>{
+            if(mounted && Array.isArray(lista)) setInv(lista);
+          });
+        })
         .subscribe();
     }).catch(()=>{});
     return ()=>{ mounted=false; if(channel) getSupabase().then(db=>db.removeChannel(channel)).catch(()=>{}); };
@@ -11881,17 +11929,19 @@ function App(){
       : "¿Eliminar esta carga? Esta acción no se puede deshacer.";
     if(!window.confirm(msg)) return;
 
-    // Revertir stock: borrar productos nuevos, restaurar stock anterior en updates.
-    // Se elimina por CÓDIGO (no por id) porque el id local puede ser temporal y no
-    // coincidir con el id serial de Supabase → el DELETE por id fallaría silenciosamente.
-    for(const it of nuevos){
-      const prod = inv.find(p=>p.codigo===it.codigo);
-      if(prod){
-        setInv(prev=>prev.filter(p=>p.codigo!==it.codigo));
-        // syncConRespaldo garantiza reintento vía outbox si falla la red
-        syncConRespaldo("eliminarProductoCodigo", {codigo:it.codigo}, ()=>sbEliminarProductoPorCodigo(it.codigo));
-      }
+    // Códigos de productos nuevos que realmente existen en el inventario.
+    // Se elimina por CÓDIGO (no por id): el id local puede ser temporal y no
+    // coincidir con el id serial de Supabase → el DELETE por id fallaría.
+    const codigosABorrar = nuevos
+      .map(it=>inv.find(p=>p.codigo===it.codigo)?.codigo)
+      .filter(Boolean);
+
+    // 1. Optimista: quitar del estado local de inmediato
+    if(codigosABorrar.length){
+      const setCods = new Set(codigosABorrar);
+      setInv(prev=>prev.filter(p=>!setCods.has(p.codigo)));
     }
+    // 2. Restaurar stock anterior en updates
     for(const it of updates){
       const prod = inv.find(p=>p.codigo===it.codigo);
       if(prod){
@@ -11901,8 +11951,24 @@ function App(){
       }
     }
 
+    // 3. Borrado BULK en la nube (un solo request) y ESPERARLO antes de borrar la
+    //    carga. Así, cuando las otras sesiones reciban el DELETE de la carga y
+    //    recarguen el inventario, los productos YA no están → borrado 100%.
+    let bulkOk = true;
+    if(codigosABorrar.length){
+      bulkOk = await sbEliminarProductosPorCodigos(codigosABorrar);
+      if(!bulkOk) pushToOutbox("eliminarProductosCodigos", {codigos:codigosABorrar});
+    }
+
+    // 4. Eliminar la carga (dispara la recarga en las otras sesiones)
     setCargas(prev=>prev.filter(c=>c.id!==cargaId));
-    syncConRespaldo("eliminarCarga", {cargaId}, ()=>sbEliminarCarga(cargaId));
+    if(bulkOk){
+      syncConRespaldo("eliminarCarga", {cargaId}, ()=>sbEliminarCarga(cargaId));
+    } else {
+      // Si el bulk quedó en outbox, encolar también la carga para que se borre
+      // recién después (el outbox procesa en orden FIFO)
+      pushToOutbox("eliminarCarga", {cargaId});
+    }
     const c2 = JSON.parse(localStorage.getItem("th_cargas")||"[]");
     localStorage.setItem("th_cargas", JSON.stringify(c2.filter(c=>c.id!==cargaId)));
   }

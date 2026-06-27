@@ -21596,6 +21596,21 @@
       return false;
     }
   }
+  async function sbEliminarProductosPorCodigos(codigos) {
+    if (!codigos || codigos.length === 0) return true;
+    try {
+      const db = await getSupabase();
+      for (let i = 0; i < codigos.length; i += 200) {
+        const chunk = codigos.slice(i, i + 200);
+        const { error } = await db.from("inventario").delete().in("codigo", chunk);
+        if (error) throw error;
+      }
+      return true;
+    } catch (e) {
+      console.warn("Supabase eliminar productos (bulk):", e.message);
+      return false;
+    }
+  }
   async function sbEliminarCarga(cargaId) {
     try {
       const db = await getSupabase();
@@ -22076,6 +22091,30 @@
       return null;
     }
   }
+  async function sbCargarInventario() {
+    try {
+      const db = await getSupabase();
+      const { data, error } = await db.from("inventario").select("*");
+      if (error) throw error;
+      return (data || []).map((p) => ({
+        id: p.id,
+        codigo: p.codigo,
+        marcaId: p.marca_id,
+        marcaNombre: p.marca_nombre,
+        nombre: p.nombre,
+        categoria: p.categoria,
+        precio: p.precio,
+        descripcion: p.descripcion || "",
+        subcat: p.subcat || "",
+        stock: p.stock,
+        stockInicial: p.stock_inicial,
+        fecha: p.fecha
+      }));
+    } catch (e) {
+      console.warn("Supabase recargar inventario:", e.message);
+      return null;
+    }
+  }
   async function sbGuardarAuditLog(evento) {
     try {
       const db = await getSupabase();
@@ -22163,6 +22202,8 @@
         return await sbGuardarMarcas(op.payload);
       case "eliminarProductoCodigo":
         return await sbEliminarProductoPorCodigo(op.payload.codigo);
+      case "eliminarProductosCodigos":
+        return await sbEliminarProductosPorCodigos(op.payload.codigos);
       case "eliminarCarga":
         return await sbEliminarCarga(op.payload.cargaId);
       default:
@@ -33664,6 +33705,13 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
           };
           if (!mounted) return;
           setCargas((prev) => prev.some((x) => x.id === carga.id) ? prev : [carga, ...prev]);
+        }).on("postgres_changes", { event: "DELETE", schema: "public", table: "cargas_inventario" }, (payload) => {
+          if (!mounted) return;
+          const cargaId = payload.old?.id;
+          if (cargaId) setCargas((prev) => prev.filter((c) => c.id !== cargaId));
+          sbCargarInventario().then((lista) => {
+            if (mounted && Array.isArray(lista)) setInv(lista);
+          });
         }).subscribe();
       }).catch(() => {
       });
@@ -34167,12 +34215,10 @@ ${resumen}
 
 Esta acci\xF3n no se puede deshacer.` : "\xBFEliminar esta carga? Esta acci\xF3n no se puede deshacer.";
       if (!window.confirm(msg)) return;
-      for (const it of nuevos) {
-        const prod = inv.find((p) => p.codigo === it.codigo);
-        if (prod) {
-          setInv((prev) => prev.filter((p) => p.codigo !== it.codigo));
-          syncConRespaldo("eliminarProductoCodigo", { codigo: it.codigo }, () => sbEliminarProductoPorCodigo(it.codigo));
-        }
+      const codigosABorrar = nuevos.map((it) => inv.find((p) => p.codigo === it.codigo)?.codigo).filter(Boolean);
+      if (codigosABorrar.length) {
+        const setCods = new Set(codigosABorrar);
+        setInv((prev) => prev.filter((p) => !setCods.has(p.codigo)));
       }
       for (const it of updates) {
         const prod = inv.find((p) => p.codigo === it.codigo);
@@ -34182,8 +34228,17 @@ Esta acci\xF3n no se puede deshacer.` : "\xBFEliminar esta carga? Esta acci\xF3n
           syncConRespaldo("stock", { prodId: prod.id, stock: stockRestaurado }, () => sbActualizarStock(prod.id, stockRestaurado));
         }
       }
+      let bulkOk = true;
+      if (codigosABorrar.length) {
+        bulkOk = await sbEliminarProductosPorCodigos(codigosABorrar);
+        if (!bulkOk) pushToOutbox("eliminarProductosCodigos", { codigos: codigosABorrar });
+      }
       setCargas((prev) => prev.filter((c) => c.id !== cargaId));
-      syncConRespaldo("eliminarCarga", { cargaId }, () => sbEliminarCarga(cargaId));
+      if (bulkOk) {
+        syncConRespaldo("eliminarCarga", { cargaId }, () => sbEliminarCarga(cargaId));
+      } else {
+        pushToOutbox("eliminarCarga", { cargaId });
+      }
       const c2 = JSON.parse(localStorage.getItem("th_cargas") || "[]");
       localStorage.setItem("th_cargas", JSON.stringify(c2.filter((c) => c.id !== cargaId)));
     }
