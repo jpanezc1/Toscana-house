@@ -689,6 +689,11 @@ function useRealtimeSync(setVentas, setInv, setRetiros) {
             ...i, stock: p.stock, nombre: p.nombre, precio: p.precio, categoria: p.categoria, descripcion: p.descripcion||i.descripcion
           } : i));
         })
+        // ── Producto eliminado del inventario (rollback de carga) ──────────
+        .on("postgres_changes", { event: "DELETE", schema: "public", table: "inventario" }, payload => {
+          const id = payload.old?.id;
+          if(mounted && id) setInv(prev => prev.filter(i => i.id !== id));
+        })
         // ── Retiro registrado en otro dispositivo ───────────────────────
         .on("postgres_changes", { event: "INSERT", schema: "public", table: "retiros" }, payload => {
           const r = payload.new;

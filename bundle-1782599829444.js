@@ -22277,6 +22277,9 @@
             categoria: p.categoria,
             descripcion: p.descripcion || i.descripcion
           } : i));
+        }).on("postgres_changes", { event: "DELETE", schema: "public", table: "inventario" }, (payload) => {
+          const id = payload.old?.id;
+          if (mounted && id) setInv((prev) => prev.filter((i) => i.id !== id));
         }).on("postgres_changes", { event: "INSERT", schema: "public", table: "retiros" }, (payload) => {
           const r = payload.new;
           const retiro = {
