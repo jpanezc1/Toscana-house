@@ -511,14 +511,30 @@ async function sbEliminarUsuario(usuario) {
   } catch(e) { console.warn("Supabase delete usuario:", e.message); }
 }
 
+// PostgREST corta en 1000 filas por request. Este helper trae TODO paginando
+// con .range() hasta que una página devuelve menos de 1000 (fin de la tabla).
+// Sin esto, inventarios/ventas con >1000 filas se cargaban truncados.
+async function sbSelectAll(db, tabla, columns="*") {
+  const PAGE = 1000;
+  let from = 0, out = [];
+  for(;;){
+    const { data, error } = await db.from(tabla).select(columns).range(from, from+PAGE-1);
+    if(error) throw error;
+    out = out.concat(data||[]);
+    if(!data || data.length < PAGE) break;
+    from += PAGE;
+  }
+  return out;
+}
+
 async function sbCargarTodo() {
   try {
     const db = await getSupabase();
-    const [{ data: inv }, { data: ventas }, { data: items }, { data: cierres }] = await Promise.all([
-      db.from("inventario").select("*"),
-      db.from("ventas").select("*"),
-      db.from("venta_items").select("*"),
-      db.from("cierres").select("*"),
+    const [inv, ventas, items, cierres] = await Promise.all([
+      sbSelectAll(db, "inventario"),
+      sbSelectAll(db, "ventas"),
+      sbSelectAll(db, "venta_items"),
+      sbSelectAll(db, "cierres"),
     ]);
 
     // Reconstruir ventas con sus items
@@ -562,8 +578,7 @@ async function sbCargarTodo() {
 async function sbCargarInventario() {
   try {
     const db = await getSupabase();
-    const { data, error } = await db.from("inventario").select("*");
-    if (error) throw error;
+    const data = await sbSelectAll(db, "inventario");
     return (data || []).map(p => ({
       id: p.id, codigo: p.codigo, marcaId: p.marca_id,
       marcaNombre: p.marca_nombre, nombre: p.nombre,
