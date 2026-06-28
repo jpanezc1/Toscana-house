@@ -4933,12 +4933,15 @@ function useAuth() {
       return { ok: true };
     }
 
-    // Intentar también desde tabla usuarios (usuarios custom)
+    // Intentar también desde tabla usuarios (usuarios custom).
+    // Verifica la contraseña contra la columna `password` — antes NO se chequeaba
+    // (cualquier contraseña entraba). Si la cuenta no tiene password seteada,
+    // se rechaza (no se permite login sin credencial).
     try {
       const db = await getSupabase();
-      const { data } = await db.from("usuarios").select("usuario,nombre,rol,estado,marca_id")
+      const { data } = await db.from("usuarios").select("usuario,nombre,rol,estado,marca_id,password")
         .eq("usuario", uLow).single();
-      if (data && data.estado !== "inactivo") {
+      if (data && data.estado !== "inactivo" && data.password && data.password === pass) {
         setUser({ usuario:data.usuario, nombre:data.nombre, rol:data.rol,
           estado:data.estado, marcaId:data.marca_id, loginAt:Date.now() });
         return { ok: true };

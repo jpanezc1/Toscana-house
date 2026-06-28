@@ -26604,8 +26604,8 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       }
       try {
         const db = await getSupabase();
-        const { data } = await db.from("usuarios").select("usuario,nombre,rol,estado,marca_id").eq("usuario", uLow).single();
-        if (data && data.estado !== "inactivo") {
+        const { data } = await db.from("usuarios").select("usuario,nombre,rol,estado,marca_id,password").eq("usuario", uLow).single();
+        if (data && data.estado !== "inactivo" && data.password && data.password === pass) {
           setUser({
             usuario: data.usuario,
             nombre: data.nombre,
