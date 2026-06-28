@@ -7554,7 +7554,7 @@ function ImportarExcelModal({inv, onImportar, onClose, onArchivoCapturado}){
     // ── Códigos que SÍ deberían quedar en el inventario tras la carga ──
     const codigosEsperados = importables.map(f=>f.sku.toUpperCase().trim());
 
-    const totalUnidades = importables.reduce((s,f)=>s+(Number(f.stock)||1),0);
+    const totalUnidades = importables.reduce((s,f)=>s+(Number(f.stock)||0),0);
     setStats({ok, upd, skip:omitidos.length, total:preview.length, omitidos, codigosEsperados, totalUnidades});
     setVerif({checking:true, intento:0, faltantes:[], confirmados:0, total:codigosEsperados.length});
     setEstado("done");
@@ -8155,7 +8155,7 @@ function ImportarExcelModal({inv, onImportar, onClose, onArchivoCapturado}){
                 return {nombre:(prod?.nombre||f.desc||"").toUpperCase(), codigo:f.sku.toUpperCase(), precio:prod?.precio||f.precio, marcaNombre:prod?.marcaNombre||f.marcaNombre, descripcion:prod?.descripcion||f.desc||"", stock:f.stock};
               }),
             ];
-            const totalEtiquetas = todosParaEtiquetas.reduce((acc,f)=>acc+Math.max(1,Number(f.stock)||1),0);
+            const totalEtiquetas = todosParaEtiquetas.reduce((acc,f)=>acc+(Number(f.stock)||0),0);
             return (
             <button
               onClick={()=>imprimirEtiquetasLote(expandirPorStock(todosParaEtiquetas))}
@@ -16358,7 +16358,7 @@ function RegistroCargas({cargas, marcas, marcaId=null, onVerificar=null, user=nu
                               subcat: _talla,
                             };
                           });
-                        const totalEtiq = paraImprimir.reduce((s,it)=>s+Math.max(1,it.stock),0);
+                        const totalEtiq = paraImprimir.reduce((s,it)=>s+(Number(it.stock)||0),0);
                         return (
                           <button
                             onClick={e=>{e.stopPropagation(); imprimirEtiquetasLote(expandirPorStock(paraImprimir));}}

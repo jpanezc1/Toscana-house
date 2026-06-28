@@ -29139,7 +29139,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       }
       const omitidos = preview.filter((f) => !(f.desc && f.marcaId && f.precio > 0)).map((f) => ({ sku: f.sku, desc: f.desc, marca: f.marcaNombre, errs: f._errs }));
       const codigosEsperados = importables.map((f) => f.sku.toUpperCase().trim());
-      const totalUnidades = importables.reduce((s, f) => s + (Number(f.stock) || 1), 0);
+      const totalUnidades = importables.reduce((s, f) => s + (Number(f.stock) || 0), 0);
       setStats({ ok, upd, skip: omitidos.length, total: preview.length, omitidos, codigosEsperados, totalUnidades });
       setVerif({ checking: true, intento: 0, faltantes: [], confirmados: 0, total: codigosEsperados.length });
       setEstado("done");
@@ -29750,7 +29750,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
           return { nombre: (prod?.nombre || f.desc || "").toUpperCase(), codigo: f.sku.toUpperCase(), precio: prod?.precio || f.precio, marcaNombre: prod?.marcaNombre || f.marcaNombre, descripcion: prod?.descripcion || f.desc || "", stock: f.stock };
         })
       ];
-      const totalEtiquetas = todosParaEtiquetas.reduce((acc, f) => acc + Math.max(1, Number(f.stock) || 1), 0);
+      const totalEtiquetas = todosParaEtiquetas.reduce((acc, f) => acc + (Number(f.stock) || 0), 0);
       return /* @__PURE__ */ import_react.default.createElement(
         "button",
         {
@@ -39252,7 +39252,7 @@ ${c.diferencia > 0.01 ? `Cliente paga diferencia: Bs ${fmt2(c.diferencia)} (${c.
             subcat: _talla
           };
         });
-        const totalEtiq = paraImprimir.reduce((s, it) => s + Math.max(1, it.stock), 0);
+        const totalEtiq = paraImprimir.reduce((s, it) => s + (Number(it.stock) || 0), 0);
         return /* @__PURE__ */ import_react.default.createElement(
           "button",
           {
