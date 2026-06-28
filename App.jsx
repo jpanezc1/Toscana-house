@@ -17008,9 +17008,14 @@ function InventarioPorMarca({inv, ventas, retiros=[], bajas=[], onRecibir, onBaj
         <div style={{display:"flex",gap:8,marginTop:8}}>
           <IOSBtn onPress={()=>{
               if(productos.length===0){ alert("No hay productos para imprimir"); return; }
+              imprimirEtiquetasLote(productos);
+            }}
+            full small icon="🏷">{`${productos.length} etiqueta${productos.length!==1?'s':''} · 1 por código`}</IOSBtn>
+          <IOSBtn onPress={()=>{
+              if(productos.length===0){ alert("No hay productos para imprimir"); return; }
               imprimirEtiquetasLote(expandirPorStock(productos));
             }}
-            full small icon="🏷">{`Imprimir ${productos.reduce((acc,p)=>acc+Math.max(0,Number(p.stock)||0),0)} etiqueta${productos.length!==1?'s':''} (código de barras)`}</IOSBtn>
+            variant="fill" full small icon="🏷">{`${productos.reduce((acc,p)=>acc+Math.max(0,Number(p.stock)||0),0)} · 1 por unidad`}</IOSBtn>
         </div>
       </div>
 

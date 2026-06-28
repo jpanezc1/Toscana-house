@@ -40132,13 +40132,29 @@ ${c.resumen || c.id}`)) onEliminarCarga(c.id);
             alert("No hay productos para imprimir");
             return;
           }
-          imprimirEtiquetasLote(expandirPorStock(productos));
+          imprimirEtiquetasLote(productos);
         },
         full: true,
         small: true,
         icon: "\u{1F3F7}"
       },
-      `Imprimir ${productos.reduce((acc, p) => acc + Math.max(0, Number(p.stock) || 0), 0)} etiqueta${productos.length !== 1 ? "s" : ""} (c\xF3digo de barras)`
+      `${productos.length} etiqueta${productos.length !== 1 ? "s" : ""} \xB7 1 por c\xF3digo`
+    ), /* @__PURE__ */ import_react.default.createElement(
+      IOSBtn,
+      {
+        onPress: () => {
+          if (productos.length === 0) {
+            alert("No hay productos para imprimir");
+            return;
+          }
+          imprimirEtiquetasLote(expandirPorStock(productos));
+        },
+        variant: "fill",
+        full: true,
+        small: true,
+        icon: "\u{1F3F7}"
+      },
+      `${productos.reduce((acc, p) => acc + Math.max(0, Number(p.stock) || 0), 0)} \xB7 1 por unidad`
     ))), (ventasCodigoInv || ventaAbiertaInv) && (() => {
       const cerrarTodo = () => {
         setVentaAbiertaInv(null);
