@@ -29081,7 +29081,8 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
             const existing = filasMap.get(matchKey);
             existing.stock += f.stock;
             if (f.cat && existing.cat && f.cat !== existing.cat) {
-              existing._conflictoCat = `Categor\xEDa "${f.cat}" difiere de "${existing.cat}"`;
+              existing._conflictoCat = `Cat. "${f.cat}" \u2260 "${existing.cat}"`;
+              existing._bloqueado = true;
             }
           } else {
             filasMap.set(keyByCod, { ...f });
@@ -29098,7 +29099,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
     }
     async function importar() {
       setEstado("importando");
-      const importables = preview.filter((f) => f.desc && f.marcaId && f.precio > 0);
+      const importables = preview.filter((f) => f.desc && f.marcaId && f.precio > 0 && !f._bloqueado);
       let ok = 0, upd = 0;
       for (const f of importables) {
         if (f._dup) {
@@ -29260,17 +29261,22 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
         parsearArchivo(f);
       }
     }
+    function desbloquearFila(sku) {
+      setPreview((prev) => prev.map((f) => f.sku.toUpperCase() === sku.toUpperCase() ? { ...f, _bloqueado: false } : f));
+    }
     const previstaFiltrada = (0, import_react.useMemo)(() => {
-      if (filtro === "validas") return preview.filter((f) => f._errs.length === 0 && !f._dup);
+      if (filtro === "validas") return preview.filter((f) => f._errs.length === 0 && !f._dup && !f._bloqueado);
       if (filtro === "errores") return preview.filter((f) => f._errs.length > 0);
-      if (filtro === "dups") return preview.filter((f) => f._dup);
+      if (filtro === "dups") return preview.filter((f) => f._dup && !f._bloqueado);
+      if (filtro === "conflictos") return preview.filter((f) => f._bloqueado);
       return preview;
     }, [preview, filtro]);
-    const nValidas = preview.filter((f) => f._errs.length === 0).length;
+    const nConflictos = preview.filter((f) => f._bloqueado).length;
+    const nValidas = preview.filter((f) => f._errs.length === 0 && !f._bloqueado).length;
     const nErrores = preview.filter((f) => f._errs.length > 0).length;
-    const nDups = preview.filter((f) => f._dup).length;
+    const nDups = preview.filter((f) => f._dup && !f._bloqueado).length;
     const nAuto = preview.filter((f) => f.autoSKU).length;
-    const nUnidades = preview.filter((f) => f._errs.length === 0).reduce((s, f) => s + (Number(f.stock) || 0), 0);
+    const nUnidades = preview.filter((f) => f._errs.length === 0 && !f._bloqueado).reduce((s, f) => s + (Number(f.stock) || 0), 0);
     return /* @__PURE__ */ import_react.default.createElement(Sheet, { open: true, title: "Importar Excel \u2014 Inventario", onClose, tall: true }, /* @__PURE__ */ import_react.default.createElement("div", { style: { padding: "0 4px 20px" } }, estado === "idle" && /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: {
       background: `${C.gold}10`,
       border: `1.5px solid ${C.gold}35`,
@@ -29397,12 +29403,40 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       padding: "10px 8px",
       textAlign: "center",
       border: `1px solid ${s.c}25`
-    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 20, fontWeight: 700, color: s.c, fontFamily: FONT_UI } }, s.v), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: C.label3, fontFamily: FONT_UI, textTransform: "uppercase", letterSpacing: 0.5 } }, s.l)))), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 6, marginBottom: 12, flexWrap: "wrap" } }, [
-      { id: "todas", l: `Todas (${preview.length})` },
-      { id: "validas", l: `V\xE1lidas (${nValidas})` },
-      { id: "errores", l: `Errores (${nErrores})` },
-      { id: "dups", l: `Duplicadas (${nDups})` },
-      { id: "etiquetas", l: `\u{1F3F7} Etiquetas` }
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 20, fontWeight: 700, color: s.c, fontFamily: FONT_UI } }, s.v), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: C.label3, fontFamily: FONT_UI, textTransform: "uppercase", letterSpacing: 0.5 } }, s.l)))), nConflictos > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      background: `${C.red}0d`,
+      border: `1.5px solid ${C.red}50`,
+      borderRadius: 12,
+      padding: "10px 14px",
+      marginBottom: 12,
+      display: "flex",
+      alignItems: "center",
+      gap: 10
+    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 16 } }, "\u{1F6AB}"), /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, fontWeight: 700, color: C.red, fontFamily: FONT_UI } }, nConflictos, " c\xF3digo", nConflictos !== 1 ? "s" : "", " bloqueado", nConflictos !== 1 ? "s" : "", " por conflicto de categor\xEDa"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT_UI, marginTop: 2 } }, "Mismo c\xF3digo, categor\xEDa distinta. Confirm\xE1 fila por fila antes de importar.")), /* @__PURE__ */ import_react.default.createElement(
+      "button",
+      {
+        onClick: () => setFiltro("conflictos"),
+        style: {
+          background: C.red,
+          border: "none",
+          borderRadius: 8,
+          padding: "5px 10px",
+          fontSize: 11,
+          fontWeight: 700,
+          color: "#fff",
+          cursor: "pointer",
+          fontFamily: FONT_UI,
+          whiteSpace: "nowrap"
+        }
+      },
+      "Ver conflictos"
+    )), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 6, marginBottom: 12, flexWrap: "wrap" } }, [
+      { id: "todas", l: `Todas (${preview.length})`, ac: C.label },
+      { id: "validas", l: `V\xE1lidas (${nValidas})`, ac: C.label },
+      { id: "errores", l: `Errores (${nErrores})`, ac: C.label },
+      { id: "dups", l: `Duplicadas (${nDups})`, ac: C.label },
+      ...nConflictos > 0 ? [{ id: "conflictos", l: `\u{1F6AB} Conflictos (${nConflictos})`, ac: C.red }] : [],
+      { id: "etiquetas", l: `\u{1F3F7} Etiquetas`, ac: C.label }
     ].map((ft) => /* @__PURE__ */ import_react.default.createElement(
       "button",
       {
@@ -29416,9 +29450,9 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
           fontFamily: FONT_UI,
           cursor: "pointer",
           transition: "all .12s",
-          border: `1px solid ${filtro === ft.id ? C.label : C.sep}`,
-          background: filtro === ft.id ? C.label : C.bg0,
-          color: filtro === ft.id ? C.bg0 : C.label3
+          border: `1px solid ${filtro === ft.id ? ft.ac : C.sep}`,
+          background: filtro === ft.id ? ft.ac : C.bg0,
+          color: filtro === ft.id ? C.bg0 : ft.id === "conflictos" ? C.red : C.label3
         }
       },
       ft.l
@@ -29450,16 +29484,16 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       fontFamily: FONT_UI
     } }, h))), previstaFiltrada.map((f, i) => {
       const hasErr = f._errs.length > 0;
-      const rowBg = hasErr ? `${C.red}07` : f._conflictoCat ? `${C.amber}12` : f._dup ? `${C.amber}07` : "transparent";
-      const estadoChip = hasErr ? { txt: f._errs[0], color: C.red } : f._conflictoCat ? { txt: `\u26A0 ${f._conflictoCat}`, color: C.amber } : f._dup ? { txt: "Actualiza stock", color: C.amber } : { txt: "\u2713 V\xE1lido", color: C.green };
+      const rowBg = f._bloqueado ? `${C.red}0a` : hasErr ? `${C.red}07` : f._dup ? `${C.amber}07` : "transparent";
+      const estadoChip = f._bloqueado ? { txt: `\u{1F6AB} ${f._conflictoCat}`, color: C.red } : hasErr ? { txt: f._errs[0], color: C.red } : f._dup ? { txt: "Actualiza stock", color: C.amber } : { txt: "\u2713 V\xE1lido", color: C.green };
       return /* @__PURE__ */ import_react.default.createElement("div", { key: i, style: {
         display: "grid",
-        gridTemplateColumns: "2fr 1fr 1.5fr 0.6fr 0.6fr 1fr",
+        gridTemplateColumns: f._bloqueado ? "2fr 1fr 1.5fr 0.6fr 0.6fr 1.6fr" : "2fr 1fr 1.5fr 0.6fr 0.6fr 1fr",
         padding: "9px 12px",
         borderBottom: `1px solid ${C.sep}`,
         background: rowBg,
         alignItems: "center"
-      } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, fontFamily: "monospace", color: C.gold, fontWeight: 700, lineHeight: 1.2 } }, f.sku), f.autoSKU && /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, fontFamily: "monospace", color: f._bloqueado ? C.red : C.gold, fontWeight: 700, lineHeight: 1.2 } }, f.sku), f.autoSKU && /* @__PURE__ */ import_react.default.createElement("div", { style: {
         fontSize: 9,
         color: C.gold,
         fontFamily: FONT_UI,
@@ -29468,7 +29502,25 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
         letterSpacing: 0.4,
         opacity: 0.7,
         marginTop: 1
-      } }, "\u{1F916} auto")), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: f.marcaId ? C.label : C.red, fontFamily: FONT_UI, fontWeight: f.marcaId ? 400 : 600 } }, f.marcaNombre.slice(0, 12) || "\u2014"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label, fontFamily: FONT_UI } }, f.desc.slice(0, 22), f.desc.length > 22 ? "\u2026" : "", f.talla && /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 9, color: C.label3, marginLeft: 4 } }, f.talla)), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, fontWeight: 600, color: f.precio > 0 ? C.label : C.red, fontFamily: FONT_UI } }, f.precio > 0 ? `Bs ${f.precio}` : "\u2014"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: C.blue, fontFamily: FONT_UI, textAlign: "center" } }, "\xD7", f.stock || 1), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      } }, "\u{1F916} auto")), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: f.marcaId ? C.label : C.red, fontFamily: FONT_UI, fontWeight: f.marcaId ? 400 : 600 } }, f.marcaNombre.slice(0, 12) || "\u2014"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label, fontFamily: FONT_UI } }, f.desc.slice(0, 22), f.desc.length > 22 ? "\u2026" : "", f.talla && /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 9, color: C.label3, marginLeft: 4 } }, f.talla)), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, fontWeight: 600, color: f.precio > 0 ? C.label : C.red, fontFamily: FONT_UI } }, f.precio > 0 ? `Bs ${f.precio}` : "\u2014"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: C.blue, fontFamily: FONT_UI, textAlign: "center" } }, "\xD7", f.stock || 1), f._bloqueado ? /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 3 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 9, fontWeight: 700, color: C.red, fontFamily: FONT_UI, lineHeight: 1.3 } }, f._conflictoCat), /* @__PURE__ */ import_react.default.createElement(
+        "button",
+        {
+          onClick: () => desbloquearFila(f.sku),
+          style: {
+            background: `${C.red}18`,
+            border: `1px solid ${C.red}50`,
+            borderRadius: 6,
+            padding: "2px 6px",
+            fontSize: 9,
+            fontWeight: 700,
+            color: C.red,
+            cursor: "pointer",
+            fontFamily: FONT_UI,
+            textAlign: "center"
+          }
+        },
+        "Confirmar igual \u2713"
+      )) : /* @__PURE__ */ import_react.default.createElement("div", { style: {
         fontSize: 9,
         fontWeight: 700,
         color: estadoChip.color,
@@ -29480,30 +29532,25 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
     }), previstaFiltrada.length === 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: { padding: "24px", textAlign: "center", color: C.label3, fontSize: 13, fontFamily: FONT_UI } }, "Sin filas en este filtro")), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 8 } }, nValidas > 0 && /* @__PURE__ */ import_react.default.createElement(
       "button",
       {
-        onClick: importar,
+        onClick: nConflictos > 0 ? void 0 : importar,
         style: {
-          background: C.label,
+          background: nConflictos > 0 ? C.sep : C.label,
           border: "none",
           borderRadius: 14,
           padding: "14px",
           fontSize: 15,
           fontWeight: 700,
-          color: C.bg0,
-          cursor: "pointer",
+          color: nConflictos > 0 ? C.label3 : C.bg0,
+          cursor: nConflictos > 0 ? "not-allowed" : "pointer",
           fontFamily: FONT_UI,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          gap: 8
+          gap: 8,
+          opacity: nConflictos > 0 ? 0.6 : 1
         }
       },
-      "\u2713 Importar ",
-      nValidas,
-      " producto",
-      nValidas !== 1 ? "s" : "",
-      " v\xE1lido",
-      nValidas !== 1 ? "s" : "",
-      nDups > 0 && /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 12, opacity: 0.8 } }, "(+", nDups, " actualiza stock)")
+      nConflictos > 0 ? `\u{1F6AB} Resolver ${nConflictos} conflicto${nConflictos !== 1 ? "s" : ""} antes de importar` : /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, null, "\u2713 Importar ", nValidas, " producto", nValidas !== 1 ? "s" : "", " v\xE1lido", nValidas !== 1 ? "s" : "", nDups > 0 && /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 12, opacity: 0.8 } }, "(+", nDups, " actualiza stock)"))
     ), /* @__PURE__ */ import_react.default.createElement(
       "button",
       {

@@ -7479,9 +7479,10 @@ function ImportarExcelModal({inv, onImportar, onClose, onArchivoCapturado}){
           const existing = filasMap.get(matchKey);
           // Mismo código → mismo producto, sumar stock
           existing.stock += f.stock;
-          // Alerta si la categoría difiere (posible error en el Excel)
+          // Categoría distinta → BLOQUEAR: no carga sin confirmación explícita
           if(f.cat && existing.cat && f.cat !== existing.cat){
-            existing._conflictoCat = `Categoría "${f.cat}" difiere de "${existing.cat}"`;
+            existing._conflictoCat = `Cat. "${f.cat}" ≠ "${existing.cat}"`;
+            existing._bloqueado = true;
           }
         } else {
           filasMap.set(keyByCod, {...f});
@@ -7501,7 +7502,7 @@ function ImportarExcelModal({inv, onImportar, onClose, onArchivoCapturado}){
   // ── Importar ───────────────────────────────────────────────────────
   async function importar(){
     setEstado("importando");
-    const importables = preview.filter(f=>f.desc&&f.marcaId&&f.precio>0);
+    const importables = preview.filter(f=>f.desc&&f.marcaId&&f.precio>0&&!f._bloqueado);
     let ok=0, upd=0;
 
     for(const f of importables){
@@ -7659,19 +7660,25 @@ function ImportarExcelModal({inv, onImportar, onClose, onArchivoCapturado}){
   function onDragLeave(e) { e.preventDefault(); setIsDragging(false); }
   function onDrop(e)      { e.preventDefault(); setIsDragging(false); const f=e.dataTransfer.files?.[0]; if(f){parsearArchivo(f);} }
 
+  function desbloquearFila(sku){
+    setPreview(prev=>prev.map(f=>f.sku.toUpperCase()===sku.toUpperCase()?{...f,_bloqueado:false}:f));
+  }
+
   // ── Preview filtrado ───────────────────────────────────────────────
   const previstaFiltrada = useMemo(()=>{
-    if(filtro==="validas")  return preview.filter(f=>f._errs.length===0&&!f._dup);
-    if(filtro==="errores")  return preview.filter(f=>f._errs.length>0);
-    if(filtro==="dups")     return preview.filter(f=>f._dup);
+    if(filtro==="validas")     return preview.filter(f=>f._errs.length===0&&!f._dup&&!f._bloqueado);
+    if(filtro==="errores")     return preview.filter(f=>f._errs.length>0);
+    if(filtro==="dups")        return preview.filter(f=>f._dup&&!f._bloqueado);
+    if(filtro==="conflictos")  return preview.filter(f=>f._bloqueado);
     return preview;
   },[preview,filtro]);
 
-  const nValidas = preview.filter(f=>f._errs.length===0).length;
+  const nConflictos = preview.filter(f=>f._bloqueado).length;
+  const nValidas = preview.filter(f=>f._errs.length===0&&!f._bloqueado).length;
   const nErrores = preview.filter(f=>f._errs.length>0).length;
-  const nDups    = preview.filter(f=>f._dup).length;
+  const nDups    = preview.filter(f=>f._dup&&!f._bloqueado).length;
   const nAuto    = preview.filter(f=>f.autoSKU).length;
-  const nUnidades = preview.filter(f=>f._errs.length===0).reduce((s,f)=>s+(Number(f.stock)||0),0);
+  const nUnidades = preview.filter(f=>f._errs.length===0&&!f._bloqueado).reduce((s,f)=>s+(Number(f.stock)||0),0);
 
   return (
     <Sheet open title="Importar Excel — Inventario" onClose={onClose} tall>
@@ -7801,19 +7808,43 @@ function ImportarExcelModal({inv, onImportar, onClose, onArchivoCapturado}){
             ))}
           </div>
 
+          {/* Banner de conflictos bloqueantes */}
+          {nConflictos>0&&(
+            <div style={{background:`${C.red}0d`,border:`1.5px solid ${C.red}50`,borderRadius:12,
+              padding:"10px 14px",marginBottom:12,display:"flex",alignItems:"center",gap:10}}>
+              <span style={{fontSize:16}}>🚫</span>
+              <div style={{flex:1}}>
+                <div style={{fontSize:12,fontWeight:700,color:C.red,fontFamily:FONT_UI}}>
+                  {nConflictos} código{nConflictos!==1?"s":""} bloqueado{nConflictos!==1?"s":""} por conflicto de categoría
+                </div>
+                <div style={{fontSize:11,color:C.label3,fontFamily:FONT_UI,marginTop:2}}>
+                  Mismo código, categoría distinta. Confirmá fila por fila antes de importar.
+                </div>
+              </div>
+              <button onClick={()=>setFiltro("conflictos")}
+                style={{background:C.red,border:"none",borderRadius:8,padding:"5px 10px",
+                  fontSize:11,fontWeight:700,color:"#fff",cursor:"pointer",fontFamily:FONT_UI,whiteSpace:"nowrap"}}>
+                Ver conflictos
+              </button>
+            </div>
+          )}
+
           {/* Filtros */}
           <div style={{display:"flex",gap:6,marginBottom:12,flexWrap:"wrap"}}>
             {[
-              {id:"todas",     l:`Todas (${preview.length})`},
-              {id:"validas",   l:`Válidas (${nValidas})`},
-              {id:"errores",   l:`Errores (${nErrores})`},
-              {id:"dups",      l:`Duplicadas (${nDups})`},
-              {id:"etiquetas", l:`🏷 Etiquetas`},
+              {id:"todas",       l:`Todas (${preview.length})`,           ac:C.label},
+              {id:"validas",     l:`Válidas (${nValidas})`,                ac:C.label},
+              {id:"errores",     l:`Errores (${nErrores})`,                ac:C.label},
+              {id:"dups",        l:`Duplicadas (${nDups})`,                ac:C.label},
+              ...(nConflictos>0?[{id:"conflictos", l:`🚫 Conflictos (${nConflictos})`, ac:C.red}]:[]),
+              {id:"etiquetas",   l:`🏷 Etiquetas`,                         ac:C.label},
             ].map(ft=>(
               <button key={ft.id} onClick={()=>setFiltro(ft.id)}
                 style={{padding:"5px 12px",borderRadius:20,fontSize:11,fontWeight:600,fontFamily:FONT_UI,
-                  cursor:"pointer",transition:"all .12s",border:`1px solid ${filtro===ft.id?C.label:C.sep}`,
-                  background:filtro===ft.id?C.label:C.bg0, color:filtro===ft.id?C.bg0:C.label3}}>
+                  cursor:"pointer",transition:"all .12s",
+                  border:`1px solid ${filtro===ft.id?ft.ac:C.sep}`,
+                  background:filtro===ft.id?ft.ac:C.bg0,
+                  color:filtro===ft.id?C.bg0:ft.id==="conflictos"?C.red:C.label3}}>
                 {ft.l}
               </button>
             ))}
@@ -7867,20 +7898,21 @@ function ImportarExcelModal({inv, onImportar, onClose, onArchivoCapturado}){
             {/* Filas */}
             {previstaFiltrada.map((f,i)=>{
               const hasErr = f._errs.length>0;
-              const rowBg  = hasErr?`${C.red}07`:f._conflictoCat?`${C.amber}12`:f._dup?`${C.amber}07`:"transparent";
-              const estadoChip = hasErr
+              const rowBg  = f._bloqueado?`${C.red}0a`:hasErr?`${C.red}07`:f._dup?`${C.amber}07`:"transparent";
+              const estadoChip = f._bloqueado
+                ? {txt:`🚫 ${f._conflictoCat}`, color:C.red}
+                : hasErr
                 ? {txt:f._errs[0], color:C.red}
-                : f._conflictoCat
-                ? {txt:`⚠ ${f._conflictoCat}`, color:C.amber}
                 : f._dup
                 ? {txt:"Actualiza stock", color:C.amber}
                 : {txt:"✓ Válido", color:C.green};
               return(
-                <div key={i} style={{display:"grid",gridTemplateColumns:"2fr 1fr 1.5fr 0.6fr 0.6fr 1fr",
+                <div key={i} style={{display:"grid",
+                  gridTemplateColumns:f._bloqueado?"2fr 1fr 1.5fr 0.6fr 0.6fr 1.6fr":"2fr 1fr 1.5fr 0.6fr 0.6fr 1fr",
                   padding:"9px 12px",borderBottom:`1px solid ${C.sep}`,background:rowBg,
                   alignItems:"center"}}>
                   <div>
-                    <div style={{fontSize:11,fontFamily:"monospace",color:C.gold,fontWeight:700,lineHeight:1.2}}>
+                    <div style={{fontSize:11,fontFamily:"monospace",color:f._bloqueado?C.red:C.gold,fontWeight:700,lineHeight:1.2}}>
                       {f.sku}
                     </div>
                     {f.autoSKU&&(
@@ -7903,10 +7935,24 @@ function ImportarExcelModal({inv, onImportar, onClose, onArchivoCapturado}){
                   <div style={{fontSize:11,fontWeight:700,color:C.blue,fontFamily:FONT_UI,textAlign:"center"}}>
                     ×{f.stock||1}
                   </div>
-                  <div style={{fontSize:9,fontWeight:700,color:estadoChip.color,fontFamily:FONT_UI,
-                    textTransform:"uppercase",letterSpacing:.3,lineHeight:1.3}}>
-                    {estadoChip.txt.slice(0,20)}
-                  </div>
+                  {f._bloqueado ? (
+                    <div style={{display:"flex",flexDirection:"column",gap:3}}>
+                      <div style={{fontSize:9,fontWeight:700,color:C.red,fontFamily:FONT_UI,lineHeight:1.3}}>
+                        {f._conflictoCat}
+                      </div>
+                      <button onClick={()=>desbloquearFila(f.sku)}
+                        style={{background:`${C.red}18`,border:`1px solid ${C.red}50`,borderRadius:6,
+                          padding:"2px 6px",fontSize:9,fontWeight:700,color:C.red,cursor:"pointer",
+                          fontFamily:FONT_UI,textAlign:"center"}}>
+                        Confirmar igual ✓
+                      </button>
+                    </div>
+                  ) : (
+                    <div style={{fontSize:9,fontWeight:700,color:estadoChip.color,fontFamily:FONT_UI,
+                      textTransform:"uppercase",letterSpacing:.3,lineHeight:1.3}}>
+                      {estadoChip.txt.slice(0,20)}
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -7921,12 +7967,17 @@ function ImportarExcelModal({inv, onImportar, onClose, onArchivoCapturado}){
           {/* Botones acción */}
           <div style={{display:"flex",flexDirection:"column",gap:8}}>
             {nValidas>0&&(
-              <button onClick={importar}
-                style={{background:C.label,border:"none",borderRadius:14,padding:"14px",
-                  fontSize:15,fontWeight:700,color:C.bg0,cursor:"pointer",fontFamily:FONT_UI,
-                  display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
-                ✓ Importar {nValidas} producto{nValidas!==1?"s":""} válido{nValidas!==1?"s":""}
-                {nDups>0&&<span style={{fontSize:12,opacity:.8}}>(+{nDups} actualiza stock)</span>}
+              <button onClick={nConflictos>0?undefined:importar}
+                style={{background:nConflictos>0?C.sep:C.label,border:"none",borderRadius:14,padding:"14px",
+                  fontSize:15,fontWeight:700,color:nConflictos>0?C.label3:C.bg0,
+                  cursor:nConflictos>0?"not-allowed":"pointer",fontFamily:FONT_UI,
+                  display:"flex",alignItems:"center",justifyContent:"center",gap:8,opacity:nConflictos>0?.6:1}}>
+                {nConflictos>0
+                  ? `🚫 Resolver ${nConflictos} conflicto${nConflictos!==1?"s":""} antes de importar`
+                  : <>✓ Importar {nValidas} producto{nValidas!==1?"s":""} válido{nValidas!==1?"s":""}
+                      {nDups>0&&<span style={{fontSize:12,opacity:.8}}>(+{nDups} actualiza stock)</span>}
+                    </>
+                }
               </button>
             )}
             <button onClick={exportarPreview}
