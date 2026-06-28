@@ -12024,10 +12024,25 @@ function App(){
   const _importBuf = useRef({items:[], sbItems:[], ts:0, timer:null, archivo:null, archivoNombre:null});
 
   async function handleEditarProducto(prodId, campos){
-    setInv(prev=>prev.map(p=>p.id===prodId?{...p,...campos}:p));
-    await sbActualizarProductoPatch(prodId, campos);
+    const prev = inv.find(p=>p.id===prodId);
+    const { _motivo, ...rest } = campos; // _motivo es solo para auditoría, no es columna
+    setInv(p=>p.map(x=>x.id===prodId?{...x,...rest}:x));
+    // Traducir a columnas de Supabase (estado local usa stockInicial; la tabla, stock_inicial)
+    const cloud = {...rest};
+    if("stockInicial" in cloud){ cloud.stock_inicial = cloud.stockInicial; delete cloud.stockInicial; }
+    await sbActualizarProductoPatch(prodId, cloud);
     const inv2 = JSON.parse(localStorage.getItem("th_inv")||"[]");
-    localStorage.setItem("th_inv", JSON.stringify(inv2.map(p=>p.id===prodId?{...p,...campos}:p)));
+    localStorage.setItem("th_inv", JSON.stringify(inv2.map(p=>p.id===prodId?{...p,...rest}:p)));
+    // Auditoría forense si fue una corrección de stock a la baja (admin)
+    if(prev && typeof rest.stock==="number" && rest.stock < (Number(prev.stock)||0)){
+      logAudit("STOCK_AJUSTE", {
+        resumen:`Corrección stock (admin): ${prev.nombre} (${prev.codigo}) ${prev.stock}→${rest.stock}${_motivo?` · ${_motivo}`:""}`,
+        codigo:prev.codigo, nombre:prev.nombre, marca:prev.marcaNombre||"—",
+        stockAntes:prev.stock, stockDespues:rest.stock,
+        stockInicialAntes:prev.stockInicial, stockInicialDespues:rest.stockInicial,
+        motivo:_motivo||"", usuario:user?.nombre,
+      }, user);
+    }
   }
 
   async function handleEliminarProducto(prodId){
@@ -16494,6 +16509,8 @@ function InventarioPorMarca({inv, ventas, retiros=[], bajas=[], onRecibir, onBaj
   const [editNombre, setEditNombre] = useState("");
   const [editPrecio, setEditPrecio] = useState("");
   const [editDesc, setEditDesc] = useState("");
+  const [editStock, setEditStock] = useState("");    // corrección de stock (solo admin, solo bajar)
+  const [editMotivo, setEditMotivo] = useState("");  // motivo de la corrección
   const [editGuardando, setEditGuardando] = useState(false);
   var _hN149 = useState(null); var marcaSelec = _hN149[0]; var setMarcaSelec = _hN149[1];;
   var _hInvBq = useState(""); var invBusq = _hInvBq[0]; var setInvBusq = _hInvBq[1];;
@@ -16508,16 +16525,37 @@ function InventarioPorMarca({inv, ventas, retiros=[], bajas=[], onRecibir, onBaj
     setEditNombre(prod.nombre||"");
     setEditPrecio(String(prod.precio||""));
     setEditDesc(prod.descripcion||"");
+    setEditStock(String(prod.stock??0));
+    setEditMotivo("");
   }
 
   async function guardarEdicion(){
     if(!editProd||!onEditarProducto) return;
-    setEditGuardando(true);
     const campos = {
       nombre: editNombre.toUpperCase().trim(),
       precio: Number(editPrecio)||editProd.precio,
       descripcion: editDesc.trim(),
     };
+    // ── Corrección de stock a la baja — SOLO admin ─────────────────────
+    if(user?.rol==="admin" && editStock.trim()!==""){
+      const actual = Number(editProd.stock)||0;
+      const nuevo  = Math.floor(Number(editStock));
+      if(!isNaN(nuevo) && nuevo!==actual){
+        if(nuevo>actual){
+          alert("Desde Editar solo se puede DISMINUIR el stock.\nPara aumentar usá «Recibir» o «Reponer stock».");
+          return;
+        }
+        if(nuevo<0){ alert("El stock no puede ser negativo."); return; }
+        if(!editMotivo.trim()){ alert("Indicá el motivo de la corrección de stock."); return; }
+        const delta = actual - nuevo;
+        campos.stock = nuevo;
+        // Corrección de conteo: baja stockInicial el mismo delta para mantener
+        // la identidad stockInicial = stock + vendidas + bajas (no falsea ventas).
+        campos.stockInicial = Math.max(0, (Number(editProd.stockInicial)||actual) - delta);
+        campos._motivo = editMotivo.trim();
+      }
+    }
+    setEditGuardando(true);
     await onEditarProducto(editProd.id, campos);
     setEditGuardando(false);
     setEditProd(null);
@@ -16991,6 +17029,38 @@ function InventarioPorMarca({inv, ventas, retiros=[], bajas=[], onRecibir, onBaj
                   style={{width:"100%",padding:"8px 10px",borderRadius:10,border:`1px solid ${C.sep}`,
                     background:C.bg2,color:C.label,fontSize:13,fontFamily:FONT}}/>
               </div>
+              {/* ── Corrección de stock a la baja — SOLO admin ── */}
+              {user?.rol==="admin"&&(()=>{
+                const actual=Number(editProd.stock)||0;
+                const nuevo=Math.floor(Number(editStock));
+                const baja=!isNaN(nuevo)&&nuevo<actual;
+                return (
+                <div style={{borderTop:`1px dashed ${C.sep}`,paddingTop:12,marginTop:2}}>
+                  <div style={{fontSize:10,fontWeight:700,letterSpacing:.5,textTransform:"uppercase",
+                    color:C.amber,fontFamily:FONT_UI,marginBottom:8,display:"flex",alignItems:"center",gap:5}}>
+                    🔒 Admin · corregir stock a la baja
+                  </div>
+                  <div style={{display:"grid",gridTemplateColumns:"auto 1fr",gap:8,alignItems:"center"}}>
+                    <div style={{fontSize:12,color:C.label3,fontFamily:FONT}}>Stock actual: <b style={{color:C.label}}>{actual}</b> →</div>
+                    <input value={editStock} onChange={e=>setEditStock(e.target.value)} type="number" min="0" max={actual}
+                      style={{width:"100%",padding:"8px 10px",borderRadius:10,
+                        border:`1px solid ${baja?C.amber:C.sep}`,
+                        background:C.bg2,color:C.label,fontSize:13,fontFamily:FONT}}/>
+                  </div>
+                  {baja&&(
+                    <div style={{marginTop:8}}>
+                      <input value={editMotivo} onChange={e=>setEditMotivo(e.target.value)}
+                        placeholder="Motivo de la corrección (obligatorio)"
+                        style={{width:"100%",padding:"8px 10px",borderRadius:10,border:`1px solid ${C.amber}`,
+                          background:C.bg2,color:C.label,fontSize:12,fontFamily:FONT}}/>
+                      <div style={{fontSize:10,color:C.label3,fontFamily:FONT_UI,marginTop:5,lineHeight:1.4}}>
+                        Baja {actual-nuevo} unidad{actual-nuevo!==1?"es":""} como <b>corrección de conteo</b> (ajusta también el stock inicial). Para merma/pérdida real usá «Dar de Baja».
+                      </div>
+                    </div>
+                  )}
+                </div>
+                );
+              })()}
             </div>
             <div style={{padding:"12px 16px",borderTop:`1px solid ${C.sep}`,display:"flex",gap:8,justifyContent:"flex-end"}}>
               <button onClick={()=>setEditProd(null)}

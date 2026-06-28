@@ -34299,10 +34299,31 @@ Motivo: ${motivo}` : ""}`)) {
     }
     const _importBuf = (0, import_react.useRef)({ items: [], sbItems: [], ts: 0, timer: null, archivo: null, archivoNombre: null });
     async function handleEditarProducto(prodId, campos) {
-      setInv((prev) => prev.map((p) => p.id === prodId ? { ...p, ...campos } : p));
-      await sbActualizarProductoPatch(prodId, campos);
+      const prev = inv.find((p) => p.id === prodId);
+      const { _motivo, ...rest } = campos;
+      setInv((p) => p.map((x) => x.id === prodId ? { ...x, ...rest } : x));
+      const cloud = { ...rest };
+      if ("stockInicial" in cloud) {
+        cloud.stock_inicial = cloud.stockInicial;
+        delete cloud.stockInicial;
+      }
+      await sbActualizarProductoPatch(prodId, cloud);
       const inv2 = JSON.parse(localStorage.getItem("th_inv") || "[]");
-      localStorage.setItem("th_inv", JSON.stringify(inv2.map((p) => p.id === prodId ? { ...p, ...campos } : p)));
+      localStorage.setItem("th_inv", JSON.stringify(inv2.map((p) => p.id === prodId ? { ...p, ...rest } : p)));
+      if (prev && typeof rest.stock === "number" && rest.stock < (Number(prev.stock) || 0)) {
+        logAudit("STOCK_AJUSTE", {
+          resumen: `Correcci\xF3n stock (admin): ${prev.nombre} (${prev.codigo}) ${prev.stock}\u2192${rest.stock}${_motivo ? ` \xB7 ${_motivo}` : ""}`,
+          codigo: prev.codigo,
+          nombre: prev.nombre,
+          marca: prev.marcaNombre || "\u2014",
+          stockAntes: prev.stock,
+          stockDespues: rest.stock,
+          stockInicialAntes: prev.stockInicial,
+          stockInicialDespues: rest.stockInicial,
+          motivo: _motivo || "",
+          usuario: user?.nombre
+        }, user);
+      }
     }
     async function handleEliminarProducto(prodId) {
       const prod = inv.find((p) => p.id === prodId);
@@ -39416,6 +39437,8 @@ ${c.resumen || c.id}`)) onEliminarCarga(c.id);
     const [editNombre, setEditNombre] = (0, import_react.useState)("");
     const [editPrecio, setEditPrecio] = (0, import_react.useState)("");
     const [editDesc, setEditDesc] = (0, import_react.useState)("");
+    const [editStock, setEditStock] = (0, import_react.useState)("");
+    const [editMotivo, setEditMotivo] = (0, import_react.useState)("");
     const [editGuardando, setEditGuardando] = (0, import_react.useState)(false);
     var _hN149 = (0, import_react.useState)(null);
     var marcaSelec = _hN149[0];
@@ -39441,15 +39464,39 @@ ${c.resumen || c.id}`)) onEliminarCarga(c.id);
       setEditNombre(prod.nombre || "");
       setEditPrecio(String(prod.precio || ""));
       setEditDesc(prod.descripcion || "");
+      setEditStock(String(prod.stock ?? 0));
+      setEditMotivo("");
     }
     async function guardarEdicion() {
       if (!editProd || !onEditarProducto) return;
-      setEditGuardando(true);
       const campos = {
         nombre: editNombre.toUpperCase().trim(),
         precio: Number(editPrecio) || editProd.precio,
         descripcion: editDesc.trim()
       };
+      if (user?.rol === "admin" && editStock.trim() !== "") {
+        const actual = Number(editProd.stock) || 0;
+        const nuevo = Math.floor(Number(editStock));
+        if (!isNaN(nuevo) && nuevo !== actual) {
+          if (nuevo > actual) {
+            alert("Desde Editar solo se puede DISMINUIR el stock.\nPara aumentar us\xE1 \xABRecibir\xBB o \xABReponer stock\xBB.");
+            return;
+          }
+          if (nuevo < 0) {
+            alert("El stock no puede ser negativo.");
+            return;
+          }
+          if (!editMotivo.trim()) {
+            alert("Indic\xE1 el motivo de la correcci\xF3n de stock.");
+            return;
+          }
+          const delta = actual - nuevo;
+          campos.stock = nuevo;
+          campos.stockInicial = Math.max(0, (Number(editProd.stockInicial) || actual) - delta);
+          campos._motivo = editMotivo.trim();
+        }
+      }
+      setEditGuardando(true);
       await onEditarProducto(editProd.id, campos);
       setEditGuardando(false);
       setEditProd(null);
@@ -40087,7 +40134,59 @@ ${c.resumen || c.id}`)) onEliminarCarga(c.id);
           fontFamily: FONT
         }
       }
-    ))), /* @__PURE__ */ import_react.default.createElement("div", { style: { padding: "12px 16px", borderTop: `1px solid ${C.sep}`, display: "flex", gap: 8, justifyContent: "flex-end" } }, /* @__PURE__ */ import_react.default.createElement(
+    )), user?.rol === "admin" && (() => {
+      const actual = Number(editProd.stock) || 0;
+      const nuevo = Math.floor(Number(editStock));
+      const baja = !isNaN(nuevo) && nuevo < actual;
+      return /* @__PURE__ */ import_react.default.createElement("div", { style: { borderTop: `1px dashed ${C.sep}`, paddingTop: 12, marginTop: 2 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+        fontSize: 10,
+        fontWeight: 700,
+        letterSpacing: 0.5,
+        textTransform: "uppercase",
+        color: C.amber,
+        fontFamily: FONT_UI,
+        marginBottom: 8,
+        display: "flex",
+        alignItems: "center",
+        gap: 5
+      } }, "\u{1F512} Admin \xB7 corregir stock a la baja"), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "grid", gridTemplateColumns: "auto 1fr", gap: 8, alignItems: "center" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT } }, "Stock actual: ", /* @__PURE__ */ import_react.default.createElement("b", { style: { color: C.label } }, actual), " \u2192"), /* @__PURE__ */ import_react.default.createElement(
+        "input",
+        {
+          value: editStock,
+          onChange: (e) => setEditStock(e.target.value),
+          type: "number",
+          min: "0",
+          max: actual,
+          style: {
+            width: "100%",
+            padding: "8px 10px",
+            borderRadius: 10,
+            border: `1px solid ${baja ? C.amber : C.sep}`,
+            background: C.bg2,
+            color: C.label,
+            fontSize: 13,
+            fontFamily: FONT
+          }
+        }
+      )), baja && /* @__PURE__ */ import_react.default.createElement("div", { style: { marginTop: 8 } }, /* @__PURE__ */ import_react.default.createElement(
+        "input",
+        {
+          value: editMotivo,
+          onChange: (e) => setEditMotivo(e.target.value),
+          placeholder: "Motivo de la correcci\xF3n (obligatorio)",
+          style: {
+            width: "100%",
+            padding: "8px 10px",
+            borderRadius: 10,
+            border: `1px solid ${C.amber}`,
+            background: C.bg2,
+            color: C.label,
+            fontSize: 12,
+            fontFamily: FONT
+          }
+        }
+      ), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: C.label3, fontFamily: FONT_UI, marginTop: 5, lineHeight: 1.4 } }, "Baja ", actual - nuevo, " unidad", actual - nuevo !== 1 ? "es" : "", " como ", /* @__PURE__ */ import_react.default.createElement("b", null, "correcci\xF3n de conteo"), " (ajusta tambi\xE9n el stock inicial). Para merma/p\xE9rdida real us\xE1 \xABDar de Baja\xBB.")));
+    })()), /* @__PURE__ */ import_react.default.createElement("div", { style: { padding: "12px 16px", borderTop: `1px solid ${C.sep}`, display: "flex", gap: 8, justifyContent: "flex-end" } }, /* @__PURE__ */ import_react.default.createElement(
       "button",
       {
         onClick: () => setEditProd(null),
