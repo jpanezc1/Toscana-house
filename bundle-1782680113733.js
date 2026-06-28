@@ -21552,6 +21552,23 @@
       return allOk;
     }
   }
+  async function sbExistenCodigos(codigos) {
+    if (!codigos || !codigos.length) return /* @__PURE__ */ new Set();
+    try {
+      const db = await getSupabase();
+      const present = /* @__PURE__ */ new Set();
+      for (let i = 0; i < codigos.length; i += 200) {
+        const lote = codigos.slice(i, i + 200);
+        const { data, error } = await db.from("inventario").select("codigo").in("codigo", lote);
+        if (error) throw error;
+        (data || []).forEach((r) => present.add((r.codigo || "").toUpperCase().trim()));
+      }
+      return present;
+    } catch (e) {
+      console.warn("[verif] sbExistenCodigos:", e.message);
+      return null;
+    }
+  }
   async function sbActualizarStock(prodId, nuevoStock) {
     try {
       const db = await getSupabase();
@@ -22535,6 +22552,10 @@
       });
     });
     return map;
+  }
+  var _localIdSeq = 0;
+  function nextLocalId() {
+    return Date.now() * 1e3 + _localIdSeq++ % 1e3;
   }
   function expandirPorStock(items) {
     const out = [];
@@ -29163,9 +29184,12 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       let cancelado = false;
       const timers = [];
       const delays = [1200, 3e3, 6e3];
-      function check(intento) {
+      async function check(intento) {
         if (cancelado) return;
-        const presentes = new Set(invRef.current.map((p) => (p.codigo || "").toUpperCase().trim()));
+        procesarOutbox();
+        const cloud = await sbExistenCodigos(stats.codigosEsperados);
+        if (cancelado) return;
+        const presentes = cloud || new Set(invRef.current.map((p) => (p.codigo || "").toUpperCase().trim()));
         const faltantes = stats.codigosEsperados.filter((c) => !presentes.has(c));
         setVerif({
           intento,
@@ -29187,8 +29211,10 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
     function reverificar() {
       if (!stats?.codigosEsperados?.length) return;
       setVerif((v) => ({ ...v, checking: true }));
-      setTimeout(() => {
-        const presentes = new Set(invRef.current.map((p) => (p.codigo || "").toUpperCase().trim()));
+      procesarOutbox();
+      setTimeout(async () => {
+        const cloud = await sbExistenCodigos(stats.codigosEsperados);
+        const presentes = cloud || new Set(invRef.current.map((p) => (p.codigo || "").toUpperCase().trim()));
         const faltantes = stats.codigosEsperados.filter((c) => !presentes.has(c));
         setVerif({
           intento: (verif?.intento || 0) + 1,
@@ -29197,7 +29223,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
           total: stats.codigosEsperados.length,
           checking: false
         });
-      }, 600);
+      }, 800);
     }
     async function exportarPendientes() {
       const XLSX = await loadXLSX();
@@ -34375,7 +34401,7 @@ Esta acci\xF3n no se puede deshacer.` : "\xBFEliminar esta carga? Esta acci\xF3n
           color: color || _c || ""
         });
       } else if (tipo === "create") {
-        const localId = Date.now() * 1e3 + Math.floor(Math.random() * 999);
+        const localId = nextLocalId();
         const newProd = { id: localId, ...producto };
         setInv((prev) => [...prev, newProd]);
         _importBuf.current.sbItems.push(newProd);
@@ -34397,7 +34423,9 @@ Esta acci\xF3n no se puede deshacer.` : "\xBFEliminar esta carga? Esta acci\xF3n
       _importBuf.current.timer = setTimeout(async () => {
         const sbItems = _importBuf.current.sbItems.splice(0);
         for (let i = 0; i < sbItems.length; i += 50) {
-          await sbGuardarProductosBatch(sbItems.slice(i, i + 50));
+          const chunk = sbItems.slice(i, i + 50);
+          const ok = await sbGuardarProductosBatch(chunk);
+          if (!ok) chunk.forEach((p) => pushToOutbox("producto", p));
         }
         const buf = _importBuf.current.items;
         if (buf.length === 0) return;
@@ -39428,9 +39456,12 @@ ${c.resumen || c.id}`)) onEliminarCarga(c.id);
     }
     const vendidosPorProd = (0, import_react.useMemo)(() => {
       const map = {};
-      ventas.forEach((v) => v.items.forEach((it) => {
-        map[it.prodId] = (map[it.prodId] || 0) + it.cantidad;
-      }));
+      ventas.forEach((v) => {
+        if (v.anulada) return;
+        v.items.forEach((it) => {
+          map[it.prodId] = (map[it.prodId] || 0) + it.cantidad;
+        });
+      });
       return map;
     }, [ventas]);
     const retirosPorCodigo = (0, import_react.useMemo)(() => {
