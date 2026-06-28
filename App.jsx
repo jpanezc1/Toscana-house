@@ -610,7 +610,9 @@ function removeFromOutbox(id){
 async function ejecutarOpOutbox(op){
   switch(op.tipo){
     case "producto":    return !!(await sbGuardarProducto(op.payload));
-    case "stock":         return await sbActualizarStock(op.payload.prodId, op.payload.stock);
+    case "stock":         return op.payload.stock_inicial!=null
+                            ? await sbActualizarProductoPatch(op.payload.prodId, {stock:Math.max(0,op.payload.stock), stock_inicial:op.payload.stock_inicial})
+                            : await sbActualizarStock(op.payload.prodId, op.payload.stock);
     case "producto_patch":return await sbActualizarProductoPatch(op.payload.prodId, op.payload);
     case "venta":       return await sbGuardarVenta(op.payload);
     case "anularVenta": return await sbAnularVenta(op.payload.id);
@@ -961,6 +963,22 @@ function abreviarNombre(nombre, maxLen = 90) {
 }
 
 // Repite cada item según su stock, para imprimir una etiqueta por unidad física
+// ── Unidades REALMENTE vendidas por código (verdad = registro de ventas) ──
+// "Vendidas" SIEMPRE sale de ventas[], NUNCA de (stockInicial − stock):
+// las bajas, reposiciones y reimportaciones cambian el stock sin ser ventas,
+// y contaminarían el conteo. Esta es la única fuente de verdad de ventas.
+function mapVendidasPorCodigo(ventas){
+  const map = {};
+  (ventas||[]).forEach(v=>{
+    if(v.anulada) return;
+    (v.items||[]).forEach(it=>{
+      const k = (it.codigo||"").toUpperCase();
+      if(k) map[k] = (map[k]||0) + (Number(it.cantidad)||0);
+    });
+  });
+  return map;
+}
+
 function expandirPorStock(items) {
   const out = [];
   for (const it of items) {
@@ -2226,10 +2244,11 @@ async function generarExcelMensual(ventas, inventario, mes, anio, setGenerando, 
       ["Código","Producto","Marca","Categoría","Precio (Bs)","Stock inicial","Stock actual","Vendidas","% Vendido","Estado"],
     ];
 
+    const vendMapStock = mapVendidasPorCodigo(ventas);
     MARCAS.forEach(m => {
       const prods = inventario.filter(i => i.marcaId === m.id);
       prods.forEach(p => {
-        const vendidas = p.stockInicial - p.stock;
+        const vendidas = vendMapStock[(p.codigo||"").toUpperCase()] || 0;
         const pct = p.stockInicial > 0 ? Math.round((vendidas/p.stockInicial)*100) : 0;
         stockRows.push([
           p.codigo, p.nombre, m.nombre, p.categoria||"",
@@ -2365,8 +2384,9 @@ async function generarExcelMarca(marca, ventas, inventario, setGenerando) {
       [],
       ["Código","Producto","Categoría","Precio (Bs)","Stock inicial","Stock actual","Vendidas","% Vendido","Estado","Fecha ingreso"],
     ];
+    const vendMapMarca = mapVendidasPorCodigo(ventas);
     prods.forEach(p => {
-      const vendidas = p.stockInicial - p.stock;
+      const vendidas = vendMapMarca[(p.codigo||"").toUpperCase()] || 0;
       const pct = p.stockInicial > 0 ? Math.round((vendidas/p.stockInicial)*100) : 0;
       stockRows.push([p.codigo, p.nombre, p.categoria||"", p.precio, p.stockInicial, p.stock, vendidas, pct+"%", p.stock===0?"AGOTADO":p.stock<3?"BAJO STOCK":"OK", p.fecha]);
     });
@@ -2387,11 +2407,12 @@ async function generarExcelMarca(marca, ventas, inventario, setGenerando) {
 }
 
 // ── REPORTE STOCK COMPLETO ────────────────────────────────
-async function generarExcelStock(inventario, setGenerando) {
+async function generarExcelStock(inventario, ventas, setGenerando) {
   setGenerando(true);
   try {
     const XLSX = await loadXLSX();
     const wb   = XLSX.utils.book_new();
+    const vendMapTodo = mapVendidasPorCodigo(ventas);
 
     // Pestaña general
     const rows = [
@@ -2402,7 +2423,7 @@ async function generarExcelStock(inventario, setGenerando) {
     ];
     MARCAS.forEach(m => {
       inventario.filter(i => i.marcaId === m.id).forEach(p => {
-        const vendidas = p.stockInicial - p.stock;
+        const vendidas = vendMapTodo[(p.codigo||"").toUpperCase()] || 0;
         const pct = p.stockInicial > 0 ? Math.round((vendidas/p.stockInicial)*100) : 0;
         rows.push([p.codigo, p.nombre, m.nombre, p.categoria||"", p.precio, p.stockInicial, p.stock, vendidas, pct+"%", p.stock===0?"AGOTADO":p.stock<3?"BAJO STOCK":"OK", p.fecha]);
       });
@@ -2420,7 +2441,7 @@ async function generarExcelStock(inventario, setGenerando) {
         ["Código","Producto","Categoría","Precio (Bs)","Stock inicial","Stock actual","Vendidas","Estado"],
       ];
       prods.forEach(p => {
-        const vendidas = p.stockInicial - p.stock;
+        const vendidas = vendMapTodo[(p.codigo||"").toUpperCase()] || 0;
         mRows.push([p.codigo, p.nombre, p.categoria||"", p.precio, p.stockInicial, p.stock, vendidas, p.stock===0?"AGOTADO":p.stock<3?"BAJO":""]);
       });
       const ws = XLSX.utils.aoa_to_sheet(mRows);
@@ -11935,8 +11956,11 @@ function App(){
     if(!cant||cant<=0){setRepMsg({ok:false,msg:"Ingresa una cantidad válida"});return;}
     const stockAntes=prod.stock||0;
     const stockDespues=stockAntes+cant;
-    setInv(p=>p.map(i=>i.id===prod.id?{...i,stock:stockDespues}:i));
-    syncConRespaldo("stock", {prodId:prod.id, stock:stockDespues}, ()=>sbActualizarStock(prod.id, stockDespues));
+    // stockInicial = total histórico recibido → también sube al reponer
+    const iniAntes=Number(prod.stockInicial)||stockAntes;
+    const iniDespues=iniAntes+cant;
+    setInv(p=>p.map(i=>i.id===prod.id?{...i,stock:stockDespues,stockInicial:iniDespues}:i));
+    syncConRespaldo("stock", {prodId:prod.id, stock:stockDespues, stock_inicial:iniDespues}, ()=>sbActualizarProductoPatch(prod.id, {stock:stockDespues, stock_inicial:iniDespues}));
     logAudit("STOCK_ADD", {
       resumen: `Entrada de stock: ${prod.nombre} (${prod.codigo}) +${cant} · stock ${stockAntes}→${stockDespues}`,
       codigo: prod.codigo, nombre: prod.nombre,
@@ -12068,12 +12092,16 @@ function App(){
       const prod = inv.find(p=>p.codigo===codigo);
       const stockAntes = prod?.stock||0;
       const stockNuevo = stock > 0 ? stockAntes + stock : stockAntes;
+      // stockInicial = total histórico recibido → también sube al reimportar
+      const iniAntes  = Number(prod?.stockInicial)||stockAntes;
+      const iniNuevo  = stock > 0 ? iniAntes + stock : iniAntes;
       const patch = {stock:stockNuevo};
+      if(stock > 0)   patch.stockInicial = iniNuevo;
       if(descripcion) patch.descripcion = descripcion; // siempre actualizar — sobrescribe si ya tiene
       if(subcat)      patch.subcat      = subcat;
       setInv(prev=>prev.map(p=>p.codigo===codigo?{...p,...patch}:p));
       if(prod){
-        if(stock > 0) syncConRespaldo("stock", {prodId:prod.id, stock:stockNuevo}, ()=>sbActualizarStock(prod.id, stockNuevo));
+        if(stock > 0) syncConRespaldo("stock", {prodId:prod.id, stock:stockNuevo, stock_inicial:iniNuevo}, ()=>sbActualizarProductoPatch(prod.id, {stock:stockNuevo, stock_inicial:iniNuevo}));
         if(patch.descripcion||patch.subcat){
           syncConRespaldo("producto_patch", {prodId:prod.id,...patch}, ()=>sbActualizarProductoPatch(prod.id, patch));
         }
@@ -12782,7 +12810,7 @@ function App(){
                     WebkitTapHighlightColor:"transparent",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
                   {generando?"⏳ Generando…":"📊 Reporte Mensual .xlsx"}
                 </button>
-                <button onClick={()=>generarExcelStock(inv,setGenerando)}
+                <button onClick={()=>generarExcelStock(inv,ventas,setGenerando)}
                   disabled={generando}
                   style={{flex:1,background:generando?C.bg2:`${C.blue}20`,border:`1px solid ${generando?C.sep:C.blue}40`,
                     borderRadius:12,padding:"12px 10px",color:generando?C.label3:C.blue,
@@ -17367,6 +17395,8 @@ function MarcaDetalle({marcaId,inv,ventas,vMes,mes,anio,MK,cierres,setCierres,ge
   const cerrado =cierres[`${MK}-${marcaId}`]?.cerrado;
   const historial=getHist(marcaId);
   const prods   =inv.filter(i=>i.marcaId===marcaId);
+  // Vendidas reales por código (verdad = ventas, no stockInicial−stock)
+  const vendMapMD = mapVendidasPorCodigo(ventas);
   // Retiros de esta marca — comparación con coerción numérica para evitar string/int mismatch
   const retirosMarca = retiros.filter(r=>{
     if(Number(r.marcaId)===Number(marcaId)) return true;
@@ -17625,7 +17655,7 @@ function MarcaDetalle({marcaId,inv,ventas,vMes,mes,anio,MK,cierres,setCierres,ge
                   <span style={{fontSize:10,letterSpacing:1,textTransform:"uppercase",color:C.label3,fontFamily:FONT_UI,opacity:.5,textAlign:"right",minWidth:52}}>Stock</span>
                 </div>
                 {prods.map((p,i)=>{
-                  const vendidas=p.stockInicial-p.stock;
+                  const vendidas=vendMapMD[(p.codigo||"").toUpperCase()]||0;
                   return (
                     <div key={p.id} style={{
                       display:"grid",gridTemplateColumns:"1fr auto auto",gap:"0 16px",
@@ -18040,6 +18070,9 @@ function HistorialTab({ventas, inv, cierres, onVentaClick}){
 
   const MKSel = mkKey(mesSel, anioSel);
 
+  // Vendidas reales por código (verdad = ventas, no stockInicial−stock)
+  const vendMapHist = mapVendidasPorCodigo(ventas);
+
   // Ventas del período seleccionado
   const ventasPer = useMemo(()=>
     ventas.filter(v=>v.mk===MKSel),
@@ -18307,7 +18340,7 @@ function HistorialTab({ventas, inv, cierres, onVentaClick}){
                 const prods=inv.filter(i=>i.marcaId===m.id);
                 if(!prods.length) return null;
                 const stockTotal=prods.reduce((s,p)=>s+p.stock,0);
-                const vendTotal=prods.reduce((s,p)=>s+(p.stockInicial-p.stock),0);
+                const vendTotal=prods.reduce((s,p)=>s+(vendMapHist[(p.codigo||"").toUpperCase()]||0),0);
                 return (
                   <div key={m.id} style={{background:C.bg2,borderRadius:14,
                     padding:"14px 16px",marginBottom:10,borderLeft:`4px solid ${m.color}`}}>

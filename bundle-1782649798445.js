@@ -22179,7 +22179,7 @@
       case "producto":
         return !!await sbGuardarProducto(op.payload);
       case "stock":
-        return await sbActualizarStock(op.payload.prodId, op.payload.stock);
+        return op.payload.stock_inicial != null ? await sbActualizarProductoPatch(op.payload.prodId, { stock: Math.max(0, op.payload.stock), stock_inicial: op.payload.stock_inicial }) : await sbActualizarStock(op.payload.prodId, op.payload.stock);
       case "producto_patch":
         return await sbActualizarProductoPatch(op.payload.prodId, op.payload);
       case "venta":
@@ -22524,6 +22524,17 @@
     }
     if (n.length <= maxLen) return n;
     return n.slice(0, maxLen - 1).trim() + "\u2026";
+  }
+  function mapVendidasPorCodigo(ventas) {
+    const map = {};
+    (ventas || []).forEach((v) => {
+      if (v.anulada) return;
+      (v.items || []).forEach((it) => {
+        const k = (it.codigo || "").toUpperCase();
+        if (k) map[k] = (map[k] || 0) + (Number(it.cantidad) || 0);
+      });
+    });
+    return map;
   }
   function expandirPorStock(items) {
     const out = [];
@@ -23816,10 +23827,11 @@
         [],
         ["C\xF3digo", "Producto", "Marca", "Categor\xEDa", "Precio (Bs)", "Stock inicial", "Stock actual", "Vendidas", "% Vendido", "Estado"]
       ];
+      const vendMapStock = mapVendidasPorCodigo(ventas);
       MARCAS.forEach((m) => {
         const prods = inventario.filter((i) => i.marcaId === m.id);
         prods.forEach((p) => {
-          const vendidas = p.stockInicial - p.stock;
+          const vendidas = vendMapStock[(p.codigo || "").toUpperCase()] || 0;
           const pct = p.stockInicial > 0 ? Math.round(vendidas / p.stockInicial * 100) : 0;
           stockRows.push([
             p.codigo,
@@ -23942,8 +23954,9 @@
         [],
         ["C\xF3digo", "Producto", "Categor\xEDa", "Precio (Bs)", "Stock inicial", "Stock actual", "Vendidas", "% Vendido", "Estado", "Fecha ingreso"]
       ];
+      const vendMapMarca = mapVendidasPorCodigo(ventas);
       prods.forEach((p) => {
-        const vendidas = p.stockInicial - p.stock;
+        const vendidas = vendMapMarca[(p.codigo || "").toUpperCase()] || 0;
         const pct = p.stockInicial > 0 ? Math.round(vendidas / p.stockInicial * 100) : 0;
         stockRows.push([p.codigo, p.nombre, p.categoria || "", p.precio, p.stockInicial, p.stock, vendidas, pct + "%", p.stock === 0 ? "AGOTADO" : p.stock < 3 ? "BAJO STOCK" : "OK", p.fecha]);
       });
@@ -23962,11 +23975,12 @@
     }
     setGenerando(false);
   }
-  async function generarExcelStock(inventario, setGenerando) {
+  async function generarExcelStock(inventario, ventas, setGenerando) {
     setGenerando(true);
     try {
       const XLSX = await loadXLSX();
       const wb = XLSX.utils.book_new();
+      const vendMapTodo = mapVendidasPorCodigo(ventas);
       const rows = [
         ["TOSCANA HOUSE \u2014 REPORTE DE STOCK COMPLETO"],
         [`Generado: ${(/* @__PURE__ */ new Date()).toLocaleString("es-BO")}`],
@@ -23975,7 +23989,7 @@
       ];
       MARCAS.forEach((m) => {
         inventario.filter((i) => i.marcaId === m.id).forEach((p) => {
-          const vendidas = p.stockInicial - p.stock;
+          const vendidas = vendMapTodo[(p.codigo || "").toUpperCase()] || 0;
           const pct = p.stockInicial > 0 ? Math.round(vendidas / p.stockInicial * 100) : 0;
           rows.push([p.codigo, p.nombre, m.nombre, p.categoria || "", p.precio, p.stockInicial, p.stock, vendidas, pct + "%", p.stock === 0 ? "AGOTADO" : p.stock < 3 ? "BAJO STOCK" : "OK", p.fecha]);
         });
@@ -23992,7 +24006,7 @@
           ["C\xF3digo", "Producto", "Categor\xEDa", "Precio (Bs)", "Stock inicial", "Stock actual", "Vendidas", "Estado"]
         ];
         prods.forEach((p) => {
-          const vendidas = p.stockInicial - p.stock;
+          const vendidas = vendMapTodo[(p.codigo || "").toUpperCase()] || 0;
           mRows.push([p.codigo, p.nombre, p.categoria || "", p.precio, p.stockInicial, p.stock, vendidas, p.stock === 0 ? "AGOTADO" : p.stock < 3 ? "BAJO" : ""]);
         });
         const ws = XLSX.utils.aoa_to_sheet(mRows);
@@ -34212,8 +34226,10 @@ Motivo: ${motivo}` : ""}`)) {
       }
       const stockAntes = prod.stock || 0;
       const stockDespues = stockAntes + cant;
-      setInv((p) => p.map((i) => i.id === prod.id ? { ...i, stock: stockDespues } : i));
-      syncConRespaldo("stock", { prodId: prod.id, stock: stockDespues }, () => sbActualizarStock(prod.id, stockDespues));
+      const iniAntes = Number(prod.stockInicial) || stockAntes;
+      const iniDespues = iniAntes + cant;
+      setInv((p) => p.map((i) => i.id === prod.id ? { ...i, stock: stockDespues, stockInicial: iniDespues } : i));
+      syncConRespaldo("stock", { prodId: prod.id, stock: stockDespues, stock_inicial: iniDespues }, () => sbActualizarProductoPatch(prod.id, { stock: stockDespues, stock_inicial: iniDespues }));
       logAudit("STOCK_ADD", {
         resumen: `Entrada de stock: ${prod.nombre} (${prod.codigo}) +${cant} \xB7 stock ${stockAntes}\u2192${stockDespues}`,
         codigo: prod.codigo,
@@ -34332,12 +34348,15 @@ Esta acci\xF3n no se puede deshacer.` : "\xBFEliminar esta carga? Esta acci\xF3n
         const prod = inv.find((p) => p.codigo === codigo);
         const stockAntes = prod?.stock || 0;
         const stockNuevo = stock > 0 ? stockAntes + stock : stockAntes;
+        const iniAntes = Number(prod?.stockInicial) || stockAntes;
+        const iniNuevo = stock > 0 ? iniAntes + stock : iniAntes;
         const patch = { stock: stockNuevo };
+        if (stock > 0) patch.stockInicial = iniNuevo;
         if (descripcion) patch.descripcion = descripcion;
         if (subcat) patch.subcat = subcat;
         setInv((prev) => prev.map((p) => p.codigo === codigo ? { ...p, ...patch } : p));
         if (prod) {
-          if (stock > 0) syncConRespaldo("stock", { prodId: prod.id, stock: stockNuevo }, () => sbActualizarStock(prod.id, stockNuevo));
+          if (stock > 0) syncConRespaldo("stock", { prodId: prod.id, stock: stockNuevo, stock_inicial: iniNuevo }, () => sbActualizarProductoPatch(prod.id, { stock: stockNuevo, stock_inicial: iniNuevo }));
           if (patch.descripcion || patch.subcat) {
             syncConRespaldo("producto_patch", { prodId: prod.id, ...patch }, () => sbActualizarProductoPatch(prod.id, patch));
           }
@@ -35088,7 +35107,7 @@ Esta acci\xF3n no se puede deshacer.` : "\xBFEliminar esta carga? Esta acci\xF3n
     ), /* @__PURE__ */ import_react.default.createElement(
       "button",
       {
-        onClick: () => generarExcelStock(inv, setGenerando),
+        onClick: () => generarExcelStock(inv, ventas, setGenerando),
         disabled: generando,
         style: {
           flex: 1,
@@ -40650,6 +40669,7 @@ ${c.resumen || c.id}`)) onEliminarCarga(c.id);
     const cerrado = cierres[`${MK}-${marcaId}`]?.cerrado;
     const historial = getHist(marcaId);
     const prods = inv.filter((i) => i.marcaId === marcaId);
+    const vendMapMD = mapVendidasPorCodigo(ventas);
     const retirosMarca = retiros.filter((r) => {
       if (Number(r.marcaId) === Number(marcaId)) return true;
       if (r.marcaNombre && marca && r.marcaNombre.toLowerCase() === marca.nombre.toLowerCase()) return true;
@@ -40883,7 +40903,7 @@ ${c.resumen || c.id}`)) onEliminarCarga(c.id);
       borderBottom: `1px solid ${C.sep}`,
       marginBottom: 0
     } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 10, letterSpacing: 1, textTransform: "uppercase", color: C.label3, fontFamily: FONT_UI, opacity: 0.5 } }, "Producto"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 10, letterSpacing: 1, textTransform: "uppercase", color: C.label3, fontFamily: FONT_UI, opacity: 0.5, textAlign: "right" } }, "Precio"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 10, letterSpacing: 1, textTransform: "uppercase", color: C.label3, fontFamily: FONT_UI, opacity: 0.5, textAlign: "right", minWidth: 52 } }, "Stock")), prods.map((p, i) => {
-      const vendidas = p.stockInicial - p.stock;
+      const vendidas = vendMapMD[(p.codigo || "").toUpperCase()] || 0;
       return /* @__PURE__ */ import_react.default.createElement("div", { key: p.id, style: {
         display: "grid",
         gridTemplateColumns: "1fr auto auto",
@@ -41352,6 +41372,7 @@ ${c.resumen || c.id}`)) onEliminarCarga(c.id);
     var setVista = _hN154[1];
     ;
     const MKSel = mkKey(mesSel, anioSel);
+    const vendMapHist = mapVendidasPorCodigo(ventas);
     const ventasPer = (0, import_react.useMemo)(
       () => ventas.filter((v) => v.mk === MKSel),
       [ventas, MKSel]
@@ -41561,7 +41582,7 @@ ${c.resumen || c.id}`)) onEliminarCarga(c.id);
       const prods = inv.filter((i) => i.marcaId === m.id);
       if (!prods.length) return null;
       const stockTotal = prods.reduce((s, p) => s + p.stock, 0);
-      const vendTotal = prods.reduce((s, p) => s + (p.stockInicial - p.stock), 0);
+      const vendTotal = prods.reduce((s, p) => s + (vendMapHist[(p.codigo || "").toUpperCase()] || 0), 0);
       return /* @__PURE__ */ import_react.default.createElement("div", { key: m.id, style: {
         background: C.bg2,
         borderRadius: 14,
