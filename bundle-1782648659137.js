@@ -29403,7 +29403,34 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       padding: "10px 8px",
       textAlign: "center",
       border: `1px solid ${s.c}25`
-    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 20, fontWeight: 700, color: s.c, fontFamily: FONT_UI } }, s.v), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: C.label3, fontFamily: FONT_UI, textTransform: "uppercase", letterSpacing: 0.5 } }, s.l)))), nConflictos > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: {
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 20, fontWeight: 700, color: s.c, fontFamily: FONT_UI } }, s.v), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: C.label3, fontFamily: FONT_UI, textTransform: "uppercase", letterSpacing: 0.5 } }, s.l)))), nErrores > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      background: `${C.red}0d`,
+      border: `1.5px solid ${C.red}50`,
+      borderRadius: 12,
+      padding: "10px 14px",
+      marginBottom: 12,
+      display: "flex",
+      alignItems: "center",
+      gap: 10
+    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 16 } }, "\u26D4"), /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, fontWeight: 700, color: C.red, fontFamily: FONT_UI } }, nErrores, " fila", nErrores !== 1 ? "s" : "", " con error \u2014 el Excel no puede cargarse incompleto"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT_UI, marginTop: 2 } }, "Correg\xED los datos en el Excel (marca, precio, descripci\xF3n) y volv\xE9 a cargar el archivo.")), /* @__PURE__ */ import_react.default.createElement(
+      "button",
+      {
+        onClick: () => setFiltro("errores"),
+        style: {
+          background: C.red,
+          border: "none",
+          borderRadius: 8,
+          padding: "5px 10px",
+          fontSize: 11,
+          fontWeight: 700,
+          color: "#fff",
+          cursor: "pointer",
+          fontFamily: FONT_UI,
+          whiteSpace: "nowrap"
+        }
+      },
+      "Ver errores"
+    )), nConflictos > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: {
       background: `${C.red}0d`,
       border: `1.5px solid ${C.red}50`,
       borderRadius: 12,
@@ -29529,28 +29556,28 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
         letterSpacing: 0.3,
         lineHeight: 1.3
       } }, estadoChip.txt.slice(0, 20)));
-    }), previstaFiltrada.length === 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: { padding: "24px", textAlign: "center", color: C.label3, fontSize: 13, fontFamily: FONT_UI } }, "Sin filas en este filtro")), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 8 } }, nValidas > 0 && /* @__PURE__ */ import_react.default.createElement(
+    }), previstaFiltrada.length === 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: { padding: "24px", textAlign: "center", color: C.label3, fontSize: 13, fontFamily: FONT_UI } }, "Sin filas en este filtro")), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 8 } }, (nValidas > 0 || nErrores > 0 || nConflictos > 0) && /* @__PURE__ */ import_react.default.createElement(
       "button",
       {
-        onClick: nConflictos > 0 ? void 0 : importar,
+        onClick: nErrores > 0 || nConflictos > 0 ? void 0 : importar,
         style: {
-          background: nConflictos > 0 ? C.sep : C.label,
+          background: nErrores > 0 || nConflictos > 0 ? C.sep : C.label,
           border: "none",
           borderRadius: 14,
           padding: "14px",
           fontSize: 15,
           fontWeight: 700,
-          color: nConflictos > 0 ? C.label3 : C.bg0,
-          cursor: nConflictos > 0 ? "not-allowed" : "pointer",
+          color: nErrores > 0 || nConflictos > 0 ? C.label3 : C.bg0,
+          cursor: nErrores > 0 || nConflictos > 0 ? "not-allowed" : "pointer",
           fontFamily: FONT_UI,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
           gap: 8,
-          opacity: nConflictos > 0 ? 0.6 : 1
+          opacity: nErrores > 0 || nConflictos > 0 ? 0.6 : 1
         }
       },
-      nConflictos > 0 ? `\u{1F6AB} Resolver ${nConflictos} conflicto${nConflictos !== 1 ? "s" : ""} antes de importar` : /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, null, "\u2713 Importar ", nValidas, " producto", nValidas !== 1 ? "s" : "", " v\xE1lido", nValidas !== 1 ? "s" : "", nDups > 0 && /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 12, opacity: 0.8 } }, "(+", nDups, " actualiza stock)"))
+      nErrores > 0 ? `\u26D4 Corregir ${nErrores} error${nErrores !== 1 ? "es" : ""} en el Excel antes de importar` : nConflictos > 0 ? `\u{1F6AB} Resolver ${nConflictos} conflicto${nConflictos !== 1 ? "s" : ""} antes de importar` : /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, null, "\u2713 Importar ", nValidas, " producto", nValidas !== 1 ? "s" : "", " v\xE1lido", nValidas !== 1 ? "s" : "", nDups > 0 && /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 12, opacity: 0.8 } }, "(+", nDups, " actualiza stock)"))
     ), /* @__PURE__ */ import_react.default.createElement(
       "button",
       {

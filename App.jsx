@@ -7808,6 +7808,27 @@ function ImportarExcelModal({inv, onImportar, onClose, onArchivoCapturado}){
             ))}
           </div>
 
+          {/* Banner de errores bloqueantes — filas que no pueden importarse */}
+          {nErrores>0&&(
+            <div style={{background:`${C.red}0d`,border:`1.5px solid ${C.red}50`,borderRadius:12,
+              padding:"10px 14px",marginBottom:12,display:"flex",alignItems:"center",gap:10}}>
+              <span style={{fontSize:16}}>⛔</span>
+              <div style={{flex:1}}>
+                <div style={{fontSize:12,fontWeight:700,color:C.red,fontFamily:FONT_UI}}>
+                  {nErrores} fila{nErrores!==1?"s":""} con error — el Excel no puede cargarse incompleto
+                </div>
+                <div style={{fontSize:11,color:C.label3,fontFamily:FONT_UI,marginTop:2}}>
+                  Corregí los datos en el Excel (marca, precio, descripción) y volvé a cargar el archivo.
+                </div>
+              </div>
+              <button onClick={()=>setFiltro("errores")}
+                style={{background:C.red,border:"none",borderRadius:8,padding:"5px 10px",
+                  fontSize:11,fontWeight:700,color:"#fff",cursor:"pointer",fontFamily:FONT_UI,whiteSpace:"nowrap"}}>
+                Ver errores
+              </button>
+            </div>
+          )}
+
           {/* Banner de conflictos bloqueantes */}
           {nConflictos>0&&(
             <div style={{background:`${C.red}0d`,border:`1.5px solid ${C.red}50`,borderRadius:12,
@@ -7966,13 +7987,16 @@ function ImportarExcelModal({inv, onImportar, onClose, onArchivoCapturado}){
 
           {/* Botones acción */}
           <div style={{display:"flex",flexDirection:"column",gap:8}}>
-            {nValidas>0&&(
-              <button onClick={nConflictos>0?undefined:importar}
-                style={{background:nConflictos>0?C.sep:C.label,border:"none",borderRadius:14,padding:"14px",
-                  fontSize:15,fontWeight:700,color:nConflictos>0?C.label3:C.bg0,
-                  cursor:nConflictos>0?"not-allowed":"pointer",fontFamily:FONT_UI,
-                  display:"flex",alignItems:"center",justifyContent:"center",gap:8,opacity:nConflictos>0?.6:1}}>
-                {nConflictos>0
+            {(nValidas>0||nErrores>0||nConflictos>0)&&(
+              <button onClick={(nErrores>0||nConflictos>0)?undefined:importar}
+                style={{background:(nErrores>0||nConflictos>0)?C.sep:C.label,border:"none",borderRadius:14,padding:"14px",
+                  fontSize:15,fontWeight:700,color:(nErrores>0||nConflictos>0)?C.label3:C.bg0,
+                  cursor:(nErrores>0||nConflictos>0)?"not-allowed":"pointer",fontFamily:FONT_UI,
+                  display:"flex",alignItems:"center",justifyContent:"center",gap:8,
+                  opacity:(nErrores>0||nConflictos>0)?.6:1}}>
+                {nErrores>0
+                  ? `⛔ Corregir ${nErrores} error${nErrores!==1?"es":""} en el Excel antes de importar`
+                  : nConflictos>0
                   ? `🚫 Resolver ${nConflictos} conflicto${nConflictos!==1?"s":""} antes de importar`
                   : <>✓ Importar {nValidas} producto{nValidas!==1?"s":""} válido{nValidas!==1?"s":""}
                       {nDups>0&&<span style={{fontSize:12,opacity:.8}}>(+{nDups} actualiza stock)</span>}
