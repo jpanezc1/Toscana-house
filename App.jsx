@@ -8562,7 +8562,11 @@ function ImportarVentasLibresModal({open, onImportar, onClose}){
                 FECHA · TURNO · MARCA · PRECIO · METODO_PAGO
               </div>
               <input ref={fileRef} type="file" accept=".xlsx,.xls" style={{display:"none"}}
-                onChange={e=>e.target.files[0]&&parsearArchivo(e.target.files[0])}/>
+                onChange={e=>{
+                  const f = e.target.files[0];
+                  e.target.value = ""; // reset: permite re-seleccionar el mismo archivo
+                  if(f) parsearArchivo(f);
+                }}/>
               <div style={{display:"flex",gap:10,justifyContent:"center",flexWrap:"wrap"}}>
                 <button onClick={()=>fileRef.current?.click()}
                   style={{height:44,padding:"0 24px",border:"none",borderRadius:12,

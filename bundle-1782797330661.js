@@ -30153,7 +30153,11 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
         type: "file",
         accept: ".xlsx,.xls",
         style: { display: "none" },
-        onChange: (e) => e.target.files[0] && parsearArchivo(e.target.files[0])
+        onChange: (e) => {
+          const f = e.target.files[0];
+          e.target.value = "";
+          if (f) parsearArchivo(f);
+        }
       }
     ), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" } }, /* @__PURE__ */ import_react.default.createElement(
       "button",
