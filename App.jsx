@@ -1630,11 +1630,28 @@ function loadXLSX() {
     if (window.XLSX) { resolve(window.XLSX); return; }
     const s = document.createElement("script");
     s.src = "https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js";
-    s.onload  = () => resolve(window.XLSX);
-    s.onerror = () => reject(new Error("No se pudo cargar xlsx-js-style"));
+    let settled = false;
+    const done = (fn,arg)=>{ if(!settled){ settled=true; fn(arg); } };
+    s.onload  = () => done(resolve, window.XLSX);
+    s.onerror = () => done(reject, new Error("No se pudo cargar xlsx-js-style"));
+    // Si el CDN tarda más de 12s (red lenta/bloqueada) caemos a la lib
+    // empaquetada en vez de quedar colgados para siempre. La empaquetada
+    // no tiene estilos de celda pero sí lee/escribe datos correctamente.
+    setTimeout(()=>{
+      if(window.__XLSXBundled) done(resolve, window.__XLSXBundled);
+      else done(reject, new Error("Timeout cargando xlsx-js-style"));
+    }, 12000);
     document.head.appendChild(s);
   }).catch(e => { _XLSXPromise = null; throw e; }); // permite reintentar si falló
   return _XLSXPromise;
+}
+
+// Para LEER/escribir archivos sin estilos de celda: usa la librería xlsx
+// EMPAQUETADA en el bundle (no depende de ningún CDN → instantáneo y
+// funciona offline). Es lo que evita que el import se quede en "Leyendo...".
+async function getXLSXRead() {
+  if (typeof window !== "undefined" && window.__XLSXBundled) return window.__XLSXBundled;
+  return await loadXLSX(); // respaldo si por algún motivo no se empaquetó
 }
 
 // Helper: descargar blob como archivo
@@ -8286,8 +8303,12 @@ function ImportarVentasLibresModal({open, onImportar, onClose}){
       return `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,"0")}-${String(d.getUTCDate()).padStart(2,"0")}`;
     }
     const s = String(raw).trim();
-    let m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
-    if(m) return `${m[3]}-${m[2].padStart(2,"0")}-${m[1].padStart(2,"0")}`;
+    // DD/MM/YYYY o DD/MM/YY (año de 2 dígitos → 20YY, ej. "3/6/26" = 2026)
+    let m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2}|\d{4})$/);
+    if(m){
+      let anio = m[3].length===2 ? `20${m[3]}` : m[3];
+      return `${anio}-${m[2].padStart(2,"0")}-${m[1].padStart(2,"0")}`;
+    }
     m = s.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/);
     if(m) return `${m[1]}-${m[2].padStart(2,"0")}-${m[3].padStart(2,"0")}`;
     return null;
@@ -8341,7 +8362,7 @@ function ImportarVentasLibresModal({open, onImportar, onClose}){
       });
     }, 15000);
     try{
-      const XLSX = await loadXLSX();
+      const XLSX = await getXLSXRead();
       const buf  = await file.arrayBuffer();
       const wb   = XLSX.read(buf,{type:"array"});
       let rawAll = [];
@@ -8417,7 +8438,7 @@ function ImportarVentasLibresModal({open, onImportar, onClose}){
   }
 
   async function descargarPlantilla(){
-    const XLSX = await loadXLSX();
+    const XLSX = await getXLSXRead();
     const wb = XLSX.utils.book_new();
     const ws = XLSX.utils.aoa_to_sheet([
       ["FECHA","TURNO","MARCA","PRECIO","METODO_PAGO"],
