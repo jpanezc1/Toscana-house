@@ -29843,6 +29843,290 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       fontFamily: FONT_UI
     } }, "Listo \u2014 Ver inventario"))));
   }
+  function ImportarVentasLibresModal({ open, onImportar, onClose }) {
+    const [estado, setEstado] = (0, import_react.useState)("idle");
+    const [filas, setFilas] = (0, import_react.useState)([]);
+    const [resultado, setResultado] = (0, import_react.useState)(null);
+    const fileRef = (0, import_react.useRef)(null);
+    function norm(s) {
+      return String(s || "").trim().normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+    }
+    function resolverMarca(raw) {
+      const n = norm(raw);
+      if (!n) return null;
+      let m = MARCAS_SEED.find((s) => norm(s.nombre) === n);
+      if (m) return m;
+      m = MARCAS_SEED.find((s) => norm(s.nombre).startsWith(n) || n.startsWith(norm(s.nombre)));
+      if (m) return m;
+      m = MARCAS_SEED.find((s) => norm(s.nombre).includes(n) || n.includes(norm(s.nombre)));
+      return m || null;
+    }
+    async function parsearArchivo(file) {
+      setEstado("leyendo");
+      try {
+        const XLSX = await loadXLSX();
+        const buf = await file.arrayBuffer();
+        const wb = XLSX.read(buf, { type: "array" });
+        let rawAll = [];
+        for (const shName of wb.SheetNames) {
+          const ws = wb.Sheets[shName];
+          const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
+          if (rows.length > 1) {
+            rawAll = rows;
+            break;
+          }
+        }
+        if (rawAll.length < 2) {
+          setEstado("idle");
+          alert("Archivo vac\xEDo");
+          return;
+        }
+        const n = (s) => norm(String(s || ""));
+        let hRow = 0;
+        for (let i = 0; i < Math.min(10, rawAll.length); i++) {
+          const r = rawAll[i].map((c) => n(c));
+          if (r.some((c) => c.includes("marca") || c.includes("descripcion") || c.includes("precio"))) {
+            hRow = i;
+            break;
+          }
+        }
+        const headers = rawAll[hRow].map((c) => n(c));
+        const col = (...names) => {
+          for (const nm of names) {
+            const i = headers.findIndex((h) => h === nm);
+            if (i >= 0) return i;
+          }
+          for (const nm of names) {
+            const i = headers.findIndex((h) => h.includes(nm));
+            if (i >= 0) return i;
+          }
+          return -1;
+        };
+        const cM = col("marca");
+        const cD = col("descripcion", "detalle", "nombre", "producto", "articulo", "item");
+        const cP = col("precio", "price", "monto", "bs", "valor", "total");
+        const parsed = [];
+        for (let i = hRow + 1; i < rawAll.length; i++) {
+          const row = rawAll[i];
+          const mRaw = String(row[cM] || "").trim();
+          const desc = String(cD >= 0 ? row[cD] : "").trim();
+          const pRaw = cP >= 0 ? row[cP] : "";
+          const precio = parseFloat(String(pRaw).replace(/[^\d.,]/g, "").replace(",", "."));
+          if (!mRaw && !desc && !pRaw) continue;
+          const marcaObj = resolverMarca(mRaw);
+          parsed.push({
+            _num: i - hRow,
+            _ok: !!marcaObj && !!desc && !isNaN(precio) && precio > 0,
+            _errMarca: !marcaObj,
+            _errDesc: !desc,
+            _errPrecio: isNaN(precio) || precio <= 0,
+            marcaRaw: mRaw,
+            marcaId: marcaObj?.id || null,
+            marcaNombre: marcaObj?.nombre || mRaw,
+            descripcion: desc,
+            precio: isNaN(precio) ? 0 : precio
+          });
+        }
+        setFilas(parsed);
+        setEstado("preview");
+      } catch (e) {
+        setEstado("idle");
+        alert("Error al leer el archivo: " + e.message);
+      }
+    }
+    async function confirmar() {
+      const validas2 = filas.filter((f) => f._ok);
+      if (!validas2.length) return;
+      setEstado("importando");
+      const nVentas = await onImportar(validas2);
+      setResultado({ total: validas2.length, nVentas, marcas: [...new Set(validas2.map((f) => f.marcaNombre))] });
+      setEstado("done");
+    }
+    async function descargarPlantilla() {
+      const XLSX = await loadXLSX();
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.aoa_to_sheet([
+        ["MARCA", "DESCRIPCION", "PRECIO"],
+        ["She", "Collar plateado largo", 85],
+        ["Narcissa", "Anillo resina verde", 120],
+        ["Ramona", "Blusa estampada talle M", 180],
+        ["Monas", "Cartera tejida crema", 250]
+      ]);
+      ws["!cols"] = [{ wch: 18 }, { wch: 38 }, { wch: 10 }];
+      XLSX.utils.book_append_sheet(wb, ws, "Ventas");
+      const buf = XLSX.write(wb, { type: "array", bookType: "xlsx" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(new Blob([buf], { type: "application/octet-stream" }));
+      a.download = "Plantilla_Ventas_Sin_Codigo.xlsx";
+      a.click();
+    }
+    const validas = filas.filter((f) => f._ok);
+    const invalidas = filas.filter((f) => !f._ok);
+    const totalBs = validas.reduce((s, f) => s + f.precio, 0);
+    const porMarca = {};
+    validas.forEach((f) => {
+      const k = f.marcaNombre;
+      if (!porMarca[k]) porMarca[k] = { marcaNombre: k, count: 0, total: 0 };
+      porMarca[k].count++;
+      porMarca[k].total += f.precio;
+    });
+    return /* @__PURE__ */ import_react.default.createElement(Sheet, { open, onClose, title: "Importar ventas sin c\xF3digo", tall: true }, /* @__PURE__ */ import_react.default.createElement("div", { style: { padding: "4px 20px 24px", fontFamily: FONT_UI } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, marginBottom: 16, textAlign: "center" } }, "Excel con columnas MARCA \xB7 DESCRIPCION \xB7 PRECIO"), estado === "done" && resultado ? /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center", padding: "16px 0" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 36, marginBottom: 10 } }, "\u2713"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 16, fontWeight: 700, color: C.green, marginBottom: 4 } }, resultado.total, " ventas registradas"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label2, marginBottom: 6 } }, resultado.nVentas, " lote", resultado.nVentas !== 1 ? "s" : "", " (uno por marca)"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label2, marginBottom: 20, lineHeight: 1.6 } }, resultado.marcas.join(" \xB7 ")), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: onClose, variant: "success", full: true }, "Listo \u2014 ver liquidaciones")) : estado === "preview" ? /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 8, marginBottom: 12 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1, background: "#E8F5E9", borderRadius: 12, padding: "10px 14px" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: "#388E3C", fontWeight: 700, marginBottom: 2 } }, "V\xC1LIDAS"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 24, fontWeight: 700, color: "#2E7D32" } }, validas.length)), invalidas.length > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1, background: "#FFF3E0", borderRadius: 12, padding: "10px 14px" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: "#E65100", fontWeight: 700, marginBottom: 2 } }, "ERRORES"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 24, fontWeight: 700, color: "#E65100" } }, invalidas.length)), /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1, background: "#E3F2FD", borderRadius: 12, padding: "10px 14px" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: "#1565C0", fontWeight: 700, marginBottom: 2 } }, "TOTAL Bs."), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 24, fontWeight: 700, color: "#0D47A1" } }, totalBs.toFixed(0)))), Object.values(porMarca).length > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      background: C.bg1,
+      border: `1px solid ${C.sep}`,
+      borderRadius: 12,
+      marginBottom: 12,
+      overflow: "hidden"
+    } }, Object.values(porMarca).map((m, i, arr) => /* @__PURE__ */ import_react.default.createElement("div", { key: m.marcaNombre, style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      padding: "8px 14px",
+      borderBottom: i < arr.length - 1 ? `1px solid ${C.sep}` : "none"
+    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, color: C.label, fontWeight: 600 } }, m.marcaNombre), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 12, color: C.label2, fontFamily: FONT_MONO } }, m.count, " \xEDtems \xB7 Bs ", m.total.toFixed(0))))), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      maxHeight: 200,
+      overflowY: "auto",
+      border: `1px solid ${C.sep}`,
+      borderRadius: 12,
+      marginBottom: 12
+    } }, filas.map((f, i) => /* @__PURE__ */ import_react.default.createElement("div", { key: i, style: {
+      display: "flex",
+      gap: 8,
+      padding: "6px 12px",
+      alignItems: "center",
+      borderBottom: i < filas.length - 1 ? `1px solid ${C.sep}` : "none",
+      background: f._ok ? "transparent" : "#FFF8F0"
+    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: {
+      width: 16,
+      fontSize: 11,
+      fontWeight: 700,
+      flexShrink: 0,
+      color: f._ok ? "#388E3C" : "#E65100"
+    } }, f._ok ? "\u2713" : "!"), /* @__PURE__ */ import_react.default.createElement("span", { style: {
+      width: 80,
+      fontSize: 11,
+      color: f._errMarca ? "#E65100" : C.label2,
+      flexShrink: 0,
+      overflow: "hidden",
+      textOverflow: "ellipsis",
+      whiteSpace: "nowrap"
+    } }, f.marcaRaw || "\u2014"), /* @__PURE__ */ import_react.default.createElement("span", { style: {
+      flex: 1,
+      fontSize: 11,
+      color: f._errDesc ? "#E65100" : C.label2,
+      overflow: "hidden",
+      textOverflow: "ellipsis",
+      whiteSpace: "nowrap"
+    } }, f.descripcion || "(sin descripci\xF3n)"), /* @__PURE__ */ import_react.default.createElement("span", { style: {
+      fontSize: 11,
+      fontFamily: FONT_MONO,
+      flexShrink: 0,
+      color: f._errPrecio ? "#E65100" : C.label2
+    } }, f.precio > 0 ? `Bs ${f.precio}` : "\u2014")))), invalidas.length > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      fontSize: 11,
+      color: "#E65100",
+      background: "#FFF3E0",
+      borderRadius: 8,
+      padding: "8px 12px",
+      marginBottom: 12
+    } }, invalidas.length, " fila(s) ser\xE1n ignoradas: marca no reconocida, precio inv\xE1lido o descripci\xF3n vac\xEDa."), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 8 } }, /* @__PURE__ */ import_react.default.createElement(
+      "button",
+      {
+        onClick: () => {
+          setEstado("idle");
+          setFilas([]);
+        },
+        style: {
+          flex: 1,
+          height: 44,
+          border: `1px solid ${C.sep}`,
+          borderRadius: 12,
+          background: C.bg1,
+          cursor: "pointer",
+          fontSize: 13,
+          color: C.label,
+          fontFamily: FONT_UI
+        }
+      },
+      "Cambiar archivo"
+    ), /* @__PURE__ */ import_react.default.createElement(
+      "button",
+      {
+        onClick: confirmar,
+        disabled: validas.length === 0 || estado === "importando",
+        style: {
+          flex: 2,
+          height: 44,
+          border: "none",
+          borderRadius: 12,
+          cursor: "pointer",
+          background: validas.length === 0 ? "rgba(0,0,0,0.08)" : C.green,
+          color: validas.length === 0 ? C.label3 : "#fff",
+          fontSize: 14,
+          fontWeight: 700,
+          fontFamily: FONT_UI
+        }
+      },
+      estado === "importando" ? "Importando..." : `Registrar ${validas.length} ventas`
+    ))) : /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      background: C.bg1,
+      border: `1px solid ${C.sep}`,
+      borderRadius: 16,
+      padding: "24px 20px",
+      textAlign: "center",
+      marginBottom: 16
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 36, marginBottom: 10 } }, "\u{1F4CA}"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.label, marginBottom: 6, fontWeight: 500 } }, "Tres columnas requeridas:"), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      fontFamily: FONT_MONO,
+      fontSize: 13,
+      color: C.blue,
+      fontWeight: 600,
+      marginBottom: 16,
+      letterSpacing: 1
+    } }, "MARCA \xB7 DESCRIPCION \xB7 PRECIO"), /* @__PURE__ */ import_react.default.createElement(
+      "input",
+      {
+        ref: fileRef,
+        type: "file",
+        accept: ".xlsx,.xls",
+        style: { display: "none" },
+        onChange: (e) => e.target.files[0] && parsearArchivo(e.target.files[0])
+      }
+    ), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" } }, /* @__PURE__ */ import_react.default.createElement(
+      "button",
+      {
+        onClick: () => fileRef.current?.click(),
+        style: {
+          height: 44,
+          padding: "0 24px",
+          border: "none",
+          borderRadius: 12,
+          background: estado === "leyendo" ? "rgba(0,0,0,0.08)" : C.label,
+          color: estado === "leyendo" ? C.label3 : "#fff",
+          fontSize: 13,
+          fontWeight: 700,
+          cursor: "pointer",
+          fontFamily: FONT_UI
+        }
+      },
+      estado === "leyendo" ? "Leyendo..." : "Seleccionar Excel"
+    ), /* @__PURE__ */ import_react.default.createElement(
+      "button",
+      {
+        onClick: descargarPlantilla,
+        style: {
+          height: 44,
+          padding: "0 20px",
+          border: `1px solid ${C.sep}`,
+          borderRadius: 12,
+          background: C.bg1,
+          color: C.label2,
+          fontSize: 13,
+          cursor: "pointer",
+          fontFamily: FONT_UI
+        }
+      },
+      "Descargar plantilla"
+    ))), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label2, lineHeight: 1.7, padding: "0 4px" } }, "\u2022 Una fila = una venta registrada (sin afectar stock).", /* @__PURE__ */ import_react.default.createElement("br", null), "\u2022 Se crea un lote por marca para las liquidaciones.", /* @__PURE__ */ import_react.default.createElement("br", null), "\u2022 Las marcas se reconocen en may\xFAsculas o min\xFAsculas.", /* @__PURE__ */ import_react.default.createElement("br", null), "\u2022 Quedan en el mes actual para el cierre de junio."))));
+  }
   function HomeDashboard({ ventas, inv, vMes, mes, anio, onGoTab }) {
     const isDesktop = useIsDesktop();
     const hoyStr = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
@@ -34600,6 +34884,54 @@ Esta acci\xF3n no se puede deshacer.` : "\xBFEliminar esta carga? Esta acci\xF3n
       }, user);
       return vf;
     }
+    function handleImportarVentasLibres(filas) {
+      const porMarca = {};
+      filas.forEach((f) => {
+        const k = f.marcaId;
+        if (!porMarca[k]) porMarca[k] = { marcaId: f.marcaId, marcaNombre: f.marcaNombre, items: [] };
+        porMarca[k].items.push(f);
+      });
+      let counter = 0;
+      Object.values(porMarca).forEach((g) => {
+        counter++;
+        const id = `VL${Date.now()}${counter}`;
+        const items = g.items.map((f) => ({
+          prodId: null,
+          codigo: "LIBRE",
+          nombre: f.descripcion,
+          marcaId: f.marcaId,
+          marcaNombre: f.marcaNombre,
+          cantidad: 1,
+          precioUnit: f.precio,
+          subtotal: f.precio
+        }));
+        const total = items.reduce((s, it) => s + it.subtotal, 0);
+        const vf = {
+          id,
+          fecha: hoy(),
+          hora: hora(),
+          mk: MK,
+          mes,
+          anio,
+          total,
+          subtotal: total,
+          descPct: 0,
+          metodoPago: "efectivo",
+          vendedor: user?.nombre || "Admin",
+          origen: "IMPORT_LIBRE",
+          items
+        };
+        setVentas((p) => [...p, vf]);
+        syncConRespaldo("venta", vf, () => sbGuardarVenta(vf));
+        logAudit("IMPORT_VENTAS_LIBRES", {
+          resumen: `Import sin SKU: ${items.length} \xEDtems \xB7 ${g.marcaNombre} \xB7 Bs ${total}`,
+          ventaId: id,
+          total,
+          marca: g.marcaNombre
+        }, user);
+      });
+      return counter;
+    }
     function handleCambio(cambio) {
       cambio.itemsDevueltos.forEach((it) => {
         const prod = inv.find((i) => i.id === it.prodId);
@@ -34895,7 +35227,7 @@ Esta acci\xF3n no se puede deshacer.` : "\xBFEliminar esta carga? Esta acci\xF3n
         onGoVerif: () => setTab("auditoria"),
         tabActual: tab
       }
-    )), tab === "cargas" && /* @__PURE__ */ import_react.default.createElement(RegistroCargas, { cargas: cargasCompletas, marcas: MARCAS, onVerificar: handleVerificarCarga, user, onEliminarCarga: handleEliminarCarga, inv }), tab === "cambios" && /* @__PURE__ */ import_react.default.createElement(CambiosTab, { inv, ventas, onCambio: handleCambio }), tab === "ventas_ant" && user?.rol === "admin" && /* @__PURE__ */ import_react.default.createElement(VentasAntiguas, { inv, ventas, cargas: cargasCompletas, onVentaHistorica: handleVentaHistorica, user }), tab === "marcas" && !marcaDetalle && /* @__PURE__ */ import_react.default.createElement("div", null, marcasState.filter((m) => m.estado === "inactiva").length > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: {
+    )), tab === "cargas" && /* @__PURE__ */ import_react.default.createElement(RegistroCargas, { cargas: cargasCompletas, marcas: MARCAS, onVerificar: handleVerificarCarga, user, onEliminarCarga: handleEliminarCarga, inv }), tab === "cambios" && /* @__PURE__ */ import_react.default.createElement(CambiosTab, { inv, ventas, onCambio: handleCambio }), tab === "ventas_ant" && user?.rol === "admin" && /* @__PURE__ */ import_react.default.createElement(VentasAntiguas, { inv, ventas, cargas: cargasCompletas, onVentaHistorica: handleVentaHistorica, onImportarVentasLibres: handleImportarVentasLibres, user }), tab === "marcas" && !marcaDetalle && /* @__PURE__ */ import_react.default.createElement("div", null, marcasState.filter((m) => m.estado === "inactiva").length > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: {
       fontSize: 13,
       fontWeight: 600,
       color: C.label3,
@@ -38518,7 +38850,7 @@ ${c.diferencia > 0.01 ? `Cliente paga diferencia: Bs ${fmt2(c.diferencia)} (${c.
       }
     ), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: confirmar, variant: "fill", full: true, icon: "\u2713" }, "Confirmar cambio"));
   }
-  function VentasAntiguas({ inv, ventas, cargas, onVentaHistorica, user }) {
+  function VentasAntiguas({ inv, ventas, cargas, onVentaHistorica, onImportarVentasLibres, user }) {
     const hoyISO = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
     const fechaCargaPorMarca = import_react.default.useMemo(() => {
       const map = {};
@@ -38540,6 +38872,7 @@ ${c.diferencia > 0.01 ? `Cliente paga diferencia: Bs ${fmt2(c.diferencia)} (${c.
     const [confirmado, setConfirmado] = import_react.default.useState(null);
     const [guardando, setGuardando] = import_react.default.useState(false);
     const [verificados, setVerificados] = import_react.default.useState(/* @__PURE__ */ new Set());
+    const [shImportLibre, setShImportLibre] = import_react.default.useState(false);
     const inputRef = import_react.default.useRef(null);
     const total = carrito.reduce((s, it) => s + it.subtotal, 0);
     function getConflictoItem(it) {
@@ -38659,7 +38992,7 @@ ${c.diferencia > 0.01 ? `Cliente paga diferencia: Bs ${fmt2(c.diferencia)} (${c.
         };
       }).sort((a, b) => a.fechaISO.localeCompare(b.fechaISO));
     }, [fechaCargaPorMarca, inv]);
-    return /* @__PURE__ */ import_react.default.createElement("div", { style: { paddingBottom: 32 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10, marginBottom: 14 } }, /* @__PURE__ */ import_react.default.createElement("i", { className: "ti ti-clock-history", style: { fontSize: 20, color: C.label2 }, "aria-hidden": "true" }), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 15, fontWeight: 600, color: C.label, fontFamily: FONT } }, "Ventas antiguas"), /* @__PURE__ */ import_react.default.createElement("span", { style: {
+    return /* @__PURE__ */ import_react.default.createElement("div", { style: { paddingBottom: 32 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10, marginBottom: 14, flexWrap: "wrap" } }, /* @__PURE__ */ import_react.default.createElement("i", { className: "ti ti-clock-history", style: { fontSize: 20, color: C.label2 }, "aria-hidden": "true" }), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 15, fontWeight: 600, color: C.label, fontFamily: FONT } }, "Ventas antiguas"), /* @__PURE__ */ import_react.default.createElement("span", { style: {
       fontSize: 11,
       padding: "2px 8px",
       borderRadius: 4,
@@ -38669,7 +39002,37 @@ ${c.diferencia > 0.01 ? `Cliente paga diferencia: Bs ${fmt2(c.diferencia)} (${c.
       display: "inline-flex",
       alignItems: "center",
       gap: 4
-    } }, /* @__PURE__ */ import_react.default.createElement("i", { className: "ti ti-shield-lock", style: { fontSize: 11 }, "aria-hidden": "true" }), "Solo admin")), resumenCargas.length > 0 && /* @__PURE__ */ import_react.default.createElement("details", { style: { marginBottom: 12 } }, /* @__PURE__ */ import_react.default.createElement("summary", { style: {
+    } }, /* @__PURE__ */ import_react.default.createElement("i", { className: "ti ti-shield-lock", style: { fontSize: 11 }, "aria-hidden": "true" }), "Solo admin"), onImportarVentasLibres && /* @__PURE__ */ import_react.default.createElement(
+      "button",
+      {
+        onClick: () => setShImportLibre(true),
+        style: {
+          marginLeft: "auto",
+          display: "flex",
+          alignItems: "center",
+          gap: 6,
+          height: 34,
+          padding: "0 14px",
+          border: `1px solid ${C.sep}`,
+          borderRadius: 10,
+          background: C.bg1,
+          cursor: "pointer",
+          fontSize: 12,
+          fontWeight: 600,
+          color: C.label,
+          fontFamily: FONT_UI
+        }
+      },
+      /* @__PURE__ */ import_react.default.createElement("i", { className: "ti ti-table-import", style: { fontSize: 14 }, "aria-hidden": "true" }),
+      "Importar Excel sin SKU"
+    )), shImportLibre && /* @__PURE__ */ import_react.default.createElement(
+      ImportarVentasLibresModal,
+      {
+        open: shImportLibre,
+        onImportar: onImportarVentasLibres,
+        onClose: () => setShImportLibre(false)
+      }
+    ), resumenCargas.length > 0 && /* @__PURE__ */ import_react.default.createElement("details", { style: { marginBottom: 12 } }, /* @__PURE__ */ import_react.default.createElement("summary", { style: {
       fontSize: 12,
       fontWeight: 500,
       color: C.label2,

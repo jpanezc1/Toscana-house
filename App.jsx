@@ -8248,6 +8248,271 @@ function ImportarExcelModal({inv, onImportar, onClose, onArchivoCapturado}){
   );
 }
 
+// ══════════════════════════════════════════════════════════════════════
+// ImportarVentasLibresModal — carga masiva de ventas sin SKU
+// Excel con columnas: MARCA · DESCRIPCION · PRECIO
+// No afecta stock. Genera una venta por marca para liquidaciones.
+// ══════════════════════════════════════════════════════════════════════
+function ImportarVentasLibresModal({open, onImportar, onClose}){
+  const [estado,    setEstado]    = useState("idle");
+  const [filas,     setFilas]     = useState([]);
+  const [resultado, setResultado] = useState(null);
+  const fileRef = useRef(null);
+
+  function norm(s){ return String(s||"").trim().normalize("NFD").replace(/[̀-ͯ]/g,"").toLowerCase(); }
+
+  function resolverMarca(raw){
+    const n = norm(raw);
+    if(!n) return null;
+    let m = MARCAS_SEED.find(s => norm(s.nombre) === n);
+    if(m) return m;
+    m = MARCAS_SEED.find(s => norm(s.nombre).startsWith(n) || n.startsWith(norm(s.nombre)));
+    if(m) return m;
+    m = MARCAS_SEED.find(s => norm(s.nombre).includes(n) || n.includes(norm(s.nombre)));
+    return m || null;
+  }
+
+  async function parsearArchivo(file){
+    setEstado("leyendo");
+    try{
+      const XLSX = await loadXLSX();
+      const buf  = await file.arrayBuffer();
+      const wb   = XLSX.read(buf,{type:"array"});
+      let rawAll = [];
+      for(const shName of wb.SheetNames){
+        const ws  = wb.Sheets[shName];
+        const rows = XLSX.utils.sheet_to_json(ws,{header:1,defval:""});
+        if(rows.length>1){ rawAll = rows; break; }
+      }
+      if(rawAll.length<2){ setEstado("idle"); alert("Archivo vacío"); return; }
+
+      const n = s => norm(String(s||""));
+      let hRow=0;
+      for(let i=0;i<Math.min(10,rawAll.length);i++){
+        const r=rawAll[i].map(c=>n(c));
+        if(r.some(c=>c.includes("marca")||c.includes("descripcion")||c.includes("precio"))){hRow=i;break;}
+      }
+      const headers = rawAll[hRow].map(c=>n(c));
+      const col = (...names) => {
+        for(const nm of names){ const i=headers.findIndex(h=>h===nm); if(i>=0) return i; }
+        for(const nm of names){ const i=headers.findIndex(h=>h.includes(nm)); if(i>=0) return i; }
+        return -1;
+      };
+      const cM = col("marca");
+      const cD = col("descripcion","detalle","nombre","producto","articulo","item");
+      const cP = col("precio","price","monto","bs","valor","total");
+
+      const parsed = [];
+      for(let i=hRow+1;i<rawAll.length;i++){
+        const row  = rawAll[i];
+        const mRaw = String(row[cM]||"").trim();
+        const desc = String(cD>=0 ? row[cD]:"").trim();
+        const pRaw = cP>=0 ? row[cP] : "";
+        const precio = parseFloat(String(pRaw).replace(/[^\d.,]/g,"").replace(",","."));
+        if(!mRaw && !desc && !pRaw) continue;
+        const marcaObj = resolverMarca(mRaw);
+        parsed.push({
+          _num: i-hRow,
+          _ok: !!marcaObj && !!desc && !isNaN(precio) && precio>0,
+          _errMarca: !marcaObj,
+          _errDesc: !desc,
+          _errPrecio: isNaN(precio)||precio<=0,
+          marcaRaw: mRaw,
+          marcaId: marcaObj?.id||null,
+          marcaNombre: marcaObj?.nombre||mRaw,
+          descripcion: desc,
+          precio: isNaN(precio)?0:precio,
+        });
+      }
+      setFilas(parsed);
+      setEstado("preview");
+    } catch(e){ setEstado("idle"); alert("Error al leer el archivo: "+e.message); }
+  }
+
+  async function confirmar(){
+    const validas = filas.filter(f=>f._ok);
+    if(!validas.length) return;
+    setEstado("importando");
+    const nVentas = await onImportar(validas);
+    setResultado({total:validas.length, nVentas, marcas:[...new Set(validas.map(f=>f.marcaNombre))]});
+    setEstado("done");
+  }
+
+  async function descargarPlantilla(){
+    const XLSX = await loadXLSX();
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet([
+      ["MARCA","DESCRIPCION","PRECIO"],
+      ["She","Collar plateado largo",85],
+      ["Narcissa","Anillo resina verde",120],
+      ["Ramona","Blusa estampada talle M",180],
+      ["Monas","Cartera tejida crema",250],
+    ]);
+    ws["!cols"]=[{wch:18},{wch:38},{wch:10}];
+    XLSX.utils.book_append_sheet(wb,ws,"Ventas");
+    const buf=XLSX.write(wb,{type:"array",bookType:"xlsx"});
+    const a=document.createElement("a");
+    a.href=URL.createObjectURL(new Blob([buf],{type:"application/octet-stream"}));
+    a.download="Plantilla_Ventas_Sin_Codigo.xlsx";
+    a.click();
+  }
+
+  const validas   = filas.filter(f=>f._ok);
+  const invalidas = filas.filter(f=>!f._ok);
+  const totalBs   = validas.reduce((s,f)=>s+f.precio,0);
+  const porMarca  = {};
+  validas.forEach(f=>{
+    const k=f.marcaNombre;
+    if(!porMarca[k]) porMarca[k]={marcaNombre:k,count:0,total:0};
+    porMarca[k].count++;
+    porMarca[k].total+=f.precio;
+  });
+
+  return (
+    <Sheet open={open} onClose={onClose} title="Importar ventas sin código" tall>
+      <div style={{padding:"4px 20px 24px",fontFamily:FONT_UI}}>
+        <div style={{fontSize:11,color:C.label3,marginBottom:16,textAlign:"center"}}>
+          Excel con columnas MARCA · DESCRIPCION · PRECIO
+        </div>
+
+        {estado==="done" && resultado ? (
+          <div style={{textAlign:"center",padding:"16px 0"}}>
+            <div style={{fontSize:36,marginBottom:10}}>✓</div>
+            <div style={{fontSize:16,fontWeight:700,color:C.green,marginBottom:4}}>
+              {resultado.total} ventas registradas
+            </div>
+            <div style={{fontSize:12,color:C.label2,marginBottom:6}}>
+              {resultado.nVentas} lote{resultado.nVentas!==1?"s":""} (uno por marca)
+            </div>
+            <div style={{fontSize:12,color:C.label2,marginBottom:20,lineHeight:1.6}}>
+              {resultado.marcas.join(" · ")}
+            </div>
+            <IOSBtn onPress={onClose} variant="success" full>Listo — ver liquidaciones</IOSBtn>
+          </div>
+        ) : estado==="preview" ? (
+          <div>
+            <div style={{display:"flex",gap:8,marginBottom:12}}>
+              <div style={{flex:1,background:"#E8F5E9",borderRadius:12,padding:"10px 14px"}}>
+                <div style={{fontSize:10,color:"#388E3C",fontWeight:700,marginBottom:2}}>VÁLIDAS</div>
+                <div style={{fontSize:24,fontWeight:700,color:"#2E7D32"}}>{validas.length}</div>
+              </div>
+              {invalidas.length>0&&(
+                <div style={{flex:1,background:"#FFF3E0",borderRadius:12,padding:"10px 14px"}}>
+                  <div style={{fontSize:10,color:"#E65100",fontWeight:700,marginBottom:2}}>ERRORES</div>
+                  <div style={{fontSize:24,fontWeight:700,color:"#E65100"}}>{invalidas.length}</div>
+                </div>
+              )}
+              <div style={{flex:1,background:"#E3F2FD",borderRadius:12,padding:"10px 14px"}}>
+                <div style={{fontSize:10,color:"#1565C0",fontWeight:700,marginBottom:2}}>TOTAL Bs.</div>
+                <div style={{fontSize:24,fontWeight:700,color:"#0D47A1"}}>{totalBs.toFixed(0)}</div>
+              </div>
+            </div>
+
+            {Object.values(porMarca).length>0&&(
+              <div style={{background:C.bg1,border:`1px solid ${C.sep}`,borderRadius:12,
+                marginBottom:12,overflow:"hidden"}}>
+                {Object.values(porMarca).map((m,i,arr)=>(
+                  <div key={m.marcaNombre} style={{display:"flex",justifyContent:"space-between",
+                    alignItems:"center",padding:"8px 14px",
+                    borderBottom:i<arr.length-1?`1px solid ${C.sep}`:"none"}}>
+                    <span style={{fontSize:13,color:C.label,fontWeight:600}}>{m.marcaNombre}</span>
+                    <span style={{fontSize:12,color:C.label2,fontFamily:FONT_MONO}}>
+                      {m.count} ítems · Bs {m.total.toFixed(0)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div style={{maxHeight:200,overflowY:"auto",border:`1px solid ${C.sep}`,
+              borderRadius:12,marginBottom:12}}>
+              {filas.map((f,i)=>(
+                <div key={i} style={{display:"flex",gap:8,padding:"6px 12px",
+                  alignItems:"center",
+                  borderBottom:i<filas.length-1?`1px solid ${C.sep}`:"none",
+                  background:f._ok?"transparent":"#FFF8F0"}}>
+                  <span style={{width:16,fontSize:11,fontWeight:700,flexShrink:0,
+                    color:f._ok?"#388E3C":"#E65100"}}>{f._ok?"✓":"!"}</span>
+                  <span style={{width:80,fontSize:11,color:f._errMarca?"#E65100":C.label2,
+                    flexShrink:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                    {f.marcaRaw||"—"}
+                  </span>
+                  <span style={{flex:1,fontSize:11,color:f._errDesc?"#E65100":C.label2,
+                    overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                    {f.descripcion||"(sin descripción)"}
+                  </span>
+                  <span style={{fontSize:11,fontFamily:FONT_MONO,flexShrink:0,
+                    color:f._errPrecio?"#E65100":C.label2}}>
+                    {f.precio>0?`Bs ${f.precio}`:"—"}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            {invalidas.length>0&&(
+              <div style={{fontSize:11,color:"#E65100",background:"#FFF3E0",borderRadius:8,
+                padding:"8px 12px",marginBottom:12}}>
+                {invalidas.length} fila(s) serán ignoradas: marca no reconocida, precio inválido o descripción vacía.
+              </div>
+            )}
+
+            <div style={{display:"flex",gap:8}}>
+              <button onClick={()=>{setEstado("idle");setFilas([]);}}
+                style={{flex:1,height:44,border:`1px solid ${C.sep}`,borderRadius:12,
+                  background:C.bg1,cursor:"pointer",fontSize:13,color:C.label,fontFamily:FONT_UI}}>
+                Cambiar archivo
+              </button>
+              <button onClick={confirmar} disabled={validas.length===0||estado==="importando"}
+                style={{flex:2,height:44,border:"none",borderRadius:12,cursor:"pointer",
+                  background:validas.length===0?"rgba(0,0,0,0.08)":C.green,
+                  color:validas.length===0?C.label3:"#fff",fontSize:14,fontWeight:700,
+                  fontFamily:FONT_UI}}>
+                {estado==="importando"?"Importando...":`Registrar ${validas.length} ventas`}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div>
+            <div style={{background:C.bg1,border:`1px solid ${C.sep}`,borderRadius:16,
+              padding:"24px 20px",textAlign:"center",marginBottom:16}}>
+              <div style={{fontSize:36,marginBottom:10}}>📊</div>
+              <div style={{fontSize:13,color:C.label,marginBottom:6,fontWeight:500}}>
+                Tres columnas requeridas:
+              </div>
+              <div style={{fontFamily:FONT_MONO,fontSize:13,color:C.blue,fontWeight:600,
+                marginBottom:16,letterSpacing:1}}>
+                MARCA · DESCRIPCION · PRECIO
+              </div>
+              <input ref={fileRef} type="file" accept=".xlsx,.xls" style={{display:"none"}}
+                onChange={e=>e.target.files[0]&&parsearArchivo(e.target.files[0])}/>
+              <div style={{display:"flex",gap:10,justifyContent:"center",flexWrap:"wrap"}}>
+                <button onClick={()=>fileRef.current?.click()}
+                  style={{height:44,padding:"0 24px",border:"none",borderRadius:12,
+                    background:estado==="leyendo"?"rgba(0,0,0,0.08)":C.label,
+                    color:estado==="leyendo"?C.label3:"#fff",
+                    fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:FONT_UI}}>
+                  {estado==="leyendo"?"Leyendo...":"Seleccionar Excel"}
+                </button>
+                <button onClick={descargarPlantilla}
+                  style={{height:44,padding:"0 20px",border:`1px solid ${C.sep}`,borderRadius:12,
+                    background:C.bg1,color:C.label2,fontSize:13,cursor:"pointer",fontFamily:FONT_UI}}>
+                  Descargar plantilla
+                </button>
+              </div>
+            </div>
+            <div style={{fontSize:12,color:C.label2,lineHeight:1.7,padding:"0 4px"}}>
+              • Una fila = una venta registrada (sin afectar stock).<br/>
+              • Se crea un lote por marca para las liquidaciones.<br/>
+              • Las marcas se reconocen en mayúsculas o minúsculas.<br/>
+              • Quedan en el mes actual para el cierre de junio.
+            </div>
+          </div>
+        )}
+      </div>
+    </Sheet>
+  );
+}
+
 function HomeDashboard({ventas, inv, vMes, mes, anio, onGoTab}){
   const isDesktop = useIsDesktop();
 
@@ -12340,6 +12605,46 @@ function App(){
     return vf;
   }
 
+  function handleImportarVentasLibres(filas){
+    const porMarca = {};
+    filas.forEach(f=>{
+      const k = f.marcaId;
+      if(!porMarca[k]) porMarca[k]={marcaId:f.marcaId,marcaNombre:f.marcaNombre,items:[]};
+      porMarca[k].items.push(f);
+    });
+    let counter = 0;
+    Object.values(porMarca).forEach(g=>{
+      counter++;
+      const id = `VL${Date.now()}${counter}`;
+      const items = g.items.map(f=>({
+        prodId: null,
+        codigo: "LIBRE",
+        nombre: f.descripcion,
+        marcaId: f.marcaId,
+        marcaNombre: f.marcaNombre,
+        cantidad: 1,
+        precioUnit: f.precio,
+        subtotal: f.precio,
+      }));
+      const total = items.reduce((s,it)=>s+it.subtotal,0);
+      const vf = {
+        id, fecha:hoy(), hora:hora(), mk:MK, mes, anio,
+        total, subtotal:total, descPct:0,
+        metodoPago:"efectivo",
+        vendedor: user?.nombre||"Admin",
+        origen:"IMPORT_LIBRE",
+        items,
+      };
+      setVentas(p=>[...p,vf]);
+      syncConRespaldo("venta", vf, ()=>sbGuardarVenta(vf));
+      logAudit("IMPORT_VENTAS_LIBRES",{
+        resumen:`Import sin SKU: ${items.length} ítems · ${g.marcaNombre} · Bs ${total}`,
+        ventaId:id, total, marca:g.marcaNombre,
+      }, user);
+    });
+    return counter;
+  }
+
   function handleCambio(cambio){
     // Restaurar stock de items devueltos
     cambio.itemsDevueltos.forEach(it=>{
@@ -12618,7 +12923,7 @@ function App(){
 
         {/* VENTAS ANTIGUAS — solo admin */}
         {tab==="ventas_ant" && user?.rol==="admin" && (
-          <VentasAntiguas inv={inv} ventas={ventas} cargas={cargasCompletas} onVentaHistorica={handleVentaHistorica} user={user}/>
+          <VentasAntiguas inv={inv} ventas={ventas} cargas={cargasCompletas} onVentaHistorica={handleVentaHistorica} onImportarVentasLibres={handleImportarVentasLibres} user={user}/>
         )}
 
         {/* MARCAS — lista */}
@@ -15774,7 +16079,7 @@ ${c.diferencia>0.01?`Cliente paga diferencia: Bs ${fmt2(c.diferencia)} (${c.meto
 // ══════════════════════════════════════════════════════════
 // VENTAS ANTIGUAS — registro histórico de ventas pre-sistema
 // ══════════════════════════════════════════════════════════
-function VentasAntiguas({inv, ventas, cargas, onVentaHistorica, user}){
+function VentasAntiguas({inv, ventas, cargas, onVentaHistorica, onImportarVentasLibres, user}){
   const hoyISO = new Date().toISOString().slice(0,10);
 
   // ── Fecha de primera carga por marcaId (desde cargasCompletas) ──────────
@@ -15800,6 +16105,7 @@ function VentasAntiguas({inv, ventas, cargas, onVentaHistorica, user}){
   const [confirmado,    setConfirmado]    = React.useState(null);
   const [guardando,     setGuardando]     = React.useState(false);
   const [verificados,   setVerificados]   = React.useState(new Set()); // Set de prodIds verificados
+  const [shImportLibre, setShImportLibre] = React.useState(false);
   const inputRef = React.useRef(null);
 
   const total = carrito.reduce((s,it)=>s+it.subtotal,0);
@@ -15909,14 +16215,32 @@ function VentasAntiguas({inv, ventas, cargas, onVentaHistorica, user}){
   return (
     <div style={{paddingBottom:32}}>
       {/* Header */}
-      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}>
+      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14,flexWrap:"wrap"}}>
         <i className="ti ti-clock-history" style={{fontSize:20,color:C.label2}} aria-hidden="true"/>
         <span style={{fontSize:15,fontWeight:600,color:C.label,fontFamily:FONT}}>Ventas antiguas</span>
         <span style={{fontSize:11,padding:"2px 8px",borderRadius:4,background:"#EEEDFE",color:"#3C3489",
           fontWeight:500,display:"inline-flex",alignItems:"center",gap:4}}>
           <i className="ti ti-shield-lock" style={{fontSize:11}} aria-hidden="true"/>Solo admin
         </span>
+        {onImportarVentasLibres&&(
+          <button onClick={()=>setShImportLibre(true)}
+            style={{marginLeft:"auto",display:"flex",alignItems:"center",gap:6,
+              height:34,padding:"0 14px",border:`1px solid ${C.sep}`,borderRadius:10,
+              background:C.bg1,cursor:"pointer",fontSize:12,fontWeight:600,
+              color:C.label,fontFamily:FONT_UI}}>
+            <i className="ti ti-table-import" style={{fontSize:14}} aria-hidden="true"/>
+            Importar Excel sin SKU
+          </button>
+        )}
       </div>
+
+      {shImportLibre&&(
+        <ImportarVentasLibresModal
+          open={shImportLibre}
+          onImportar={onImportarVentasLibres}
+          onClose={()=>setShImportLibre(false)}
+        />
+      )}
 
       {/* Panel de fechas de carga por marca */}
       {resumenCargas.length>0&&(
