@@ -29894,6 +29894,22 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       if (n.includes("tarj") || n.includes("card")) return "tarjeta";
       return "efectivo";
     }
+    function parsearPrecio(raw) {
+      let s = String(raw == null ? "" : raw).trim();
+      if (!s) return NaN;
+      s = s.replace(/[^\d.,\-]/g, "");
+      const hasComma = s.includes(",");
+      const hasDot = s.includes(".");
+      if (hasComma && hasDot) {
+        const lastComma = s.lastIndexOf(",");
+        const lastDot = s.lastIndexOf(".");
+        s = lastComma > lastDot ? s.replace(/\./g, "").replace(",", ".") : s.replace(/,/g, "");
+      } else if (hasComma && !hasDot) {
+        const parts = s.split(",");
+        s = parts.length === 2 && parts[1].length <= 2 ? s.replace(",", ".") : s.replace(/,/g, "");
+      }
+      return parseFloat(s);
+    }
     async function parsearArchivo(file) {
       setEstado("leyendo");
       try {
@@ -29950,7 +29966,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
           const desc = String(cD >= 0 ? row[cD] : "").trim();
           const pRaw = cP >= 0 ? row[cP] : "";
           const mpRaw = cMP >= 0 ? row[cMP] : "";
-          const precio = parseFloat(String(pRaw).replace(/[^\d.,]/g, "").replace(",", "."));
+          const precio = parsearPrecio(pRaw);
           if (!mRaw && !pRaw && !fRaw) continue;
           const marcaObj = resolverMarca(mRaw);
           const fechaISO = parsearFecha(fRaw);

@@ -8308,6 +8308,30 @@ function ImportarVentasLibresModal({open, onImportar, onClose}){
     return "efectivo";
   }
 
+  // Parsea precio con coma O punto como separador de miles o decimal —
+  // "1,200.0" (miles=coma) y "1.200,50" (miles=punto) deben dar 1200.x,
+  // nunca tratar la coma como decimal a ciegas (corrompía 1,200 → 1.2).
+  function parsearPrecio(raw){
+    let s = String(raw==null?"":raw).trim();
+    if(!s) return NaN;
+    s = s.replace(/[^\d.,\-]/g,"");
+    const hasComma = s.includes(",");
+    const hasDot   = s.includes(".");
+    if(hasComma && hasDot){
+      const lastComma = s.lastIndexOf(",");
+      const lastDot   = s.lastIndexOf(".");
+      s = lastComma > lastDot
+        ? s.replace(/\./g,"").replace(",",".")   // coma decimal, punto miles
+        : s.replace(/,/g,"");                     // punto decimal, coma miles
+    } else if(hasComma && !hasDot){
+      const parts = s.split(",");
+      s = (parts.length===2 && parts[1].length<=2)
+        ? s.replace(",",".")   // coma decimal (ej. 199,50)
+        : s.replace(/,/g,""); // coma de miles (ej. 1,200)
+    }
+    return parseFloat(s);
+  }
+
   async function parsearArchivo(file){
     setEstado("leyendo");
     try{
@@ -8350,7 +8374,7 @@ function ImportarVentasLibresModal({open, onImportar, onClose}){
         const desc = String(cD>=0 ? row[cD]:"").trim();
         const pRaw = cP>=0 ? row[cP] : "";
         const mpRaw= cMP>=0 ? row[cMP] : "";
-        const precio = parseFloat(String(pRaw).replace(/[^\d.,]/g,"").replace(",","."));
+        const precio = parsearPrecio(pRaw);
         if(!mRaw && !pRaw && !fRaw) continue;
         const marcaObj = resolverMarca(mRaw);
         const fechaISO = parsearFecha(fRaw);
