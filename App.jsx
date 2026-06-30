@@ -8272,6 +8272,40 @@ function ImportarVentasLibresModal({open, onImportar, onClose}){
     return m || null;
   }
 
+  // Acepta fecha Excel serial, Date, "DD/MM/YYYY" o "YYYY-MM-DD" → ISO "YYYY-MM-DD"
+  function parsearFecha(raw){
+    if(raw==null || raw==="") return null;
+    if(raw instanceof Date){
+      return `${raw.getFullYear()}-${String(raw.getMonth()+1).padStart(2,"0")}-${String(raw.getDate()).padStart(2,"0")}`;
+    }
+    if(typeof raw==="number"){
+      const utcDays = Math.floor(raw - 25569);
+      const d = new Date(utcDays * 86400 * 1000);
+      return `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,"0")}-${String(d.getUTCDate()).padStart(2,"0")}`;
+    }
+    const s = String(raw).trim();
+    let m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+    if(m) return `${m[3]}-${m[2].padStart(2,"0")}-${m[1].padStart(2,"0")}`;
+    m = s.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/);
+    if(m) return `${m[1]}-${m[2].padStart(2,"0")}-${m[3].padStart(2,"0")}`;
+    return null;
+  }
+
+  function resolverTurno(raw){
+    const n = norm(raw);
+    if(n.startsWith("man")) return "Mañana";
+    if(n.startsWith("noc")) return "Noche";
+    if(n.startsWith("tar")) return "Tarde";
+    return "Tarde";
+  }
+
+  function resolverMetodo(raw){
+    const n = norm(raw);
+    if(n.includes("qr")) return "qr";
+    if(n.includes("tarj")||n.includes("card")) return "tarjeta";
+    return "efectivo";
+  }
+
   async function parsearArchivo(file){
     setEstado("leyendo");
     try{
@@ -8298,30 +8332,42 @@ function ImportarVentasLibresModal({open, onImportar, onClose}){
         for(const nm of names){ const i=headers.findIndex(h=>h.includes(nm)); if(i>=0) return i; }
         return -1;
       };
-      const cM = col("marca");
-      const cD = col("descripcion","detalle","nombre","producto","articulo","item");
-      const cP = col("precio","price","monto","bs","valor","total");
+      const cF  = col("fecha","date");
+      const cT  = col("turno","shift");
+      const cM  = col("marca");
+      const cD  = col("descripcion","detalle","nombre","producto","articulo","item");
+      const cP  = col("precio","price","monto","bs","valor","total");
+      const cMP = col("metodo de pago","metodo_pago","metodopago","metodo","pago","forma de pago");
 
       const parsed = [];
       for(let i=hRow+1;i<rawAll.length;i++){
         const row  = rawAll[i];
+        const fRaw = cF>=0 ? row[cF] : "";
+        const tRaw = cT>=0 ? row[cT] : "";
         const mRaw = String(row[cM]||"").trim();
         const desc = String(cD>=0 ? row[cD]:"").trim();
         const pRaw = cP>=0 ? row[cP] : "";
+        const mpRaw= cMP>=0 ? row[cMP] : "";
         const precio = parseFloat(String(pRaw).replace(/[^\d.,]/g,"").replace(",","."));
-        if(!mRaw && !desc && !pRaw) continue;
+        if(!mRaw && !desc && !pRaw && !fRaw) continue;
         const marcaObj = resolverMarca(mRaw);
+        const fechaISO = parsearFecha(fRaw);
         parsed.push({
           _num: i-hRow,
-          _ok: !!marcaObj && !!desc && !isNaN(precio) && precio>0,
+          _ok: !!marcaObj && !!desc && !isNaN(precio) && precio>0 && !!fechaISO,
           _errMarca: !marcaObj,
           _errDesc: !desc,
           _errPrecio: isNaN(precio)||precio<=0,
+          _errFecha: !fechaISO,
           marcaRaw: mRaw,
           marcaId: marcaObj?.id||null,
           marcaNombre: marcaObj?.nombre||mRaw,
           descripcion: desc,
           precio: isNaN(precio)?0:precio,
+          fecha: fechaISO,
+          fechaRaw: String(fRaw||""),
+          turno: resolverTurno(tRaw),
+          metodoPago: resolverMetodo(mpRaw),
         });
       }
       setFilas(parsed);
@@ -8342,13 +8388,13 @@ function ImportarVentasLibresModal({open, onImportar, onClose}){
     const XLSX = await loadXLSX();
     const wb = XLSX.utils.book_new();
     const ws = XLSX.utils.aoa_to_sheet([
-      ["MARCA","DESCRIPCION","PRECIO"],
-      ["She","Collar plateado largo",85],
-      ["Narcissa","Anillo resina verde",120],
-      ["Ramona","Blusa estampada talle M",180],
-      ["Monas","Cartera tejida crema",250],
+      ["FECHA","TURNO","MARCA","DESCRIPCION","PRECIO","METODO_PAGO"],
+      ["15/04/2026","Tarde","She","Collar plateado largo",85,"efectivo"],
+      ["15/04/2026","Mañana","Narcissa","Anillo resina verde",120,"qr"],
+      ["16/04/2026","Noche","Ramona","Blusa estampada talle M",180,"tarjeta"],
+      ["16/04/2026","Tarde","Monas","Cartera tejida crema",250,"efectivo"],
     ]);
-    ws["!cols"]=[{wch:18},{wch:38},{wch:10}];
+    ws["!cols"]=[{wch:12},{wch:10},{wch:14},{wch:36},{wch:10},{wch:14}];
     XLSX.utils.book_append_sheet(wb,ws,"Ventas");
     const buf=XLSX.write(wb,{type:"array",bookType:"xlsx"});
     const a=document.createElement("a");
@@ -8372,7 +8418,7 @@ function ImportarVentasLibresModal({open, onImportar, onClose}){
     <Sheet open={open} onClose={onClose} title="Importar ventas sin código" tall>
       <div style={{padding:"4px 20px 24px",fontFamily:FONT_UI}}>
         <div style={{fontSize:11,color:C.label3,marginBottom:16,textAlign:"center"}}>
-          Excel con columnas MARCA · DESCRIPCION · PRECIO
+          Excel con columnas FECHA · TURNO · MARCA · DESCRIPCION · PRECIO · METODO_PAGO
         </div>
 
         {estado==="done" && resultado ? (
@@ -8382,7 +8428,7 @@ function ImportarVentasLibresModal({open, onImportar, onClose}){
               {resultado.total} ventas registradas
             </div>
             <div style={{fontSize:12,color:C.label2,marginBottom:6}}>
-              {resultado.nVentas} lote{resultado.nVentas!==1?"s":""} (uno por marca)
+              {resultado.nVentas} venta{resultado.nVentas!==1?"s":""} creadas (agrupadas por marca, fecha, turno y método de pago)
             </div>
             <div style={{fontSize:12,color:C.label2,marginBottom:20,lineHeight:1.6}}>
               {resultado.marcas.join(" · ")}
@@ -8427,13 +8473,17 @@ function ImportarVentasLibresModal({open, onImportar, onClose}){
             <div style={{maxHeight:200,overflowY:"auto",border:`1px solid ${C.sep}`,
               borderRadius:12,marginBottom:12}}>
               {filas.map((f,i)=>(
-                <div key={i} style={{display:"flex",gap:8,padding:"6px 12px",
+                <div key={i} style={{display:"flex",gap:6,padding:"6px 12px",
                   alignItems:"center",
                   borderBottom:i<filas.length-1?`1px solid ${C.sep}`:"none",
                   background:f._ok?"transparent":"#FFF8F0"}}>
-                  <span style={{width:16,fontSize:11,fontWeight:700,flexShrink:0,
+                  <span style={{width:14,fontSize:11,fontWeight:700,flexShrink:0,
                     color:f._ok?"#388E3C":"#E65100"}}>{f._ok?"✓":"!"}</span>
-                  <span style={{width:80,fontSize:11,color:f._errMarca?"#E65100":C.label2,
+                  <span style={{width:66,fontSize:10,fontFamily:FONT_MONO,flexShrink:0,
+                    color:f._errFecha?"#E65100":C.label3}}>
+                    {f.fecha?f.fecha.split("-").reverse().join("/"):(f.fechaRaw||"—")}
+                  </span>
+                  <span style={{width:70,fontSize:11,color:f._errMarca?"#E65100":C.label2,
                     flexShrink:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
                     {f.marcaRaw||"—"}
                   </span>
@@ -8452,7 +8502,7 @@ function ImportarVentasLibresModal({open, onImportar, onClose}){
             {invalidas.length>0&&(
               <div style={{fontSize:11,color:"#E65100",background:"#FFF3E0",borderRadius:8,
                 padding:"8px 12px",marginBottom:12}}>
-                {invalidas.length} fila(s) serán ignoradas: marca no reconocida, precio inválido o descripción vacía.
+                {invalidas.length} fila(s) serán ignoradas: marca no reconocida, precio inválido, descripción vacía o fecha inválida (usar DD/MM/AAAA).
               </div>
             )}
 
@@ -8477,11 +8527,11 @@ function ImportarVentasLibresModal({open, onImportar, onClose}){
               padding:"24px 20px",textAlign:"center",marginBottom:16}}>
               <div style={{fontSize:36,marginBottom:10}}>📊</div>
               <div style={{fontSize:13,color:C.label,marginBottom:6,fontWeight:500}}>
-                Tres columnas requeridas:
+                Columnas requeridas:
               </div>
-              <div style={{fontFamily:FONT_MONO,fontSize:13,color:C.blue,fontWeight:600,
-                marginBottom:16,letterSpacing:1}}>
-                MARCA · DESCRIPCION · PRECIO
+              <div style={{fontFamily:FONT_MONO,fontSize:12,color:C.blue,fontWeight:600,
+                marginBottom:16,letterSpacing:.5,lineHeight:1.6}}>
+                FECHA · TURNO · MARCA · DESCRIPCION · PRECIO · METODO_PAGO
               </div>
               <input ref={fileRef} type="file" accept=".xlsx,.xls" style={{display:"none"}}
                 onChange={e=>e.target.files[0]&&parsearArchivo(e.target.files[0])}/>
@@ -8502,9 +8552,10 @@ function ImportarVentasLibresModal({open, onImportar, onClose}){
             </div>
             <div style={{fontSize:12,color:C.label2,lineHeight:1.7,padding:"0 4px"}}>
               • Una fila = una venta registrada (sin afectar stock).<br/>
-              • Se crea un lote por marca para las liquidaciones.<br/>
-              • Las marcas se reconocen en mayúsculas o minúsculas.<br/>
-              • Quedan en el mes actual para el cierre de junio.
+              • Fecha: DD/MM/AAAA. Turno: Mañana/Tarde/Noche. Método: efectivo/qr/tarjeta.<br/>
+              • Se agrupan por marca+fecha+turno+método para las liquidaciones.<br/>
+              • Las marcas y turnos se reconocen en mayúsculas o minúsculas.<br/>
+              • Cada venta queda en el mes real de su fecha (abril, mayo, junio...).
             </div>
           </div>
         )}
@@ -12606,14 +12657,16 @@ function App(){
   }
 
   function handleImportarVentasLibres(filas){
-    const porMarca = {};
+    // Agrupar por marca + fecha + turno + método de pago — cada combinación
+    // única es una venta (la venta solo puede tener un metodoPago/fecha).
+    const grupos = {};
     filas.forEach(f=>{
-      const k = f.marcaId;
-      if(!porMarca[k]) porMarca[k]={marcaId:f.marcaId,marcaNombre:f.marcaNombre,items:[]};
-      porMarca[k].items.push(f);
+      const k = `${f.marcaId}|${f.fecha}|${f.turno}|${f.metodoPago}`;
+      if(!grupos[k]) grupos[k]={marcaId:f.marcaId,marcaNombre:f.marcaNombre,fecha:f.fecha,turno:f.turno,metodoPago:f.metodoPago,items:[]};
+      grupos[k].items.push(f);
     });
     let counter = 0;
-    Object.values(porMarca).forEach(g=>{
+    Object.values(grupos).forEach(g=>{
       counter++;
       const id = `VL${Date.now()}${counter}`;
       const items = g.items.map(f=>({
@@ -12627,10 +12680,13 @@ function App(){
         subtotal: f.precio,
       }));
       const total = items.reduce((s,it)=>s+it.subtotal,0);
+      const [anioH, mesISO] = g.fecha.split("-").map(Number);
+      const mesH = mesISO - 1; // 0-indexed
+      const mkH  = mkKey(mesH, anioH);
       const vf = {
-        id, fecha:hoy(), hora:hora(), mk:MK, mes, anio,
+        id, fecha:g.fecha, hora:g.turno, mk:mkH, mes:mesH, anio:anioH,
         total, subtotal:total, descPct:0,
-        metodoPago:"efectivo",
+        metodoPago:g.metodoPago,
         vendedor: user?.nombre||"Admin",
         origen:"IMPORT_LIBRE",
         items,
@@ -12638,8 +12694,8 @@ function App(){
       setVentas(p=>[...p,vf]);
       syncConRespaldo("venta", vf, ()=>sbGuardarVenta(vf));
       logAudit("IMPORT_VENTAS_LIBRES",{
-        resumen:`Import sin SKU: ${items.length} ítems · ${g.marcaNombre} · Bs ${total}`,
-        ventaId:id, total, marca:g.marcaNombre,
+        resumen:`Import sin SKU: ${items.length} ítems · ${g.marcaNombre} · ${g.fecha} · Bs ${total}`,
+        ventaId:id, total, marca:g.marcaNombre, fecha:g.fecha,
       }, user);
     });
     return counter;
