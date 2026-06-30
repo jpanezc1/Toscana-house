@@ -58417,6 +58417,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       [`\u2212 Desc. Tarjeta (${pctTarjeta}%)`, `-${$2(Math.round(descTarjeta))}`, C.red],
       [`= Subtotal -${pctTarjeta}%`, $2(Math.round(subtotalBanco)), C.label2],
       [`\u2212 Comisi\xF3n ventas (${pctComision}%)`, `-${$2(Math.round(comision))}`, C.red],
+      [`= Subtotal -${pctComision}%`, $2(Math.round(subtotalBanco - comision)), C.label2],
       alquiler > 0 ? [`\u2212 Alquiler`, `-${$2(alquiler)}`, C.amber] : null,
       ...gastos.filter((g) => g.desc || Number(g.monto) > 0).map(
         (g) => [`\u2212 ${g.desc || "Gasto extra"}`, `-${$2(Math.round(Number(g.monto) || 0))}`, C.red]

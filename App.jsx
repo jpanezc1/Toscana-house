@@ -4815,6 +4815,7 @@ function LiqModal({marcaId,ventas,mes,anio,MK,cierres,setCierres,onClose,syncCie
           [`− Desc. Tarjeta (${pctTarjeta}%)`,`-${$(Math.round(descTarjeta))}`,C.red],
           [`= Subtotal -${pctTarjeta}%`,$(Math.round(subtotalBanco)),C.label2],
           [`− Comisión ventas (${pctComision}%)`,`-${$(Math.round(comision))}`,C.red],
+          [`= Subtotal -${pctComision}%`,$(Math.round(subtotalBanco-comision)),C.label2],
           alquiler>0?[`− Alquiler`,`-${$(alquiler)}`,C.amber]:null,
           ...gastos.filter(g=>g.desc||Number(g.monto)>0).map(g=>
             [`− ${g.desc||"Gasto extra"}`,`-${$(Math.round(Number(g.monto)||0))}`,C.red]
