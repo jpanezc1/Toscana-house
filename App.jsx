@@ -1606,6 +1606,7 @@ function MarcaIcon({marca, size=20, radius=8, style={}}){
 
 // ── Helpers ───────────────────────────────────────────────
 const $    = n => "Bs " + new Intl.NumberFormat("es-BO",{minimumFractionDigits:0,maximumFractionDigits:2}).format(n||0);
+const $1   = n => "Bs " + new Intl.NumberFormat("es-BO",{minimumFractionDigits:1,maximumFractionDigits:1}).format(n||0);
 const hoy  = () => { const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
 const hora = () => new Date().toLocaleTimeString("es-BO",{hour:"2-digit",minute:"2-digit"});
 const mkKey= (m,a) => `${a}-${String(m+1).padStart(2,"0")}`;
@@ -4802,7 +4803,7 @@ function LiqModal({marcaId,ventas,mes,anio,MK,cierres,setCierres,onClose,syncCie
             ].map(s=>(
               <div key={s.label} style={{textAlign:"center",padding:"9px 8px",
                 background:`${s.color}10`,borderRadius:12}}>
-                <div style={{fontSize:14,fontWeight:700,color:C.label,fontFamily:FONT,letterSpacing:"-0.01em"}}>{$(Math.round(s.val))}</div>
+                <div style={{fontSize:14,fontWeight:700,color:C.label,fontFamily:FONT,letterSpacing:"-0.01em"}}>{$1(s.val)}</div>
                 <div style={{fontSize:10,color:C.label3,fontFamily:FONT,marginTop:2,opacity:.7}}>{s.label}</div>
               </div>
             ))}
@@ -4811,14 +4812,14 @@ function LiqModal({marcaId,ventas,mes,anio,MK,cierres,setCierres,onClose,syncCie
 
         {/* Cálculo paso a paso */}
         {[
-          ["Ventas brutas",$(Math.round(bruto)),C.label],
-          [`− Desc. Tarjeta (${pctTarjeta}%)`,`-${$(Math.round(descTarjeta))}`,C.red],
-          [`= Subtotal -${pctTarjeta}%`,$(Math.round(subtotalBanco)),C.label2],
-          [`− Comisión ventas (${pctComision}%)`,`-${$(Math.round(comision))}`,C.red],
-          [`= Subtotal -${pctComision}%`,$(Math.round(subtotalBanco-comision)),C.label2],
-          alquiler>0?[`− Alquiler`,`-${$(alquiler)}`,C.amber]:null,
+          ["Ventas brutas",$1(bruto),C.label],
+          [`− Desc. Tarjeta (${pctTarjeta}%)`,`-${$1(descTarjeta)}`,C.red],
+          [`= Subtotal -${pctTarjeta}%`,$1(subtotalBanco),C.label2],
+          [`− Comisión ventas (${pctComision}%)`,`-${$1(comision)}`,C.red],
+          [`= Subtotal -${pctComision}%`,$1(subtotalBanco-comision),C.label2],
+          alquiler>0?[`− Alquiler`,`-${$1(alquiler)}`,C.amber]:null,
           ...gastos.filter(g=>g.desc||Number(g.monto)>0).map(g=>
-            [`− ${g.desc||"Gasto extra"}`,`-${$(Math.round(Number(g.monto)||0))}`,C.red]
+            [`− ${g.desc||"Gasto extra"}`,`-${$1(Number(g.monto)||0)}`,C.red]
           ),
         ].filter(Boolean).map(([k,v,c],i,arr)=>(
           <div key={`${k}-${i}`} style={{display:"flex",justifyContent:"space-between",alignItems:"center",
@@ -4832,7 +4833,7 @@ function LiqModal({marcaId,ventas,mes,anio,MK,cierres,setCierres,onClose,syncCie
           <span style={{fontSize:11,fontWeight:600,color:C.label,fontFamily:FONT,
             textTransform:"uppercase",letterSpacing:".08em",opacity:.6}}>Total Neto</span>
           <span style={{fontSize:28,fontWeight:700,color:C.label,fontFamily:FONT,
-            letterSpacing:"-0.03em",lineHeight:1}}>{$(Math.round(neto))}</span>
+            letterSpacing:"-0.03em",lineHeight:1}}>{$1(neto)}</span>
         </div>
       </div>
 

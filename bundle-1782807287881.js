@@ -22253,8 +22253,8 @@
         }
         o = o.replace(/\+-/, "-");
       }
-      o = o.replace(/^([+-]?)(\d*)\.(\d*)[Ee]/, function($$, $1, $22, $3) {
-        return $1 + $22 + $3.substr(0, (period + ee) % period) + "." + $3.substr(ee) + "E";
+      o = o.replace(/^([+-]?)(\d*)\.(\d*)[Ee]/, function($$, $12, $22, $3) {
+        return $12 + $22 + $3.substr(0, (period + ee) % period) + "." + $3.substr(ee) + "E";
       });
     } else o = val.toExponential(idx);
     if (fmt.match(/E\+00$/) && o.match(/e[+-]\d$/)) o = o.substr(0, o.length - 1) + "0" + o.charAt(o.length - 1);
@@ -22329,11 +22329,11 @@
     if (r = fmt.match(frac1)) return write_num_f1(r, aval, sign);
     if (fmt.match(/^#+0+$/)) return sign + pad0r(aval, fmt.length - fmt.indexOf("0"));
     if (r = fmt.match(dec1)) {
-      o = rnd(val, r[1].length).replace(/^([^\.]+)$/, "$1." + hashq(r[1])).replace(/\.$/, "." + hashq(r[1])).replace(/\.(\d*)$/, function($$, $1) {
-        return "." + $1 + fill("0", hashq(
+      o = rnd(val, r[1].length).replace(/^([^\.]+)$/, "$1." + hashq(r[1])).replace(/\.$/, "." + hashq(r[1])).replace(/\.(\d*)$/, function($$, $12) {
+        return "." + $12 + fill("0", hashq(
           /*::(*/
           r[1]
-        ).length - $1.length);
+        ).length - $12.length);
       });
       return fmt.indexOf("0.") !== -1 ? o : o.replace(/^0\./, ".");
     }
@@ -22445,8 +22445,8 @@
         else o += "E+" + (fakee - ee);
         o = o.replace(/\+-/, "-");
       }
-      o = o.replace(/^([+-]?)(\d*)\.(\d*)[Ee]/, function($$, $1, $22, $3) {
-        return $1 + $22 + $3.substr(0, (period + ee) % period) + "." + $3.substr(ee) + "E";
+      o = o.replace(/^([+-]?)(\d*)\.(\d*)[Ee]/, function($$, $12, $22, $3) {
+        return $12 + $22 + $3.substr(0, (period + ee) % period) + "." + $3.substr(ee) + "E";
       });
     } else o = val.toExponential(idx);
     if (fmt.match(/E\+00$/) && o.match(/e[+-]\d$/)) o = o.substr(0, o.length - 1) + "0" + o.charAt(o.length - 1);
@@ -22475,8 +22475,8 @@
     if (fmt.match(/^#+0+$/)) return sign + pad0(aval, fmt.length - fmt.indexOf("0"));
     if (r = fmt.match(dec1)) {
       o = ("" + val).replace(/^([^\.]+)$/, "$1." + hashq(r[1])).replace(/\.$/, "." + hashq(r[1]));
-      o = o.replace(/\.(\d*)$/, function($$, $1) {
-        return "." + $1 + fill("0", hashq(r[1]).length - $1.length);
+      o = o.replace(/\.(\d*)$/, function($$, $12) {
+        return "." + $12 + fill("0", hashq(r[1]).length - $12.length);
       });
       return fmt.indexOf("0.") !== -1 ? o : o.replace(/^0\./, ".");
     }
@@ -25170,9 +25170,9 @@
       return "";
     });
     if (!isNaN(v = Number(ss))) return v / wt;
-    ss = ss.replace(/[(](.*)[)]/, function($$, $1) {
+    ss = ss.replace(/[(](.*)[)]/, function($$, $12) {
       wt = -wt;
-      return $1;
+      return $12;
     });
     if (!isNaN(v = Number(ss))) return v / wt;
     return v;
@@ -25362,8 +25362,8 @@
     var encregex = /&(?:quot|apos|gt|lt|amp|#x?([\da-fA-F]+));/ig, coderegex = /_x([\da-fA-F]{4})_/ig;
     return function unescapexml2(text) {
       var s = text + "", i = s.indexOf("<![CDATA[");
-      if (i == -1) return s.replace(encregex, function($$, $1) {
-        return encodings[$$] || String.fromCharCode(parseInt($1, $$.indexOf("x") > -1 ? 16 : 10)) || $$;
+      if (i == -1) return s.replace(encregex, function($$, $12) {
+        return encodings[$$] || String.fromCharCode(parseInt($12, $$.indexOf("x") > -1 ? 16 : 10)) || $$;
       }).replace(coderegex, function(m, c) {
         return String.fromCharCode(parseInt(c, 16));
       });
@@ -25403,8 +25403,8 @@
   }
   var xlml_fixstr = /* @__PURE__ */ (function() {
     var entregex = /&#(\d+);/g;
-    function entrepl($$, $1) {
-      return String.fromCharCode(parseInt($1, 10));
+    function entrepl($$, $12) {
+      return String.fromCharCode(parseInt($12, 10));
     }
     return function xlml_fixstr2(str) {
       return str.replace(entregex, entrepl);
@@ -30407,12 +30407,12 @@
       "{": 223
     };
     var sylk_char_regex = new RegExp("\x1BN(" + keys(sylk_escapes).join("|").replace(/\|\|\|/, "|\\||").replace(/([?()+])/g, "\\$1") + "|\\|)", "gm");
-    var sylk_char_fn = function(_, $1) {
-      var o = sylk_escapes[$1];
+    var sylk_char_fn = function(_, $12) {
+      var o = sylk_escapes[$12];
       return typeof o == "number" ? _getansi(o) : o;
     };
-    var decode_sylk_char = function($$, $1, $22) {
-      var newcc = $1.charCodeAt(0) - 32 << 4 | $22.charCodeAt(0) - 48;
+    var decode_sylk_char = function($$, $12, $22) {
+      var newcc = $12.charCodeAt(0) - 32 << 4 | $22.charCodeAt(0) - 48;
       return newcc == 59 ? $$ : _getansi(newcc);
     };
     sylk_escapes["|"] = 254;
@@ -35262,7 +35262,7 @@
   var rc_to_a1 = /* @__PURE__ */ (function() {
     var rcregex = /(^|[^A-Za-z_])R(\[?-?\d+\]|[1-9]\d*|)C(\[?-?\d+\]|[1-9]\d*|)(?![A-Za-z0-9_])/g;
     var rcbase = { r: 0, c: 0 };
-    function rcfunc($$, $1, $22, $3) {
+    function rcfunc($$, $12, $22, $3) {
       var cRel = false, rRel = false;
       if ($22.length == 0) rRel = true;
       else if ($22.charAt(0) == "[") {
@@ -35279,7 +35279,7 @@
       else --C2;
       if (rRel) R += rcbase.r;
       else --R;
-      return $1 + (cRel ? "" : "$") + encode_col(C2) + (rRel ? "" : "$") + encode_row(R);
+      return $12 + (cRel ? "" : "$") + encode_col(C2) + (rRel ? "" : "$") + encode_row(R);
     }
     return function rc_to_a12(fstr, base) {
       rcbase = base;
@@ -35289,18 +35289,18 @@
   var crefregex = /(^|[^._A-Z0-9])([$]?)([A-Z]{1,2}|[A-W][A-Z]{2}|X[A-E][A-Z]|XF[A-D])([$]?)(10[0-3]\d{4}|104[0-7]\d{3}|1048[0-4]\d{2}|10485[0-6]\d|104857[0-6]|[1-9]\d{0,5})(?![_.\(A-Za-z0-9])/g;
   var a1_to_rc = /* @__PURE__ */ (function() {
     return function a1_to_rc2(fstr, base) {
-      return fstr.replace(crefregex, function($0, $1, $22, $3, $4, $5) {
+      return fstr.replace(crefregex, function($0, $12, $22, $3, $4, $5) {
         var c = decode_col($3) - ($22 ? 0 : base.c);
         var r = decode_row($5) - ($4 ? 0 : base.r);
         var R = r == 0 ? "" : !$4 ? "[" + r + "]" : r + 1;
         var C2 = c == 0 ? "" : !$22 ? "[" + c + "]" : c + 1;
-        return $1 + "R" + R + "C" + C2;
+        return $12 + "R" + R + "C" + C2;
       });
     };
   })();
   function shift_formula_str(f, delta) {
-    return f.replace(crefregex, function($0, $1, $22, $3, $4, $5) {
-      return $1 + ($22 == "$" ? $22 + $3 : encode_col(decode_col($3) + delta.c)) + ($4 == "$" ? $4 + $5 : encode_row(decode_row($5) + delta.r));
+    return f.replace(crefregex, function($0, $12, $22, $3, $4, $5) {
+      return $12 + ($22 == "$" ? $22 + $3 : encode_col(decode_col($3) + delta.c)) + ($4 == "$" ? $4 + $5 : encode_row(decode_row($5) + delta.r));
     });
   }
   function shift_formula_xlsx(f, range, cell) {
@@ -37732,8 +37732,8 @@
       if (f.charCodeAt(0) == 61) f = f.slice(1);
     }
     f = f.replace(/COM\.MICROSOFT\./g, "");
-    f = f.replace(/\[((?:\.[A-Z]+[0-9]+)(?::\.[A-Z]+[0-9]+)?)\]/g, function($$, $1) {
-      return $1.replace(/\./g, "");
+    f = f.replace(/\[((?:\.[A-Z]+[0-9]+)(?::\.[A-Z]+[0-9]+)?)\]/g, function($$, $12) {
+      return $12.replace(/\./g, "");
     });
     f = f.replace(/\[.(#[A-Z]*[?!])\]/g, "$1");
     return f.replace(/[;~]/g, ",").replace(/\|/g, ";");
@@ -49563,8 +49563,8 @@
     return null;
   }
   function parse_text_p(text) {
-    var fixed = text.replace(/[\t\r\n]/g, " ").trim().replace(/ +/g, " ").replace(/<text:s\/>/g, " ").replace(/<text:s text:c="(\d+)"\/>/g, function($$, $1) {
-      return Array(parseInt($1, 10) + 1).join(" ");
+    var fixed = text.replace(/[\t\r\n]/g, " ").trim().replace(/ +/g, " ").replace(/<text:s\/>/g, " ").replace(/<text:s text:c="(\d+)"\/>/g, function($$, $12) {
+      return Array(parseInt($12, 10) + 1).join(" ");
     }).replace(/<text:tab[^>]*\/>/g, "	").replace(/<text:line-break\/>/g, "\n");
     var v = unescapexml(fixed.replace(/<[^>]*>/g, ""));
     return [v];
@@ -55125,6 +55125,7 @@
     } }, marca.emoji || "\u25C6");
   }
   var $2 = (n) => "Bs " + new Intl.NumberFormat("es-BO", { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(n || 0);
+  var $1 = (n) => "Bs " + new Intl.NumberFormat("es-BO", { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(n || 0);
   var hoy = () => {
     const d = /* @__PURE__ */ new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -58412,15 +58413,15 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       padding: "9px 8px",
       background: `${s.color}10`,
       borderRadius: 12
-    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 14, fontWeight: 700, color: C.label, fontFamily: FONT, letterSpacing: "-0.01em" } }, $2(Math.round(s.val))), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: C.label3, fontFamily: FONT, marginTop: 2, opacity: 0.7 } }, s.label))))), [
-      ["Ventas brutas", $2(Math.round(bruto)), C.label],
-      [`\u2212 Desc. Tarjeta (${pctTarjeta}%)`, `-${$2(Math.round(descTarjeta))}`, C.red],
-      [`= Subtotal -${pctTarjeta}%`, $2(Math.round(subtotalBanco)), C.label2],
-      [`\u2212 Comisi\xF3n ventas (${pctComision}%)`, `-${$2(Math.round(comision))}`, C.red],
-      [`= Subtotal -${pctComision}%`, $2(Math.round(subtotalBanco - comision)), C.label2],
-      alquiler > 0 ? [`\u2212 Alquiler`, `-${$2(alquiler)}`, C.amber] : null,
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 14, fontWeight: 700, color: C.label, fontFamily: FONT, letterSpacing: "-0.01em" } }, $1(s.val)), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: C.label3, fontFamily: FONT, marginTop: 2, opacity: 0.7 } }, s.label))))), [
+      ["Ventas brutas", $1(bruto), C.label],
+      [`\u2212 Desc. Tarjeta (${pctTarjeta}%)`, `-${$1(descTarjeta)}`, C.red],
+      [`= Subtotal -${pctTarjeta}%`, $1(subtotalBanco), C.label2],
+      [`\u2212 Comisi\xF3n ventas (${pctComision}%)`, `-${$1(comision)}`, C.red],
+      [`= Subtotal -${pctComision}%`, $1(subtotalBanco - comision), C.label2],
+      alquiler > 0 ? [`\u2212 Alquiler`, `-${$1(alquiler)}`, C.amber] : null,
       ...gastos.filter((g) => g.desc || Number(g.monto) > 0).map(
-        (g) => [`\u2212 ${g.desc || "Gasto extra"}`, `-${$2(Math.round(Number(g.monto) || 0))}`, C.red]
+        (g) => [`\u2212 ${g.desc || "Gasto extra"}`, `-${$1(Number(g.monto) || 0)}`, C.red]
       )
     ].filter(Boolean).map(([k, v, c], i, arr) => /* @__PURE__ */ import_react.default.createElement("div", { key: `${k}-${i}`, style: {
       display: "flex",
@@ -58449,7 +58450,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       fontFamily: FONT,
       letterSpacing: "-0.03em",
       lineHeight: 1
-    } }, $2(Math.round(neto))))), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 10, marginTop: 16 } }, /* @__PURE__ */ import_react.default.createElement(
+    } }, $1(neto)))), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 10, marginTop: 16 } }, /* @__PURE__ */ import_react.default.createElement(
       IOSBtn,
       {
         onPress: () => generarVistaPreviaLiquidacion(marca, mes, anio, {
