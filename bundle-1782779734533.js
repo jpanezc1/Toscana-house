@@ -23182,7 +23182,10 @@
     } }, marca.emoji || "\u25C6");
   }
   var $ = (n) => "Bs " + new Intl.NumberFormat("es-BO", { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(n || 0);
-  var hoy = () => (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+  var hoy = () => {
+    const d = /* @__PURE__ */ new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  };
   var hora = () => (/* @__PURE__ */ new Date()).toLocaleTimeString("es-BO", { hour: "2-digit", minute: "2-digit" });
   var mkKey = (m, a) => `${a}-${String(m + 1).padStart(2, "0")}`;
   var genCod = (mid, nombre, idx) => {
@@ -30129,7 +30132,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
   }
   function HomeDashboard({ ventas, inv, vMes, mes, anio, onGoTab }) {
     const isDesktop = useIsDesktop();
-    const hoyStr = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+    const hoyStr = hoy();
     const vHoy = ventas.filter((v) => v.fecha === hoyStr && !v.anulada);
     const totalHoy = vHoy.reduce((s, v) => s + getDisplayTotal(v), 0);
     const totalMes = vMes.reduce((s, v) => s + getDisplayTotal(v), 0);

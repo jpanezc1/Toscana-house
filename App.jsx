@@ -1606,7 +1606,7 @@ function MarcaIcon({marca, size=20, radius=8, style={}}){
 
 // ── Helpers ───────────────────────────────────────────────
 const $    = n => "Bs " + new Intl.NumberFormat("es-BO",{minimumFractionDigits:0,maximumFractionDigits:2}).format(n||0);
-const hoy  = () => new Date().toISOString().slice(0,10);
+const hoy  = () => { const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
 const hora = () => new Date().toLocaleTimeString("es-BO",{hour:"2-digit",minute:"2-digit"});
 const mkKey= (m,a) => `${a}-${String(m+1).padStart(2,"0")}`;
 const genCod=(mid,nombre,idx)=>{
@@ -8516,7 +8516,7 @@ function ImportarVentasLibresModal({open, onImportar, onClose}){
 function HomeDashboard({ventas, inv, vMes, mes, anio, onGoTab}){
   const isDesktop = useIsDesktop();
 
-  const hoyStr = new Date().toISOString().slice(0,10);
+  const hoyStr = hoy();
   const vHoy   = ventas.filter(v => v.fecha === hoyStr && !v.anulada);
   const totalHoy = vHoy.reduce((s, v) => s + getDisplayTotal(v), 0);
   const totalMes  = vMes.reduce((s, v) => s + getDisplayTotal(v), 0);
