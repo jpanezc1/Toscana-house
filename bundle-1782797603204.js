@@ -23207,6 +23207,9 @@
       s.onload = () => resolve(window.XLSX);
       s.onerror = () => reject(new Error("No se pudo cargar xlsx-js-style"));
       document.head.appendChild(s);
+    }).catch((e) => {
+      _XLSXPromise = null;
+      throw e;
     });
     return _XLSXPromise;
   }
@@ -29912,6 +29915,15 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
     }
     async function parsearArchivo(file) {
       setEstado("leyendo");
+      const timeoutId = setTimeout(() => {
+        setEstado((prev) => {
+          if (prev === "leyendo") {
+            alert("Tard\xF3 demasiado en leer el archivo. Prob\xE1 de nuevo.");
+            return "idle";
+          }
+          return prev;
+        });
+      }, 15e3);
       try {
         const XLSX = await loadXLSX();
         const buf = await file.arrayBuffer();
@@ -29926,6 +29938,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
           }
         }
         if (rawAll.length < 2) {
+          clearTimeout(timeoutId);
           setEstado("idle");
           alert("Archivo vac\xEDo");
           return;
@@ -29987,9 +30000,11 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
             metodoPago: resolverMetodo(mpRaw)
           });
         }
+        clearTimeout(timeoutId);
         setFilas(parsed);
         setEstado("preview");
       } catch (e) {
+        clearTimeout(timeoutId);
         setEstado("idle");
         alert("Error al leer el archivo: " + e.message);
       }

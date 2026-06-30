@@ -1633,7 +1633,7 @@ function loadXLSX() {
     s.onload  = () => resolve(window.XLSX);
     s.onerror = () => reject(new Error("No se pudo cargar xlsx-js-style"));
     document.head.appendChild(s);
-  });
+  }).catch(e => { _XLSXPromise = null; throw e; }); // permite reintentar si falló
   return _XLSXPromise;
 }
 
@@ -8334,6 +8334,12 @@ function ImportarVentasLibresModal({open, onImportar, onClose}){
 
   async function parsearArchivo(file){
     setEstado("leyendo");
+    const timeoutId = setTimeout(()=>{
+      setEstado(prev=>{
+        if(prev==="leyendo"){ alert("Tardó demasiado en leer el archivo. Probá de nuevo."); return "idle"; }
+        return prev;
+      });
+    }, 15000);
     try{
       const XLSX = await loadXLSX();
       const buf  = await file.arrayBuffer();
@@ -8344,7 +8350,7 @@ function ImportarVentasLibresModal({open, onImportar, onClose}){
         const rows = XLSX.utils.sheet_to_json(ws,{header:1,defval:""});
         if(rows.length>1){ rawAll = rows; break; }
       }
-      if(rawAll.length<2){ setEstado("idle"); alert("Archivo vacío"); return; }
+      if(rawAll.length<2){ clearTimeout(timeoutId); setEstado("idle"); alert("Archivo vacío"); return; }
 
       const n = s => norm(String(s||""));
       let hRow=0;
@@ -8395,9 +8401,10 @@ function ImportarVentasLibresModal({open, onImportar, onClose}){
           metodoPago: resolverMetodo(mpRaw),
         });
       }
+      clearTimeout(timeoutId);
       setFilas(parsed);
       setEstado("preview");
-    } catch(e){ setEstado("idle"); alert("Error al leer el archivo: "+e.message); }
+    } catch(e){ clearTimeout(timeoutId); setEstado("idle"); alert("Error al leer el archivo: "+e.message); }
   }
 
   async function confirmar(){
