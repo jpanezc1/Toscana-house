@@ -29918,7 +29918,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
         let hRow = 0;
         for (let i = 0; i < Math.min(10, rawAll.length); i++) {
           const r = rawAll[i].map((c) => n(c));
-          if (r.some((c) => c.includes("marca") || c.includes("descripcion") || c.includes("precio"))) {
+          if (r.some((c) => c.includes("marca") || c.includes("fecha") || c.includes("precio"))) {
             hRow = i;
             break;
           }
@@ -29938,7 +29938,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
         const cF = col("fecha", "date");
         const cT = col("turno", "shift");
         const cM = col("marca");
-        const cD = col("descripcion", "detalle", "nombre", "producto", "articulo", "item");
+        const cD = col("descripcion", "detalle", "producto", "articulo", "item");
         const cP = col("precio", "price", "monto", "bs", "valor", "total");
         const cMP = col("metodo de pago", "metodo_pago", "metodopago", "metodo", "pago", "forma de pago");
         const parsed = [];
@@ -29951,20 +29951,19 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
           const pRaw = cP >= 0 ? row[cP] : "";
           const mpRaw = cMP >= 0 ? row[cMP] : "";
           const precio = parseFloat(String(pRaw).replace(/[^\d.,]/g, "").replace(",", "."));
-          if (!mRaw && !desc && !pRaw && !fRaw) continue;
+          if (!mRaw && !pRaw && !fRaw) continue;
           const marcaObj = resolverMarca(mRaw);
           const fechaISO = parsearFecha(fRaw);
           parsed.push({
             _num: i - hRow,
-            _ok: !!marcaObj && !!desc && !isNaN(precio) && precio > 0 && !!fechaISO,
+            _ok: !!marcaObj && !isNaN(precio) && precio > 0 && !!fechaISO,
             _errMarca: !marcaObj,
-            _errDesc: !desc,
             _errPrecio: isNaN(precio) || precio <= 0,
             _errFecha: !fechaISO,
             marcaRaw: mRaw,
             marcaId: marcaObj?.id || null,
             marcaNombre: marcaObj?.nombre || mRaw,
-            descripcion: desc,
+            descripcion: desc || `Venta ${marcaObj?.nombre || mRaw}`,
             precio: isNaN(precio) ? 0 : precio,
             fecha: fechaISO,
             fechaRaw: String(fRaw || ""),
@@ -29991,13 +29990,13 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       const XLSX = await loadXLSX();
       const wb = XLSX.utils.book_new();
       const ws = XLSX.utils.aoa_to_sheet([
-        ["FECHA", "TURNO", "MARCA", "DESCRIPCION", "PRECIO", "METODO_PAGO"],
-        ["15/04/2026", "Tarde", "She", "Collar plateado largo", 85, "efectivo"],
-        ["15/04/2026", "Ma\xF1ana", "Narcissa", "Anillo resina verde", 120, "qr"],
-        ["16/04/2026", "Noche", "Ramona", "Blusa estampada talle M", 180, "tarjeta"],
-        ["16/04/2026", "Tarde", "Monas", "Cartera tejida crema", 250, "efectivo"]
+        ["FECHA", "TURNO", "MARCA", "PRECIO", "METODO_PAGO"],
+        ["15/04/2026", "Tarde", "She", 85, "efectivo"],
+        ["15/04/2026", "Ma\xF1ana", "Narcissa", 120, "qr"],
+        ["16/04/2026", "Noche", "Ramona", 180, "tarjeta"],
+        ["16/04/2026", "Tarde", "Monas", 250, "efectivo"]
       ]);
-      ws["!cols"] = [{ wch: 12 }, { wch: 10 }, { wch: 14 }, { wch: 36 }, { wch: 10 }, { wch: 14 }];
+      ws["!cols"] = [{ wch: 12 }, { wch: 10 }, { wch: 14 }, { wch: 10 }, { wch: 14 }];
       XLSX.utils.book_append_sheet(wb, ws, "Ventas");
       const buf = XLSX.write(wb, { type: "array", bookType: "xlsx" });
       const a = document.createElement("a");
@@ -30015,7 +30014,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       porMarca[k].count++;
       porMarca[k].total += f.precio;
     });
-    return /* @__PURE__ */ import_react.default.createElement(Sheet, { open, onClose, title: "Importar ventas sin c\xF3digo", tall: true }, /* @__PURE__ */ import_react.default.createElement("div", { style: { padding: "4px 20px 24px", fontFamily: FONT_UI } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, marginBottom: 16, textAlign: "center" } }, "Excel con columnas FECHA \xB7 TURNO \xB7 MARCA \xB7 DESCRIPCION \xB7 PRECIO \xB7 METODO_PAGO"), estado === "done" && resultado ? /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center", padding: "16px 0" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 36, marginBottom: 10 } }, "\u2713"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 16, fontWeight: 700, color: C.green, marginBottom: 4 } }, resultado.total, " ventas registradas"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label2, marginBottom: 6 } }, resultado.nVentas, " venta", resultado.nVentas !== 1 ? "s" : "", " creadas (agrupadas por marca, fecha, turno y m\xE9todo de pago)"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label2, marginBottom: 20, lineHeight: 1.6 } }, resultado.marcas.join(" \xB7 ")), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: onClose, variant: "success", full: true }, "Listo \u2014 ver liquidaciones")) : estado === "preview" ? /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 8, marginBottom: 12 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1, background: "#E8F5E9", borderRadius: 12, padding: "10px 14px" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: "#388E3C", fontWeight: 700, marginBottom: 2 } }, "V\xC1LIDAS"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 24, fontWeight: 700, color: "#2E7D32" } }, validas.length)), invalidas.length > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1, background: "#FFF3E0", borderRadius: 12, padding: "10px 14px" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: "#E65100", fontWeight: 700, marginBottom: 2 } }, "ERRORES"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 24, fontWeight: 700, color: "#E65100" } }, invalidas.length)), /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1, background: "#E3F2FD", borderRadius: 12, padding: "10px 14px" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: "#1565C0", fontWeight: 700, marginBottom: 2 } }, "TOTAL Bs."), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 24, fontWeight: 700, color: "#0D47A1" } }, totalBs.toFixed(0)))), Object.values(porMarca).length > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: {
+    return /* @__PURE__ */ import_react.default.createElement(Sheet, { open, onClose, title: "Importar ventas sin c\xF3digo", tall: true }, /* @__PURE__ */ import_react.default.createElement("div", { style: { padding: "4px 20px 24px", fontFamily: FONT_UI } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, marginBottom: 16, textAlign: "center" } }, "Excel con columnas FECHA \xB7 TURNO \xB7 MARCA \xB7 PRECIO \xB7 METODO_PAGO"), estado === "done" && resultado ? /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center", padding: "16px 0" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 36, marginBottom: 10 } }, "\u2713"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 16, fontWeight: 700, color: C.green, marginBottom: 4 } }, resultado.total, " ventas registradas"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label2, marginBottom: 6 } }, resultado.nVentas, " venta", resultado.nVentas !== 1 ? "s" : "", " creadas (agrupadas por marca, fecha, turno y m\xE9todo de pago)"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label2, marginBottom: 20, lineHeight: 1.6 } }, resultado.marcas.join(" \xB7 ")), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: onClose, variant: "success", full: true }, "Listo \u2014 ver liquidaciones")) : estado === "preview" ? /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 8, marginBottom: 12 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1, background: "#E8F5E9", borderRadius: 12, padding: "10px 14px" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: "#388E3C", fontWeight: 700, marginBottom: 2 } }, "V\xC1LIDAS"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 24, fontWeight: 700, color: "#2E7D32" } }, validas.length)), invalidas.length > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1, background: "#FFF3E0", borderRadius: 12, padding: "10px 14px" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: "#E65100", fontWeight: 700, marginBottom: 2 } }, "ERRORES"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 24, fontWeight: 700, color: "#E65100" } }, invalidas.length)), /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1, background: "#E3F2FD", borderRadius: 12, padding: "10px 14px" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: "#1565C0", fontWeight: 700, marginBottom: 2 } }, "TOTAL Bs."), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 24, fontWeight: 700, color: "#0D47A1" } }, totalBs.toFixed(0)))), Object.values(porMarca).length > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: {
       background: C.bg1,
       border: `1px solid ${C.sep}`,
       borderRadius: 12,
@@ -30053,21 +30052,19 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       flexShrink: 0,
       color: f._errFecha ? "#E65100" : C.label3
     } }, f.fecha ? f.fecha.split("-").reverse().join("/") : f.fechaRaw || "\u2014"), /* @__PURE__ */ import_react.default.createElement("span", { style: {
-      width: 70,
-      fontSize: 11,
-      color: f._errMarca ? "#E65100" : C.label2,
-      flexShrink: 0,
-      overflow: "hidden",
-      textOverflow: "ellipsis",
-      whiteSpace: "nowrap"
-    } }, f.marcaRaw || "\u2014"), /* @__PURE__ */ import_react.default.createElement("span", { style: {
       flex: 1,
       fontSize: 11,
-      color: f._errDesc ? "#E65100" : C.label2,
+      color: f._errMarca ? "#E65100" : C.label2,
       overflow: "hidden",
       textOverflow: "ellipsis",
       whiteSpace: "nowrap"
-    } }, f.descripcion || "(sin descripci\xF3n)"), /* @__PURE__ */ import_react.default.createElement("span", { style: {
+    } }, f.marcaRaw || "\u2014"), /* @__PURE__ */ import_react.default.createElement("span", { style: { width: 50, fontSize: 10, color: C.label3, flexShrink: 0 } }, f.turno), /* @__PURE__ */ import_react.default.createElement("span", { style: {
+      width: 54,
+      fontSize: 10,
+      color: C.label3,
+      flexShrink: 0,
+      textTransform: "capitalize"
+    } }, f.metodoPago), /* @__PURE__ */ import_react.default.createElement("span", { style: {
       fontSize: 11,
       fontFamily: FONT_MONO,
       flexShrink: 0,
@@ -30079,7 +30076,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       borderRadius: 8,
       padding: "8px 12px",
       marginBottom: 12
-    } }, invalidas.length, " fila(s) ser\xE1n ignoradas: marca no reconocida, precio inv\xE1lido, descripci\xF3n vac\xEDa o fecha inv\xE1lida (usar DD/MM/AAAA)."), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 8 } }, /* @__PURE__ */ import_react.default.createElement(
+    } }, invalidas.length, " fila(s) ser\xE1n ignoradas: marca no reconocida, precio inv\xE1lido o fecha inv\xE1lida (usar DD/MM/AAAA)."), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 8 } }, /* @__PURE__ */ import_react.default.createElement(
       "button",
       {
         onClick: () => {
@@ -30133,7 +30130,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       marginBottom: 16,
       letterSpacing: 0.5,
       lineHeight: 1.6
-    } }, "FECHA \xB7 TURNO \xB7 MARCA \xB7 DESCRIPCION \xB7 PRECIO \xB7 METODO_PAGO"), /* @__PURE__ */ import_react.default.createElement(
+    } }, "FECHA \xB7 TURNO \xB7 MARCA \xB7 PRECIO \xB7 METODO_PAGO"), /* @__PURE__ */ import_react.default.createElement(
       "input",
       {
         ref: fileRef,

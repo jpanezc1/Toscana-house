@@ -8324,7 +8324,7 @@ function ImportarVentasLibresModal({open, onImportar, onClose}){
       let hRow=0;
       for(let i=0;i<Math.min(10,rawAll.length);i++){
         const r=rawAll[i].map(c=>n(c));
-        if(r.some(c=>c.includes("marca")||c.includes("descripcion")||c.includes("precio"))){hRow=i;break;}
+        if(r.some(c=>c.includes("marca")||c.includes("fecha")||c.includes("precio"))){hRow=i;break;}
       }
       const headers = rawAll[hRow].map(c=>n(c));
       const col = (...names) => {
@@ -8335,7 +8335,7 @@ function ImportarVentasLibresModal({open, onImportar, onClose}){
       const cF  = col("fecha","date");
       const cT  = col("turno","shift");
       const cM  = col("marca");
-      const cD  = col("descripcion","detalle","nombre","producto","articulo","item");
+      const cD  = col("descripcion","detalle","producto","articulo","item");
       const cP  = col("precio","price","monto","bs","valor","total");
       const cMP = col("metodo de pago","metodo_pago","metodopago","metodo","pago","forma de pago");
 
@@ -8349,20 +8349,19 @@ function ImportarVentasLibresModal({open, onImportar, onClose}){
         const pRaw = cP>=0 ? row[cP] : "";
         const mpRaw= cMP>=0 ? row[cMP] : "";
         const precio = parseFloat(String(pRaw).replace(/[^\d.,]/g,"").replace(",","."));
-        if(!mRaw && !desc && !pRaw && !fRaw) continue;
+        if(!mRaw && !pRaw && !fRaw) continue;
         const marcaObj = resolverMarca(mRaw);
         const fechaISO = parsearFecha(fRaw);
         parsed.push({
           _num: i-hRow,
-          _ok: !!marcaObj && !!desc && !isNaN(precio) && precio>0 && !!fechaISO,
+          _ok: !!marcaObj && !isNaN(precio) && precio>0 && !!fechaISO,
           _errMarca: !marcaObj,
-          _errDesc: !desc,
           _errPrecio: isNaN(precio)||precio<=0,
           _errFecha: !fechaISO,
           marcaRaw: mRaw,
           marcaId: marcaObj?.id||null,
           marcaNombre: marcaObj?.nombre||mRaw,
-          descripcion: desc,
+          descripcion: desc || `Venta ${marcaObj?.nombre||mRaw}`,
           precio: isNaN(precio)?0:precio,
           fecha: fechaISO,
           fechaRaw: String(fRaw||""),
@@ -8388,13 +8387,13 @@ function ImportarVentasLibresModal({open, onImportar, onClose}){
     const XLSX = await loadXLSX();
     const wb = XLSX.utils.book_new();
     const ws = XLSX.utils.aoa_to_sheet([
-      ["FECHA","TURNO","MARCA","DESCRIPCION","PRECIO","METODO_PAGO"],
-      ["15/04/2026","Tarde","She","Collar plateado largo",85,"efectivo"],
-      ["15/04/2026","Mañana","Narcissa","Anillo resina verde",120,"qr"],
-      ["16/04/2026","Noche","Ramona","Blusa estampada talle M",180,"tarjeta"],
-      ["16/04/2026","Tarde","Monas","Cartera tejida crema",250,"efectivo"],
+      ["FECHA","TURNO","MARCA","PRECIO","METODO_PAGO"],
+      ["15/04/2026","Tarde","She",85,"efectivo"],
+      ["15/04/2026","Mañana","Narcissa",120,"qr"],
+      ["16/04/2026","Noche","Ramona",180,"tarjeta"],
+      ["16/04/2026","Tarde","Monas",250,"efectivo"],
     ]);
-    ws["!cols"]=[{wch:12},{wch:10},{wch:14},{wch:36},{wch:10},{wch:14}];
+    ws["!cols"]=[{wch:12},{wch:10},{wch:14},{wch:10},{wch:14}];
     XLSX.utils.book_append_sheet(wb,ws,"Ventas");
     const buf=XLSX.write(wb,{type:"array",bookType:"xlsx"});
     const a=document.createElement("a");
@@ -8418,7 +8417,7 @@ function ImportarVentasLibresModal({open, onImportar, onClose}){
     <Sheet open={open} onClose={onClose} title="Importar ventas sin código" tall>
       <div style={{padding:"4px 20px 24px",fontFamily:FONT_UI}}>
         <div style={{fontSize:11,color:C.label3,marginBottom:16,textAlign:"center"}}>
-          Excel con columnas FECHA · TURNO · MARCA · DESCRIPCION · PRECIO · METODO_PAGO
+          Excel con columnas FECHA · TURNO · MARCA · PRECIO · METODO_PAGO
         </div>
 
         {estado==="done" && resultado ? (
@@ -8483,13 +8482,16 @@ function ImportarVentasLibresModal({open, onImportar, onClose}){
                     color:f._errFecha?"#E65100":C.label3}}>
                     {f.fecha?f.fecha.split("-").reverse().join("/"):(f.fechaRaw||"—")}
                   </span>
-                  <span style={{width:70,fontSize:11,color:f._errMarca?"#E65100":C.label2,
-                    flexShrink:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                  <span style={{flex:1,fontSize:11,color:f._errMarca?"#E65100":C.label2,
+                    overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
                     {f.marcaRaw||"—"}
                   </span>
-                  <span style={{flex:1,fontSize:11,color:f._errDesc?"#E65100":C.label2,
-                    overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
-                    {f.descripcion||"(sin descripción)"}
+                  <span style={{width:50,fontSize:10,color:C.label3,flexShrink:0}}>
+                    {f.turno}
+                  </span>
+                  <span style={{width:54,fontSize:10,color:C.label3,flexShrink:0,
+                    textTransform:"capitalize"}}>
+                    {f.metodoPago}
                   </span>
                   <span style={{fontSize:11,fontFamily:FONT_MONO,flexShrink:0,
                     color:f._errPrecio?"#E65100":C.label2}}>
@@ -8502,7 +8504,7 @@ function ImportarVentasLibresModal({open, onImportar, onClose}){
             {invalidas.length>0&&(
               <div style={{fontSize:11,color:"#E65100",background:"#FFF3E0",borderRadius:8,
                 padding:"8px 12px",marginBottom:12}}>
-                {invalidas.length} fila(s) serán ignoradas: marca no reconocida, precio inválido, descripción vacía o fecha inválida (usar DD/MM/AAAA).
+                {invalidas.length} fila(s) serán ignoradas: marca no reconocida, precio inválido o fecha inválida (usar DD/MM/AAAA).
               </div>
             )}
 
@@ -8531,7 +8533,7 @@ function ImportarVentasLibresModal({open, onImportar, onClose}){
               </div>
               <div style={{fontFamily:FONT_MONO,fontSize:12,color:C.blue,fontWeight:600,
                 marginBottom:16,letterSpacing:.5,lineHeight:1.6}}>
-                FECHA · TURNO · MARCA · DESCRIPCION · PRECIO · METODO_PAGO
+                FECHA · TURNO · MARCA · PRECIO · METODO_PAGO
               </div>
               <input ref={fileRef} type="file" accept=".xlsx,.xls" style={{display:"none"}}
                 onChange={e=>e.target.files[0]&&parsearArchivo(e.target.files[0])}/>
