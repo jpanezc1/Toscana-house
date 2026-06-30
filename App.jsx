@@ -2388,6 +2388,7 @@ async function generarExcelMarca(marca, ventas, inventario, setGenerando) {
     // Agrupar ventas por mes
     const porMes = {};
     ventas.forEach(v => {
+      if (v.anulada) return;
       if (!v.items.some(i => i.marcaId === marca.id)) return;
       if (!porMes[v.mk]) porMes[v.mk] = { mk: v.mk, mes: v.mes, anio: v.anio, ventas: [] };
       porMes[v.mk].ventas.push(v);
@@ -12826,6 +12827,7 @@ function App(){
   const getHist=useCallback((marcaId)=>{
     const map={};
     ventas.forEach(v=>{
+      if(v.anulada)return;
       if(!v.items.some(i=>i.marcaId===marcaId))return;
       if(!map[v.mk])map[v.mk]={mk:v.mk,mes:v.mes,anio:v.anio,ventas:[],bruto:0};
       const its=v.items.filter(i=>i.marcaId===marcaId);

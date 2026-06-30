@@ -55905,6 +55905,7 @@
       const wb = XLSX2.utils.book_new();
       const porMes = {};
       ventas.forEach((v) => {
+        if (v.anulada) return;
         if (!v.items.some((i) => i.marcaId === marca.id)) return;
         if (!porMes[v.mk]) porMes[v.mk] = { mk: v.mk, mes: v.mes, anio: v.anio, ventas: [] };
         porMes[v.mk].ventas.push(v);
@@ -67041,6 +67042,7 @@ Esta acci\xF3n no se puede deshacer.` : "\xBFEliminar esta carga? Esta acci\xF3n
     const getHist = (0, import_react.useCallback)((marcaId) => {
       const map = {};
       ventas.forEach((v) => {
+        if (v.anulada) return;
         if (!v.items.some((i) => i.marcaId === marcaId)) return;
         if (!map[v.mk]) map[v.mk] = { mk: v.mk, mes: v.mes, anio: v.anio, ventas: [], bruto: 0 };
         const its = v.items.filter((i) => i.marcaId === marcaId);
