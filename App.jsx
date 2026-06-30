@@ -8264,11 +8264,13 @@ function ImportarVentasLibresModal({open, onImportar, onClose}){
   function resolverMarca(raw){
     const n = norm(raw);
     if(!n) return null;
-    let m = MARCAS_SEED.find(s => norm(s.nombre) === n);
+    // MARCAS = MARCAS_SEED + marcas custom (ej. Soul Atelier id 20) — nunca usar
+    // solo MARCAS_SEED o las marcas agregadas después de la entrega no matchean.
+    let m = MARCAS.find(s => norm(s.nombre) === n);
     if(m) return m;
-    m = MARCAS_SEED.find(s => norm(s.nombre).startsWith(n) || n.startsWith(norm(s.nombre)));
+    m = MARCAS.find(s => norm(s.nombre).startsWith(n) || n.startsWith(norm(s.nombre)));
     if(m) return m;
-    m = MARCAS_SEED.find(s => norm(s.nombre).includes(n) || n.includes(norm(s.nombre)));
+    m = MARCAS.find(s => norm(s.nombre).includes(n) || n.includes(norm(s.nombre)));
     return m || null;
   }
 

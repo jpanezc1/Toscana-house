@@ -29857,11 +29857,11 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
     function resolverMarca(raw) {
       const n = norm(raw);
       if (!n) return null;
-      let m = MARCAS_SEED.find((s) => norm(s.nombre) === n);
+      let m = MARCAS.find((s) => norm(s.nombre) === n);
       if (m) return m;
-      m = MARCAS_SEED.find((s) => norm(s.nombre).startsWith(n) || n.startsWith(norm(s.nombre)));
+      m = MARCAS.find((s) => norm(s.nombre).startsWith(n) || n.startsWith(norm(s.nombre)));
       if (m) return m;
-      m = MARCAS_SEED.find((s) => norm(s.nombre).includes(n) || n.includes(norm(s.nombre)));
+      m = MARCAS.find((s) => norm(s.nombre).includes(n) || n.includes(norm(s.nombre)));
       return m || null;
     }
     function parsearFecha(raw) {

@@ -180,7 +180,7 @@
   <!-- Auto-updater: detecta nueva versión y recarga sin intervención del usuario -->
   <script>
     (function(){
-      var CURRENT = "1782796458532";
+      var CURRENT = "1782796595943";
       function check(){
         fetch("/version.json?_="+Date.now(),{cache:"no-store"})
           .then(function(r){return r.json();})
@@ -195,7 +195,7 @@
       setInterval(check, 60000);
     })();
   </script>
-  <script src="bundle-1782796458532.js"></script>
+  <script src="bundle-1782796595943.js"></script>
   <!-- Service worker: permite instalar la app y seguir usándola sin internet -->
   <script>
     if("serviceWorker" in navigator){
