@@ -56608,25 +56608,25 @@
       `\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501`,
       `${marca?.emoji || ""} *${marca?.nombre || ""}* \xB7 ${MESES[mes]} ${anio}`,
       ``,
-      `\u{1F4B5} Efectivo: ${$2(Math.round(brutoEfect))}`,
-      `\u{1F4F1} QR: ${$2(Math.round(brutoQR))}`,
-      `\u{1F4B3} Tarjeta: ${$2(Math.round(brutoTarjeta))}`,
-      `*Ventas brutas: ${$2(Math.round(bruto))}*`,
+      `\u{1F4B5} Efectivo: ${$1(brutoEfect)}`,
+      `\u{1F4F1} QR: ${$1(brutoQR)}`,
+      `\u{1F4B3} Tarjeta: ${$1(brutoTarjeta)}`,
+      `*Ventas brutas: ${$1(bruto)}*`,
       ``,
-      `\u2212 Desc. Tarjeta (${pctTarjeta}%): -${$2(Math.round(descTarjeta))}`,
-      `= Subtotal -${pctTarjeta}%: ${$2(Math.round(subtotalBanco))}`,
-      `\u2212 Comisi\xF3n ventas (${pctComision}%): -${$2(Math.round(comision))}`
+      `\u2212 Desc. Tarjeta (${pctTarjeta}%): -${$1(descTarjeta)}`,
+      `= Subtotal -${pctTarjeta}%: ${$1(subtotalBanco)}`,
+      `\u2212 Comisi\xF3n ventas (${pctComision}%): -${$1(comision)}`
     ];
-    lines.push(`\u2212 Alquiler: -${$2(alquiler)}`);
+    lines.push(`\u2212 Alquiler: -${$1(alquiler)}`);
     if (totalGastos > 0) {
-      lines.push(`\u2212 Gastos extra: -${$2(Math.round(totalGastos))}`);
+      lines.push(`\u2212 Gastos extra: -${$1(totalGastos)}`);
       gastos.filter((g) => g.desc || Number(g.monto) > 0).forEach((g) => {
-        lines.push(`   \xB7 ${g.desc || "Gasto extra"}: -${$2(Number(g.monto) || 0)}`);
+        lines.push(`   \xB7 ${g.desc || "Gasto extra"}: -${$1(Number(g.monto) || 0)}`);
       });
     }
     lines.push(
       ``,
-      `\u{1F4B0} *TOTAL NETO: ${$2(Math.round(neto))}*`,
+      `\u{1F4B0} *TOTAL NETO: ${$1(neto)}*`,
       ``,
       `\u{1F4C5} ${(/* @__PURE__ */ new Date()).toLocaleDateString("es-BO")} \xB7 Toscana House`
     );
@@ -56635,15 +56635,15 @@
   function imprimirLiquidacion(marca, mes, anio, liq) {
     const win = window.open("", "_blank", "width=800,height=900");
     const filas = [
-      ["Ventas brutas", $2(liq.bruto), false],
-      liq.descTJ > 0 ? [`\u2212 Desc. Tarjeta (${liq.cfg?.pctTarjeta ?? 0}%)`, `-${$2(liq.descTJ)}`, false] : null,
-      liq.descTJ > 0 ? [`= Subtotal -${liq.cfg?.pctTarjeta ?? 0}%`, $2(liq.subBanco), false] : null,
-      liq.cfg?.pctComision > 0 ? [`\u2212 Comisi\xF3n ventas (${liq.cfg?.pctComision ?? 0}%)`, `-${$2(liq.comision)}`, false] : null,
-      liq.alquiler > 0 ? ["\u2212 Alquiler", `-${$2(liq.alquiler)}`, false] : null,
+      ["Ventas brutas", $1(liq.bruto), false],
+      liq.descTJ > 0 ? [`\u2212 Desc. Tarjeta (${liq.cfg?.pctTarjeta ?? 0}%)`, `-${$1(liq.descTJ)}`, false] : null,
+      liq.descTJ > 0 ? [`= Subtotal -${liq.cfg?.pctTarjeta ?? 0}%`, $1(liq.subBanco), false] : null,
+      liq.cfg?.pctComision > 0 ? [`\u2212 Comisi\xF3n ventas (${liq.cfg?.pctComision ?? 0}%)`, `-${$1(liq.comision)}`, false] : null,
+      liq.alquiler > 0 ? ["\u2212 Alquiler", `-${$1(liq.alquiler)}`, false] : null,
       ...liq.gastos.filter((g) => g.desc || Number(g.monto) > 0).map(
-        (g) => [`\u2212 ${g.desc || "Gasto extra"}`, `-${$2(Math.round(Number(g.monto) || 0))}`, false]
+        (g) => [`\u2212 ${g.desc || "Gasto extra"}`, `-${$1(Number(g.monto) || 0)}`, false]
       ),
-      ["Neto a liquidar", $2(liq.neto), true]
+      ["Neto a liquidar", $1(liq.neto), true]
     ].filter(Boolean);
     const filasHtml = filas.map(([k, v, bold]) => `
     <tr style="${bold ? "font-weight:700;background:#f5f0e6" : ""}">
@@ -56681,7 +56681,7 @@
       ${filasHtml}
       <tr class="total-row">
         <td style="padding:12px 14px;font-weight:700;font-size:15px">TOTAL A PAGAR</td>
-        <td style="padding:12px 14px;text-align:right;font-weight:700;font-size:15px">${$2(liq.neto)}</td>
+        <td style="padding:12px 14px;text-align:right;font-weight:700;font-size:15px">${$1(liq.neto)}</td>
       </tr>
     </tbody>
   </table>
@@ -56696,18 +56696,18 @@
   }
   function construirImagenLiquidacion(marca, mes, anio, d) {
     const filas = [
-      ["Efectivo", $2(Math.round(d.brutoEfect)), false],
-      ["QR", $2(Math.round(d.brutoQR)), false],
-      ["Tarjeta", $2(Math.round(d.brutoTarjeta)), false],
-      ["Ventas brutas", $2(Math.round(d.bruto)), false],
-      [`\u2212 Desc. Tarjeta (${d.pctTarjeta ?? 0}%)`, `-${$2(Math.round(d.descTarjeta))}`, false],
-      [`= Subtotal -${d.pctTarjeta ?? 0}%`, $2(Math.round(d.subtotalBanco)), false],
-      [`\u2212 Comisi\xF3n ventas (${d.pctComision ?? 0}%)`, `-${$2(Math.round(d.comision))}`, false],
-      ["\u2212 Alquiler", `-${$2(d.alquiler)}`, false],
+      ["Efectivo", $1(d.brutoEfect), false],
+      ["QR", $1(d.brutoQR), false],
+      ["Tarjeta", $1(d.brutoTarjeta), false],
+      ["Ventas brutas", $1(d.bruto), false],
+      [`\u2212 Desc. Tarjeta (${d.pctTarjeta ?? 0}%)`, `-${$1(d.descTarjeta)}`, false],
+      [`= Subtotal -${d.pctTarjeta ?? 0}%`, $1(d.subtotalBanco), false],
+      [`\u2212 Comisi\xF3n ventas (${d.pctComision ?? 0}%)`, `-${$1(d.comision)}`, false],
+      ["\u2212 Alquiler", `-${$1(d.alquiler)}`, false],
       ...d.gastos.filter((g) => g.desc || Number(g.monto) > 0).map(
-        (g) => [`\u2212 ${g.desc || "Gasto extra"}`, `-${$2(Math.round(Number(g.monto) || 0))}`, false]
+        (g) => [`\u2212 ${g.desc || "Gasto extra"}`, `-${$1(Number(g.monto) || 0)}`, false]
       ),
-      ["Neto a liquidar", $2(Math.round(d.neto)), true]
+      ["Neto a liquidar", $1(d.neto), true]
     ].filter(Boolean);
     const filasHtml = filas.map(([k, v, bold]) => `
     <tr style="${bold ? "font-weight:700;background:#f5f0e6" : ""}">
@@ -56730,7 +56730,7 @@
         ${filasHtml}
         <tr style="border-top:2px solid #1a3a2a">
           <td style="padding:10px 12px;font-weight:700;font-size:15px">TOTAL A PAGAR</td>
-          <td style="padding:10px 12px;text-align:right;font-weight:700;font-size:15px">${$2(Math.round(d.neto))}</td>
+          <td style="padding:10px 12px;text-align:right;font-weight:700;font-size:15px">${$1(d.neto)}</td>
         </tr>
       </tbody>
     </table>
@@ -73518,7 +73518,7 @@ ${c.resumen || c.id}`)) onEliminarCarga(c.id);
       fontFamily: FONT,
       letterSpacing: "-0.02em",
       marginBottom: 5
-    } }, $2(Math.round(s.val))), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+    } }, $1(s.val)), /* @__PURE__ */ import_react.default.createElement("div", { style: {
       fontSize: 10,
       color: C.label3,
       fontFamily: FONT_UI,
@@ -73533,15 +73533,15 @@ ${c.resumen || c.id}`)) onEliminarCarga(c.id);
       borderBottom: `1px solid ${C.sep}`,
       marginBottom: 0
     } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 12, color: "#7C3AED", fontFamily: FONT_UI, letterSpacing: 0.3 } }, "Gift Card \xB7 ", gcVentas, " venta", gcVentas !== 1 ? "s" : ""), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, fontWeight: 600, color: "#7C3AED", fontFamily: FONT } }, $2(gcTotal))), /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 28 } }, [
-      ["Ventas brutas", $2(liq.bruto), false, false],
-      [`\u2212 Desc. Tarjeta (${liq.cfg?.pctTarjeta ?? 0}%)`, `-${$2(liq.descTJ)}`, true, false],
-      [`= Subtotal`, $2(liq.subBanco), false, false],
-      [`\u2212 Comisi\xF3n (${liq.cfg?.pctComision ?? 0}%)`, `-${$2(liq.comision)}`, true, false],
-      liq.alquiler > 0 ? [`\u2212 Alquiler`, `-${$2(liq.alquiler)}`, true, false] : null,
+      ["Ventas brutas", $1(liq.bruto), false, false],
+      [`\u2212 Desc. Tarjeta (${liq.cfg?.pctTarjeta ?? 0}%)`, `-${$1(liq.descTJ)}`, true, false],
+      [`= Subtotal`, $1(liq.subBanco), false, false],
+      [`\u2212 Comisi\xF3n (${liq.cfg?.pctComision ?? 0}%)`, `-${$1(liq.comision)}`, true, false],
+      liq.alquiler > 0 ? [`\u2212 Alquiler`, `-${$1(liq.alquiler)}`, true, false] : null,
       ...liq.gastos.filter((g) => g.desc || Number(g.monto) > 0).map(
-        (g) => [`\u2212 ${g.desc || "Gasto extra"}`, `-${$2(Math.round(Number(g.monto) || 0))}`, true, false]
+        (g) => [`\u2212 ${g.desc || "Gasto extra"}`, `-${$1(Number(g.monto) || 0)}`, true, false]
       ),
-      ["Neto a liquidar", $2(liq.neto), false, true]
+      ["Neto a liquidar", $1(liq.neto), false, true]
     ].filter(Boolean).map(([k, v, muted, bold], i, arr) => /* @__PURE__ */ import_react.default.createElement("div", { key: k, style: {
       display: "flex",
       justifyContent: "space-between",

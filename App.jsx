@@ -3126,23 +3126,23 @@ function construirMensajeLiquidacion(marca, mes, anio, datos){
     `━━━━━━━━━━━━━━━━━━━━`,
     `${marca?.emoji||""} *${marca?.nombre||""}* · ${MESES[mes]} ${anio}`,
     ``,
-    `💵 Efectivo: ${$(Math.round(brutoEfect))}`,
-    `📱 QR: ${$(Math.round(brutoQR))}`,
-    `💳 Tarjeta: ${$(Math.round(brutoTarjeta))}`,
-    `*Ventas brutas: ${$(Math.round(bruto))}*`,
+    `💵 Efectivo: ${$1(brutoEfect)}`,
+    `📱 QR: ${$1(brutoQR)}`,
+    `💳 Tarjeta: ${$1(brutoTarjeta)}`,
+    `*Ventas brutas: ${$1(bruto)}*`,
     ``,
-    `− Desc. Tarjeta (${pctTarjeta}%): -${$(Math.round(descTarjeta))}`,
-    `= Subtotal -${pctTarjeta}%: ${$(Math.round(subtotalBanco))}`,
-    `− Comisión ventas (${pctComision}%): -${$(Math.round(comision))}`,
+    `− Desc. Tarjeta (${pctTarjeta}%): -${$1(descTarjeta)}`,
+    `= Subtotal -${pctTarjeta}%: ${$1(subtotalBanco)}`,
+    `− Comisión ventas (${pctComision}%): -${$1(comision)}`,
   ];
-  lines.push(`− Alquiler: -${$(alquiler)}`);
+  lines.push(`− Alquiler: -${$1(alquiler)}`);
   if(totalGastos>0){
-    lines.push(`− Gastos extra: -${$(Math.round(totalGastos))}`);
+    lines.push(`− Gastos extra: -${$1(totalGastos)}`);
     gastos.filter(g=>g.desc||Number(g.monto)>0).forEach(g=>{
-      lines.push(`   · ${g.desc||"Gasto extra"}: -${$(Number(g.monto)||0)}`);
+      lines.push(`   · ${g.desc||"Gasto extra"}: -${$1(Number(g.monto)||0)}`);
     });
   }
-  lines.push(``, `💰 *TOTAL NETO: ${$(Math.round(neto))}*`,
+  lines.push(``, `💰 *TOTAL NETO: ${$1(neto)}*`,
     ``, `📅 ${new Date().toLocaleDateString("es-BO")} · Toscana House`);
 
   return lines.join("\n");
@@ -3153,15 +3153,15 @@ function imprimirLiquidacion(marca, mes, anio, liq){
   const win = window.open('', '_blank', 'width=800,height=900');
 
   const filas = [
-    ["Ventas brutas", $(liq.bruto), false],
-    liq.descTJ>0 ? [`− Desc. Tarjeta (${liq.cfg?.pctTarjeta ?? 0}%)`, `-${$(liq.descTJ)}`, false] : null,
-    liq.descTJ>0 ? [`= Subtotal -${liq.cfg?.pctTarjeta ?? 0}%`, $(liq.subBanco), false] : null,
-    (liq.cfg?.pctComision>0) ? [`− Comisión ventas (${liq.cfg?.pctComision ?? 0}%)`, `-${$(liq.comision)}`, false] : null,
-    (liq.alquiler>0) ? ["− Alquiler", `-${$(liq.alquiler)}`, false] : null,
+    ["Ventas brutas", $1(liq.bruto), false],
+    liq.descTJ>0 ? [`− Desc. Tarjeta (${liq.cfg?.pctTarjeta ?? 0}%)`, `-${$1(liq.descTJ)}`, false] : null,
+    liq.descTJ>0 ? [`= Subtotal -${liq.cfg?.pctTarjeta ?? 0}%`, $1(liq.subBanco), false] : null,
+    (liq.cfg?.pctComision>0) ? [`− Comisión ventas (${liq.cfg?.pctComision ?? 0}%)`, `-${$1(liq.comision)}`, false] : null,
+    (liq.alquiler>0) ? ["− Alquiler", `-${$1(liq.alquiler)}`, false] : null,
     ...liq.gastos.filter(g=>g.desc||Number(g.monto)>0).map(g=>
-      [`− ${g.desc||"Gasto extra"}`, `-${$(Math.round(Number(g.monto)||0))}`, false]
+      [`− ${g.desc||"Gasto extra"}`, `-${$1(Number(g.monto)||0)}`, false]
     ),
-    ["Neto a liquidar", $(liq.neto), true],
+    ["Neto a liquidar", $1(liq.neto), true],
   ].filter(Boolean);
 
   const filasHtml = filas.map(([k,v,bold])=>`
@@ -3201,7 +3201,7 @@ function imprimirLiquidacion(marca, mes, anio, liq){
       ${filasHtml}
       <tr class="total-row">
         <td style="padding:12px 14px;font-weight:700;font-size:15px">TOTAL A PAGAR</td>
-        <td style="padding:12px 14px;text-align:right;font-weight:700;font-size:15px">${$(liq.neto)}</td>
+        <td style="padding:12px 14px;text-align:right;font-weight:700;font-size:15px">${$1(liq.neto)}</td>
       </tr>
     </tbody>
   </table>
@@ -3219,18 +3219,18 @@ function imprimirLiquidacion(marca, mes, anio, liq){
 // d: {bruto, descTarjeta, pctTarjeta, subtotalBanco, pctComision, comision, alquiler, gastos, totalGastos, neto, vMarca, marcaId}
 function construirImagenLiquidacion(marca, mes, anio, d){
   const filas = [
-    ["Efectivo", $(Math.round(d.brutoEfect)), false],
-    ["QR", $(Math.round(d.brutoQR)), false],
-    ["Tarjeta", $(Math.round(d.brutoTarjeta)), false],
-    ["Ventas brutas", $(Math.round(d.bruto)), false],
-    [`− Desc. Tarjeta (${d.pctTarjeta ?? 0}%)`, `-${$(Math.round(d.descTarjeta))}`, false],
-    [`= Subtotal -${d.pctTarjeta ?? 0}%`, $(Math.round(d.subtotalBanco)), false],
-    [`− Comisión ventas (${d.pctComision ?? 0}%)`, `-${$(Math.round(d.comision))}`, false],
-    ["− Alquiler", `-${$(d.alquiler)}`, false],
+    ["Efectivo", $1(d.brutoEfect), false],
+    ["QR", $1(d.brutoQR), false],
+    ["Tarjeta", $1(d.brutoTarjeta), false],
+    ["Ventas brutas", $1(d.bruto), false],
+    [`− Desc. Tarjeta (${d.pctTarjeta ?? 0}%)`, `-${$1(d.descTarjeta)}`, false],
+    [`= Subtotal -${d.pctTarjeta ?? 0}%`, $1(d.subtotalBanco), false],
+    [`− Comisión ventas (${d.pctComision ?? 0}%)`, `-${$1(d.comision)}`, false],
+    ["− Alquiler", `-${$1(d.alquiler)}`, false],
     ...d.gastos.filter(g=>g.desc||Number(g.monto)>0).map(g=>
-      [`− ${g.desc||"Gasto extra"}`, `-${$(Math.round(Number(g.monto)||0))}`, false]
+      [`− ${g.desc||"Gasto extra"}`, `-${$1(Number(g.monto)||0)}`, false]
     ),
-    ["Neto a liquidar", $(Math.round(d.neto)), true],
+    ["Neto a liquidar", $1(d.neto), true],
   ].filter(Boolean);
 
   const filasHtml = filas.map(([k,v,bold])=>`
@@ -3258,7 +3258,7 @@ function construirImagenLiquidacion(marca, mes, anio, d){
         ${filasHtml}
         <tr style="border-top:2px solid #1a3a2a">
           <td style="padding:10px 12px;font-weight:700;font-size:15px">TOTAL A PAGAR</td>
-          <td style="padding:10px 12px;text-align:right;font-weight:700;font-size:15px">${$(Math.round(d.neto))}</td>
+          <td style="padding:10px 12px;text-align:right;font-weight:700;font-size:15px">${$1(d.neto)}</td>
         </tr>
       </tbody>
     </table>
@@ -18287,7 +18287,7 @@ function MarcaDetalle({marcaId,inv,ventas,vMes,mes,anio,MK,cierres,setCierres,ge
               <div key={s.label} style={{padding:"16px 12px",borderRadius:12,
                 background:C.bg2,border:`1px solid ${C.sep}`,textAlign:"center"}}>
                 <div style={{fontSize:15,fontWeight:700,color:C.label,fontFamily:FONT,
-                  letterSpacing:"-0.02em",marginBottom:5}}>{$(Math.round(s.val))}</div>
+                  letterSpacing:"-0.02em",marginBottom:5}}>{$1(s.val)}</div>
                 <div style={{fontSize:10,color:C.label3,fontFamily:FONT_UI,letterSpacing:.5,
                   textTransform:"uppercase",opacity:.6}}>{s.label}</div>
               </div>
@@ -18308,15 +18308,15 @@ function MarcaDetalle({marcaId,inv,ventas,vMes,mes,anio,MK,cierres,setCierres,ge
           {/* Desglose */}
           <div style={{marginBottom:28}}>
             {[
-              ["Ventas brutas", $(liq.bruto), false, false],
-              [`− Desc. Tarjeta (${liq.cfg?.pctTarjeta ?? 0}%)`, `-${$(liq.descTJ)}`, true, false],
-              [`= Subtotal`, $(liq.subBanco), false, false],
-              [`− Comisión (${liq.cfg?.pctComision ?? 0}%)`, `-${$(liq.comision)}`, true, false],
-              (liq.alquiler > 0) ? [`− Alquiler`, `-${$(liq.alquiler)}`, true, false] : null,
+              ["Ventas brutas", $1(liq.bruto), false, false],
+              [`− Desc. Tarjeta (${liq.cfg?.pctTarjeta ?? 0}%)`, `-${$1(liq.descTJ)}`, true, false],
+              [`= Subtotal`, $1(liq.subBanco), false, false],
+              [`− Comisión (${liq.cfg?.pctComision ?? 0}%)`, `-${$1(liq.comision)}`, true, false],
+              (liq.alquiler > 0) ? [`− Alquiler`, `-${$1(liq.alquiler)}`, true, false] : null,
               ...liq.gastos.filter(g=>g.desc||Number(g.monto)>0).map(g=>
-                [`− ${g.desc||"Gasto extra"}`, `-${$(Math.round(Number(g.monto)||0))}`, true, false]
+                [`− ${g.desc||"Gasto extra"}`, `-${$1(Number(g.monto)||0)}`, true, false]
               ),
-              ["Neto a liquidar", $(liq.neto), false, true],
+              ["Neto a liquidar", $1(liq.neto), false, true],
             ].filter(Boolean).map(([k,v,muted,bold],i,arr)=>(
               <div key={k} style={{display:"flex",justifyContent:"space-between",alignItems:"center",
                 padding:bold?"18px 0":"13px 0",
