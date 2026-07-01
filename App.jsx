@@ -13031,7 +13031,7 @@ function App(){
         )}
 
         {/* POS */}
-        {tab==="pos" && <POSContainer inv={inv} onVenta={handleVenta} retiros={retiros} onRetiro={registrarRetiro} onVerNota={v=>setVentaDetalle(v)}/>}
+        {tab==="pos" && <POSContainer inv={inv} onVenta={handleVenta} retiros={retiros} onRetiro={registrarRetiro} onVerNota={v=>setVentaDetalle(v)} user={user}/>}
 
         {/* INVENTARIO — por marca */}
         {tab==="inventario" && (
@@ -13644,7 +13644,7 @@ function App(){
 // ══════════════════════════════════════════════════════════
 // POSContainer — Caja con sub-tabs Venta | Retiros
 // ══════════════════════════════════════════════════════════
-function POSContainer({inv,onVenta,retiros,onRetiro,onVerNota}){
+function POSContainer({inv,onVenta,retiros,onRetiro,onVerNota,user}){
   const [subTab, setSubTab] = useState("venta");
   const tabs=[{id:"venta",label:"💳 Venta"},{id:"retiros",label:"📤 Retiros"}];
   return (
@@ -13666,7 +13666,7 @@ function POSContainer({inv,onVenta,retiros,onRetiro,onVerNota}){
         ))}
       </div>
       {subTab==="venta"
-        ? <POS inv={inv} onVenta={onVenta} onVerNota={onVerNota}/>
+        ? <POS inv={inv} onVenta={onVenta} onVerNota={onVerNota} user={user}/>
         : <RetirosTab inv={inv} retiros={retiros} onRetiro={onRetiro}/>
       }
     </div>
@@ -13743,11 +13743,11 @@ function QRPagoPanel({total, refVenta}){
 
 // POS — Caja de ventas
 // ══════════════════════════════════════════════════════════
-function POS({inv,onVenta,onVerNota}){
+function POS({inv,onVenta,onVerNota,user}){
   var _hN135 = useState([]); var carrito = _hN135[0]; var setCarrito = _hN135[1];;
   var _hN136 = useState(""); var busq = _hN136[0]; var setBusq = _hN136[1];;
   var _hN137 = useState("efectivo"); var pago = _hN137[0]; var setPago = _hN137[1];;
-  var _hN138 = useState(""); var vendedor = _hN138[0]; var setVendedor = _hN138[1];;
+  var _hN138 = useState(user?.nombre||""); var vendedor = _hN138[0]; var setVendedor = _hN138[1];;
   var _hNcl  = useState(""); var cliente  = _hNcl[0];  var setCliente  = _hNcl[1];;
   var _hNct  = useState(""); var clienteTel = _hNct[0]; var setClienteTel = _hNct[1];;
   var _hN139 = useState(0); var descExtra = _hN139[0]; var setDescExtra = _hN139[1];;
@@ -14473,8 +14473,15 @@ function POS({inv,onVenta,onVerNota}){
         {/* Descuento adicional */}
         <IOSInput label="Descuento adicional (%)" type="number" min="0" max="100"
           value={descExtra} onChange={e=>setDescExtra(Number(e.target.value))}/>
-        <IOSInput label="Vendedor (opcional)" value={vendedor}
-          onChange={e=>setVendedor(e.target.value)} placeholder="Nombre del vendedor"/>
+        {user?.rol==="caja"
+          ? <div style={{padding:"10px 14px",borderRadius:12,background:C.bg2,
+              border:`1px solid ${C.sep}`,marginBottom:10}}>
+              <div style={{fontSize:11,color:C.label3,fontFamily:FONT_UI,letterSpacing:.3,marginBottom:3}}>Vendedor</div>
+              <div style={{fontSize:15,fontWeight:600,color:C.label,fontFamily:FONT}}>{vendedor}</div>
+            </div>
+          : <IOSInput label="Vendedor (opcional)" value={vendedor}
+              onChange={e=>setVendedor(e.target.value)} placeholder="Nombre del vendedor"/>
+        }
         <IOSInput label="Nombre del cliente (opcional)" value={cliente}
           onChange={e=>setCliente(e.target.value)} placeholder="Ej: María García"/>
         <IOSInput label="Teléfono del cliente (opcional)" value={clienteTel}

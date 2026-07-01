@@ -67269,7 +67269,7 @@ Esta acci\xF3n no se puede deshacer.` : "\xBFEliminar esta carga? Esta acci\xF3n
         anio,
         onGoTab: setTab
       }
-    ), tab === "pos" && /* @__PURE__ */ import_react.default.createElement(POSContainer, { inv, onVenta: handleVenta, retiros, onRetiro: registrarRetiro, onVerNota: (v) => setVentaDetalle(v) }), tab === "inventario" && /* @__PURE__ */ import_react.default.createElement(InventarioPorMarca, { inv, ventas, retiros, bajas: bajasLog, onRecibir: () => setShInv(true), onBaja: () => {
+    ), tab === "pos" && /* @__PURE__ */ import_react.default.createElement(POSContainer, { inv, onVenta: handleVenta, retiros, onRetiro: registrarRetiro, onVerNota: (v) => setVentaDetalle(v), user }), tab === "inventario" && /* @__PURE__ */ import_react.default.createElement(InventarioPorMarca, { inv, ventas, retiros, bajas: bajasLog, onRecibir: () => setShInv(true), onBaja: () => {
       setShBaja(true);
       setBajaMsg(null);
       setBajaCod("");
@@ -67938,7 +67938,7 @@ Esta acci\xF3n no se puede deshacer.` : "\xBFEliminar esta carga? Esta acci\xF3n
       }
     ));
   }
-  function POSContainer({ inv, onVenta, retiros, onRetiro, onVerNota }) {
+  function POSContainer({ inv, onVenta, retiros, onRetiro, onVerNota, user }) {
     const [subTab, setSubTab] = (0, import_react.useState)("venta");
     const tabs = [{ id: "venta", label: "\u{1F4B3} Venta" }, { id: "retiros", label: "\u{1F4E4} Retiros" }];
     return /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: {
@@ -67963,7 +67963,7 @@ Esta acci\xF3n no se puede deshacer.` : "\xBFEliminar esta carga? Esta acci\xF3n
       boxShadow: subTab === t.id ? "0 1px 4px rgba(0,0,0,0.10)" : "none",
       transition: "all .15s",
       WebkitTapHighlightColor: "transparent"
-    } }, t.label))), subTab === "venta" ? /* @__PURE__ */ import_react.default.createElement(POS, { inv, onVenta, onVerNota }) : /* @__PURE__ */ import_react.default.createElement(RetirosTab, { inv, retiros, onRetiro }));
+    } }, t.label))), subTab === "venta" ? /* @__PURE__ */ import_react.default.createElement(POS, { inv, onVenta, onVerNota, user }) : /* @__PURE__ */ import_react.default.createElement(RetirosTab, { inv, retiros, onRetiro }));
   }
   function QRPagoPanel({ total, refVenta }) {
     const [qrBanco, setQrBanco] = (0, import_react.useState)(cargarQRBanco);
@@ -68057,7 +68057,7 @@ Esta acci\xF3n no se puede deshacer.` : "\xBFEliminar esta carga? Esta acci\xF3n
       WebkitTapHighlightColor: "transparent"
     } }, "Quitar")), /* @__PURE__ */ import_react.default.createElement("input", { ref: fileRef, type: "file", accept: "image/*", onChange: subirQRBanco, style: { display: "none" } }));
   }
-  function POS({ inv, onVenta, onVerNota }) {
+  function POS({ inv, onVenta, onVerNota, user }) {
     var _hN135 = (0, import_react.useState)([]);
     var carrito = _hN135[0];
     var setCarrito = _hN135[1];
@@ -68070,7 +68070,7 @@ Esta acci\xF3n no se puede deshacer.` : "\xBFEliminar esta carga? Esta acci\xF3n
     var pago = _hN137[0];
     var setPago = _hN137[1];
     ;
-    var _hN138 = (0, import_react.useState)("");
+    var _hN138 = (0, import_react.useState)(user?.nombre || "");
     var vendedor = _hN138[0];
     var setVendedor = _hN138[1];
     ;
@@ -68918,7 +68918,13 @@ ${sinStock.map((it) => {
         value: descExtra,
         onChange: (e) => setDescExtra(Number(e.target.value))
       }
-    ), /* @__PURE__ */ import_react.default.createElement(
+    ), user?.rol === "caja" ? /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      padding: "10px 14px",
+      borderRadius: 12,
+      background: C.bg2,
+      border: `1px solid ${C.sep}`,
+      marginBottom: 10
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT_UI, letterSpacing: 0.3, marginBottom: 3 } }, "Vendedor"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 15, fontWeight: 600, color: C.label, fontFamily: FONT } }, vendedor)) : /* @__PURE__ */ import_react.default.createElement(
       IOSInput,
       {
         label: "Vendedor (opcional)",
