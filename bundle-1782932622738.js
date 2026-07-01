@@ -54298,6 +54298,7 @@
           const p = payload.new;
           if (mounted) setInv((prev) => prev.map((i) => i.id === p.id ? {
             ...i,
+            codigo: p.codigo || i.codigo,
             stock: p.stock,
             nombre: p.nombre,
             precio: p.precio,

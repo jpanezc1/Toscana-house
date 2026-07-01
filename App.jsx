@@ -771,7 +771,7 @@ function useRealtimeSync(setVentas, setInv, setRetiros) {
         .on("postgres_changes", { event: "UPDATE", schema: "public", table: "inventario" }, payload => {
           const p = payload.new;
           if (mounted) setInv(prev => prev.map(i => i.id === p.id ? {
-            ...i, stock: p.stock, nombre: p.nombre, precio: p.precio, categoria: p.categoria, descripcion: p.descripcion||i.descripcion
+            ...i, codigo: p.codigo||i.codigo, stock: p.stock, nombre: p.nombre, precio: p.precio, categoria: p.categoria, descripcion: p.descripcion||i.descripcion
           } : i));
         })
         // ── Producto eliminado del inventario (rollback de carga) ──────────
