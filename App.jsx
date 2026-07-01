@@ -8672,7 +8672,14 @@ function HomeDashboard({ventas, inv, vMes, mes, anio, onGoTab}){
   // ── Últimas 6 ventas ────────────────────────────────────
   const ultVentas = useMemo(() =>
     [...ventas]
-      .sort((a,b) => (b.createdAt||b.fecha||"").localeCompare(a.createdAt||a.fecha||""))
+      .sort((a, b) => {
+        // clave primaria: createdAt si existe, sino fecha+hora (compara como string ISO)
+        const sa = a.createdAt || `${a.fecha || ""}T${a.hora || "00:00"}`;
+        const sb = b.createdAt || `${b.fecha || ""}T${b.hora || "00:00"}`;
+        if (sb !== sa) return sb.localeCompare(sa);
+        // desempate: id contiene timestamp ("V1782868478656")
+        return String(b.id || "").localeCompare(String(a.id || ""));
+      })
       .slice(0, 6),
     [ventas]
   );
@@ -8810,10 +8817,20 @@ function HomeDashboard({ventas, inv, vMes, mes, anio, onGoTab}){
         if(feed.length===0) return null;
         return (
           <div style={{...cardStyle,marginBottom:14,overflow:"hidden"}}>
-            <div style={{fontSize:11,fontWeight:700,color:C.label3,fontFamily:FONT,
-              textTransform:"uppercase",letterSpacing:.8,marginBottom:12}}>
-              Actividad del showroom
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
+              <div style={{fontSize:11,fontWeight:700,color:C.label3,fontFamily:FONT,
+                textTransform:"uppercase",letterSpacing:.8}}>
+                Actividad del showroom
+              </div>
+              <div style={{display:"flex",alignItems:"center",gap:5}}>
+                <div style={{width:6,height:6,borderRadius:"50%",background:C.green,
+                  boxShadow:`0 0 0 2px ${C.green}40`,
+                  animation:"pulse-live 2s infinite"}}/>
+                <span style={{fontSize:9,fontWeight:700,color:C.green,fontFamily:FONT_UI,
+                  letterSpacing:.6,textTransform:"uppercase"}}>En vivo</span>
+              </div>
             </div>
+            <style>{`@keyframes pulse-live{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(1.3)}}`}</style>
             {feed.map((a,i)=>(
               <div key={a.id} style={{
                 display:"grid",gridTemplateColumns:"64px 52px 1fr 80px",

@@ -62206,7 +62206,12 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
     }, [vMes]);
     const maxMarca = Math.max(...topMarcas.map((m) => m.total), 1);
     const ultVentas = (0, import_react.useMemo)(
-      () => [...ventas].sort((a, b) => (b.createdAt || b.fecha || "").localeCompare(a.createdAt || a.fecha || "")).slice(0, 6),
+      () => [...ventas].sort((a, b) => {
+        const sa = a.createdAt || `${a.fecha || ""}T${a.hora || "00:00"}`;
+        const sb = b.createdAt || `${b.fecha || ""}T${b.hora || "00:00"}`;
+        if (sb !== sa) return sb.localeCompare(sa);
+        return String(b.id || "").localeCompare(String(a.id || ""));
+      }).slice(0, 6),
       [ventas]
     );
     const today = /* @__PURE__ */ new Date();
@@ -62353,15 +62358,28 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
         }))
       ].slice(0, 6);
       if (feed.length === 0) return null;
-      return /* @__PURE__ */ import_react.default.createElement("div", { style: { ...cardStyle, marginBottom: 14, overflow: "hidden" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      return /* @__PURE__ */ import_react.default.createElement("div", { style: { ...cardStyle, marginBottom: 14, overflow: "hidden" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
         fontSize: 11,
         fontWeight: 700,
         color: C.label3,
         fontFamily: FONT,
         textTransform: "uppercase",
-        letterSpacing: 0.8,
-        marginBottom: 12
-      } }, "Actividad del showroom"), feed.map((a, i) => /* @__PURE__ */ import_react.default.createElement("div", { key: a.id, style: {
+        letterSpacing: 0.8
+      } }, "Actividad del showroom"), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 5 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+        width: 6,
+        height: 6,
+        borderRadius: "50%",
+        background: C.green,
+        boxShadow: `0 0 0 2px ${C.green}40`,
+        animation: "pulse-live 2s infinite"
+      } }), /* @__PURE__ */ import_react.default.createElement("span", { style: {
+        fontSize: 9,
+        fontWeight: 700,
+        color: C.green,
+        fontFamily: FONT_UI,
+        letterSpacing: 0.6,
+        textTransform: "uppercase"
+      } }, "En vivo"))), /* @__PURE__ */ import_react.default.createElement("style", null, `@keyframes pulse-live{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(1.3)}}`), feed.map((a, i) => /* @__PURE__ */ import_react.default.createElement("div", { key: a.id, style: {
         display: "grid",
         gridTemplateColumns: "64px 52px 1fr 80px",
         alignItems: "center",
