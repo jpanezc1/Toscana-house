@@ -1723,6 +1723,18 @@ const $    = n => "Bs " + new Intl.NumberFormat("es-BO",{minimumFractionDigits:0
 const $1   = n => "Bs " + new Intl.NumberFormat("es-BO",{minimumFractionDigits:1,maximumFractionDigits:1}).format(n||0);
 const hoy  = () => { const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
 const hora = () => new Date().toLocaleTimeString("es-BO",{hour:"2-digit",minute:"2-digit"});
+// Convierte fecha ("2026-07-02") + hora ("06:18 p. m." / "18:18" / "—") a un
+// número ordenable. La hora se guarda en formato 12h con a.m./p.m., por lo que
+// compararla como texto ordena mal ("12:26 p.m." > "06:18 p.m.").
+const tsVenta = v => {
+  const [Y=0,M=1,D=1] = String(v.fecha||"").split("-").map(Number);
+  const s  = String(v.hora||"").toLowerCase();
+  const hm = s.match(/(\d{1,2}):(\d{2})/);
+  let h = hm ? +hm[1] : 0, min = hm ? +hm[2] : 0;
+  if(/p\.?\s*m/.test(s) && h < 12) h += 12;  // 06:18 p.m. → 18:18
+  if(/a\.?\s*m/.test(s) && h === 12) h = 0;  // 12:05 a.m. → 00:05
+  return (((Y*12+M)*31+D)*24+h)*60 + min;
+};
 const mkKey= (m,a) => `${a}-${String(m+1).padStart(2,"0")}`;
 const genCod=(mid,nombre,idx)=>{
   const m=MARCAS.find(x=>x.id===mid);
@@ -8840,10 +8852,10 @@ function HomeDashboard({ventas, inv, vMes, mes, anio, onGoTab}){
   const ultVentas = useMemo(() =>
     [...ventas]
       .sort((a, b) => {
-        // clave primaria: createdAt si existe, sino fecha+hora (compara como string ISO)
-        const sa = a.createdAt || `${a.fecha || ""}T${a.hora || "00:00"}`;
-        const sb = b.createdAt || `${b.fecha || ""}T${b.hora || "00:00"}`;
-        if (sb !== sa) return sb.localeCompare(sa);
+        // fecha+hora parseadas a número (la hora es 12h con a.m./p.m. — como
+        // texto ordena mal)
+        const ta = tsVenta(a), tb = tsVenta(b);
+        if (tb !== ta) return tb - ta;
         // desempate: id contiene timestamp ("V1782868478656")
         return String(b.id || "").localeCompare(String(a.id || ""));
       })
@@ -18373,10 +18385,7 @@ function MarcaDetalle({marcaId,inv,ventas,vMes,mes,anio,MK,cierres,setCierres,ge
                     const items = [
                       ...periodo.ventas.map(v=>({tipo:"venta",fecha:v.fecha,hora:v.hora||"",data:v})),
                       ...retirosPeriodo.map(r=>({tipo:"retiro",fecha:r.fecha,hora:r.hora||"",data:r})),
-                    ].sort((a,b)=>{
-                      const fa=`${a.fecha} ${a.hora}`, fb=`${b.fecha} ${b.hora}`;
-                      return fb.localeCompare(fa);
-                    });
+                    ].sort((a,b)=>tsVenta(b)-tsVenta(a));
                     return items.map((item,i)=>{
                       if(item.tipo==="venta"){
                         const v=item.data;

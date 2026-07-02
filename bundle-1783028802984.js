@@ -55247,6 +55247,15 @@
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   };
   var hora = () => (/* @__PURE__ */ new Date()).toLocaleTimeString("es-BO", { hour: "2-digit", minute: "2-digit" });
+  var tsVenta = (v) => {
+    const [Y = 0, M = 1, D = 1] = String(v.fecha || "").split("-").map(Number);
+    const s = String(v.hora || "").toLowerCase();
+    const hm = s.match(/(\d{1,2}):(\d{2})/);
+    let h = hm ? +hm[1] : 0, min = hm ? +hm[2] : 0;
+    if (/p\.?\s*m/.test(s) && h < 12) h += 12;
+    if (/a\.?\s*m/.test(s) && h === 12) h = 0;
+    return (((Y * 12 + M) * 31 + D) * 24 + h) * 60 + min;
+  };
   var mkKey = (m, a) => `${a}-${String(m + 1).padStart(2, "0")}`;
   var genCod = (mid, nombre, idx) => {
     const m = MARCAS.find((x) => x.id === mid);
@@ -62370,9 +62379,8 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
     const maxMarca = Math.max(...topMarcas.map((m) => m.total), 1);
     const ultVentas = (0, import_react.useMemo)(
       () => [...ventas].sort((a, b) => {
-        const sa = a.createdAt || `${a.fecha || ""}T${a.hora || "00:00"}`;
-        const sb = b.createdAt || `${b.fecha || ""}T${b.hora || "00:00"}`;
-        if (sb !== sa) return sb.localeCompare(sa);
+        const ta = tsVenta(a), tb = tsVenta(b);
+        if (tb !== ta) return tb - ta;
         return String(b.id || "").localeCompare(String(a.id || ""));
       }).slice(0, 6),
       [ventas]
@@ -73619,10 +73627,7 @@ ${c.resumen || c.id}`)) onEliminarCarga(c.id);
       const items = [
         ...periodo.ventas.map((v) => ({ tipo: "venta", fecha: v.fecha, hora: v.hora || "", data: v })),
         ...retirosPeriodo.map((r) => ({ tipo: "retiro", fecha: r.fecha, hora: r.hora || "", data: r }))
-      ].sort((a, b) => {
-        const fa = `${a.fecha} ${a.hora}`, fb = `${b.fecha} ${b.hora}`;
-        return fb.localeCompare(fa);
-      });
+      ].sort((a, b) => tsVenta(b) - tsVenta(a));
       return items.map((item, i) => {
         if (item.tipo === "venta") {
           const v = item.data;
