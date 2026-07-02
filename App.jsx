@@ -7534,12 +7534,11 @@ function ImportarExcelModal({inv, onImportar, onClose, onArchivoCapturado}){
           fila._prodExistente = prodExistente;
           // Si el código vino del inventario (no del Excel), usar el código real
           if(!codigosExistentes.has(sku)) fila.sku = prodExistente.codigo.toUpperCase();
-          // Detectar conflicto de color: si el Excel trae un color distinto al registrado → bloquear
+          // Detectar color distinto → marcar para actualizar nombre+descripcion al importar
           const colorExistente = ((prodExistente.descripcion||"").match(/COLOR:\s*([^·\n]+)/i)?.[1]||"").trim().toUpperCase();
           const colorNuevo = (fila.color||"").trim().toUpperCase();
           if(colorExistente && colorNuevo && colorExistente !== colorNuevo){
-            fila._conflictoColor = `Color "${colorNuevo}" ≠ "${colorExistente}" en sistema`;
-            fila._bloqueado = true;
+            fila._colorActualizado = true; // flag: el import debe actualizar nombre + descripcion
           }
         }
 
@@ -7601,9 +7600,14 @@ function ImportarExcelModal({inv, onImportar, onClose, onArchivoCapturado}){
           f.talla && `TALLA: ${f.talla.toUpperCase()}`,
           f.color && `COLOR: ${f.color.toUpperCase()}`,
         ].filter(Boolean).join(" · ") || "";
+        // Si el color cambió → actualizar nombre = descripción Excel + color nuevo
+        const nombreNuevo = f._colorActualizado
+          ? `${(f.desc||"").toUpperCase()} ${(f.color||"").toUpperCase()}`.trim()
+          : undefined;
         onImportar({
           tipo:"update", codigo:f.sku, stock:f.stock,
           descripcion: descNueva||undefined,
+          nombre: nombreNuevo,
           subcat: f.talla ? f.talla.toUpperCase() : undefined,
           talla: (f.talla||"").toUpperCase(),
           color: (f.color||"").toUpperCase(),
@@ -7931,10 +7935,10 @@ function ImportarExcelModal({inv, onImportar, onClose, onArchivoCapturado}){
               <span style={{fontSize:16}}>🚫</span>
               <div style={{flex:1}}>
                 <div style={{fontSize:12,fontWeight:700,color:C.red,fontFamily:FONT_UI}}>
-                  {nConflictos} código{nConflictos!==1?"s":""} bloqueado{nConflictos!==1?"s":""} por conflicto de categoría o color
+                  {nConflictos} código{nConflictos!==1?"s":""} bloqueado{nConflictos!==1?"s":""} por conflicto de categoría
                 </div>
                 <div style={{fontSize:11,color:C.label3,fontFamily:FONT_UI,marginTop:2}}>
-                  Mismo código, datos distintos en el sistema. Confirmá fila por fila antes de importar.
+                  Mismo código, categoría distinta. Confirmá fila por fila antes de importar.
                 </div>
               </div>
               <button onClick={()=>setFiltro("conflictos")}
@@ -12544,7 +12548,7 @@ function App(){
     sbMarcarCargaVerificada(cargaId, verificado, user.nombre);
   }
 
-  function handleImportarExcel({tipo, codigo, stock, producto, descripcion, subcat, color="", talla=""}){
+  function handleImportarExcel({tipo, codigo, stock, producto, descripcion, nombre, subcat, color="", talla=""}){
     // Helper: extrae talla y color de un string "TALLA: X · COLOR: Y"
     function _parseDescTC(d){
       const ps=(d||"").split("·").map(s=>s.trim());
@@ -12562,12 +12566,13 @@ function App(){
       const iniNuevo  = stock > 0 ? iniAntes + stock : iniAntes;
       const patch = {stock:stockNuevo};
       if(stock > 0)   patch.stockInicial = iniNuevo;
-      if(descripcion) patch.descripcion = descripcion; // siempre actualizar — sobrescribe si ya tiene
+      if(nombre)      patch.nombre      = nombre;     // actualiza nombre cuando el color cambió
+      if(descripcion) patch.descripcion = descripcion;
       if(subcat)      patch.subcat      = subcat;
       setInv(prev=>prev.map(p=>p.codigo===codigo?{...p,...patch}:p));
       if(prod){
         if(stock > 0) syncConRespaldo("stock", {prodId:prod.id, stock:stockNuevo, stock_inicial:iniNuevo}, ()=>sbActualizarProductoPatch(prod.id, {stock:stockNuevo, stock_inicial:iniNuevo}));
-        if(patch.descripcion||patch.subcat){
+        if(patch.descripcion||patch.subcat||patch.nombre){
           syncConRespaldo("producto_patch", {prodId:prod.id,...patch}, ()=>sbActualizarProductoPatch(prod.id, patch));
         }
       }

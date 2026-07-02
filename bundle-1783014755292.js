@@ -61079,8 +61079,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
             const colorExistente = ((prodExistente.descripcion || "").match(/COLOR:\s*([^·\n]+)/i)?.[1] || "").trim().toUpperCase();
             const colorNuevo = (fila.color || "").trim().toUpperCase();
             if (colorExistente && colorNuevo && colorExistente !== colorNuevo) {
-              fila._conflictoColor = `Color "${colorNuevo}" \u2260 "${colorExistente}" en sistema`;
-              fila._bloqueado = true;
+              fila._colorActualizado = true;
             }
           }
           filas.push(fila);
@@ -61128,11 +61127,13 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
             f.talla && `TALLA: ${f.talla.toUpperCase()}`,
             f.color && `COLOR: ${f.color.toUpperCase()}`
           ].filter(Boolean).join(" \xB7 ") || "";
+          const nombreNuevo = f._colorActualizado ? `${(f.desc || "").toUpperCase()} ${(f.color || "").toUpperCase()}`.trim() : void 0;
           onImportar({
             tipo: "update",
             codigo: f.sku,
             stock: f.stock,
             descripcion: descNueva || void 0,
+            nombre: nombreNuevo,
             subcat: f.talla ? f.talla.toUpperCase() : void 0,
             talla: (f.talla || "").toUpperCase(),
             color: (f.color || "").toUpperCase()
@@ -61464,7 +61465,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       display: "flex",
       alignItems: "center",
       gap: 10
-    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 16 } }, "\u{1F6AB}"), /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, fontWeight: 700, color: C.red, fontFamily: FONT_UI } }, nConflictos, " c\xF3digo", nConflictos !== 1 ? "s" : "", " bloqueado", nConflictos !== 1 ? "s" : "", " por conflicto de categor\xEDa o color"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT_UI, marginTop: 2 } }, "Mismo c\xF3digo, datos distintos en el sistema. Confirm\xE1 fila por fila antes de importar.")), /* @__PURE__ */ import_react.default.createElement(
+    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 16 } }, "\u{1F6AB}"), /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, fontWeight: 700, color: C.red, fontFamily: FONT_UI } }, nConflictos, " c\xF3digo", nConflictos !== 1 ? "s" : "", " bloqueado", nConflictos !== 1 ? "s" : "", " por conflicto de categor\xEDa"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT_UI, marginTop: 2 } }, "Mismo c\xF3digo, categor\xEDa distinta. Confirm\xE1 fila por fila antes de importar.")), /* @__PURE__ */ import_react.default.createElement(
       "button",
       {
         onClick: () => setFiltro("conflictos"),
@@ -66751,7 +66752,7 @@ Esta acci\xF3n no se puede deshacer.` : "\xBFEliminar esta carga? Esta acci\xF3n
       setCargas((prev) => prev.map((c) => c.id === cargaId ? { ...c, verificado, verificadoTs: verificado ? (/* @__PURE__ */ new Date()).toISOString() : null, verificadoPor: verificado ? user.nombre : null } : c));
       sbMarcarCargaVerificada(cargaId, verificado, user.nombre);
     }
-    function handleImportarExcel({ tipo, codigo, stock, producto, descripcion, subcat, color = "", talla = "" }) {
+    function handleImportarExcel({ tipo, codigo, stock, producto, descripcion, nombre, subcat, color = "", talla = "" }) {
       function _parseDescTC(d) {
         const ps = (d || "").split("\xB7").map((s) => s.trim());
         return {
@@ -66767,12 +66768,13 @@ Esta acci\xF3n no se puede deshacer.` : "\xBFEliminar esta carga? Esta acci\xF3n
         const iniNuevo = stock > 0 ? iniAntes + stock : iniAntes;
         const patch = { stock: stockNuevo };
         if (stock > 0) patch.stockInicial = iniNuevo;
+        if (nombre) patch.nombre = nombre;
         if (descripcion) patch.descripcion = descripcion;
         if (subcat) patch.subcat = subcat;
         setInv((prev) => prev.map((p) => p.codigo === codigo ? { ...p, ...patch } : p));
         if (prod) {
           if (stock > 0) syncConRespaldo("stock", { prodId: prod.id, stock: stockNuevo, stock_inicial: iniNuevo }, () => sbActualizarProductoPatch(prod.id, { stock: stockNuevo, stock_inicial: iniNuevo }));
-          if (patch.descripcion || patch.subcat) {
+          if (patch.descripcion || patch.subcat || patch.nombre) {
             syncConRespaldo("producto_patch", { prodId: prod.id, ...patch }, () => sbActualizarProductoPatch(prod.id, patch));
           }
         }
