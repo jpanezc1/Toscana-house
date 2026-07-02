@@ -7435,8 +7435,9 @@ function ImportarExcelModal({inv, onImportar, onClose, onArchivoCapturado}){
       }
 
       // ── Iterar filas de datos ─────────────────────────────────────────
-      const usadosSet = new Set();
-      const filas     = [];
+      const usadosSet      = new Set();
+      const filas          = [];
+      const variantesUsadas = new Map(); // baseCodigo → Set de sufijos ya asignados en este lote
 
       // Fila de marca constante: si TODO el archivo es de una sola marca
       // detectada en el nombre del archivo, usarla como fallback
@@ -7532,13 +7533,28 @@ function ImportarExcelModal({inv, onImportar, onClose, onArchivoCapturado}){
         if(prodExistente){
           const colorExistente = ((prodExistente.descripcion||"").match(/COLOR:\s*([^·\n]+)/i)?.[1]||"").trim().toUpperCase();
           const colorNuevo = (fila.color||"").trim().toUpperCase();
+          // Crear variante si hay color nuevo y es distinto al existente (o no se conoce el color del producto base)
+          const esColorDistinto = colorNuevo && (!colorExistente || colorExistente !== colorNuevo);
 
-          if(colorExistente && colorNuevo && colorExistente !== colorNuevo){
-            // Color distinto → nuevo código variante: [CODIGO]-[primera letra del color]
-            const varianteSku = `${sku}-${colorNuevo.charAt(0)}`;
+          if(esColorDistinto){
+            // Color distinto → nuevo código variante usando el código REAL del producto base
+            const baseCodigo = prodExistente.codigo.toUpperCase();
+            if(!variantesUsadas.has(baseCodigo)) variantesUsadas.set(baseCodigo, new Set());
+            const usadas = variantesUsadas.get(baseCodigo);
+
+            // Elegir sufijo: 1 letra → si hay colisión en lote o inventario, usar 2 → 3
+            let sufijo = colorNuevo.charAt(0);
+            let varianteSku = `${baseCodigo}-${sufijo}`;
+            for(let len=2; len<=3; len++){
+              const enInv = inv.find(p=>p.codigo.toUpperCase()===varianteSku && p.id!==prodExistente.id);
+              if(!usadas.has(sufijo) && !enInv) break;
+              sufijo = colorNuevo.slice(0,len);
+              varianteSku = `${baseCodigo}-${sufijo}`;
+            }
+            usadas.add(sufijo);
+
             fila.sku = varianteSku;
-            fila._autoVariante = `${sku} → ${varianteSku}`; // para mostrar en preview
-            // Verificar si la variante ya existe en inventario
+            fila._autoVariante = `${baseCodigo} → ${varianteSku}`;
             const varianteExistente = inv.find(p=>p.codigo.toUpperCase()===varianteSku);
             if(varianteExistente){
               fila._dup = true;
@@ -7546,7 +7562,7 @@ function ImportarExcelModal({inv, onImportar, onClose, onArchivoCapturado}){
             }
             // Si no existe → _dup queda false → se crea como producto nuevo
           } else {
-            // Mismo color (o sin info de color) → duplicado normal, suma stock
+            // Mismo color o sin color → duplicado normal, suma stock
             fila._dup = true;
             fila._prodExistente = prodExistente;
             if(!codigosExistentes.has(sku)) fila.sku = prodExistente.codigo.toUpperCase();

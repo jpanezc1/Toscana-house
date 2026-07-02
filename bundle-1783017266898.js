@@ -61002,6 +61002,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
         }
         const usadosSet = /* @__PURE__ */ new Set();
         const filas = [];
+        const variantesUsadas = /* @__PURE__ */ new Map();
         const fileMarcaFallback = matchMarca(file.name.replace(/\.[^.]+$/, "").replace(/[_\-]/g, " "));
         for (let i = hRow + 1; i < raw.length; i++) {
           const row = raw[i];
@@ -61075,10 +61076,22 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
           if (prodExistente) {
             const colorExistente = ((prodExistente.descripcion || "").match(/COLOR:\s*([^·\n]+)/i)?.[1] || "").trim().toUpperCase();
             const colorNuevo = (fila.color || "").trim().toUpperCase();
-            if (colorExistente && colorNuevo && colorExistente !== colorNuevo) {
-              const varianteSku = `${sku}-${colorNuevo.charAt(0)}`;
+            const esColorDistinto = colorNuevo && (!colorExistente || colorExistente !== colorNuevo);
+            if (esColorDistinto) {
+              const baseCodigo = prodExistente.codigo.toUpperCase();
+              if (!variantesUsadas.has(baseCodigo)) variantesUsadas.set(baseCodigo, /* @__PURE__ */ new Set());
+              const usadas = variantesUsadas.get(baseCodigo);
+              let sufijo = colorNuevo.charAt(0);
+              let varianteSku = `${baseCodigo}-${sufijo}`;
+              for (let len = 2; len <= 3; len++) {
+                const enInv = inv.find((p) => p.codigo.toUpperCase() === varianteSku && p.id !== prodExistente.id);
+                if (!usadas.has(sufijo) && !enInv) break;
+                sufijo = colorNuevo.slice(0, len);
+                varianteSku = `${baseCodigo}-${sufijo}`;
+              }
+              usadas.add(sufijo);
               fila.sku = varianteSku;
-              fila._autoVariante = `${sku} \u2192 ${varianteSku}`;
+              fila._autoVariante = `${baseCodigo} \u2192 ${varianteSku}`;
               const varianteExistente = inv.find((p) => p.codigo.toUpperCase() === varianteSku);
               if (varianteExistente) {
                 fila._dup = true;
