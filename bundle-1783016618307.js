@@ -67146,7 +67146,7 @@ Esta acci\xF3n no se puede deshacer.` : "\xBFEliminar esta carga? Esta acci\xF3n
       background: C.gold,
       borderRadius: 2,
       animation: "loadbar 1.2s ease-in-out infinite"
-    } })), /* @__PURE__ */ import_react.default.createElement("style", null, `@keyframes loadbar{0%{transform:translateX(-100%)}100%{transform:translateX(200%)}}@keyframes slideUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}`)), !cargando && /* @__PURE__ */ import_react.default.createElement(SyncBadge, { sync }), isDesktop && /* @__PURE__ */ import_react.default.createElement(DesktopSidebar, { tabs: TABS, active: tab, onChange: (t) => {
+    } })), /* @__PURE__ */ import_react.default.createElement("style", null, `@keyframes loadbar{0%{transform:translateX(-100%)}100%{transform:translateX(200%)}}@keyframes slideUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}`)), !cargando && user?.rol === "admin" && /* @__PURE__ */ import_react.default.createElement(SyncBadge, { sync }), isDesktop && /* @__PURE__ */ import_react.default.createElement(DesktopSidebar, { tabs: TABS, active: tab, onChange: (t) => {
       setTab(t);
       setMD(null);
     }, user, logout }), /* @__PURE__ */ import_react.default.createElement("div", { style: isDesktop ? { flex: 1, minWidth: 0, overflowY: "auto", height: "100vh" } : {} }, showingDetail ? /* @__PURE__ */ import_react.default.createElement(

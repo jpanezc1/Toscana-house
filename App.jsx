@@ -12954,7 +12954,7 @@ function App(){
       )}
 
       {/* ── INDICADOR GLOBAL DE SINCRONIZACIÓN ── */}
-      {!cargando && <SyncBadge sync={sync}/>}
+      {!cargando && user?.rol==="admin" && <SyncBadge sync={sync}/>}
 
       {/* ── DESKTOP SIDEBAR ── */}
       {isDesktop&&<DesktopSidebar tabs={TABS} active={tab} onChange={t=>{setTab(t);setMD(null);}} user={user} logout={logout}/>}
