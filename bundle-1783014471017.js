@@ -61076,6 +61076,12 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
             fila._dup = true;
             fila._prodExistente = prodExistente;
             if (!codigosExistentes.has(sku)) fila.sku = prodExistente.codigo.toUpperCase();
+            const colorExistente = ((prodExistente.descripcion || "").match(/COLOR:\s*([^·\n]+)/i)?.[1] || "").trim().toUpperCase();
+            const colorNuevo = (fila.color || "").trim().toUpperCase();
+            if (colorExistente && colorNuevo && colorExistente !== colorNuevo) {
+              fila._conflictoColor = `Color "${colorNuevo}" \u2260 "${colorExistente}" en sistema`;
+              fila._bloqueado = true;
+            }
           }
           filas.push(fila);
         }
@@ -61458,7 +61464,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       display: "flex",
       alignItems: "center",
       gap: 10
-    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 16 } }, "\u{1F6AB}"), /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, fontWeight: 700, color: C.red, fontFamily: FONT_UI } }, nConflictos, " c\xF3digo", nConflictos !== 1 ? "s" : "", " bloqueado", nConflictos !== 1 ? "s" : "", " por conflicto de categor\xEDa"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT_UI, marginTop: 2 } }, "Mismo c\xF3digo, categor\xEDa distinta. Confirm\xE1 fila por fila antes de importar.")), /* @__PURE__ */ import_react.default.createElement(
+    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 16 } }, "\u{1F6AB}"), /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, fontWeight: 700, color: C.red, fontFamily: FONT_UI } }, nConflictos, " c\xF3digo", nConflictos !== 1 ? "s" : "", " bloqueado", nConflictos !== 1 ? "s" : "", " por conflicto de categor\xEDa o color"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT_UI, marginTop: 2 } }, "Mismo c\xF3digo, datos distintos en el sistema. Confirm\xE1 fila por fila antes de importar.")), /* @__PURE__ */ import_react.default.createElement(
       "button",
       {
         onClick: () => setFiltro("conflictos"),
@@ -61531,7 +61537,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
     } }, h))), previstaFiltrada.map((f, i) => {
       const hasErr = f._errs.length > 0;
       const rowBg = f._bloqueado ? `${C.red}0a` : hasErr ? `${C.red}07` : f._dup ? `${C.amber}07` : "transparent";
-      const estadoChip = f._bloqueado ? { txt: `\u{1F6AB} ${f._conflictoCat}`, color: C.red } : hasErr ? { txt: f._errs[0], color: C.red } : f._dup ? { txt: "Actualiza stock", color: C.amber } : { txt: "\u2713 V\xE1lido", color: C.green };
+      const estadoChip = f._bloqueado ? { txt: `\u{1F6AB} ${f._conflictoColor || f._conflictoCat}`, color: C.red } : hasErr ? { txt: f._errs[0], color: C.red } : f._dup ? { txt: "Actualiza stock", color: C.amber } : { txt: "\u2713 V\xE1lido", color: C.green };
       return /* @__PURE__ */ import_react.default.createElement("div", { key: i, style: {
         display: "grid",
         gridTemplateColumns: f._bloqueado ? "2fr 1fr 1.5fr 0.6fr 0.6fr 1.6fr" : "2fr 1fr 1.5fr 0.6fr 0.6fr 1fr",
@@ -61548,7 +61554,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
         letterSpacing: 0.4,
         opacity: 0.7,
         marginTop: 1
-      } }, "\u{1F916} auto")), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: f.marcaId ? C.label : C.red, fontFamily: FONT_UI, fontWeight: f.marcaId ? 400 : 600 } }, f.marcaNombre.slice(0, 12) || "\u2014"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label, fontFamily: FONT_UI } }, f.desc.slice(0, 22), f.desc.length > 22 ? "\u2026" : "", f.talla && /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 9, color: C.label3, marginLeft: 4 } }, f.talla)), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, fontWeight: 600, color: f.precio > 0 ? C.label : C.red, fontFamily: FONT_UI } }, f.precio > 0 ? `Bs ${f.precio}` : "\u2014"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: C.blue, fontFamily: FONT_UI, textAlign: "center" } }, "\xD7", f.stock || 1), f._bloqueado ? /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 3 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 9, fontWeight: 700, color: C.red, fontFamily: FONT_UI, lineHeight: 1.3 } }, f._conflictoCat), /* @__PURE__ */ import_react.default.createElement(
+      } }, "\u{1F916} auto")), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: f.marcaId ? C.label : C.red, fontFamily: FONT_UI, fontWeight: f.marcaId ? 400 : 600 } }, f.marcaNombre.slice(0, 12) || "\u2014"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label, fontFamily: FONT_UI } }, f.desc.slice(0, 22), f.desc.length > 22 ? "\u2026" : "", f.talla && /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 9, color: C.label3, marginLeft: 4 } }, f.talla)), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, fontWeight: 600, color: f.precio > 0 ? C.label : C.red, fontFamily: FONT_UI } }, f.precio > 0 ? `Bs ${f.precio}` : "\u2014"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: C.blue, fontFamily: FONT_UI, textAlign: "center" } }, "\xD7", f.stock || 1), f._bloqueado ? /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 3 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 9, fontWeight: 700, color: C.red, fontFamily: FONT_UI, lineHeight: 1.3 } }, f._conflictoColor || f._conflictoCat), /* @__PURE__ */ import_react.default.createElement(
         "button",
         {
           onClick: () => desbloquearFila(f.sku),

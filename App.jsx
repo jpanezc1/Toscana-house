@@ -7534,6 +7534,13 @@ function ImportarExcelModal({inv, onImportar, onClose, onArchivoCapturado}){
           fila._prodExistente = prodExistente;
           // Si el código vino del inventario (no del Excel), usar el código real
           if(!codigosExistentes.has(sku)) fila.sku = prodExistente.codigo.toUpperCase();
+          // Detectar conflicto de color: si el Excel trae un color distinto al registrado → bloquear
+          const colorExistente = ((prodExistente.descripcion||"").match(/COLOR:\s*([^·\n]+)/i)?.[1]||"").trim().toUpperCase();
+          const colorNuevo = (fila.color||"").trim().toUpperCase();
+          if(colorExistente && colorNuevo && colorExistente !== colorNuevo){
+            fila._conflictoColor = `Color "${colorNuevo}" ≠ "${colorExistente}" en sistema`;
+            fila._bloqueado = true;
+          }
         }
 
         filas.push(fila);
@@ -7924,10 +7931,10 @@ function ImportarExcelModal({inv, onImportar, onClose, onArchivoCapturado}){
               <span style={{fontSize:16}}>🚫</span>
               <div style={{flex:1}}>
                 <div style={{fontSize:12,fontWeight:700,color:C.red,fontFamily:FONT_UI}}>
-                  {nConflictos} código{nConflictos!==1?"s":""} bloqueado{nConflictos!==1?"s":""} por conflicto de categoría
+                  {nConflictos} código{nConflictos!==1?"s":""} bloqueado{nConflictos!==1?"s":""} por conflicto de categoría o color
                 </div>
                 <div style={{fontSize:11,color:C.label3,fontFamily:FONT_UI,marginTop:2}}>
-                  Mismo código, categoría distinta. Confirmá fila por fila antes de importar.
+                  Mismo código, datos distintos en el sistema. Confirmá fila por fila antes de importar.
                 </div>
               </div>
               <button onClick={()=>setFiltro("conflictos")}
@@ -8009,7 +8016,7 @@ function ImportarExcelModal({inv, onImportar, onClose, onArchivoCapturado}){
               const hasErr = f._errs.length>0;
               const rowBg  = f._bloqueado?`${C.red}0a`:hasErr?`${C.red}07`:f._dup?`${C.amber}07`:"transparent";
               const estadoChip = f._bloqueado
-                ? {txt:`🚫 ${f._conflictoCat}`, color:C.red}
+                ? {txt:`🚫 ${f._conflictoColor||f._conflictoCat}`, color:C.red}
                 : hasErr
                 ? {txt:f._errs[0], color:C.red}
                 : f._dup
@@ -8047,7 +8054,7 @@ function ImportarExcelModal({inv, onImportar, onClose, onArchivoCapturado}){
                   {f._bloqueado ? (
                     <div style={{display:"flex",flexDirection:"column",gap:3}}>
                       <div style={{fontSize:9,fontWeight:700,color:C.red,fontFamily:FONT_UI,lineHeight:1.3}}>
-                        {f._conflictoCat}
+                        {f._conflictoColor||f._conflictoCat}
                       </div>
                       <button onClick={()=>desbloquearFila(f.sku)}
                         style={{background:`${C.red}18`,border:`1px solid ${C.red}50`,borderRadius:6,
