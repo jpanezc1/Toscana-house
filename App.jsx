@@ -39,10 +39,12 @@ const SUCURSAL_EMP  = "Casa Matriz";
 
 // Carga Supabase SDK desde CDN
 let _supabase = null;
+// heartbeat corto: detecta conexiones muertas en ~10s (default 30s) → reconecta antes
+const SUPA_OPTS = { realtime: { heartbeatIntervalMs: 10000 } };
 async function getSupabase() {
   if (_supabase) return _supabase;
   if (window.supabase) {
-    _supabase = window.supabase.createClient(SUPA_URL, SUPA_KEY);
+    _supabase = window.supabase.createClient(SUPA_URL, SUPA_KEY, SUPA_OPTS);
     return _supabase;
   }
   await new Promise((res, rej) => {
@@ -51,7 +53,7 @@ async function getSupabase() {
     s.onload = res; s.onerror = rej;
     document.head.appendChild(s);
   });
-  _supabase = window.supabase.createClient(SUPA_URL, SUPA_KEY);
+  _supabase = window.supabase.createClient(SUPA_URL, SUPA_KEY, SUPA_OPTS);
   return _supabase;
 }
 
@@ -563,6 +565,7 @@ async function sbCargarTodo() {
       id: p.id, codigo: p.codigo, marcaId: p.marca_id,
       marcaNombre: p.marca_nombre, nombre: p.nombre,
       categoria: p.categoria, precio: p.precio,
+      descripcion: p.descripcion||"", subcat: p.subcat||"",
       stock: p.stock, stockInicial: p.stock_inicial, fecha: p.fecha
     }));
 
@@ -698,10 +701,48 @@ async function procesarOutbox(){
   }
 }
 
+// Difunde la operación a las otras sesiones por broadcast (ruta rápida ~1 RTT,
+// sin esperar el WAL polling de postgres_changes). postgres_changes llega después
+// y corrige cualquier drift — los listeners deduplican por id.
+function rtBroadcastForOp(tipo, payload){
+  try{
+    switch(tipo){
+      case "stock": {
+        const p = {id: payload.prodId, stock: payload.stock};
+        if(payload.stock_inicial!=null) p.stockInicial = payload.stock_inicial;
+        rtBroadcast("inv_update", {p});
+        break;
+      }
+      case "producto_patch": {
+        const p = {id: payload.prodId};
+        if(payload.stock!=null)         p.stock        = payload.stock;
+        if(payload.stock_inicial!=null) p.stockInicial = payload.stock_inicial;
+        if(payload.nombre)              p.nombre       = payload.nombre;
+        if(payload.precio!=null)        p.precio       = payload.precio;
+        if(payload.categoria)           p.categoria    = payload.categoria;
+        if(payload.descripcion)         p.descripcion  = payload.descripcion;
+        if(payload.subcat)              p.subcat       = payload.subcat;
+        if(payload.codigo)              p.codigo       = payload.codigo;
+        rtBroadcast("inv_update", {p});
+        break;
+      }
+      case "venta": {
+        // sin imagen base64: el broadcast tiene límite de tamaño de payload
+        const {etiquetaImg, ...v} = payload;
+        rtBroadcast("venta_nueva", {v});
+        break;
+      }
+      case "anularVenta": rtBroadcast("venta_anulada",{id: payload.id}); break;
+      case "retiro":      rtBroadcast("retiro_nuevo", {r: payload}); break;
+    }
+  }catch{ /* broadcast es best-effort; postgres_changes respalda */ }
+}
+
 // Intenta guardar en Supabase de inmediato; si no hay red o falla,
 // encola la operación para reintento automático. Los datos ya están
 // seguros en localStorage (estado React) independientemente del resultado.
 async function syncConRespaldo(tipo, payload, fnDirecto){
+  rtBroadcastForOp(tipo, payload);
   try{
     if(typeof navigator!=="undefined" && navigator.onLine===false){
       pushToOutbox(tipo, payload);
@@ -719,10 +760,11 @@ async function syncConRespaldo(tipo, payload, fnDirecto){
 // ── Realtime sync — escucha cambios en Supabase y actualiza estado local ────
 // Activa canales en: ventas (INSERT/UPDATE) + inventario (INSERT/UPDATE)
 // Deduplicación: si la fila ya existe (optimistic update local), no se agrega.
-function useRealtimeSync(setVentas, setInv, setRetiros, setFactoryResetRecibido) {
+function useRealtimeSync(setVentas, setInv, setRetiros, setFactoryResetRecibido, onResync) {
   useEffect(() => {
     let channel = null;
     let mounted = true;
+    let wasConnected = false; // para detectar re-suscripción tras caída
 
     getSupabase().then(db => {
       if (!mounted) return;
@@ -813,6 +855,11 @@ function useRealtimeSync(setVentas, setInv, setRetiros, setFactoryResetRecibido)
           const r = payload?.r;
           if(mounted && r?.id && setRetiros) setRetiros(prev => prev.some(x=>x.id===r.id) ? prev : [...prev, r]);
         })
+        // ── Broadcast: venta anulada (ruta rápida) ──
+        .on("broadcast", {event:"venta_anulada"}, ({payload}) => {
+          const id = payload?.id;
+          if(mounted && id) setVentas(prev => prev.map(x => x.id===id ? {...x, anulada:true} : x));
+        })
         // ── Broadcast: factory reset → limpiar y recargar esta sesión ────────
         .on("broadcast", {event:"factory_reset"}, () => {
           if(!mounted) return;
@@ -829,6 +876,10 @@ function useRealtimeSync(setVentas, setInv, setRetiros, setFactoryResetRecibido)
           if (status === "SUBSCRIBED"){
             console.log("[Toscana Realtime] ✓ conectado");
             _rtChannel = channel; // exponer globalmente para rtBroadcast
+            // Re-suscripción tras caída → refetch completo: los eventos perdidos
+            // durante la desconexión no se re-emiten, hay que recargar.
+            if (wasConnected && onResync) onResync();
+            wasConnected = true;
           }
           if (status === "CHANNEL_ERROR") console.warn("[Toscana Realtime] error de canal — verifique Realtime en Supabase dashboard");
         });
@@ -857,7 +908,7 @@ function usePingLatency(){
         if(status==="SUBSCRIBED"){
           const doPing = ()=>{ if(mounted) ch.send({type:"broadcast",event:"ping",payload:{ts:Date.now()}}).catch(()=>{}); };
           doPing();
-          iv = setInterval(doPing, 30000);
+          iv = setInterval(doPing, 15000);
         }
       });
     }).catch(()=>{});
@@ -12075,7 +12126,8 @@ function App(){
   useEffect(()=>{ try{localStorage.setItem("th_cargas",JSON.stringify(cargas));}catch{} },[cargas]);
 
   // ── Realtime sync — cualquier cambio en Supabase (otro dispositivo) actualiza aquí ──
-  useRealtimeSync(setVentas, setInv, setRetiros, setFactoryResetRecibido);
+  useRealtimeSync(setVentas, setInv, setRetiros, setFactoryResetRecibido,
+    ()=>resyncDesdeNube("reconexión realtime"));
 
   // (reset de datos eliminado — localStorage persiste entre sesiones)
 
@@ -12325,42 +12377,71 @@ function App(){
     }, user);
   }
 
-  // Cargar datos desde Supabase al inicio — merge inteligente con localStorage
+  // ── Carga completa desde Supabase — merge inteligente con localStorage ──
+  // Usada al inicio, al reconectar realtime tras una caída, al volver la app
+  // a foreground y al recuperar la red. Los eventos realtime perdidos durante
+  // una desconexión NO se re-emiten → el refetch es la única garantía.
+  const _lastResync = useRef(0);
+  async function cargarDesdeNube(){
+    _lastResync.current = Date.now();
+    const data = await sbCargarTodo();
+    if(data){
+      // ── Inventario: Supabase es fuente de verdad.
+      //    Si Supabase tiene datos, reemplazar cache local exactamente.
+      //    Solo si Supabase está vacío se mantienen datos locales (modo offline).
+      setInv(prev=>{
+        if(data.inv.length===0 && prev.length>0){
+          return prev; // Supabase vacío = offline, mantener local
+        }
+        return data.inv; // Supabase tiene datos → usarlo tal cual
+      });
+
+      // ── Ventas: misma lógica
+      setVentas(prev=>{
+        if(data.ventas.length===0 && prev.length>0) return prev;
+        const sbIds = new Set(data.ventas.map(v=>String(v.id)));
+        const pendientes = prev.filter(v=>!sbIds.has(String(v.id)));
+        if(pendientes.length>0){
+          pendientes.forEach(v=>sbGuardarVenta(v));
+          return [...data.ventas, ...pendientes];
+        }
+        return data.ventas;
+      });
+
+      if(Object.keys(data.cierres).length>0) setCierres(data.cierres);
+      setDbStatus("ok");
+    } else {
+      // Supabase no responde — datos de localStorage siguen disponibles
+      setDbStatus("error");
+    }
+    return data;
+  }
+
+  // Re-sync con throttle (máx. 1 cada 20s) para no re-descargar en ráfaga
+  function resyncDesdeNube(motivo){
+    if(Date.now() - _lastResync.current < 20000) return;
+    console.log("[Toscana Resync]", motivo||"");
+    cargarDesdeNube();
+  }
+
+  // Cargar datos desde Supabase al inicio
   useEffect(()=>{
     setDbStatus("connecting");
-    sbCargarTodo().then(data=>{
-      if(data){
-        // ── Inventario: Supabase es fuente de verdad.
-        //    Si Supabase tiene datos, reemplazar cache local exactamente.
-        //    Solo si Supabase está vacío se mantienen datos locales (modo offline).
-        setInv(prev=>{
-          if(data.inv.length===0 && prev.length>0){
-            return prev; // Supabase vacío = offline, mantener local
-          }
-          return data.inv; // Supabase tiene datos → usarlo tal cual
-        });
+    cargarDesdeNube().then(()=>setCargando(false));
+  },[]); // eslint-disable-line react-hooks/exhaustive-deps
 
-        // ── Ventas: misma lógica
-        setVentas(prev=>{
-          if(data.ventas.length===0 && prev.length>0) return prev;
-          const sbIds = new Set(data.ventas.map(v=>String(v.id)));
-          const pendientes = prev.filter(v=>!sbIds.has(String(v.id)));
-          if(pendientes.length>0){
-            pendientes.forEach(v=>sbGuardarVenta(v));
-            return [...data.ventas, ...pendientes];
-          }
-          return data.ventas;
-        });
-
-        if(Object.keys(data.cierres).length>0) setCierres(data.cierres);
-        setDbStatus("ok");
-      } else {
-        // Supabase no responde — datos de localStorage siguen disponibles
-        setDbStatus("error");
-      }
-      setCargando(false);
-    });
-  },[]);
+  // Re-sync al volver a foreground (iPad/Mac suspenden el WebSocket en
+  // background) y al recuperar la conexión de red
+  useEffect(()=>{
+    const onVis = ()=>{ if(document.visibilityState==="visible") resyncDesdeNube("volvió a foreground"); };
+    const onOnline = ()=>resyncDesdeNube("red restaurada");
+    document.addEventListener("visibilitychange", onVis);
+    window.addEventListener("online", onOnline);
+    return ()=>{
+      document.removeEventListener("visibilitychange", onVis);
+      window.removeEventListener("online", onOnline);
+    };
+  },[]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Sincronizar usuarios con Supabase al inicio
   useEffect(()=>{
@@ -12778,12 +12859,10 @@ function App(){
       const stockDespues = Math.max(0, stockAntes - it.cantidad);
       setInv(p=>p.map(i=>i.id===it.prodId?{...i,stock:stockDespues}:i));
       syncConRespaldo("stock", {prodId:it.prodId, stock:stockDespues}, ()=>sbActualizarStock(it.prodId, stockDespues));
-      rtBroadcast("inv_update", {p:{id:it.prodId, stock:stockDespues}}); // ruta rápida
       stockCambios.push({prodId:it.prodId, codigo:it.codigo, nombre:it.nombre, stockAntes, stockDespues});
     });
     drive.syncVenta(vf);
     syncConRespaldo("venta", vf, ()=>sbGuardarVenta(vf));
-    rtBroadcast("venta_nueva", {v:vf}); // ruta rápida sin extra DB query
     // ── Audit forense ─────────────────────────────────────────────
     const marcas = [...new Set(v.items.map(i=>i.marcaNombre))].join(", ");
     logAudit("VENTA", {

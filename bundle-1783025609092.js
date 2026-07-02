@@ -53422,10 +53422,11 @@
   var CIUDAD_EMP = "Santa Cruz, Bolivia";
   var SUCURSAL_EMP = "Casa Matriz";
   var _supabase = null;
+  var SUPA_OPTS = { realtime: { heartbeatIntervalMs: 1e4 } };
   async function getSupabase() {
     if (_supabase) return _supabase;
     if (window.supabase) {
-      _supabase = window.supabase.createClient(SUPA_URL, SUPA_KEY);
+      _supabase = window.supabase.createClient(SUPA_URL, SUPA_KEY, SUPA_OPTS);
       return _supabase;
     }
     await new Promise((res, rej) => {
@@ -53435,7 +53436,7 @@
       s.onerror = rej;
       document.head.appendChild(s);
     });
-    _supabase = window.supabase.createClient(SUPA_URL, SUPA_KEY);
+    _supabase = window.supabase.createClient(SUPA_URL, SUPA_KEY, SUPA_OPTS);
     return _supabase;
   }
   var _rtChannel = null;
@@ -54054,6 +54055,8 @@
         nombre: p.nombre,
         categoria: p.categoria,
         precio: p.precio,
+        descripcion: p.descripcion || "",
+        subcat: p.subcat || "",
         stock: p.stock,
         stockInicial: p.stock_inicial,
         fecha: p.fecha
@@ -54216,7 +54219,45 @@
       _procesandoOutbox = false;
     }
   }
+  function rtBroadcastForOp(tipo, payload) {
+    try {
+      switch (tipo) {
+        case "stock": {
+          const p = { id: payload.prodId, stock: payload.stock };
+          if (payload.stock_inicial != null) p.stockInicial = payload.stock_inicial;
+          rtBroadcast("inv_update", { p });
+          break;
+        }
+        case "producto_patch": {
+          const p = { id: payload.prodId };
+          if (payload.stock != null) p.stock = payload.stock;
+          if (payload.stock_inicial != null) p.stockInicial = payload.stock_inicial;
+          if (payload.nombre) p.nombre = payload.nombre;
+          if (payload.precio != null) p.precio = payload.precio;
+          if (payload.categoria) p.categoria = payload.categoria;
+          if (payload.descripcion) p.descripcion = payload.descripcion;
+          if (payload.subcat) p.subcat = payload.subcat;
+          if (payload.codigo) p.codigo = payload.codigo;
+          rtBroadcast("inv_update", { p });
+          break;
+        }
+        case "venta": {
+          const { etiquetaImg, ...v } = payload;
+          rtBroadcast("venta_nueva", { v });
+          break;
+        }
+        case "anularVenta":
+          rtBroadcast("venta_anulada", { id: payload.id });
+          break;
+        case "retiro":
+          rtBroadcast("retiro_nuevo", { r: payload });
+          break;
+      }
+    } catch {
+    }
+  }
   async function syncConRespaldo(tipo, payload, fnDirecto) {
+    rtBroadcastForOp(tipo, payload);
     try {
       if (typeof navigator !== "undefined" && navigator.onLine === false) {
         pushToOutbox(tipo, payload);
@@ -54232,10 +54273,11 @@
       return false;
     }
   }
-  function useRealtimeSync(setVentas, setInv, setRetiros, setFactoryResetRecibido) {
+  function useRealtimeSync(setVentas, setInv, setRetiros, setFactoryResetRecibido, onResync) {
     (0, import_react.useEffect)(() => {
       let channel = null;
       let mounted = true;
+      let wasConnected = false;
       getSupabase().then((db) => {
         if (!mounted) return;
         channel = db.channel("toscana-realtime-v3").on("postgres_changes", { event: "INSERT", schema: "public", table: "ventas" }, async (payload) => {
@@ -54340,6 +54382,9 @@
         }).on("broadcast", { event: "retiro_nuevo" }, ({ payload }) => {
           const r = payload?.r;
           if (mounted && r?.id && setRetiros) setRetiros((prev) => prev.some((x) => x.id === r.id) ? prev : [...prev, r]);
+        }).on("broadcast", { event: "venta_anulada" }, ({ payload }) => {
+          const id = payload?.id;
+          if (mounted && id) setVentas((prev) => prev.map((x) => x.id === id ? { ...x, anulada: true } : x));
         }).on("broadcast", { event: "factory_reset" }, () => {
           if (!mounted) return;
           [
@@ -54363,6 +54408,8 @@
           if (status === "SUBSCRIBED") {
             console.log("[Toscana Realtime] \u2713 conectado");
             _rtChannel = channel;
+            if (wasConnected && onResync) onResync();
+            wasConnected = true;
           }
           if (status === "CHANNEL_ERROR") console.warn("[Toscana Realtime] error de canal \u2014 verifique Realtime en Supabase dashboard");
         });
@@ -54394,7 +54441,7 @@
               });
             };
             doPing();
-            iv = setInterval(doPing, 3e4);
+            iv = setInterval(doPing, 15e3);
           }
         });
       }).catch(() => {
@@ -66225,7 +66272,13 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       } catch {
       }
     }, [cargas]);
-    useRealtimeSync(setVentas, setInv, setRetiros, setFactoryResetRecibido);
+    useRealtimeSync(
+      setVentas,
+      setInv,
+      setRetiros,
+      setFactoryResetRecibido,
+      () => resyncDesdeNube("reconexi\xF3n realtime")
+    );
     (0, import_react.useEffect)(() => {
       setMarcasState((prev) => {
         let cambiado = false;
@@ -66501,33 +66554,54 @@ Esta acci\xF3n no se puede deshacer.`)) return;
         stockDespues
       }, user);
     }
+    const _lastResync = (0, import_react.useRef)(0);
+    async function cargarDesdeNube() {
+      _lastResync.current = Date.now();
+      const data = await sbCargarTodo();
+      if (data) {
+        setInv((prev) => {
+          if (data.inv.length === 0 && prev.length > 0) {
+            return prev;
+          }
+          return data.inv;
+        });
+        setVentas((prev) => {
+          if (data.ventas.length === 0 && prev.length > 0) return prev;
+          const sbIds = new Set(data.ventas.map((v) => String(v.id)));
+          const pendientes = prev.filter((v) => !sbIds.has(String(v.id)));
+          if (pendientes.length > 0) {
+            pendientes.forEach((v) => sbGuardarVenta(v));
+            return [...data.ventas, ...pendientes];
+          }
+          return data.ventas;
+        });
+        if (Object.keys(data.cierres).length > 0) setCierres(data.cierres);
+        setDbStatus("ok");
+      } else {
+        setDbStatus("error");
+      }
+      return data;
+    }
+    function resyncDesdeNube(motivo) {
+      if (Date.now() - _lastResync.current < 2e4) return;
+      console.log("[Toscana Resync]", motivo || "");
+      cargarDesdeNube();
+    }
     (0, import_react.useEffect)(() => {
       setDbStatus("connecting");
-      sbCargarTodo().then((data) => {
-        if (data) {
-          setInv((prev) => {
-            if (data.inv.length === 0 && prev.length > 0) {
-              return prev;
-            }
-            return data.inv;
-          });
-          setVentas((prev) => {
-            if (data.ventas.length === 0 && prev.length > 0) return prev;
-            const sbIds = new Set(data.ventas.map((v) => String(v.id)));
-            const pendientes = prev.filter((v) => !sbIds.has(String(v.id)));
-            if (pendientes.length > 0) {
-              pendientes.forEach((v) => sbGuardarVenta(v));
-              return [...data.ventas, ...pendientes];
-            }
-            return data.ventas;
-          });
-          if (Object.keys(data.cierres).length > 0) setCierres(data.cierres);
-          setDbStatus("ok");
-        } else {
-          setDbStatus("error");
-        }
-        setCargando(false);
-      });
+      cargarDesdeNube().then(() => setCargando(false));
+    }, []);
+    (0, import_react.useEffect)(() => {
+      const onVis = () => {
+        if (document.visibilityState === "visible") resyncDesdeNube("volvi\xF3 a foreground");
+      };
+      const onOnline = () => resyncDesdeNube("red restaurada");
+      document.addEventListener("visibilitychange", onVis);
+      window.addEventListener("online", onOnline);
+      return () => {
+        document.removeEventListener("visibilitychange", onVis);
+        window.removeEventListener("online", onOnline);
+      };
     }, []);
     (0, import_react.useEffect)(() => {
       sbCargarUsuarios().then((sbUsers) => {
@@ -66990,12 +67064,10 @@ Esta acci\xF3n no se puede deshacer.` : "\xBFEliminar esta carga? Esta acci\xF3n
         const stockDespues = Math.max(0, stockAntes - it.cantidad);
         setInv((p) => p.map((i) => i.id === it.prodId ? { ...i, stock: stockDespues } : i));
         syncConRespaldo("stock", { prodId: it.prodId, stock: stockDespues }, () => sbActualizarStock(it.prodId, stockDespues));
-        rtBroadcast("inv_update", { p: { id: it.prodId, stock: stockDespues } });
         stockCambios.push({ prodId: it.prodId, codigo: it.codigo, nombre: it.nombre, stockAntes, stockDespues });
       });
       drive.syncVenta(vf);
       syncConRespaldo("venta", vf, () => sbGuardarVenta(vf));
-      rtBroadcast("venta_nueva", { v: vf });
       const marcas = [...new Set(v.items.map((i) => i.marcaNombre))].join(", ");
       logAudit("VENTA", {
         resumen: `Venta Bs ${v.total} \xB7 ${v.items.length} \xEDtem(s) \xB7 ${marcas}`,
