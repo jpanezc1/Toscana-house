@@ -61073,13 +61073,21 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
           const dkSoloNombre = descKey(fila.marcaNombre, fila.desc, "", "");
           const prodExistente = codigosExistentes.has(sku) ? inv.find((p) => p.codigo.toUpperCase() === sku) : descExistente.get(dk) || descExistenteSinColor.get(dkSinColor) || descExistenteSinTallaColor.get(dkSoloNombre) || null;
           if (prodExistente) {
-            fila._dup = true;
-            fila._prodExistente = prodExistente;
-            if (!codigosExistentes.has(sku)) fila.sku = prodExistente.codigo.toUpperCase();
             const colorExistente = ((prodExistente.descripcion || "").match(/COLOR:\s*([^·\n]+)/i)?.[1] || "").trim().toUpperCase();
             const colorNuevo = (fila.color || "").trim().toUpperCase();
             if (colorExistente && colorNuevo && colorExistente !== colorNuevo) {
-              fila._colorActualizado = true;
+              const varianteSku = `${sku}-${colorNuevo.charAt(0)}`;
+              fila.sku = varianteSku;
+              fila._autoVariante = `${sku} \u2192 ${varianteSku}`;
+              const varianteExistente = inv.find((p) => p.codigo.toUpperCase() === varianteSku);
+              if (varianteExistente) {
+                fila._dup = true;
+                fila._prodExistente = varianteExistente;
+              }
+            } else {
+              fila._dup = true;
+              fila._prodExistente = prodExistente;
+              if (!codigosExistentes.has(sku)) fila.sku = prodExistente.codigo.toUpperCase();
             }
           }
           filas.push(fila);
@@ -61127,13 +61135,11 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
             f.talla && `TALLA: ${f.talla.toUpperCase()}`,
             f.color && `COLOR: ${f.color.toUpperCase()}`
           ].filter(Boolean).join(" \xB7 ") || "";
-          const nombreNuevo = f._colorActualizado ? `${(f.desc || "").toUpperCase()} ${(f.color || "").toUpperCase()}`.trim() : void 0;
           onImportar({
             tipo: "update",
             codigo: f.sku,
             stock: f.stock,
             descripcion: descNueva || void 0,
-            nombre: nombreNuevo,
             subcat: f.talla ? f.talla.toUpperCase() : void 0,
             talla: (f.talla || "").toUpperCase(),
             color: (f.color || "").toUpperCase()
@@ -61537,8 +61543,8 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       fontFamily: FONT_UI
     } }, h))), previstaFiltrada.map((f, i) => {
       const hasErr = f._errs.length > 0;
-      const rowBg = f._bloqueado ? `${C.red}0a` : hasErr ? `${C.red}07` : f._dup ? `${C.amber}07` : "transparent";
-      const estadoChip = f._bloqueado ? { txt: `\u{1F6AB} ${f._conflictoColor || f._conflictoCat}`, color: C.red } : hasErr ? { txt: f._errs[0], color: C.red } : f._dup ? { txt: "Actualiza stock", color: C.amber } : { txt: "\u2713 V\xE1lido", color: C.green };
+      const rowBg = f._bloqueado ? `${C.red}0a` : hasErr ? `${C.red}07` : f._dup ? `${C.amber}07` : f._autoVariante ? `${C.blue}07` : "transparent";
+      const estadoChip = f._bloqueado ? { txt: `\u{1F6AB} ${f._conflictoColor || f._conflictoCat}`, color: C.red } : hasErr ? { txt: f._errs[0], color: C.red } : f._autoVariante ? { txt: `\u{1F3A8} ${f._autoVariante}`, color: C.blue } : f._dup ? { txt: "Actualiza stock", color: C.amber } : { txt: "\u2713 V\xE1lido", color: C.green };
       return /* @__PURE__ */ import_react.default.createElement("div", { key: i, style: {
         display: "grid",
         gridTemplateColumns: f._bloqueado ? "2fr 1fr 1.5fr 0.6fr 0.6fr 1.6fr" : "2fr 1fr 1.5fr 0.6fr 0.6fr 1fr",

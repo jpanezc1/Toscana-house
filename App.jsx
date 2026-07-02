@@ -7530,15 +7530,26 @@ function ImportarExcelModal({inv, onImportar, onClose, onArchivoCapturado}){
           : descExistente.get(dk) || descExistenteSinColor.get(dkSinColor) || descExistenteSinTallaColor.get(dkSoloNombre) || null;
 
         if(prodExistente){
-          fila._dup = true;
-          fila._prodExistente = prodExistente;
-          // Si el código vino del inventario (no del Excel), usar el código real
-          if(!codigosExistentes.has(sku)) fila.sku = prodExistente.codigo.toUpperCase();
-          // Detectar color distinto → marcar para actualizar nombre+descripcion al importar
           const colorExistente = ((prodExistente.descripcion||"").match(/COLOR:\s*([^·\n]+)/i)?.[1]||"").trim().toUpperCase();
           const colorNuevo = (fila.color||"").trim().toUpperCase();
+
           if(colorExistente && colorNuevo && colorExistente !== colorNuevo){
-            fila._colorActualizado = true; // flag: el import debe actualizar nombre + descripcion
+            // Color distinto → nuevo código variante: [CODIGO]-[primera letra del color]
+            const varianteSku = `${sku}-${colorNuevo.charAt(0)}`;
+            fila.sku = varianteSku;
+            fila._autoVariante = `${sku} → ${varianteSku}`; // para mostrar en preview
+            // Verificar si la variante ya existe en inventario
+            const varianteExistente = inv.find(p=>p.codigo.toUpperCase()===varianteSku);
+            if(varianteExistente){
+              fila._dup = true;
+              fila._prodExistente = varianteExistente;
+            }
+            // Si no existe → _dup queda false → se crea como producto nuevo
+          } else {
+            // Mismo color (o sin info de color) → duplicado normal, suma stock
+            fila._dup = true;
+            fila._prodExistente = prodExistente;
+            if(!codigosExistentes.has(sku)) fila.sku = prodExistente.codigo.toUpperCase();
           }
         }
 
@@ -7600,14 +7611,9 @@ function ImportarExcelModal({inv, onImportar, onClose, onArchivoCapturado}){
           f.talla && `TALLA: ${f.talla.toUpperCase()}`,
           f.color && `COLOR: ${f.color.toUpperCase()}`,
         ].filter(Boolean).join(" · ") || "";
-        // Si el color cambió → actualizar nombre = descripción Excel + color nuevo
-        const nombreNuevo = f._colorActualizado
-          ? `${(f.desc||"").toUpperCase()} ${(f.color||"").toUpperCase()}`.trim()
-          : undefined;
         onImportar({
           tipo:"update", codigo:f.sku, stock:f.stock,
           descripcion: descNueva||undefined,
-          nombre: nombreNuevo,
           subcat: f.talla ? f.talla.toUpperCase() : undefined,
           talla: (f.talla||"").toUpperCase(),
           color: (f.color||"").toUpperCase(),
@@ -8018,11 +8024,13 @@ function ImportarExcelModal({inv, onImportar, onClose, onArchivoCapturado}){
             {/* Filas */}
             {previstaFiltrada.map((f,i)=>{
               const hasErr = f._errs.length>0;
-              const rowBg  = f._bloqueado?`${C.red}0a`:hasErr?`${C.red}07`:f._dup?`${C.amber}07`:"transparent";
+              const rowBg  = f._bloqueado?`${C.red}0a`:hasErr?`${C.red}07`:f._dup?`${C.amber}07`:f._autoVariante?`${C.blue}07`:"transparent";
               const estadoChip = f._bloqueado
                 ? {txt:`🚫 ${f._conflictoColor||f._conflictoCat}`, color:C.red}
                 : hasErr
                 ? {txt:f._errs[0], color:C.red}
+                : f._autoVariante
+                ? {txt:`🎨 ${f._autoVariante}`, color:C.blue}
                 : f._dup
                 ? {txt:"Actualiza stock", color:C.amber}
                 : {txt:"✓ Válido", color:C.green};
