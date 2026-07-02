@@ -55,6 +55,12 @@ async function getSupabase() {
   return _supabase;
 }
 
+// ── Broadcast channel global ──────────────────────────────
+let _rtChannel = null; // referencia al canal de realtime, para enviar broadcasts
+function rtBroadcast(event, payload){
+  if(_rtChannel) _rtChannel.send({type:"broadcast", event, payload}).catch(()=>{});
+}
+
 // ── Funciones de sincronización ──────────────────────────
 async function sbGuardarProducto(prod) {
   try {
@@ -713,7 +719,7 @@ async function syncConRespaldo(tipo, payload, fnDirecto){
 // ── Realtime sync — escucha cambios en Supabase y actualiza estado local ────
 // Activa canales en: ventas (INSERT/UPDATE) + inventario (INSERT/UPDATE)
 // Deduplicación: si la fila ya existe (optimistic update local), no se agrega.
-function useRealtimeSync(setVentas, setInv, setRetiros) {
+function useRealtimeSync(setVentas, setInv, setRetiros, setFactoryResetRecibido) {
   useEffect(() => {
     let channel = null;
     let mounted = true;
@@ -792,19 +798,76 @@ function useRealtimeSync(setVentas, setInv, setRetiros) {
             prev.some(x => x.id === retiro.id) ? prev : [...prev, retiro]
           );
         })
+        // ── Broadcast: venta nueva (ruta rápida ~80ms, sin extra DB query) ──
+        .on("broadcast", {event:"venta_nueva"}, ({payload}) => {
+          const v = payload?.v;
+          if(mounted && v?.id) setVentas(prev => prev.some(x=>x.id===v.id) ? prev : [...prev, v]);
+        })
+        // ── Broadcast: stock actualizado (ruta rápida para caja concurrente) ──
+        .on("broadcast", {event:"inv_update"}, ({payload}) => {
+          const p = payload?.p;
+          if(mounted && p?.id) setInv(prev => prev.map(i => i.id===p.id ? {...i,...p} : i));
+        })
+        // ── Broadcast: retiro nuevo (ruta rápida) ──
+        .on("broadcast", {event:"retiro_nuevo"}, ({payload}) => {
+          const r = payload?.r;
+          if(mounted && r?.id && setRetiros) setRetiros(prev => prev.some(x=>x.id===r.id) ? prev : [...prev, r]);
+        })
+        // ── Broadcast: factory reset → limpiar y recargar esta sesión ────────
+        .on("broadcast", {event:"factory_reset"}, () => {
+          if(!mounted) return;
+          ["th_inv","th_ventas","th_cierres","th_cargas","th_sync_log","th_pos_draft",
+           "th_liq_cfg","th_cajas_v1","th_gc_v1"].forEach(k=>localStorage.removeItem(k));
+          Object.keys(localStorage).forEach(k=>{
+            if(k.startsWith("th_fac_")||k.startsWith("th_liq_")||k.startsWith("th_gc_"))
+              localStorage.removeItem(k);
+          });
+          setFactoryResetRecibido(true);
+          setTimeout(()=>window.location.reload(), 3000);
+        })
         .subscribe(status => {
-          if (status === "SUBSCRIBED") console.log("[Toscana Realtime] ✓ conectado");
+          if (status === "SUBSCRIBED"){
+            console.log("[Toscana Realtime] ✓ conectado");
+            _rtChannel = channel; // exponer globalmente para rtBroadcast
+          }
           if (status === "CHANNEL_ERROR") console.warn("[Toscana Realtime] error de canal — verifique Realtime en Supabase dashboard");
         });
     }).catch(e => console.warn("[Toscana Realtime] init:", e.message));
 
     return () => {
       mounted = false;
+      _rtChannel = null;
       if (channel) {
         getSupabase().then(db => db.removeChannel(channel)).catch(() => {});
       }
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+}
+
+// Mide latencia RTT al servidor de Supabase Realtime mediante broadcast self:true
+function usePingLatency(){
+  var _hPing = useState(null); var latencyMs = _hPing[0]; var setLatencyMs = _hPing[1];
+  useEffect(()=>{
+    let ch = null, iv = null, mounted = true;
+    getSupabase().then(db=>{
+      ch = db.channel("toscana-ping-v1", {config:{broadcast:{self:true}}});
+      ch.on("broadcast", {event:"ping"}, ({payload})=>{
+        if(mounted && payload?.ts) setLatencyMs(Math.round(Date.now()-payload.ts));
+      }).subscribe(status=>{
+        if(status==="SUBSCRIBED"){
+          const doPing = ()=>{ if(mounted) ch.send({type:"broadcast",event:"ping",payload:{ts:Date.now()}}).catch(()=>{}); };
+          doPing();
+          iv = setInterval(doPing, 30000);
+        }
+      });
+    }).catch(()=>{});
+    return ()=>{
+      mounted=false;
+      if(iv) clearInterval(iv);
+      if(ch) getSupabase().then(db=>db.removeChannel(ch)).catch(()=>{});
+    };
+  },[]);
+  return latencyMs;
 }
 
 // Hook de estado de conexión Supabase
@@ -4056,6 +4119,24 @@ function SyncBadge({sync}){
     }}>
       <span style={{fontSize:14}}>{badge.icon}</span>
       <span>{badge.text}</span>
+    </div>
+  );
+}
+
+// Indicador de latencia Realtime — solo visible para admin
+function PingBadge({ms}){
+  if(!ms) return null;
+  const color = ms<120?"#22C55E":ms<350?"#F59E0B":"#EF4444";
+  const label = ms<120?"Excelente":ms<350?"Normal":"Alto";
+  return (
+    <div style={{
+      position:"fixed", top:58, right:12, zIndex:9997,
+      background:`${color}15`, border:`1px solid ${color}40`,
+      color, fontFamily:FONT_UI, fontSize:10, fontWeight:700,
+      borderRadius:999, padding:"3px 10px",
+      pointerEvents:"none", letterSpacing:.3,
+    }}>
+      ● RT {ms}ms · {label}
     </div>
   );
 }
@@ -11915,6 +11996,8 @@ function App(){
   // ── Persistencia local: ini desde localStorage, sync a nube con Supabase ──
   const[inv,setInv]     =useState(()=>{ try{return JSON.parse(localStorage.getItem("th_inv")||"[]");}catch{return[];} });
   const[ventas,setVentas]=useState(()=>{ try{return JSON.parse(localStorage.getItem("th_ventas")||"[]");}catch{return[];} });
+  const[factoryResetRecibido,setFactoryResetRecibido]=useState(false);
+  const pingMs = usePingLatency();
   const[alq,setAlq]     =useState(()=>{ try{return JSON.parse(localStorage.getItem("th_alq")||"[]");}catch{return[];} });
   const[cierres,setCierres]=useState(()=>{ try{return JSON.parse(localStorage.getItem("th_cierres")||"{}");}catch{return {};} });
   const[cargando,setCargando]=useState(true);
@@ -11992,7 +12075,7 @@ function App(){
   useEffect(()=>{ try{localStorage.setItem("th_cargas",JSON.stringify(cargas));}catch{} },[cargas]);
 
   // ── Realtime sync — cualquier cambio en Supabase (otro dispositivo) actualiza aquí ──
-  useRealtimeSync(setVentas, setInv, setRetiros);
+  useRealtimeSync(setVentas, setInv, setRetiros, setFactoryResetRecibido);
 
   // (reset de datos eliminado — localStorage persiste entre sesiones)
 
@@ -12695,10 +12778,12 @@ function App(){
       const stockDespues = Math.max(0, stockAntes - it.cantidad);
       setInv(p=>p.map(i=>i.id===it.prodId?{...i,stock:stockDespues}:i));
       syncConRespaldo("stock", {prodId:it.prodId, stock:stockDespues}, ()=>sbActualizarStock(it.prodId, stockDespues));
+      rtBroadcast("inv_update", {p:{id:it.prodId, stock:stockDespues}}); // ruta rápida
       stockCambios.push({prodId:it.prodId, codigo:it.codigo, nombre:it.nombre, stockAntes, stockDespues});
     });
     drive.syncVenta(vf);
     syncConRespaldo("venta", vf, ()=>sbGuardarVenta(vf));
+    rtBroadcast("venta_nueva", {v:vf}); // ruta rápida sin extra DB query
     // ── Audit forense ─────────────────────────────────────────────
     const marcas = [...new Set(v.items.map(i=>i.marcaNombre))].join(", ");
     logAudit("VENTA", {
@@ -12971,6 +13056,27 @@ function App(){
 
       {/* ── INDICADOR GLOBAL DE SINCRONIZACIÓN ── */}
       {!cargando && user?.rol==="admin" && <SyncBadge sync={sync}/>}
+
+      {/* ── LATENCIA REALTIME (solo admin) ── */}
+      {!cargando && user?.rol==="admin" && <PingBadge ms={pingMs}/>}
+
+      {/* ── BANNER: FACTORY RESET RECIBIDO (otras sesiones) ── */}
+      {factoryResetRecibido && (
+        <div style={{
+          position:"fixed",inset:0,zIndex:99999,
+          background:"rgba(0,0,0,0.7)",
+          display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",
+          gap:16,
+        }}>
+          <div style={{fontSize:40}}>🔄</div>
+          <div style={{color:"#fff",fontFamily:FONT,fontSize:18,fontWeight:700,textAlign:"center"}}>
+            El sistema fue reiniciado
+          </div>
+          <div style={{color:"rgba(255,255,255,0.7)",fontFamily:FONT_UI,fontSize:14,textAlign:"center"}}>
+            Recargando en 3 segundos…
+          </div>
+        </div>
+      )}
 
       {/* ── DESKTOP SIDEBAR ── */}
       {isDesktop&&<DesktopSidebar tabs={TABS} active={tab} onChange={t=>{setTab(t);setMD(null);}} user={user} logout={logout}/>}
@@ -19984,6 +20090,10 @@ function SistemaTab({user, logout, onRecargarDesdeSupabase, onSyncCompleto}){
           localStorage.removeItem(k);
       });
       addLog("Caché local — OK ✓");
+
+      // Notificar a todas las otras sesiones para que recarguen
+      rtBroadcast("factory_reset", {});
+      addLog("Notificando otras sesiones… ✓");
 
       setResetState("done");
     } catch(e){

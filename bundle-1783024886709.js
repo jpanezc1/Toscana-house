@@ -53438,6 +53438,11 @@
     _supabase = window.supabase.createClient(SUPA_URL, SUPA_KEY);
     return _supabase;
   }
+  var _rtChannel = null;
+  function rtBroadcast(event, payload) {
+    if (_rtChannel) _rtChannel.send({ type: "broadcast", event, payload }).catch(() => {
+    });
+  }
   async function sbGuardarProducto(prod) {
     try {
       const db = await getSupabase();
@@ -54227,7 +54232,7 @@
       return false;
     }
   }
-  function useRealtimeSync(setVentas, setInv, setRetiros) {
+  function useRealtimeSync(setVentas, setInv, setRetiros, setFactoryResetRecibido) {
     (0, import_react.useEffect)(() => {
       let channel = null;
       let mounted = true;
@@ -54326,19 +54331,82 @@
           if (mounted && setRetiros) setRetiros(
             (prev) => prev.some((x) => x.id === retiro.id) ? prev : [...prev, retiro]
           );
+        }).on("broadcast", { event: "venta_nueva" }, ({ payload }) => {
+          const v = payload?.v;
+          if (mounted && v?.id) setVentas((prev) => prev.some((x) => x.id === v.id) ? prev : [...prev, v]);
+        }).on("broadcast", { event: "inv_update" }, ({ payload }) => {
+          const p = payload?.p;
+          if (mounted && p?.id) setInv((prev) => prev.map((i) => i.id === p.id ? { ...i, ...p } : i));
+        }).on("broadcast", { event: "retiro_nuevo" }, ({ payload }) => {
+          const r = payload?.r;
+          if (mounted && r?.id && setRetiros) setRetiros((prev) => prev.some((x) => x.id === r.id) ? prev : [...prev, r]);
+        }).on("broadcast", { event: "factory_reset" }, () => {
+          if (!mounted) return;
+          [
+            "th_inv",
+            "th_ventas",
+            "th_cierres",
+            "th_cargas",
+            "th_sync_log",
+            "th_pos_draft",
+            "th_liq_cfg",
+            "th_cajas_v1",
+            "th_gc_v1"
+          ].forEach((k) => localStorage.removeItem(k));
+          Object.keys(localStorage).forEach((k) => {
+            if (k.startsWith("th_fac_") || k.startsWith("th_liq_") || k.startsWith("th_gc_"))
+              localStorage.removeItem(k);
+          });
+          setFactoryResetRecibido(true);
+          setTimeout(() => window.location.reload(), 3e3);
         }).subscribe((status) => {
-          if (status === "SUBSCRIBED") console.log("[Toscana Realtime] \u2713 conectado");
+          if (status === "SUBSCRIBED") {
+            console.log("[Toscana Realtime] \u2713 conectado");
+            _rtChannel = channel;
+          }
           if (status === "CHANNEL_ERROR") console.warn("[Toscana Realtime] error de canal \u2014 verifique Realtime en Supabase dashboard");
         });
       }).catch((e) => console.warn("[Toscana Realtime] init:", e.message));
       return () => {
         mounted = false;
+        _rtChannel = null;
         if (channel) {
           getSupabase().then((db) => db.removeChannel(channel)).catch(() => {
           });
         }
       };
     }, []);
+  }
+  function usePingLatency() {
+    var _hPing = (0, import_react.useState)(null);
+    var latencyMs = _hPing[0];
+    var setLatencyMs = _hPing[1];
+    (0, import_react.useEffect)(() => {
+      let ch = null, iv = null, mounted = true;
+      getSupabase().then((db) => {
+        ch = db.channel("toscana-ping-v1", { config: { broadcast: { self: true } } });
+        ch.on("broadcast", { event: "ping" }, ({ payload }) => {
+          if (mounted && payload?.ts) setLatencyMs(Math.round(Date.now() - payload.ts));
+        }).subscribe((status) => {
+          if (status === "SUBSCRIBED") {
+            const doPing = () => {
+              if (mounted) ch.send({ type: "broadcast", event: "ping", payload: { ts: Date.now() } }).catch(() => {
+              });
+            };
+            doPing();
+            iv = setInterval(doPing, 3e4);
+          }
+        });
+      }).catch(() => {
+      });
+      return () => {
+        mounted = false;
+        if (iv) clearInterval(iv);
+        if (ch) getSupabase().then((db) => db.removeChannel(ch)).catch(() => {
+        });
+      };
+    }, []);
+    return latencyMs;
   }
   var _JsBarcodeLoaded = false;
   function loadJsBarcode() {
@@ -57519,6 +57587,27 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       textOverflow: "ellipsis",
       pointerEvents: "none"
     } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 14 } }, badge.icon), /* @__PURE__ */ import_react.default.createElement("span", null, badge.text));
+  }
+  function PingBadge({ ms }) {
+    if (!ms) return null;
+    const color = ms < 120 ? "#22C55E" : ms < 350 ? "#F59E0B" : "#EF4444";
+    const label = ms < 120 ? "Excelente" : ms < 350 ? "Normal" : "Alto";
+    return /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      position: "fixed",
+      top: 58,
+      right: 12,
+      zIndex: 9997,
+      background: `${color}15`,
+      border: `1px solid ${color}40`,
+      color,
+      fontFamily: FONT_UI,
+      fontSize: 10,
+      fontWeight: 700,
+      borderRadius: 999,
+      padding: "3px 10px",
+      pointerEvents: "none",
+      letterSpacing: 0.3
+    } }, "\u25CF RT ", ms, "ms \xB7 ", label);
   }
   function NavBar({ title, subtitle, back, onBack, right }) {
     return /* @__PURE__ */ import_react.default.createElement("div", { style: {
@@ -65991,6 +66080,8 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
         return [];
       }
     });
+    const [factoryResetRecibido, setFactoryResetRecibido] = (0, import_react.useState)(false);
+    const pingMs = usePingLatency();
     const [alq, setAlq] = (0, import_react.useState)(() => {
       try {
         return JSON.parse(localStorage.getItem("th_alq") || "[]");
@@ -66134,7 +66225,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       } catch {
       }
     }, [cargas]);
-    useRealtimeSync(setVentas, setInv, setRetiros);
+    useRealtimeSync(setVentas, setInv, setRetiros, setFactoryResetRecibido);
     (0, import_react.useEffect)(() => {
       setMarcasState((prev) => {
         let cambiado = false;
@@ -66899,10 +66990,12 @@ Esta acci\xF3n no se puede deshacer.` : "\xBFEliminar esta carga? Esta acci\xF3n
         const stockDespues = Math.max(0, stockAntes - it.cantidad);
         setInv((p) => p.map((i) => i.id === it.prodId ? { ...i, stock: stockDespues } : i));
         syncConRespaldo("stock", { prodId: it.prodId, stock: stockDespues }, () => sbActualizarStock(it.prodId, stockDespues));
+        rtBroadcast("inv_update", { p: { id: it.prodId, stock: stockDespues } });
         stockCambios.push({ prodId: it.prodId, codigo: it.codigo, nombre: it.nombre, stockAntes, stockDespues });
       });
       drive.syncVenta(vf);
       syncConRespaldo("venta", vf, () => sbGuardarVenta(vf));
+      rtBroadcast("venta_nueva", { v: vf });
       const marcas = [...new Set(v.items.map((i) => i.marcaNombre))].join(", ");
       logAudit("VENTA", {
         resumen: `Venta Bs ${v.total} \xB7 ${v.items.length} \xEDtem(s) \xB7 ${marcas}`,
@@ -67159,7 +67252,17 @@ Esta acci\xF3n no se puede deshacer.` : "\xBFEliminar esta carga? Esta acci\xF3n
       background: C.gold,
       borderRadius: 2,
       animation: "loadbar 1.2s ease-in-out infinite"
-    } })), /* @__PURE__ */ import_react.default.createElement("style", null, `@keyframes loadbar{0%{transform:translateX(-100%)}100%{transform:translateX(200%)}}@keyframes slideUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}`)), !cargando && user?.rol === "admin" && /* @__PURE__ */ import_react.default.createElement(SyncBadge, { sync }), isDesktop && /* @__PURE__ */ import_react.default.createElement(DesktopSidebar, { tabs: TABS, active: tab, onChange: (t) => {
+    } })), /* @__PURE__ */ import_react.default.createElement("style", null, `@keyframes loadbar{0%{transform:translateX(-100%)}100%{transform:translateX(200%)}}@keyframes slideUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}`)), !cargando && user?.rol === "admin" && /* @__PURE__ */ import_react.default.createElement(SyncBadge, { sync }), !cargando && user?.rol === "admin" && /* @__PURE__ */ import_react.default.createElement(PingBadge, { ms: pingMs }), factoryResetRecibido && /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      position: "fixed",
+      inset: 0,
+      zIndex: 99999,
+      background: "rgba(0,0,0,0.7)",
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 16
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 40 } }, "\u{1F504}"), /* @__PURE__ */ import_react.default.createElement("div", { style: { color: "#fff", fontFamily: FONT, fontSize: 18, fontWeight: 700, textAlign: "center" } }, "El sistema fue reiniciado"), /* @__PURE__ */ import_react.default.createElement("div", { style: { color: "rgba(255,255,255,0.7)", fontFamily: FONT_UI, fontSize: 14, textAlign: "center" } }, "Recargando en 3 segundos\u2026")), isDesktop && /* @__PURE__ */ import_react.default.createElement(DesktopSidebar, { tabs: TABS, active: tab, onChange: (t) => {
       setTab(t);
       setMD(null);
     }, user, logout }), /* @__PURE__ */ import_react.default.createElement("div", { style: isDesktop ? { flex: 1, minWidth: 0, overflowY: "auto", height: "100vh" } : {} }, showingDetail ? /* @__PURE__ */ import_react.default.createElement(
@@ -75347,6 +75450,8 @@ ${c.resumen || c.id}`)) onEliminarCarga(c.id);
             localStorage.removeItem(k);
         });
         addLog("Cach\xE9 local \u2014 OK \u2713");
+        rtBroadcast("factory_reset", {});
+        addLog("Notificando otras sesiones\u2026 \u2713");
         setResetState("done");
       } catch (e) {
         addLog("Error inesperado: " + e.message, false);
