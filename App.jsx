@@ -16484,11 +16484,16 @@ function VentasAntiguas({inv, ventas, cargas, onVentaHistorica, onImportarVentas
   const [verificados,   setVerificados]   = React.useState(new Set()); // Set de prodIds verificados
   const [shImportLibre, setShImportLibre] = React.useState(false);
   const [descPct,       setDescPct]       = React.useState("");
+  const [montosMixtos,  setMontosMixtos]  = React.useState({efectivo:"", qr:"", tarjeta:""});
   const inputRef = React.useRef(null);
 
   const total      = carrito.reduce((s,it)=>s+it.subtotal,0); // subtotal sin descuento
   const desc       = Math.min(100, Math.max(0, parseFloat(descPct)||0));
   const totalFinal = +(total*(1-desc/100)).toFixed(2);
+
+  // Pago mixto: la suma de los montos debe cuadrar con el total final (con descuento)
+  const sumaMixto   = (parseFloat(montosMixtos.efectivo)||0)+(parseFloat(montosMixtos.qr)||0)+(parseFloat(montosMixtos.tarjeta)||0);
+  const mixtoCuadra = Math.abs(sumaMixto - totalFinal) < 0.01;
 
   // Para cada ítem del carrito: ¿tiene conflicto con su fecha de carga?
   function getConflictoItem(it){
@@ -16500,7 +16505,7 @@ function VentasAntiguas({inv, ventas, cargas, onVentaHistorica, onImportarVentas
 
   const itemsConConflicto = carrito.filter(it=>getConflictoItem(it)&&!verificados.has(it.prodId));
   const hayConflictos     = itemsConConflicto.length > 0;
-  const puedeConfirmar    = carrito.length>0 && !guardando && !hayConflictos;
+  const puedeConfirmar    = carrito.length>0 && !guardando && !hayConflictos && (metodo!=="mixto" || mixtoCuadra);
 
   function cambiarFecha(val){ setFecha(val); setVerificados(new Set()); }
 
@@ -16571,17 +16576,27 @@ function VentasAntiguas({inv, ventas, cargas, onVentaHistorica, onImportarVentas
     const itemsFinal = desc>0
       ? carrito.map(it=>({...it, subtotal:+(it.subtotal*factor).toFixed(2)}))
       : carrito;
+    // Pago mixto: mismo formato que caja → "mixto|efectivo:120|qr:150"
+    let metodoPagoFinal = metodo;
+    if(metodo==="mixto"){
+      const partes = [];
+      if(parseFloat(montosMixtos.efectivo)>0) partes.push("efectivo:"+montosMixtos.efectivo);
+      if(parseFloat(montosMixtos.qr)>0)       partes.push("qr:"+montosMixtos.qr);
+      if(parseFloat(montosMixtos.tarjeta)>0)  partes.push("tarjeta:"+montosMixtos.tarjeta);
+      metodoPagoFinal = partes.length>0 ? "mixto|"+partes.join("|") : "efectivo";
+    }
     const venta = {
-      fecha, turno, metodoPago:metodo, total:totalFinal, subtotal:total, descPct:desc, items:itemsFinal,
+      fecha, turno, metodoPago:metodoPagoFinal, total:totalFinal, subtotal:total, descPct:desc, items:itemsFinal,
       ...(verificados.size>0 ? {advertencia:"ITEMS_VERIFICADOS_MANUALMENTE", itemsVerificados:itemsVerif, verificadoPor:user?.nombre||"Admin"} : {}),
     };
     const vf = onVentaHistorica(venta);
     setConfirmado({...vf, cantItems:carrito.length, conVerif:verificados.size>0});
     setCarrito([]); setCodInput(""); setBusqueda([]); setVerificados(new Set()); setDescPct("");
+    setMontosMixtos({efectivo:"", qr:"", tarjeta:""});
     setGuardando(false);
   }
 
-  const METODOS = [{v:"efectivo",label:"Efectivo"},{v:"qr",label:"QR"},{v:"tarjeta",label:"Tarjeta"}];
+  const METODOS = [{v:"efectivo",label:"Efectivo"},{v:"qr",label:"QR"},{v:"tarjeta",label:"Tarjeta"},{v:"mixto",label:"Mixto"}];
   const TURNOS  = ["Mañana","Tarde","Noche"];
 
   // Resumen de fechas de carga por marca (para panel informativo)
@@ -16741,6 +16756,38 @@ function VentasAntiguas({inv, ventas, cargas, onVentaHistorica, onImportarVentas
                 fontWeight: desc>0?600:400,textAlign:"center"}}/>
           </div>
         </div>
+
+        {/* Pago mixto: distribuir el total entre métodos (mismo modelo que caja) */}
+        {metodo==="mixto"&&(
+          <div style={{background:`${C.blue}0a`,border:`1px solid ${C.blue}30`,borderRadius:10,padding:12}}>
+            <div style={{fontSize:11,color:C.blue,textAlign:"center",marginBottom:8,fontWeight:500}}>
+              Total a registrar: <b>Bs {totalFinal}</b> — distribuye entre los métodos
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:8}}>
+              {[{k:"efectivo",lbl:"💵 Efectivo"},{k:"qr",lbl:"📱 QR"},{k:"tarjeta",lbl:"💳 Tarjeta"}].map(p=>(
+                <div key={p.k}>
+                  <div style={{fontSize:10,fontWeight:500,color:C.label2,marginBottom:4}}>{p.lbl}</div>
+                  <input type="number" min="0" step="0.01" inputMode="decimal" placeholder="0"
+                    value={montosMixtos[p.k]}
+                    onChange={e=>{const v=e.target.value; setMontosMixtos(prev=>({...prev,[p.k]:v}));}}
+                    style={{width:"100%",padding:"7px 8px",borderRadius:8,boxSizing:"border-box",
+                      border:`1px solid ${C.sep}`,background:C.bg0,color:C.label,
+                      fontSize:13,fontFamily:FONT_UI,textAlign:"center"}}/>
+                </div>
+              ))}
+            </div>
+            <div style={{padding:"7px 10px",borderRadius:8,display:"flex",justifyContent:"space-between",alignItems:"center",
+              background: mixtoCuadra?`${C.green}15`:`${C.red}10`,
+              border:`1px solid ${mixtoCuadra?C.green:C.red}30`}}>
+              <span style={{fontSize:11,fontWeight:600,color:mixtoCuadra?C.green:C.red}}>
+                {mixtoCuadra?"✓ Montos cuadrados":`Diferencia: Bs ${+(Math.abs(totalFinal-sumaMixto)).toFixed(2)}`}
+              </span>
+              <span style={{fontSize:11,fontWeight:600,color:mixtoCuadra?C.green:C.red,fontFamily:FONT}}>
+                Bs {+sumaMixto.toFixed(2)} de Bs {totalFinal}
+              </span>
+            </div>
+          </div>
+        )}
 
         {/* Buscador */}
         <div>
@@ -16940,6 +16987,7 @@ function VentasAntiguas({inv, ventas, cargas, onVentaHistorica, onImportarVentas
         <i className="ti ti-clock-check" style={{fontSize:16}} aria-hidden="true"/>
         {guardando ? "Registrando…"
           : hayConflictos ? `Verificá los ${itemsConConflicto.length} ítem${itemsConConflicto.length!==1?"s":""} en conflicto`
+          : metodo==="mixto"&&!mixtoCuadra&&carrito.length>0 ? "Cuadrá los montos del pago mixto"
           : `Registrar venta histórica${total>0?" — Bs "+totalFinal:""}`}
       </button>
 
