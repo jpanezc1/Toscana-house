@@ -67135,7 +67135,7 @@ Esta acci\xF3n no se puede deshacer.` : "\xBFEliminar esta carga? Esta acci\xF3n
         ventaId: id,
         total: v.total,
         subtotal: v.subtotal,
-        descuento: 0,
+        descuento: v.descPct || 0,
         metodoPago: v.metodoPago,
         vendedor: user?.nombre || "Admin",
         marcas: marcasNombres,
@@ -71161,8 +71161,11 @@ ${c.diferencia > 0.01 ? `Cliente paga diferencia: Bs ${fmt2(c.diferencia)} (${c.
     const [guardando, setGuardando] = import_react.default.useState(false);
     const [verificados, setVerificados] = import_react.default.useState(/* @__PURE__ */ new Set());
     const [shImportLibre, setShImportLibre] = import_react.default.useState(false);
+    const [descPct, setDescPct] = import_react.default.useState("");
     const inputRef = import_react.default.useRef(null);
     const total = carrito.reduce((s, it) => s + it.subtotal, 0);
+    const desc = Math.min(100, Math.max(0, parseFloat(descPct) || 0));
+    const totalFinal = +(total * (1 - desc / 100)).toFixed(2);
     function getConflictoItem(it) {
       const fc = fechaCargaPorMarca[it.marcaId];
       if (!fc) return null;
@@ -71251,13 +71254,16 @@ ${c.diferencia > 0.01 ? `Cliente paga diferencia: Bs ${fmt2(c.diferencia)} (${c.
       if (!puedeConfirmar) return;
       setGuardando(true);
       const itemsVerif = carrito.filter((it) => verificados.has(it.prodId)).map((it) => it.codigo);
+      const factor = 1 - desc / 100;
+      const itemsFinal = desc > 0 ? carrito.map((it) => ({ ...it, subtotal: +(it.subtotal * factor).toFixed(2) })) : carrito;
       const venta = {
         fecha,
         turno,
         metodoPago: metodo,
-        total,
+        total: totalFinal,
         subtotal: total,
-        items: carrito,
+        descPct: desc,
+        items: itemsFinal,
         ...verificados.size > 0 ? { advertencia: "ITEMS_VERIFICADOS_MANUALMENTE", itemsVerificados: itemsVerif, verificadoPor: user?.nombre || "Admin" } : {}
       };
       const vf = onVentaHistorica(venta);
@@ -71266,6 +71272,7 @@ ${c.diferencia > 0.01 ? `Cliente paga diferencia: Bs ${fmt2(c.diferencia)} (${c.
       setCodInput("");
       setBusqueda([]);
       setVerificados(/* @__PURE__ */ new Set());
+      setDescPct("");
       setGuardando(false);
     }
     const METODOS = [{ v: "efectivo", label: "Efectivo" }, { v: "qr", label: "QR" }, { v: "tarjeta", label: "Tarjeta" }];
@@ -71423,7 +71430,7 @@ ${c.diferencia > 0.01 ? `Cliente paga diferencia: Bs ${fmt2(c.diferencia)} (${c.
         }
       },
       TURNOS.map((t) => /* @__PURE__ */ import_react.default.createElement("option", { key: t }, t))
-    ))), /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, fontWeight: 500, color: C.label2, marginBottom: 6 } }, /* @__PURE__ */ import_react.default.createElement("i", { className: "ti ti-credit-card", style: { fontSize: 11 }, "aria-hidden": "true" }), " M\xE9todo de pago"), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 6 } }, METODOS.map((m) => /* @__PURE__ */ import_react.default.createElement(
+    ))), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 96px", gap: 10 } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, fontWeight: 500, color: C.label2, marginBottom: 6 } }, /* @__PURE__ */ import_react.default.createElement("i", { className: "ti ti-credit-card", style: { fontSize: 11 }, "aria-hidden": "true" }), " M\xE9todo de pago"), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 6 } }, METODOS.map((m) => /* @__PURE__ */ import_react.default.createElement(
       "button",
       {
         key: m.v,
@@ -71443,7 +71450,32 @@ ${c.diferencia > 0.01 ? `Cliente paga diferencia: Bs ${fmt2(c.diferencia)} (${c.
         }
       },
       m.label
-    )))), /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, fontWeight: 500, color: C.label2, marginBottom: 6 } }, /* @__PURE__ */ import_react.default.createElement("i", { className: "ti ti-barcode", style: { fontSize: 11 }, "aria-hidden": "true" }), " Agregar por c\xF3digo"), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 6 } }, /* @__PURE__ */ import_react.default.createElement(
+    )))), /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, fontWeight: 500, color: C.label2, marginBottom: 6 } }, /* @__PURE__ */ import_react.default.createElement("i", { className: "ti ti-discount", style: { fontSize: 11 }, "aria-hidden": "true" }), " Descuento %"), /* @__PURE__ */ import_react.default.createElement(
+      "input",
+      {
+        type: "number",
+        min: "0",
+        max: "100",
+        step: "0.5",
+        inputMode: "decimal",
+        value: descPct,
+        onChange: (e) => setDescPct(e.target.value),
+        placeholder: "0",
+        style: {
+          width: "100%",
+          padding: "7px 10px",
+          borderRadius: 8,
+          boxSizing: "border-box",
+          border: desc > 0 ? `2px solid ${C.green}` : `1px solid ${C.sep}`,
+          background: desc > 0 ? `${C.green}0d` : C.bg0,
+          color: desc > 0 ? C.green : C.label,
+          fontSize: 13,
+          fontFamily: FONT_UI,
+          fontWeight: desc > 0 ? 600 : 400,
+          textAlign: "center"
+        }
+      }
+    ))), /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, fontWeight: 500, color: C.label2, marginBottom: 6 } }, /* @__PURE__ */ import_react.default.createElement("i", { className: "ti ti-barcode", style: { fontSize: 11 }, "aria-hidden": "true" }), " Agregar por c\xF3digo"), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 6 } }, /* @__PURE__ */ import_react.default.createElement(
       "input",
       {
         ref: inputRef,
@@ -71658,14 +71690,13 @@ ${c.diferencia > 0.01 ? `Cliente paga diferencia: Bs ${fmt2(c.diferencia)} (${c.
           }
         }
       ), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 11, color: estaVerif ? "#F57F17" : "#C62828", lineHeight: 1.5 } }, "Verifiqu\xE9 que ", /* @__PURE__ */ import_react.default.createElement("b", null, it.nombre), " (", it.marcaNombre, ") con fecha ", /* @__PURE__ */ import_react.default.createElement("b", null, fecha), " no est\xE1 registrado en el sistema"))));
-    }), /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      padding: "10px 14px",
-      background: C.bg2,
-      borderTop: `1px solid ${C.sep}`,
+    }), /* @__PURE__ */ import_react.default.createElement("div", { style: { padding: "10px 14px", background: C.bg2, borderTop: `1px solid ${C.sep}` } }, desc > 0 && /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, null, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 3 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 11, color: C.label3 } }, "Subtotal"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 12, color: C.label2, fontFamily: FONT } }, "Bs ", total)), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 5 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 11, color: C.green, fontWeight: 600 } }, "Descuento (", desc, "%)"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 12, color: C.green, fontWeight: 600, fontFamily: FONT } }, "\u2212Bs ", +(total - totalFinal).toFixed(2)))), /* @__PURE__ */ import_react.default.createElement("div", { style: {
       display: "flex",
       justifyContent: "space-between",
-      alignItems: "center"
-    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 12, color: C.label2 } }, "Total"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 16, fontWeight: 600, color: C.label, fontFamily: FONT } }, "Bs ", total))), hayConflictos && /* @__PURE__ */ import_react.default.createElement(
+      alignItems: "center",
+      borderTop: desc > 0 ? `1px solid ${C.sep}` : "none",
+      paddingTop: desc > 0 ? 6 : 0
+    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 12, color: C.label2 } }, "Total"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 16, fontWeight: 600, color: C.label, fontFamily: FONT } }, "Bs ", totalFinal)))), hayConflictos && /* @__PURE__ */ import_react.default.createElement(
       "button",
       {
         onClick: quitarConflictivos,
@@ -71720,7 +71751,7 @@ ${c.diferencia > 0.01 ? `Cliente paga diferencia: Bs ${fmt2(c.diferencia)} (${c.
         }
       },
       /* @__PURE__ */ import_react.default.createElement("i", { className: "ti ti-clock-check", style: { fontSize: 16 }, "aria-hidden": "true" }),
-      guardando ? "Registrando\u2026" : hayConflictos ? `Verific\xE1 los ${itemsConConflicto.length} \xEDtem${itemsConConflicto.length !== 1 ? "s" : ""} en conflicto` : `Registrar venta hist\xF3rica${total > 0 ? " \u2014 Bs " + total : ""}`
+      guardando ? "Registrando\u2026" : hayConflictos ? `Verific\xE1 los ${itemsConConflicto.length} \xEDtem${itemsConConflicto.length !== 1 ? "s" : ""} en conflicto` : `Registrar venta hist\xF3rica${total > 0 ? " \u2014 Bs " + totalFinal : ""}`
     ), /* @__PURE__ */ import_react.default.createElement("div", { style: {
       marginTop: 12,
       background: "#EEEDFE",

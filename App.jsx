@@ -12934,7 +12934,7 @@ function App(){
       ventaId: id,
       total: v.total,
       subtotal: v.subtotal,
-      descuento: 0,
+      descuento: v.descPct || 0,
       metodoPago: v.metodoPago,
       vendedor: user?.nombre || "Admin",
       marcas: marcasNombres,
@@ -16483,9 +16483,12 @@ function VentasAntiguas({inv, ventas, cargas, onVentaHistorica, onImportarVentas
   const [guardando,     setGuardando]     = React.useState(false);
   const [verificados,   setVerificados]   = React.useState(new Set()); // Set de prodIds verificados
   const [shImportLibre, setShImportLibre] = React.useState(false);
+  const [descPct,       setDescPct]       = React.useState("");
   const inputRef = React.useRef(null);
 
-  const total = carrito.reduce((s,it)=>s+it.subtotal,0);
+  const total      = carrito.reduce((s,it)=>s+it.subtotal,0); // subtotal sin descuento
+  const desc       = Math.min(100, Math.max(0, parseFloat(descPct)||0));
+  const totalFinal = +(total*(1-desc/100)).toFixed(2);
 
   // Para cada ítem del carrito: ¿tiene conflicto con su fecha de carga?
   function getConflictoItem(it){
@@ -16562,13 +16565,19 @@ function VentasAntiguas({inv, ventas, cargas, onVentaHistorica, onImportarVentas
     if(!puedeConfirmar) return;
     setGuardando(true);
     const itemsVerif = carrito.filter(it=>verificados.has(it.prodId)).map(it=>it.codigo);
+    // Igual que el POS: el descuento se aplica al subtotal de cada ítem
+    // para que las liquidaciones por marca prorrateen sobre el monto real
+    const factor = 1 - desc/100;
+    const itemsFinal = desc>0
+      ? carrito.map(it=>({...it, subtotal:+(it.subtotal*factor).toFixed(2)}))
+      : carrito;
     const venta = {
-      fecha, turno, metodoPago:metodo, total, subtotal:total, items:carrito,
+      fecha, turno, metodoPago:metodo, total:totalFinal, subtotal:total, descPct:desc, items:itemsFinal,
       ...(verificados.size>0 ? {advertencia:"ITEMS_VERIFICADOS_MANUALMENTE", itemsVerificados:itemsVerif, verificadoPor:user?.nombre||"Admin"} : {}),
     };
     const vf = onVentaHistorica(venta);
     setConfirmado({...vf, cantItems:carrito.length, conVerif:verificados.size>0});
-    setCarrito([]); setCodInput(""); setBusqueda([]); setVerificados(new Set());
+    setCarrito([]); setCodInput(""); setBusqueda([]); setVerificados(new Set()); setDescPct("");
     setGuardando(false);
   }
 
@@ -16699,22 +16708,37 @@ function VentasAntiguas({inv, ventas, cargas, onVentaHistorica, onImportarVentas
           </div>
         </div>
 
-        {/* Método de pago */}
-        <div>
-          <div style={{fontSize:11,fontWeight:500,color:C.label2,marginBottom:6}}>
-            <i className="ti ti-credit-card" style={{fontSize:11}} aria-hidden="true"/> Método de pago
+        {/* Método de pago + Descuento */}
+        <div style={{display:"grid",gridTemplateColumns:"1fr 96px",gap:10}}>
+          <div>
+            <div style={{fontSize:11,fontWeight:500,color:C.label2,marginBottom:6}}>
+              <i className="ti ti-credit-card" style={{fontSize:11}} aria-hidden="true"/> Método de pago
+            </div>
+            <div style={{display:"flex",gap:6}}>
+              {METODOS.map(m=>(
+                <button key={m.v} onClick={()=>setMetodo(m.v)}
+                  style={{flex:1,padding:"7px 6px",borderRadius:8,fontSize:12,fontFamily:FONT_UI,
+                    fontWeight:500,cursor:"pointer",transition:"all .15s",
+                    border: metodo===m.v?`2px solid ${C.blue}`:`1px solid ${C.sep}`,
+                    background: metodo===m.v?`${C.blue}12`:"transparent",
+                    color: metodo===m.v?C.blue:C.label2}}>
+                  {m.label}
+                </button>
+              ))}
+            </div>
           </div>
-          <div style={{display:"flex",gap:6}}>
-            {METODOS.map(m=>(
-              <button key={m.v} onClick={()=>setMetodo(m.v)}
-                style={{flex:1,padding:"7px 6px",borderRadius:8,fontSize:12,fontFamily:FONT_UI,
-                  fontWeight:500,cursor:"pointer",transition:"all .15s",
-                  border: metodo===m.v?`2px solid ${C.blue}`:`1px solid ${C.sep}`,
-                  background: metodo===m.v?`${C.blue}12`:"transparent",
-                  color: metodo===m.v?C.blue:C.label2}}>
-                {m.label}
-              </button>
-            ))}
+          <div>
+            <div style={{fontSize:11,fontWeight:500,color:C.label2,marginBottom:6}}>
+              <i className="ti ti-discount" style={{fontSize:11}} aria-hidden="true"/> Descuento %
+            </div>
+            <input type="number" min="0" max="100" step="0.5" inputMode="decimal"
+              value={descPct} onChange={e=>setDescPct(e.target.value)}
+              placeholder="0"
+              style={{width:"100%",padding:"7px 10px",borderRadius:8,boxSizing:"border-box",
+                border: desc>0?`2px solid ${C.green}`:`1px solid ${C.sep}`,
+                background: desc>0?`${C.green}0d`:C.bg0,
+                color: desc>0?C.green:C.label,fontSize:13,fontFamily:FONT_UI,
+                fontWeight: desc>0?600:400,textAlign:"center"}}/>
           </div>
         </div>
 
@@ -16871,10 +16895,24 @@ function VentasAntiguas({inv, ventas, cargas, onVentaHistorica, onImportarVentas
             );
           })}
 
-          <div style={{padding:"10px 14px",background:C.bg2,borderTop:`1px solid ${C.sep}`,
-            display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-            <span style={{fontSize:12,color:C.label2}}>Total</span>
-            <span style={{fontSize:16,fontWeight:600,color:C.label,fontFamily:FONT}}>Bs {total}</span>
+          <div style={{padding:"10px 14px",background:C.bg2,borderTop:`1px solid ${C.sep}`}}>
+            {desc>0&&(
+              <>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:3}}>
+                  <span style={{fontSize:11,color:C.label3}}>Subtotal</span>
+                  <span style={{fontSize:12,color:C.label2,fontFamily:FONT}}>Bs {total}</span>
+                </div>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:5}}>
+                  <span style={{fontSize:11,color:C.green,fontWeight:600}}>Descuento ({desc}%)</span>
+                  <span style={{fontSize:12,color:C.green,fontWeight:600,fontFamily:FONT}}>−Bs {+(total-totalFinal).toFixed(2)}</span>
+                </div>
+              </>
+            )}
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",
+              borderTop: desc>0?`1px solid ${C.sep}`:"none",paddingTop: desc>0?6:0}}>
+              <span style={{fontSize:12,color:C.label2}}>Total</span>
+              <span style={{fontSize:16,fontWeight:600,color:C.label,fontFamily:FONT}}>Bs {totalFinal}</span>
+            </div>
           </div>
         </div>
       )}
@@ -16902,7 +16940,7 @@ function VentasAntiguas({inv, ventas, cargas, onVentaHistorica, onImportarVentas
         <i className="ti ti-clock-check" style={{fontSize:16}} aria-hidden="true"/>
         {guardando ? "Registrando…"
           : hayConflictos ? `Verificá los ${itemsConConflicto.length} ítem${itemsConConflicto.length!==1?"s":""} en conflicto`
-          : `Registrar venta histórica${total>0?" — Bs "+total:""}`}
+          : `Registrar venta histórica${total>0?" — Bs "+totalFinal:""}`}
       </button>
 
       <div style={{marginTop:12,background:"#EEEDFE",borderRadius:10,padding:"10px 14px",
