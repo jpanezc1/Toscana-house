@@ -52,6 +52,7 @@ Editar `App.jsx` → `npm run build` → `git add` (App.jsx + bundle nuevo + ind
 - **Import de Excel:** plantilla oficial (MARCA, DESCRIPCIÓN, PRECIO, STOCK, TALLA, CATEGORÍA, COLOR, SKU/CÓDIGO). Código repetido → **suma stock** (no duplica). Mismo código con **categoría distinta** → **bloquea** hasta confirmación. Filas con error → **bloquea** la importación (todo o nada). Verificación post-carga consulta **Supabase** (`sbExistenCodigos`), no el estado local.
 - **Etiquetas:** 50×25mm, CODE128 (JsBarcode). Stock N → N etiquetas con el mismo código. Botones: "1 por código" y "1 por unidad".
 - **Liquidaciones** (`calcLiqMarca`): prorratea ventas multimarca por `pct = sub/vTot`; el `pct` suma exactamente 1 por venta → cuadre exacto. El dinero sale de `ventas[]`, no de stock.
+- **Comisión tarjeta 1.8% = SOLO a la marca, NUNCA al cliente.** El cliente paga subtotal − descuento manual, sin importar el método de pago. La comisión se descuenta en la liquidación de la marca (`descTJ` con `cfg.pctTarjeta`). `descPct` guarda únicamente el descuento manual. Ventas con tarjeta ANTERIORES al 23-jun-2026 llevan el 1.8 embebido en `descPct` (modelo viejo) → `getManualDescPct(v)` maneja la compatibilidad; usarlo SIEMPRE en vez de leer `descPct` directo para mostrar/calcular descuentos.
 - **MARCAS** vienen de `MARCAS_SEED` (hardcoded, ids 1-19 + custom) + localStorage, NO de la tabla `marcas` de Supabase.
 
 ## Bugs conocidos / gotchas
