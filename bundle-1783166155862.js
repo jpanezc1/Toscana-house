@@ -54570,13 +54570,18 @@
       wordBreak: "break-all"
     } }, codigo));
   }
+  var TARJETA_DESC_CLIENTE_HASTA = "2026-06-23";
+  function getManualDescPct(v) {
+    const legacy = v.metodoPago === "tarjeta" && (v.fecha || "") < TARJETA_DESC_CLIENTE_HASTA;
+    return Math.max(0, (v.descPct || 0) - (legacy ? 1.8 : 0));
+  }
   function getDisplayTotal(v) {
     if (!v) return 0;
     const items = v.items || [];
     if (!items.length) return v.total || 0;
     const itemsSum = items.reduce((s, i) => s + (i.precioUnit || 0) * (i.cantidad || 1), 0);
     if (!itemsSum) return v.total || 0;
-    const manualDescPct = Math.max(0, (v.descPct || 0) - (v.metodoPago === "tarjeta" ? 1.8 : 0));
+    const manualDescPct = getManualDescPct(v);
     return manualDescPct > 0 ? +(itemsSum * (1 - manualDescPct / 100)).toFixed(2) : itemsSum;
   }
   function abreviarNombre(nombre, maxLen = 90) {
@@ -55710,7 +55715,7 @@
     const cfg = leerCfgLiq(marcaId);
     let brutoEf = 0, brutoQR = 0, brutoTJ = 0;
     vMarca.forEach((v) => {
-      const manualDescPct = Math.max(0, (v.descPct || 0) - (v.metodoPago === "tarjeta" ? 1.8 : 0));
+      const manualDescPct = getManualDescPct(v);
       const sub = v.items.filter((i) => i.marcaId === marcaId).reduce((s, i) => s + (i.precioUnit || 0) * (i.cantidad || 1) * (1 - manualDescPct / 100), 0);
       const vTot = getDisplayTotal(v) || sub;
       const pct = vTot > 0 ? sub / vTot : 1;
@@ -57122,7 +57127,7 @@
     const fmt2 = (n) => Number(n || 0).toLocaleString("es-BO", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     const subtotalBruto = venta.items.reduce((s, i) => s + i.precioUnit * i.cantidad, 0);
     const displayTotal = getDisplayTotal(venta);
-    const manualDescPct = Math.max(0, (venta.descPct || 0) - (venta.metodoPago === "tarjeta" ? 1.8 : 0));
+    const manualDescPct = getManualDescPct(venta);
     const descAdicional = subtotalBruto - displayTotal;
     const rows = venta.items.map((it) => `
     <tr>
@@ -57132,7 +57137,7 @@
       <td style="text-align:center">${it.cantidad}</td>
       <td style="text-align:right">${fmt2(it.precioUnit)}</td>
       <td style="text-align:right">${manualDescPct ? manualDescPct + "%" : "\u2014"}</td>
-      <td style="text-align:right">${fmt2(it.precioUnit * it.cantidad * (1 - manualDescPct / 100))}</td>
+      <td style="text-align:right">${fmt2(it.precioUnit * it.cantidad)}</td>
     </tr>`).join("");
     win.document.write(`<!DOCTYPE html>
 <html lang="es"><head>
@@ -59799,8 +59804,8 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       gap: 0,
       padding: "10px 14px",
       borderBottom: i < venta.items.length - 1 ? `1px solid ${C.sep}` : ""
-    } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, fontWeight: 500, color: C.label, fontFamily: FONT } }, it.nombre), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT } }, it.marcaNombre, " \xB7 x", it.cantidad)), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.label2, fontFamily: FONT, textAlign: "right", minWidth: 60, paddingLeft: 8 } }, $2(it.precioUnit)), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, fontWeight: 600, color: C.label, fontFamily: FONT, textAlign: "right", minWidth: 70, paddingLeft: 8 } }, $2(it.subtotal)))), (() => {
-      const manualDescPct = Math.max(0, (venta.descPct || 0) - (venta.metodoPago === "tarjeta" ? 1.8 : 0));
+    } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, fontWeight: 500, color: C.label, fontFamily: FONT } }, it.nombre), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT } }, it.marcaNombre, " \xB7 x", it.cantidad)), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.label2, fontFamily: FONT, textAlign: "right", minWidth: 60, paddingLeft: 8 } }, $2(it.precioUnit)), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, fontWeight: 600, color: C.label, fontFamily: FONT, textAlign: "right", minWidth: 70, paddingLeft: 8 } }, $2(it.precioUnit * it.cantidad)))), (() => {
+      const manualDescPct = getManualDescPct(venta);
       const itemsSum = venta.items.reduce((s, i) => s + i.precioUnit * i.cantidad, 0);
       const displayTotal = getDisplayTotal(venta);
       return /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, null, manualDescPct > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: {

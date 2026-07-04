@@ -1077,6 +1077,19 @@ function lineaEtiqueta(nombre, descripcion){
   return partes.join(" ");
 }
 
+// ── Descuento manual real de una venta ─────────────────────────────
+// Desde el 23-jun-2026 la comisión de tarjeta (1.8%) NO se cobra al cliente:
+// va solo a la liquidación de la marca (calcLiqMarca → descTJ). descPct guarda
+// únicamente el descuento manual del vendedor.
+// Compat: ventas con tarjeta ANTERIORES al 23-jun sí llevaban el 1.8 incluido
+// en descPct (el modelo viejo lo descontaba al cliente) → solo a esas se les
+// resta para no alterar notas/liquidaciones ya emitidas.
+const TARJETA_DESC_CLIENTE_HASTA = "2026-06-23";
+function getManualDescPct(v){
+  const legacy = v.metodoPago==="tarjeta" && (v.fecha||"") < TARJETA_DESC_CLIENTE_HASTA;
+  return Math.max(0, (v.descPct||0) - (legacy ? 1.8 : 0));
+}
+
 // Retorna el total real de una venta para display: precio lleno de los items
 // menos solo el descuento manual (nunca la comisión bancaria de tarjeta).
 function getDisplayTotal(v){
@@ -1085,7 +1098,7 @@ function getDisplayTotal(v){
   if(!items.length) return v.total||0;
   const itemsSum=items.reduce((s,i)=>s+(i.precioUnit||0)*(i.cantidad||1),0);
   if(!itemsSum) return v.total||0;
-  const manualDescPct=Math.max(0,(v.descPct||0)-(v.metodoPago==="tarjeta"?1.8:0));
+  const manualDescPct=getManualDescPct(v);
   return manualDescPct>0 ? +((itemsSum*(1-manualDescPct/100)).toFixed(2)) : itemsSum;
 }
 
@@ -2194,7 +2207,7 @@ function calcLiqMarca(vMarca, marcaId, MK) {
   let brutoEf = 0, brutoQR = 0, brutoTJ = 0;
   vMarca.forEach(v => {
     // sub: precio lleno de items de esta marca menos solo descuento manual
-    const manualDescPct = Math.max(0, (v.descPct||0) - (v.metodoPago==="tarjeta" ? 1.8 : 0));
+    const manualDescPct = getManualDescPct(v);
     const sub = v.items.filter(i => i.marcaId === marcaId)
       .reduce((s, i) => s + (i.precioUnit||0) * (i.cantidad||1) * (1 - manualDescPct/100), 0);
     const vTot  = getDisplayTotal(v) || sub;
@@ -3653,8 +3666,9 @@ function abrirNotaVenta(venta, numSecuencial, autoPrint=false){
   const fmt2=n=>Number(n||0).toLocaleString("es-BO",{minimumFractionDigits:2,maximumFractionDigits:2});
   const subtotalBruto=venta.items.reduce((s,i)=>s+i.precioUnit*i.cantidad,0);
   const displayTotal=getDisplayTotal(venta);
-  const manualDescPct=Math.max(0,(venta.descPct||0)-(venta.metodoPago==="tarjeta"?1.8:0));
+  const manualDescPct=getManualDescPct(venta);
   const descAdicional=subtotalBruto-displayTotal;
+  // Filas a precio LLENO: la cuenta visible cuadra (Subtotal − Descuento = Total)
   const rows=venta.items.map(it=>`
     <tr>
       <td>${it.codigo}</td>
@@ -3663,7 +3677,7 @@ function abrirNotaVenta(venta, numSecuencial, autoPrint=false){
       <td style="text-align:center">${it.cantidad}</td>
       <td style="text-align:right">${fmt2(it.precioUnit)}</td>
       <td style="text-align:right">${manualDescPct?manualDescPct+"%":"—"}</td>
-      <td style="text-align:right">${fmt2(it.precioUnit*it.cantidad*(1-manualDescPct/100))}</td>
+      <td style="text-align:right">${fmt2(it.precioUnit*it.cantidad)}</td>
     </tr>`).join("");
   win.document.write(`<!DOCTYPE html>
 <html lang="es"><head>
@@ -6086,13 +6100,14 @@ function NotaVentaModal({venta, onClose, numVenta, onAnularVenta}){
               {$(it.precioUnit)}
             </div>
             <div style={{fontSize:13,fontWeight:600,color:C.label,fontFamily:FONT,textAlign:"right",minWidth:70,paddingLeft:8}}>
-              {$(it.subtotal)}
+              {$(it.precioUnit*it.cantidad)}
             </div>
           </div>
         ))}
-        {/* Descuento si hay — solo descuento manual, nunca comisión bancaria tarjeta */}
+        {/* Descuento si hay — solo descuento manual, nunca comisión bancaria tarjeta.
+            Ítems arriba a precio LLENO → la resta visible cuadra con el total. */}
         {(()=>{
-          const manualDescPct=Math.max(0,(venta.descPct||0)-(venta.metodoPago==="tarjeta"?1.8:0));
+          const manualDescPct=getManualDescPct(venta);
           const itemsSum=venta.items.reduce((s,i)=>s+i.precioUnit*i.cantidad,0);
           const displayTotal=getDisplayTotal(venta);
           return(<>
@@ -6573,7 +6588,7 @@ function imprimirComprobante(venta) {
     <table>
       <tr>
         ${(()=>{
-          const manualDescPct=Math.max(0,(venta.descPct||0)-(venta.metodoPago==="tarjeta"?1.8:0));
+          const manualDescPct=getManualDescPct(venta);
           const displayTotal=getDisplayTotal(venta);
           const itemsSum=(venta.items||[]).reduce((s,i)=>s+(i.precioUnit||0)*(i.cantidad||1),0);
           return (manualDescPct>0?`
