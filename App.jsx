@@ -20227,6 +20227,48 @@ function SistemaTab({user, logout, onRecargarDesdeSupabase, onSyncCompleto}){
   const [inputVal, setInputVal]   = useState("");
   const isAdmin = user?.rol === "admin";
 
+  // ── Cola de sincronización (outbox) — hooks a nivel de componente,
+  //    NUNCA dentro de IIFEs de renderIdle (rompe el reset) ──
+  const [outboxOps,  setOutboxOps]  = useState(()=>getOutbox());
+  const [outboxProc, setOutboxProc] = useState(false);
+  useEffect(()=>{
+    const onChange = ()=>setOutboxOps(getOutbox());
+    window.addEventListener("th-outbox-changed", onChange);
+    return ()=>window.removeEventListener("th-outbox-changed", onChange);
+  },[]);
+  async function reintentarOutbox(){
+    setOutboxProc(true);
+    try{ await procesarOutbox(); } finally {
+      setOutboxOps(getOutbox());
+      setOutboxProc(false);
+    }
+  }
+  function descargarOutbox(){
+    const blob = new Blob([JSON.stringify(getOutbox(),null,2)],{type:"application/json"});
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `toscana_pendientes_${hoy()}.json`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+  function resumenOp(op){
+    const p = op.payload||{};
+    switch(op.tipo){
+      case "venta":          return `Venta ${p.id||""} · Bs ${p.total??"?"} · ${(p.items||[]).length} ítem(s)`;
+      case "stock":          return `Stock → ${p.stock}${p.stock_inicial!=null?` (inicial ${p.stock_inicial})`:""} · prod ${p.prodId}`;
+      case "producto_patch": return `Edición de producto · prod ${p.prodId}`;
+      case "producto":       return `Producto ${p.codigo||p.nombre||""}`;
+      case "retiro":         return `Retiro ${p.codigo||""} ×${p.cantidad||1}`;
+      case "anularVenta":    return `Anulación de venta ${p.id||""}`;
+      case "carga":          return `Carga: ${p.resumen||p.tipo||""}`;
+      case "cierre":         return `Cierre ${p.key||""}`;
+      case "marcas":         return "Configuración de marcas";
+      case "usuarios":       return "Usuarios del sistema";
+      case "auditLog":       return `Registro de auditoría (${p.tipo||""})`;
+      default:               return op.tipo;
+    }
+  }
+
   const INFO_ROWS = [
     ["Versión","Toscana House OS v3.1"],
     ["Base de datos","Supabase (nube)"],
@@ -20307,6 +20349,74 @@ function SistemaTab({user, logout, onRecargarDesdeSupabase, onSyncCompleto}){
           </div>
         ))}
       </div>
+
+      {/* Cola de sincronización — cambios de ESTE dispositivo pendientes de subir */}
+      {isAdmin && (
+        <div style={{background:C.bg1,borderRadius:16,border:`1px solid ${C.sep}`,
+          padding:"16px",marginBottom:12,boxShadow:"0 1px 6px rgba(0,0,0,0.04)"}}>
+          <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
+            <span style={{fontSize:16}}>📤</span>
+            <span style={{fontSize:13,fontWeight:700,color:C.label,fontFamily:FONT}}>
+              Cola de sincronización
+            </span>
+            <span style={{marginLeft:"auto",fontSize:12,fontWeight:700,fontFamily:FONT_UI,
+              color: outboxOps.length ? C.amber : C.green}}>
+              {outboxOps.length
+                ? `${outboxOps.length} pendiente${outboxOps.length===1?"":"s"}`
+                : "Todo en la nube ✓"}
+            </span>
+          </div>
+          <div style={{fontSize:12,color:C.label3,fontFamily:FONT,lineHeight:1.6,
+            marginBottom: outboxOps.length ? 10 : 0}}>
+            Cambios hechos en este dispositivo que aún no llegaron a Supabase.
+            Se reintentan solos cada 20 segundos con la app abierta. Cada operación
+            tiene ID único: al subir no se duplica nada.
+          </div>
+          {outboxOps.length>0 && (
+            <>
+              <div style={{maxHeight:220,overflowY:"auto",marginBottom:10}}>
+                {outboxOps.map(op=>(
+                  <div key={op.id} style={{padding:"8px 12px",borderRadius:10,
+                    background:C.bg2,border:`1px solid ${C.sep}`,marginBottom:6}}>
+                    <div style={{display:"flex",justifyContent:"space-between",gap:8}}>
+                      <span style={{fontSize:12,fontWeight:600,color:C.label,fontFamily:FONT_UI,
+                        overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                        {resumenOp(op)}
+                      </span>
+                      <span style={{fontSize:11,color:C.label3,fontFamily:"monospace",flexShrink:0}}>
+                        {new Date(op.ts).toLocaleString("es-BO")}
+                      </span>
+                    </div>
+                    {op.intentos>0&&(
+                      <div style={{fontSize:11,color:C.amber,marginTop:2,fontFamily:FONT_UI}}>
+                        ⚠ {op.intentos} intento{op.intentos===1?"":"s"} fallido{op.intentos===1?"":"s"}
+                        {op.ultimoIntento?` · último: ${new Date(op.ultimoIntento).toLocaleTimeString("es-BO")}`:""}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+              <div style={{display:"flex",gap:8}}>
+                <button onClick={reintentarOutbox} disabled={outboxProc} style={{
+                  flex:1,padding:"11px",borderRadius:10,
+                  border:`1.5px solid ${C.blue}40`,background:`${C.blue}10`,
+                  cursor: outboxProc?"wait":"pointer",fontSize:13,fontWeight:600,
+                  color:C.blue,fontFamily:FONT,WebkitTapHighlightColor:"transparent",
+                  opacity: outboxProc?0.6:1}}>
+                  {outboxProc ? "Reintentando…" : "🔄 Reintentar ahora"}
+                </button>
+                <button onClick={descargarOutbox} style={{
+                  flex:1,padding:"11px",borderRadius:10,
+                  border:`1.5px solid ${C.sep}`,background:C.bg2,
+                  cursor:"pointer",fontSize:13,fontWeight:600,
+                  color:C.label,fontFamily:FONT,WebkitTapHighlightColor:"transparent"}}>
+                  ⬇️ Respaldo JSON
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      )}
 
       {/* Carpeta de descargas organizada por marca */}
       {(()=>{

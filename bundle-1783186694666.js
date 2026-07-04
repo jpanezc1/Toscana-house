@@ -75550,6 +75550,59 @@ ${c.resumen || c.id}`)) onEliminarCarga(c.id);
     const [resetLog, setResetLog] = (0, import_react.useState)([]);
     const [inputVal, setInputVal] = (0, import_react.useState)("");
     const isAdmin = user?.rol === "admin";
+    const [outboxOps, setOutboxOps] = (0, import_react.useState)(() => getOutbox());
+    const [outboxProc, setOutboxProc] = (0, import_react.useState)(false);
+    (0, import_react.useEffect)(() => {
+      const onChange = () => setOutboxOps(getOutbox());
+      window.addEventListener("th-outbox-changed", onChange);
+      return () => window.removeEventListener("th-outbox-changed", onChange);
+    }, []);
+    async function reintentarOutbox() {
+      setOutboxProc(true);
+      try {
+        await procesarOutbox();
+      } finally {
+        setOutboxOps(getOutbox());
+        setOutboxProc(false);
+      }
+    }
+    function descargarOutbox() {
+      const blob = new Blob([JSON.stringify(getOutbox(), null, 2)], { type: "application/json" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `toscana_pendientes_${hoy()}.json`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    }
+    function resumenOp(op) {
+      const p = op.payload || {};
+      switch (op.tipo) {
+        case "venta":
+          return `Venta ${p.id || ""} \xB7 Bs ${p.total ?? "?"} \xB7 ${(p.items || []).length} \xEDtem(s)`;
+        case "stock":
+          return `Stock \u2192 ${p.stock}${p.stock_inicial != null ? ` (inicial ${p.stock_inicial})` : ""} \xB7 prod ${p.prodId}`;
+        case "producto_patch":
+          return `Edici\xF3n de producto \xB7 prod ${p.prodId}`;
+        case "producto":
+          return `Producto ${p.codigo || p.nombre || ""}`;
+        case "retiro":
+          return `Retiro ${p.codigo || ""} \xD7${p.cantidad || 1}`;
+        case "anularVenta":
+          return `Anulaci\xF3n de venta ${p.id || ""}`;
+        case "carga":
+          return `Carga: ${p.resumen || p.tipo || ""}`;
+        case "cierre":
+          return `Cierre ${p.key || ""}`;
+        case "marcas":
+          return "Configuraci\xF3n de marcas";
+        case "usuarios":
+          return "Usuarios del sistema";
+        case "auditLog":
+          return `Registro de auditor\xEDa (${p.tipo || ""})`;
+        default:
+          return op.tipo;
+      }
+    }
     const INFO_ROWS = [
       ["Versi\xF3n", "Toscana House OS v3.1"],
       ["Base de datos", "Supabase (nube)"],
@@ -75629,7 +75682,65 @@ ${c.resumen || c.id}`)) onEliminarCarga(c.id);
       justifyContent: "space-between",
       padding: "13px 16px",
       borderBottom: i < arr.length - 1 ? `1px solid ${C.sep}` : ""
-    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 14, color: C.label2, fontFamily: FONT } }, k), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 14, fontWeight: 500, color: C.label, fontFamily: FONT } }, v)))), (() => {
+    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 14, color: C.label2, fontFamily: FONT } }, k), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 14, fontWeight: 500, color: C.label, fontFamily: FONT } }, v)))), isAdmin && /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      background: C.bg1,
+      borderRadius: 16,
+      border: `1px solid ${C.sep}`,
+      padding: "16px",
+      marginBottom: 12,
+      boxShadow: "0 1px 6px rgba(0,0,0,0.04)"
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 4 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 16 } }, "\u{1F4E4}"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, fontWeight: 700, color: C.label, fontFamily: FONT } }, "Cola de sincronizaci\xF3n"), /* @__PURE__ */ import_react.default.createElement("span", { style: {
+      marginLeft: "auto",
+      fontSize: 12,
+      fontWeight: 700,
+      fontFamily: FONT_UI,
+      color: outboxOps.length ? C.amber : C.green
+    } }, outboxOps.length ? `${outboxOps.length} pendiente${outboxOps.length === 1 ? "" : "s"}` : "Todo en la nube \u2713")), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      fontSize: 12,
+      color: C.label3,
+      fontFamily: FONT,
+      lineHeight: 1.6,
+      marginBottom: outboxOps.length ? 10 : 0
+    } }, "Cambios hechos en este dispositivo que a\xFAn no llegaron a Supabase. Se reintentan solos cada 20 segundos con la app abierta. Cada operaci\xF3n tiene ID \xFAnico: al subir no se duplica nada."), outboxOps.length > 0 && /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, null, /* @__PURE__ */ import_react.default.createElement("div", { style: { maxHeight: 220, overflowY: "auto", marginBottom: 10 } }, outboxOps.map((op) => /* @__PURE__ */ import_react.default.createElement("div", { key: op.id, style: {
+      padding: "8px 12px",
+      borderRadius: 10,
+      background: C.bg2,
+      border: `1px solid ${C.sep}`,
+      marginBottom: 6
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", gap: 8 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: {
+      fontSize: 12,
+      fontWeight: 600,
+      color: C.label,
+      fontFamily: FONT_UI,
+      overflow: "hidden",
+      textOverflow: "ellipsis",
+      whiteSpace: "nowrap"
+    } }, resumenOp(op)), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 11, color: C.label3, fontFamily: "monospace", flexShrink: 0 } }, new Date(op.ts).toLocaleString("es-BO"))), op.intentos > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.amber, marginTop: 2, fontFamily: FONT_UI } }, "\u26A0 ", op.intentos, " intento", op.intentos === 1 ? "" : "s", " fallido", op.intentos === 1 ? "" : "s", op.ultimoIntento ? ` \xB7 \xFAltimo: ${new Date(op.ultimoIntento).toLocaleTimeString("es-BO")}` : "")))), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 8 } }, /* @__PURE__ */ import_react.default.createElement("button", { onClick: reintentarOutbox, disabled: outboxProc, style: {
+      flex: 1,
+      padding: "11px",
+      borderRadius: 10,
+      border: `1.5px solid ${C.blue}40`,
+      background: `${C.blue}10`,
+      cursor: outboxProc ? "wait" : "pointer",
+      fontSize: 13,
+      fontWeight: 600,
+      color: C.blue,
+      fontFamily: FONT,
+      WebkitTapHighlightColor: "transparent",
+      opacity: outboxProc ? 0.6 : 1
+    } }, outboxProc ? "Reintentando\u2026" : "\u{1F504} Reintentar ahora"), /* @__PURE__ */ import_react.default.createElement("button", { onClick: descargarOutbox, style: {
+      flex: 1,
+      padding: "11px",
+      borderRadius: 10,
+      border: `1.5px solid ${C.sep}`,
+      background: C.bg2,
+      cursor: "pointer",
+      fontSize: 13,
+      fontWeight: 600,
+      color: C.label,
+      fontFamily: FONT,
+      WebkitTapHighlightColor: "transparent"
+    } }, "\u2B07\uFE0F Respaldo JSON")))), (() => {
       const [carpetaNombre, setCarpetaNombre] = import_react.default.useState(null);
       const [fsaOk, setFsaOk] = import_react.default.useState("showDirectoryPicker" in window);
       import_react.default.useEffect(() => {
