@@ -1743,9 +1743,17 @@ const tsVenta = v => {
   const [Y=0,M=1,D=1] = String(v.fecha||"").split("-").map(Number);
   const s  = String(v.hora||"").toLowerCase();
   const hm = s.match(/(\d{1,2}):(\d{2})/);
-  let h = hm ? +hm[1] : 0, min = hm ? +hm[2] : 0;
-  if(/p\.?\s*m/.test(s) && h < 12) h += 12;  // 06:18 p.m. → 18:18
-  if(/a\.?\s*m/.test(s) && h === 12) h = 0;  // 12:05 a.m. → 00:05
+  let h = 0, min = 0;
+  if(hm){
+    h = +hm[1]; min = +hm[2];
+    if(/p\.?\s*m/.test(s) && h < 12) h += 12;  // 06:18 p.m. → 18:18
+    if(/a\.?\s*m/.test(s) && h === 12) h = 0;  // 12:05 a.m. → 00:05
+  } else {
+    // Ventas antiguas: sin hora, solo turno → posición representativa del día
+    if(s.includes("mañana")||s.includes("manana")) h = 9;   // bloque mañana
+    else if(s.includes("tarde"))                   h = 15;  // bloque tarde
+    else if(s.includes("noche"))                   h = 20;  // bloque noche
+  }
   return (((Y*12+M)*31+D)*24+h)*60 + min;
 };
 const mkKey= (m,a) => `${a}-${String(m+1).padStart(2,"0")}`;
@@ -19222,9 +19230,34 @@ function HistorialTab({ventas, inv, cierres, onVentaClick}){
         <div>
           {ventasPer.length===0
             ? <EmptyState icon="📊" title="Sin ventas" sub={`${MESES[mesSel]} ${anioSel}`}/>
-            : [...ventasPer].reverse().map(v=>{
+            : (()=>{
+                // Orden cronológico real: fecha desc → hora desc (turnos de ventas
+                // antiguas se ubican en su bloque del día vía tsVenta)
+                const ordenadas = [...ventasPer].sort((a,b)=>{
+                  const ta=tsVenta(a), tb=tsVenta(b);
+                  if(tb!==ta) return tb-ta;
+                  return String(b.id||"").localeCompare(String(a.id||""));
+                });
+                const DIAS=["Domingo","Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"];
+                const fmtDia=f=>{
+                  const [Y,M,D]=String(f||"").split("-").map(Number);
+                  if(!Y||!M||!D) return f||"—";
+                  const d=new Date(Y,M-1,D);
+                  return `${DIAS[d.getDay()]} ${D} de ${MESES[M-1]}`;
+                };
+                let ultFecha=null;
+                return ordenadas.map(v=>{
+                const conHeader = v.fecha!==ultFecha;
+                ultFecha = v.fecha;
                 return (
-                  <div key={v.id} onClick={()=>onVentaClick&&onVentaClick(v)}
+                  <React.Fragment key={v.id}>
+                  {conHeader&&(
+                    <div style={{fontSize:10,fontWeight:700,color:C.label3,fontFamily:FONT_UI,
+                      textTransform:"uppercase",letterSpacing:.8,margin:"12px 2px 6px"}}>
+                      {fmtDia(v.fecha)}
+                    </div>
+                  )}
+                  <div onClick={()=>onVentaClick&&onVentaClick(v)}
                     style={{background:C.bg2,borderRadius:10,padding:"7px 12px",marginBottom:4,
                       cursor:"pointer",WebkitTapHighlightColor:"transparent",
                       borderLeft:`3px solid ${colorPago(v.metodoPago)||C.sep}`}}>
@@ -19232,7 +19265,9 @@ function HistorialTab({ventas, inv, cierres, onVentaClick}){
                       <div style={{flex:1,minWidth:0}}>
                         <div style={{display:"flex",alignItems:"center",gap:5,marginBottom:2,flexWrap:"wrap"}}>
                           <PagoDisplay mp={v.metodoPago} total={getDisplayTotal(v)} small/>
-                          <span style={{fontSize:9,color:C.label3,fontFamily:FONT,opacity:.7}}>{v.fecha} {v.hora}</span>
+                          <span style={{fontSize:9,color:C.label3,fontFamily:FONT,opacity:.7}}>
+                            {/(\d{1,2}):(\d{2})/.test(v.hora||"") ? v.hora : `Turno ${v.hora||"—"}`}
+                          </span>
                         </div>
                         {v.items.map((it,ii)=>{
                           const m=MARCAS.find(x=>x.id===it.marcaId);
@@ -19252,8 +19287,10 @@ function HistorialTab({ventas, inv, cierres, onVentaClick}){
                       </div>
                     </div>
                   </div>
+                  </React.Fragment>
                 );
-              })
+                });
+              })()
           }
         </div>
       )}

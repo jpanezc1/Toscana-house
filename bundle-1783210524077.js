@@ -55256,9 +55256,17 @@
     const [Y = 0, M = 1, D = 1] = String(v.fecha || "").split("-").map(Number);
     const s = String(v.hora || "").toLowerCase();
     const hm = s.match(/(\d{1,2}):(\d{2})/);
-    let h = hm ? +hm[1] : 0, min = hm ? +hm[2] : 0;
-    if (/p\.?\s*m/.test(s) && h < 12) h += 12;
-    if (/a\.?\s*m/.test(s) && h === 12) h = 0;
+    let h = 0, min = 0;
+    if (hm) {
+      h = +hm[1];
+      min = +hm[2];
+      if (/p\.?\s*m/.test(s) && h < 12) h += 12;
+      if (/a\.?\s*m/.test(s) && h === 12) h = 0;
+    } else {
+      if (s.includes("ma\xF1ana") || s.includes("manana")) h = 9;
+      else if (s.includes("tarde")) h = 15;
+      else if (s.includes("noche")) h = 20;
+    }
     return (((Y * 12 + M) * 31 + D) * 24 + h) * 60 + min;
   };
   var mkKey = (m, a) => `${a}-${String(m + 1).padStart(2, "0")}`;
@@ -74429,43 +74437,67 @@ ${c.resumen || c.id}`)) onEliminarCarga(c.id);
         textAlign: "center",
         opacity: val > 0 ? 1 : 0.4
       } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13 } }, icon), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, fontWeight: 700, color, fontFamily: FONT } }, val > 0 ? $2(val) : "\u2014")))));
-    })), vista === "ventas" && /* @__PURE__ */ import_react.default.createElement("div", null, ventasPer.length === 0 ? /* @__PURE__ */ import_react.default.createElement(EmptyState, { icon: "\u{1F4CA}", title: "Sin ventas", sub: `${MESES[mesSel]} ${anioSel}` }) : [...ventasPer].reverse().map((v) => {
-      return /* @__PURE__ */ import_react.default.createElement(
-        "div",
-        {
-          key: v.id,
-          onClick: () => onVentaClick && onVentaClick(v),
-          style: {
-            background: C.bg2,
-            borderRadius: 10,
-            padding: "7px 12px",
-            marginBottom: 4,
-            cursor: "pointer",
-            WebkitTapHighlightColor: "transparent",
-            borderLeft: `3px solid ${colorPago(v.metodoPago) || C.sep}`
-          }
-        },
-        /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 5, marginBottom: 2, flexWrap: "wrap" } }, /* @__PURE__ */ import_react.default.createElement(PagoDisplay, { mp: v.metodoPago, total: getDisplayTotal(v), small: true }), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 9, color: C.label3, fontFamily: FONT, opacity: 0.7 } }, v.fecha, " ", v.hora)), v.items.map((it, ii) => {
-          const m = MARCAS.find((x) => x.id === it.marcaId);
-          return /* @__PURE__ */ import_react.default.createElement("div", { key: ii, style: {
-            fontSize: 11,
-            color: C.label2,
-            fontFamily: FONT,
-            display: "flex",
-            alignItems: "center",
-            gap: 4,
-            marginBottom: 1,
-            lineHeight: "1.25"
-          } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { width: 4, height: 4, borderRadius: "50%", background: m?.color, flexShrink: 0 } }), /* @__PURE__ */ import_react.default.createElement("span", { style: { overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 } }, it.nombre, " \xD7", it.cantidad), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontWeight: 600, color: C.label, flexShrink: 0, fontSize: 11 } }, $2(it.subtotal)));
-        })), /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "right", flexShrink: 0 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: {
-          fontSize: 15,
+    })), vista === "ventas" && /* @__PURE__ */ import_react.default.createElement("div", null, ventasPer.length === 0 ? /* @__PURE__ */ import_react.default.createElement(EmptyState, { icon: "\u{1F4CA}", title: "Sin ventas", sub: `${MESES[mesSel]} ${anioSel}` }) : (() => {
+      const ordenadas = [...ventasPer].sort((a, b) => {
+        const ta = tsVenta(a), tb = tsVenta(b);
+        if (tb !== ta) return tb - ta;
+        return String(b.id || "").localeCompare(String(a.id || ""));
+      });
+      const DIAS = ["Domingo", "Lunes", "Martes", "Mi\xE9rcoles", "Jueves", "Viernes", "S\xE1bado"];
+      const fmtDia = (f) => {
+        const [Y, M, D] = String(f || "").split("-").map(Number);
+        if (!Y || !M || !D) return f || "\u2014";
+        const d = new Date(Y, M - 1, D);
+        return `${DIAS[d.getDay()]} ${D} de ${MESES[M - 1]}`;
+      };
+      let ultFecha = null;
+      return ordenadas.map((v) => {
+        const conHeader = v.fecha !== ultFecha;
+        ultFecha = v.fecha;
+        return /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, { key: v.id }, conHeader && /* @__PURE__ */ import_react.default.createElement("div", { style: {
+          fontSize: 10,
           fontWeight: 700,
-          color: C.label,
-          fontFamily: FONT,
-          letterSpacing: "-0.02em"
-        } }, $2(getDisplayTotal(v)))))
-      );
-    })), vista === "stock" && /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT, marginBottom: 12 } }, "Inventario registrado \u2014 estado actual"), inv.length === 0 ? /* @__PURE__ */ import_react.default.createElement(EmptyState, { icon: "\u{1F4E6}", title: "Sin productos en inventario" }) : MARCAS.map((m) => {
+          color: C.label3,
+          fontFamily: FONT_UI,
+          textTransform: "uppercase",
+          letterSpacing: 0.8,
+          margin: "12px 2px 6px"
+        } }, fmtDia(v.fecha)), /* @__PURE__ */ import_react.default.createElement(
+          "div",
+          {
+            onClick: () => onVentaClick && onVentaClick(v),
+            style: {
+              background: C.bg2,
+              borderRadius: 10,
+              padding: "7px 12px",
+              marginBottom: 4,
+              cursor: "pointer",
+              WebkitTapHighlightColor: "transparent",
+              borderLeft: `3px solid ${colorPago(v.metodoPago) || C.sep}`
+            }
+          },
+          /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 5, marginBottom: 2, flexWrap: "wrap" } }, /* @__PURE__ */ import_react.default.createElement(PagoDisplay, { mp: v.metodoPago, total: getDisplayTotal(v), small: true }), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 9, color: C.label3, fontFamily: FONT, opacity: 0.7 } }, /(\d{1,2}):(\d{2})/.test(v.hora || "") ? v.hora : `Turno ${v.hora || "\u2014"}`)), v.items.map((it, ii) => {
+            const m = MARCAS.find((x) => x.id === it.marcaId);
+            return /* @__PURE__ */ import_react.default.createElement("div", { key: ii, style: {
+              fontSize: 11,
+              color: C.label2,
+              fontFamily: FONT,
+              display: "flex",
+              alignItems: "center",
+              gap: 4,
+              marginBottom: 1,
+              lineHeight: "1.25"
+            } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { width: 4, height: 4, borderRadius: "50%", background: m?.color, flexShrink: 0 } }), /* @__PURE__ */ import_react.default.createElement("span", { style: { overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 } }, it.nombre, " \xD7", it.cantidad), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontWeight: 600, color: C.label, flexShrink: 0, fontSize: 11 } }, $2(it.subtotal)));
+          })), /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "right", flexShrink: 0 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: {
+            fontSize: 15,
+            fontWeight: 700,
+            color: C.label,
+            fontFamily: FONT,
+            letterSpacing: "-0.02em"
+          } }, $2(getDisplayTotal(v)))))
+        ));
+      });
+    })()), vista === "stock" && /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT, marginBottom: 12 } }, "Inventario registrado \u2014 estado actual"), inv.length === 0 ? /* @__PURE__ */ import_react.default.createElement(EmptyState, { icon: "\u{1F4E6}", title: "Sin productos en inventario" }) : MARCAS.map((m) => {
       const prods = inv.filter((i) => i.marcaId === m.id);
       if (!prods.length) return null;
       const stockTotal = prods.reduce((s, p) => s + p.stock, 0);
