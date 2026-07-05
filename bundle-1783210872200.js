@@ -57663,7 +57663,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
     const label = ms < 120 ? "Excelente" : ms < 350 ? "Normal" : "Alto";
     return /* @__PURE__ */ import_react.default.createElement("div", { style: {
       position: "fixed",
-      top: 58,
+      bottom: 12,
       right: 12,
       zIndex: 9997,
       background: `${color}15`,
@@ -57675,7 +57675,9 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       borderRadius: 999,
       padding: "3px 10px",
       pointerEvents: "none",
-      letterSpacing: 0.3
+      letterSpacing: 0.3,
+      backdropFilter: "blur(8px)",
+      WebkitBackdropFilter: "blur(8px)"
     } }, "\u25CF RT ", ms, "ms \xB7 ", label);
   }
   function NavBar({ title, subtitle, back, onBack, right }) {
@@ -58049,6 +58051,9 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
     } }, prefix), /* @__PURE__ */ import_react.default.createElement(
       "input",
       {
+        autoComplete: "off",
+        autoCorrect: "off",
+        spellCheck: false,
         ...p,
         style: {
           width: "100%",
@@ -77077,6 +77082,9 @@ Esta acci\xF3n no se puede deshacer.`,
     } }, "\u{1F50D}"), /* @__PURE__ */ import_react.default.createElement(
       "input",
       {
+        autoComplete: "off",
+        autoCorrect: "off",
+        spellCheck: false,
         value: codBusq,
         onChange: (e) => setCodBusq(e.target.value),
         placeholder: "C\xF3digo de producto o nombre del \xEDtem\u2026",

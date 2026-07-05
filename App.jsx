@@ -4215,11 +4215,12 @@ function PingBadge({ms}){
   const label = ms<120?"Excelente":ms<350?"Normal":"Alto";
   return (
     <div style={{
-      position:"fixed", top:58, right:12, zIndex:9997,
+      position:"fixed", bottom:12, right:12, zIndex:9997,
       background:`${color}15`, border:`1px solid ${color}40`,
       color, fontFamily:FONT_UI, fontSize:10, fontWeight:700,
       borderRadius:999, padding:"3px 10px",
       pointerEvents:"none", letterSpacing:.3,
+      backdropFilter:"blur(8px)", WebkitBackdropFilter:"blur(8px)",
     }}>
       ● RT {ms}ms · {label}
     </div>
@@ -4550,7 +4551,7 @@ function IOSInput({label,prefix,style:st={},...p}){
       <div style={{position:"relative"}}>
         {prefix&&<span style={{position:"absolute",left:14,top:"50%",transform:"translateY(-50%)",
           color:C.label3,fontSize:15,fontFamily:FONT,pointerEvents:"none"}}>{prefix}</span>}
-        <input {...p} style={{
+        <input autoComplete="off" autoCorrect="off" spellCheck={false} {...p} style={{
           width:"100%",padding:"12px 14px",paddingLeft:prefix?"38px":"14px",
           borderRadius:10,border:`1px solid ${C.sep}`,
           background:C.bg2,fontSize:14,color:C.label,
@@ -21665,6 +21666,7 @@ function DashboardVentas({ventas, onVentaClick}){
             <span style={{position:"absolute",left:12,top:"50%",transform:"translateY(-50%)",
               fontSize:16,color:C.label3}}>🔍</span>
             <input
+              autoComplete="off" autoCorrect="off" spellCheck={false}
               value={codBusq}
               onChange={e=>setCodBusq(e.target.value)}
               placeholder="Código de producto o nombre del ítem…"
