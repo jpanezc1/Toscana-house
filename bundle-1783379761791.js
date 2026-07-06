@@ -63251,20 +63251,19 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       const d = descuentos[m.id] || {};
       const vig = descMarcaVigente(descuentos, m.id);
       const activo = vig > 0;
+      const guardado = !!d.activo;
+      const vencido = guardado && d.hasta && hoy() > d.hasta;
       return /* @__PURE__ */ import_react.default.createElement("div", { key: m.id, style: {
-        display: "flex",
-        alignItems: "center",
-        gap: 10,
         padding: "10px 16px",
         borderTop: `1px solid ${C.sep}`,
-        background: activo ? `${C.green}0a` : "transparent"
-      } }, /* @__PURE__ */ import_react.default.createElement(MarcaIcon, { marca: m, size: 22, radius: 6 }), /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, fontWeight: 600, color: C.label, fontFamily: FONT } }, m.nombre), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: activo ? C.green : C.label3, fontFamily: FONT_UI } }, activo ? `${vig}% activo${d.hasta ? ` \xB7 hasta ${d.hasta.split("-").reverse().join("/")}` : ""}${d.updatedBy ? ` \xB7 por ${d.updatedBy}` : ""}` : "sin descuento")), /* @__PURE__ */ import_react.default.createElement(
+        background: activo ? `${C.green}0a` : vencido ? `${C.amber}0a` : "transparent"
+      } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10 } }, /* @__PURE__ */ import_react.default.createElement(MarcaIcon, { marca: m, size: 22, radius: 6 }), /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, fontWeight: 600, color: C.label, fontFamily: FONT } }, m.nombre), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: activo ? C.green : vencido ? C.amber : C.label3, fontFamily: FONT_UI } }, activo ? `${vig}% activo${d.hasta ? ` \xB7 hasta ${d.hasta.split("-").reverse().join("/")}` : " \xB7 sin l\xEDmite"}${d.updatedBy ? ` \xB7 por ${d.updatedBy}` : ""}` : vencido ? `venci\xF3 el ${d.hasta.split("-").reverse().join("/")}` : "sin descuento")), /* @__PURE__ */ import_react.default.createElement(
         "select",
         {
-          value: activo ? vig : 0,
+          value: guardado ? Number(d.pct) || 0 : 0,
           onChange: (e) => {
             const v = Number(e.target.value);
-            onGuardar(m.id, v > 0 ? { activo: true, pct: v } : { activo: false });
+            onGuardar(m.id, v > 0 ? { activo: true, pct: v, hasta: d.hasta || "" } : { activo: false });
           },
           style: {
             padding: "6px 8px",
@@ -63280,7 +63279,33 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
         },
         /* @__PURE__ */ import_react.default.createElement("option", { value: 0 }, "\u2014"),
         OPCIONES.map((o) => /* @__PURE__ */ import_react.default.createElement("option", { key: o, value: o }, o, "%"))
-      ));
+      )), guardado && /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginTop: 8, paddingLeft: 32 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 11, color: C.label3, fontFamily: FONT_UI } }, "Hasta:"), /* @__PURE__ */ import_react.default.createElement(
+        "input",
+        {
+          type: "date",
+          value: d.hasta || "",
+          min: hoy(),
+          onChange: (e) => onGuardar(m.id, { activo: true, pct: Number(d.pct) || 0, hasta: e.target.value }),
+          style: {
+            flex: 1,
+            maxWidth: 170,
+            padding: "5px 8px",
+            borderRadius: 8,
+            border: `1px solid ${C.sep}`,
+            background: C.bg2,
+            color: C.label,
+            fontSize: 12,
+            fontFamily: FONT_UI
+          }
+        }
+      ), d.hasta && /* @__PURE__ */ import_react.default.createElement(
+        "button",
+        {
+          onClick: () => onGuardar(m.id, { activo: true, pct: Number(d.pct) || 0, hasta: "" }),
+          style: { background: "none", border: "none", color: C.label3, fontSize: 11, cursor: "pointer", fontFamily: FONT_UI }
+        },
+        "sin l\xEDmite"
+      )));
     })));
   }
   function DescuentoMarcaCard({ actual, onGuardar }) {

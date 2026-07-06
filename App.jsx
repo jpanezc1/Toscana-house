@@ -9699,24 +9699,46 @@ function PanelDescuentosAdmin({marcas, descuentos, onGuardar}){
             const d = descuentos[m.id]||{};
             const vig = descMarcaVigente(descuentos, m.id);
             const activo = vig>0;
+            const guardado = !!d.activo;        // guardado como activo (aunque esté vencido)
+            const vencido = guardado && d.hasta && hoy()>d.hasta;
             return (
-              <div key={m.id} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 16px",
-                borderTop:`1px solid ${C.sep}`,background:activo?`${C.green}0a`:"transparent"}}>
-                <MarcaIcon marca={m} size={22} radius={6}/>
-                <div style={{flex:1,minWidth:0}}>
-                  <div style={{fontSize:13,fontWeight:600,color:C.label,fontFamily:FONT}}>{m.nombre}</div>
-                  <div style={{fontSize:10,color:activo?C.green:C.label3,fontFamily:FONT_UI}}>
-                    {activo ? `${vig}% activo${d.hasta?` · hasta ${d.hasta.split("-").reverse().join("/")}`:""}${d.updatedBy?` · por ${d.updatedBy}`:""}` : "sin descuento"}
+              <div key={m.id} style={{padding:"10px 16px",
+                borderTop:`1px solid ${C.sep}`,background:activo?`${C.green}0a`:vencido?`${C.amber}0a`:"transparent"}}>
+                <div style={{display:"flex",alignItems:"center",gap:10}}>
+                  <MarcaIcon marca={m} size={22} radius={6}/>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontSize:13,fontWeight:600,color:C.label,fontFamily:FONT}}>{m.nombre}</div>
+                    <div style={{fontSize:10,color:activo?C.green:vencido?C.amber:C.label3,fontFamily:FONT_UI}}>
+                      {activo ? `${vig}% activo${d.hasta?` · hasta ${d.hasta.split("-").reverse().join("/")}`:" · sin límite"}${d.updatedBy?` · por ${d.updatedBy}`:""}`
+                        : vencido ? `venció el ${d.hasta.split("-").reverse().join("/")}`
+                        : "sin descuento"}
+                    </div>
                   </div>
+                  <select value={guardado?(Number(d.pct)||0):0}
+                    onChange={e=>{const v=Number(e.target.value); onGuardar(m.id, v>0?{activo:true,pct:v,hasta:d.hasta||""}:{activo:false});}}
+                    style={{padding:"6px 8px",borderRadius:8,border:`1px solid ${activo?C.green:C.sep}`,
+                      background:C.bg2,color:activo?C.green:C.label2,fontSize:12,fontFamily:FONT_UI,
+                      fontWeight:activo?700:400,cursor:"pointer"}}>
+                    <option value={0}>—</option>
+                    {OPCIONES.map(o=><option key={o} value={o}>{o}%</option>)}
+                  </select>
                 </div>
-                <select value={activo?vig:0}
-                  onChange={e=>{const v=Number(e.target.value); onGuardar(m.id, v>0?{activo:true,pct:v}:{activo:false});}}
-                  style={{padding:"6px 8px",borderRadius:8,border:`1px solid ${activo?C.green:C.sep}`,
-                    background:C.bg2,color:activo?C.green:C.label2,fontSize:12,fontFamily:FONT_UI,
-                    fontWeight:activo?700:400,cursor:"pointer"}}>
-                  <option value={0}>—</option>
-                  {OPCIONES.map(o=><option key={o} value={o}>{o}%</option>)}
-                </select>
+                {/* Vencimiento — editable por admin cuando el descuento está encendido */}
+                {guardado&&(
+                  <div style={{display:"flex",alignItems:"center",gap:8,marginTop:8,paddingLeft:32}}>
+                    <span style={{fontSize:11,color:C.label3,fontFamily:FONT_UI}}>Hasta:</span>
+                    <input type="date" value={d.hasta||""} min={hoy()}
+                      onChange={e=>onGuardar(m.id,{activo:true,pct:Number(d.pct)||0,hasta:e.target.value})}
+                      style={{flex:1,maxWidth:170,padding:"5px 8px",borderRadius:8,border:`1px solid ${C.sep}`,
+                        background:C.bg2,color:C.label,fontSize:12,fontFamily:FONT_UI}}/>
+                    {d.hasta&&(
+                      <button onClick={()=>onGuardar(m.id,{activo:true,pct:Number(d.pct)||0,hasta:""})}
+                        style={{background:"none",border:"none",color:C.label3,fontSize:11,cursor:"pointer",fontFamily:FONT_UI}}>
+                        sin límite
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
             );
           })}
