@@ -895,6 +895,66 @@ function useRealtimeSync(setVentas, setInv, setRetiros, setFactoryResetRecibido,
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 }
 
+// ── Detector de reloj desviado ───────────────────────────────────────
+// La app estampa fecha/hora de las ventas con el reloj LOCAL del equipo.
+// Compara ese "reloj de pared" contra la hora real de Bolivia (epoch del
+// header Date del servidor, same-origin → siempre legible). Detecta tanto
+// reloj corrido (caja +37 min) como zona horaria mal configurada (+6 h).
+function useClockDrift(){
+  var _hCD = useState(0); var driftMin = _hCD[0]; var setDriftMin = _hCD[1];
+  useEffect(()=>{
+    let mounted = true;
+    // Convierte un instante a "minutos de pared" en una zona horaria dada
+    const wallMin = (dt, tz) => {
+      const parts = new Intl.DateTimeFormat("en-CA",{
+        ...(tz?{timeZone:tz}:{}),
+        year:"numeric",month:"2-digit",day:"2-digit",
+        hour:"2-digit",minute:"2-digit",hour12:false,
+      }).formatToParts(dt);
+      const g = t => +parts.find(x=>x.type===t).value;
+      return Date.UTC(g("year"),g("month")-1,g("day"),g("hour")%24,g("minute"))/60000;
+    };
+    async function medir(){
+      try{
+        const r = await fetch(`/version.json?_=${Date.now()}`, {cache:"no-store"});
+        const d = r.headers.get("date");
+        if(!d || !mounted) return;
+        const serverEpoch = new Date(d).getTime();
+        if(!serverEpoch) return;
+        // Lo que estampa este equipo vs lo que debería estampar (hora Bolivia real)
+        const drift = wallMin(new Date(), null) - wallMin(new Date(serverEpoch), "America/La_Paz");
+        if(mounted) setDriftMin(Math.round(drift));
+      }catch{ /* sin red → no medir */ }
+    }
+    medir();
+    const iv = setInterval(medir, 10*60*1000);
+    return ()=>{ mounted=false; clearInterval(iv); };
+  },[]);
+  return driftMin;
+}
+
+// Banner rojo fijo — visible para TODOS los roles mientras el reloj esté mal
+function ClockDriftBanner({driftMin}){
+  if(Math.abs(driftMin) < 5) return null;
+  const abs = Math.abs(driftMin);
+  const txt = abs >= 90
+    ? `${Math.round(abs/60)} hora${Math.round(abs/60)===1?"":"s"}`
+    : `${abs} minuto${abs===1?"":"s"}`;
+  return (
+    <div style={{
+      position:"fixed", top:0, left:0, right:0, zIndex:99998,
+      background:"#C62828", color:"#fff",
+      padding:"9px 16px", textAlign:"center",
+      fontFamily:FONT_UI, fontSize:13, fontWeight:600, lineHeight:1.4,
+      boxShadow:"0 2px 8px rgba(0,0,0,0.25)",
+    }}>
+      ⚠️ El reloj de este equipo está {driftMin>0?"adelantado":"atrasado"} {txt} —
+      las ventas se registran con hora equivocada. Corregir en Ajustes → Fecha y hora
+      (activar "automático") o avisar al administrador.
+    </div>
+  );
+}
+
 // Mide latencia RTT al servidor de Supabase Realtime mediante broadcast self:true
 function usePingLatency(){
   var _hPing = useState(null); var latencyMs = _hPing[0]; var setLatencyMs = _hPing[1];
@@ -12085,6 +12145,7 @@ function App(){
   const[ventas,setVentas]=useState(()=>{ try{return JSON.parse(localStorage.getItem("th_ventas")||"[]");}catch{return[];} });
   const[factoryResetRecibido,setFactoryResetRecibido]=useState(false);
   const pingMs = usePingLatency();
+  const clockDrift = useClockDrift();
   const[alq,setAlq]     =useState(()=>{ try{return JSON.parse(localStorage.getItem("th_alq")||"[]");}catch{return[];} });
   const[cierres,setCierres]=useState(()=>{ try{return JSON.parse(localStorage.getItem("th_cierres")||"{}");}catch{return {};} });
   const[cargando,setCargando]=useState(true);
@@ -13174,6 +13235,9 @@ function App(){
 
       {/* ── LATENCIA REALTIME (solo admin) ── */}
       {!cargando && user?.rol==="admin" && <PingBadge ms={pingMs}/>}
+
+      {/* ── RELOJ DESVIADO (todos los roles — las ventas estampan hora local) ── */}
+      {!cargando && <ClockDriftBanner driftMin={clockDrift}/>}
 
       {/* ── BANNER: FACTORY RESET RECIBIDO (otras sesiones) ── */}
       {factoryResetRecibido && (

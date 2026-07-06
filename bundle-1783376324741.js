@@ -54424,6 +54424,67 @@
       };
     }, []);
   }
+  function useClockDrift() {
+    var _hCD = (0, import_react.useState)(0);
+    var driftMin = _hCD[0];
+    var setDriftMin = _hCD[1];
+    (0, import_react.useEffect)(() => {
+      let mounted = true;
+      const wallMin = (dt, tz) => {
+        const parts = new Intl.DateTimeFormat("en-CA", {
+          ...tz ? { timeZone: tz } : {},
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: false
+        }).formatToParts(dt);
+        const g = (t) => +parts.find((x) => x.type === t).value;
+        return Date.UTC(g("year"), g("month") - 1, g("day"), g("hour") % 24, g("minute")) / 6e4;
+      };
+      async function medir() {
+        try {
+          const r = await fetch(`/version.json?_=${Date.now()}`, { cache: "no-store" });
+          const d = r.headers.get("date");
+          if (!d || !mounted) return;
+          const serverEpoch = new Date(d).getTime();
+          if (!serverEpoch) return;
+          const drift = wallMin(/* @__PURE__ */ new Date(), null) - wallMin(new Date(serverEpoch), "America/La_Paz");
+          if (mounted) setDriftMin(Math.round(drift));
+        } catch {
+        }
+      }
+      medir();
+      const iv = setInterval(medir, 10 * 60 * 1e3);
+      return () => {
+        mounted = false;
+        clearInterval(iv);
+      };
+    }, []);
+    return driftMin;
+  }
+  function ClockDriftBanner({ driftMin }) {
+    if (Math.abs(driftMin) < 5) return null;
+    const abs = Math.abs(driftMin);
+    const txt = abs >= 90 ? `${Math.round(abs / 60)} hora${Math.round(abs / 60) === 1 ? "" : "s"}` : `${abs} minuto${abs === 1 ? "" : "s"}`;
+    return /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      position: "fixed",
+      top: 0,
+      left: 0,
+      right: 0,
+      zIndex: 99998,
+      background: "#C62828",
+      color: "#fff",
+      padding: "9px 16px",
+      textAlign: "center",
+      fontFamily: FONT_UI,
+      fontSize: 13,
+      fontWeight: 600,
+      lineHeight: 1.4,
+      boxShadow: "0 2px 8px rgba(0,0,0,0.25)"
+    } }, "\u26A0\uFE0F El reloj de este equipo est\xE1 ", driftMin > 0 ? "adelantado" : "atrasado", " ", txt, ' \u2014 las ventas se registran con hora equivocada. Corregir en Ajustes \u2192 Fecha y hora (activar "autom\xE1tico") o avisar al administrador.');
+  }
   function usePingLatency() {
     var _hPing = (0, import_react.useState)(null);
     var latencyMs = _hPing[0];
@@ -66155,6 +66216,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
     });
     const [factoryResetRecibido, setFactoryResetRecibido] = (0, import_react.useState)(false);
     const pingMs = usePingLatency();
+    const clockDrift = useClockDrift();
     const [alq, setAlq] = (0, import_react.useState)(() => {
       try {
         return JSON.parse(localStorage.getItem("th_alq") || "[]");
@@ -67350,7 +67412,7 @@ Esta acci\xF3n no se puede deshacer.` : "\xBFEliminar esta carga? Esta acci\xF3n
       background: C.gold,
       borderRadius: 2,
       animation: "loadbar 1.2s ease-in-out infinite"
-    } })), /* @__PURE__ */ import_react.default.createElement("style", null, `@keyframes loadbar{0%{transform:translateX(-100%)}100%{transform:translateX(200%)}}@keyframes slideUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}`)), !cargando && user?.rol === "admin" && /* @__PURE__ */ import_react.default.createElement(SyncBadge, { sync }), !cargando && user?.rol === "admin" && /* @__PURE__ */ import_react.default.createElement(PingBadge, { ms: pingMs }), factoryResetRecibido && /* @__PURE__ */ import_react.default.createElement("div", { style: {
+    } })), /* @__PURE__ */ import_react.default.createElement("style", null, `@keyframes loadbar{0%{transform:translateX(-100%)}100%{transform:translateX(200%)}}@keyframes slideUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}`)), !cargando && user?.rol === "admin" && /* @__PURE__ */ import_react.default.createElement(SyncBadge, { sync }), !cargando && user?.rol === "admin" && /* @__PURE__ */ import_react.default.createElement(PingBadge, { ms: pingMs }), !cargando && /* @__PURE__ */ import_react.default.createElement(ClockDriftBanner, { driftMin: clockDrift }), factoryResetRecibido && /* @__PURE__ */ import_react.default.createElement("div", { style: {
       position: "fixed",
       inset: 0,
       zIndex: 99999,
