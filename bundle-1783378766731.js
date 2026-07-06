@@ -54071,6 +54071,46 @@
       return null;
     }
   }
+  async function sbCargarDescuentos() {
+    try {
+      const db = await getSupabase();
+      const { data, error } = await db.from("config_descuentos").select("*");
+      if (error) throw error;
+      const map = {};
+      (data || []).forEach((d) => {
+        map[d.marca_id] = { activo: !!d.activo, pct: Number(d.pct) || 0, hasta: d.hasta || "", updatedBy: d.updated_by || "" };
+      });
+      return map;
+    } catch (e) {
+      console.warn("Supabase cargar descuentos:", e.message);
+      return null;
+    }
+  }
+  async function sbGuardarDescuentoMarca(d) {
+    try {
+      const db = await getSupabase();
+      const { error } = await db.from("config_descuentos").upsert({
+        marca_id: d.marcaId,
+        marca_nombre: d.marcaNombre || "",
+        activo: !!d.activo,
+        pct: Number(d.pct) || 0,
+        hasta: d.hasta || null,
+        updated_by: d.updatedBy || "",
+        updated_at: (/* @__PURE__ */ new Date()).toISOString()
+      }, { onConflict: "marca_id" });
+      if (error) throw error;
+      return true;
+    } catch (e) {
+      console.warn("Supabase guardar descuento:", e.message);
+      return false;
+    }
+  }
+  function descMarcaVigente(descuentos, marcaId) {
+    const d = descuentos?.[marcaId];
+    if (!d || !d.activo) return 0;
+    if (d.hasta && hoy() > d.hasta) return 0;
+    return Math.min(50, Math.max(0, Number(d.pct) || 0));
+  }
   async function sbCargarInventario() {
     try {
       const db = await getSupabase();
@@ -54179,6 +54219,8 @@
         return await sbGuardarUsuarios(op.payload);
       case "marcas":
         return await sbGuardarMarcas(op.payload);
+      case "descuentoMarca":
+        return await sbGuardarDescuentoMarca(op.payload);
       case "eliminarProductoCodigo":
         return await sbEliminarProductoPorCodigo(op.payload.codigo);
       case "eliminarProductosCodigos":
@@ -54273,7 +54315,7 @@
       return false;
     }
   }
-  function useRealtimeSync(setVentas, setInv, setRetiros, setFactoryResetRecibido, onResync) {
+  function useRealtimeSync(setVentas, setInv, setRetiros, setFactoryResetRecibido, onResync, onDescuentoMarca) {
     (0, import_react.useEffect)(() => {
       let channel = null;
       let mounted = true;
@@ -54385,6 +54427,20 @@
         }).on("broadcast", { event: "venta_anulada" }, ({ payload }) => {
           const id = payload?.id;
           if (mounted && id) setVentas((prev) => prev.map((x) => x.id === id ? { ...x, anulada: true } : x));
+        }).on("broadcast", { event: "descuento_marca" }, ({ payload }) => {
+          if (mounted && payload?.marcaId != null && onDescuentoMarca) onDescuentoMarca(payload);
+        }).on("postgres_changes", { event: "*", schema: "public", table: "config_descuentos" }, (payload) => {
+          const d = payload.new;
+          if (mounted && d?.marca_id != null && onDescuentoMarca) onDescuentoMarca({
+            marcaId: d.marca_id,
+            marcaNombre: d.marca_nombre || "",
+            activo: !!d.activo,
+            pct: Number(d.pct) || 0,
+            hasta: d.hasta || "",
+            por: d.updated_by || "",
+            _silencioso: true
+            // sin toast (el broadcast ya avisó)
+          });
         }).on("broadcast", { event: "factory_reset" }, () => {
           if (!mounted) return;
           [
@@ -54484,6 +54540,43 @@
       lineHeight: 1.4,
       boxShadow: "0 2px 8px rgba(0,0,0,0.25)"
     } }, "\u26A0\uFE0F El reloj de este equipo est\xE1 ", driftMin > 0 ? "adelantado" : "atrasado", " ", txt, ' \u2014 las ventas se registran con hora equivocada. Corregir en Ajustes \u2192 Fecha y hora (activar "autom\xE1tico") o avisar al administrador.');
+  }
+  function AlertaDescuento({ data, onClose }) {
+    (0, import_react.useEffect)(() => {
+      if (!data) return;
+      const t = setTimeout(onClose, 6e3);
+      return () => clearTimeout(t);
+    }, [data, onClose]);
+    if (!data) return null;
+    const activo = !!data.activo;
+    const hastaTxt = data.hasta ? ` \xB7 v\xE1lido hasta ${data.hasta.split("-").reverse().join("/")}` : "";
+    return /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      position: "fixed",
+      top: 12,
+      left: "50%",
+      transform: "translateX(-50%)",
+      zIndex: 99997,
+      width: "calc(100% - 32px)",
+      maxWidth: 440,
+      background: C.bg1,
+      border: `2px solid ${activo ? C.green : C.label3}`,
+      borderRadius: 14,
+      padding: "12px 14px",
+      display: "flex",
+      alignItems: "center",
+      gap: 11,
+      boxShadow: "0 8px 24px rgba(0,0,0,0.18)",
+      backdropFilter: "blur(10px)",
+      WebkitBackdropFilter: "blur(10px)"
+    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 22 } }, activo ? "\u{1F3F7}\uFE0F" : "\u26AA"), /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, fontWeight: 600, color: C.label, fontFamily: FONT } }, activo ? `${data.marcaNombre} activ\xF3 ${data.pct}% de descuento` : `${data.marcaNombre} desactiv\xF3 su descuento`), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT_UI, marginTop: 1 } }, activo ? `Se aplica solo a sus art\xEDculos al cobrar${hastaTxt}` : "Sus art\xEDculos vuelven a precio completo")), /* @__PURE__ */ import_react.default.createElement("button", { onClick: onClose, style: {
+      background: "none",
+      border: "none",
+      cursor: "pointer",
+      color: C.label3,
+      fontSize: 16,
+      padding: 4,
+      flexShrink: 0
+    } }, "\u2715"));
   }
   function usePingLatency() {
     var _hPing = (0, import_react.useState)(null);
@@ -54636,14 +54729,17 @@
     const legacy = v.metodoPago === "tarjeta" && (v.fecha || "") < TARJETA_DESC_CLIENTE_HASTA;
     return Math.max(0, (v.descPct || 0) - (legacy ? 1.8 : 0));
   }
+  function netItemSub(v, it) {
+    const full = (it.precioUnit || it.precio || 0) * (it.cantidad || 1);
+    const d = it.descPct != null ? Number(it.descPct) || 0 : getManualDescPct(v);
+    return +(full * (1 - d / 100)).toFixed(2);
+  }
   function getDisplayTotal(v) {
     if (!v) return 0;
     const items = v.items || [];
     if (!items.length) return v.total || 0;
-    const itemsSum = items.reduce((s, i) => s + (i.precioUnit || 0) * (i.cantidad || 1), 0);
-    if (!itemsSum) return v.total || 0;
-    const manualDescPct = getManualDescPct(v);
-    return manualDescPct > 0 ? +(itemsSum * (1 - manualDescPct / 100)).toFixed(2) : itemsSum;
+    const sum = items.reduce((s, it) => s + netItemSub(v, it), 0);
+    return sum || v.total || 0;
   }
   function abreviarNombre(nombre, maxLen = 90) {
     if (!nombre) return "";
@@ -55784,8 +55880,7 @@
     const cfg = leerCfgLiq(marcaId);
     let brutoEf = 0, brutoQR = 0, brutoTJ = 0;
     vMarca.forEach((v) => {
-      const manualDescPct = getManualDescPct(v);
-      const sub = v.items.filter((i) => i.marcaId === marcaId).reduce((s, i) => s + (i.precioUnit || 0) * (i.cantidad || 1) * (1 - manualDescPct / 100), 0);
+      const sub = v.items.filter((i) => i.marcaId === marcaId).reduce((s, i) => s + netItemSub(v, i), 0);
       const vTot = getDisplayTotal(v) || sub;
       const pct = vTot > 0 ? sub / vTot : 1;
       const m = parseMixtoXls(v.metodoPago, getDisplayTotal(v));
@@ -57196,8 +57291,8 @@
     const fmt2 = (n) => Number(n || 0).toLocaleString("es-BO", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     const subtotalBruto = venta.items.reduce((s, i) => s + i.precioUnit * i.cantidad, 0);
     const displayTotal = getDisplayTotal(venta);
-    const manualDescPct = getManualDescPct(venta);
     const descAdicional = subtotalBruto - displayTotal;
+    const itemDesc = (it) => it.descPct != null ? Number(it.descPct) || 0 : getManualDescPct(venta);
     const rows = venta.items.map((it) => `
     <tr>
       <td>${it.codigo}</td>
@@ -57205,7 +57300,7 @@
       <td style="text-align:center">UNIDAD (BIENES)</td>
       <td style="text-align:center">${it.cantidad}</td>
       <td style="text-align:right">${fmt2(it.precioUnit)}</td>
-      <td style="text-align:right">${manualDescPct ? manualDescPct + "%" : "\u2014"}</td>
+      <td style="text-align:right">${itemDesc(it) ? itemDesc(it) + "%" : "\u2014"}</td>
       <td style="text-align:right">${fmt2(it.precioUnit * it.cantidad)}</td>
     </tr>`).join("");
     win.document.write(`<!DOCTYPE html>
@@ -59879,16 +59974,17 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       padding: "10px 14px",
       borderBottom: i < venta.items.length - 1 ? `1px solid ${C.sep}` : ""
     } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, fontWeight: 500, color: C.label, fontFamily: FONT } }, it.nombre), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT } }, it.marcaNombre, " \xB7 x", it.cantidad)), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.label2, fontFamily: FONT, textAlign: "right", minWidth: 60, paddingLeft: 8 } }, $2(it.precioUnit)), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, fontWeight: 600, color: C.label, fontFamily: FONT, textAlign: "right", minWidth: 70, paddingLeft: 8 } }, $2(it.precioUnit * it.cantidad)))), (() => {
-      const manualDescPct = getManualDescPct(venta);
       const itemsSum = venta.items.reduce((s, i) => s + i.precioUnit * i.cantidad, 0);
       const displayTotal = getDisplayTotal(venta);
-      return /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, null, manualDescPct > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      const descBs = itemsSum - displayTotal;
+      const pctPond = itemsSum > 0 ? Math.round(descBs / itemsSum * 100) : 0;
+      return /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, null, descBs > 5e-3 && /* @__PURE__ */ import_react.default.createElement("div", { style: {
         display: "flex",
         justifyContent: "space-between",
         padding: "8px 14px",
         background: `${C.amber}10`,
         borderTop: `1px solid ${C.sep}`
-      } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, color: C.amber, fontFamily: FONT } }, "Descuento (", manualDescPct, "%)"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, color: C.amber, fontFamily: FONT, fontWeight: 600 } }, "-", $2(itemsSum - displayTotal))), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, color: C.amber, fontFamily: FONT } }, "Descuento (", pctPond, "%)"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, color: C.amber, fontFamily: FONT, fontWeight: 600 } }, "-", $2(descBs))), /* @__PURE__ */ import_react.default.createElement("div", { style: {
         display: "flex",
         justifyContent: "space-between",
         padding: "12px 14px",
@@ -63123,7 +63219,184 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       ))))))
     );
   }
-  function BrandPortal({ user, ventas, inv, cargas, retiros = [], logout }) {
+  function PanelDescuentosAdmin({ marcas, descuentos, onGuardar }) {
+    const [abierto, setAbierto] = (0, import_react.useState)(false);
+    const OPCIONES = [5, 10, 15, 20, 25, 30];
+    const lista = (marcas || []).filter((m) => m.estado !== "inactiva");
+    const activos = lista.filter((m) => descMarcaVigente(descuentos, m.id) > 0);
+    return /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      background: C.bg1,
+      border: `1px solid ${C.sep}`,
+      borderRadius: 16,
+      marginBottom: 16,
+      overflow: "hidden",
+      boxShadow: "0 1px 6px rgba(0,0,0,0.04)"
+    } }, /* @__PURE__ */ import_react.default.createElement("button", { onClick: () => setAbierto((a) => !a), style: {
+      width: "100%",
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+      padding: "14px 16px",
+      background: "none",
+      border: "none",
+      cursor: "pointer",
+      WebkitTapHighlightColor: "transparent"
+    } }, /* @__PURE__ */ import_react.default.createElement("i", { className: "ti ti-discount", style: { fontSize: 16, color: C.gold }, "aria-hidden": "true" }), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 14, fontWeight: 700, color: C.label, fontFamily: FONT } }, "Descuentos por marca"), /* @__PURE__ */ import_react.default.createElement("span", { style: {
+      marginLeft: "auto",
+      fontSize: 12,
+      fontWeight: 700,
+      fontFamily: FONT_UI,
+      color: activos.length ? C.green : C.label3
+    } }, activos.length ? `${activos.length} activo${activos.length === 1 ? "" : "s"}` : "ninguno activo"), /* @__PURE__ */ import_react.default.createElement("i", { className: `ti ti-chevron-${abierto ? "up" : "down"}`, style: { fontSize: 14, color: C.label3 }, "aria-hidden": "true" })), abierto && /* @__PURE__ */ import_react.default.createElement("div", { style: { borderTop: `1px solid ${C.sep}` } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { padding: "8px 16px", fontSize: 11, color: C.label3, fontFamily: FONT_UI, lineHeight: 1.5 } }, "La marca puede activar el suyo desde su portal; vos pod\xE9s activarlo o apagarlo ac\xE1. Cada marca absorbe su descuento en la liquidaci\xF3n."), lista.map((m) => {
+      const d = descuentos[m.id] || {};
+      const vig = descMarcaVigente(descuentos, m.id);
+      const activo = vig > 0;
+      return /* @__PURE__ */ import_react.default.createElement("div", { key: m.id, style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        padding: "10px 16px",
+        borderTop: `1px solid ${C.sep}`,
+        background: activo ? `${C.green}0a` : "transparent"
+      } }, /* @__PURE__ */ import_react.default.createElement(MarcaIcon, { marca: m, size: 22, radius: 6 }), /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, fontWeight: 600, color: C.label, fontFamily: FONT } }, m.nombre), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: activo ? C.green : C.label3, fontFamily: FONT_UI } }, activo ? `${vig}% activo${d.hasta ? ` \xB7 hasta ${d.hasta.split("-").reverse().join("/")}` : ""}${d.updatedBy ? ` \xB7 por ${d.updatedBy}` : ""}` : "sin descuento")), /* @__PURE__ */ import_react.default.createElement(
+        "select",
+        {
+          value: activo ? vig : 0,
+          onChange: (e) => {
+            const v = Number(e.target.value);
+            onGuardar(m.id, v > 0 ? { activo: true, pct: v } : { activo: false });
+          },
+          style: {
+            padding: "6px 8px",
+            borderRadius: 8,
+            border: `1px solid ${activo ? C.green : C.sep}`,
+            background: C.bg2,
+            color: activo ? C.green : C.label2,
+            fontSize: 12,
+            fontFamily: FONT_UI,
+            fontWeight: activo ? 700 : 400,
+            cursor: "pointer"
+          }
+        },
+        /* @__PURE__ */ import_react.default.createElement("option", { value: 0 }, "\u2014"),
+        OPCIONES.map((o) => /* @__PURE__ */ import_react.default.createElement("option", { key: o, value: o }, o, "%"))
+      ));
+    })));
+  }
+  function DescuentoMarcaCard({ actual, onGuardar }) {
+    const OPCIONES = [5, 10, 15, 20, 25, 30];
+    const activo = !!actual?.activo;
+    const pct = Number(actual?.pct) || 0;
+    const hasta = actual?.hasta || "";
+    const vencido = hasta && hoy() > hasta;
+    const [pctSel, setPctSel] = (0, import_react.useState)(pct || 20);
+    const [hastaSel, setHastaSel] = (0, import_react.useState)(hasta);
+    (0, import_react.useEffect)(() => {
+      if (pct) setPctSel(pct);
+      setHastaSel(hasta);
+    }, [pct, hasta]);
+    function toggle() {
+      if (activo) {
+        onGuardar({ activo: false });
+      } else {
+        onGuardar({ activo: true, pct: pctSel, hasta: hastaSel || "" });
+      }
+    }
+    return /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      background: C.bg1,
+      border: `2px solid ${activo && !vencido ? C.green : C.sep}`,
+      borderRadius: 16,
+      padding: 16,
+      marginBottom: 20,
+      boxShadow: "0 1px 6px rgba(0,0,0,0.04)"
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: activo ? 12 : 0 } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 14, fontWeight: 700, color: C.label, fontFamily: FONT } }, /* @__PURE__ */ import_react.default.createElement("i", { className: "ti ti-discount", style: { fontSize: 15, verticalAlign: -2, marginRight: 6 }, "aria-hidden": "true" }), "Descuento en tienda"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: activo && !vencido ? C.green : C.label3, fontFamily: FONT_UI, marginTop: 2 } }, activo && !vencido ? `Activo \xB7 ${pct}% \xB7 se aplica en caja ahora` : vencido ? "Venci\xF3 \u2014 reactiv\xE1 para volver a aplicarlo" : "Apagado \xB7 tus art\xEDculos salen a precio completo")), /* @__PURE__ */ import_react.default.createElement(
+      "button",
+      {
+        onClick: toggle,
+        "aria-label": "Activar descuento",
+        style: {
+          width: 48,
+          height: 28,
+          borderRadius: 999,
+          border: "none",
+          cursor: "pointer",
+          flexShrink: 0,
+          background: activo && !vencido ? C.green : C.label3,
+          position: "relative",
+          transition: "background .2s",
+          WebkitTapHighlightColor: "transparent"
+        }
+      },
+      /* @__PURE__ */ import_react.default.createElement("span", { style: {
+        position: "absolute",
+        top: 3,
+        left: activo && !vencido ? 23 : 3,
+        width: 22,
+        height: 22,
+        borderRadius: "50%",
+        background: "#fff",
+        transition: "left .2s",
+        boxShadow: "0 1px 3px rgba(0,0,0,0.3)"
+      } })
+    )), activo && /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, null, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 6, marginBottom: 10, flexWrap: "wrap" } }, OPCIONES.map((o) => /* @__PURE__ */ import_react.default.createElement(
+      "button",
+      {
+        key: o,
+        onClick: () => {
+          setPctSel(o);
+          onGuardar({ activo: true, pct: o, hasta: hastaSel || "" });
+        },
+        style: {
+          flex: "1 1 0",
+          minWidth: 52,
+          padding: "7px 0",
+          borderRadius: 999,
+          cursor: "pointer",
+          fontFamily: FONT_UI,
+          fontSize: 12,
+          fontWeight: pct === o ? 700 : 500,
+          border: `${pct === o ? 2 : 1}px solid ${pct === o ? C.green : C.sep}`,
+          background: pct === o ? `${C.green}18` : C.bg2,
+          color: pct === o ? C.green : C.label2,
+          WebkitTapHighlightColor: "transparent"
+        }
+      },
+      o,
+      "%"
+    ))), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 11, color: C.label3, fontFamily: FONT_UI } }, "Vence (opcional):"), /* @__PURE__ */ import_react.default.createElement(
+      "input",
+      {
+        type: "date",
+        value: hastaSel,
+        min: hoy(),
+        onChange: (e) => {
+          setHastaSel(e.target.value);
+          onGuardar({ activo: true, pct, hasta: e.target.value });
+        },
+        style: {
+          flex: 1,
+          padding: "6px 8px",
+          borderRadius: 8,
+          border: `1px solid ${C.sep}`,
+          background: C.bg2,
+          color: C.label,
+          fontSize: 12,
+          fontFamily: FONT_UI
+        }
+      }
+    ), hastaSel && /* @__PURE__ */ import_react.default.createElement(
+      "button",
+      {
+        onClick: () => {
+          setHastaSel("");
+          onGuardar({ activo: true, pct, hasta: "" });
+        },
+        style: { background: "none", border: "none", color: C.label3, fontSize: 11, cursor: "pointer", fontFamily: FONT_UI }
+      },
+      "sin l\xEDmite"
+    )), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT_UI, marginTop: 10, lineHeight: 1.5 } }, "\u2139\uFE0F El ", pct, "% se descuenta de tu liquidaci\xF3n, no de Toscana. Al activarlo se avisa a la tienda al instante.")));
+  }
+  function BrandPortal({ user, ventas, inv, cargas, retiros = [], logout, descuentos = {}, onGuardarDescuento }) {
     const isDesktop = useIsDesktop();
     const now = /* @__PURE__ */ new Date();
     const [mes, setMes] = (0, import_react.useState)(now.getMonth());
@@ -63470,7 +63743,13 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       alignItems: "center",
       justifyContent: "space-between",
       padding: "16px 28px 0"
-    } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 18, fontWeight: 600, color: C.label, fontFamily: FONT, letterSpacing: "-0.01em" } }, marca.nombre), /* @__PURE__ */ import_react.default.createElement("div", { style: { marginTop: 4 } }, /* @__PURE__ */ import_react.default.createElement(LiveBadge, null))), MesSel), /* @__PURE__ */ import_react.default.createElement("div", { style: { padding: isDesktop ? "16px 28px 0" : "16px 16px 0", maxWidth: isDesktop ? 900 : 780, margin: "0 auto" } }, tab === "dashboard" && /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+    } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 18, fontWeight: 600, color: C.label, fontFamily: FONT, letterSpacing: "-0.01em" } }, marca.nombre), /* @__PURE__ */ import_react.default.createElement("div", { style: { marginTop: 4 } }, /* @__PURE__ */ import_react.default.createElement(LiveBadge, null))), MesSel), /* @__PURE__ */ import_react.default.createElement("div", { style: { padding: isDesktop ? "16px 28px 0" : "16px 16px 0", maxWidth: isDesktop ? 900 : 780, margin: "0 auto" } }, tab === "dashboard" && /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement(
+      DescuentoMarcaCard,
+      {
+        actual: descuentos[marcaId],
+        onGuardar: (patch) => onGuardarDescuento && onGuardarDescuento(marcaId, patch)
+      }
+    ), /* @__PURE__ */ import_react.default.createElement("div", { style: {
       fontSize: 10,
       letterSpacing: 1.2,
       textTransform: "uppercase",
@@ -66217,6 +66496,52 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
     const [factoryResetRecibido, setFactoryResetRecibido] = (0, import_react.useState)(false);
     const pingMs = usePingLatency();
     const clockDrift = useClockDrift();
+    const [descuentos, setDescuentos] = (0, import_react.useState)(() => {
+      try {
+        return JSON.parse(localStorage.getItem("th_descuentos") || "{}");
+      } catch {
+        return {};
+      }
+    });
+    const [alertaDesc, setAlertaDesc] = (0, import_react.useState)(null);
+    (0, import_react.useEffect)(() => {
+      try {
+        localStorage.setItem("th_descuentos", JSON.stringify(descuentos));
+      } catch {
+      }
+    }, [descuentos]);
+    (0, import_react.useEffect)(() => {
+      sbCargarDescuentos().then((m) => {
+        if (m) setDescuentos(m);
+      });
+    }, []);
+    function onDescuentoMarcaRT(p) {
+      setDescuentos((prev) => ({ ...prev, [p.marcaId]: { activo: p.activo, pct: p.pct, hasta: p.hasta || "", updatedBy: p.por || "" } }));
+      if (!p._silencioso) setAlertaDesc({ ...p, ts: Date.now() });
+    }
+    function guardarDescuentoMarca(marcaId, patch) {
+      const m = MARCAS.find((x) => x.id === marcaId);
+      const prev = descuentos[marcaId] || {};
+      const rec = {
+        marcaId,
+        marcaNombre: m?.nombre || "",
+        activo: patch.activo !== void 0 ? !!patch.activo : !!prev.activo,
+        pct: patch.pct !== void 0 ? Number(patch.pct) || 0 : Number(prev.pct) || 0,
+        hasta: patch.hasta !== void 0 ? patch.hasta || "" : prev.hasta || "",
+        updatedBy: user?.nombre || user?.usuario || ""
+      };
+      setDescuentos((p) => ({ ...p, [marcaId]: { activo: rec.activo, pct: rec.pct, hasta: rec.hasta, updatedBy: rec.updatedBy } }));
+      syncConRespaldo("descuentoMarca", rec, () => sbGuardarDescuentoMarca(rec));
+      rtBroadcast("descuento_marca", { marcaId, marcaNombre: rec.marcaNombre, activo: rec.activo, pct: rec.pct, hasta: rec.hasta, por: rec.updatedBy });
+      logAudit("DESCUENTO_MARCA", {
+        resumen: rec.activo ? `${rec.marcaNombre}: descuento ${rec.pct}% ACTIVADO${rec.hasta ? ` hasta ${rec.hasta.split("-").reverse().join("/")}` : ""}` : `${rec.marcaNombre}: descuento desactivado`,
+        marcaId,
+        marca: rec.marcaNombre,
+        pct: rec.pct,
+        activo: rec.activo,
+        hasta: rec.hasta
+      }, user);
+    }
     const [alq, setAlq] = (0, import_react.useState)(() => {
       try {
         return JSON.parse(localStorage.getItem("th_alq") || "[]");
@@ -66365,7 +66690,8 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       setInv,
       setRetiros,
       setFactoryResetRecibido,
-      () => resyncDesdeNube("reconexi\xF3n realtime")
+      () => resyncDesdeNube("reconexi\xF3n realtime"),
+      onDescuentoMarcaRT
     );
     (0, import_react.useEffect)(() => {
       setMarcasState((prev) => {
@@ -67378,7 +67704,7 @@ Esta acci\xF3n no se puede deshacer.` : "\xBFEliminar esta carga? Esta acci\xF3n
       fontFamily: FONT
     } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center", color: "#999" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 28, marginBottom: 12 } }, "\u{1F510}"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 14 } }, "Verificando sesi\xF3n\u2026")));
     if (!user) return /* @__PURE__ */ import_react.default.createElement(LoginScreen, { onLogin: login });
-    if (user.rol === "marca") return /* @__PURE__ */ import_react.default.createElement(BrandPortal, { user, ventas, inv, cargas: cargasCompletas, retiros, logout });
+    if (user.rol === "marca") return /* @__PURE__ */ import_react.default.createElement(BrandPortal, { user, ventas, inv, cargas: cargasCompletas, retiros, logout, descuentos, onGuardarDescuento: guardarDescuentoMarca });
     const _liqPagos = sumPagos(vMes);
     const liqEf = _liqPagos.efectivo;
     const liqQr = _liqPagos.qr;
@@ -67412,7 +67738,7 @@ Esta acci\xF3n no se puede deshacer.` : "\xBFEliminar esta carga? Esta acci\xF3n
       background: C.gold,
       borderRadius: 2,
       animation: "loadbar 1.2s ease-in-out infinite"
-    } })), /* @__PURE__ */ import_react.default.createElement("style", null, `@keyframes loadbar{0%{transform:translateX(-100%)}100%{transform:translateX(200%)}}@keyframes slideUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}`)), !cargando && user?.rol === "admin" && /* @__PURE__ */ import_react.default.createElement(SyncBadge, { sync }), !cargando && user?.rol === "admin" && /* @__PURE__ */ import_react.default.createElement(PingBadge, { ms: pingMs }), !cargando && /* @__PURE__ */ import_react.default.createElement(ClockDriftBanner, { driftMin: clockDrift }), factoryResetRecibido && /* @__PURE__ */ import_react.default.createElement("div", { style: {
+    } })), /* @__PURE__ */ import_react.default.createElement("style", null, `@keyframes loadbar{0%{transform:translateX(-100%)}100%{transform:translateX(200%)}}@keyframes slideUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}`)), !cargando && user?.rol === "admin" && /* @__PURE__ */ import_react.default.createElement(SyncBadge, { sync }), !cargando && user?.rol === "admin" && /* @__PURE__ */ import_react.default.createElement(PingBadge, { ms: pingMs }), !cargando && /* @__PURE__ */ import_react.default.createElement(ClockDriftBanner, { driftMin: clockDrift }), /* @__PURE__ */ import_react.default.createElement(AlertaDescuento, { data: alertaDesc, onClose: () => setAlertaDesc(null) }), factoryResetRecibido && /* @__PURE__ */ import_react.default.createElement("div", { style: {
       position: "fixed",
       inset: 0,
       zIndex: 99999,
@@ -67559,7 +67885,7 @@ Esta acci\xF3n no se puede deshacer.` : "\xBFEliminar esta carga? Esta acci\xF3n
         anio,
         onGoTab: setTab
       }
-    ), tab === "pos" && /* @__PURE__ */ import_react.default.createElement(POSContainer, { inv, onVenta: handleVenta, retiros, onRetiro: registrarRetiro, onVerNota: (v) => setVentaDetalle(v), user }), tab === "inventario" && /* @__PURE__ */ import_react.default.createElement(InventarioPorMarca, { inv, ventas, retiros, bajas: bajasLog, onRecibir: () => setShInv(true), onBaja: () => {
+    ), tab === "pos" && /* @__PURE__ */ import_react.default.createElement(POSContainer, { inv, onVenta: handleVenta, retiros, onRetiro: registrarRetiro, onVerNota: (v) => setVentaDetalle(v), user, descuentos }), tab === "inventario" && /* @__PURE__ */ import_react.default.createElement(InventarioPorMarca, { inv, ventas, retiros, bajas: bajasLog, onRecibir: () => setShInv(true), onBaja: () => {
       setShBaja(true);
       setBajaMsg(null);
       setBajaCod("");
@@ -67589,7 +67915,14 @@ Esta acci\xF3n no se puede deshacer.` : "\xBFEliminar esta carga? Esta acci\xF3n
         onGoVerif: () => setTab("auditoria"),
         tabActual: tab
       }
-    )), tab === "cargas" && /* @__PURE__ */ import_react.default.createElement(RegistroCargas, { cargas: cargasCompletas, marcas: MARCAS, onVerificar: handleVerificarCarga, user, onEliminarCarga: handleEliminarCarga, inv }), tab === "cambios" && /* @__PURE__ */ import_react.default.createElement(CambiosTab, { inv, ventas, onCambio: handleCambio }), tab === "ventas_ant" && user?.rol === "admin" && /* @__PURE__ */ import_react.default.createElement(VentasAntiguas, { inv, ventas, cargas: cargasCompletas, onVentaHistorica: handleVentaHistorica, onImportarVentasLibres: handleImportarVentasLibres, user }), tab === "marcas" && !marcaDetalle && /* @__PURE__ */ import_react.default.createElement("div", null, marcasState.filter((m) => m.estado === "inactiva").length > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: {
+    )), tab === "cargas" && /* @__PURE__ */ import_react.default.createElement(RegistroCargas, { cargas: cargasCompletas, marcas: MARCAS, onVerificar: handleVerificarCarga, user, onEliminarCarga: handleEliminarCarga, inv }), tab === "cambios" && /* @__PURE__ */ import_react.default.createElement(CambiosTab, { inv, ventas, onCambio: handleCambio }), tab === "ventas_ant" && user?.rol === "admin" && /* @__PURE__ */ import_react.default.createElement(VentasAntiguas, { inv, ventas, cargas: cargasCompletas, onVentaHistorica: handleVentaHistorica, onImportarVentasLibres: handleImportarVentasLibres, user }), tab === "marcas" && !marcaDetalle && /* @__PURE__ */ import_react.default.createElement("div", null, user?.rol === "admin" && /* @__PURE__ */ import_react.default.createElement(
+      PanelDescuentosAdmin,
+      {
+        marcas: marcasState,
+        descuentos,
+        onGuardar: guardarDescuentoMarca
+      }
+    ), marcasState.filter((m) => m.estado === "inactiva").length > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: {
       fontSize: 13,
       fontWeight: 600,
       color: C.label3,
@@ -68228,7 +68561,7 @@ Esta acci\xF3n no se puede deshacer.` : "\xBFEliminar esta carga? Esta acci\xF3n
       }
     ));
   }
-  function POSContainer({ inv, onVenta, retiros, onRetiro, onVerNota, user }) {
+  function POSContainer({ inv, onVenta, retiros, onRetiro, onVerNota, user, descuentos }) {
     const [subTab, setSubTab] = (0, import_react.useState)("venta");
     const tabs = [{ id: "venta", label: "\u{1F4B3} Venta" }, { id: "retiros", label: "\u{1F4E4} Retiros" }];
     return /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: {
@@ -68253,7 +68586,7 @@ Esta acci\xF3n no se puede deshacer.` : "\xBFEliminar esta carga? Esta acci\xF3n
       boxShadow: subTab === t.id ? "0 1px 4px rgba(0,0,0,0.10)" : "none",
       transition: "all .15s",
       WebkitTapHighlightColor: "transparent"
-    } }, t.label))), subTab === "venta" ? /* @__PURE__ */ import_react.default.createElement(POS, { inv, onVenta, onVerNota, user }) : /* @__PURE__ */ import_react.default.createElement(RetirosTab, { inv, retiros, onRetiro }));
+    } }, t.label))), subTab === "venta" ? /* @__PURE__ */ import_react.default.createElement(POS, { inv, onVenta, onVerNota, user, descuentos }) : /* @__PURE__ */ import_react.default.createElement(RetirosTab, { inv, retiros, onRetiro }));
   }
   function QRPagoPanel({ total, refVenta }) {
     const [qrBanco, setQrBanco] = (0, import_react.useState)(cargarQRBanco);
@@ -68347,7 +68680,7 @@ Esta acci\xF3n no se puede deshacer.` : "\xBFEliminar esta carga? Esta acci\xF3n
       WebkitTapHighlightColor: "transparent"
     } }, "Quitar")), /* @__PURE__ */ import_react.default.createElement("input", { ref: fileRef, type: "file", accept: "image/*", onChange: subirQRBanco, style: { display: "none" } }));
   }
-  function POS({ inv, onVenta, onVerNota, user }) {
+  function POS({ inv, onVenta, onVerNota, user, descuentos = {} }) {
     var _hN135 = (0, import_react.useState)([]);
     var carrito = _hN135[0];
     var setCarrito = _hN135[1];
@@ -68446,19 +68779,26 @@ Esta acci\xF3n no se puede deshacer.` : "\xBFEliminar esta carga? Esta acci\xF3n
     }, [inv, busq]);
     const pagoInfo = PAGOS.find((p) => p.id === pago) || PAGOS[0];
     const subtotal = carrito.reduce((s, it) => s + it.precio * it.cantidad, 0);
-    const descTarjeta = pago === "tarjeta" ? subtotal * (pagoInfo.desc / 100) : 0;
-    const descManual = subtotal * (descExtra / 100);
-    const total = subtotal - descTarjeta - descManual;
-    const descPct = pagoInfo.desc + Number(descExtra);
+    const descItemPct = (it) => Math.min(
+      50,
+      descMarcaVigente(descuentos, it.marcaId) + Number(descExtra || 0)
+    );
+    const total = carrito.reduce((s, it) => s + it.precio * it.cantidad * (1 - descItemPct(it) / 100), 0);
+    const descTotalBs = subtotal - total;
+    const descPct = subtotal > 0 ? +(descTotalBs / subtotal * 100).toFixed(2) : 0;
+    const hayDescMarca = carrito.some((it) => descMarcaVigente(descuentos, it.marcaId) > 0);
     const porMarca = (0, import_react.useMemo)(() => {
       const m = {};
       carrito.forEach((it) => {
-        if (!m[it.marcaId]) m[it.marcaId] = { nombre: it.marcaNombre, color: it.marcaColor, emoji: it.marcaEmoji, total: 0, uds: 0 };
-        m[it.marcaId].total += it.precio * it.cantidad;
+        const dm = descMarcaVigente(descuentos, it.marcaId);
+        if (!m[it.marcaId]) m[it.marcaId] = { nombre: it.marcaNombre, color: it.marcaColor, emoji: it.marcaEmoji, total: 0, neto: 0, uds: 0, descMarca: dm };
+        const bruto = it.precio * it.cantidad;
+        m[it.marcaId].total += bruto;
+        m[it.marcaId].neto += bruto * (1 - descItemPct(it) / 100);
         m[it.marcaId].uds += it.cantidad;
       });
       return Object.entries(m);
-    }, [carrito]);
+    }, [carrito, descuentos, descExtra]);
     function add(prod) {
       const m = MARCAS.find((x) => x.id === prod.marcaId);
       setCarrito((p) => {
@@ -68573,17 +68913,21 @@ ${sinStock.map((it) => {
         }).join("\n")}`);
         return;
       }
-      const factor = 1 - descPct / 100;
-      const items = carrito.map((it) => ({
-        prodId: it.prodId,
-        codigo: it.codigo,
-        nombre: it.nombre,
-        marcaId: it.marcaId,
-        marcaNombre: it.marcaNombre,
-        cantidad: it.cantidad,
-        precioUnit: it.precio,
-        subtotal: +(it.precio * it.cantidad * factor).toFixed(2)
-      }));
+      const items = carrito.map((it) => {
+        const d = descItemPct(it);
+        return {
+          prodId: it.prodId,
+          codigo: it.codigo,
+          nombre: it.nombre,
+          marcaId: it.marcaId,
+          marcaNombre: it.marcaNombre,
+          cantidad: it.cantidad,
+          precioUnit: it.precio,
+          descPct: +d.toFixed(2),
+          // descuento propio del ítem (clave del nuevo modelo)
+          subtotal: +(it.precio * it.cantidad * (1 - d / 100)).toFixed(2)
+        };
+      });
       if (pagoGC) {
         if (!gcEncontrado) {
           alert("Busca y verifica la Gift Card primero");
@@ -68782,7 +69126,15 @@ ${sinStock.map((it) => {
       overflow: "hidden",
       textOverflow: "ellipsis",
       whiteSpace: "nowrap"
-    } }, it.nombre), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT } }, it.marcaEmoji, " ", it.marcaNombre)), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10, flexShrink: 0 } }, /* @__PURE__ */ import_react.default.createElement("button", { onClick: () => cambiar(it.prodId, -1), style: {
+    } }, it.nombre), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" } }, /* @__PURE__ */ import_react.default.createElement("span", null, it.marcaEmoji, " ", it.marcaNombre), descMarcaVigente(descuentos, it.marcaId) > 0 && /* @__PURE__ */ import_react.default.createElement("span", { style: {
+      fontSize: 10,
+      fontWeight: 700,
+      color: C.green,
+      background: `${C.green}18`,
+      padding: "1px 6px",
+      borderRadius: 4,
+      fontFamily: FONT_UI
+    } }, "\u2212", descMarcaVigente(descuentos, it.marcaId), "%"))), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10, flexShrink: 0 } }, /* @__PURE__ */ import_react.default.createElement("button", { onClick: () => cambiar(it.prodId, -1), style: {
       width: 32,
       height: 32,
       borderRadius: "50%",
@@ -68810,7 +69162,7 @@ ${sinStock.map((it) => {
       color: C.label2,
       fontWeight: 700,
       WebkitTapHighlightColor: "transparent"
-    } }, "+")), /* @__PURE__ */ import_react.default.createElement("div", { style: { minWidth: 70, textAlign: "right" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 15, fontWeight: 700, color: C.label, fontFamily: FONT } }, $2(it.precio * it.cantidad))), /* @__PURE__ */ import_react.default.createElement("button", { onClick: () => quitar(it.prodId), style: {
+    } }, "+")), /* @__PURE__ */ import_react.default.createElement("div", { style: { minWidth: 70, textAlign: "right" } }, descMarcaVigente(descuentos, it.marcaId) > 0 ? /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, textDecoration: "line-through", fontFamily: FONT } }, $2(it.precio * it.cantidad)), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 15, fontWeight: 700, color: C.green, fontFamily: FONT } }, $2(it.precio * it.cantidad * (1 - descItemPct(it) / 100)))) : /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 15, fontWeight: 700, color: C.label, fontFamily: FONT } }, $2(it.precio * it.cantidad))), /* @__PURE__ */ import_react.default.createElement("button", { onClick: () => quitar(it.prodId), style: {
       background: "none",
       border: "none",
       cursor: "pointer",
@@ -68974,7 +69326,14 @@ ${sinStock.map((it) => {
       padding: "20px",
       marginBottom: 20,
       textAlign: "center"
-    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.label3, fontFamily: FONT, marginBottom: 6 } }, "Total a cobrar"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 40, fontWeight: 700, color: C.label, fontFamily: FONT, lineHeight: 1 } }, $2(total)), descPct > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.label3, fontFamily: FONT, marginTop: 6 } }, "Subtotal ", $2(subtotal), " \xB7 -(", descPct, "%)")), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.label3, fontFamily: FONT, marginBottom: 6 } }, "Total a cobrar"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 40, fontWeight: 700, color: C.label, fontFamily: FONT, lineHeight: 1 } }, $2(total)), descTotalBs > 5e-3 && /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.label3, fontFamily: FONT, marginTop: 6 } }, "Subtotal ", $2(subtotal), " \xB7 descuentos \u2212", $2(descTotalBs)), hayDescMarca && /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      marginTop: 10,
+      paddingTop: 10,
+      borderTop: `1px solid ${C.gold}25`,
+      display: "flex",
+      flexDirection: "column",
+      gap: 3
+    } }, porMarca.filter(([, d]) => d.descMarca > 0).map(([id, d]) => /* @__PURE__ */ import_react.default.createElement("div", { key: id, style: { display: "flex", justifyContent: "space-between", fontSize: 12, fontFamily: FONT } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.label2 } }, d.emoji, " ", d.nombre, " ", /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.green, fontWeight: 700 } }, "\u2212", d.descMarca, "%")), /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.label2 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { textDecoration: "line-through", color: C.label3, fontSize: 11 } }, $2(d.total)), " ", $2(d.neto)))))), /* @__PURE__ */ import_react.default.createElement("div", { style: {
       fontSize: 13,
       fontWeight: 600,
       color: C.label3,
@@ -69198,13 +69557,13 @@ ${sinStock.map((it) => {
       border: `1px solid ${C.green}30`,
       textAlign: "center",
       marginTop: 8
-    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.green, fontWeight: 700, fontFamily: FONT_UI } }, "\u2713 Gift Card cubre el total completo")))), /* @__PURE__ */ import_react.default.createElement(
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.green, fontWeight: 700, fontFamily: FONT_UI } }, "\u2713 Gift Card cubre el total completo")))), user?.rol === "admin" && /* @__PURE__ */ import_react.default.createElement(
       IOSInput,
       {
-        label: "Descuento adicional (%)",
+        label: "Descuento adicional manual (%)",
         type: "number",
         min: "0",
-        max: "100",
+        max: "50",
         value: descExtra,
         onChange: (e) => setDescExtra(Number(e.target.value))
       }
@@ -74711,7 +75070,8 @@ ${c.resumen || c.id}`)) onEliminarCarga(c.id);
     USUARIO: { label: "Usuario", icono: "\u{1F464}", color: "#6A1B9A" },
     RESET: { label: "Factory Reset", icono: "\u{1F504}", color: "#C94C4C" },
     LOGIN: { label: "Acceso", icono: "\u{1F510}", color: "#546E7A" },
-    CIERRE: { label: "Cierre", icono: "\u{1F4CA}", color: "#8A6418" }
+    CIERRE: { label: "Cierre", icono: "\u{1F4CA}", color: "#8A6418" },
+    DESCUENTO_MARCA: { label: "Descuento marca", icono: "\u{1F3F7}\uFE0F", color: "#2E7D32" }
   };
   function crearCarga(tipo, usuario, extra) {
     const now = /* @__PURE__ */ new Date();

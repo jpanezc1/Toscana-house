@@ -580,6 +580,41 @@ async function sbCargarTodo() {
   }
 }
 
+// ── Descuentos por marca (tabla config_descuentos) ──────────────────
+async function sbCargarDescuentos(){
+  try{
+    const db = await getSupabase();
+    const {data, error} = await db.from("config_descuentos").select("*");
+    if(error) throw error;
+    const map = {};
+    (data||[]).forEach(d=>{
+      map[d.marca_id] = {activo:!!d.activo, pct:Number(d.pct)||0, hasta:d.hasta||"", updatedBy:d.updated_by||""};
+    });
+    return map;
+  }catch(e){ console.warn("Supabase cargar descuentos:", e.message); return null; }
+}
+async function sbGuardarDescuentoMarca(d){
+  try{
+    const db = await getSupabase();
+    const {error} = await db.from("config_descuentos").upsert({
+      marca_id: d.marcaId, marca_nombre: d.marcaNombre||"",
+      activo: !!d.activo, pct: Number(d.pct)||0,
+      hasta: d.hasta||null, updated_by: d.updatedBy||"",
+      updated_at: new Date().toISOString(),
+    }, {onConflict:"marca_id"});
+    if(error) throw error;
+    return true;
+  }catch(e){ console.warn("Supabase guardar descuento:", e.message); return false; }
+}
+
+// % de descuento vigente de una marca (0 si apagado o vencido)
+function descMarcaVigente(descuentos, marcaId){
+  const d = descuentos?.[marcaId];
+  if(!d || !d.activo) return 0;
+  if(d.hasta && hoy() > d.hasta) return 0; // venció → se apaga solo
+  return Math.min(50, Math.max(0, Number(d.pct)||0));
+}
+
 // Recarga SOLO el inventario desde Supabase (fuente de verdad).
 // Se usa cuando se elimina una carga en otro dispositivo: en vez de depender
 // de recibir N eventos DELETE individuales (que el realtime descarta en ráfaga),
@@ -665,6 +700,7 @@ async function ejecutarOpOutbox(op){
     case "auditLog":    return await sbGuardarAuditLog(op.payload);
     case "usuarios":    return await sbGuardarUsuarios(op.payload);
     case "marcas":      return await sbGuardarMarcas(op.payload);
+    case "descuentoMarca": return await sbGuardarDescuentoMarca(op.payload);
     case "eliminarProductoCodigo": return await sbEliminarProductoPorCodigo(op.payload.codigo);
     case "eliminarProductosCodigos": return await sbEliminarProductosPorCodigos(op.payload.codigos);
     case "eliminarCarga":          return await sbEliminarCarga(op.payload.cargaId);
@@ -760,7 +796,7 @@ async function syncConRespaldo(tipo, payload, fnDirecto){
 // ── Realtime sync — escucha cambios en Supabase y actualiza estado local ────
 // Activa canales en: ventas (INSERT/UPDATE) + inventario (INSERT/UPDATE)
 // Deduplicación: si la fila ya existe (optimistic update local), no se agrega.
-function useRealtimeSync(setVentas, setInv, setRetiros, setFactoryResetRecibido, onResync) {
+function useRealtimeSync(setVentas, setInv, setRetiros, setFactoryResetRecibido, onResync, onDescuentoMarca) {
   useEffect(() => {
     let channel = null;
     let mounted = true;
@@ -860,6 +896,19 @@ function useRealtimeSync(setVentas, setInv, setRetiros, setFactoryResetRecibido,
           const id = payload?.id;
           if(mounted && id) setVentas(prev => prev.map(x => x.id===id ? {...x, anulada:true} : x));
         })
+        // ── Broadcast: descuento de marca activado/cambiado (alerta + estado) ──
+        .on("broadcast", {event:"descuento_marca"}, ({payload}) => {
+          if(mounted && payload?.marcaId!=null && onDescuentoMarca) onDescuentoMarca(payload);
+        })
+        // ── Tabla config_descuentos: cambios desde cualquier dispositivo ──
+        .on("postgres_changes", {event:"*", schema:"public", table:"config_descuentos"}, payload => {
+          const d = payload.new;
+          if(mounted && d?.marca_id!=null && onDescuentoMarca) onDescuentoMarca({
+            marcaId: d.marca_id, marcaNombre: d.marca_nombre||"",
+            activo: !!d.activo, pct: Number(d.pct)||0, hasta: d.hasta||"",
+            por: d.updated_by||"", _silencioso: true, // sin toast (el broadcast ya avisó)
+          });
+        })
         // ── Broadcast: factory reset → limpiar y recargar esta sesión ────────
         .on("broadcast", {event:"factory_reset"}, () => {
           if(!mounted) return;
@@ -951,6 +1000,42 @@ function ClockDriftBanner({driftMin}){
       ⚠️ El reloj de este equipo está {driftMin>0?"adelantado":"atrasado"} {txt} —
       las ventas se registran con hora equivocada. Corregir en Ajustes → Fecha y hora
       (activar "automático") o avisar al administrador.
+    </div>
+  );
+}
+
+// Toast: aviso cuando una marca activa/cambia su descuento (admin y caja)
+function AlertaDescuento({data, onClose}){
+  useEffect(()=>{
+    if(!data) return;
+    const t=setTimeout(onClose, 6000);
+    return ()=>clearTimeout(t);
+  },[data,onClose]);
+  if(!data) return null;
+  const activo = !!data.activo;
+  const hastaTxt = data.hasta ? ` · válido hasta ${data.hasta.split("-").reverse().join("/")}` : "";
+  return (
+    <div style={{
+      position:"fixed", top:12, left:"50%", transform:"translateX(-50%)",
+      zIndex:99997, width:"calc(100% - 32px)", maxWidth:440,
+      background:C.bg1, border:`2px solid ${activo?C.green:C.label3}`,
+      borderRadius:14, padding:"12px 14px", display:"flex", alignItems:"center", gap:11,
+      boxShadow:"0 8px 24px rgba(0,0,0,0.18)",
+      backdropFilter:"blur(10px)", WebkitBackdropFilter:"blur(10px)",
+    }}>
+      <span style={{fontSize:22}}>{activo?"🏷️":"⚪"}</span>
+      <div style={{flex:1,minWidth:0}}>
+        <div style={{fontSize:13,fontWeight:600,color:C.label,fontFamily:FONT}}>
+          {activo
+            ? `${data.marcaNombre} activó ${data.pct}% de descuento`
+            : `${data.marcaNombre} desactivó su descuento`}
+        </div>
+        <div style={{fontSize:11,color:C.label3,fontFamily:FONT_UI,marginTop:1}}>
+          {activo ? `Se aplica solo a sus artículos al cobrar${hastaTxt}` : "Sus artículos vuelven a precio completo"}
+        </div>
+      </div>
+      <button onClick={onClose} style={{background:"none",border:"none",cursor:"pointer",
+        color:C.label3,fontSize:16,padding:4,flexShrink:0}}>✕</button>
     </div>
   );
 }
@@ -1150,16 +1235,24 @@ function getManualDescPct(v){
   return Math.max(0, (v.descPct||0) - (legacy ? 1.8 : 0));
 }
 
-// Retorna el total real de una venta para display: precio lleno de los items
-// menos solo el descuento manual (nunca la comisión bancaria de tarjeta).
+// Subtotal NETO de un ítem = precio lleno menos su descuento efectivo.
+// Modelo nuevo: cada ítem guarda su propio descPct (descuento por marca +
+// manual). Ventas viejas sin descPct por ítem → usa el descuento global de
+// la venta (getManualDescPct maneja la comisión legacy de tarjeta).
+function netItemSub(v, it){
+  const full = (it.precioUnit||it.precio||0) * (it.cantidad||1);
+  const d = it.descPct!=null ? Number(it.descPct)||0 : getManualDescPct(v);
+  return +(full*(1-d/100)).toFixed(2);
+}
+
+// Retorna el total real de una venta para display: suma de subtotales netos
+// por ítem. Display y liquidación usan netItemSub → siempre coinciden.
 function getDisplayTotal(v){
   if(!v) return 0;
   const items=(v.items||[]);
   if(!items.length) return v.total||0;
-  const itemsSum=items.reduce((s,i)=>s+(i.precioUnit||0)*(i.cantidad||1),0);
-  if(!itemsSum) return v.total||0;
-  const manualDescPct=getManualDescPct(v);
-  return manualDescPct>0 ? +((itemsSum*(1-manualDescPct/100)).toFixed(2)) : itemsSum;
+  const sum=items.reduce((s,it)=>s+netItemSub(v,it),0);
+  return sum || v.total || 0;
 }
 
 // Abrevia nombres largos de productos para que entren en la etiqueta
@@ -2274,10 +2367,11 @@ function calcLiqMarca(vMarca, marcaId, MK) {
   const cfg = leerCfgLiq(marcaId);
   let brutoEf = 0, brutoQR = 0, brutoTJ = 0;
   vMarca.forEach(v => {
-    // sub: precio lleno de items de esta marca menos solo descuento manual
-    const manualDescPct = getManualDescPct(v);
+    // sub: subtotal neto de items de ESTA marca (cada ítem con SU descuento).
+    // netItemSub aplica el descuento por marca del ítem → cada marca absorbe
+    // solo el suyo, nunca el de otra marca en la misma venta.
     const sub = v.items.filter(i => i.marcaId === marcaId)
-      .reduce((s, i) => s + (i.precioUnit||0) * (i.cantidad||1) * (1 - manualDescPct/100), 0);
+      .reduce((s, i) => s + netItemSub(v, i), 0);
     const vTot  = getDisplayTotal(v) || sub;
     const pct   = vTot > 0 ? sub / vTot : 1;
     const m     = parseMixtoXls(v.metodoPago, getDisplayTotal(v));
@@ -3734,9 +3828,10 @@ function abrirNotaVenta(venta, numSecuencial, autoPrint=false){
   const fmt2=n=>Number(n||0).toLocaleString("es-BO",{minimumFractionDigits:2,maximumFractionDigits:2});
   const subtotalBruto=venta.items.reduce((s,i)=>s+i.precioUnit*i.cantidad,0);
   const displayTotal=getDisplayTotal(venta);
-  const manualDescPct=getManualDescPct(venta);
   const descAdicional=subtotalBruto-displayTotal;
-  // Filas a precio LLENO: la cuenta visible cuadra (Subtotal − Descuento = Total)
+  // Descuento por ítem: propio del ítem (nuevo modelo) o el global (ventas viejas)
+  const itemDesc = it => it.descPct!=null ? Number(it.descPct)||0 : getManualDescPct(venta);
+  // Filas a precio LLENO en columna Subtotal: la cuenta visible cuadra
   const rows=venta.items.map(it=>`
     <tr>
       <td>${it.codigo}</td>
@@ -3744,7 +3839,7 @@ function abrirNotaVenta(venta, numSecuencial, autoPrint=false){
       <td style="text-align:center">UNIDAD (BIENES)</td>
       <td style="text-align:center">${it.cantidad}</td>
       <td style="text-align:right">${fmt2(it.precioUnit)}</td>
-      <td style="text-align:right">${manualDescPct?manualDescPct+"%":"—"}</td>
+      <td style="text-align:right">${itemDesc(it)?itemDesc(it)+"%":"—"}</td>
       <td style="text-align:right">${fmt2(it.precioUnit*it.cantidad)}</td>
     </tr>`).join("");
   win.document.write(`<!DOCTYPE html>
@@ -6176,16 +6271,17 @@ function NotaVentaModal({venta, onClose, numVenta, onAnularVenta}){
         {/* Descuento si hay — solo descuento manual, nunca comisión bancaria tarjeta.
             Ítems arriba a precio LLENO → la resta visible cuadra con el total. */}
         {(()=>{
-          const manualDescPct=getManualDescPct(venta);
           const itemsSum=venta.items.reduce((s,i)=>s+i.precioUnit*i.cantidad,0);
           const displayTotal=getDisplayTotal(venta);
+          const descBs=itemsSum-displayTotal;
+          const pctPond=itemsSum>0?Math.round(descBs/itemsSum*100):0;
           return(<>
-            {manualDescPct>0&&(
+            {descBs>0.005&&(
               <div style={{display:"flex",justifyContent:"space-between",padding:"8px 14px",
                 background:`${C.amber}10`,borderTop:`1px solid ${C.sep}`}}>
-                <span style={{fontSize:13,color:C.amber,fontFamily:FONT}}>Descuento ({manualDescPct}%)</span>
+                <span style={{fontSize:13,color:C.amber,fontFamily:FONT}}>Descuento ({pctPond}%)</span>
                 <span style={{fontSize:13,color:C.amber,fontFamily:FONT,fontWeight:600}}>
-                  -{$(itemsSum-displayTotal)}
+                  -{$(descBs)}
                 </span>
               </div>
             )}
@@ -6657,17 +6753,18 @@ function imprimirComprobante(venta) {
     <table>
       <tr>
         ${(()=>{
-          const manualDescPct=getManualDescPct(venta);
           const displayTotal=getDisplayTotal(venta);
           const itemsSum=(venta.items||[]).reduce((s,i)=>s+(i.precioUnit||0)*(i.cantidad||1),0);
-          return (manualDescPct>0?`
+          const descBs=itemsSum-displayTotal;
+          const pctPond=itemsSum>0?Math.round(descBs/itemsSum*100):0;
+          return (descBs>0.005?`
         <tr>
           <td class="label">Subtotal</td>
           <td style="text-align:right">Bs ${itemsSum.toFixed(2)}</td>
         </tr>
         <tr>
-          <td class="label">Descuento ${manualDescPct}%</td>
-          <td style="text-align:right;color:#c00">-Bs ${(itemsSum-displayTotal).toFixed(2)}</td>
+          <td class="label">Descuento ${pctPond}%</td>
+          <td style="text-align:right;color:#c00">-Bs ${descBs.toFixed(2)}</td>
         </tr>`:"")
           +`<tr>
           <td class="total-label">TOTAL</td>
@@ -9573,7 +9670,140 @@ function BrandVentaModal({venta, marca, onClose}){
   );
 }
 
-function BrandPortal({user, ventas, inv, cargas, retiros=[], logout}){
+// Panel admin: ver/activar/apagar el descuento de cada marca (pestaña Marcas)
+function PanelDescuentosAdmin({marcas, descuentos, onGuardar}){
+  const [abierto, setAbierto] = useState(false);
+  const OPCIONES = [5,10,15,20,25,30];
+  const lista = (marcas||[]).filter(m=>m.estado!=="inactiva");
+  const activos = lista.filter(m=>descMarcaVigente(descuentos, m.id)>0);
+  return (
+    <div style={{background:C.bg1,border:`1px solid ${C.sep}`,borderRadius:16,
+      marginBottom:16,overflow:"hidden",boxShadow:"0 1px 6px rgba(0,0,0,0.04)"}}>
+      <button onClick={()=>setAbierto(a=>!a)} style={{width:"100%",display:"flex",
+        alignItems:"center",gap:10,padding:"14px 16px",background:"none",border:"none",
+        cursor:"pointer",WebkitTapHighlightColor:"transparent"}}>
+        <i className="ti ti-discount" style={{fontSize:16,color:C.gold}} aria-hidden="true"/>
+        <span style={{fontSize:14,fontWeight:700,color:C.label,fontFamily:FONT}}>Descuentos por marca</span>
+        <span style={{marginLeft:"auto",fontSize:12,fontWeight:700,fontFamily:FONT_UI,
+          color:activos.length?C.green:C.label3}}>
+          {activos.length?`${activos.length} activo${activos.length===1?"":"s"}`:"ninguno activo"}
+        </span>
+        <i className={`ti ti-chevron-${abierto?"up":"down"}`} style={{fontSize:14,color:C.label3}} aria-hidden="true"/>
+      </button>
+      {abierto&&(
+        <div style={{borderTop:`1px solid ${C.sep}`}}>
+          <div style={{padding:"8px 16px",fontSize:11,color:C.label3,fontFamily:FONT_UI,lineHeight:1.5}}>
+            La marca puede activar el suyo desde su portal; vos podés activarlo o apagarlo acá. Cada marca absorbe su descuento en la liquidación.
+          </div>
+          {lista.map(m=>{
+            const d = descuentos[m.id]||{};
+            const vig = descMarcaVigente(descuentos, m.id);
+            const activo = vig>0;
+            return (
+              <div key={m.id} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 16px",
+                borderTop:`1px solid ${C.sep}`,background:activo?`${C.green}0a`:"transparent"}}>
+                <MarcaIcon marca={m} size={22} radius={6}/>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:13,fontWeight:600,color:C.label,fontFamily:FONT}}>{m.nombre}</div>
+                  <div style={{fontSize:10,color:activo?C.green:C.label3,fontFamily:FONT_UI}}>
+                    {activo ? `${vig}% activo${d.hasta?` · hasta ${d.hasta.split("-").reverse().join("/")}`:""}${d.updatedBy?` · por ${d.updatedBy}`:""}` : "sin descuento"}
+                  </div>
+                </div>
+                <select value={activo?vig:0}
+                  onChange={e=>{const v=Number(e.target.value); onGuardar(m.id, v>0?{activo:true,pct:v}:{activo:false});}}
+                  style={{padding:"6px 8px",borderRadius:8,border:`1px solid ${activo?C.green:C.sep}`,
+                    background:C.bg2,color:activo?C.green:C.label2,fontSize:12,fontFamily:FONT_UI,
+                    fontWeight:activo?700:400,cursor:"pointer"}}>
+                  <option value={0}>—</option>
+                  {OPCIONES.map(o=><option key={o} value={o}>{o}%</option>)}
+                </select>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Tarjeta de autogestión de descuento — portal de marca
+function DescuentoMarcaCard({actual, onGuardar}){
+  const OPCIONES = [5,10,15,20,25,30];
+  const activo = !!actual?.activo;
+  const pct    = Number(actual?.pct)||0;
+  const hasta  = actual?.hasta||"";
+  const vencido = hasta && hoy() > hasta;
+  const [pctSel, setPctSel] = useState(pct||20);
+  const [hastaSel, setHastaSel] = useState(hasta);
+  useEffect(()=>{ if(pct) setPctSel(pct); setHastaSel(hasta); },[pct,hasta]);
+
+  function toggle(){
+    if(activo){ onGuardar({activo:false}); }
+    else{ onGuardar({activo:true, pct:pctSel, hasta:hastaSel||""}); }
+  }
+
+  return (
+    <div style={{background:C.bg1, border:`2px solid ${activo&&!vencido?C.green:C.sep}`,
+      borderRadius:16, padding:16, marginBottom:20,
+      boxShadow:"0 1px 6px rgba(0,0,0,0.04)"}}>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:activo?12:0}}>
+        <div>
+          <div style={{fontSize:14,fontWeight:700,color:C.label,fontFamily:FONT}}>
+            <i className="ti ti-discount" style={{fontSize:15,verticalAlign:-2,marginRight:6}} aria-hidden="true"/>
+            Descuento en tienda
+          </div>
+          <div style={{fontSize:11,color:activo&&!vencido?C.green:C.label3,fontFamily:FONT_UI,marginTop:2}}>
+            {activo&&!vencido ? `Activo · ${pct}% · se aplica en caja ahora`
+              : vencido ? "Venció — reactivá para volver a aplicarlo"
+              : "Apagado · tus artículos salen a precio completo"}
+          </div>
+        </div>
+        <button onClick={toggle} aria-label="Activar descuento"
+          style={{width:48,height:28,borderRadius:999,border:"none",cursor:"pointer",flexShrink:0,
+            background: activo&&!vencido?C.green:C.label3, position:"relative",transition:"background .2s",
+            WebkitTapHighlightColor:"transparent"}}>
+          <span style={{position:"absolute",top:3,left:activo&&!vencido?23:3,width:22,height:22,
+            borderRadius:"50%",background:"#fff",transition:"left .2s",boxShadow:"0 1px 3px rgba(0,0,0,0.3)"}}/>
+        </button>
+      </div>
+
+      {activo&&(
+        <>
+          <div style={{display:"flex",gap:6,marginBottom:10,flexWrap:"wrap"}}>
+            {OPCIONES.map(o=>(
+              <button key={o} onClick={()=>{setPctSel(o); onGuardar({activo:true,pct:o,hasta:hastaSel||""});}}
+                style={{flex:"1 1 0",minWidth:52,padding:"7px 0",borderRadius:999,cursor:"pointer",
+                  fontFamily:FONT_UI,fontSize:12,fontWeight:pct===o?700:500,
+                  border:`${pct===o?2:1}px solid ${pct===o?C.green:C.sep}`,
+                  background:pct===o?`${C.green}18`:C.bg2, color:pct===o?C.green:C.label2,
+                  WebkitTapHighlightColor:"transparent"}}>
+                {o}%
+              </button>
+            ))}
+          </div>
+          <div style={{display:"flex",alignItems:"center",gap:8}}>
+            <span style={{fontSize:11,color:C.label3,fontFamily:FONT_UI}}>Vence (opcional):</span>
+            <input type="date" value={hastaSel} min={hoy()}
+              onChange={e=>{setHastaSel(e.target.value); onGuardar({activo:true,pct,hasta:e.target.value});}}
+              style={{flex:1,padding:"6px 8px",borderRadius:8,border:`1px solid ${C.sep}`,
+                background:C.bg2,color:C.label,fontSize:12,fontFamily:FONT_UI}}/>
+            {hastaSel&&(
+              <button onClick={()=>{setHastaSel(""); onGuardar({activo:true,pct,hasta:""});}}
+                style={{background:"none",border:"none",color:C.label3,fontSize:11,cursor:"pointer",fontFamily:FONT_UI}}>
+                sin límite
+              </button>
+            )}
+          </div>
+          <div style={{fontSize:11,color:C.label3,fontFamily:FONT_UI,marginTop:10,lineHeight:1.5}}>
+            ℹ️ El {pct}% se descuenta de tu liquidación, no de Toscana. Al activarlo se avisa a la tienda al instante.
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function BrandPortal({user, ventas, inv, cargas, retiros=[], logout, descuentos={}, onGuardarDescuento}){
   // ── TODOS los hooks ANTES de cualquier return condicional ──
   const isDesktop = useIsDesktop();
   const now = new Date();
@@ -9927,6 +10157,11 @@ function BrandPortal({user, ventas, inv, cargas, retiros=[], logout}){
         {/* ══ DASHBOARD ══ */}
         {tab==="dashboard"&&(
           <div>
+            {/* ── Descuento en tienda (autogestión de la marca) ── */}
+            <DescuentoMarcaCard
+              actual={descuentos[marcaId]}
+              onGuardar={patch=>onGuardarDescuento&&onGuardarDescuento(marcaId, patch)}/>
+
             {/* ── Sección Hoy ── */}
             <div style={{fontSize:10,letterSpacing:1.2,textTransform:"uppercase",color:C.label3,
               fontFamily:FONT_UI,marginBottom:12,opacity:.65}}>Hoy</div>
@@ -12146,6 +12381,40 @@ function App(){
   const[factoryResetRecibido,setFactoryResetRecibido]=useState(false);
   const pingMs = usePingLatency();
   const clockDrift = useClockDrift();
+
+  // ── Descuentos por marca (config compartida) ──
+  const[descuentos,setDescuentos]=useState(()=>{ try{return JSON.parse(localStorage.getItem("th_descuentos")||"{}");}catch{return{};} });
+  const[alertaDesc,setAlertaDesc]=useState(null); // toast: {marcaNombre,activo,pct,hasta,por,ts}
+  useEffect(()=>{ try{localStorage.setItem("th_descuentos",JSON.stringify(descuentos));}catch{} },[descuentos]);
+  useEffect(()=>{ sbCargarDescuentos().then(m=>{ if(m) setDescuentos(m); }); },[]);
+
+  // Recibe cambios de descuento (broadcast o postgres_changes) → estado + toast
+  function onDescuentoMarcaRT(p){
+    setDescuentos(prev=>({...prev,[p.marcaId]:{activo:p.activo,pct:p.pct,hasta:p.hasta||"",updatedBy:p.por||""}}));
+    if(!p._silencioso) setAlertaDesc({...p, ts:Date.now()});
+  }
+
+  // Guardar descuento (panel admin o portal de marca) — optimista + nube + alerta
+  function guardarDescuentoMarca(marcaId, patch){
+    const m = MARCAS.find(x=>x.id===marcaId);
+    const prev = descuentos[marcaId]||{};
+    const rec = {
+      marcaId, marcaNombre: m?.nombre||"",
+      activo: patch.activo!==undefined ? !!patch.activo : !!prev.activo,
+      pct:    patch.pct!==undefined ? (Number(patch.pct)||0) : (Number(prev.pct)||0),
+      hasta:  patch.hasta!==undefined ? (patch.hasta||"") : (prev.hasta||""),
+      updatedBy: user?.nombre||user?.usuario||"",
+    };
+    setDescuentos(p=>({...p,[marcaId]:{activo:rec.activo,pct:rec.pct,hasta:rec.hasta,updatedBy:rec.updatedBy}}));
+    syncConRespaldo("descuentoMarca", rec, ()=>sbGuardarDescuentoMarca(rec));
+    rtBroadcast("descuento_marca", {marcaId, marcaNombre:rec.marcaNombre, activo:rec.activo, pct:rec.pct, hasta:rec.hasta, por:rec.updatedBy});
+    logAudit("DESCUENTO_MARCA", {
+      resumen: rec.activo
+        ? `${rec.marcaNombre}: descuento ${rec.pct}% ACTIVADO${rec.hasta?` hasta ${rec.hasta.split("-").reverse().join("/")}`:""}`
+        : `${rec.marcaNombre}: descuento desactivado`,
+      marcaId, marca: rec.marcaNombre, pct: rec.pct, activo: rec.activo, hasta: rec.hasta,
+    }, user);
+  }
   const[alq,setAlq]     =useState(()=>{ try{return JSON.parse(localStorage.getItem("th_alq")||"[]");}catch{return[];} });
   const[cierres,setCierres]=useState(()=>{ try{return JSON.parse(localStorage.getItem("th_cierres")||"{}");}catch{return {};} });
   const[cargando,setCargando]=useState(true);
@@ -12224,7 +12493,7 @@ function App(){
 
   // ── Realtime sync — cualquier cambio en Supabase (otro dispositivo) actualiza aquí ──
   useRealtimeSync(setVentas, setInv, setRetiros, setFactoryResetRecibido,
-    ()=>resyncDesdeNube("reconexión realtime"));
+    ()=>resyncDesdeNube("reconexión realtime"), onDescuentoMarcaRT);
 
   // (reset de datos eliminado — localStorage persiste entre sesiones)
 
@@ -13191,7 +13460,7 @@ function App(){
   if (!user) return <LoginScreen onLogin={login}/>;
 
   // Portal de marca (lectura)
-  if (user.rol === "marca") return <BrandPortal user={user} ventas={ventas} inv={inv} cargas={cargasCompletas} retiros={retiros} logout={logout}/>;
+  if (user.rol === "marca") return <BrandPortal user={user} ventas={ventas} inv={inv} cargas={cargasCompletas} retiros={retiros} logout={logout} descuentos={descuentos} onGuardarDescuento={guardarDescuentoMarca}/>;
 
   // ── Liquidaciones: métricas pre-calculadas — mixto distribuido ─────────────
   const _liqPagos   = sumPagos(vMes);
@@ -13238,6 +13507,9 @@ function App(){
 
       {/* ── RELOJ DESVIADO (todos los roles — las ventas estampan hora local) ── */}
       {!cargando && <ClockDriftBanner driftMin={clockDrift}/>}
+
+      {/* ── ALERTA: marca activó/cambió su descuento (admin y caja) ── */}
+      <AlertaDescuento data={alertaDesc} onClose={()=>setAlertaDesc(null)}/>
 
       {/* ── BANNER: FACTORY RESET RECIBIDO (otras sesiones) ── */}
       {factoryResetRecibido && (
@@ -13352,7 +13624,7 @@ function App(){
         )}
 
         {/* POS */}
-        {tab==="pos" && <POSContainer inv={inv} onVenta={handleVenta} retiros={retiros} onRetiro={registrarRetiro} onVerNota={v=>setVentaDetalle(v)} user={user}/>}
+        {tab==="pos" && <POSContainer inv={inv} onVenta={handleVenta} retiros={retiros} onRetiro={registrarRetiro} onVerNota={v=>setVentaDetalle(v)} user={user} descuentos={descuentos}/>}
 
         {/* INVENTARIO — por marca */}
         {tab==="inventario" && (
@@ -13387,6 +13659,12 @@ function App(){
         {/* MARCAS — lista */}
         {tab==="marcas" && !marcaDetalle && (
           <div>
+            {/* ── Panel admin: descuentos por marca ── */}
+            {user?.rol==="admin"&&(
+              <PanelDescuentosAdmin marcas={marcasState} descuentos={descuentos}
+                onGuardar={guardarDescuentoMarca}/>
+            )}
+
             {/* Contador de estados */}
             {marcasState.filter(m=>m.estado==="inactiva").length>0&&(
               <div style={{fontSize:13,fontWeight:600,color:C.label3,textTransform:"uppercase",
@@ -13965,7 +14243,7 @@ function App(){
 // ══════════════════════════════════════════════════════════
 // POSContainer — Caja con sub-tabs Venta | Retiros
 // ══════════════════════════════════════════════════════════
-function POSContainer({inv,onVenta,retiros,onRetiro,onVerNota,user}){
+function POSContainer({inv,onVenta,retiros,onRetiro,onVerNota,user,descuentos}){
   const [subTab, setSubTab] = useState("venta");
   const tabs=[{id:"venta",label:"💳 Venta"},{id:"retiros",label:"📤 Retiros"}];
   return (
@@ -13987,7 +14265,7 @@ function POSContainer({inv,onVenta,retiros,onRetiro,onVerNota,user}){
         ))}
       </div>
       {subTab==="venta"
-        ? <POS inv={inv} onVenta={onVenta} onVerNota={onVerNota} user={user}/>
+        ? <POS inv={inv} onVenta={onVenta} onVerNota={onVerNota} user={user} descuentos={descuentos}/>
         : <RetirosTab inv={inv} retiros={retiros} onRetiro={onRetiro}/>
       }
     </div>
@@ -14064,7 +14342,7 @@ function QRPagoPanel({total, refVenta}){
 
 // POS — Caja de ventas
 // ══════════════════════════════════════════════════════════
-function POS({inv,onVenta,onVerNota,user}){
+function POS({inv,onVenta,onVerNota,user,descuentos={}}){
   var _hN135 = useState([]); var carrito = _hN135[0]; var setCarrito = _hN135[1];;
   var _hN136 = useState(""); var busq = _hN136[0]; var setBusq = _hN136[1];;
   var _hN137 = useState("efectivo"); var pago = _hN137[0]; var setPago = _hN137[1];;
@@ -14118,21 +14396,28 @@ function POS({inv,onVenta,onVerNota,user}){
   },[inv,busq]);
 
   const pagoInfo=PAGOS.find(p=>p.id===pago)||PAGOS[0];
-  const subtotal=carrito.reduce((s,it)=>s+it.precio*it.cantidad,0);
-  const descTarjeta=pago==="tarjeta"?subtotal*(pagoInfo.desc/100):0;
-  const descManual=subtotal*(descExtra/100);
-  const total=subtotal-descTarjeta-descManual;
-  const descPct=pagoInfo.desc+Number(descExtra);
+  const subtotal=carrito.reduce((s,it)=>s+it.precio*it.cantidad,0); // precio lleno
+  // Descuento efectivo de un ítem = descuento vigente de su marca + descuento
+  // manual global (admin), tope 50%. Cada marca absorbe SOLO el suyo.
+  const descItemPct = it => Math.min(50,
+    descMarcaVigente(descuentos, it.marcaId) + Number(descExtra||0));
+  const total = carrito.reduce((s,it)=>s + it.precio*it.cantidad*(1-descItemPct(it)/100), 0);
+  const descTotalBs = subtotal - total;                       // Bs descontados en total
+  const descPct = subtotal>0 ? +(descTotalBs/subtotal*100).toFixed(2) : 0; // % ponderado (display/compat)
+  const hayDescMarca = carrito.some(it=>descMarcaVigente(descuentos, it.marcaId)>0);
 
   const porMarca=useMemo(()=>{
     const m={};
     carrito.forEach(it=>{
-      if(!m[it.marcaId])m[it.marcaId]={nombre:it.marcaNombre,color:it.marcaColor,emoji:it.marcaEmoji,total:0,uds:0};
-      m[it.marcaId].total+=it.precio*it.cantidad;
+      const dm=descMarcaVigente(descuentos, it.marcaId);
+      if(!m[it.marcaId])m[it.marcaId]={nombre:it.marcaNombre,color:it.marcaColor,emoji:it.marcaEmoji,total:0,neto:0,uds:0,descMarca:dm};
+      const bruto=it.precio*it.cantidad;
+      m[it.marcaId].total+=bruto;                              // lleno
+      m[it.marcaId].neto +=bruto*(1-descItemPct(it)/100);      // con descuento
       m[it.marcaId].uds+=it.cantidad;
     });
     return Object.entries(m);
-  },[carrito]);
+  },[carrito,descuentos,descExtra]);
 
   function add(prod){
     const m=MARCAS.find(x=>x.id===prod.marcaId);
@@ -14222,12 +14507,16 @@ function POS({inv,onVenta,onVerNota,user}){
     if(!carrito.length) return;
     const sinStock=carrito.filter(it=>{const s=inv.find(i=>i.id===it.prodId)?.stock||0;return it.cantidad>s;});
     if(sinStock.length){alert(`Stock insuficiente:\n${sinStock.map(it=>{const s=inv.find(i=>i.id===it.prodId)?.stock||0;return`• ${it.nombre}: pedís ${it.cantidad}, hay ${s}`;}).join("\n")}`);return;}
-    const factor=1-descPct/100;
-    const items=carrito.map(it=>({
-      prodId:it.prodId,codigo:it.codigo,nombre:it.nombre,
-      marcaId:it.marcaId,marcaNombre:it.marcaNombre,
-      cantidad:it.cantidad,precioUnit:it.precio,subtotal:+(it.precio*it.cantidad*factor).toFixed(2),
-    }));
+    const items=carrito.map(it=>{
+      const d=descItemPct(it); // descuento por marca + manual, por ítem
+      return {
+        prodId:it.prodId,codigo:it.codigo,nombre:it.nombre,
+        marcaId:it.marcaId,marcaNombre:it.marcaNombre,
+        cantidad:it.cantidad,precioUnit:it.precio,
+        descPct:+d.toFixed(2), // descuento propio del ítem (clave del nuevo modelo)
+        subtotal:+(it.precio*it.cantidad*(1-d/100)).toFixed(2),
+      };
+    });
 
     // ── Gift Card flow ───────────────────────────────────────
     if(pagoGC){
@@ -14395,8 +14684,14 @@ function POS({inv,onVenta,onVerNota,user}){
               <div style={{flex:1,minWidth:0}}>
                 <div style={{fontSize:15,fontWeight:500,color:C.label,fontFamily:FONT,
                   overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{it.nombre}</div>
-                <div style={{fontSize:12,color:C.label3,fontFamily:FONT}}>
-                  {it.marcaEmoji} {it.marcaNombre}
+                <div style={{fontSize:12,color:C.label3,fontFamily:FONT,display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+                  <span>{it.marcaEmoji} {it.marcaNombre}</span>
+                  {descMarcaVigente(descuentos, it.marcaId)>0&&(
+                    <span style={{fontSize:10,fontWeight:700,color:C.green,background:`${C.green}18`,
+                      padding:"1px 6px",borderRadius:4,fontFamily:FONT_UI}}>
+                      −{descMarcaVigente(descuentos, it.marcaId)}%
+                    </span>
+                  )}
                 </div>
               </div>
               <div style={{display:"flex",alignItems:"center",gap:10,flexShrink:0}}>
@@ -14417,7 +14712,16 @@ function POS({inv,onVenta,onVerNota,user}){
                 }}>+</button>
               </div>
               <div style={{minWidth:70,textAlign:"right"}}>
-                <div style={{fontSize:15,fontWeight:700,color:C.label,fontFamily:FONT}}>{$(it.precio*it.cantidad)}</div>
+                {descMarcaVigente(descuentos, it.marcaId)>0 ? (
+                  <>
+                    <div style={{fontSize:11,color:C.label3,textDecoration:"line-through",fontFamily:FONT}}>{$(it.precio*it.cantidad)}</div>
+                    <div style={{fontSize:15,fontWeight:700,color:C.green,fontFamily:FONT}}>
+                      {$(it.precio*it.cantidad*(1-descItemPct(it)/100))}
+                    </div>
+                  </>
+                ) : (
+                  <div style={{fontSize:15,fontWeight:700,color:C.label,fontFamily:FONT}}>{$(it.precio*it.cantidad)}</div>
+                )}
               </div>
               <button onClick={()=>quitar(it.prodId)} style={{
                 background:"none",border:"none",cursor:"pointer",
@@ -14553,9 +14857,21 @@ function POS({inv,onVenta,onVerNota,user}){
           borderRadius:16,padding:"20px",marginBottom:20,textAlign:"center"}}>
           <div style={{fontSize:13,color:C.label3,fontFamily:FONT,marginBottom:6}}>Total a cobrar</div>
           <div style={{fontSize:40,fontWeight:700,color:C.label,fontFamily:FONT,lineHeight:1}}>{$(total)}</div>
-          {descPct>0&&<div style={{fontSize:13,color:C.label3,fontFamily:FONT,marginTop:6}}>
-            Subtotal {$(subtotal)} · -({descPct}%)
+          {descTotalBs>0.005&&<div style={{fontSize:13,color:C.label3,fontFamily:FONT,marginTop:6}}>
+            Subtotal {$(subtotal)} · descuentos −{$(descTotalBs)}
           </div>}
+          {/* Desglose por marca cuando hay descuento de marca activo */}
+          {hayDescMarca&&(
+            <div style={{marginTop:10,paddingTop:10,borderTop:`1px solid ${C.gold}25`,
+              display:"flex",flexDirection:"column",gap:3}}>
+              {porMarca.filter(([,d])=>d.descMarca>0).map(([id,d])=>(
+                <div key={id} style={{display:"flex",justifyContent:"space-between",fontSize:12,fontFamily:FONT}}>
+                  <span style={{color:C.label2}}>{d.emoji} {d.nombre} <span style={{color:C.green,fontWeight:700}}>−{d.descMarca}%</span></span>
+                  <span style={{color:C.label2}}><span style={{textDecoration:"line-through",color:C.label3,fontSize:11}}>{$(d.total)}</span> {$(d.neto)}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Método de pago */}
@@ -14791,9 +15107,12 @@ function POS({inv,onVenta,onVerNota,user}){
           </div>
         )}
 
-        {/* Descuento adicional */}
-        <IOSInput label="Descuento adicional (%)" type="number" min="0" max="100"
-          value={descExtra} onChange={e=>setDescExtra(Number(e.target.value))}/>
+        {/* Descuento adicional manual — SOLO admin (excepción puntual sobre
+            todo el carrito; las marcas autogestionan el suyo desde su portal) */}
+        {user?.rol==="admin"&&(
+          <IOSInput label="Descuento adicional manual (%)" type="number" min="0" max="50"
+            value={descExtra} onChange={e=>setDescExtra(Number(e.target.value))}/>
+        )}
         {user?.rol==="caja"
           ? <div style={{padding:"10px 14px",borderRadius:12,background:C.bg2,
               border:`1px solid ${C.sep}`,marginBottom:10}}>
@@ -19528,6 +19847,7 @@ const AUDIT_TIPOS = {
   RESET:      { label:"Factory Reset",icono:"🔄",  color:"#C94C4C" },
   LOGIN:      { label:"Acceso",       icono:"🔐",  color:"#546E7A" },
   CIERRE:     { label:"Cierre",       icono:"📊",  color:"#8A6418" },
+  DESCUENTO_MARCA: { label:"Descuento marca", icono:"🏷️", color:"#2E7D32" },
 };
 
 // ── Registro de carga (trazabilidad de inventario) ────────────────────────
