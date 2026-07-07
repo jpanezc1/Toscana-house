@@ -69090,6 +69090,7 @@ Esta acci\xF3n no se puede deshacer.` : "\xBFEliminar esta carga? Esta acci\xF3n
     var descExtra = _hN139[0];
     var setDescExtra = _hN139[1];
     ;
+    const [descMarcaManual, setDescMarcaManual] = (0, import_react.useState)({});
     var _hN140 = (0, import_react.useState)(null);
     var etiqueta = _hN140[0];
     var setEtiqueta = _hN140[1];
@@ -69161,7 +69162,7 @@ Esta acci\xF3n no se puede deshacer.` : "\xBFEliminar esta carga? Esta acci\xF3n
     const pagoInfo = PAGOS.find((p) => p.id === pago) || PAGOS[0];
     const subtotal = carrito.reduce((s, it) => s + it.precio * it.cantidad, 0);
     const descItemInfo = (it) => descEfectivoCodigo(descuentos, descCodigos, it.marcaId, it.codigo);
-    const descItemPct = (it) => Math.min(50, descItemInfo(it).pct + Number(descExtra || 0));
+    const descItemPct = (it) => Math.min(50, descItemInfo(it).pct + (Number(descMarcaManual[it.marcaId]) || 0) + Number(descExtra || 0));
     const total = carrito.reduce((s, it) => s + it.precio * it.cantidad * (1 - descItemPct(it) / 100), 0);
     const descTotalBs = subtotal - total;
     const descPct = subtotal > 0 ? +(descTotalBs / subtotal * 100).toFixed(2) : 0;
@@ -69169,15 +69170,16 @@ Esta acci\xF3n no se puede deshacer.` : "\xBFEliminar esta carga? Esta acci\xF3n
     const porMarca = (0, import_react.useMemo)(() => {
       const m = {};
       carrito.forEach((it) => {
-        const dm = descMarcaVigente(descuentos, it.marcaId);
-        if (!m[it.marcaId]) m[it.marcaId] = { nombre: it.marcaNombre, color: it.marcaColor, emoji: it.marcaEmoji, total: 0, neto: 0, uds: 0, descMarca: dm };
+        const dm = descItemInfo(it).pct;
+        if (!m[it.marcaId]) m[it.marcaId] = { id: it.marcaId, nombre: it.marcaNombre, color: it.marcaColor, emoji: it.marcaEmoji, total: 0, neto: 0, uds: 0, descConfig: dm, descManual: Number(descMarcaManual[it.marcaId]) || 0 };
         const bruto = it.precio * it.cantidad;
         m[it.marcaId].total += bruto;
         m[it.marcaId].neto += bruto * (1 - descItemPct(it) / 100);
         m[it.marcaId].uds += it.cantidad;
+        m[it.marcaId].descConfig = Math.max(m[it.marcaId].descConfig, dm);
       });
       return Object.entries(m);
-    }, [carrito, descuentos, descCodigos, descExtra]);
+    }, [carrito, descuentos, descCodigos, descExtra, descMarcaManual]);
     function add(prod) {
       const m = MARCAS.find((x) => x.id === prod.marcaId);
       setCarrito((p) => {
@@ -69351,6 +69353,7 @@ ${sinStock.map((it) => {
         autoDescargarNota(vf2);
         setCarrito([]);
         setDescExtra(0);
+        setDescMarcaManual({});
         setBusq("");
         setEtiqueta(null);
         setCliente("");
@@ -69705,14 +69708,87 @@ ${sinStock.map((it) => {
       padding: "20px",
       marginBottom: 20,
       textAlign: "center"
-    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.label3, fontFamily: FONT, marginBottom: 6 } }, "Total a cobrar"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 40, fontWeight: 700, color: C.label, fontFamily: FONT, lineHeight: 1 } }, $2(total)), descTotalBs > 5e-3 && /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.label3, fontFamily: FONT, marginTop: 6 } }, "Subtotal ", $2(subtotal), " \xB7 descuentos \u2212", $2(descTotalBs)), hayDescMarca && /* @__PURE__ */ import_react.default.createElement("div", { style: {
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.label3, fontFamily: FONT, marginBottom: 6 } }, "Total a cobrar"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 40, fontWeight: 700, color: C.label, fontFamily: FONT, lineHeight: 1 } }, $2(total)), descTotalBs > 5e-3 && /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.label3, fontFamily: FONT, marginTop: 6 } }, "Subtotal ", $2(subtotal), " \xB7 descuentos \u2212", $2(descTotalBs)), descTotalBs > 5e-3 && /* @__PURE__ */ import_react.default.createElement("div", { style: {
       marginTop: 10,
       paddingTop: 10,
       borderTop: `1px solid ${C.gold}25`,
       display: "flex",
       flexDirection: "column",
       gap: 3
-    } }, porMarca.filter(([, d]) => d.descMarca > 0).map(([id, d]) => /* @__PURE__ */ import_react.default.createElement("div", { key: id, style: { display: "flex", justifyContent: "space-between", fontSize: 12, fontFamily: FONT } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.label2 } }, d.emoji, " ", d.nombre, " ", /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.green, fontWeight: 700 } }, "\u2212", d.descMarca, "%")), /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.label2 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { textDecoration: "line-through", color: C.label3, fontSize: 11 } }, $2(d.total)), " ", $2(d.neto)))))), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+    } }, porMarca.filter(([, d]) => d.total > d.neto + 5e-3).map(([id, d]) => {
+      const pctEf = Math.round((d.total - d.neto) / d.total * 100);
+      return /* @__PURE__ */ import_react.default.createElement("div", { key: id, style: { display: "flex", justifyContent: "space-between", fontSize: 12, fontFamily: FONT } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.label2 } }, d.emoji, " ", d.nombre, " ", /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.green, fontWeight: 700 } }, "\u2212", pctEf, "%")), /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.label2 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { textDecoration: "line-through", color: C.label3, fontSize: 11 } }, $2(d.total)), " ", $2(d.neto)));
+    }))), porMarca.length > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 20 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      fontSize: 13,
+      fontWeight: 600,
+      color: C.label3,
+      textTransform: "uppercase",
+      letterSpacing: 0.6,
+      marginBottom: 10
+    } }, "Descuento adicional por marca"), /* @__PURE__ */ import_react.default.createElement("div", { style: { border: `1px solid ${C.sep}`, borderRadius: 14, overflow: "hidden" } }, porMarca.map(([id, d], i) => {
+      const on = id in descMarcaManual;
+      const manual = Number(descMarcaManual[id]) || 0;
+      return /* @__PURE__ */ import_react.default.createElement("div", { key: id, style: {
+        padding: "11px 14px",
+        borderBottom: i < porMarca.length - 1 ? `1px solid ${C.sep}` : "none",
+        background: on ? `${C.green}0a` : "transparent"
+      } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 14, fontWeight: 600, color: C.label, fontFamily: FONT } }, d.emoji, " ", d.nombre, " ", /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 11, color: C.label3, fontWeight: 400 } }, "\xB7 ", d.uds, " uds")), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: on ? C.green : C.label3, fontFamily: FONT, marginTop: 1 } }, d.total > d.neto + 5e-3 ? /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, null, /* @__PURE__ */ import_react.default.createElement("span", { style: { textDecoration: "line-through" } }, $2(d.total)), " \u2192 ", $2(d.neto), d.descConfig > 0 ? /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.label3 } }, " (incluye su promo ", d.descConfig, "%)") : null) : `${$2(d.total)} \xB7 sin descuento`)), /* @__PURE__ */ import_react.default.createElement(
+        "button",
+        {
+          onClick: () => setDescMarcaManual((prev) => {
+            const n = { ...prev };
+            if (id in n) delete n[id];
+            else n[id] = 10;
+            return n;
+          }),
+          "aria-label": "Descuento adicional",
+          style: {
+            width: 46,
+            height: 26,
+            borderRadius: 999,
+            border: "none",
+            cursor: "pointer",
+            flexShrink: 0,
+            background: on ? C.green : C.label3,
+            position: "relative",
+            transition: "background .2s",
+            WebkitTapHighlightColor: "transparent"
+          }
+        },
+        /* @__PURE__ */ import_react.default.createElement("span", { style: {
+          position: "absolute",
+          top: 3,
+          left: on ? 23 : 3,
+          width: 20,
+          height: 20,
+          borderRadius: "50%",
+          background: "#fff",
+          transition: "left .2s",
+          boxShadow: "0 1px 3px rgba(0,0,0,0.3)"
+        } })
+      )), on && /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 6, marginTop: 10 } }, [5, 10, 15, 20, 30].map((v) => /* @__PURE__ */ import_react.default.createElement(
+        "button",
+        {
+          key: v,
+          onClick: () => setDescMarcaManual((prev) => ({ ...prev, [id]: v })),
+          style: {
+            flex: 1,
+            padding: "7px 0",
+            borderRadius: 999,
+            cursor: "pointer",
+            fontFamily: FONT_UI,
+            fontSize: 12,
+            fontWeight: manual === v ? 700 : 500,
+            border: `${manual === v ? 2 : 1}px solid ${manual === v ? C.green : C.sep}`,
+            background: manual === v ? `${C.green}18` : C.bg2,
+            color: manual === v ? C.green : C.label2,
+            WebkitTapHighlightColor: "transparent"
+          }
+        },
+        v,
+        "%"
+      ))));
+    })), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT, marginTop: 8, lineHeight: 1.5 } }, "Se suma al descuento que ya tenga la marca. Cada marca absorbe el suyo y queda registrado en la venta.")), /* @__PURE__ */ import_react.default.createElement("div", { style: {
       fontSize: 13,
       fontWeight: 600,
       color: C.label3,
@@ -69990,7 +70066,7 @@ ${sinStock.map((it) => {
       alignItems: "center",
       padding: "12px 16px",
       borderBottom: i < porMarca.length - 1 ? `1px solid ${C.sep}` : ""
-    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 16 } }, d.emoji), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 15, color: C.label, fontFamily: FONT } }, d.nombre), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 12, color: C.label3 } }, d.uds, " uds")), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 15, fontWeight: 600, color: d.color, fontFamily: FONT } }, $2(d.total * (1 - descPct / 100))))))), /* @__PURE__ */ import_react.default.createElement(
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 16 } }, d.emoji), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 15, color: C.label, fontFamily: FONT } }, d.nombre), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 12, color: C.label3 } }, d.uds, " uds")), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 15, fontWeight: 600, color: d.color, fontFamily: FONT } }, $2(d.neto)))))), /* @__PURE__ */ import_react.default.createElement(
       IOSBtn,
       {
         onPress: esPagoQR ? verificarPagoQR : cobrar,

@@ -14656,6 +14656,8 @@ function POS({inv,onVenta,onVerNota,user,descuentos={},descCodigos={}}){
   var _hNcl  = useState(""); var cliente  = _hNcl[0];  var setCliente  = _hNcl[1];;
   var _hNct  = useState(""); var clienteTel = _hNct[0]; var setClienteTel = _hNct[1];;
   var _hN139 = useState(0); var descExtra = _hN139[0]; var setDescExtra = _hN139[1];;
+  // Descuento adicional POR MARCA de esta venta (manual en caja): {marcaId: pct}
+  const [descMarcaManual, setDescMarcaManual] = useState({});
   var _hN140 = useState(null); var etiqueta = _hN140[0]; var setEtiqueta = _hN140[1];;
   var _hN141 = useState(null); var ultima = _hN141[0]; var setUltima = _hN141[1];;
   var _hN142 = useState(false); var showOk = _hN142[0]; var setShowOk = _hN142[1];;
@@ -14706,7 +14708,8 @@ function POS({inv,onVenta,onVerNota,user,descuentos={},descCodigos={}}){
   // Descuento del ítem = el del CÓDIGO (manda) o el general de la MARCA, más el
   // manual global (admin), tope 50%. Cada marca absorbe SOLO el suyo.
   const descItemInfo = it => descEfectivoCodigo(descuentos, descCodigos, it.marcaId, it.codigo);
-  const descItemPct = it => Math.min(50, descItemInfo(it).pct + Number(descExtra||0));
+  // Efectivo del ítem = config (código/marca) + adicional manual de SU marca + global admin, tope 50%
+  const descItemPct = it => Math.min(50, descItemInfo(it).pct + (Number(descMarcaManual[it.marcaId])||0) + Number(descExtra||0));
   const total = carrito.reduce((s,it)=>s + it.precio*it.cantidad*(1-descItemPct(it)/100), 0);
   const descTotalBs = subtotal - total;                       // Bs descontados en total
   const descPct = subtotal>0 ? +(descTotalBs/subtotal*100).toFixed(2) : 0; // % ponderado (display/compat)
@@ -14715,15 +14718,16 @@ function POS({inv,onVenta,onVerNota,user,descuentos={},descCodigos={}}){
   const porMarca=useMemo(()=>{
     const m={};
     carrito.forEach(it=>{
-      const dm=descMarcaVigente(descuentos, it.marcaId);
-      if(!m[it.marcaId])m[it.marcaId]={nombre:it.marcaNombre,color:it.marcaColor,emoji:it.marcaEmoji,total:0,neto:0,uds:0,descMarca:dm};
+      const dm=descItemInfo(it).pct; // descuento configurado (código o marca)
+      if(!m[it.marcaId])m[it.marcaId]={id:it.marcaId,nombre:it.marcaNombre,color:it.marcaColor,emoji:it.marcaEmoji,total:0,neto:0,uds:0,descConfig:dm,descManual:Number(descMarcaManual[it.marcaId])||0};
       const bruto=it.precio*it.cantidad;
       m[it.marcaId].total+=bruto;                              // lleno
       m[it.marcaId].neto +=bruto*(1-descItemPct(it)/100);      // con descuento
       m[it.marcaId].uds+=it.cantidad;
+      m[it.marcaId].descConfig=Math.max(m[it.marcaId].descConfig,dm); // muestra el config vigente
     });
     return Object.entries(m);
-  },[carrito,descuentos,descCodigos,descExtra]);
+  },[carrito,descuentos,descCodigos,descExtra,descMarcaManual]);
 
   function add(prod){
     const m=MARCAS.find(x=>x.id===prod.marcaId);
@@ -14855,7 +14859,7 @@ function POS({inv,onVenta,onVerNota,user,descuentos={},descCodigos={}}){
       });
       setUltima(vf);setShowOk(true);setShowPago(false);
       autoDescargarNota(vf);
-      setCarrito([]);setDescExtra(0);setBusq("");setEtiqueta(null);setCliente("");setClienteTel("");
+      setCarrito([]);setDescExtra(0);setDescMarcaManual({});setBusq("");setEtiqueta(null);setCliente("");setClienteTel("");
       setPagoGC(false);setGcCodigo("");setGcEncontrado(null);setGcBusqMsg(null);setGcMontoUsar("");
       return;
     }
@@ -15166,19 +15170,84 @@ function POS({inv,onVenta,onVerNota,user,descuentos={},descCodigos={}}){
           {descTotalBs>0.005&&<div style={{fontSize:13,color:C.label3,fontFamily:FONT,marginTop:6}}>
             Subtotal {$(subtotal)} · descuentos −{$(descTotalBs)}
           </div>}
-          {/* Desglose por marca cuando hay descuento de marca activo */}
-          {hayDescMarca&&(
+          {/* Desglose por marca cuando hay algún descuento */}
+          {descTotalBs>0.005&&(
             <div style={{marginTop:10,paddingTop:10,borderTop:`1px solid ${C.gold}25`,
               display:"flex",flexDirection:"column",gap:3}}>
-              {porMarca.filter(([,d])=>d.descMarca>0).map(([id,d])=>(
+              {porMarca.filter(([,d])=>d.total>d.neto+0.005).map(([id,d])=>{
+                const pctEf=Math.round((d.total-d.neto)/d.total*100);
+                return (
                 <div key={id} style={{display:"flex",justifyContent:"space-between",fontSize:12,fontFamily:FONT}}>
-                  <span style={{color:C.label2}}>{d.emoji} {d.nombre} <span style={{color:C.green,fontWeight:700}}>−{d.descMarca}%</span></span>
+                  <span style={{color:C.label2}}>{d.emoji} {d.nombre} <span style={{color:C.green,fontWeight:700}}>−{pctEf}%</span></span>
                   <span style={{color:C.label2}}><span style={{textDecoration:"line-through",color:C.label3,fontSize:11}}>{$(d.total)}</span> {$(d.neto)}</span>
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
+
+        {/* ── Descuento adicional por marca (toggle por marca del carrito) ── */}
+        {porMarca.length>0&&(
+          <div style={{marginBottom:20}}>
+            <div style={{fontSize:13,fontWeight:600,color:C.label3,textTransform:"uppercase",
+              letterSpacing:.6,marginBottom:10}}>Descuento adicional por marca</div>
+            <div style={{border:`1px solid ${C.sep}`,borderRadius:14,overflow:"hidden"}}>
+              {porMarca.map(([id,d],i)=>{
+                const on = id in descMarcaManual;
+                const manual = Number(descMarcaManual[id])||0;
+                return (
+                  <div key={id} style={{padding:"11px 14px",
+                    borderBottom:i<porMarca.length-1?`1px solid ${C.sep}`:"none",
+                    background:on?`${C.green}0a`:"transparent"}}>
+                    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10}}>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{fontSize:14,fontWeight:600,color:C.label,fontFamily:FONT}}>
+                          {d.emoji} {d.nombre} <span style={{fontSize:11,color:C.label3,fontWeight:400}}>· {d.uds} uds</span>
+                        </div>
+                        <div style={{fontSize:11,color:on?C.green:C.label3,fontFamily:FONT,marginTop:1}}>
+                          {d.total>d.neto+0.005
+                            ? <><span style={{textDecoration:"line-through"}}>{$(d.total)}</span> → {$(d.neto)}{d.descConfig>0?<span style={{color:C.label3}}> (incluye su promo {d.descConfig}%)</span>:null}</>
+                            : `${$(d.total)} · sin descuento`}
+                        </div>
+                      </div>
+                      {/* toggle */}
+                      <button onClick={()=>setDescMarcaManual(prev=>{
+                          const n={...prev};
+                          if(id in n) delete n[id]; else n[id]=10;
+                          return n;
+                        })}
+                        aria-label="Descuento adicional"
+                        style={{width:46,height:26,borderRadius:999,border:"none",cursor:"pointer",flexShrink:0,
+                          background:on?C.green:C.label3,position:"relative",transition:"background .2s",
+                          WebkitTapHighlightColor:"transparent"}}>
+                        <span style={{position:"absolute",top:3,left:on?23:3,width:20,height:20,borderRadius:"50%",
+                          background:"#fff",transition:"left .2s",boxShadow:"0 1px 3px rgba(0,0,0,0.3)"}}/>
+                      </button>
+                    </div>
+                    {on&&(
+                      <div style={{display:"flex",gap:6,marginTop:10}}>
+                        {[5,10,15,20,30].map(v=>(
+                          <button key={v} onClick={()=>setDescMarcaManual(prev=>({...prev,[id]:v}))}
+                            style={{flex:1,padding:"7px 0",borderRadius:999,cursor:"pointer",fontFamily:FONT_UI,
+                              fontSize:12,fontWeight:manual===v?700:500,
+                              border:`${manual===v?2:1}px solid ${manual===v?C.green:C.sep}`,
+                              background:manual===v?`${C.green}18`:C.bg2, color:manual===v?C.green:C.label2,
+                              WebkitTapHighlightColor:"transparent"}}>
+                            {v}%
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            <div style={{fontSize:11,color:C.label3,fontFamily:FONT,marginTop:8,lineHeight:1.5}}>
+              Se suma al descuento que ya tenga la marca. Cada marca absorbe el suyo y queda registrado en la venta.
+            </div>
+          </div>
+        )}
 
         {/* Método de pago */}
         <div style={{fontSize:13,fontWeight:600,color:C.label3,textTransform:"uppercase",
@@ -15448,7 +15517,7 @@ function POS({inv,onVenta,onVerNota,user,descuentos={},descCodigos={}}){
                     <span style={{fontSize:12,color:C.label3}}>{d.uds} uds</span>
                   </div>
                   <span style={{fontSize:15,fontWeight:600,color:d.color,fontFamily:FONT}}>
-                    {$(d.total*(1-descPct/100))}
+                    {$(d.neto)}
                   </span>
                 </div>
               ))}
