@@ -54111,6 +54111,74 @@
     if (d.hasta && hoy() > d.hasta) return 0;
     return Math.min(50, Math.max(0, Number(d.pct) || 0));
   }
+  function descCodigoVigente(descCodigos, codigo) {
+    const d = descCodigos?.[(codigo || "").toUpperCase()];
+    if (!d || !d.activo) return 0;
+    if (d.hasta && hoy() > d.hasta) return 0;
+    return Math.min(50, Math.max(0, Number(d.pct) || 0));
+  }
+  function descEfectivoCodigo(descuentos, descCodigos, marcaId, codigo) {
+    const pc = descCodigoVigente(descCodigos, codigo);
+    if (pc > 0) return { pct: pc, fuente: "codigo" };
+    const pm = descMarcaVigente(descuentos, marcaId);
+    if (pm > 0) return { pct: pm, fuente: "marca" };
+    return { pct: 0, fuente: null };
+  }
+  async function sbCargarDescuentosCodigo() {
+    try {
+      const db = await getSupabase();
+      const { data, error } = await db.from("descuentos_codigo").select("*");
+      if (error) throw error;
+      const map = {};
+      (data || []).forEach((d) => {
+        map[(d.codigo || "").toUpperCase()] = {
+          marcaId: d.marca_id,
+          marcaNombre: d.marca_nombre || "",
+          nombre: d.nombre || "",
+          activo: !!d.activo,
+          pct: Number(d.pct) || 0,
+          hasta: d.hasta || "",
+          updatedBy: d.updated_by || ""
+        };
+      });
+      return map;
+    } catch (e) {
+      console.warn("Supabase cargar desc. c\xF3digo:", e.message);
+      return null;
+    }
+  }
+  async function sbGuardarDescuentoCodigo(d) {
+    try {
+      const db = await getSupabase();
+      const { error } = await db.from("descuentos_codigo").upsert({
+        codigo: (d.codigo || "").toUpperCase(),
+        marca_id: d.marcaId,
+        marca_nombre: d.marcaNombre || "",
+        nombre: d.nombre || "",
+        activo: !!d.activo,
+        pct: Number(d.pct) || 0,
+        hasta: d.hasta || null,
+        updated_by: d.updatedBy || "",
+        updated_at: (/* @__PURE__ */ new Date()).toISOString()
+      }, { onConflict: "codigo" });
+      if (error) throw error;
+      return true;
+    } catch (e) {
+      console.warn("Supabase guardar desc. c\xF3digo:", e.message);
+      return false;
+    }
+  }
+  async function sbEliminarDescuentoCodigo(codigo) {
+    try {
+      const db = await getSupabase();
+      const { error } = await db.from("descuentos_codigo").delete().eq("codigo", (codigo || "").toUpperCase());
+      if (error) throw error;
+      return true;
+    } catch (e) {
+      console.warn("Supabase eliminar desc. c\xF3digo:", e.message);
+      return false;
+    }
+  }
   async function sbCargarInventario() {
     try {
       const db = await getSupabase();
@@ -54221,6 +54289,10 @@
         return await sbGuardarMarcas(op.payload);
       case "descuentoMarca":
         return await sbGuardarDescuentoMarca(op.payload);
+      case "descuentoCodigo":
+        return await sbGuardarDescuentoCodigo(op.payload);
+      case "eliminarDescuentoCodigo":
+        return await sbEliminarDescuentoCodigo(op.payload.codigo);
       case "eliminarProductoCodigo":
         return await sbEliminarProductoPorCodigo(op.payload.codigo);
       case "eliminarProductosCodigos":
@@ -54315,7 +54387,7 @@
       return false;
     }
   }
-  function useRealtimeSync(setVentas, setInv, setRetiros, setFactoryResetRecibido, onResync, onDescuentoMarca) {
+  function useRealtimeSync(setVentas, setInv, setRetiros, setFactoryResetRecibido, onResync, onDescuentoMarca, onDescuentoCodigo) {
     (0, import_react.useEffect)(() => {
       let channel = null;
       let mounted = true;
@@ -54440,6 +54512,27 @@
             por: d.updated_by || "",
             _silencioso: true
             // sin toast (el broadcast ya avisó)
+          });
+        }).on("broadcast", { event: "descuento_codigo" }, ({ payload }) => {
+          if (mounted && payload?.codigo && onDescuentoCodigo) onDescuentoCodigo(payload);
+        }).on("postgres_changes", { event: "*", schema: "public", table: "descuentos_codigo" }, (payload) => {
+          if (!mounted || !onDescuentoCodigo) return;
+          if (payload.eventType === "DELETE" || payload.new == null) {
+            const cod = payload.old?.codigo;
+            if (cod) onDescuentoCodigo({ codigo: cod, _eliminar: true, _silencioso: true });
+            return;
+          }
+          const d = payload.new;
+          onDescuentoCodigo({
+            codigo: d.codigo,
+            marcaId: d.marca_id,
+            marcaNombre: d.marca_nombre || "",
+            nombre: d.nombre || "",
+            activo: !!d.activo,
+            pct: Number(d.pct) || 0,
+            hasta: d.hasta || "",
+            por: d.updated_by || "",
+            _silencioso: true
           });
         }).on("broadcast", { event: "factory_reset" }, () => {
           if (!mounted) return;
@@ -54568,7 +54661,7 @@
       boxShadow: "0 8px 24px rgba(0,0,0,0.18)",
       backdropFilter: "blur(10px)",
       WebkitBackdropFilter: "blur(10px)"
-    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 22 } }, activo ? "\u{1F3F7}\uFE0F" : "\u26AA"), /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, fontWeight: 600, color: C.label, fontFamily: FONT } }, activo ? `${data.marcaNombre} activ\xF3 ${data.pct}% de descuento` : `${data.marcaNombre} desactiv\xF3 su descuento`), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT_UI, marginTop: 1 } }, activo ? `Se aplica solo a sus art\xEDculos al cobrar${hastaTxt}` : "Sus art\xEDculos vuelven a precio completo")), /* @__PURE__ */ import_react.default.createElement("button", { onClick: onClose, style: {
+    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 22 } }, activo ? "\u{1F3F7}\uFE0F" : "\u26AA"), /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, fontWeight: 600, color: C.label, fontFamily: FONT } }, data.porCodigo ? `${data.marcaNombre}: ${data.pct}% en ${data.porCodigo}` : activo ? `${data.marcaNombre} activ\xF3 ${data.pct}% de descuento` : `${data.marcaNombre} desactiv\xF3 su descuento`), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT_UI, marginTop: 1 } }, data.porCodigo ? `Descuento por producto${hastaTxt}` : activo ? `Se aplica solo a sus art\xEDculos al cobrar${hastaTxt}` : "Sus art\xEDculos vuelven a precio completo")), /* @__PURE__ */ import_react.default.createElement("button", { onClick: onClose, style: {
       background: "none",
       border: "none",
       cursor: "pointer",
@@ -63421,7 +63514,186 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       "sin l\xEDmite"
     )), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT_UI, marginTop: 10, lineHeight: 1.5 } }, "\u2139\uFE0F El ", pct, "% se descuenta de tu liquidaci\xF3n, no de Toscana. Al activarlo se avisa a la tienda al instante.")));
   }
-  function BrandPortal({ user, ventas, inv, cargas, retiros = [], logout, descuentos = {}, onGuardarDescuento }) {
+  function DescuentosPorCodigoCard({ marca, inv, descCodigos = {}, onGuardar, onQuitar }) {
+    const OPCIONES = [10, 20, 30, 40, 50];
+    const [abierto, setAbierto] = (0, import_react.useState)(false);
+    const [busq, setBusq] = (0, import_react.useState)("");
+    const [sel, setSel] = (0, import_react.useState)(null);
+    const [pctSel, setPctSel] = (0, import_react.useState)(20);
+    const [hastaSel, setHastaSel] = (0, import_react.useState)("");
+    const mid = marca?.id;
+    const misCodigos = Object.entries(descCodigos).filter(([, d]) => String(d.marcaId) === String(mid)).map(([codigo, d]) => ({ codigo, ...d }));
+    const resultados = import_react.default.useMemo(() => {
+      const q = busq.trim().toUpperCase();
+      if (!q) return [];
+      const qn = q.replace(/[^A-Z0-9]/g, "");
+      return inv.filter((p) => String(p.marcaId) === String(mid) && ((p.codigo || "").toUpperCase().includes(q) || (p.codigo || "").toUpperCase().replace(/[^A-Z0-9]/g, "").includes(qn) || (p.nombre || "").toUpperCase().includes(q))).slice(0, 6);
+    }, [busq, inv, mid]);
+    function elegir(p) {
+      setSel(p);
+      setPctSel(20);
+      setHastaSel("");
+      setBusq("");
+    }
+    function confirmar() {
+      if (!sel || !onGuardar) return;
+      onGuardar(sel.codigo, { marcaId: mid, marcaNombre: marca?.nombre || "", nombre: sel.nombre, pct: pctSel, hasta: hastaSel || "" });
+      setSel(null);
+    }
+    return /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      background: C.bg1,
+      border: `1px solid ${C.sep}`,
+      borderRadius: 16,
+      padding: 16,
+      marginBottom: 20,
+      boxShadow: "0 1px 6px rgba(0,0,0,0.04)"
+    } }, /* @__PURE__ */ import_react.default.createElement("button", { onClick: () => setAbierto((a) => !a), style: {
+      width: "100%",
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      background: "none",
+      border: "none",
+      cursor: "pointer",
+      padding: 0,
+      WebkitTapHighlightColor: "transparent"
+    } }, /* @__PURE__ */ import_react.default.createElement("i", { className: "ti ti-tag", style: { fontSize: 15, color: C.gold }, "aria-hidden": "true" }), /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "left", flex: 1 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 14, fontWeight: 700, color: C.label, fontFamily: FONT } }, "Descuentos por producto"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT_UI, marginTop: 1 } }, "Un % propio para c\xF3digos que elijas, manda sobre el general")), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 12, fontWeight: 700, fontFamily: FONT_UI, color: misCodigos.length ? C.green : C.label3 } }, misCodigos.length ? `${misCodigos.length}` : ""), /* @__PURE__ */ import_react.default.createElement("i", { className: `ti ti-chevron-${abierto ? "up" : "down"}`, style: { fontSize: 14, color: C.label3 }, "aria-hidden": "true" })), abierto && /* @__PURE__ */ import_react.default.createElement("div", { style: { marginTop: 14 } }, misCodigos.length > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: { border: `1px solid ${C.sep}`, borderRadius: 12, overflow: "hidden", marginBottom: 12 } }, misCodigos.map((d, i) => {
+      const vencido = d.hasta && hoy() > d.hasta;
+      return /* @__PURE__ */ import_react.default.createElement("div", { key: d.codigo, style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        padding: "10px 12px",
+        borderBottom: i < misCodigos.length - 1 ? `1px solid ${C.sep}` : "none",
+        background: vencido ? `${C.amber}0a` : `${C.green}0a`
+      } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+        fontSize: 12.5,
+        fontWeight: 600,
+        color: C.label,
+        fontFamily: FONT,
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+        whiteSpace: "nowrap"
+      } }, d.nombre || d.codigo), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: C.label3, fontFamily: FONT_MONO } }, d.codigo, d.hasta ? ` \xB7 ${vencido ? "venci\xF3" : "hasta"} ${d.hasta.split("-").reverse().join("/")}` : " \xB7 sin l\xEDmite")), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 14, fontWeight: 700, color: vencido ? C.amber : C.green, fontFamily: FONT } }, d.pct, "%"), /* @__PURE__ */ import_react.default.createElement(
+        "button",
+        {
+          onClick: () => onQuitar && onQuitar(d.codigo),
+          "aria-label": "Quitar",
+          style: { background: "none", border: "none", cursor: "pointer", color: C.label3, padding: 4 }
+        },
+        /* @__PURE__ */ import_react.default.createElement("i", { className: "ti ti-trash", style: { fontSize: 14 }, "aria-hidden": "true" })
+      ));
+    })), sel ? /* @__PURE__ */ import_react.default.createElement("div", { style: { border: `2px solid ${C.green}`, borderRadius: 12, padding: 12, background: `${C.green}08` } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, fontWeight: 600, color: C.label, fontFamily: FONT } }, sel.nombre), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: C.label3, fontFamily: FONT_MONO } }, sel.codigo, " \xB7 ", $2(sel.precio))), /* @__PURE__ */ import_react.default.createElement("button", { onClick: () => setSel(null), style: { background: "none", border: "none", cursor: "pointer", color: C.label3, fontSize: 16, padding: 2 } }, "\u2715")), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 5, marginBottom: 10, flexWrap: "wrap" } }, OPCIONES.map((o) => /* @__PURE__ */ import_react.default.createElement(
+      "button",
+      {
+        key: o,
+        onClick: () => setPctSel(o),
+        style: {
+          flex: "1 1 0",
+          minWidth: 46,
+          padding: "7px 0",
+          borderRadius: 999,
+          cursor: "pointer",
+          fontFamily: FONT_UI,
+          fontSize: 12,
+          fontWeight: pctSel === o ? 700 : 500,
+          border: `${pctSel === o ? 2 : 1}px solid ${pctSel === o ? C.green : C.sep}`,
+          background: pctSel === o ? `${C.green}18` : C.bg2,
+          color: pctSel === o ? C.green : C.label2,
+          WebkitTapHighlightColor: "transparent"
+        }
+      },
+      o,
+      "%"
+    ))), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 8, alignItems: "center" } }, /* @__PURE__ */ import_react.default.createElement(
+      "input",
+      {
+        type: "date",
+        value: hastaSel,
+        min: hoy(),
+        onChange: (e) => setHastaSel(e.target.value),
+        placeholder: "Hasta",
+        style: {
+          flex: 1,
+          padding: "8px 10px",
+          borderRadius: 8,
+          border: `1px solid ${C.sep}`,
+          background: C.bg2,
+          color: C.label,
+          fontSize: 12,
+          fontFamily: FONT_UI
+        }
+      }
+    ), /* @__PURE__ */ import_react.default.createElement("button", { onClick: confirmar, style: {
+      padding: "8px 18px",
+      borderRadius: 8,
+      border: "none",
+      background: C.label,
+      color: C.bg0,
+      fontSize: 13,
+      fontWeight: 600,
+      fontFamily: FONT_UI,
+      cursor: "pointer"
+    } }, descCodigos[sel.codigo.toUpperCase()] ? "Actualizar" : "Agregar"))) : /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, null, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      border: `1px solid ${C.sep}`,
+      borderRadius: 10,
+      padding: "9px 12px",
+      background: C.bg2
+    } }, /* @__PURE__ */ import_react.default.createElement("i", { className: "ti ti-search", style: { fontSize: 15, color: C.label3 }, "aria-hidden": "true" }), /* @__PURE__ */ import_react.default.createElement(
+      "input",
+      {
+        value: busq,
+        onChange: (e) => setBusq(e.target.value),
+        autoComplete: "off",
+        autoCorrect: "off",
+        spellCheck: false,
+        placeholder: "Agregar producto \u2014 busc\xE1 por c\xF3digo o nombre",
+        style: {
+          flex: 1,
+          border: "none",
+          outline: "none",
+          background: "transparent",
+          fontSize: 13,
+          color: C.label,
+          fontFamily: FONT_UI
+        }
+      }
+    )), resultados.length > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: { border: `1px solid ${C.sep}`, borderRadius: 10, marginTop: 6, overflow: "hidden" } }, resultados.map((p) => {
+      const yaTiene = !!descCodigos[(p.codigo || "").toUpperCase()];
+      return /* @__PURE__ */ import_react.default.createElement(
+        "div",
+        {
+          key: p.id,
+          onClick: () => elegir(p),
+          style: {
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            padding: "9px 12px",
+            cursor: "pointer",
+            borderBottom: `1px solid ${C.sep}`,
+            background: "transparent"
+          },
+          onMouseEnter: (e) => e.currentTarget.style.background = C.bg2,
+          onMouseLeave: (e) => e.currentTarget.style.background = "transparent"
+        },
+        /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+          fontSize: 12.5,
+          fontWeight: 500,
+          color: C.label,
+          fontFamily: FONT,
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          whiteSpace: "nowrap"
+        } }, p.nombre), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: C.label3, fontFamily: FONT_MONO } }, p.codigo, " \xB7 ", $2(p.precio))),
+        yaTiene ? /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 10, color: C.green, fontWeight: 700, fontFamily: FONT_UI } }, "ya tiene") : /* @__PURE__ */ import_react.default.createElement("i", { className: "ti ti-plus", style: { fontSize: 16, color: C.gold }, "aria-hidden": "true" })
+      );
+    })), busq.trim() && resultados.length === 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT_UI, padding: "8px 4px" } }, 'Ning\xFAn producto tuyo coincide con "', busq, '"')), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT_UI, marginTop: 10, lineHeight: 1.5 } }, "\u2139\uFE0F El descuento por producto se descuenta de tu liquidaci\xF3n y manda sobre el descuento general. Los dem\xE1s productos usan el general (si est\xE1 activo).")));
+  }
+  function BrandPortal({ user, ventas, inv, cargas, retiros = [], logout, descuentos = {}, onGuardarDescuento, descCodigos = {}, onGuardarDescCodigo, onQuitarDescCodigo }) {
     const isDesktop = useIsDesktop();
     const now = /* @__PURE__ */ new Date();
     const [mes, setMes] = (0, import_react.useState)(now.getMonth());
@@ -63773,6 +64045,15 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       {
         actual: descuentos[marcaId],
         onGuardar: (patch) => onGuardarDescuento && onGuardarDescuento(marcaId, patch)
+      }
+    ), /* @__PURE__ */ import_react.default.createElement(
+      DescuentosPorCodigoCard,
+      {
+        marca,
+        inv,
+        descCodigos,
+        onGuardar: onGuardarDescCodigo,
+        onQuitar: onQuitarDescCodigo
       }
     ), /* @__PURE__ */ import_react.default.createElement("div", { style: {
       fontSize: 10,
@@ -66567,6 +66848,80 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
         hasta: rec.hasta
       }, user);
     }
+    const [descCodigos, setDescCodigos] = (0, import_react.useState)(() => {
+      try {
+        return JSON.parse(localStorage.getItem("th_desc_codigos") || "{}");
+      } catch {
+        return {};
+      }
+    });
+    (0, import_react.useEffect)(() => {
+      try {
+        localStorage.setItem("th_desc_codigos", JSON.stringify(descCodigos));
+      } catch {
+      }
+    }, [descCodigos]);
+    (0, import_react.useEffect)(() => {
+      sbCargarDescuentosCodigo().then((m) => {
+        if (m) setDescCodigos(m);
+      });
+    }, []);
+    function onDescuentoCodigoRT(p) {
+      const cod = (p.codigo || "").toUpperCase();
+      if (p._eliminar) {
+        setDescCodigos((prev) => {
+          const n = { ...prev };
+          delete n[cod];
+          return n;
+        });
+        return;
+      }
+      setDescCodigos((prev) => ({ ...prev, [cod]: { marcaId: p.marcaId, marcaNombre: p.marcaNombre || "", nombre: p.nombre || "", activo: p.activo, pct: p.pct, hasta: p.hasta || "", updatedBy: p.por || p.updatedBy || "" } }));
+      if (!p._silencioso) setAlertaDesc({ marcaNombre: p.marcaNombre, activo: p.activo, pct: p.pct, hasta: p.hasta, porCodigo: p.nombre || cod, ts: Date.now() });
+    }
+    function guardarDescuentoCodigo(codigo, { marcaId, marcaNombre, nombre, pct, hasta }) {
+      const cod = (codigo || "").toUpperCase();
+      const rec = {
+        codigo: cod,
+        marcaId,
+        marcaNombre: marcaNombre || "",
+        nombre: nombre || "",
+        activo: true,
+        pct: Number(pct) || 0,
+        hasta: hasta || "",
+        updatedBy: user?.nombre || user?.usuario || ""
+      };
+      setDescCodigos((p) => ({ ...p, [cod]: { marcaId: rec.marcaId, marcaNombre: rec.marcaNombre, nombre: rec.nombre, activo: true, pct: rec.pct, hasta: rec.hasta, updatedBy: rec.updatedBy } }));
+      syncConRespaldo("descuentoCodigo", rec, () => sbGuardarDescuentoCodigo(rec));
+      rtBroadcast("descuento_codigo", { codigo: cod, marcaId: rec.marcaId, marcaNombre: rec.marcaNombre, nombre: rec.nombre, activo: true, pct: rec.pct, hasta: rec.hasta, por: rec.updatedBy });
+      logAudit("DESCUENTO_CODIGO", {
+        resumen: `${rec.marcaNombre}: ${rec.nombre || cod} (${cod}) al ${rec.pct}%${rec.hasta ? ` hasta ${rec.hasta.split("-").reverse().join("/")}` : ""}`,
+        marcaId: rec.marcaId,
+        marca: rec.marcaNombre,
+        codigo: cod,
+        pct: rec.pct,
+        hasta: rec.hasta
+      }, user);
+    }
+    function eliminarDescuentoCodigo(codigo) {
+      const cod = (codigo || "").toUpperCase();
+      const rec = descCodigos[cod] || {};
+      setDescCodigos((p) => {
+        const n = { ...p };
+        delete n[cod];
+        return n;
+      });
+      syncConRespaldo("eliminarDescuentoCodigo", { codigo: cod }, () => sbEliminarDescuentoCodigo(cod));
+      rtBroadcast("descuento_codigo", { codigo: cod, _eliminar: true });
+      logAudit("DESCUENTO_CODIGO", {
+        resumen: `${rec.marcaNombre || ""}: descuento quitado de ${rec.nombre || cod} (${cod})`,
+        marcaId: rec.marcaId,
+        marca: rec.marcaNombre || "",
+        codigo: cod,
+        pct: 0,
+        activo: false
+      }, user);
+    }
     const [alq, setAlq] = (0, import_react.useState)(() => {
       try {
         return JSON.parse(localStorage.getItem("th_alq") || "[]");
@@ -66716,7 +67071,8 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       setRetiros,
       setFactoryResetRecibido,
       () => resyncDesdeNube("reconexi\xF3n realtime"),
-      onDescuentoMarcaRT
+      onDescuentoMarcaRT,
+      onDescuentoCodigoRT
     );
     (0, import_react.useEffect)(() => {
       setMarcasState((prev) => {
@@ -67729,7 +68085,7 @@ Esta acci\xF3n no se puede deshacer.` : "\xBFEliminar esta carga? Esta acci\xF3n
       fontFamily: FONT
     } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center", color: "#999" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 28, marginBottom: 12 } }, "\u{1F510}"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 14 } }, "Verificando sesi\xF3n\u2026")));
     if (!user) return /* @__PURE__ */ import_react.default.createElement(LoginScreen, { onLogin: login });
-    if (user.rol === "marca") return /* @__PURE__ */ import_react.default.createElement(BrandPortal, { user, ventas, inv, cargas: cargasCompletas, retiros, logout, descuentos, onGuardarDescuento: guardarDescuentoMarca });
+    if (user.rol === "marca") return /* @__PURE__ */ import_react.default.createElement(BrandPortal, { user, ventas, inv, cargas: cargasCompletas, retiros, logout, descuentos, onGuardarDescuento: guardarDescuentoMarca, descCodigos, onGuardarDescCodigo: guardarDescuentoCodigo, onQuitarDescCodigo: eliminarDescuentoCodigo });
     const _liqPagos = sumPagos(vMes);
     const liqEf = _liqPagos.efectivo;
     const liqQr = _liqPagos.qr;
@@ -67910,7 +68266,7 @@ Esta acci\xF3n no se puede deshacer.` : "\xBFEliminar esta carga? Esta acci\xF3n
         anio,
         onGoTab: setTab
       }
-    ), tab === "pos" && /* @__PURE__ */ import_react.default.createElement(POSContainer, { inv, onVenta: handleVenta, retiros, onRetiro: registrarRetiro, onVerNota: (v) => setVentaDetalle(v), user, descuentos }), tab === "inventario" && /* @__PURE__ */ import_react.default.createElement(InventarioPorMarca, { inv, ventas, retiros, bajas: bajasLog, onRecibir: () => setShInv(true), onBaja: () => {
+    ), tab === "pos" && /* @__PURE__ */ import_react.default.createElement(POSContainer, { inv, onVenta: handleVenta, retiros, onRetiro: registrarRetiro, onVerNota: (v) => setVentaDetalle(v), user, descuentos, descCodigos }), tab === "inventario" && /* @__PURE__ */ import_react.default.createElement(InventarioPorMarca, { inv, ventas, retiros, bajas: bajasLog, onRecibir: () => setShInv(true), onBaja: () => {
       setShBaja(true);
       setBajaMsg(null);
       setBajaCod("");
@@ -68586,7 +68942,7 @@ Esta acci\xF3n no se puede deshacer.` : "\xBFEliminar esta carga? Esta acci\xF3n
       }
     ));
   }
-  function POSContainer({ inv, onVenta, retiros, onRetiro, onVerNota, user, descuentos }) {
+  function POSContainer({ inv, onVenta, retiros, onRetiro, onVerNota, user, descuentos, descCodigos }) {
     const [subTab, setSubTab] = (0, import_react.useState)("venta");
     const tabs = [{ id: "venta", label: "\u{1F4B3} Venta" }, { id: "retiros", label: "\u{1F4E4} Retiros" }];
     return /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: {
@@ -68611,7 +68967,7 @@ Esta acci\xF3n no se puede deshacer.` : "\xBFEliminar esta carga? Esta acci\xF3n
       boxShadow: subTab === t.id ? "0 1px 4px rgba(0,0,0,0.10)" : "none",
       transition: "all .15s",
       WebkitTapHighlightColor: "transparent"
-    } }, t.label))), subTab === "venta" ? /* @__PURE__ */ import_react.default.createElement(POS, { inv, onVenta, onVerNota, user, descuentos }) : /* @__PURE__ */ import_react.default.createElement(RetirosTab, { inv, retiros, onRetiro }));
+    } }, t.label))), subTab === "venta" ? /* @__PURE__ */ import_react.default.createElement(POS, { inv, onVenta, onVerNota, user, descuentos, descCodigos }) : /* @__PURE__ */ import_react.default.createElement(RetirosTab, { inv, retiros, onRetiro }));
   }
   function QRPagoPanel({ total, refVenta }) {
     const [qrBanco, setQrBanco] = (0, import_react.useState)(cargarQRBanco);
@@ -68705,7 +69061,7 @@ Esta acci\xF3n no se puede deshacer.` : "\xBFEliminar esta carga? Esta acci\xF3n
       WebkitTapHighlightColor: "transparent"
     } }, "Quitar")), /* @__PURE__ */ import_react.default.createElement("input", { ref: fileRef, type: "file", accept: "image/*", onChange: subirQRBanco, style: { display: "none" } }));
   }
-  function POS({ inv, onVenta, onVerNota, user, descuentos = {} }) {
+  function POS({ inv, onVenta, onVerNota, user, descuentos = {}, descCodigos = {} }) {
     var _hN135 = (0, import_react.useState)([]);
     var carrito = _hN135[0];
     var setCarrito = _hN135[1];
@@ -68804,14 +69160,12 @@ Esta acci\xF3n no se puede deshacer.` : "\xBFEliminar esta carga? Esta acci\xF3n
     }, [inv, busq]);
     const pagoInfo = PAGOS.find((p) => p.id === pago) || PAGOS[0];
     const subtotal = carrito.reduce((s, it) => s + it.precio * it.cantidad, 0);
-    const descItemPct = (it) => Math.min(
-      50,
-      descMarcaVigente(descuentos, it.marcaId) + Number(descExtra || 0)
-    );
+    const descItemInfo = (it) => descEfectivoCodigo(descuentos, descCodigos, it.marcaId, it.codigo);
+    const descItemPct = (it) => Math.min(50, descItemInfo(it).pct + Number(descExtra || 0));
     const total = carrito.reduce((s, it) => s + it.precio * it.cantidad * (1 - descItemPct(it) / 100), 0);
     const descTotalBs = subtotal - total;
     const descPct = subtotal > 0 ? +(descTotalBs / subtotal * 100).toFixed(2) : 0;
-    const hayDescMarca = carrito.some((it) => descMarcaVigente(descuentos, it.marcaId) > 0);
+    const hayDescMarca = carrito.some((it) => descItemInfo(it).pct > 0);
     const porMarca = (0, import_react.useMemo)(() => {
       const m = {};
       carrito.forEach((it) => {
@@ -68823,7 +69177,7 @@ Esta acci\xF3n no se puede deshacer.` : "\xBFEliminar esta carga? Esta acci\xF3n
         m[it.marcaId].uds += it.cantidad;
       });
       return Object.entries(m);
-    }, [carrito, descuentos, descExtra]);
+    }, [carrito, descuentos, descCodigos, descExtra]);
     function add(prod) {
       const m = MARCAS.find((x) => x.id === prod.marcaId);
       setCarrito((p) => {
@@ -69151,7 +69505,7 @@ ${sinStock.map((it) => {
       overflow: "hidden",
       textOverflow: "ellipsis",
       whiteSpace: "nowrap"
-    } }, it.nombre), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" } }, /* @__PURE__ */ import_react.default.createElement("span", null, it.marcaEmoji, " ", it.marcaNombre), descMarcaVigente(descuentos, it.marcaId) > 0 && /* @__PURE__ */ import_react.default.createElement("span", { style: {
+    } }, it.nombre), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" } }, /* @__PURE__ */ import_react.default.createElement("span", null, it.marcaEmoji, " ", it.marcaNombre), descItemInfo(it).pct > 0 && /* @__PURE__ */ import_react.default.createElement("span", { style: {
       fontSize: 10,
       fontWeight: 700,
       color: C.green,
@@ -69159,7 +69513,7 @@ ${sinStock.map((it) => {
       padding: "1px 6px",
       borderRadius: 4,
       fontFamily: FONT_UI
-    } }, "\u2212", descMarcaVigente(descuentos, it.marcaId), "%"))), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10, flexShrink: 0 } }, /* @__PURE__ */ import_react.default.createElement("button", { onClick: () => cambiar(it.prodId, -1), style: {
+    } }, "\u2212", descItemInfo(it).pct, "% ", descItemInfo(it).fuente === "codigo" ? "producto" : "marca"))), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10, flexShrink: 0 } }, /* @__PURE__ */ import_react.default.createElement("button", { onClick: () => cambiar(it.prodId, -1), style: {
       width: 32,
       height: 32,
       borderRadius: "50%",
@@ -69187,7 +69541,7 @@ ${sinStock.map((it) => {
       color: C.label2,
       fontWeight: 700,
       WebkitTapHighlightColor: "transparent"
-    } }, "+")), /* @__PURE__ */ import_react.default.createElement("div", { style: { minWidth: 70, textAlign: "right" } }, descMarcaVigente(descuentos, it.marcaId) > 0 ? /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, textDecoration: "line-through", fontFamily: FONT } }, $2(it.precio * it.cantidad)), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 15, fontWeight: 700, color: C.green, fontFamily: FONT } }, $2(it.precio * it.cantidad * (1 - descItemPct(it) / 100)))) : /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 15, fontWeight: 700, color: C.label, fontFamily: FONT } }, $2(it.precio * it.cantidad))), /* @__PURE__ */ import_react.default.createElement("button", { onClick: () => quitar(it.prodId), style: {
+    } }, "+")), /* @__PURE__ */ import_react.default.createElement("div", { style: { minWidth: 70, textAlign: "right" } }, descItemPct(it) > 0 ? /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, textDecoration: "line-through", fontFamily: FONT } }, $2(it.precio * it.cantidad)), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 15, fontWeight: 700, color: C.green, fontFamily: FONT } }, $2(it.precio * it.cantidad * (1 - descItemPct(it) / 100)))) : /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 15, fontWeight: 700, color: C.label, fontFamily: FONT } }, $2(it.precio * it.cantidad))), /* @__PURE__ */ import_react.default.createElement("button", { onClick: () => quitar(it.prodId), style: {
       background: "none",
       border: "none",
       cursor: "pointer",
@@ -75096,7 +75450,8 @@ ${c.resumen || c.id}`)) onEliminarCarga(c.id);
     RESET: { label: "Factory Reset", icono: "\u{1F504}", color: "#C94C4C" },
     LOGIN: { label: "Acceso", icono: "\u{1F510}", color: "#546E7A" },
     CIERRE: { label: "Cierre", icono: "\u{1F4CA}", color: "#8A6418" },
-    DESCUENTO_MARCA: { label: "Descuento marca", icono: "\u{1F3F7}\uFE0F", color: "#2E7D32" }
+    DESCUENTO_MARCA: { label: "Descuento marca", icono: "\u{1F3F7}\uFE0F", color: "#2E7D32" },
+    DESCUENTO_CODIGO: { label: "Descuento producto", icono: "\u{1F3F7}\uFE0F", color: "#2E7D32" }
   };
   function crearCarga(tipo, usuario, extra) {
     const now = /* @__PURE__ */ new Date();

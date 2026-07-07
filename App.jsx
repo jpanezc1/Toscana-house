@@ -615,6 +615,61 @@ function descMarcaVigente(descuentos, marcaId){
   return Math.min(50, Math.max(0, Number(d.pct)||0));
 }
 
+// % de descuento vigente de un CÓDIGO puntual (0 si apagado o vencido)
+function descCodigoVigente(descCodigos, codigo){
+  const d = descCodigos?.[(codigo||"").toUpperCase()];
+  if(!d || !d.activo) return 0;
+  if(d.hasta && hoy() > d.hasta) return 0;
+  return Math.min(50, Math.max(0, Number(d.pct)||0));
+}
+
+// Descuento EFECTIVO de un artículo: el del código manda sobre el general
+// de la marca. Devuelve {pct, fuente:"codigo"|"marca"|null}.
+function descEfectivoCodigo(descuentos, descCodigos, marcaId, codigo){
+  const pc = descCodigoVigente(descCodigos, codigo);
+  if(pc>0) return {pct:pc, fuente:"codigo"};
+  const pm = descMarcaVigente(descuentos, marcaId);
+  if(pm>0) return {pct:pm, fuente:"marca"};
+  return {pct:0, fuente:null};
+}
+
+// ── Descuentos por código (tabla descuentos_codigo) ─────────────────
+async function sbCargarDescuentosCodigo(){
+  try{
+    const db = await getSupabase();
+    const {data, error} = await db.from("descuentos_codigo").select("*");
+    if(error) throw error;
+    const map = {};
+    (data||[]).forEach(d=>{
+      map[(d.codigo||"").toUpperCase()] = {
+        marcaId:d.marca_id, marcaNombre:d.marca_nombre||"", nombre:d.nombre||"",
+        activo:!!d.activo, pct:Number(d.pct)||0, hasta:d.hasta||"", updatedBy:d.updated_by||"",
+      };
+    });
+    return map;
+  }catch(e){ console.warn("Supabase cargar desc. código:", e.message); return null; }
+}
+async function sbGuardarDescuentoCodigo(d){
+  try{
+    const db = await getSupabase();
+    const {error} = await db.from("descuentos_codigo").upsert({
+      codigo:(d.codigo||"").toUpperCase(), marca_id:d.marcaId, marca_nombre:d.marcaNombre||"",
+      nombre:d.nombre||"", activo:!!d.activo, pct:Number(d.pct)||0,
+      hasta:d.hasta||null, updated_by:d.updatedBy||"", updated_at:new Date().toISOString(),
+    }, {onConflict:"codigo"});
+    if(error) throw error;
+    return true;
+  }catch(e){ console.warn("Supabase guardar desc. código:", e.message); return false; }
+}
+async function sbEliminarDescuentoCodigo(codigo){
+  try{
+    const db = await getSupabase();
+    const {error} = await db.from("descuentos_codigo").delete().eq("codigo",(codigo||"").toUpperCase());
+    if(error) throw error;
+    return true;
+  }catch(e){ console.warn("Supabase eliminar desc. código:", e.message); return false; }
+}
+
 // Recarga SOLO el inventario desde Supabase (fuente de verdad).
 // Se usa cuando se elimina una carga en otro dispositivo: en vez de depender
 // de recibir N eventos DELETE individuales (que el realtime descarta en ráfaga),
@@ -701,6 +756,8 @@ async function ejecutarOpOutbox(op){
     case "usuarios":    return await sbGuardarUsuarios(op.payload);
     case "marcas":      return await sbGuardarMarcas(op.payload);
     case "descuentoMarca": return await sbGuardarDescuentoMarca(op.payload);
+    case "descuentoCodigo": return await sbGuardarDescuentoCodigo(op.payload);
+    case "eliminarDescuentoCodigo": return await sbEliminarDescuentoCodigo(op.payload.codigo);
     case "eliminarProductoCodigo": return await sbEliminarProductoPorCodigo(op.payload.codigo);
     case "eliminarProductosCodigos": return await sbEliminarProductosPorCodigos(op.payload.codigos);
     case "eliminarCarga":          return await sbEliminarCarga(op.payload.cargaId);
@@ -796,7 +853,7 @@ async function syncConRespaldo(tipo, payload, fnDirecto){
 // ── Realtime sync — escucha cambios en Supabase y actualiza estado local ────
 // Activa canales en: ventas (INSERT/UPDATE) + inventario (INSERT/UPDATE)
 // Deduplicación: si la fila ya existe (optimistic update local), no se agrega.
-function useRealtimeSync(setVentas, setInv, setRetiros, setFactoryResetRecibido, onResync, onDescuentoMarca) {
+function useRealtimeSync(setVentas, setInv, setRetiros, setFactoryResetRecibido, onResync, onDescuentoMarca, onDescuentoCodigo) {
   useEffect(() => {
     let channel = null;
     let mounted = true;
@@ -907,6 +964,23 @@ function useRealtimeSync(setVentas, setInv, setRetiros, setFactoryResetRecibido,
             marcaId: d.marca_id, marcaNombre: d.marca_nombre||"",
             activo: !!d.activo, pct: Number(d.pct)||0, hasta: d.hasta||"",
             por: d.updated_by||"", _silencioso: true, // sin toast (el broadcast ya avisó)
+          });
+        })
+        // ── Broadcast: descuento por código (alerta rápida) ──
+        .on("broadcast", {event:"descuento_codigo"}, ({payload}) => {
+          if(mounted && payload?.codigo && onDescuentoCodigo) onDescuentoCodigo(payload);
+        })
+        // ── Tabla descuentos_codigo: cambios desde cualquier dispositivo ──
+        .on("postgres_changes", {event:"*", schema:"public", table:"descuentos_codigo"}, payload => {
+          if(!mounted || !onDescuentoCodigo) return;
+          if(payload.eventType==="DELETE" || payload.new==null){
+            const cod = payload.old?.codigo; if(cod) onDescuentoCodigo({codigo:cod, _eliminar:true, _silencioso:true});
+            return;
+          }
+          const d = payload.new;
+          onDescuentoCodigo({
+            codigo:d.codigo, marcaId:d.marca_id, marcaNombre:d.marca_nombre||"", nombre:d.nombre||"",
+            activo:!!d.activo, pct:Number(d.pct)||0, hasta:d.hasta||"", por:d.updated_by||"", _silencioso:true,
           });
         })
         // ── Broadcast: factory reset → limpiar y recargar esta sesión ────────
@@ -1026,12 +1100,16 @@ function AlertaDescuento({data, onClose}){
       <span style={{fontSize:22}}>{activo?"🏷️":"⚪"}</span>
       <div style={{flex:1,minWidth:0}}>
         <div style={{fontSize:13,fontWeight:600,color:C.label,fontFamily:FONT}}>
-          {activo
+          {data.porCodigo
+            ? `${data.marcaNombre}: ${data.pct}% en ${data.porCodigo}`
+            : activo
             ? `${data.marcaNombre} activó ${data.pct}% de descuento`
             : `${data.marcaNombre} desactivó su descuento`}
         </div>
         <div style={{fontSize:11,color:C.label3,fontFamily:FONT_UI,marginTop:1}}>
-          {activo ? `Se aplica solo a sus artículos al cobrar${hastaTxt}` : "Sus artículos vuelven a precio completo"}
+          {data.porCodigo ? `Descuento por producto${hastaTxt}`
+            : activo ? `Se aplica solo a sus artículos al cobrar${hastaTxt}`
+            : "Sus artículos vuelven a precio completo"}
         </div>
       </div>
       <button onClick={onClose} style={{background:"none",border:"none",cursor:"pointer",
@@ -9825,7 +9903,168 @@ function DescuentoMarcaCard({actual, onGuardar}){
   );
 }
 
-function BrandPortal({user, ventas, inv, cargas, retiros=[], logout, descuentos={}, onGuardarDescuento}){
+// Descuentos por producto (código específico) — portal de marca
+function DescuentosPorCodigoCard({marca, inv, descCodigos={}, onGuardar, onQuitar}){
+  const OPCIONES = [10,20,30,40,50];
+  const [abierto, setAbierto] = useState(false);
+  const [busq, setBusq] = useState("");
+  const [sel, setSel] = useState(null);   // producto elegido para configurar
+  const [pctSel, setPctSel] = useState(20);
+  const [hastaSel, setHastaSel] = useState("");
+
+  const mid = marca?.id;
+  // Códigos de ESTA marca con descuento configurado
+  const misCodigos = Object.entries(descCodigos)
+    .filter(([,d])=>String(d.marcaId)===String(mid))
+    .map(([codigo,d])=>({codigo,...d}));
+
+  // Búsqueda en el catálogo propio (código o nombre)
+  const resultados = React.useMemo(()=>{
+    const q = busq.trim().toUpperCase();
+    if(!q) return [];
+    const qn = q.replace(/[^A-Z0-9]/g,"");
+    return inv.filter(p=>String(p.marcaId)===String(mid) && (
+      (p.codigo||"").toUpperCase().includes(q) ||
+      (p.codigo||"").toUpperCase().replace(/[^A-Z0-9]/g,"").includes(qn) ||
+      (p.nombre||"").toUpperCase().includes(q)
+    )).slice(0,6);
+  },[busq, inv, mid]);
+
+  function elegir(p){ setSel(p); setPctSel(20); setHastaSel(""); setBusq(""); }
+  function confirmar(){
+    if(!sel||!onGuardar) return;
+    onGuardar(sel.codigo, {marcaId:mid, marcaNombre:marca?.nombre||"", nombre:sel.nombre, pct:pctSel, hasta:hastaSel||""});
+    setSel(null);
+  }
+
+  return (
+    <div style={{background:C.bg1, border:`1px solid ${C.sep}`, borderRadius:16,
+      padding:16, marginBottom:20, boxShadow:"0 1px 6px rgba(0,0,0,0.04)"}}>
+      <button onClick={()=>setAbierto(a=>!a)} style={{width:"100%",display:"flex",alignItems:"center",
+        gap:8,background:"none",border:"none",cursor:"pointer",padding:0,WebkitTapHighlightColor:"transparent"}}>
+        <i className="ti ti-tag" style={{fontSize:15,color:C.gold}} aria-hidden="true"/>
+        <div style={{textAlign:"left",flex:1}}>
+          <div style={{fontSize:14,fontWeight:700,color:C.label,fontFamily:FONT}}>Descuentos por producto</div>
+          <div style={{fontSize:11,color:C.label3,fontFamily:FONT_UI,marginTop:1}}>Un % propio para códigos que elijas, manda sobre el general</div>
+        </div>
+        <span style={{fontSize:12,fontWeight:700,fontFamily:FONT_UI,color:misCodigos.length?C.green:C.label3}}>
+          {misCodigos.length?`${misCodigos.length}`:""}
+        </span>
+        <i className={`ti ti-chevron-${abierto?"up":"down"}`} style={{fontSize:14,color:C.label3}} aria-hidden="true"/>
+      </button>
+
+      {abierto&&(
+        <div style={{marginTop:14}}>
+          {/* Lista actual */}
+          {misCodigos.length>0&&(
+            <div style={{border:`1px solid ${C.sep}`,borderRadius:12,overflow:"hidden",marginBottom:12}}>
+              {misCodigos.map((d,i)=>{
+                const vencido = d.hasta && hoy()>d.hasta;
+                return (
+                  <div key={d.codigo} style={{display:"flex",alignItems:"center",gap:8,padding:"10px 12px",
+                    borderBottom:i<misCodigos.length-1?`1px solid ${C.sep}`:"none",
+                    background:vencido?`${C.amber}0a`:`${C.green}0a`}}>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:12.5,fontWeight:600,color:C.label,fontFamily:FONT,
+                        overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{d.nombre||d.codigo}</div>
+                      <div style={{fontSize:10,color:C.label3,fontFamily:FONT_MONO}}>
+                        {d.codigo}{d.hasta?` · ${vencido?"venció":"hasta"} ${d.hasta.split("-").reverse().join("/")}`:" · sin límite"}
+                      </div>
+                    </div>
+                    <span style={{fontSize:14,fontWeight:700,color:vencido?C.amber:C.green,fontFamily:FONT}}>{d.pct}%</span>
+                    <button onClick={()=>onQuitar&&onQuitar(d.codigo)} aria-label="Quitar"
+                      style={{background:"none",border:"none",cursor:"pointer",color:C.label3,padding:4}}>
+                      <i className="ti ti-trash" style={{fontSize:14}} aria-hidden="true"/>
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Configurar el producto elegido */}
+          {sel ? (
+            <div style={{border:`2px solid ${C.green}`,borderRadius:12,padding:12,background:`${C.green}08`}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10}}>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:13,fontWeight:600,color:C.label,fontFamily:FONT}}>{sel.nombre}</div>
+                  <div style={{fontSize:10,color:C.label3,fontFamily:FONT_MONO}}>{sel.codigo} · {$(sel.precio)}</div>
+                </div>
+                <button onClick={()=>setSel(null)} style={{background:"none",border:"none",cursor:"pointer",color:C.label3,fontSize:16,padding:2}}>✕</button>
+              </div>
+              <div style={{display:"flex",gap:5,marginBottom:10,flexWrap:"wrap"}}>
+                {OPCIONES.map(o=>(
+                  <button key={o} onClick={()=>setPctSel(o)}
+                    style={{flex:"1 1 0",minWidth:46,padding:"7px 0",borderRadius:999,cursor:"pointer",
+                      fontFamily:FONT_UI,fontSize:12,fontWeight:pctSel===o?700:500,
+                      border:`${pctSel===o?2:1}px solid ${pctSel===o?C.green:C.sep}`,
+                      background:pctSel===o?`${C.green}18`:C.bg2, color:pctSel===o?C.green:C.label2,
+                      WebkitTapHighlightColor:"transparent"}}>{o}%</button>
+                ))}
+              </div>
+              <div style={{display:"flex",gap:8,alignItems:"center"}}>
+                <input type="date" value={hastaSel} min={hoy()} onChange={e=>setHastaSel(e.target.value)}
+                  placeholder="Hasta"
+                  style={{flex:1,padding:"8px 10px",borderRadius:8,border:`1px solid ${C.sep}`,
+                    background:C.bg2,color:C.label,fontSize:12,fontFamily:FONT_UI}}/>
+                <button onClick={confirmar} style={{padding:"8px 18px",borderRadius:8,border:"none",
+                  background:C.label,color:C.bg0,fontSize:13,fontWeight:600,fontFamily:FONT_UI,cursor:"pointer"}}>
+                  {descCodigos[sel.codigo.toUpperCase()]?"Actualizar":"Agregar"}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <>
+              <div style={{display:"flex",alignItems:"center",gap:8,border:`1px solid ${C.sep}`,
+                borderRadius:10,padding:"9px 12px",background:C.bg2}}>
+                <i className="ti ti-search" style={{fontSize:15,color:C.label3}} aria-hidden="true"/>
+                <input value={busq} onChange={e=>setBusq(e.target.value)}
+                  autoComplete="off" autoCorrect="off" spellCheck={false}
+                  placeholder="Agregar producto — buscá por código o nombre"
+                  style={{flex:1,border:"none",outline:"none",background:"transparent",
+                    fontSize:13,color:C.label,fontFamily:FONT_UI}}/>
+              </div>
+              {resultados.length>0&&(
+                <div style={{border:`1px solid ${C.sep}`,borderRadius:10,marginTop:6,overflow:"hidden"}}>
+                  {resultados.map(p=>{
+                    const yaTiene = !!descCodigos[(p.codigo||"").toUpperCase()];
+                    return (
+                      <div key={p.id} onClick={()=>elegir(p)}
+                        style={{display:"flex",justifyContent:"space-between",alignItems:"center",
+                          padding:"9px 12px",cursor:"pointer",borderBottom:`1px solid ${C.sep}`,
+                          background:"transparent"}}
+                        onMouseEnter={e=>e.currentTarget.style.background=C.bg2}
+                        onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+                        <div style={{flex:1,minWidth:0}}>
+                          <div style={{fontSize:12.5,fontWeight:500,color:C.label,fontFamily:FONT,
+                            overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.nombre}</div>
+                          <div style={{fontSize:10,color:C.label3,fontFamily:FONT_MONO}}>{p.codigo} · {$(p.precio)}</div>
+                        </div>
+                        {yaTiene
+                          ? <span style={{fontSize:10,color:C.green,fontWeight:700,fontFamily:FONT_UI}}>ya tiene</span>
+                          : <i className="ti ti-plus" style={{fontSize:16,color:C.gold}} aria-hidden="true"/>}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+              {busq.trim()&&resultados.length===0&&(
+                <div style={{fontSize:11,color:C.label3,fontFamily:FONT_UI,padding:"8px 4px"}}>
+                  Ningún producto tuyo coincide con "{busq}"
+                </div>
+              )}
+            </>
+          )}
+          <div style={{fontSize:11,color:C.label3,fontFamily:FONT_UI,marginTop:10,lineHeight:1.5}}>
+            ℹ️ El descuento por producto se descuenta de tu liquidación y manda sobre el descuento general. Los demás productos usan el general (si está activo).
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function BrandPortal({user, ventas, inv, cargas, retiros=[], logout, descuentos={}, onGuardarDescuento, descCodigos={}, onGuardarDescCodigo, onQuitarDescCodigo}){
   // ── TODOS los hooks ANTES de cualquier return condicional ──
   const isDesktop = useIsDesktop();
   const now = new Date();
@@ -10183,6 +10422,11 @@ function BrandPortal({user, ventas, inv, cargas, retiros=[], logout, descuentos=
             <DescuentoMarcaCard
               actual={descuentos[marcaId]}
               onGuardar={patch=>onGuardarDescuento&&onGuardarDescuento(marcaId, patch)}/>
+
+            {/* ── Descuentos por producto ── */}
+            <DescuentosPorCodigoCard
+              marca={marca} inv={inv} descCodigos={descCodigos}
+              onGuardar={onGuardarDescCodigo} onQuitar={onQuitarDescCodigo}/>
 
             {/* ── Sección Hoy ── */}
             <div style={{fontSize:10,letterSpacing:1.2,textTransform:"uppercase",color:C.label3,
@@ -12437,6 +12681,46 @@ function App(){
       marcaId, marca: rec.marcaNombre, pct: rec.pct, activo: rec.activo, hasta: rec.hasta,
     }, user);
   }
+
+  // ── Descuentos por código ──
+  const[descCodigos,setDescCodigos]=useState(()=>{ try{return JSON.parse(localStorage.getItem("th_desc_codigos")||"{}");}catch{return{};} });
+  useEffect(()=>{ try{localStorage.setItem("th_desc_codigos",JSON.stringify(descCodigos));}catch{} },[descCodigos]);
+  useEffect(()=>{ sbCargarDescuentosCodigo().then(m=>{ if(m) setDescCodigos(m); }); },[]);
+
+  // Recibe cambios de descuento por código (broadcast o postgres_changes)
+  function onDescuentoCodigoRT(p){
+    const cod = (p.codigo||"").toUpperCase();
+    if(p._eliminar){ setDescCodigos(prev=>{ const n={...prev}; delete n[cod]; return n; }); return; }
+    setDescCodigos(prev=>({...prev,[cod]:{marcaId:p.marcaId,marcaNombre:p.marcaNombre||"",nombre:p.nombre||"",activo:p.activo,pct:p.pct,hasta:p.hasta||"",updatedBy:p.por||p.updatedBy||""}}));
+    if(!p._silencioso) setAlertaDesc({marcaNombre:p.marcaNombre, activo:p.activo, pct:p.pct, hasta:p.hasta, porCodigo:p.nombre||cod, ts:Date.now()});
+  }
+
+  // Guardar descuento de un código (portal de marca / admin)
+  function guardarDescuentoCodigo(codigo, {marcaId, marcaNombre, nombre, pct, hasta}){
+    const cod = (codigo||"").toUpperCase();
+    const rec = { codigo:cod, marcaId, marcaNombre:marcaNombre||"", nombre:nombre||"",
+      activo:true, pct:Number(pct)||0, hasta:hasta||"", updatedBy:user?.nombre||user?.usuario||"" };
+    setDescCodigos(p=>({...p,[cod]:{marcaId:rec.marcaId,marcaNombre:rec.marcaNombre,nombre:rec.nombre,activo:true,pct:rec.pct,hasta:rec.hasta,updatedBy:rec.updatedBy}}));
+    syncConRespaldo("descuentoCodigo", rec, ()=>sbGuardarDescuentoCodigo(rec));
+    rtBroadcast("descuento_codigo", {codigo:cod, marcaId:rec.marcaId, marcaNombre:rec.marcaNombre, nombre:rec.nombre, activo:true, pct:rec.pct, hasta:rec.hasta, por:rec.updatedBy});
+    logAudit("DESCUENTO_CODIGO", {
+      resumen: `${rec.marcaNombre}: ${rec.nombre||cod} (${cod}) al ${rec.pct}%${rec.hasta?` hasta ${rec.hasta.split("-").reverse().join("/")}`:""}`,
+      marcaId:rec.marcaId, marca:rec.marcaNombre, codigo:cod, pct:rec.pct, hasta:rec.hasta,
+    }, user);
+  }
+
+  // Quitar descuento de un código
+  function eliminarDescuentoCodigo(codigo){
+    const cod = (codigo||"").toUpperCase();
+    const rec = descCodigos[cod]||{};
+    setDescCodigos(p=>{ const n={...p}; delete n[cod]; return n; });
+    syncConRespaldo("eliminarDescuentoCodigo", {codigo:cod}, ()=>sbEliminarDescuentoCodigo(cod));
+    rtBroadcast("descuento_codigo", {codigo:cod, _eliminar:true});
+    logAudit("DESCUENTO_CODIGO", {
+      resumen: `${rec.marcaNombre||""}: descuento quitado de ${rec.nombre||cod} (${cod})`,
+      marcaId:rec.marcaId, marca:rec.marcaNombre||"", codigo:cod, pct:0, activo:false,
+    }, user);
+  }
   const[alq,setAlq]     =useState(()=>{ try{return JSON.parse(localStorage.getItem("th_alq")||"[]");}catch{return[];} });
   const[cierres,setCierres]=useState(()=>{ try{return JSON.parse(localStorage.getItem("th_cierres")||"{}");}catch{return {};} });
   const[cargando,setCargando]=useState(true);
@@ -12515,7 +12799,7 @@ function App(){
 
   // ── Realtime sync — cualquier cambio en Supabase (otro dispositivo) actualiza aquí ──
   useRealtimeSync(setVentas, setInv, setRetiros, setFactoryResetRecibido,
-    ()=>resyncDesdeNube("reconexión realtime"), onDescuentoMarcaRT);
+    ()=>resyncDesdeNube("reconexión realtime"), onDescuentoMarcaRT, onDescuentoCodigoRT);
 
   // (reset de datos eliminado — localStorage persiste entre sesiones)
 
@@ -13482,7 +13766,7 @@ function App(){
   if (!user) return <LoginScreen onLogin={login}/>;
 
   // Portal de marca (lectura)
-  if (user.rol === "marca") return <BrandPortal user={user} ventas={ventas} inv={inv} cargas={cargasCompletas} retiros={retiros} logout={logout} descuentos={descuentos} onGuardarDescuento={guardarDescuentoMarca}/>;
+  if (user.rol === "marca") return <BrandPortal user={user} ventas={ventas} inv={inv} cargas={cargasCompletas} retiros={retiros} logout={logout} descuentos={descuentos} onGuardarDescuento={guardarDescuentoMarca} descCodigos={descCodigos} onGuardarDescCodigo={guardarDescuentoCodigo} onQuitarDescCodigo={eliminarDescuentoCodigo}/>;
 
   // ── Liquidaciones: métricas pre-calculadas — mixto distribuido ─────────────
   const _liqPagos   = sumPagos(vMes);
@@ -13646,7 +13930,7 @@ function App(){
         )}
 
         {/* POS */}
-        {tab==="pos" && <POSContainer inv={inv} onVenta={handleVenta} retiros={retiros} onRetiro={registrarRetiro} onVerNota={v=>setVentaDetalle(v)} user={user} descuentos={descuentos}/>}
+        {tab==="pos" && <POSContainer inv={inv} onVenta={handleVenta} retiros={retiros} onRetiro={registrarRetiro} onVerNota={v=>setVentaDetalle(v)} user={user} descuentos={descuentos} descCodigos={descCodigos}/>}
 
         {/* INVENTARIO — por marca */}
         {tab==="inventario" && (
@@ -14265,7 +14549,7 @@ function App(){
 // ══════════════════════════════════════════════════════════
 // POSContainer — Caja con sub-tabs Venta | Retiros
 // ══════════════════════════════════════════════════════════
-function POSContainer({inv,onVenta,retiros,onRetiro,onVerNota,user,descuentos}){
+function POSContainer({inv,onVenta,retiros,onRetiro,onVerNota,user,descuentos,descCodigos}){
   const [subTab, setSubTab] = useState("venta");
   const tabs=[{id:"venta",label:"💳 Venta"},{id:"retiros",label:"📤 Retiros"}];
   return (
@@ -14287,7 +14571,7 @@ function POSContainer({inv,onVenta,retiros,onRetiro,onVerNota,user,descuentos}){
         ))}
       </div>
       {subTab==="venta"
-        ? <POS inv={inv} onVenta={onVenta} onVerNota={onVerNota} user={user} descuentos={descuentos}/>
+        ? <POS inv={inv} onVenta={onVenta} onVerNota={onVerNota} user={user} descuentos={descuentos} descCodigos={descCodigos}/>
         : <RetirosTab inv={inv} retiros={retiros} onRetiro={onRetiro}/>
       }
     </div>
@@ -14364,7 +14648,7 @@ function QRPagoPanel({total, refVenta}){
 
 // POS — Caja de ventas
 // ══════════════════════════════════════════════════════════
-function POS({inv,onVenta,onVerNota,user,descuentos={}}){
+function POS({inv,onVenta,onVerNota,user,descuentos={},descCodigos={}}){
   var _hN135 = useState([]); var carrito = _hN135[0]; var setCarrito = _hN135[1];;
   var _hN136 = useState(""); var busq = _hN136[0]; var setBusq = _hN136[1];;
   var _hN137 = useState("efectivo"); var pago = _hN137[0]; var setPago = _hN137[1];;
@@ -14419,14 +14703,14 @@ function POS({inv,onVenta,onVerNota,user,descuentos={}}){
 
   const pagoInfo=PAGOS.find(p=>p.id===pago)||PAGOS[0];
   const subtotal=carrito.reduce((s,it)=>s+it.precio*it.cantidad,0); // precio lleno
-  // Descuento efectivo de un ítem = descuento vigente de su marca + descuento
+  // Descuento del ítem = el del CÓDIGO (manda) o el general de la MARCA, más el
   // manual global (admin), tope 50%. Cada marca absorbe SOLO el suyo.
-  const descItemPct = it => Math.min(50,
-    descMarcaVigente(descuentos, it.marcaId) + Number(descExtra||0));
+  const descItemInfo = it => descEfectivoCodigo(descuentos, descCodigos, it.marcaId, it.codigo);
+  const descItemPct = it => Math.min(50, descItemInfo(it).pct + Number(descExtra||0));
   const total = carrito.reduce((s,it)=>s + it.precio*it.cantidad*(1-descItemPct(it)/100), 0);
   const descTotalBs = subtotal - total;                       // Bs descontados en total
   const descPct = subtotal>0 ? +(descTotalBs/subtotal*100).toFixed(2) : 0; // % ponderado (display/compat)
-  const hayDescMarca = carrito.some(it=>descMarcaVigente(descuentos, it.marcaId)>0);
+  const hayDescMarca = carrito.some(it=>descItemInfo(it).pct>0);
 
   const porMarca=useMemo(()=>{
     const m={};
@@ -14439,7 +14723,7 @@ function POS({inv,onVenta,onVerNota,user,descuentos={}}){
       m[it.marcaId].uds+=it.cantidad;
     });
     return Object.entries(m);
-  },[carrito,descuentos,descExtra]);
+  },[carrito,descuentos,descCodigos,descExtra]);
 
   function add(prod){
     const m=MARCAS.find(x=>x.id===prod.marcaId);
@@ -14708,10 +14992,10 @@ function POS({inv,onVenta,onVerNota,user,descuentos={}}){
                   overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{it.nombre}</div>
                 <div style={{fontSize:12,color:C.label3,fontFamily:FONT,display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
                   <span>{it.marcaEmoji} {it.marcaNombre}</span>
-                  {descMarcaVigente(descuentos, it.marcaId)>0&&(
+                  {descItemInfo(it).pct>0&&(
                     <span style={{fontSize:10,fontWeight:700,color:C.green,background:`${C.green}18`,
                       padding:"1px 6px",borderRadius:4,fontFamily:FONT_UI}}>
-                      −{descMarcaVigente(descuentos, it.marcaId)}%
+                      −{descItemInfo(it).pct}% {descItemInfo(it).fuente==="codigo"?"producto":"marca"}
                     </span>
                   )}
                 </div>
@@ -14734,7 +15018,7 @@ function POS({inv,onVenta,onVerNota,user,descuentos={}}){
                 }}>+</button>
               </div>
               <div style={{minWidth:70,textAlign:"right"}}>
-                {descMarcaVigente(descuentos, it.marcaId)>0 ? (
+                {descItemPct(it)>0 ? (
                   <>
                     <div style={{fontSize:11,color:C.label3,textDecoration:"line-through",fontFamily:FONT}}>{$(it.precio*it.cantidad)}</div>
                     <div style={{fontSize:15,fontWeight:700,color:C.green,fontFamily:FONT}}>
@@ -19870,6 +20154,7 @@ const AUDIT_TIPOS = {
   LOGIN:      { label:"Acceso",       icono:"🔐",  color:"#546E7A" },
   CIERRE:     { label:"Cierre",       icono:"📊",  color:"#8A6418" },
   DESCUENTO_MARCA: { label:"Descuento marca", icono:"🏷️", color:"#2E7D32" },
+  DESCUENTO_CODIGO:{ label:"Descuento producto", icono:"🏷️", color:"#2E7D32" },
 };
 
 // ── Registro de carga (trazabilidad de inventario) ────────────────────────
