@@ -69162,7 +69162,7 @@ Esta acci\xF3n no se puede deshacer.` : "\xBFEliminar esta carga? Esta acci\xF3n
     const pagoInfo = PAGOS.find((p) => p.id === pago) || PAGOS[0];
     const subtotal = carrito.reduce((s, it) => s + it.precio * it.cantidad, 0);
     const descItemInfo = (it) => descEfectivoCodigo(descuentos, descCodigos, it.marcaId, it.codigo);
-    const descItemPct = (it) => Math.min(50, descItemInfo(it).pct + (Number(descMarcaManual[it.marcaId]) || 0) + Number(descExtra || 0));
+    const descItemPct = (it) => Math.min(60, descItemInfo(it).pct + (Number(descMarcaManual[it.marcaId]) || 0) + Number(descExtra || 0));
     const total = carrito.reduce((s, it) => s + it.precio * it.cantidad * (1 - descItemPct(it) / 100), 0);
     const descTotalBs = subtotal - total;
     const descPct = subtotal > 0 ? +(descTotalBs / subtotal * 100).toFixed(2) : 0;
@@ -69766,7 +69766,7 @@ ${sinStock.map((it) => {
           transition: "left .2s",
           boxShadow: "0 1px 3px rgba(0,0,0,0.3)"
         } })
-      )), on && /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 6, marginTop: 10 } }, [5, 10, 15, 20, 30].map((v) => /* @__PURE__ */ import_react.default.createElement(
+      )), on && /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, null, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 5, marginTop: 10 } }, [10, 20, 30, 40, 50, 60].map((v) => /* @__PURE__ */ import_react.default.createElement(
         "button",
         {
           key: v,
@@ -69787,7 +69787,32 @@ ${sinStock.map((it) => {
         },
         v,
         "%"
-      ))));
+      ))), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginTop: 8 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 11, color: C.label3, fontFamily: FONT } }, "O valor exacto:"), /* @__PURE__ */ import_react.default.createElement(
+        "input",
+        {
+          type: "number",
+          min: "0",
+          max: "60",
+          step: "1",
+          inputMode: "numeric",
+          value: manual,
+          onChange: (e) => {
+            const v = Math.min(60, Math.max(0, Math.round(Number(e.target.value) || 0)));
+            setDescMarcaManual((prev) => ({ ...prev, [id]: v }));
+          },
+          style: {
+            width: 64,
+            padding: "5px 8px",
+            borderRadius: 8,
+            textAlign: "center",
+            border: `1px solid ${C.sep}`,
+            background: C.bg0,
+            color: C.label,
+            fontSize: 13,
+            fontFamily: FONT_UI
+          }
+        }
+      ), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 11, color: C.label3, fontFamily: FONT } }, "% \xB7 m\xE1x. 60"))));
     })), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT, marginTop: 8, lineHeight: 1.5 } }, "Se suma al descuento que ya tenga la marca. Cada marca absorbe el suyo y queda registrado en la venta.")), /* @__PURE__ */ import_react.default.createElement("div", { style: {
       fontSize: 13,
       fontWeight: 600,
@@ -70018,7 +70043,7 @@ ${sinStock.map((it) => {
         label: "Descuento adicional manual (%)",
         type: "number",
         min: "0",
-        max: "50",
+        max: "60",
         value: descExtra,
         onChange: (e) => setDescExtra(Number(e.target.value))
       }
