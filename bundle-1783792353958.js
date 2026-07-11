@@ -69766,18 +69766,17 @@ ${sinStock.map((it) => {
           transition: "left .2s",
           boxShadow: "0 1px 3px rgba(0,0,0,0.3)"
         } })
-      )), on && /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, null, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 5, marginTop: 10 } }, [10, 20, 30, 40, 50, 60].map((v) => /* @__PURE__ */ import_react.default.createElement(
+      )), on && /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 6, marginTop: 10 } }, [5, 10, 15, 20, 30, 40, 50, 60].map((v) => /* @__PURE__ */ import_react.default.createElement(
         "button",
         {
           key: v,
           onClick: () => setDescMarcaManual((prev) => ({ ...prev, [id]: v })),
           style: {
-            flex: 1,
-            padding: "7px 0",
+            padding: "8px 0",
             borderRadius: 999,
             cursor: "pointer",
             fontFamily: FONT_UI,
-            fontSize: 12,
+            fontSize: 12.5,
             fontWeight: manual === v ? 700 : 500,
             border: `${manual === v ? 2 : 1}px solid ${manual === v ? C.green : C.sep}`,
             background: manual === v ? `${C.green}18` : C.bg2,
@@ -69787,32 +69786,7 @@ ${sinStock.map((it) => {
         },
         v,
         "%"
-      ))), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginTop: 8 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 11, color: C.label3, fontFamily: FONT } }, "O valor exacto:"), /* @__PURE__ */ import_react.default.createElement(
-        "input",
-        {
-          type: "number",
-          min: "0",
-          max: "60",
-          step: "1",
-          inputMode: "numeric",
-          value: manual,
-          onChange: (e) => {
-            const v = Math.min(60, Math.max(0, Math.round(Number(e.target.value) || 0)));
-            setDescMarcaManual((prev) => ({ ...prev, [id]: v }));
-          },
-          style: {
-            width: 64,
-            padding: "5px 8px",
-            borderRadius: 8,
-            textAlign: "center",
-            border: `1px solid ${C.sep}`,
-            background: C.bg0,
-            color: C.label,
-            fontSize: 13,
-            fontFamily: FONT_UI
-          }
-        }
-      ), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 11, color: C.label3, fontFamily: FONT } }, "% \xB7 m\xE1x. 60"))));
+      ))));
     })), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT, marginTop: 8, lineHeight: 1.5 } }, "Se suma al descuento que ya tenga la marca. Cada marca absorbe el suyo y queda registrado en la venta.")), /* @__PURE__ */ import_react.default.createElement("div", { style: {
       fontSize: 13,
       fontWeight: 600,
@@ -70037,17 +70011,7 @@ ${sinStock.map((it) => {
       border: `1px solid ${C.green}30`,
       textAlign: "center",
       marginTop: 8
-    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.green, fontWeight: 700, fontFamily: FONT_UI } }, "\u2713 Gift Card cubre el total completo")))), user?.rol === "admin" && /* @__PURE__ */ import_react.default.createElement(
-      IOSInput,
-      {
-        label: "Descuento adicional manual (%)",
-        type: "number",
-        min: "0",
-        max: "60",
-        value: descExtra,
-        onChange: (e) => setDescExtra(Number(e.target.value))
-      }
-    ), user?.rol === "caja" ? /* @__PURE__ */ import_react.default.createElement("div", { style: {
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.green, fontWeight: 700, fontFamily: FONT_UI } }, "\u2713 Gift Card cubre el total completo")))), user?.rol === "caja" ? /* @__PURE__ */ import_react.default.createElement("div", { style: {
       padding: "10px 14px",
       borderRadius: 12,
       background: C.bg2,

@@ -15226,29 +15226,18 @@ function POS({inv,onVenta,onVerNota,user,descuentos={},descCodigos={}}){
                       </button>
                     </div>
                     {on&&(
-                      <>
-                        <div style={{display:"flex",gap:5,marginTop:10}}>
-                          {[10,20,30,40,50,60].map(v=>(
-                            <button key={v} onClick={()=>setDescMarcaManual(prev=>({...prev,[id]:v}))}
-                              style={{flex:1,padding:"7px 0",borderRadius:999,cursor:"pointer",fontFamily:FONT_UI,
-                                fontSize:12,fontWeight:manual===v?700:500,
-                                border:`${manual===v?2:1}px solid ${manual===v?C.green:C.sep}`,
-                                background:manual===v?`${C.green}18`:C.bg2, color:manual===v?C.green:C.label2,
-                                WebkitTapHighlightColor:"transparent"}}>
-                              {v}%
-                            </button>
-                          ))}
-                        </div>
-                        <div style={{display:"flex",alignItems:"center",gap:8,marginTop:8}}>
-                          <span style={{fontSize:11,color:C.label3,fontFamily:FONT}}>O valor exacto:</span>
-                          <input type="number" min="0" max="60" step="1" inputMode="numeric"
-                            value={manual}
-                            onChange={e=>{const v=Math.min(60,Math.max(0,Math.round(Number(e.target.value)||0))); setDescMarcaManual(prev=>({...prev,[id]:v}));}}
-                            style={{width:64,padding:"5px 8px",borderRadius:8,textAlign:"center",
-                              border:`1px solid ${C.sep}`,background:C.bg0,color:C.label,fontSize:13,fontFamily:FONT_UI}}/>
-                          <span style={{fontSize:11,color:C.label3,fontFamily:FONT}}>% · máx. 60</span>
-                        </div>
-                      </>
+                      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:6,marginTop:10}}>
+                        {[5,10,15,20,30,40,50,60].map(v=>(
+                          <button key={v} onClick={()=>setDescMarcaManual(prev=>({...prev,[id]:v}))}
+                            style={{padding:"8px 0",borderRadius:999,cursor:"pointer",fontFamily:FONT_UI,
+                              fontSize:12.5,fontWeight:manual===v?700:500,
+                              border:`${manual===v?2:1}px solid ${manual===v?C.green:C.sep}`,
+                              background:manual===v?`${C.green}18`:C.bg2, color:manual===v?C.green:C.label2,
+                              WebkitTapHighlightColor:"transparent"}}>
+                            {v}%
+                          </button>
+                        ))}
+                      </div>
                     )}
                   </div>
                 );
@@ -15493,12 +15482,9 @@ function POS({inv,onVenta,onVerNota,user,descuentos={},descCodigos={}}){
           </div>
         )}
 
-        {/* Descuento adicional manual — SOLO admin (excepción puntual sobre
-            todo el carrito; las marcas autogestionan el suyo desde su portal) */}
-        {user?.rol==="admin"&&(
-          <IOSInput label="Descuento adicional manual (%)" type="number" min="0" max="60"
-            value={descExtra} onChange={e=>setDescExtra(Number(e.target.value))}/>
-        )}
+        {/* Campo de descuento manual global ELIMINADO — el único control de
+            descuento en el cobro es el toggle "Descuento adicional por marca"
+            (chips 5-60%). descExtra queda en 0 y no se suma. */}
         {user?.rol==="caja"
           ? <div style={{padding:"10px 14px",borderRadius:12,background:C.bg2,
               border:`1px solid ${C.sep}`,marginBottom:10}}>
