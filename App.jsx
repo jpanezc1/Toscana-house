@@ -19781,7 +19781,8 @@ function HistorialTab({ventas, inv, cierres, onVentaClick}){
   const now = new Date();
   var _hN152 = useState(now.getMonth()); var mesSel = _hN152[0]; var setMesSel = _hN152[1];
   var _hN153 = useState(now.getFullYear()); var anioSel = _hN153[0]; var setAnioSel = _hN153[1];
-  var _hN154 = useState("resumen"); var vista = _hN154[0]; var setVista = _hN154[1];; // resumen | marcas | ventas | stock
+  var _hN154 = useState("resumen"); var vista = _hN154[0]; var setVista = _hN154[1];; // resumen | marcas | ventas | dia | stock
+  var _hDia = useState(null); var diaOpen = _hDia[0]; var setDiaOpen = _hDia[1]; // fecha expandida en "Por día"
 
   const MKSel = mkKey(mesSel, anioSel);
 
@@ -19904,6 +19905,7 @@ function HistorialTab({ventas, inv, cierres, onVentaClick}){
             {value:"resumen",label:"Resumen"},
             {value:"marcas", label:"Marcas"},
             {value:"ventas", label:"Ventas"},
+            {value:"dia",    label:"Por día"},
             {value:"stock",  label:"Stock"},
           ]}
           value={vista} onChange={setVista}
@@ -20071,6 +20073,96 @@ function HistorialTab({ventas, inv, cierres, onVentaClick}){
           }
         </div>
       )}
+
+      {/* ── POR DÍA ── */}
+      {vista==="dia"&&(()=>{
+        const nf = n => new Intl.NumberFormat("es-BO",{maximumFractionDigits:0}).format(n||0);
+        const DIAS=["Domingo","Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"];
+        const fmtDia=f=>{ const [Y,M,D]=String(f||"").split("-").map(Number); if(!Y||!M||!D) return f||"—";
+          const d=new Date(Y,M-1,D); return `${DIAS[d.getDay()]} ${D} de ${MESES[M-1]}`; };
+        // Agrupar ventas activas del período por fecha
+        const porDia = {};
+        ventasPerActivas.forEach(v=>{ (porDia[v.fecha] ||= []).push(v); });
+        const dias = Object.keys(porDia).sort((a,b)=>b.localeCompare(a)); // más reciente arriba
+        return (
+          <div>
+            {/* Resumen del período por método */}
+            <div style={{background:C.bg2,border:`1px solid ${C.sep}`,borderRadius:14,padding:14,marginBottom:14}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:12}}>
+                <span style={{fontSize:13,color:C.label3,fontFamily:FONT}}>{MESES[mesSel]} {anioSel} · {ventasPerActivas.length} venta{ventasPerActivas.length!==1?"s":""}</span>
+                <span style={{fontSize:22,fontWeight:700,color:totalPer>0?C.gold:C.label3,fontFamily:FONT}}>{$(totalPer)}</span>
+              </div>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8}}>
+                {[["💵 Efectivo",efectivoPer,C.green],["📱 QR",qrPer,C.blue],["💳 Tarjeta",tarjetaPer,C.amber]].map(([lb,val,col])=>(
+                  <div key={lb} style={{background:`${col}12`,borderRadius:10,padding:"8px 10px"}}>
+                    <div style={{fontSize:11,color:col,fontFamily:FONT_UI}}>{lb}</div>
+                    <div style={{fontSize:15,fontWeight:700,color:col,fontFamily:FONT,marginTop:2}}>{$(val)}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {dias.length===0
+              ? <EmptyState icon="📅" title="Sin ventas" sub={`${MESES[mesSel]} ${anioSel}`}/>
+              : <>
+                <div style={{fontSize:10,fontWeight:700,color:C.label3,fontFamily:FONT_UI,
+                  textTransform:"uppercase",letterSpacing:.8,margin:"0 2px 8px"}}>Día por día</div>
+                {dias.map(fecha=>{
+                  const vs = porDia[fecha];
+                  const totalD = vs.reduce((s,v)=>s+getDisplayTotal(v),0);
+                  const p = sumPagos(vs);
+                  const abierto = diaOpen===fecha;
+                  return (
+                    <div key={fecha} style={{marginBottom:8}}>
+                      <div onClick={()=>setDiaOpen(abierto?null:fecha)}
+                        style={{background:C.bg2,border:`1px solid ${abierto?C.gold+"55":C.sep}`,borderRadius:12,
+                          padding:"11px 14px",cursor:"pointer",WebkitTapHighlightColor:"transparent"}}>
+                        <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline"}}>
+                          <span style={{fontSize:14,fontWeight:600,color:C.label,fontFamily:FONT}}>
+                            {fmtDia(fecha)} <span style={{fontSize:11,color:C.label3,fontWeight:400}}>· {vs.length} venta{vs.length!==1?"s":""}</span>
+                          </span>
+                          <span style={{fontSize:16,fontWeight:700,color:C.label,fontFamily:FONT}}>{$(totalD)}</span>
+                        </div>
+                        <div style={{display:"flex",gap:14,marginTop:6,fontSize:12,fontFamily:FONT,flexWrap:"wrap"}}>
+                          {p.efectivo>0&&<span style={{color:C.green}}>💵 {nf(p.efectivo)}</span>}
+                          {p.qr>0&&<span style={{color:C.blue}}>📱 {nf(p.qr)}</span>}
+                          {p.tarjeta>0&&<span style={{color:C.amber}}>💳 {nf(p.tarjeta)}</span>}
+                          {p.giftcard>0&&<span style={{color:"#7C3AED"}}>🎁 {nf(p.giftcard)}</span>}
+                          <span style={{marginLeft:"auto",color:C.label3,fontSize:11}}>{abierto?"▲":"▼"}</span>
+                        </div>
+                      </div>
+                      {/* Detalle del día (ventas individuales) */}
+                      {abierto&&(
+                        <div style={{padding:"6px 4px 2px"}}>
+                          {[...vs].sort((a,b)=>tsVenta(b)-tsVenta(a)).map(v=>(
+                            <div key={v.id} onClick={()=>onVentaClick&&onVentaClick(v)}
+                              style={{background:C.bg1,borderRadius:9,padding:"7px 12px",marginBottom:4,
+                                cursor:"pointer",WebkitTapHighlightColor:"transparent",
+                                borderLeft:`3px solid ${colorPago(v.metodoPago)||C.sep}`}}>
+                              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8}}>
+                                <div style={{display:"flex",alignItems:"center",gap:6,minWidth:0}}>
+                                  <PagoDisplay mp={v.metodoPago} total={getDisplayTotal(v)} small/>
+                                  <span style={{fontSize:10,color:C.label3,fontFamily:FONT,opacity:.7}}>
+                                    {/(\d{1,2}):(\d{2})/.test(v.hora||"") ? v.hora : `Turno ${v.hora||"—"}`}
+                                  </span>
+                                  <span style={{fontSize:11,color:C.label2,fontFamily:FONT,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                                    · {v.items.length} ítem{v.items.length!==1?"s":""}
+                                  </span>
+                                </div>
+                                <span style={{fontSize:14,fontWeight:700,color:C.label,fontFamily:FONT,flexShrink:0}}>{$(getDisplayTotal(v))}</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </>
+            }
+          </div>
+        );
+      })()}
 
       {/* ── STOCK ── */}
       {vista==="stock"&&(
