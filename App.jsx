@@ -437,6 +437,26 @@ async function sbGuardarUsuarios(lista) {
   } catch(e) { console.warn("Supabase save usuarios:", e.message); return false; }
 }
 
+// Escribe SOLO la columna password (preserva nombre/rol/estado/marca).
+// El login lee esta columna desde Supabase → el cambio toma efecto en todas
+// las sesiones apenas queda guardado.
+async function sbActualizarPassword(usuario, password) {
+  try {
+    const db = await getSupabase();
+    const { error } = await db.from("usuarios").update({ password }).eq("usuario", usuario);
+    if (error) throw error;
+    return true;
+  } catch(e) { console.warn("Supabase update password:", e.message); return false; }
+}
+// Lee el password actual de Supabase (null si el usuario no está en la tabla)
+async function sbLeerPassword(usuario) {
+  try {
+    const db = await getSupabase();
+    const { data } = await db.from("usuarios").select("password").eq("usuario", usuario).maybeSingle();
+    return data ? (data.password || "") : null;
+  } catch { return null; }
+}
+
 async function sbCargarUsuarios() {
   try {
     const db = await getSupabase();
@@ -754,6 +774,7 @@ async function ejecutarOpOutbox(op){
     case "auditoria":   return await sbGuardarAuditoria(op.payload);
     case "auditLog":    return await sbGuardarAuditLog(op.payload);
     case "usuarios":    return await sbGuardarUsuarios(op.payload);
+    case "password":    return await sbActualizarPassword(op.payload.usuario, op.payload.password);
     case "marcas":      return await sbGuardarMarcas(op.payload);
     case "descuentoMarca": return await sbGuardarDescuentoMarca(op.payload);
     case "descuentoCodigo": return await sbGuardarDescuentoCodigo(op.payload);
@@ -20324,20 +20345,23 @@ function PanelCambiarPass({user, usuarios, onGuardar}){
   const [msg,    setMsg]    = useState(null);
   const [saving, setSaving] = useState(false);
 
-  function cambiar(){
+  async function cambiar(){
     setMsg(null);
-    const u = usuarios.find(x=>x.usuario===user.usuario);
-    if(!u){ setMsg({ok:false,txt:"Usuario no encontrado"}); return; }
-    if(u.password!==passActual){ setMsg({ok:false,txt:"Contraseña actual incorrecta"}); return; }
     if(passNueva.length<6){ setMsg({ok:false,txt:"Mínimo 6 caracteres"}); return; }
     if(passNueva!==passConfirm){ setMsg({ok:false,txt:"Las contraseñas no coinciden"}); return; }
     setSaving(true);
-    setTimeout(()=>{
-      onGuardar(usuarios.map(x=>x.usuario===user.usuario?{...x,password:passNueva}:x));
-      setSaving(false);
-      setMsg({ok:true,txt:"✓ Contraseña actualizada correctamente"});
-      setPassActual(""); setPassNueva(""); setPassConfirm("");
-    }, 380);
+    // Verifica la contraseña actual contra Supabase (fuente de verdad del login).
+    // Si el usuario aún no tiene password seteada en la nube, se permite.
+    const actualNube = await sbLeerPassword(user.usuario);
+    const localU = usuarios.find(x=>x.usuario===user.usuario);
+    const actualReal = actualNube!=null ? actualNube : (localU?.password ?? "");
+    if(actualReal && actualReal !== passActual){
+      setSaving(false); setMsg({ok:false,txt:"Contraseña actual incorrecta"}); return;
+    }
+    onGuardar(usuarios.map(x=>x.usuario===user.usuario?{...x,password:passNueva}:x));
+    setSaving(false);
+    setMsg({ok:true,txt:"✓ Contraseña actualizada · ya funciona en todos los dispositivos"});
+    setPassActual(""); setPassNueva(""); setPassConfirm("");
   }
 
   const ipt=(label,val,set,placeholder)=>(
@@ -21605,7 +21629,16 @@ function ConfigTab({user, logout, onRecargarDesdeSupabase, onSyncCompleto}){
   function guardarUsuarios(u, accion, afectado, toastMsg){
     setUsuarios(u);
     localStorage.setItem("th_usuarios", JSON.stringify(u));
-    sbGuardarUsuarios(u); // sincronizar a la nube para que funcione en todos los dispositivos
+    // Metadata (nombre/rol/estado/marca) con reintento automático si no hay red
+    syncConRespaldo("usuarios", u, ()=>sbGuardarUsuarios(u));
+    // Password: se escribe en su propia columna, con reintento, por cada usuario
+    // que traiga una contraseña. El login la lee de Supabase → efectiva al instante
+    // en todas las sesiones. sbGuardarUsuarios NO toca password (no la pisa).
+    u.forEach(x=>{
+      if(typeof x.password === "string" && x.password.length>0){
+        syncConRespaldo("password", {usuario:x.usuario, password:x.password}, ()=>sbActualizarPassword(x.usuario, x.password));
+      }
+    });
     if(accion&&afectado){
       agregarAudit(accion, afectado, user.nombre);
       setAuditLog(JSON.parse(localStorage.getItem(AUDIT_KEY)||"[]"));
@@ -21686,9 +21719,13 @@ function ConfigTab({user, logout, onRecargarDesdeSupabase, onSyncCompleto}){
   // acciones
   function handleResetPass(u){
     const temp=generarTempPassword();
-    // Con Supabase Auth, el reset de contraseña debe hacerse desde el dashboard de Supabase
-    // o via service_role. Aquí mostramos la contraseña temporal para que el admin la ingrese allí.
-    setTempPass({usuario:u.usuario,nombre:u.nombre,password:temp,soloManual:true});
+    // Guarda la contraseña temporal en la tabla usuarios (con reintento) → toma
+    // efecto de inmediato en todas las sesiones. Se muestra para entregársela.
+    guardarUsuarios(
+      usuarios.map(x=>x.usuario===u.usuario?{...x,password:temp}:x),
+      "Reseteó contraseña", u.usuario
+    );
+    setTempPass({usuario:u.usuario,nombre:u.nombre,password:temp,soloManual:false});
     setConfirmAct(null); setMenuAbierto(null);
   }
   function handleToggle(u){
@@ -21722,11 +21759,14 @@ function ConfigTab({user, logout, onRecargarDesdeSupabase, onSyncCompleto}){
       if(data.password) sbCrearAuthUsuario(data.usuario, data.password, data.nombre, data.rol, data.marcaId);
     } else {
       const update = {...data, marcaId:data.marcaId?Number(data.marcaId):undefined};
-      delete update.password; // contraseña no se guarda en tabla usuarios
+      // Si el admin dejó el campo vacío, NO tocar la contraseña (no pisarla).
+      // Si escribió una nueva, se conserva y guardarUsuarios la persiste.
+      if(!update.password) delete update.password;
+      const cambioPass = !!update.password;
       guardarUsuarios(
         usuarios.map(u=>u.usuario===data.usuario ? {...u,...update} : u),
-        "Editó usuario", data.usuario,
-        `Cambios de @${data.usuario} guardados`
+        cambioPass ? "Cambió contraseña" : "Editó usuario", data.usuario,
+        cambioPass ? `Contraseña de @${data.usuario} actualizada` : `Cambios de @${data.usuario} guardados`
       );
     }
     setModalAdd(false); setEditando(null);

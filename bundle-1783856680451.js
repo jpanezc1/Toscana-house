@@ -53912,6 +53912,26 @@
       return false;
     }
   }
+  async function sbActualizarPassword(usuario, password) {
+    try {
+      const db = await getSupabase();
+      const { error } = await db.from("usuarios").update({ password }).eq("usuario", usuario);
+      if (error) throw error;
+      return true;
+    } catch (e) {
+      console.warn("Supabase update password:", e.message);
+      return false;
+    }
+  }
+  async function sbLeerPassword(usuario) {
+    try {
+      const db = await getSupabase();
+      const { data } = await db.from("usuarios").select("password").eq("usuario", usuario).maybeSingle();
+      return data ? data.password || "" : null;
+    } catch {
+      return null;
+    }
+  }
   async function sbCargarUsuarios() {
     try {
       const db = await getSupabase();
@@ -54285,6 +54305,8 @@
         return await sbGuardarAuditLog(op.payload);
       case "usuarios":
         return await sbGuardarUsuarios(op.payload);
+      case "password":
+        return await sbActualizarPassword(op.payload.usuario, op.payload.password);
       case "marcas":
         return await sbGuardarMarcas(op.payload);
       case "descuentoMarca":
@@ -75627,17 +75649,8 @@ ${c.resumen || c.id}`)) onEliminarCarga(c.id);
     const [show, setShow] = (0, import_react.useState)(false);
     const [msg, setMsg] = (0, import_react.useState)(null);
     const [saving, setSaving] = (0, import_react.useState)(false);
-    function cambiar() {
+    async function cambiar() {
       setMsg(null);
-      const u = usuarios.find((x) => x.usuario === user.usuario);
-      if (!u) {
-        setMsg({ ok: false, txt: "Usuario no encontrado" });
-        return;
-      }
-      if (u.password !== passActual) {
-        setMsg({ ok: false, txt: "Contrase\xF1a actual incorrecta" });
-        return;
-      }
       if (passNueva.length < 6) {
         setMsg({ ok: false, txt: "M\xEDnimo 6 caracteres" });
         return;
@@ -75647,14 +75660,20 @@ ${c.resumen || c.id}`)) onEliminarCarga(c.id);
         return;
       }
       setSaving(true);
-      setTimeout(() => {
-        onGuardar(usuarios.map((x) => x.usuario === user.usuario ? { ...x, password: passNueva } : x));
+      const actualNube = await sbLeerPassword(user.usuario);
+      const localU = usuarios.find((x) => x.usuario === user.usuario);
+      const actualReal = actualNube != null ? actualNube : localU?.password ?? "";
+      if (actualReal && actualReal !== passActual) {
         setSaving(false);
-        setMsg({ ok: true, txt: "\u2713 Contrase\xF1a actualizada correctamente" });
-        setPassActual("");
-        setPassNueva("");
-        setPassConfirm("");
-      }, 380);
+        setMsg({ ok: false, txt: "Contrase\xF1a actual incorrecta" });
+        return;
+      }
+      onGuardar(usuarios.map((x) => x.usuario === user.usuario ? { ...x, password: passNueva } : x));
+      setSaving(false);
+      setMsg({ ok: true, txt: "\u2713 Contrase\xF1a actualizada \xB7 ya funciona en todos los dispositivos" });
+      setPassActual("");
+      setPassNueva("");
+      setPassConfirm("");
     }
     const ipt = (label, val, set, placeholder) => /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 12 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
       fontSize: 11,
@@ -77056,7 +77075,12 @@ ${c.resumen || c.id}`)) onEliminarCarga(c.id);
     function guardarUsuarios(u, accion, afectado, toastMsg) {
       setUsuarios(u);
       localStorage.setItem("th_usuarios", JSON.stringify(u));
-      sbGuardarUsuarios(u);
+      syncConRespaldo("usuarios", u, () => sbGuardarUsuarios(u));
+      u.forEach((x) => {
+        if (typeof x.password === "string" && x.password.length > 0) {
+          syncConRespaldo("password", { usuario: x.usuario, password: x.password }, () => sbActualizarPassword(x.usuario, x.password));
+        }
+      });
       if (accion && afectado) {
         agregarAudit(accion, afectado, user.nombre);
         setAuditLog(JSON.parse(localStorage.getItem(AUDIT_KEY) || "[]"));
@@ -77157,7 +77181,12 @@ ${c.resumen || c.id}`)) onEliminarCarga(c.id);
     }
     function handleResetPass(u) {
       const temp = generarTempPassword();
-      setTempPass({ usuario: u.usuario, nombre: u.nombre, password: temp, soloManual: true });
+      guardarUsuarios(
+        usuarios.map((x) => x.usuario === u.usuario ? { ...x, password: temp } : x),
+        "Resete\xF3 contrase\xF1a",
+        u.usuario
+      );
+      setTempPass({ usuario: u.usuario, nombre: u.nombre, password: temp, soloManual: false });
       setConfirmAct(null);
       setMenuAbierto(null);
     }
@@ -77196,12 +77225,13 @@ ${c.resumen || c.id}`)) onEliminarCarga(c.id);
         if (data.password) sbCrearAuthUsuario(data.usuario, data.password, data.nombre, data.rol, data.marcaId);
       } else {
         const update = { ...data, marcaId: data.marcaId ? Number(data.marcaId) : void 0 };
-        delete update.password;
+        if (!update.password) delete update.password;
+        const cambioPass = !!update.password;
         guardarUsuarios(
           usuarios.map((u) => u.usuario === data.usuario ? { ...u, ...update } : u),
-          "Edit\xF3 usuario",
+          cambioPass ? "Cambi\xF3 contrase\xF1a" : "Edit\xF3 usuario",
           data.usuario,
-          `Cambios de @${data.usuario} guardados`
+          cambioPass ? `Contrase\xF1a de @${data.usuario} actualizada` : `Cambios de @${data.usuario} guardados`
         );
       }
       setModalAdd(false);
