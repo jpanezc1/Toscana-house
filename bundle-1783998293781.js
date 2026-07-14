@@ -57477,6 +57477,44 @@
       return null;
     }
   }
+  function resumenVentaTexto(venta, url) {
+    const fmt = (n) => "Bs " + Number(n || 0).toLocaleString("es-BO", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const num = String(venta.id || "").replace(/\D/g, "").slice(-6);
+    const total = getDisplayTotal(venta);
+    const marcas = [...new Set((venta.items || []).map((i) => i.marcaNombre).filter(Boolean))];
+    const metodo = (typeof labelPago === "function" ? labelPago(venta.metodoPago) : venta.metodoPago) || "";
+    const L = [];
+    L.push("*TOSCANA HOUSE*");
+    if (venta.anulada) L.push("\u26A0 VENTA ANULADA");
+    L.push("Nota de venta N.o " + num);
+    if (venta.fecha) L.push("Fecha: " + venta.fecha + (venta.hora ? " \xB7 " + venta.hora : ""));
+    if (marcas.length === 1) L.push("Marca: " + marcas[0]);
+    else if (marcas.length > 1) L.push("Multimarca: " + marcas.join(", "));
+    if (venta.clienteNombre) L.push("Cliente: " + venta.clienteNombre + (venta.clienteTelefono ? " \xB7 " + venta.clienteTelefono : ""));
+    L.push("");
+    L.push("*Detalle:*");
+    (venta.items || []).forEach((it) => {
+      L.push("\u2022 " + String(it.nombre || "").trim() + " x" + (it.cantidad || 1) + (it.marcaNombre ? " (" + it.marcaNombre + ")" : "") + " \u2014 " + fmt(netItemSub(venta, it)));
+    });
+    L.push("");
+    let metodoLinea = "M\xE9todo de pago: " + metodo;
+    if (String(venta.metodoPago || "").startsWith("mixto|") && typeof parsePago === "function") {
+      const p = parsePago(venta.metodoPago, total);
+      const partes = [];
+      if (p.efectivo > 0) partes.push("efectivo " + fmt(p.efectivo));
+      if (p.qr > 0) partes.push("QR " + fmt(p.qr));
+      if (p.tarjeta > 0) partes.push("tarjeta " + fmt(p.tarjeta));
+      if (partes.length) metodoLinea += " (" + partes.join(", ") + ")";
+    }
+    L.push(metodoLinea);
+    L.push("*TOTAL: " + fmt(total) + "*");
+    if (url) {
+      L.push("");
+      L.push("Nota en PDF: " + url);
+    }
+    L.push("\xA1Gracias por tu compra!");
+    return L.join("\n");
+  }
   async function enviarNotaVentaWhatsApp(venta, notify) {
     const say = notify || ((m) => {
       try {
@@ -57490,17 +57528,17 @@
       const file = new File([doc.output("blob")], "Nota_" + num + ".pdf", { type: "application/pdf" });
       const esMovil = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1;
       if (esMovil && navigator.canShare && navigator.canShare({ files: [file] })) {
-        await navigator.share({ files: [file], title: "Nota de venta N.o " + num });
+        await navigator.share({ files: [file], title: "Nota de venta N.o " + num, text: resumenVentaTexto(venta) });
         return;
       }
       console.log("[Nota] subiendo PDF\u2026");
       const url = await subirNotaVentaPDF(doc, venta);
       if (url) {
-        const texto = "*TOSCANA HOUSE*\nNota de venta N.o " + num + "\nTu nota en PDF: " + url + "\nGracias por tu compra!";
+        const texto = resumenVentaTexto(venta, url);
         const tel = String(venta.clienteTelefono || "").replace(/\D/g, "");
         const destino = tel.length >= 7 ? "https://wa.me/591" + tel + "?text=" : "https://wa.me/?text=";
         window.open(destino + encodeURIComponent(texto), "_blank");
-        say("Listo \u2014 el mensaje lleva el enlace al PDF");
+        say("Listo \u2014 el mensaje lleva toda la venta + el enlace al PDF");
         return;
       }
       doc.save("Nota_" + num + ".pdf");
