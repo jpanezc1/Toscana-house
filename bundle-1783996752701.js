@@ -57303,17 +57303,224 @@
       img.src = dataUrl;
     });
   }
-  function generarVistaPreviaNotaVenta(venta, numSecuencial, setPreview) {
-    const num = numSecuencial || venta.id.replace(/\D/g, "").slice(-4).padStart(4, "0");
-    const marcas = [...new Set((venta.items || []).map((i) => i.marcaNombre).filter(Boolean))];
-    const marcaCarpeta = marcas.length === 1 ? marcas[0] : marcas.length > 1 ? "Multimarca" : null;
-    const fechaSlug = (venta.fecha || "").replace(/\//g, "-");
-    construirImagenNotaVenta(venta, num).then((blob) => {
-      const marcaSlug = marcas.map((m) => m.replace(/ /g, "_")).join("-") || "TH";
-      const nombre = `TH_${marcaSlug}_NotaVenta_N${num}_${fechaSlug}.png`;
-      const url = URL.createObjectURL(blob);
-      setPreview({ url, blob, nombre, num, marcaNombre: marcaCarpeta });
-    }).catch(() => alert("No se pudo generar la imagen de la nota"));
+  async function notaVentaPDF(venta) {
+    const { jsPDF } = window.jspdf || {};
+    if (!jsPDF) throw new Error("jsPDF no carg\xF3");
+    const doc = new jsPDF({ unit: "mm", format: "a4" });
+    const num = String(venta.id || "").replace(/\D/g, "").slice(-4).padStart(4, "0");
+    const fmt2 = (n) => Number(n || 0).toLocaleString("es-BO", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const W = 210, M = 20;
+    let y = 24;
+    const items = venta.items || [];
+    const itemDesc = (it) => it.descPct != null ? Number(it.descPct) || 0 : getManualDescPct(venta);
+    const subtotalBruto = items.reduce((s, i) => s + (i.precioUnit || 0) * (i.cantidad || 1), 0);
+    const total = getDisplayTotal(venta);
+    const descBs = subtotalBruto - total;
+    if (venta.anulada) {
+      doc.saveGraphicsState();
+      doc.setGState(new doc.GState({ opacity: 0.1 }));
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(80);
+      doc.setTextColor(220, 60, 90);
+      doc.text("ANULADA", 105, 165, { align: "center", angle: 25 });
+      doc.restoreGraphicsState();
+      doc.setTextColor(20, 20, 20);
+    }
+    doc.setTextColor(24, 20, 16);
+    doc.setFont("times", "normal");
+    doc.setFontSize(22);
+    doc.text("T  H", M, y);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9);
+    doc.setTextColor(138, 100, 24);
+    doc.text("TOSCANA HOUSE", M, y + 6);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(6.5);
+    doc.setTextColor(120, 120, 120);
+    doc.text("CASA DE MODA", M, y + 10.5);
+    doc.setTextColor(24, 20, 16);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(14);
+    doc.text("NOTA DE VENTA", W - M, y - 2, { align: "right" });
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.text("N.o " + num, W - M, y + 4, { align: "right" });
+    doc.text(String(venta.fecha || "") + "  " + String(venta.hora || ""), W - M, y + 9, { align: "right" });
+    if (typeof NIT_EMPRESA !== "undefined") doc.text("NIT " + NIT_EMPRESA, W - M, y + 14, { align: "right" });
+    y += 20;
+    doc.setDrawColor(210, 205, 195);
+    doc.setLineWidth(0.4);
+    doc.line(M, y, W - M, y);
+    y += 8;
+    const info = [];
+    if (typeof PROPIETARIA !== "undefined") info.push(["Propietaria", PROPIETARIA]);
+    if (typeof SUCURSAL_EMP !== "undefined") info.push(["Sucursal", SUCURSAL_EMP]);
+    info.push(["Vendedor", venta.vendedor || "Tienda"]);
+    info.push(["Metodo de pago", (typeof labelPago === "function" ? labelPago(venta.metodoPago) : venta.metodoPago) || "-"]);
+    if (venta.clienteNombre) info.push(["Cliente", venta.clienteNombre + (venta.clienteTelefono ? " - " + venta.clienteTelefono : "")]);
+    const colX = M + (W - 2 * M) / 2;
+    const celda = (row, cx, ry) => {
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(7.5);
+      doc.setTextColor(140, 140, 140);
+      doc.text(String(row[0]).toUpperCase(), cx, ry);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9.5);
+      doc.setTextColor(24, 20, 16);
+      doc.text(doc.splitTextToSize(String(row[1]), (W - 2 * M) / 2 - 6)[0] || "", cx, ry + 5);
+    };
+    for (let i = 0; i < info.length; i += 2) {
+      celda(info[i], M, y);
+      if (info[i + 1]) celda(info[i + 1], colX, y);
+      y += 12;
+    }
+    y += 1;
+    doc.setDrawColor(210, 205, 195);
+    doc.line(M, y, W - M, y);
+    y += 7;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(7.5);
+    doc.setTextColor(130, 130, 130);
+    doc.text("CODIGO", M, y);
+    doc.text("DESCRIPCION", M + 26, y);
+    doc.text("CANT", W - M - 52, y, { align: "right" });
+    doc.text("P.UNIT", W - M - 30, y, { align: "right" });
+    doc.text("SUBTOTAL", W - M, y, { align: "right" });
+    y += 2;
+    doc.setDrawColor(230, 226, 218);
+    doc.line(M, y, W - M, y);
+    y += 5;
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.setTextColor(24, 20, 16);
+    items.forEach((it) => {
+      const linea = (it.precioUnit || 0) * (it.cantidad || 1);
+      doc.setFont("courier", "normal");
+      doc.setFontSize(8);
+      doc.setTextColor(120, 120, 120);
+      doc.text(String(it.codigo || ""), M, y);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9);
+      doc.setTextColor(24, 20, 16);
+      const nom = doc.splitTextToSize(String(it.nombre || "") + (it.marcaNombre ? " - " + it.marcaNombre : ""), W - M - 26 - 58);
+      doc.text(nom[0] || "", M + 26, y);
+      doc.text(String(it.cantidad || 1), W - M - 52, y, { align: "right" });
+      doc.text(fmt2(it.precioUnit), W - M - 30, y, { align: "right" });
+      doc.text(fmt2(linea), W - M, y, { align: "right" });
+      y += 6.5;
+      if (y > 250) {
+        doc.addPage();
+        y = 24;
+      }
+    });
+    doc.setDrawColor(210, 205, 195);
+    doc.line(M, y, W - M, y);
+    y += 8;
+    const tx = W - M - 55, vx = W - M;
+    doc.setFontSize(9);
+    doc.setTextColor(90, 90, 90);
+    doc.text("Subtotal", tx, y);
+    doc.setTextColor(24, 20, 16);
+    doc.text("Bs " + fmt2(subtotalBruto), vx, y, { align: "right" });
+    y += 6;
+    const pctPond = subtotalBruto > 0 ? Math.round(descBs / subtotalBruto * 100) : 0;
+    if (descBs > 5e-3) {
+      doc.setTextColor(150, 60, 60);
+      doc.text("Descuento " + pctPond + "%", tx, y);
+      doc.text("- Bs " + fmt2(descBs), vx, y, { align: "right" });
+      y += 6;
+    }
+    doc.setDrawColor(24, 20, 16);
+    doc.setLineWidth(0.5);
+    doc.line(tx, y - 2, vx, y - 2);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(13);
+    doc.setTextColor(24, 20, 16);
+    doc.text("TOTAL", tx, y + 4);
+    doc.text("Bs " + fmt2(total), vx, y + 4, { align: "right" });
+    y += 12;
+    if (typeof numeroALetras === "function") {
+      doc.setFont("helvetica", "italic");
+      doc.setFontSize(8);
+      doc.setTextColor(90, 90, 90);
+      const son = doc.splitTextToSize("Son: " + numeroALetras(total), W - 2 * M);
+      doc.text(son, M, y);
+      y += son.length * 4 + 4;
+    }
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    doc.setTextColor(138, 100, 24);
+    doc.text("Gracias por tu compra", 105, y + 6, { align: "center" });
+    doc.setFontSize(7);
+    doc.setTextColor(150, 150, 150);
+    const pie = [typeof DIRECCION_EMP !== "undefined" ? DIRECCION_EMP : "", typeof TELEFONO_EMP !== "undefined" ? "Tel " + TELEFONO_EMP : "", typeof CIUDAD_EMP !== "undefined" ? CIUDAD_EMP : ""].filter(Boolean).join("  \xB7  ");
+    doc.setDrawColor(230, 226, 218);
+    doc.line(M, 285, W - M, 285);
+    doc.text(pie, 105, 290, { align: "center" });
+    return doc;
+  }
+  async function subirNotaVentaPDF(doc, venta) {
+    try {
+      const sb = await getSupabase();
+      if (!sb) return null;
+      const blob = doc.output("blob");
+      const num = String(venta.id || "").replace(/\D/g, "").slice(-6);
+      const path = String(venta.id) + "/Nota_" + num + ".pdf";
+      const { error } = await sb.storage.from("notas").upload(path, blob, { contentType: "application/pdf", upsert: true });
+      if (error) {
+        console.warn("subir nota:", error.message);
+        return null;
+      }
+      return sb.storage.from("notas").getPublicUrl(path).data.publicUrl;
+    } catch (e) {
+      console.warn("subir nota:", e.message);
+      return null;
+    }
+  }
+  async function enviarNotaVentaWhatsApp(venta, notify) {
+    const say = notify || ((m) => {
+      try {
+        alert(m);
+      } catch {
+      }
+    });
+    const num = String(venta.id || "").replace(/\D/g, "").slice(-6);
+    try {
+      const doc = await notaVentaPDF(venta);
+      const file = new File([doc.output("blob")], "Nota_" + num + ".pdf", { type: "application/pdf" });
+      const esMovil = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1;
+      if (esMovil && navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], title: "Nota de venta N.o " + num });
+        return;
+      }
+      console.log("[Nota] subiendo PDF\u2026");
+      const url = await subirNotaVentaPDF(doc, venta);
+      if (url) {
+        const texto = "*TOSCANA HOUSE*\nNota de venta N.o " + num + "\nTu nota en PDF: " + url + "\nGracias por tu compra!";
+        const tel = String(venta.clienteTelefono || "").replace(/\D/g, "");
+        const destino = tel.length >= 7 ? "https://wa.me/591" + tel + "?text=" : "https://wa.me/?text=";
+        window.open(destino + encodeURIComponent(texto), "_blank");
+        say("Listo \u2014 el mensaje lleva el enlace al PDF");
+        return;
+      }
+      doc.save("Nota_" + num + ".pdf");
+      say("PDF descargado \u2014 adjuntalo con el clip \u{1F4CE} en WhatsApp");
+    } catch (e) {
+      if (e && e.name === "AbortError") return;
+      say("No pude preparar el env\xEDo, prob\xE1 de nuevo.");
+    }
+  }
+  async function verNotaVentaPDF(venta) {
+    try {
+      const doc = await notaVentaPDF(venta);
+      const w = window.open(doc.output("bloburl"), "_blank");
+      if (!w) doc.save("Nota_" + String(venta.id || "").replace(/\D/g, "").slice(-6) + ".pdf");
+    } catch (e) {
+      try {
+        alert("No se pudo generar el PDF");
+      } catch {
+      }
+    }
   }
   function NotaImgPreviewModal({ data, onClose }) {
     if (!data) return null;
@@ -60178,7 +60385,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
     ), /* @__PURE__ */ import_react.default.createElement(
       "button",
       {
-        onClick: () => generarVistaPreviaNotaVenta(venta, num, setPreviewNota),
+        onClick: () => enviarNotaVentaWhatsApp(venta),
         style: {
           background: `linear-gradient(135deg,#25D366,#128C7E)`,
           border: "none",
@@ -60197,7 +60404,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
     ), /* @__PURE__ */ import_react.default.createElement(
       "button",
       {
-        onClick: () => generarVistaPreviaNotaVenta(venta, num, setPreviewNota),
+        onClick: () => verNotaVentaPDF(venta),
         style: {
           background: `linear-gradient(135deg,#546E7A,#37474F)`,
           border: "none",
@@ -60211,8 +60418,8 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
           WebkitTapHighlightColor: "transparent"
         }
       },
-      /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 22 } }, "\u2B06"),
-      /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, fontWeight: 700, color: "#fff", fontFamily: FONT_UI } }, "Compartir")
+      /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 22 } }, "\u{1F4C4}"),
+      /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, fontWeight: 700, color: "#fff", fontFamily: FONT_UI } }, "Ver PDF")
     )), !venta.anulada && /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 10 } }, facturaGuardada && !facturaGuardada.anulada && /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 8 } }, !confirmAnulF ? /* @__PURE__ */ import_react.default.createElement("button", { onClick: () => setConfirmAnulF(true), style: {
       width: "100%",
       background: "none",
@@ -69704,7 +69911,7 @@ ${sinStock.map((it) => {
       marginBottom: 3,
       paddingLeft: 8,
       borderLeft: `2px solid ${C.gold}40`
-    } }, it.nombre, " ", /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.label3 } }, "\xD7", it.cantidad), /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.label3 } }, " \xB7 ", it.marcaNombre))), /* @__PURE__ */ import_react.default.createElement("div", { style: { marginTop: 14, display: "flex", flexDirection: "column", gap: 8 } }, /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => onVerNota && onVerNota(ultima), variant: "primary", full: true, small: true, icon: "\u{1F9FE}" }, "Ver Nota de Venta"), /* @__PURE__ */ import_react.default.createElement(
+    } }, it.nombre, " ", /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.label3 } }, "\xD7", it.cantidad), /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.label3 } }, " \xB7 ", it.marcaNombre))), /* @__PURE__ */ import_react.default.createElement("div", { style: { marginTop: 14, display: "flex", flexDirection: "column", gap: 8 } }, /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => verNotaVentaPDF(ultima), variant: "primary", full: true, small: true, icon: "\u{1F9FE}" }, "Ver Nota (PDF)"), /* @__PURE__ */ import_react.default.createElement(
       IOSBtn,
       {
         onPress: () => setShowFacPOS(true),
@@ -69715,7 +69922,7 @@ ${sinStock.map((it) => {
         style: { background: `linear-gradient(135deg,#1A237E,#283593)` }
       },
       "Emitir Factura SIAT"
-    ), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => generarVistaPreviaNotaVenta(ultima, void 0, setPreviewNota), variant: "fill", full: true, small: true, icon: "\u{1F4F2}" }, "Enviar por WhatsApp"))), /* @__PURE__ */ import_react.default.createElement(NotaImgPreviewModal, { data: previewNota, onClose: () => setPreviewNota(null) }), /* @__PURE__ */ import_react.default.createElement(
+    ), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => enviarNotaVentaWhatsApp(ultima), variant: "fill", full: true, small: true, icon: "\u{1F4F2}" }, "Enviar por WhatsApp"))), /* @__PURE__ */ import_react.default.createElement(NotaImgPreviewModal, { data: previewNota, onClose: () => setPreviewNota(null) }), /* @__PURE__ */ import_react.default.createElement(
       FacturaModal,
       {
         venta: ultima,
@@ -78393,7 +78600,7 @@ Esta acci\xF3n no se puede deshacer.`,
           borderRadius: 6,
           borderLeft: `3px solid ${g.marca?.color}`
         } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 1 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 5 } }, /* @__PURE__ */ import_react.default.createElement(MarcaIcon, { marca: g.marca, size: 12, radius: 3 }), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 11, fontWeight: 600, color: g.marca?.color, fontFamily: FONT } }, g.marca?.nombre)), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 12, fontWeight: 700, color: C.label, fontFamily: FONT, letterSpacing: "-0.01em" } }, $2(g.sub))), g.items.map((it, ii) => /* @__PURE__ */ import_react.default.createElement("div", { key: ii, style: { fontSize: 10, color: C.label2, fontFamily: FONT, lineHeight: "1.2" } }, "\xB7 ", it.nombre, " \xD7", it.cantidad, " = ", $2(it.subtotal))))),
-        !isDesktop && /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => generarVistaPreviaNotaVenta(v, void 0, setPreviewNota), variant: "fill", small: true, full: true, icon: "\u{1F4F2}" }, "Enviar por WhatsApp"),
+        !isDesktop && /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => enviarNotaVentaWhatsApp(v), variant: "fill", small: true, full: true, icon: "\u{1F4F2}" }, "Enviar por WhatsApp"),
         v.etiquetaImg && /* @__PURE__ */ import_react.default.createElement(
           "img",
           {

@@ -328,6 +328,8 @@ const html = `<!DOCTYPE html>
       setInterval(check, 60000);
     })();
   </script>
+  <!-- jsPDF: generación de notas de venta en PDF nativo (ligero, nítido) -->
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
   <script src="bundle-${v}.js"></script>
   <!-- Service worker: permite instalar la app y seguir usándola sin internet -->
   <script>
