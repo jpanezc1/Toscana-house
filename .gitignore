@@ -3,9 +3,14 @@ main.jsx
 main_fixed.jsx
 *.py
 *.sql
+!supabase/
+!supabase/**/*.sql
 apps-script.js
 toscana-house.jsx
 toscana-house-new.jsx
 toscana-house.html
 App.js
 .DS_Store
+.vercel
+.env*
+supabase/.temp/

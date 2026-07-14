@@ -1,6 +1,36 @@
 const esbuild = require("esbuild");
 const fs = require("fs");
 
+const PROD_SUPABASE_URL = "https://uqphxiixdulqscbfyxhz.supabase.co";
+const PROD_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVxcGh4aWl4ZHVscXNjYmZ5eGh6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcwMzc0NjQsImV4cCI6MjA5MjYxMzQ2NH0.U1EIf4JWqfrvga7CApClLl7nzBuFoPpD8BlicxvfB-w";
+const deployEnvironment = String(process.env.VERCEL_ENV || "local").trim().toLowerCase();
+const configuredSupabaseUrl = String(process.env.TH_SUPABASE_URL || "").trim().replace(/\/$/, "");
+const configuredSupabaseAnonKey = String(process.env.TH_SUPABASE_ANON_KEY || "").trim();
+
+if (deployEnvironment === "preview") {
+  if (!configuredSupabaseUrl || !configuredSupabaseAnonKey) {
+    throw new Error(
+      "Build de preview bloqueado: configure TH_SUPABASE_URL y TH_SUPABASE_ANON_KEY para staging."
+    );
+  }
+  if (configuredSupabaseUrl === PROD_SUPABASE_URL) {
+    throw new Error(
+      "Build de preview bloqueado: TH_SUPABASE_URL apunta a la base de datos de producción."
+    );
+  }
+}
+
+const buildSupabaseUrl = configuredSupabaseUrl || PROD_SUPABASE_URL;
+const buildSupabaseAnonKey = configuredSupabaseAnonKey || PROD_SUPABASE_ANON_KEY;
+const configuredAppEnvironment = String(process.env.TH_APP_ENV || "").trim().toLowerCase();
+const buildAppEnvironment = deployEnvironment === "preview"
+  ? "staging"
+  : deployEnvironment === "production"
+    ? "production"
+    : (["local", "staging", "production"].includes(configuredAppEnvironment)
+      ? configuredAppEnvironment
+      : "");
+
 // ── Crear main.jsx (entry point) ─────────────────────────────────────────────
 let app = fs.readFileSync("App.jsx", "utf8");
 app = app.replace(/^import .+\n/gm, "");
@@ -30,6 +60,11 @@ esbuild.buildSync({
   platform: "browser",
   target: "es2020",
   minify: false,
+  define: {
+    __TH_SUPABASE_URL__: JSON.stringify(buildSupabaseUrl),
+    __TH_SUPABASE_ANON_KEY__: JSON.stringify(buildSupabaseAnonKey),
+    __TH_APP_ENV__: JSON.stringify(buildAppEnvironment),
+  },
 });
 
 // ── PWA Manifest ──────────────────────────────────────────────────────────────
@@ -319,6 +354,16 @@ const html = `<!DOCTYPE html>
           .then(function(r){return r.json();})
           .then(function(d){
             if(String(d.v) !== String(CURRENT)){
+              var busy=false;
+              try{busy=sessionStorage.getItem("th_critical_ui_state_v1")==="1";}catch(e){}
+              try{
+                var draft=JSON.parse(localStorage.getItem("th_pos_draft")||"null");
+                busy=busy||(draft&&Array.isArray(draft.carrito)&&draft.carrito.length>0);
+              }catch(e){}
+              if(busy){
+                console.log("[TH] Actualización pendiente — se aplicará al terminar la operación activa");
+                return;
+              }
               console.log("[TH] Nueva versión "+d.v+" → recargando");
               window.location.reload(true);
             }
