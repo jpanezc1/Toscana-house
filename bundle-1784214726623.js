@@ -54540,6 +54540,28 @@
     if (d.hasta && hoy() > d.hasta) return 0;
     return Math.min(50, Math.max(0, Number(d.pct) || 0));
   }
+  function descNotifSig(d) {
+    return (d && d.activo ? 1 : 0) + "|" + (Number(d?.pct) || 0) + "|" + (d?.hasta || "");
+  }
+  var _descNotifAck = null;
+  function descNotifAck() {
+    if (!_descNotifAck) {
+      try {
+        _descNotifAck = JSON.parse(localStorage.getItem("th_desc_notif_ack") || "{}");
+      } catch {
+        _descNotifAck = {};
+      }
+    }
+    return _descNotifAck;
+  }
+  function descNotifMarcar(marcaId, sig) {
+    const a = descNotifAck();
+    a[marcaId] = sig;
+    try {
+      localStorage.setItem("th_desc_notif_ack", JSON.stringify(a));
+    } catch {
+    }
+  }
   function descCodigoVigente(descCodigos, codigo) {
     const d = descCodigos?.[(codigo || "").toUpperCase()];
     if (!d || !d.activo) return 0;
@@ -55029,9 +55051,8 @@
             activo: !!d.activo,
             pct: Number(d.pct) || 0,
             hasta: d.hasta || "",
-            por: d.updated_by || "",
-            _silencioso: true
-            // sin toast (el broadcast ya avisó)
+            por: d.updated_by || ""
+            // vía confiable: el dedup por firma evita repetir el aviso del broadcast
           });
         }).on("broadcast", { event: "descuento_codigo" }, ({ payload }) => {
           if (mounted && payload?.codigo && onDescuentoCodigo) onDescuentoCodigo(payload);
@@ -55157,10 +55178,41 @@
   function AlertaDescuento({ data, onClose }) {
     (0, import_react.useEffect)(() => {
       if (!data) return;
-      const t = setTimeout(onClose, 6e3);
+      const t = setTimeout(onClose, 14e3);
       return () => clearTimeout(t);
     }, [data, onClose]);
     if (!data) return null;
+    if (data.consolidado) {
+      const nombres = data.marcas || [];
+      const lista = nombres.slice(0, 3).join(", ") + (nombres.length > 3 ? ` y ${nombres.length - 3} m\xE1s` : "");
+      return /* @__PURE__ */ import_react.default.createElement("div", { style: {
+        position: "fixed",
+        top: 12,
+        left: "50%",
+        transform: "translateX(-50%)",
+        zIndex: 99997,
+        width: "calc(100% - 32px)",
+        maxWidth: 440,
+        background: C.bg1,
+        border: `2px solid ${C.green}`,
+        borderRadius: 14,
+        padding: "12px 14px",
+        display: "flex",
+        alignItems: "center",
+        gap: 11,
+        boxShadow: "0 8px 24px rgba(0,0,0,0.18)",
+        backdropFilter: "blur(10px)",
+        WebkitBackdropFilter: "blur(10px)"
+      } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 22 } }, "\u{1F3F7}\uFE0F"), /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, fontWeight: 600, color: C.label, fontFamily: FONT } }, nombres.length, " marcas con descuento activo"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT_UI, marginTop: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, lista)), /* @__PURE__ */ import_react.default.createElement("button", { onClick: onClose, style: {
+        background: "none",
+        border: "none",
+        cursor: "pointer",
+        color: C.label3,
+        fontSize: 16,
+        padding: 4,
+        flexShrink: 0
+      } }, "\u2715"));
+    }
     const activo = !!data.activo;
     const hastaTxt = data.hasta ? ` \xB7 v\xE1lido hasta ${data.hasta.split("-").reverse().join("/")}` : "";
     return /* @__PURE__ */ import_react.default.createElement("div", { style: {
@@ -67862,9 +67914,33 @@ No se guard\xF3 una importaci\xF3n parcial; puedes reintentar.`);
         if (m) setDescuentos(m);
       });
     }, [user?.usuario]);
+    (0, import_react.useEffect)(() => {
+      if (!user || user.rol === "marca") return;
+      const ack = descNotifAck();
+      const nuevos = MARCAS.filter((m) => {
+        if (descMarcaVigente(descuentos, m.id) <= 0) return false;
+        const d = descuentos[m.id];
+        return ack[m.id] !== descNotifSig({ activo: true, pct: d.pct, hasta: d.hasta });
+      });
+      if (!nuevos.length) return;
+      nuevos.forEach((m) => {
+        const d = descuentos[m.id];
+        descNotifMarcar(m.id, descNotifSig({ activo: true, pct: d.pct, hasta: d.hasta }));
+      });
+      if (nuevos.length === 1) {
+        const m = nuevos[0], d = descuentos[m.id];
+        setAlertaDesc({ marcaNombre: m.nombre, activo: true, pct: d.pct, hasta: d.hasta, ts: Date.now() });
+      } else {
+        setAlertaDesc({ consolidado: true, marcas: nuevos.map((m) => m.nombre), ts: Date.now() });
+      }
+    }, [descuentos, user?.usuario]);
     function onDescuentoMarcaRT(p) {
       setDescuentos((prev) => ({ ...prev, [p.marcaId]: { activo: p.activo, pct: p.pct, hasta: p.hasta || "", updatedBy: p.por || "" } }));
-      if (!p._silencioso) setAlertaDesc({ ...p, ts: Date.now() });
+      if (user?.rol === "marca") return;
+      const sig = descNotifSig({ activo: p.activo, pct: p.pct, hasta: p.hasta });
+      if (descNotifAck()[p.marcaId] === sig) return;
+      descNotifMarcar(p.marcaId, sig);
+      setAlertaDesc({ ...p, ts: Date.now() });
     }
     async function guardarDescuentoMarca(marcaId, patch) {
       const m = MARCAS.find((x) => x.id === marcaId);
@@ -67889,6 +67965,7 @@ No se aplic\xF3 ning\xFAn cambio.`);
         }
       }
       setDescuentos((p) => ({ ...p, [marcaId]: { activo: rec.activo, pct: rec.pct, hasta: rec.hasta, updatedBy: rec.updatedBy } }));
+      descNotifMarcar(marcaId, descNotifSig({ activo: rec.activo, pct: rec.pct, hasta: rec.hasta }));
       if (mode !== "transactional") syncConRespaldo("descuentoMarca", rec, () => sbGuardarDescuentoMarca(rec));
       rtBroadcast("descuento_marca", { marcaId, marcaNombre: rec.marcaNombre, activo: rec.activo, pct: rec.pct, hasta: rec.hasta, por: rec.updatedBy });
       if (mode !== "transactional") logAudit("DESCUENTO_MARCA", {

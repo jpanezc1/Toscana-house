@@ -969,6 +969,21 @@ function descMarcaVigente(descuentos, marcaId){
   return Math.min(50, Math.max(0, Number(d.pct)||0));
 }
 
+// ── Aviso persistente de descuentos por marca (por equipo) ──────────────────
+// "Firma" de un descuento: si cambia, es un aviso nuevo. Guardamos en
+// localStorage qué firma ya se mostró en ESTE equipo, para que el aviso sea
+// confiable (broadcast + tabla + carga inicial convergen) y no se duplique.
+function descNotifSig(d){ return (d&&d.activo?1:0)+"|"+(Number(d?.pct)||0)+"|"+(d?.hasta||""); }
+let _descNotifAck = null; // {marcaId: sig}
+function descNotifAck(){
+  if(!_descNotifAck){ try{_descNotifAck=JSON.parse(localStorage.getItem("th_desc_notif_ack")||"{}");}catch{_descNotifAck={};} }
+  return _descNotifAck;
+}
+function descNotifMarcar(marcaId, sig){
+  const a=descNotifAck(); a[marcaId]=sig;
+  try{localStorage.setItem("th_desc_notif_ack",JSON.stringify(a));}catch{}
+}
+
 // % de descuento vigente de un CÓDIGO puntual (0 si apagado o vencido)
 function descCodigoVigente(descCodigos, codigo){
   const d = descCodigos?.[(codigo||"").toUpperCase()];
@@ -1390,7 +1405,7 @@ function useRealtimeSync(setVentas, setInv, setRetiros, setFactoryResetRecibido,
           if(mounted && d?.marca_id!=null && onDescuentoMarca) onDescuentoMarca({
             marcaId: d.marca_id, marcaNombre: d.marca_nombre||"",
             activo: !!d.activo, pct: Number(d.pct)||0, hasta: d.hasta||"",
-            por: d.updated_by||"", _silencioso: true, // sin toast (el broadcast ya avisó)
+            por: d.updated_by||"", // vía confiable: el dedup por firma evita repetir el aviso del broadcast
           });
         })
         // ── Broadcast: descuento por código (alerta rápida) ──
@@ -1509,10 +1524,36 @@ function ClockDriftBanner({driftMin}){
 function AlertaDescuento({data, onClose}){
   useEffect(()=>{
     if(!data) return;
-    const t=setTimeout(onClose, 6000);
+    const t=setTimeout(onClose, 14000);
     return ()=>clearTimeout(t);
   },[data,onClose]);
   if(!data) return null;
+  if(data.consolidado){
+    const nombres = data.marcas||[];
+    const lista = nombres.slice(0,3).join(", ") + (nombres.length>3?` y ${nombres.length-3} más`:"");
+    return (
+      <div style={{
+        position:"fixed", top:12, left:"50%", transform:"translateX(-50%)",
+        zIndex:99997, width:"calc(100% - 32px)", maxWidth:440,
+        background:C.bg1, border:`2px solid ${C.green}`,
+        borderRadius:14, padding:"12px 14px", display:"flex", alignItems:"center", gap:11,
+        boxShadow:"0 8px 24px rgba(0,0,0,0.18)",
+        backdropFilter:"blur(10px)", WebkitBackdropFilter:"blur(10px)",
+      }}>
+        <span style={{fontSize:22}}>🏷️</span>
+        <div style={{flex:1,minWidth:0}}>
+          <div style={{fontSize:13,fontWeight:600,color:C.label,fontFamily:FONT}}>
+            {nombres.length} marcas con descuento activo
+          </div>
+          <div style={{fontSize:11,color:C.label3,fontFamily:FONT_UI,marginTop:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+            {lista}
+          </div>
+        </div>
+        <button onClick={onClose} style={{background:"none",border:"none",cursor:"pointer",
+          color:C.label3,fontSize:16,padding:4,flexShrink:0}}>✕</button>
+      </div>
+    );
+  }
   const activo = !!data.activo;
   const hastaTxt = data.hasta ? ` · válido hasta ${data.hasta.split("-").reverse().join("/")}` : "";
   return (
@@ -13507,10 +13548,38 @@ function App(){
     sbCargarDescuentos().then(m=>{ if(m) setDescuentos(m); });
   },[user?.usuario]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Recibe cambios de descuento (broadcast o postgres_changes) → estado + toast
+  // Red de seguridad: al cargar/reconectar, avisa de descuentos de marca VIGENTES
+  // que este equipo aún no vio (p.ej. la marca los habilitó mientras la caja
+  // estaba cerrada, o se perdió el broadcast). No se repite gracias a la firma.
+  useEffect(()=>{
+    if(!user || user.rol==="marca") return;
+    const ack = descNotifAck();
+    const nuevos = MARCAS.filter(m=>{
+      if(descMarcaVigente(descuentos, m.id) <= 0) return false;
+      const d = descuentos[m.id];
+      return ack[m.id] !== descNotifSig({activo:true, pct:d.pct, hasta:d.hasta});
+    });
+    if(!nuevos.length) return;
+    nuevos.forEach(m=>{ const d=descuentos[m.id]; descNotifMarcar(m.id, descNotifSig({activo:true, pct:d.pct, hasta:d.hasta})); });
+    if(nuevos.length===1){
+      const m=nuevos[0], d=descuentos[m.id];
+      setAlertaDesc({marcaNombre:m.nombre, activo:true, pct:d.pct, hasta:d.hasta, ts:Date.now()});
+    }else{
+      setAlertaDesc({consolidado:true, marcas:nuevos.map(m=>m.nombre), ts:Date.now()});
+    }
+  },[descuentos, user?.usuario]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Recibe cambios de descuento (broadcast o postgres_changes) → estado + toast.
+  // El aviso se decide por FIRMA persistida (no por la vía): si este equipo aún
+  // no vio esta firma, avisa una vez; da igual si llegó por broadcast, por la
+  // tabla, o si el broadcast se perdió. La sesión de la propia marca no se auto-avisa.
   function onDescuentoMarcaRT(p){
     setDescuentos(prev=>({...prev,[p.marcaId]:{activo:p.activo,pct:p.pct,hasta:p.hasta||"",updatedBy:p.por||""}}));
-    if(!p._silencioso) setAlertaDesc({...p, ts:Date.now()});
+    if(user?.rol==="marca") return;
+    const sig = descNotifSig({activo:p.activo,pct:p.pct,hasta:p.hasta});
+    if(descNotifAck()[p.marcaId] === sig) return; // ya avisado en este equipo
+    descNotifMarcar(p.marcaId, sig);
+    setAlertaDesc({...p, ts:Date.now()});
   }
 
   // Guardar descuento (panel admin o portal de marca) — optimista + nube + alerta
@@ -13530,6 +13599,7 @@ function App(){
       catch(e){alert(`${e?.message||"No se pudo guardar el descuento"}\n\nNo se aplicó ningún cambio.`);return false;}
     }
     setDescuentos(p=>({...p,[marcaId]:{activo:rec.activo,pct:rec.pct,hasta:rec.hasta,updatedBy:rec.updatedBy}}));
+    descNotifMarcar(marcaId, descNotifSig({activo:rec.activo,pct:rec.pct,hasta:rec.hasta})); // el equipo que lo habilita no se auto-avisa
     if(mode!=="transactional") syncConRespaldo("descuentoMarca", rec, ()=>sbGuardarDescuentoMarca(rec));
     rtBroadcast("descuento_marca", {marcaId, marcaNombre:rec.marcaNombre, activo:rec.activo, pct:rec.pct, hasta:rec.hasta, por:rec.updatedBy});
     if(mode!=="transactional") logAudit("DESCUENTO_MARCA", {
