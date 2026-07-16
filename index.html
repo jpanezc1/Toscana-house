@@ -180,12 +180,22 @@
   <!-- Auto-updater: detecta nueva versión y recarga sin intervención del usuario -->
   <script>
     (function(){
-      var CURRENT = "1783998293781";
+      var CURRENT = "1784214726623";
       function check(){
         fetch("/version.json?_="+Date.now(),{cache:"no-store"})
           .then(function(r){return r.json();})
           .then(function(d){
             if(String(d.v) !== String(CURRENT)){
+              var busy=false;
+              try{busy=sessionStorage.getItem("th_critical_ui_state_v1")==="1";}catch(e){}
+              try{
+                var draft=JSON.parse(localStorage.getItem("th_pos_draft")||"null");
+                busy=busy||(draft&&Array.isArray(draft.carrito)&&draft.carrito.length>0);
+              }catch(e){}
+              if(busy){
+                console.log("[TH] Actualización pendiente — se aplicará al terminar la operación activa");
+                return;
+              }
               console.log("[TH] Nueva versión "+d.v+" → recargando");
               window.location.reload(true);
             }
@@ -197,7 +207,7 @@
   </script>
   <!-- jsPDF: generación de notas de venta en PDF nativo (ligero, nítido) -->
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
-  <script src="bundle-1783998293781.js"></script>
+  <script src="bundle-1784214726623.js"></script>
   <!-- Service worker: permite instalar la app y seguir usándola sin internet -->
   <script>
     if("serviceWorker" in navigator){

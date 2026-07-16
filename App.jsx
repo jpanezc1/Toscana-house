@@ -4,20 +4,34 @@ import { useState, useMemo, useRef, useCallback, useEffect } from "react";
 // SUPABASE — Base de datos en la nube
 // Proyecto: toscana house | uqphxiixdulqscbfyxhz
 // ════════════════════════════════════════════════════════════
-const SUPA_URL  = "https://uqphxiixdulqscbfyxhz.supabase.co";
-const SUPA_KEY  = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVxcGh4aWl4ZHVscXNjYmZ5eGh6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcwMzc0NjQsImV4cCI6MjA5MjYxMzQ2NH0.U1EIf4JWqfrvga7CApClLl7nzBuFoPpD8BlicxvfB-w";
+const SUPA_URL  = (typeof __TH_SUPABASE_URL__ !== "undefined" && __TH_SUPABASE_URL__)
+  || "https://uqphxiixdulqscbfyxhz.supabase.co";
+const SUPA_KEY  = (typeof __TH_SUPABASE_ANON_KEY__ !== "undefined" && __TH_SUPABASE_ANON_KEY__)
+  || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVxcGh4aWl4ZHVscXNjYmZ5eGh6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcwMzc0NjQsImV4cCI6MjA5MjYxMzQ2NH0.U1EIf4JWqfrvga7CApClLl7nzBuFoPpD8BlicxvfB-w";
 
 // ── Auto-updater: detecta nuevos deploys y recarga la app ─────────────────────
 (function autoUpdater(){
   // El bundle actual se inyecta en build time
   const BUNDLE_ACTUAL = document.querySelector('script[src^="bundle-"]')?.src?.match(/bundle-(\d+)\.js/)?.[1];
   if(!BUNDLE_ACTUAL) return;
+  function hayTrabajoProtegido(){
+    try{ if(sessionStorage.getItem("th_critical_ui_state_v1")==="1") return true; }catch{}
+    try{
+      const draft=JSON.parse(localStorage.getItem("th_pos_draft")||"null");
+      if(Array.isArray(draft?.carrito)&&draft.carrito.length>0) return true;
+    }catch{}
+    return false;
+  }
   async function checkVersion(){
     try{
       const r = await fetch("/version.json?_="+Date.now(), {cache:"no-store"});
       if(!r.ok) return;
       const {v} = await r.json();
       if(String(v) !== String(BUNDLE_ACTUAL)){
+        if(hayTrabajoProtegido()){
+          console.log("[TH] Actualización pendiente — se aplicará cuando termine la operación activa");
+          return;
+        }
         console.log("[TH] Nueva versión detectada — recargando...");
         window.location.reload(true);
       }
@@ -55,6 +69,241 @@ async function getSupabase() {
   });
   _supabase = window.supabase.createClient(SUPA_URL, SUPA_KEY, SUPA_OPTS);
   return _supabase;
+}
+
+// ── Blindaje transaccional: identidad de dispositivo, idempotencia y flags ──
+const TH_DEVICE_KEY = "th_device_id_v1";
+const TH_FEATURE_CACHE_KEY = "th_feature_modes_v1";
+const TH_VALID_MODES = new Set(["legacy", "shadow", "transactional"]);
+
+function thUUID(){
+  if(globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g,c=>{
+    const r=Math.random()*16|0, v=c==="x"?r:(r&3|8);
+    return v.toString(16);
+  });
+}
+function thDeviceId(){
+  try{
+    let id=localStorage.getItem(TH_DEVICE_KEY);
+    if(!id){ id=thUUID(); localStorage.setItem(TH_DEVICE_KEY,id); }
+    return id;
+  }catch{ return "device-unknown"; }
+}
+function thClientVersion(){
+  return document.querySelector('script[src^="bundle-"]')?.src?.match(/bundle-(\d+)\.js/)?.[1]||"dev";
+}
+function thEnvironment(){
+  const buildEnvironment=(typeof __TH_APP_ENV__ !== "undefined" && __TH_APP_ENV__)||"";
+  if(["local","staging","production"].includes(buildEnvironment)) return buildEnvironment;
+  const host=(globalThis.location?.hostname||"").toLowerCase();
+  if(host==="localhost"||host==="127.0.0.1"||host==="") return "local";
+  if(host.endsWith(".vercel.app")) return "staging";
+  return "production";
+}
+// Las pruebas de control deben conservarse en Supabase/ledger para auditoría,
+// pero nunca mezclarse con ventas, anulaciones ni liquidaciones operativas.
+function thEsVentaTecnica(venta){
+  const id=String(venta?.id||"").trim().toUpperCase();
+  const origen=String(venta?.origen||"").trim().toUpperCase();
+  const metadata=venta?.metadata||{};
+  return metadata.excludeFromReports===true
+    || origen==="PRUEBA_CANARIO"
+    || id.startsWith("TEST_CANARY_");
+}
+function thOperationContext(user){
+  return {
+    usuario:user?.usuario||"",
+    nombre:user?.nombre||"",
+    rol:user?.rol||"",
+    marcaId:user?.marcaId??null,
+    deviceId:thDeviceId(),
+    clientVersion:thClientVersion(),
+    environment:thEnvironment(),
+  };
+}
+function thFeatureCache(){
+  try{return JSON.parse(localStorage.getItem(TH_FEATURE_CACHE_KEY)||"{}");}catch{return{};}
+}
+function thSetCachedMode(key,modo){
+  try{
+    const all=thFeatureCache();
+    all[key]={modo,checkedAt:Date.now()};
+    localStorage.setItem(TH_FEATURE_CACHE_KEY,JSON.stringify(all));
+  }catch{}
+}
+async function sbResolverModoOperacion(operacion,user){
+  const ambiente=thEnvironment();
+  const usuario=user?.usuario||"*";
+  const deviceId=thDeviceId();
+  const key=`${ambiente}|${operacion}|${usuario}|${deviceId}`;
+  const cached=thFeatureCache()[key]?.modo;
+  if(typeof navigator!=="undefined"&&navigator.onLine===false) return TH_VALID_MODES.has(cached)?cached:"legacy";
+  try{
+    const db=await getSupabase();
+    const {data,error}=await db.rpc("th_resolver_feature_flag",{
+      p_ambiente:ambiente,p_operacion:operacion,p_usuario:usuario,p_device_id:deviceId,
+    });
+    if(error) throw error;
+    const modo=TH_VALID_MODES.has(data)?data:"legacy";
+    thSetCachedMode(key,modo);
+    return modo;
+  }catch(e){
+    console.warn(`[Blindaje] flag ${operacion}:`,e.message);
+    return TH_VALID_MODES.has(cached)?cached:"legacy";
+  }
+}
+
+class THOperationError extends Error{
+  constructor(result,fallback="La operación no fue confirmada"){
+    super(result?.message||fallback);
+    this.name="THOperationError";
+    this.code=result?.code||"OPERATION_REJECTED";
+    this.result=result||null;
+  }
+}
+async function sbEjecutarRPCTransaccional(nombre,args){
+  if(typeof navigator!=="undefined"&&navigator.onLine===false){
+    throw new THOperationError({code:"OFFLINE",message:"Esta operación segura necesita conexión. No se modificó ningún dato."});
+  }
+  const db=await getSupabase();
+  const {data,error}=await db.rpc(nombre,args);
+  if(error) throw new THOperationError({code:error.code||"RPC_ERROR",message:error.message});
+  if(!data||data.ok!==true) throw new THOperationError(data);
+  return data;
+}
+async function sbRegistrarVentaTransaccional(operationId,venta,user){
+  const {items,...ventaHeader}=venta;
+  return sbEjecutarRPCTransaccional("th_registrar_venta",{
+    p_operation_id:operationId,p_venta:ventaHeader,p_items:items,
+    p_context:thOperationContext(user),
+  });
+}
+async function sbAnularVentaTransaccional(operationId,ventaId,motivo,user){
+  return sbEjecutarRPCTransaccional("th_anular_venta",{
+    p_operation_id:operationId,p_venta_id:ventaId,p_motivo:motivo||"",p_context:thOperationContext(user),
+  });
+}
+async function sbRegistrarCambioTransaccional(operationId,cambio,user){
+  return sbEjecutarRPCTransaccional("th_registrar_cambio",{
+    p_operation_id:operationId,p_cambio:cambio,p_context:thOperationContext(user),
+  });
+}
+async function sbMovimientoTransaccional(rpc,operationId,data,user){
+  return sbEjecutarRPCTransaccional(rpc,{
+    p_operation_id:operationId,p_data:data,p_context:thOperationContext(user),
+  });
+}
+async function sbImportacionTransaccional(operationId,carga,user){
+  return sbEjecutarRPCTransaccional("th_registrar_importacion",{
+    p_operation_id:operationId,p_carga:carga,p_context:thOperationContext(user),
+  });
+}
+async function sbAjusteBatchTransaccional(operationId,ajuste,user){
+  return sbEjecutarRPCTransaccional("th_ajustar_inventario_batch",{
+    p_operation_id:operationId,p_ajuste:ajuste,p_context:thOperationContext(user),
+  });
+}
+async function sbRevertirCargaTransaccional(operationId,cargaId,motivo,user){
+  return sbEjecutarRPCTransaccional("th_revertir_carga",{
+    p_operation_id:operationId,p_carga_id:cargaId,p_motivo:motivo||"",
+    p_context:thOperationContext(user),
+  });
+}
+async function sbEditarProductoTransaccional(operationId,data,user){
+  return sbEjecutarRPCTransaccional("th_editar_producto",{
+    p_operation_id:operationId,p_data:data,p_context:thOperationContext(user),
+  });
+}
+async function sbDesactivarProductoTransaccional(operationId,productoId,motivo,user){
+  return sbEjecutarRPCTransaccional("th_desactivar_producto",{
+    p_operation_id:operationId,p_producto_id:productoId,p_motivo:motivo||"",
+    p_context:thOperationContext(user),
+  });
+}
+async function sbImportarVentasLibresTransaccional(operationId,data,user){
+  return sbEjecutarRPCTransaccional("th_importar_ventas_libres",{
+    p_operation_id:operationId,p_data:data,p_context:thOperationContext(user),
+  });
+}
+async function sbCrearGiftCardTransaccional(operationId,data,user){
+  return sbEjecutarRPCTransaccional("th_crear_gift_card",{
+    p_operation_id:operationId,p_data:data,p_context:thOperationContext(user),
+  });
+}
+async function sbCanjearGiftCardTransaccional(operationId,codigo,monto,nota,user){
+  return sbEjecutarRPCTransaccional("th_canjear_gift_card",{
+    p_operation_id:operationId,p_codigo:codigo,p_monto:monto,p_nota:nota||"",
+    p_context:thOperationContext(user),
+  });
+}
+async function sbImportarGiftCardsTransaccional(operationId,cards,user){
+  return sbEjecutarRPCTransaccional("th_importar_gift_cards",{
+    p_operation_id:operationId,p_cards:cards,p_context:thOperationContext(user),
+  });
+}
+async function sbGuardarEstadoOperativoTransaccional(operationId,tipo,data,user){
+  return sbEjecutarRPCTransaccional("th_guardar_estado_operativo",{
+    p_operation_id:operationId,p_tipo:tipo,p_data:data,p_context:thOperationContext(user),
+  });
+}
+async function sbGuardarConfiguracionFinancieraTransaccional(operationId,tipo,data,user){
+  return sbEjecutarRPCTransaccional("th_guardar_configuracion_financiera",{
+    p_operation_id:operationId,p_tipo:tipo,p_data:data,p_context:thOperationContext(user),
+  });
+}
+async function sbGuardarConfiguracionFinancieraPendiente(payload){
+  return sbEjecutarRPCTransaccional("th_guardar_configuracion_financiera",{
+    p_operation_id:payload.operationId,p_tipo:payload.tipo,p_data:payload.data,p_context:payload.context||{},
+  }).then(()=>true);
+}
+async function sbCargarConfiguracionFinanciera(){
+  try{
+    const db=await getSupabase();
+    const [{data:config,error:e1},{data:periodos,error:e2},{data:alquileres,error:e3}]=await Promise.all([
+      db.from("liquidacion_config").select("*"),
+      db.from("liquidacion_periodos").select("*"),
+      db.from("alquiler_estados").select("*"),
+    ]);
+    if(e1||e2||e3) throw e1||e2||e3;
+    return {config:config||[],periodos:periodos||[],alquileres:alquileres||[]};
+  }catch(e){console.warn("Supabase configuración financiera:",e.message);return null;}
+}
+async function sbCargarCajasSeguras(){
+  try{
+    const db=await getSupabase();
+    const [{data:cajas,error:e1},{data:turnos,error:e2}]=await Promise.all([
+      db.from("cajas").select("id,codigo,nombre,activa").eq("activa",true).order("id"),
+      db.from("caja_turnos").select("*").order("abierta_at",{ascending:false}).limit(500),
+    ]);
+    if(e1||e2) throw e1||e2;
+    return (cajas||[]).map(c=>{
+      const lista=(turnos||[]).filter(t=>Number(t.caja_id)===Number(c.id));
+      const abierto=lista.find(t=>!t.cerrada_at);
+      const ultimo=lista.find(t=>t.cerrada_at);
+      return {
+        id:c.id,codigo:c.codigo,nombre:c.nombre,isOpen:!!abierto,turnoId:abierto?.id||null,
+        ultimoCierre:ultimo?.cerrada_at?new Date(ultimo.cerrada_at).toLocaleDateString("es-BO"):null,
+        balanceCierre:Number(ultimo?.balance_cierre)||0,
+      };
+    });
+  }catch(e){console.warn("Supabase cajas:",e.message);return null;}
+}
+async function sbCambiarTurnoCaja(operationId,cajaId,accion,balance,user){
+  return sbEjecutarRPCTransaccional("th_cambiar_turno_caja",{
+    p_operation_id:operationId,p_caja_id:cajaId,p_accion:accion,p_balance:balance??null,
+    p_context:thOperationContext(user),
+  });
+}
+async function sbRegistrarShadow(operationId,tipo,payload,user){
+  try{
+    const db=await getSupabase();
+    const {error}=await db.rpc("th_registrar_shadow",{
+      p_operation_id:operationId,p_tipo:tipo,p_payload:payload,p_context:thOperationContext(user),
+    });
+    if(error) throw error;
+    return true;
+  }catch(e){ console.warn(`[Blindaje] shadow ${tipo}:`,e.message); return false; }
 }
 
 // ── Broadcast channel global ──────────────────────────────
@@ -217,15 +466,23 @@ async function sbGuardarVenta(venta) {
       total: venta.total, subtotal: venta.subtotal,
       desc_pct: venta.descPct||0, metodo_pago: venta.metodoPago,
       vendedor: venta.vendedor, etiqueta_img: venta.etiquetaImg||null,
-      cliente_nombre: venta.clienteNombre||null, cliente_telefono: venta.clienteTelefono||null
+      cliente_nombre: venta.clienteNombre||null, cliente_telefono: venta.clienteTelefono||null,
+      origen: venta.origen||null, canal: venta.canal||null,
+      efectivo: venta.efectivo||null, qr: venta.qr||null, tarjeta: venta.tarjeta||null,
+      gc_id: venta.gcId||null, gc_usado: venta.gcUsado||null,
+      gc_allocations: venta.gcAllocations||null,
+      operation_id: venta.operationId||null, engine: venta.engine||"legacy",
+      device_id: venta.deviceId||thDeviceId(), client_version: venta.clientVersion||thClientVersion()
     });
     if (errVenta) throw errVenta;
-    const items = venta.items.map(it => ({
+    const items = venta.items.map((it,idx) => ({
       venta_id: venta.id, prod_id: it.prodId, codigo: it.codigo,
       nombre: it.nombre, marca_id: it.marcaId, marca_nombre: it.marcaNombre,
-      cantidad: it.cantidad, precio_unit: it.precioUnit, subtotal: it.subtotal
+      cantidad: it.cantidad, precio_unit: it.precioUnit, subtotal: it.subtotal,
+      desc_pct: it.descPct||0,
+      line_key: it.lineKey||`${venta.operationId||venta.id}:${idx+1}`
     }));
-    const { error: errItems } = await db.from("venta_items").insert(items);
+    const { error: errItems } = await db.from("venta_items").upsert(items,{onConflict:"venta_id,line_key"});
     if (errItems) throw errItems;
     return true;
   } catch(e) { console.warn("Supabase save venta:", e.message); return false; }
@@ -259,30 +516,34 @@ async function sbObtenerSesionVerif(id) {
   } catch(e) { console.warn("Supabase obtener sesión verif:", e.message); return null; }
 }
 
-async function sbCrearSesionVerif(id, mk, marcaId, baseTs) {
+async function sbCrearSesionVerif(id, mk, marcaId, baseTs, user) {
   try {
     const db = await getSupabase();
-    await db.from("th_verif_sesion").upsert(
-      { id, mk, marca_id: marcaId, base_ts: baseTs.toISOString(), conteo: {} },
-      { onConflict: "id", ignoreDuplicates: true }
-    );
-  } catch(e) { console.warn("Supabase crear sesión verif:", e.message); }
+    const {data,error}=await db.rpc("th_iniciar_sesion_verificacion",{
+      p_id:id,p_mk:mk,p_marca_id:marcaId??null,p_base_ts:baseTs.toISOString(),
+      p_context:thOperationContext(user),
+    });
+    if(error) throw error;
+    return data;
+  } catch(e) { console.warn("Supabase crear sesión verif:", e.message); return null; }
 }
 
-async function sbIncrementarConteoVerif(id, codigo) {
+async function sbIncrementarConteoVerif(id, codigo, operationId, user) {
   try {
-    const db = await getSupabase();
-    const { data, error } = await db.rpc("incrementar_conteo_verif", { p_id: id, p_codigo: codigo });
-    if (error) throw error;
-    return data;
+    const data=await sbEjecutarRPCTransaccional("th_incrementar_conteo_verificacion",{
+      p_operation_id:operationId,p_id:id,p_codigo:codigo,p_context:thOperationContext(user),
+    });
+    return data?.conteo||null;
   } catch(e) { console.warn("Supabase incrementar conteo verif:", e.message); return null; }
 }
 
-async function sbResetSesionVerif(id) {
+async function sbResetSesionVerif(id, operationId, user, motivo="reinicio_manual") {
   try {
-    const db = await getSupabase();
-    await db.from("th_verif_sesion").update({ conteo: {} }).eq("id", id);
-  } catch(e) { console.warn("Supabase reset sesión verif:", e.message); }
+    const data=await sbEjecutarRPCTransaccional("th_reiniciar_sesion_verificacion",{
+      p_operation_id:operationId,p_id:id,p_motivo:motivo,p_context:thOperationContext(user),
+    });
+    return data;
+  } catch(e) { console.warn("Supabase reset sesión verif:", e.message); return null; }
 }
 
 async function sbGuardarRetiro(retiro) {
@@ -330,7 +591,7 @@ async function sbMarcarCargaVerificada(cargaId, verificado, nombre) {
 async function sbGuardarCarga(c) {
   try {
     const db = await getSupabase();
-    const { error } = await db.from("cargas_inventario").insert({
+    const { error } = await db.from("cargas_inventario").upsert({
       id: c.id, ts: c.ts, fecha: c.fecha, hora: c.hora, tipo: c.tipo,
       usuario: c.usuario, nombre: c.nombre, rol: c.rol,
       marca_id: c.marcaId, marca_nombre: c.marcaNombre,
@@ -339,7 +600,8 @@ async function sbGuardarCarga(c) {
       detalle: c.items||[],
       archivo_nombre: c.archivoNombre||null,
       archivo_url: c.archivoUrl||null,
-    });
+      operation_id:c.operationId||null,
+    },{onConflict:"id"});
     if (error) throw error;
     return true;
   } catch(e) { console.warn("Supabase carga (tabla puede no existir):", e.message); return false; }
@@ -354,9 +616,46 @@ async function sbSubirEvidencia(blob, fileName, cargaId) {
       contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     });
     if (error) throw error;
-    const { data } = db.storage.from("cargas-evidencia").getPublicUrl(path);
-    return data.publicUrl;
+    return `storage://cargas-evidencia/${path}`;
   } catch(e) { console.warn("Supabase subir evidencia:", e.message); return null; }
+}
+
+async function sbResolverArchivoSeguro(ref, expiresIn=600, downloadName=""){
+  if(!ref) return null;
+  const value=String(ref);
+  let raw="";
+  if(value.startsWith("storage://")) raw=value.slice("storage://".length);
+  else{
+    // Compatibilidad: las cargas históricas guardaron la URL pública completa.
+    // Si el bucket ahora es privado, reconstruimos bucket/ruta y firmamos el
+    // objeto sin modificar ni perder el registro histórico.
+    try{
+      const url=new URL(value);
+      const marker="/storage/v1/object/public/";
+      if(!url.pathname.startsWith(marker)) return value;
+      raw=decodeURIComponent(url.pathname.slice(marker.length));
+    }catch{ return value; }
+  }
+  const slash=raw.indexOf("/");
+  if(slash<=0) return null;
+  const bucket=raw.slice(0,slash), path=raw.slice(slash+1);
+  if(!["cargas-evidencia","notas"].includes(bucket)||!path) return null;
+  const db=await getSupabase();
+  const options=downloadName?{download:downloadName}:undefined;
+  const {data,error}=await db.storage.from(bucket).createSignedUrl(path,expiresIn,options);
+  if(error) throw error;
+  return data?.signedUrl||null;
+}
+
+async function sbDescargarArchivoSeguro(ref,downloadName="archivo"){
+  try{
+    const url=await sbResolverArchivoSeguro(ref,600,downloadName);
+    if(!url) throw new Error("No se pudo generar el enlace temporal");
+    const a=document.createElement("a");
+    a.href=url;a.download=downloadName;a.target="_blank";a.rel="noopener noreferrer";
+    document.body.appendChild(a);a.click();a.remove();
+    return true;
+  }catch(e){ console.warn("Descarga segura:",e.message);return false; }
 }
 
 async function generarExcelEvidenciaManual(items, titulo) {
@@ -384,6 +683,9 @@ async function sbCargarCargas() {
       resumen:c.resumen, totalItems:c.total_items,
       nuevos:c.nuevos||0, actualizados:c.actualizados||0, items:c.detalle||[],
       verificado:c.verificado||false, verificadoTs:c.verificado_ts||null, verificadoPor:c.verificado_por||null,
+      operationId:c.operation_id||null,revertida:c.revertida||false,
+      revertidaAt:c.revertida_at||null,revertidaPor:c.revertida_por||null,
+      archivoNombre:c.archivo_nombre||null,archivoUrl:c.archivo_url||null,
     }));
   } catch(e) { console.warn("Supabase load cargas:", e.message); return []; }
 }
@@ -421,10 +723,24 @@ async function sbCargarAuditorias() {
 }
 
 // ── Usuarios en la nube ──────────────────────────────────
+function thUsuariosSinCredenciales(lista){
+  return (Array.isArray(lista)?lista:[]).map(({password,...u})=>u);
+}
+function thPurgarCredencialesLocales(){
+  try{
+    const usuarios=JSON.parse(localStorage.getItem("th_usuarios")||"[]");
+    if(Array.isArray(usuarios)) localStorage.setItem("th_usuarios",JSON.stringify(thUsuariosSinCredenciales(usuarios)));
+    const outbox=JSON.parse(localStorage.getItem("th_sync_outbox")||"[]");
+    if(Array.isArray(outbox)) localStorage.setItem("th_sync_outbox",JSON.stringify(
+      outbox.filter(op=>!["password","usuarios"].includes(op?.tipo))
+    ));
+  }catch{}
+}
+thPurgarCredencialesLocales();
 async function sbGuardarUsuarios(lista) {
   try {
     const db = await getSupabase();
-    const rows = lista.map(u => ({
+    const rows = thUsuariosSinCredenciales(lista).map(u => ({
       usuario: u.usuario,
       nombre: u.nombre,
       rol: u.rol || "caja",
@@ -437,24 +753,38 @@ async function sbGuardarUsuarios(lista) {
   } catch(e) { console.warn("Supabase save usuarios:", e.message); return false; }
 }
 
-// Escribe SOLO la columna password (preserva nombre/rol/estado/marca).
-// El login lee esta columna desde Supabase → el cambio toma efecto en todas
-// las sesiones apenas queda guardado.
-async function sbActualizarPassword(usuario, password) {
-  try {
-    const db = await getSupabase();
-    const { error } = await db.from("usuarios").update({ password }).eq("usuario", usuario);
-    if (error) throw error;
-    return true;
-  } catch(e) { console.warn("Supabase update password:", e.message); return false; }
+// Las contraseñas pertenecen exclusivamente a Supabase Auth; nunca se leen ni
+// se escriben en public.usuarios desde el navegador.
+async function sbCambiarPasswordSegura(usuario,passwordActual,passwordNueva){
+  try{
+    const db=await getSupabase();
+    const {error:loginError}=await db.auth.signInWithPassword({
+      email:`${usuario.toLowerCase().trim()}@th.internal`,password:passwordActual,
+    });
+    if(loginError) return {ok:false,error:"Contraseña actual incorrecta"};
+    const {error}=await db.auth.updateUser({password:passwordNueva});
+    if(error) throw error;
+    return {ok:true};
+  }catch(e){ return {ok:false,error:e.message||"No se pudo actualizar la contraseña"}; }
 }
-// Lee el password actual de Supabase (null si el usuario no está en la tabla)
-async function sbLeerPassword(usuario) {
-  try {
-    const db = await getSupabase();
-    const { data } = await db.from("usuarios").select("password").eq("usuario", usuario).maybeSingle();
-    return data ? (data.password || "") : null;
-  } catch { return null; }
+
+async function sbAdminUsuario(action,payload={}){
+  try{
+    const db=await getSupabase();
+    const {data:{session}}=await db.auth.getSession();
+    if(!session) throw new Error("Sesión administrativa requerida");
+    const res=await fetch(`${SUPA_URL}/functions/v1/admin-usuario`,{
+      method:"POST",headers:{"Content-Type":"application/json","Authorization":`Bearer ${session.access_token}`},
+      body:JSON.stringify({action,operationId:payload.operationId||thUUID(),...payload}),
+    });
+    const data=await res.json().catch(()=>({}));
+    if(!res.ok||data.ok===false) throw new Error(data.error||"Operación administrativa rechazada");
+    return {ok:true,data};
+  }catch(e){ console.warn("admin-usuario:",e.message); return {ok:false,error:e.message}; }
+}
+
+async function sbAdminResetPassword(usuario,password){
+  return sbAdminUsuario("reset_password",{usuario,password});
 }
 
 async function sbCargarUsuarios() {
@@ -493,20 +823,20 @@ async function sbCargarMarcas() {
   } catch(e) { console.warn("Supabase load marcas:", e.message); return null; }
 }
 
-async function sbCrearAuthUsuario(usuario, password, nombre, rol, marcaId) {
+async function sbCrearAuthUsuario(usuario, password, nombre, rol, marcaId, operationId=thUUID()) {
   try {
     const db = await getSupabase();
     const { data: { session } } = await db.auth.getSession();
     if (!session) return false;
     const res = await fetch(
-      "https://uqphxiixdulqscbfyxhz.supabase.co/functions/v1/crear-usuario",
+      `${SUPA_URL}/functions/v1/crear-usuario`,
       {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${session.access_token}`,
         },
-        body: JSON.stringify({ usuario, password, nombre, rol, marca_id: marcaId || null }),
+        body: JSON.stringify({ usuario, password, nombre, rol, marca_id: marcaId || null, operationId }),
       }
     );
     const data = await res.json();
@@ -525,11 +855,8 @@ async function sbCambiarPassword(nuevoPassword) {
 }
 
 async function sbEliminarAuthUsuario(usuario) {
-  try {
-    const db = await getSupabase();
-    await db.rpc("admin_eliminar_usuario", { p_usuario: usuario });
-    return true;
-  } catch(e) { console.warn("eliminar auth usuario:", e.message); return false; }
+  const result=await sbAdminUsuario("delete",{usuario});
+  return result.ok;
 }
 
 async function sbEliminarUsuario(usuario) {
@@ -572,16 +899,21 @@ async function sbCargarTodo() {
       descPct: v.desc_pct, metodoPago: v.metodo_pago,
       vendedor: v.vendedor, etiquetaImg: v.etiqueta_img,
       clienteNombre: v.cliente_nombre||"", clienteTelefono: v.cliente_telefono||"",
+      origen:v.origen||"", canal:v.canal||"", efectivo:Number(v.efectivo)||0,
+      qr:Number(v.qr)||0, tarjeta:Number(v.tarjeta)||0,
+      gcId:v.gc_id||"", gcUsado:Number(v.gc_usado)||0, gcAllocations:v.gc_allocations||null,
+      operationId:v.operation_id||null, engine:v.engine||"legacy",
+      metadata:v.metadata||{},
       anulada: v.anulada || false,
       items: (items||[]).filter(i=>i.venta_id===v.id).map(i=>({
         prodId: i.prod_id, codigo: i.codigo, nombre: i.nombre,
         marcaId: i.marca_id, marcaNombre: i.marca_nombre,
         cantidad: i.cantidad, precioUnit: i.precio_unit, subtotal: i.subtotal
       }))
-    }));
+    })).filter(v=>!thEsVentaTecnica(v));
 
     // Reconstruir inventario
-    const invCompleto = (inv||[]).map(p => ({
+    const invCompleto = (inv||[]).filter(p=>p.activo!==false).map(p => ({
       id: p.id, codigo: p.codigo, marcaId: p.marca_id,
       marcaNombre: p.marca_nombre, nombre: p.nombre,
       categoria: p.categoria, precio: p.precio,
@@ -591,7 +923,9 @@ async function sbCargarTodo() {
 
     // Reconstruir cierres
     const cierresObj = {};
-    (cierres||[]).forEach(c => { cierresObj[c.id] = { cerrado: c.cerrado, fecha: c.fecha, mk: c.mk }; });
+    (cierres||[]).forEach(c => { cierresObj[c.id] = {
+      cerrado:c.cerrado,fecha:c.fecha,mk:c.mk,snapshot:c.metadata?.snapshot||null,
+    }; });
 
     return { inv: invCompleto, ventas: ventasCompletas, cierres: cierresObj };
   } catch(e) {
@@ -633,6 +967,21 @@ function descMarcaVigente(descuentos, marcaId){
   if(!d || !d.activo) return 0;
   if(d.hasta && hoy() > d.hasta) return 0; // venció → se apaga solo
   return Math.min(50, Math.max(0, Number(d.pct)||0));
+}
+
+// ── Aviso persistente de descuentos por marca (por equipo) ──────────────────
+// "Firma" de un descuento: si cambia, es un aviso nuevo. Guardamos en
+// localStorage qué firma ya se mostró en ESTE equipo, para que el aviso sea
+// confiable (broadcast + tabla + carga inicial convergen) y no se duplique.
+function descNotifSig(d){ return (d&&d.activo?1:0)+"|"+(Number(d?.pct)||0)+"|"+(d?.hasta||""); }
+let _descNotifAck = null; // {marcaId: sig}
+function descNotifAck(){
+  if(!_descNotifAck){ try{_descNotifAck=JSON.parse(localStorage.getItem("th_desc_notif_ack")||"{}");}catch{_descNotifAck={};} }
+  return _descNotifAck;
+}
+function descNotifMarcar(marcaId, sig){
+  const a=descNotifAck(); a[marcaId]=sig;
+  try{localStorage.setItem("th_desc_notif_ack",JSON.stringify(a));}catch{}
 }
 
 // % de descuento vigente de un CÓDIGO puntual (0 si apagado o vencido)
@@ -698,7 +1047,7 @@ async function sbCargarInventario() {
   try {
     const db = await getSupabase();
     const data = await sbSelectAll(db, "inventario");
-    return (data || []).map(p => ({
+    return (data || []).filter(p=>p.activo!==false).map(p => ({
       id: p.id, codigo: p.codigo, marcaId: p.marca_id,
       marcaNombre: p.marca_nombre, nombre: p.nombre,
       categoria: p.categoria, precio: p.precio,
@@ -712,10 +1061,14 @@ async function sbCargarInventario() {
 async function sbGuardarAuditLog(evento) {
   try {
     const db = await getSupabase();
-    const {id, ts, fecha, hora, tipo, usuario, nombre, rol, ...detalle} = evento;
-    const { error } = await db.from("audit_log").upsert({id, ts, fecha, hora, tipo, usuario, nombre, rol, detalle});
+    const {data,error}=await db.rpc("th_registrar_evento_cliente",{
+      p_evento:evento,
+      p_context:thOperationContext({
+        usuario:evento.usuario,nombre:evento.nombre,rol:evento.rol,marcaId:evento.marcaId,
+      }),
+    });
     if (error) throw error;
-    return true;
+    return data?.ok===true;
   } catch(e) { console.warn("Supabase save audit_log:", e.message); return false; }
 }
 
@@ -765,7 +1118,10 @@ async function ejecutarOpOutbox(op){
     case "stock":         return op.payload.stock_inicial!=null
                             ? await sbActualizarProductoPatch(op.payload.prodId, {stock:Math.max(0,op.payload.stock), stock_inicial:op.payload.stock_inicial})
                             : await sbActualizarStock(op.payload.prodId, op.payload.stock);
-    case "producto_patch":return await sbActualizarProductoPatch(op.payload.prodId, op.payload);
+    case "producto_patch":{
+      const {prodId,...campos}=op.payload;
+      return await sbActualizarProductoPatch(prodId,campos);
+    }
     case "venta":       return await sbGuardarVenta(op.payload);
     case "anularVenta": return await sbAnularVenta(op.payload.id);
     case "cierre":      return await sbGuardarCierre(op.payload.key, op.payload.data);
@@ -773,8 +1129,8 @@ async function ejecutarOpOutbox(op){
     case "carga":       return await sbGuardarCarga(op.payload);
     case "auditoria":   return await sbGuardarAuditoria(op.payload);
     case "auditLog":    return await sbGuardarAuditLog(op.payload);
-    case "usuarios":    return await sbGuardarUsuarios(op.payload);
-    case "password":    return await sbActualizarPassword(op.payload.usuario, op.payload.password);
+    case "usuarios":    return true; // perfiles y roles sólo se modifican mediante Edge Functions administrativas
+    case "password":    return true; // descarta colas antiguas con credenciales legacy
     case "marcas":      return await sbGuardarMarcas(op.payload);
     case "descuentoMarca": return await sbGuardarDescuentoMarca(op.payload);
     case "descuentoCodigo": return await sbGuardarDescuentoCodigo(op.payload);
@@ -782,8 +1138,43 @@ async function ejecutarOpOutbox(op){
     case "eliminarProductoCodigo": return await sbEliminarProductoPorCodigo(op.payload.codigo);
     case "eliminarProductosCodigos": return await sbEliminarProductosPorCodigos(op.payload.codigos);
     case "eliminarCarga":          return await sbEliminarCarga(op.payload.cargaId);
-    default: return true; // tipo desconocido — no bloquear la cola
+    case "estadoFinanciero":       return await sbGuardarConfiguracionFinancieraPendiente(op.payload);
+    default: return false; // nunca descartar una operación desconocida sin conciliación explícita
   }
+}
+
+const TH_OUTBOX_OPERATION_MAP={
+  venta:["VENTA"],anularVenta:["ANULACION"],retiro:["RETIRO"],cierre:["CIERRE_MENSUAL"],
+  carga:["IMPORTACION","RECEPCION"],auditoria:["AUDITORIA_INVENTARIO"],marcas:["CONFIG_MARCAS"],
+  descuentoMarca:["DESCUENTO_MARCA"],descuentoCodigo:["DESCUENTO_CODIGO"],
+  eliminarDescuentoCodigo:["DESCUENTO_CODIGO"],eliminarCarga:["REVERSO_CARGA"],
+  producto:["RECEPCION","IMPORTACION","RECUPERACION_INVENTARIO"],
+  producto_patch:["EDICION_PRODUCTO","REPOSICION","AJUSTE_AUDITORIA"],
+  eliminarProductoCodigo:["DESACTIVAR_PRODUCTO"],eliminarProductosCodigos:["REVERSO_CARGA"],
+  stock:["VENTA","ANULACION","CAMBIO","RETIRO","BAJA","REPOSICION","RECEPCION","IMPORTACION","AJUSTE_AUDITORIA","REVERSO_CARGA"],
+};
+let _outboxUserCache=null;
+async function thUsuarioActualOutbox(){
+  if(_outboxUserCache&&Date.now()-_outboxUserCache.ts<60000) return _outboxUserCache.user;
+  try{
+    const db=await getSupabase();
+    const {data:{user}}=await db.auth.getUser();
+    if(!user) return null;
+    const {data}=await db.from("usuarios").select("usuario,nombre,rol,marca_id").eq("auth_id",user.id).maybeSingle();
+    const perfil=data?{usuario:data.usuario,nombre:data.nombre,rol:data.rol,marcaId:data.marca_id}:null;
+    _outboxUserCache={ts:Date.now(),user:perfil};
+    return perfil;
+  }catch{return null;}
+}
+async function thBloqueoModoSeguroOutbox(op){
+  if(["auditLog","estadoFinanciero","usuarios","password"].includes(op?.tipo)) return null;
+  const operaciones=TH_OUTBOX_OPERATION_MAP[op?.tipo]||[];
+  if(!operaciones.length) return null;
+  const user=await thUsuarioActualOutbox();
+  for(const operacion of operaciones){
+    if(await sbResolverModoOperacion(operacion,user||{})==="transactional") return operacion;
+  }
+  return null;
 }
 
 let _procesandoOutbox = false;
@@ -796,6 +1187,17 @@ async function procesarOutbox(){
   _procesandoOutbox = true;
   try{
     for(const op of getOutbox()){
+      const bloqueo=await thBloqueoModoSeguroOutbox(op);
+      if(bloqueo){
+        const actual=getOutbox();
+        const idx=actual.findIndex(o=>o.id===op.id);
+        if(idx>=0){
+          actual[idx].bloqueadaPorModoSeguro=bloqueo;
+          actual[idx].ultimoIntento=Date.now();
+          setOutbox(actual);
+        }
+        continue;
+      }
       let ok=false;
       try{ ok = await ejecutarOpOutbox(op); }catch{ ok=false; }
       if(ok){
@@ -874,8 +1276,9 @@ async function syncConRespaldo(tipo, payload, fnDirecto){
 // ── Realtime sync — escucha cambios en Supabase y actualiza estado local ────
 // Activa canales en: ventas (INSERT/UPDATE) + inventario (INSERT/UPDATE)
 // Deduplicación: si la fila ya existe (optimistic update local), no se agrega.
-function useRealtimeSync(setVentas, setInv, setRetiros, setFactoryResetRecibido, onResync, onDescuentoMarca, onDescuentoCodigo) {
+function useRealtimeSync(setVentas, setInv, setRetiros, setFactoryResetRecibido, onResync, onDescuentoMarca, onDescuentoCodigo, userKey) {
   useEffect(() => {
+    if(!userKey) return;
     let channel = null;
     let mounted = true;
     let wasConnected = false; // para detectar re-suscripción tras caída
@@ -886,6 +1289,7 @@ function useRealtimeSync(setVentas, setInv, setRetiros, setFactoryResetRecibido,
         // ── Venta nueva ────────────────────────────────────────────────────
         .on("postgres_changes", { event: "INSERT", schema: "public", table: "ventas" }, async payload => {
           const v = payload.new;
+          if(thEsVentaTecnica(v)) return;
           try {
             const { data: rawItems } = await db.from("venta_items").select("*").eq("venta_id", v.id);
             const venta = {
@@ -893,6 +1297,10 @@ function useRealtimeSync(setVentas, setInv, setRetiros, setFactoryResetRecibido,
               mes: v.mes, anio: v.anio, total: v.total, subtotal: v.subtotal,
               descPct: v.desc_pct, metodoPago: v.metodo_pago,
               vendedor: v.vendedor, etiquetaImg: v.etiqueta_img,
+              clienteNombre:v.cliente_nombre||"", clienteTelefono:v.cliente_telefono||"",
+              origen:v.origen||"", canal:v.canal||"", operationId:v.operation_id||null,
+              engine:v.engine||"legacy", gcId:v.gc_id||"", gcUsado:Number(v.gc_usado)||0,
+              metadata:v.metadata||{},
               anulada: v.anulada || false,
               items: (rawItems || []).map(i => ({
                 prodId: i.prod_id, codigo: i.codigo, nombre: i.nombre,
@@ -908,17 +1316,21 @@ function useRealtimeSync(setVentas, setInv, setRetiros, setFactoryResetRecibido,
         // ── Venta actualizada (anulada, etc.) ───────────────────────────
         .on("postgres_changes", { event: "UPDATE", schema: "public", table: "ventas" }, payload => {
           const v = payload.new;
-          if (mounted) setVentas(prev => prev.map(x => x.id === v.id ? {
-            ...x,
-            anulada: v.anulada || false,
-            total: v.total,
-            subtotal: v.subtotal,
-            metodoPago: v.metodo_pago,
-          } : x));
+          if (mounted) setVentas(prev => thEsVentaTecnica(v)
+            ? prev.filter(x=>x.id!==v.id)
+            : prev.map(x => x.id === v.id ? {
+              ...x,
+              anulada: v.anulada || false,
+              total: v.total,
+              subtotal: v.subtotal,
+              metodoPago: v.metodo_pago,
+              metadata:v.metadata||x.metadata||{},
+            } : x));
         })
         // ── Producto nuevo en inventario ────────────────────────────────
         .on("postgres_changes", { event: "INSERT", schema: "public", table: "inventario" }, payload => {
           const p = payload.new;
+          if(p.activo===false) return;
           const prod = {
             id: p.id, codigo: p.codigo, marcaId: p.marca_id,
             marcaNombre: p.marca_nombre, nombre: p.nombre,
@@ -932,9 +1344,18 @@ function useRealtimeSync(setVentas, setInv, setRetiros, setFactoryResetRecibido,
         // ── Stock / precio actualizado ───────────────────────────────────
         .on("postgres_changes", { event: "UPDATE", schema: "public", table: "inventario" }, payload => {
           const p = payload.new;
-          if (mounted) setInv(prev => prev.map(i => i.id === p.id ? {
-            ...i, codigo: p.codigo||i.codigo, stock: p.stock, nombre: p.nombre, precio: p.precio, categoria: p.categoria, descripcion: p.descripcion||i.descripcion
-          } : i));
+          if (mounted) setInv(prev => {
+            if(p.activo===false) return prev.filter(i=>i.id!==p.id);
+            const patch={
+              id:p.id,codigo:p.codigo,marcaId:p.marca_id,marcaNombre:p.marca_nombre,
+              nombre:p.nombre,categoria:p.categoria,precio:p.precio,
+              descripcion:p.descripcion||"",subcat:p.subcat||"",stock:p.stock,
+              stockInicial:p.stock_inicial,fecha:p.fecha,
+            };
+            return prev.some(i=>i.id===p.id)
+              ? prev.map(i=>i.id===p.id?{...i,...patch}:i)
+              : [...prev,patch];
+          });
         })
         // ── Producto eliminado del inventario (rollback de carga) ──────────
         .on("postgres_changes", { event: "DELETE", schema: "public", table: "inventario" }, payload => {
@@ -957,7 +1378,7 @@ function useRealtimeSync(setVentas, setInv, setRetiros, setFactoryResetRecibido,
         // ── Broadcast: venta nueva (ruta rápida ~80ms, sin extra DB query) ──
         .on("broadcast", {event:"venta_nueva"}, ({payload}) => {
           const v = payload?.v;
-          if(mounted && v?.id) setVentas(prev => prev.some(x=>x.id===v.id) ? prev : [...prev, v]);
+          if(mounted && v?.id && !thEsVentaTecnica(v)) setVentas(prev => prev.some(x=>x.id===v.id) ? prev : [...prev, v]);
         })
         // ── Broadcast: stock actualizado (ruta rápida para caja concurrente) ──
         .on("broadcast", {event:"inv_update"}, ({payload}) => {
@@ -984,7 +1405,7 @@ function useRealtimeSync(setVentas, setInv, setRetiros, setFactoryResetRecibido,
           if(mounted && d?.marca_id!=null && onDescuentoMarca) onDescuentoMarca({
             marcaId: d.marca_id, marcaNombre: d.marca_nombre||"",
             activo: !!d.activo, pct: Number(d.pct)||0, hasta: d.hasta||"",
-            por: d.updated_by||"", _silencioso: true, // sin toast (el broadcast ya avisó)
+            por: d.updated_by||"", // vía confiable: el dedup por firma evita repetir el aviso del broadcast
           });
         })
         // ── Broadcast: descuento por código (alerta rápida) ──
@@ -1036,7 +1457,7 @@ function useRealtimeSync(setVentas, setInv, setRetiros, setFactoryResetRecibido,
         getSupabase().then(db => db.removeChannel(channel)).catch(() => {});
       }
     };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [userKey]); // eslint-disable-line react-hooks/exhaustive-deps
 }
 
 // ── Detector de reloj desviado ───────────────────────────────────────
@@ -1103,10 +1524,36 @@ function ClockDriftBanner({driftMin}){
 function AlertaDescuento({data, onClose}){
   useEffect(()=>{
     if(!data) return;
-    const t=setTimeout(onClose, 6000);
+    const t=setTimeout(onClose, 14000);
     return ()=>clearTimeout(t);
   },[data,onClose]);
   if(!data) return null;
+  if(data.consolidado){
+    const nombres = data.marcas||[];
+    const lista = nombres.slice(0,3).join(", ") + (nombres.length>3?` y ${nombres.length-3} más`:"");
+    return (
+      <div style={{
+        position:"fixed", top:12, left:"50%", transform:"translateX(-50%)",
+        zIndex:99997, width:"calc(100% - 32px)", maxWidth:440,
+        background:C.bg1, border:`2px solid ${C.green}`,
+        borderRadius:14, padding:"12px 14px", display:"flex", alignItems:"center", gap:11,
+        boxShadow:"0 8px 24px rgba(0,0,0,0.18)",
+        backdropFilter:"blur(10px)", WebkitBackdropFilter:"blur(10px)",
+      }}>
+        <span style={{fontSize:22}}>🏷️</span>
+        <div style={{flex:1,minWidth:0}}>
+          <div style={{fontSize:13,fontWeight:600,color:C.label,fontFamily:FONT}}>
+            {nombres.length} marcas con descuento activo
+          </div>
+          <div style={{fontSize:11,color:C.label3,fontFamily:FONT_UI,marginTop:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+            {lista}
+          </div>
+        </div>
+        <button onClick={onClose} style={{background:"none",border:"none",cursor:"pointer",
+          color:C.label3,fontSize:16,padding:4,flexShrink:0}}>✕</button>
+      </div>
+    );
+  }
   const activo = !!data.activo;
   const hastaTxt = data.hasta ? ` · válido hasta ${data.hasta.split("-").reverse().join("/")}` : "";
   return (
@@ -2438,6 +2885,9 @@ function leerCfgLiq(marcaId) {
 function guardarCfgLiq(marcaId, cfg) {
   const key = `th_liq_cfg_${marcaId}`;
   try { localStorage.setItem(key, JSON.stringify(cfg)); } catch {}
+  try{window.dispatchEvent(new CustomEvent("th-financial-state",{detail:{
+    tipo:"LIQUIDACION_CONFIG",data:{marcaId:Number(marcaId),configuracion:cfg},
+  }}));}catch{}
 }
 function leerGastosLiq(marcaId, MK) {
   const key = `th_liq_gastos_${marcaId}_${MK}`;
@@ -2447,7 +2897,22 @@ function leerGastosLiq(marcaId, MK) {
 function guardarGastosLiq(marcaId, MK, gastos) {
   const key = `th_liq_gastos_${marcaId}_${MK}`;
   try { localStorage.setItem(key, JSON.stringify(gastos)); } catch {}
+  try{window.dispatchEvent(new CustomEvent("th-financial-state",{detail:{
+    tipo:"LIQUIDACION_GASTOS",data:{marcaId:Number(marcaId),mk:MK,gastos},
+  }}));}catch{}
 }
+function guardarAlquilerEstado(estado){
+  try{window.dispatchEvent(new CustomEvent("th-financial-state",{detail:{
+    tipo:"ALQUILER_ESTADO",data:estado,
+  }}));}catch{}
+}
+
+let thFinancialSaveQueue=Promise.resolve();
+function thEnqueueFinancialSave(task){
+  thFinancialSaveQueue=thFinancialSaveQueue.then(task,task);
+  return thFinancialSaveQueue;
+}
+async function thEsperarFinanzasPendientes(){ return thFinancialSaveQueue; }
 function parseMixtoXls(metodoPago, total) {
   if (metodoPago?.startsWith("mixto|")) {
     const obj = { efectivo: 0, qr: 0, tarjeta: 0, giftcard: 0 };
@@ -2491,18 +2956,17 @@ function calcLiqMarca(vMarca, marcaId, MK) {
 
 // ── FACTURACIÓN SIAT BOLIVIA — CUCU API ────────────────────────
 const CUCU_CFG_KEY = "th_cucu_cfg";
-const CUCU_DEF = {
-  apiKey: "",
-  endpoint: "https://app.cucu.bo/api/v1/invoices",
-  codigoActividad: "470000",
-  codigoProductoSin: "58311",
-  modoApi: true,
-};
-const CUCU_MP = { efectivo:1, qr:5, tarjeta:2, transferencia:4 };
+const CUCU_DEF = { modoApi:true };
 
 function leerCfgCUCU(){
-  try{ return {...CUCU_DEF,...JSON.parse(localStorage.getItem(CUCU_CFG_KEY)||"{}")}; }
-  catch{ return CUCU_DEF; }
+  try{
+    const raw=JSON.parse(localStorage.getItem(CUCU_CFG_KEY)||"{}");
+    const safe={...CUCU_DEF,modoApi:raw.modoApi!==false};
+    if(raw.apiKey||raw.endpoint||raw.codigoActividad||raw.codigoProductoSin){
+      localStorage.setItem(CUCU_CFG_KEY,JSON.stringify(safe));
+    }
+    return safe;
+  }catch{ return CUCU_DEF; }
 }
 function guardarFacturaLocal(ventaId, data){
   try{ localStorage.setItem(`th_fac_${ventaId}`, JSON.stringify(data)); }catch{}
@@ -2510,70 +2974,37 @@ function guardarFacturaLocal(ventaId, data){
 function leerFacturaLocal(ventaId){
   try{ return JSON.parse(localStorage.getItem(`th_fac_${ventaId}`)||"null"); }catch{return null;}
 }
-async function emitirFacturaCUCU(venta, nitComprador, nombreComprador){
-  const cfg = leerCfgCUCU();
-  if(!cfg.apiKey) throw new Error("API Key de CUCU no configurada. Ir a Config → Sistema → Facturación.");
-  const mp = venta.metodoPago;
-  let codPago = 1;
-  if(mp?.startsWith("mixto|")){
-    const obj={efectivo:0,qr:0,tarjeta:0};
-    mp.split("|").slice(1).forEach(p=>{const[k,v]=p.split(":");obj[k]=parseFloat(v)||0;});
-    const dom=Object.keys(obj).reduce((a,b)=>obj[a]>=obj[b]?a:b,"efectivo");
-    codPago=CUCU_MP[dom]||1;
-  } else { codPago=CUCU_MP[mp]||1; }
-  const payload = {
-    actividadEconomica: cfg.codigoActividad,
-    metodoPago: codPago,
-    cliente: { nit: Number(nitComprador)||0, razonSocial:(nombreComprador||"Sin Nombre").trim() },
-    items: venta.items.map(it=>({
-      codigoProducto: Number(cfg.codigoProductoSin)||58311,
-      descripcion: (it.nombre||"Producto").slice(0,100),
-      cantidad: it.cantidad||1,
-      precioUnitario: it.precioUnit||0,
-      descuento: 0,
-      subtotal: it.subtotal||0,
-    })),
-    total: venta.total||0,
-  };
-  const r = await fetch(cfg.endpoint, {
+async function llamarFacturacionSegura(action,payload={}){
+  const db=await getSupabase();
+  const {data:{session}}=await db.auth.getSession();
+  if(!session) throw new Error("Sesión expirada. Vuelve a iniciar sesión.");
+  const r=await fetch(`${SUPA_URL}/functions/v1/cucu-facturacion`,{
     method:"POST",
-    headers:{"Authorization":`Bearer ${cfg.apiKey}`,"Content-Type":"application/json"},
-    body:JSON.stringify(payload),
+    headers:{"Authorization":`Bearer ${session.access_token}`,"Content-Type":"application/json"},
+    body:JSON.stringify({action,...payload}),
+    signal:AbortSignal.timeout(30000),
   });
-  if(!r.ok){
-    let msg="";
-    try{const j=await r.json();msg=j.message||j.error||JSON.stringify(j);}catch{msg=await r.text();}
-    throw new Error(`CUCU ${r.status}: ${msg.slice(0,200)}`);
-  }
-  const body=await r.json();
-  const d=body.data||body;
-  return {
-    cuf: d.cuf||d.CUF||d.codigoCuf||"",
-    numero: d.numero||d.nroFactura||d.numeroFactura||d.number||"",
-    qrUrl: d.qr||d.qrUrl||d.urlQr||"",
-    pdf: d.pdf||d.pdfUrl||d.urlPdf||"",
-    nitComprador: Number(nitComprador)||0,
-    nombreComprador: (nombreComprador||"Sin Nombre").trim(),
-  };
+  const data=await r.json().catch(()=>({ok:false,error:`Respuesta inválida (${r.status})`}));
+  if(!r.ok||!data.ok) throw new Error(data.error||`Facturación ${r.status}`);
+  return data;
 }
-
-async function anularFacturaCUCU(cuf) {
-  const cfg = leerCfgCUCU();
-  if(!cfg.apiKey) throw new Error("Sin API Key de CUCU — ir a Config → Facturación.");
-  // Try DELETE /{cuf} first, common CUCU pattern
-  const base = cfg.endpoint.replace(/\/invoices\/?$/, "");
-  const url  = `${base}/invoices/${encodeURIComponent(cuf)}`;
-  const r = await fetch(url, {
-    method: "DELETE",
-    headers: {"Authorization":`Bearer ${cfg.apiKey}`,"Content-Type":"application/json"},
-    signal: AbortSignal.timeout(10000),
+async function emitirFacturaCUCU(venta,nitComprador,nombreComprador,telefono,operationId){
+  return llamarFacturacionSegura("issue",{
+    ventaId:venta.id,nit:String(nitComprador||0),nombre:(nombreComprador||"Sin Nombre").trim(),
+    telefono:(telefono||"").trim(),operationId,
   });
-  if(!r.ok && r.status !== 404){
-    let msg="";
-    try{const j=await r.json();msg=j.message||j.error||JSON.stringify(j);}catch{msg=await r.text();}
-    throw new Error(`CUCU ${r.status}: ${msg.slice(0,200)}`);
-  }
-  return r.status===204?{}:(await r.json().catch(()=>({})));
+}
+async function registrarFacturaManual(venta,nitComprador,nombreComprador,telefono,numero,cuf,operationId){
+  return llamarFacturacionSegura("manual",{
+    ventaId:venta.id,nit:String(nitComprador||0),nombre:(nombreComprador||"Sin Nombre").trim(),
+    telefono:(telefono||"").trim(),numero,cuf,operationId,
+  });
+}
+async function cargarFacturaServidor(ventaId){
+  return llamarFacturacionSegura("get",{ventaId});
+}
+async function anularFacturaCUCU(ventaId,operationId,motivo=1){
+  return llamarFacturacionSegura("void",{ventaId,operationId,motivo});
 }
 
 // ── REPORTE MENSUAL COMPLETO (todas las marcas, una pestaña c/u) ──
@@ -3976,7 +4407,7 @@ async function subirNotaVentaPDF(doc, venta){
     const path = String(venta.id) + "/Nota_" + num + ".pdf";
     const { error } = await sb.storage.from("notas").upload(path, blob, { contentType:"application/pdf", upsert:true });
     if(error){ console.warn("subir nota:", error.message); return null; }
-    return sb.storage.from("notas").getPublicUrl(path).data.publicUrl;
+    return await sbResolverArchivoSeguro(`storage://notas/${path}`,604800);
   }catch(e){ console.warn("subir nota:", e.message); return null; }
 }
 
@@ -5112,13 +5543,18 @@ function StatCard({icon,label,value,sub,color=C.gold,compact}){
 // PctMarcasPanel — configuración centralizada de porcentajes
 // Persiste en localStorage sin depender del mes
 // ══════════════════════════════════════════════════════════
-function PctMarcasPanel({ onCfgChange }) {
+function PctMarcasPanel({ onCfgChange, version=0 }) {
   const [open, setOpen] = useState(false);
   const [cfgs, setCfgs] = useState(()=>{
     const obj={};
     MARCAS.forEach(m=>{ obj[m.id]=leerCfgLiq(m.id); });
     return obj;
   });
+  useEffect(()=>{
+    const obj={};
+    MARCAS.forEach(m=>{obj[m.id]=leerCfgLiq(m.id);});
+    setCfgs(obj);
+  },[version]);
 
   function handleChange(marcaId, field, val){
     const newCfg = {...cfgs[marcaId], [field]: val};
@@ -5279,25 +5715,30 @@ function PctMarcasPanel({ onCfgChange }) {
 // ══════════════════════════════════════════════════════════
 // LiqModal — liquidación como componente iOS sheet
 // ══════════════════════════════════════════════════════════
-function LiqModal({marcaId,ventas,mes,anio,MK,cierres,setCierres,onClose,syncCierre,onCfgChange}){
+function LiqModal({marcaId,ventas,mes,anio,MK,cierres,onCambiarCierre,onClose,onCfgChange}){
   if(!marcaId) return null;
   const marca=MARCAS.find(x=>x.id===marcaId);
-  const [cfg, setCfg] = useState(()=>leerCfgLiq(marcaId));
+  const cierreActual=cierres[`${MK}-${marcaId}`];
+  const cerrado=!!cierreActual?.cerrado;
+  const cierreSnapshot=cerrado?cierreActual?.snapshot:null;
+  const [cfg, setCfg] = useState(()=>cierreSnapshot?.configuracion||leerCfgLiq(marcaId));
   const [showCfg, setShowCfg] = useState(false);
   const [imgPreview, setImgPreview] = useState(null);
-  const pctTarjeta = Number(cfg.pctTarjeta)||0;
-  const pctComision = Number(cfg.pctComision)||0;
-  const alquiler = Number(cfg.alquiler)||0;
+  const pctTarjeta = Number(cierreSnapshot?.configuracion?.pctTarjeta??cfg.pctTarjeta)||0;
+  const pctComision = Number(cierreSnapshot?.configuracion?.pctComision??cfg.pctComision)||0;
+  const alquiler = Number(cierreSnapshot?.alquiler??cfg.alquiler)||0;
 
   function saveCfg(newCfg){
+    if(cerrado){alert("La liquidación está cerrada. Reábrela antes de cambiar su configuración.");return;}
     setCfg(newCfg);
     guardarCfgLiq(marcaId, newCfg);
     if(typeof onCfgChange==="function") onCfgChange();
   }
 
   // ── Gastos extra del período ──────────────────────────────
-  const [gastos, setGastos] = useState(()=>leerGastosLiq(marcaId, MK));
+  const [gastos, setGastos] = useState(()=>cierreSnapshot?.gastos||leerGastosLiq(marcaId, MK));
   function updateGastos(next){
+    if(cerrado){alert("La liquidación está cerrada. Reábrela antes de cambiar sus gastos.");return;}
     setGastos(next);
     guardarGastosLiq(marcaId, MK, next);
   }
@@ -5310,11 +5751,12 @@ function LiqModal({marcaId,ventas,mes,anio,MK,cierres,setCierres,onClose,syncCie
   function changeGasto(id, field, val){
     updateGastos(gastos.map(g=>g.id===id?{...g,[field]:val}:g));
   }
-  const totalGastos = gastos.reduce((s,g)=>s+(Number(g.monto)||0),0);
+  const totalGastos = cierreSnapshot
+    ? Number(cierreSnapshot.totalGastos)||0
+    : gastos.reduce((s,g)=>s+(Number(g.monto)||0),0);
 
   const vMes=ventas.filter(v=>v.mk===MK&&!v.anulada);
   const vMarca=vMes.filter(v=>v.items.some(i=>i.marcaId===marcaId));
-  const cerrado=cierres[`${MK}-${marcaId}`]?.cerrado;
 
   function getMontosMixtos(venta){
     if(venta.metodoPago?.startsWith("mixto|")){
@@ -5340,11 +5782,16 @@ function LiqModal({marcaId,ventas,mes,anio,MK,cierres,setCierres,onClose,syncCie
     brutoTarjeta += montos.tarjeta * pct;
   });
 
-  const bruto = brutoEfect + brutoQR + brutoTarjeta;
-  const descTarjeta = brutoTarjeta * pctTarjeta/100;
-  const subtotalBanco = bruto - descTarjeta;
-  const comision = subtotalBanco * pctComision/100;
-  const neto = subtotalBanco - comision - alquiler - totalGastos;
+  if(cierreSnapshot){
+    brutoEfect=Number(cierreSnapshot.efectivo)||0;
+    brutoQR=Number(cierreSnapshot.qr)||0;
+    brutoTarjeta=Number(cierreSnapshot.tarjeta)||0;
+  }
+  const bruto = cierreSnapshot?Number(cierreSnapshot.bruto)||0:brutoEfect+brutoQR+brutoTarjeta;
+  const descTarjeta = cierreSnapshot?Number(cierreSnapshot.descuentoTarjeta)||0:brutoTarjeta*pctTarjeta/100;
+  const subtotalBanco = cierreSnapshot?Number(cierreSnapshot.subtotalBanco)||0:bruto-descTarjeta;
+  const comision = cierreSnapshot?Number(cierreSnapshot.comision)||0:subtotalBanco*pctComision/100;
+  const neto = cierreSnapshot?Number(cierreSnapshot.neto)||0:subtotalBanco-comision-alquiler-totalGastos;
 
   return (
     <>
@@ -5477,10 +5924,10 @@ function LiqModal({marcaId,ventas,mes,anio,MK,cierres,setCierres,onClose,syncCie
           Exportar Excel
         </IOSBtn>
         {!cerrado
-          ? <IOSBtn onPress={()=>{const key=`${MK}-${marcaId}`,data={cerrado:true,fecha:hoy(),mk:MK,marca_id:marcaId};setCierres(p=>({...p,[key]:{cerrado:true,fecha:hoy(),mk:MK}}));syncConRespaldo("cierre",{key,data},()=>sbGuardarCierre(key,data));onClose();}} variant="success" icon="✓">
+          ? <IOSBtn onPress={async()=>{if(await onCambiarCierre(marcaId,true))onClose();}} variant="success" icon="✓">
               Confirmar Cierre Mensual
             </IOSBtn>
-          : <IOSBtn onPress={()=>{setCierres(p=>({...p,[`${MK}-${marcaId}`]:{cerrado:false,mk:MK}}));onClose();}} variant="danger">
+          : <IOSBtn onPress={async()=>{if(await onCambiarCierre(marcaId,false))onClose();}} variant="danger">
               Reabrir Liquidación
             </IOSBtn>
         }
@@ -5500,14 +5947,8 @@ function LiqModal({marcaId,ventas,mes,anio,MK,cierres,setCierres,onClose,syncCie
 // Usuarios con contraseña — sesión guardada en localStorage
 // ════════════════════════════════════════════════════════════
 
-// ── Usuarios autorizados ─────────────────────────────────
-// Para agregar usuarios: {usuario, password, nombre, rol}
-// rol: "admin" (acceso total) | "caja" (solo POS y ventas)
-const USUARIOS = [
-  { usuario: "toscana",  password: "casa2024",    nombre: "Toscana House",  rol: "admin" },
-  { usuario: "caja",     password: "caja2024",    nombre: "Vendedor Caja",  rol: "caja"  },
-  { usuario: "tatiana",  password: "toscana2024", nombre: "Tatiana",        rol: "admin" },
-];
+// Los perfiles se cargan desde Supabase. Nunca se incluyen credenciales en el bundle.
+const USUARIOS = [];
 function useAuth() {
   var _hN108 = useState(null); var user = _hN108[0]; var setUser = _hN108[1];
   var _hN108b = useState(false); var authReady = _hN108b[0]; var setAuthReady = _hN108b[1];
@@ -5550,15 +5991,6 @@ function useAuth() {
     const uLow = usuario.toLowerCase().trim();
     const pass  = password.trim();
 
-    // Respaldo local mientras Supabase Auth se estabiliza
-    const FALLBACK = [
-      { usuario:"toscana",  password:"casa2024",    nombre:"Carolina Granier", rol:"admin" },
-      { usuario:"caja",     password:"caja2024",    nombre:"Vendedor Caja",    rol:"caja"  },
-      { usuario:"tatiana",  password:"toscana2024", nombre:"Tatiana",          rol:"admin" },
-      { usuario:"jpanezc",  password:"123456",      nombre:"Juan Pablo Anez",  rol:"admin" },
-      { usuario:"juanpa",   password:"123456",      nombre:"Jp",               rol:"marca" },
-    ];
-
     try {
       const db = await getSupabase();
       const email = uLow + "@th.internal";
@@ -5574,29 +6006,8 @@ function useAuth() {
           return { ok: true };
         }
       }
-    } catch(e) {}
-
-    // Si Supabase Auth falla, verificar contra lista local
-    const found = FALLBACK.find(u => u.usuario === uLow && u.password === pass);
-    if (found) {
-      setUser({ ...found, loginAt: Date.now() });
-      return { ok: true };
-    }
-
-    // Intentar también desde tabla usuarios (usuarios custom).
-    // Verifica la contraseña contra la columna `password` — antes NO se chequeaba
-    // (cualquier contraseña entraba). Si la cuenta no tiene password seteada,
-    // se rechaza (no se permite login sin credencial).
-    try {
-      const db = await getSupabase();
-      const { data } = await db.from("usuarios").select("usuario,nombre,rol,estado,marca_id,password")
-        .eq("usuario", uLow).single();
-      if (data && data.estado !== "inactivo" && data.password && data.password === pass) {
-        setUser({ usuario:data.usuario, nombre:data.nombre, rol:data.rol,
-          estado:data.estado, marcaId:data.marca_id, loginAt:Date.now() });
-        return { ok: true };
-      }
-    } catch(e) {}
+      if(error) console.warn("Supabase Auth:",error.message);
+    } catch(e) { console.warn("Supabase Auth:",e.message); }
 
     return { ok: false, error: "Usuario o contraseña incorrectos" };
   }
@@ -5833,7 +6244,11 @@ function RetirosTab({inv, retiros, onRetiro}){
   const [scanStatus, setScanStatus] = useState(null); // null | "leyendo" | "ok" | "notfound"
   const [scanMsg, setScanMsg]   = useState("");
   const [showScanner, setShowScanner] = useState(false);
+  const [guardandoRetiro,setGuardandoRetiro]=useState(false);
+  const retiroOperationRef=useRef(null);
   const fileRef = useRef(null);
+
+  useEffect(()=>{ retiroOperationRef.current=null; },[prodEncontrado,cantidad,destinatario,motivo]);
 
   function buscarProdPorCod(cod){
     const c = cod.trim().toUpperCase();
@@ -5868,22 +6283,30 @@ function RetirosTab({inv, retiros, onRetiro}){
     e.target.value = "";
   }
 
-  function confirmarRetiro(){
+  async function confirmarRetiro(){
     if(!prodEncontrado) return;
     if(!destinatario.trim()){ setMsg({ok:false,txt:"Ingresa el nombre del destinatario"}); return; }
     const cant = parseInt(cantidad)||1;
     if(cant > prodEncontrado.stock){ setMsg({ok:false,txt:`Stock insuficiente (disponible: ${prodEncontrado.stock})`}); return; }
+    if(!retiroOperationRef.current) retiroOperationRef.current=thUUID();
     const r = {
       id:`RET-${Date.now()}`,
+      operationId:retiroOperationRef.current,
       fecha:hoy(), hora:hora(),
       prodId:prodEncontrado.id, codigo:prodEncontrado.codigo,
       nombre:prodEncontrado.nombre, marcaId:prodEncontrado.marcaId,
       marcaNombre:prodEncontrado.marcaNombre,
       cantidad:cant, destinatario:destinatario.trim(), motivo:motivo.trim()
     };
-    onRetiro(r);
-    setMsg({ok:true,txt:`✓ "${prodEncontrado.nombre}" retirado para ${destinatario.trim()}`});
-    setProdEncontrado(null); setCodBusq(""); setDestinatario(""); setMotivo(""); setCantidad("1");
+    setGuardandoRetiro(true);
+    try{
+      await onRetiro(r);
+      retiroOperationRef.current=null;
+      setMsg({ok:true,txt:`✓ "${prodEncontrado.nombre}" retirado para ${destinatario.trim()}`});
+      setProdEncontrado(null); setCodBusq(""); setDestinatario(""); setMotivo(""); setCantidad("1");
+    }catch(e){
+      setMsg({ok:false,txt:`${e?.message||"No se pudo confirmar el retiro"}. Los datos siguen en el formulario.`});
+    }finally{ setGuardandoRetiro(false); }
   }
 
   // Filtrado + agrupación por marca
@@ -6050,14 +6473,14 @@ function RetirosTab({inv, retiros, onRetiro}){
 
         <button
           onClick={confirmarRetiro}
-          disabled={!prodEncontrado||!destinatario.trim()}
+          disabled={!prodEncontrado||!destinatario.trim()||guardandoRetiro}
           style={{
             width:"100%",background:!prodEncontrado||!destinatario.trim()?"#E0E0E0":C.amber,
             border:"none",borderRadius:12,padding:"14px",fontSize:15,fontWeight:700,
             color:!prodEncontrado||!destinatario.trim()?"#9E9E9E":"#fff",
             cursor:!prodEncontrado||!destinatario.trim()?"not-allowed":"pointer",
             fontFamily:FONT,WebkitTapHighlightColor:"transparent"}}>
-          📤 Confirmar Retiro
+          {guardandoRetiro?"Registrando de forma segura…":"📤 Confirmar Retiro"}
         </button>
       </div>
 
@@ -6171,6 +6594,8 @@ function FacturaModal({venta, open, onClose, onFacturada}){
   const [errMsg,setErrMsg]   = useState("");
   const [manNro,setManNro]   = useState("");
   const [manCuf,setManCuf]   = useState("");
+  const [factExist,setFactExist] = useState(()=>venta?leerFacturaLocal(venta.id):null);
+  const facturaOperationRef=useRef(null);
 
   const cfg = leerCfgCUCU();
 
@@ -6180,28 +6605,39 @@ function FacturaModal({venta, open, onClose, onFacturada}){
       setModo(cfg.modoApi!==false?"api":"manual");
       setEstado("idle"); setResultado(null); setErrMsg("");
       setManNro(""); setManCuf("");
+      facturaOperationRef.current=null;
+      const cached=venta?leerFacturaLocal(venta.id):null;
+      setFactExist(cached);
+      if(venta?.id) cargarFacturaServidor(venta.id).then(data=>{
+        if(data.factura){guardarFacturaLocal(venta.id,data.factura);setFactExist(data.factura);}
+        else if(data.estado){setErrMsg(data.mensaje||"La factura requiere revisión administrativa.");setEstado("bloqueada");}
+      }).catch(e=>{setErrMsg(e.message||"No se pudo verificar la factura en el servidor");});
     }
-  },[open]);
-
-  const factExist = venta ? leerFacturaLocal(venta.id) : null;
+  },[open,venta?.id]);
 
   async function emitir(){
     setEstado("enviando"); setErrMsg("");
     try{
-      const r = await emitirFacturaCUCU(venta,nit,nombre);
-      guardarFacturaLocal(venta.id,{...r, telefono:telefono.trim()});
-      setResultado({...r, telefono:telefono.trim()}); setEstado("ok");
+      if(!facturaOperationRef.current) facturaOperationRef.current=thUUID();
+      const r=await emitirFacturaCUCU(venta,nit,nombre,telefono,facturaOperationRef.current);
+      facturaOperationRef.current=null;
+      guardarFacturaLocal(venta.id,r); setFactExist(r);
+      setResultado(r); setEstado("ok");
       onFacturada&&onFacturada(r);
     }catch(e){ setErrMsg(e.message); setEstado("error"); }
   }
 
-  function guardarManual(){
+  async function guardarManual(){
     if(!manNro&&!manCuf){ setErrMsg("Ingresá el número de factura o CUF."); return; }
-    const r={cuf:manCuf,numero:manNro,qrUrl:"",pdf:"",
-      nitComprador:Number(nit)||0,nombreComprador:nombre.trim(),telefono:telefono.trim()};
-    guardarFacturaLocal(venta.id,r);
-    setResultado(r); setEstado("ok");
-    onFacturada&&onFacturada(r);
+    setEstado("enviando");setErrMsg("");
+    try{
+      if(!facturaOperationRef.current) facturaOperationRef.current=thUUID();
+      const r=await registrarFacturaManual(venta,nit,nombre,telefono,manNro,manCuf,facturaOperationRef.current);
+      facturaOperationRef.current=null;
+      guardarFacturaLocal(venta.id,r);setFactExist(r);
+      setResultado(r);setEstado("ok");
+      onFacturada&&onFacturada(r);
+    }catch(e){setErrMsg(e.message);setEstado("error");}
   }
 
   const FacturaOK = ({r})=>(
@@ -6293,9 +6729,6 @@ function FacturaModal({venta, open, onClose, onFacturada}){
             {factExist.pdf&&<a href={factExist.pdf} target="_blank" rel="noopener noreferrer" style={{textDecoration:"none"}}>
               <IOSBtn variant="fill" full icon="📄">Ver PDF Factura</IOSBtn>
             </a>}
-            <IOSBtn onPress={()=>setEstado("form")} variant="fill" full>
-              Emitir nueva factura
-            </IOSBtn>
           </div>
         </div>
       ) : estado==="ok"&&resultado?(
@@ -6325,7 +6758,7 @@ function FacturaModal({venta, open, onClose, onFacturada}){
           {/* Modo toggle */}
           <div style={{display:"flex",gap:8,marginBottom:16}}>
             {[["api","🌐 API CUCU"],["manual","Manual"]].map(([m,l])=>(
-              <button key={m} onClick={()=>{setModo(m);setErrMsg("");}} style={{
+              <button key={m} onClick={()=>{setModo(m);if(estado!=="bloqueada")setErrMsg("");}} style={{
                 flex:1,padding:"10px",borderRadius:12,cursor:"pointer",fontFamily:FONT,fontSize:13,
                 border:`2px solid ${modo===m?C.blue:C.sep}`,
                 background:modo===m?`${C.blue}15`:C.bg2,
@@ -6379,10 +6812,8 @@ function FacturaModal({venta, open, onClose, onFacturada}){
                 marginBottom:16,border:`1px solid ${C.blue}20`}}>
                 <div style={{fontSize:12,color:C.blue,fontFamily:FONT,lineHeight:1.7}}>
                   🏢 <strong>SYLVIA CAROLINA GRANIER ZALLES</strong><br/>
-                  NIT Emisor: <strong>{NIT_EMPRESA}</strong>
-                  {!cfg.apiKey&&<><br/><span style={{color:C.red}}>
-                    ⚠ Sin API Key — ir a Config → Sistema → Facturación
-                  </span></>}
+                  NIT Emisor: <strong>{NIT_EMPRESA}</strong><br/>
+                  <span style={{color:C.green}}>🔒 Credenciales protegidas en el servidor</span>
                 </div>
               </div>
               {errMsg&&<div style={{background:`${C.red}12`,border:`1px solid ${C.red}30`,
@@ -6390,8 +6821,8 @@ function FacturaModal({venta, open, onClose, onFacturada}){
                 <div style={{fontSize:13,color:C.red,fontFamily:FONT}}>⚠ {errMsg}</div>
               </div>}
               <IOSBtn onPress={emitir} variant="primary" full
-                disabled={estado==="enviando"} icon={estado==="enviando"?"⏳":"🧾"}>
-                {estado==="enviando"?"Emitiendo…":"Emitir Factura SIAT"}
+                disabled={estado==="enviando"||estado==="bloqueada"} icon={estado==="enviando"?"⏳":"🧾"}>
+                {estado==="enviando"?"Emitiendo…":estado==="bloqueada"?"Emisión bloqueada para revisión":"Emitir Factura SIAT"}
               </IOSBtn>
             </>
           )}
@@ -6408,8 +6839,8 @@ function FacturaModal({venta, open, onClose, onFacturada}){
                 borderRadius:12,padding:12,marginBottom:16}}>
                 <div style={{fontSize:13,color:C.red,fontFamily:FONT}}>⚠ {errMsg}</div>
               </div>}
-              <IOSBtn onPress={guardarManual} variant="primary" full icon="💾">
-                Guardar Factura
+              <IOSBtn onPress={guardarManual} variant="primary" full icon="💾" disabled={estado==="enviando"||estado==="bloqueada"}>
+                {estado==="enviando"?"Guardando…":estado==="bloqueada"?"Emisión bloqueada para revisión":"Guardar Factura"}
               </IOSBtn>
             </>
           )}
@@ -6500,20 +6931,39 @@ function NotaVentaModal({venta, onClose, numVenta, onAnularVenta}){
   const [confirmAnulF,   setConfirmAnulF]    = useState(false);
   const [anulandoFac,    setAnulandoFac]     = useState(false);
   const [anulFacMsg,     setAnulFacMsg]      = useState(null);
+  const [anulandoVenta,  setAnulandoVenta]   = useState(false);
+  const [anulVentaMsg,   setAnulVentaMsg]    = useState(null);
+  const anulVentaOperationRef=useRef(null);
+  const anulFacturaOperationRef=useRef(null);
   const [previewNota,    setPreviewNota]     = useState(null);
   const num = numVenta || venta.id.replace(/\D/g,"").slice(-4).padStart(4,"0");
   const facturaGuardada = leerFacturaLocal(venta.id);
 
   async function ejecutarAnularFactura(){
     const fac = leerFacturaLocal(venta.id);
-    if(!fac?.cuf){ setAnulFacMsg({ok:false,txt:"No hay CUF registrado para esta factura."}); return; }
+    if(!fac){ setAnulFacMsg({ok:false,txt:"No hay factura registrada para esta venta."}); return; }
     setAnulandoFac(true); setAnulFacMsg(null); setConfirmAnulF(false);
     try{
-      await anularFacturaCUCU(fac.cuf);
+      if(!anulFacturaOperationRef.current) anulFacturaOperationRef.current=thUUID();
+      await anularFacturaCUCU(venta.id,anulFacturaOperationRef.current,1);
+      anulFacturaOperationRef.current=null;
       guardarFacturaLocal(venta.id, {...fac, anulada:true, fechaAnulacion:new Date().toLocaleDateString("es-BO")});
       setAnulFacMsg({ok:true, txt:"✓ Factura anulada en SIAT / CUCU"});
     }catch(e){ setAnulFacMsg({ok:false, txt:e.message}); }
     setAnulandoFac(false);
+  }
+
+  async function ejecutarAnularVenta(){
+    if(!onAnularVenta||anulandoVenta) return;
+    if(!anulVentaOperationRef.current) anulVentaOperationRef.current=thUUID();
+    setAnulandoVenta(true);setAnulVentaMsg(null);
+    try{
+      await onAnularVenta(venta.id,{operationId:anulVentaOperationRef.current,motivo:"Anulación confirmada desde detalle"});
+      anulVentaOperationRef.current=null;
+      setConfirmAnulV(false);
+    }catch(e){
+      setAnulVentaMsg({ok:false,txt:e?.message||"No se pudo confirmar la anulación. La venta sigue activa."});
+    }finally{ setAnulandoVenta(false); }
   }
 
   const filaInfo = (lbl, val) => (
@@ -6757,12 +7207,14 @@ function NotaVentaModal({venta, onClose, numVenta, onAnularVenta}){
                   background:C.bg2,cursor:"pointer",fontFamily:FONT,fontSize:13,color:C.label2,
                   WebkitTapHighlightColor:"transparent",
                 }}>Cancelar</button>
-                <button onClick={()=>{onAnularVenta&&onAnularVenta(venta.id);setConfirmAnulV(false);}} style={{
+                <button onClick={ejecutarAnularVenta} disabled={anulandoVenta} style={{
                   flex:1,padding:"10px",borderRadius:11,border:"none",
                   background:C.red,cursor:"pointer",fontFamily:FONT,fontSize:13,
                   fontWeight:700,color:"#fff",WebkitTapHighlightColor:"transparent",
-                }}>Sí, anular</button>
+                }}>{anulandoVenta?"Anulando…":"Sí, anular"}</button>
               </div>
+              {anulVentaMsg&&<div role="alert" style={{marginTop:8,fontSize:12,color:C.red,
+                fontFamily:FONT,textAlign:"center"}}>{anulVentaMsg.txt}</div>}
             </div>
           )}
         </div>
@@ -6835,7 +7287,7 @@ function NotaVentaModal({venta, onClose, numVenta, onAnularVenta}){
 // ══════════════════════════════════════════════════════════
 // CAJAS — Gestión de turnos
 // ══════════════════════════════════════════════════════════
-function CajasTab(){
+function CajasTab({user}){
   const CAJAS_KEY = "th_cajas_v1";
   const defaultCajas = [
     {id:1,nombre:"Caja Turno en la mañana",isOpen:false,ultimoCierre:null,balanceCierre:0},
@@ -6846,19 +7298,42 @@ function CajasTab(){
   });
   const [balInput, setBalInput] = useState({});
   const [showBal, setShowBal] = useState(null);
+  const [procesando,setProcesando]=useState(null);
+
+  useEffect(()=>{
+    sbCargarCajasSeguras().then(remoto=>{
+      if(Array.isArray(remoto)&&remoto.length>0) saveCajas(remoto);
+    });
+  },[]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function saveCajas(updated){
     setCajas(updated);
     try{localStorage.setItem(CAJAS_KEY,JSON.stringify(updated));}catch{}
   }
-  function abrirCaja(id){
-    saveCajas(cajas.map(c=>c.id===id?{...c,isOpen:true}:c));
+  async function abrirCaja(id){
+    setProcesando(id);
+    try{
+      const operationId=thUUID();
+      const mode=await sbResolverModoOperacion("CAJA_TURNO",user);
+      if(mode==="transactional") await sbCambiarTurnoCaja(operationId,id,"ABRIR",0,user);
+      saveCajas(cajas.map(c=>c.id===id?{...c,isOpen:true}:c));
+      if(mode==="shadow") await sbRegistrarShadow(operationId,"CAJA_TURNO",{cajaId:id,accion:"ABRIR"},user);
+    }catch(e){alert(`${e?.message||"No se pudo abrir la caja"}\n\nNo se cambió el turno.`);}
+    finally{setProcesando(null);}
   }
-  function cerrarCaja(id){
+  async function cerrarCaja(id){
     const bal=parseFloat(balInput[id])||0;
-    saveCajas(cajas.map(c=>c.id===id?{...c,isOpen:false,ultimoCierre:hoy(),balanceCierre:bal}:c));
-    setShowBal(null);
-    setBalInput(p=>({...p,[id]:""}));
+    setProcesando(id);
+    try{
+      const operationId=thUUID();
+      const mode=await sbResolverModoOperacion("CAJA_TURNO",user);
+      if(mode==="transactional") await sbCambiarTurnoCaja(operationId,id,"CERRAR",bal,user);
+      saveCajas(cajas.map(c=>c.id===id?{...c,isOpen:false,ultimoCierre:hoy(),balanceCierre:bal}:c));
+      if(mode==="shadow") await sbRegistrarShadow(operationId,"CAJA_TURNO",{cajaId:id,accion:"CERRAR",balance:bal},user);
+      setShowBal(null);
+      setBalInput(p=>({...p,[id]:""}));
+    }catch(e){alert(`${e?.message||"No se pudo cerrar la caja"}\n\nNo se registró un cierre parcial.`);}
+    finally{setProcesando(null);}
   }
 
   const abiertas=cajas.filter(c=>c.isOpen).length;
@@ -6931,12 +7406,12 @@ function CajasTab(){
                     whiteSpace:"nowrap"}}>
                     CERRAR CAJA
                   </button>
-                : <button onClick={()=>abrirCaja(c.id)} style={{
+                : <button onClick={()=>abrirCaja(c.id)} disabled={procesando===c.id} style={{
                     background:C.green,border:"none",borderRadius:12,
                     padding:"10px 16px",color:"#fff",fontSize:13,fontWeight:700,
                     cursor:"pointer",fontFamily:FONT,WebkitTapHighlightColor:"transparent",
                     whiteSpace:"nowrap"}}>
-                    ABRIR CAJA
+                    {procesando===c.id?"PROCESANDO…":"ABRIR CAJA"}
                   </button>
               }
             </div>
@@ -6970,11 +7445,11 @@ function CajasTab(){
                   WebkitTapHighlightColor:"transparent"}}>
                   Cancelar
                 </button>
-                <button onClick={()=>cerrarCaja(c.id)} style={{
+                <button onClick={()=>cerrarCaja(c.id)} disabled={procesando===c.id} style={{
                   flex:1,background:"#1565C0",border:"none",borderRadius:12,
                   padding:"11px",fontSize:13,fontWeight:700,color:"#fff",
                   cursor:"pointer",fontFamily:FONT,WebkitTapHighlightColor:"transparent"}}>
-                  Confirmar Cierre
+                  {procesando===c.id?"Procesando…":"Confirmar Cierre"}
                 </button>
               </div>
             </div>
@@ -8946,6 +9421,7 @@ function ImportarVentasLibresModal({open, onImportar, onClose}){
   const [filas,     setFilas]     = useState([]);
   const [resultado, setResultado] = useState(null);
   const fileRef = useRef(null);
+  const importOperationRef=useRef(null);
 
   function norm(s){ return String(s||"").trim().normalize("NFD").replace(/[̀-ͯ]/g,"").toLowerCase(); }
 
@@ -9095,6 +9571,7 @@ function ImportarVentasLibresModal({open, onImportar, onClose}){
       }
       clearTimeout(timeoutId);
       setFilas(parsed);
+      importOperationRef.current=null;
       setEstado("preview");
     } catch(e){ clearTimeout(timeoutId); setEstado("idle"); alert("Error al leer el archivo: "+e.message); }
   }
@@ -9103,9 +9580,16 @@ function ImportarVentasLibresModal({open, onImportar, onClose}){
     const validas = filas.filter(f=>f._ok);
     if(!validas.length) return;
     setEstado("importando");
-    const nVentas = await onImportar(validas);
-    setResultado({total:validas.length, nVentas, marcas:[...new Set(validas.map(f=>f.marcaNombre))]});
-    setEstado("done");
+    if(!importOperationRef.current) importOperationRef.current=thUUID();
+    try{
+      const nVentas=await onImportar(validas,{operationId:importOperationRef.current});
+      importOperationRef.current=null;
+      setResultado({total:validas.length,nVentas,marcas:[...new Set(validas.map(f=>f.marcaNombre))]});
+      setEstado("done");
+    }catch(e){
+      setEstado("preview");
+      alert(`${e?.message||"No se pudo confirmar la importación"}\n\nNo se guardó una importación parcial; puedes reintentar.`);
+    }
   }
 
   async function descargarPlantilla(){
@@ -10294,7 +10778,7 @@ function DescuentosPorCodigoCard({marca, inv, descCodigos={}, onGuardar, onQuita
   );
 }
 
-function BrandPortal({user, ventas, inv, cargas, retiros=[], logout, descuentos={}, onGuardarDescuento, descCodigos={}, onGuardarDescCodigo, onQuitarDescCodigo}){
+function BrandPortal({user, ventas, inv, cargas, retiros=[], logout, descuentos={}, onGuardarDescuento, descCodigos={}, onGuardarDescCodigo, onQuitarDescCodigo, financialVersion=0}){
   // ── TODOS los hooks ANTES de cualquier return condicional ──
   const isDesktop = useIsDesktop();
   const now = new Date();
@@ -10377,7 +10861,7 @@ function BrandPortal({user, ventas, inv, cargas, retiros=[], logout, descuentos=
   },[vMes, mid]);
 
   // Liquidación con config real (incluye gastos extra del período)
-  const liq = useMemo(()=>calcLiqMarca(vMes, mid, MK),[vMes, mid, MK]);
+  const liq = useMemo(()=>calcLiqMarca(vMes, mid, MK),[vMes, mid, MK, financialVersion]);
   const gastos = liq.gastos;
 
   // GC usadas en ventas de esta marca este mes
@@ -11610,7 +12094,7 @@ function NuevaMarcaModal({editMarca, marcasActuales, onClose, onGuardar}){
     e.target.value="";       // reset para poder seleccionar el mismo archivo de nuevo
   }
 
-  function guardar(){
+  async function guardar(){
     setMsg(null);
     if(!f.nombre.trim()){ setMsg("El nombre de la marca es requerido"); return; }
     if(f.nombre.trim().length<2){ setMsg("Nombre demasiado corto"); return; }
@@ -11620,7 +12104,7 @@ function NuevaMarcaModal({editMarca, marcasActuales, onClose, onGuardar}){
       if(existe.find(u=>u.usuario===uLogin.toLowerCase().trim())){
         setMsg("Ese nombre de usuario ya existe"); return;
       }
-      if(!uPass||uPass.length<6){ setMsg("Contraseña mínimo 6 caracteres"); return; }
+      if(!uPass||uPass.length<8){ setMsg("Contraseña mínimo 8 caracteres"); return; }
     }
     const seedImagen = MARCAS_SEED.find(s=>s.id===(isNew?nextId:editMarca.id))?.imagen||"";
     const marca = {
@@ -11655,7 +12139,8 @@ function NuevaMarcaModal({editMarca, marcasActuales, onClose, onGuardar}){
       };
     }
     // Guardar inmediatamente — sin timeout
-    onGuardar(marca, isNew, nuevoUsuario);
+    const ok=await onGuardar(marca,isNew,nuevoUsuario);
+    if(ok===false){setMsg("No se pudo confirmar la marca. No se aplicó ningún cambio.");return;}
     setDone(true);
     setTimeout(()=>onClose(), 600);
   }
@@ -11971,7 +12456,7 @@ function NuevaMarcaModal({editMarca, marcasActuales, onClose, onGuardar}){
                     <div style={{position:"relative"}}>
                       <input type={showPass?"text":"password"} value={uPass}
                         onChange={e=>setUPass(e.target.value)}
-                        placeholder="Mínimo 6 caracteres"
+                        placeholder="Mínimo 8 caracteres"
                         style={{width:"100%",padding:"12px 44px 12px 14px",borderRadius:12,
                           border:`1.5px solid ${C.sep}`,background:C.bg0,
                           fontSize:15,color:C.label,fontFamily:FONT,outline:"none",
@@ -12089,6 +12574,54 @@ function cargarGC() {
 function guardarGC(lista) {
   try { localStorage.setItem(GC_KEY, JSON.stringify(lista)); } catch {}
 }
+function mapGiftCardsNube(cards, usos=[]) {
+  const porTarjeta=new Map();
+  usos.forEach(u=>{
+    const item={
+      id:u.id,fecha:String(u.created_at||"").slice(0,10),monto:Number(u.monto)||0,
+      nota:u.nota||"",ventaId:u.venta_id||null,operationId:u.operation_id||null,
+    };
+    if(!porTarjeta.has(u.gift_card_id)) porTarjeta.set(u.gift_card_id,[]);
+    porTarjeta.get(u.gift_card_id).push(item);
+  });
+  return (cards||[]).map(g=>{
+    const historial=porTarjeta.get(g.id)||[];
+    return {
+      id:g.id,codigo:g.codigo,monto:Number(g.monto)||0,saldo:Number(g.saldo)||0,
+      emision:g.emision,vencimiento:g.vencimiento||null,nota:g.nota||"",
+      estado:g.estado||"vigente",usos:historial,
+      ultimoUso:historial.length?historial[historial.length-1].fecha:null,
+      rowVersion:Number(g.row_version)||0,_nube:true,
+    };
+  });
+}
+async function sbCargarGiftCardsCloud() {
+  try{
+    const db=await getSupabase();
+    const {data:cards,error}=await db.from("gift_cards").select("*").order("emision",{ascending:false});
+    if(error) throw error;
+    if(!cards?.length) return [];
+    const {data:usos,error:usosError}=await db.from("gift_card_usos").select("*")
+      .in("gift_card_id",cards.map(g=>g.id)).order("created_at",{ascending:true});
+    if(usosError) throw usosError;
+    return mapGiftCardsNube(cards,usos||[]);
+  }catch(e){
+    console.warn("[Gift Cards] No se pudo cargar la fuente central:",e.message);
+    return null;
+  }
+}
+async function sbBuscarGiftCardCloud(codigo) {
+  const normalizado=String(codigo||"").trim().toUpperCase();
+  if(!normalizado) return null;
+  const db=await getSupabase();
+  const {data:card,error}=await db.from("gift_cards").select("*").eq("codigo",normalizado).maybeSingle();
+  if(error) throw error;
+  if(!card) return null;
+  const {data:usos,error:usosError}=await db.from("gift_card_usos").select("*")
+    .eq("gift_card_id",card.id).order("created_at",{ascending:true});
+  if(usosError) throw usosError;
+  return mapGiftCardsNube([card],usos||[])[0]||null;
+}
 function gcEstado(gc) {
   if ((gc.saldo||0) <= 0) return "agotada";
   if (gc.vencimiento && gc.vencimiento < hoy()) return "vencida";
@@ -12170,17 +12703,20 @@ async function exportarExcelGC(gcFiltradas, fechaIni, fechaFin) {
 }
 
 // ── SheetCrearGC ─────────────────────────────────────────────────
-function SheetCrearGC({ onClose, onCreada }) {
+function SheetCrearGC({ onClose, onCreada, user, mode="legacy" }) {
   const isDesktop = useIsDesktop();
   const [monto,       setMonto]       = useState("");
   const [vencimiento, setVencimiento] = useState("");
   const [nota,        setNota]        = useState("");
   const [done,        setDone]        = useState(false);
   const [nuevaGC,     setNuevaGC]     = useState(null);
+  const [guardando,   setGuardando]   = useState(false);
+  const [errorMsg,    setErrorMsg]    = useState(null);
 
-  function crear() {
+  async function crear() {
     const m = parseFloat(monto);
-    if (!m || m <= 0) return;
+    if (!m || m <= 0 || guardando) return;
+    setGuardando(true); setErrorMsg(null);
     const id = genGCId();
     const gc = {
       id, codigo: id,
@@ -12190,11 +12726,25 @@ function SheetCrearGC({ onClose, onCreada }) {
       nota: nota.trim(),
       usos: [], ultimoUso: null,
     };
-    const lista = [...cargarGC(), gc];
-    guardarGC(lista);
-    setNuevaGC(gc);
-    setDone(true);
-    onCreada && onCreada(lista);
+    try{
+      let lista=null;
+      if(mode==="transactional"){
+        const result=await sbCrearGiftCardTransaccional(thUUID(),gc,user);
+        gc.id=result.giftCardId||gc.id;
+        gc.codigo=result.codigo||gc.codigo;
+        gc.saldo=Number(result.saldo??gc.saldo);
+        gc._nube=true;
+      }else{
+        lista=[...cargarGC(),gc];
+        guardarGC(lista);
+        if(mode==="shadow") await sbRegistrarShadow(thUUID(),"CREAR_GIFT_CARD",gc,user);
+      }
+      setNuevaGC(gc);
+      setDone(true);
+      if(onCreada) await onCreada(lista);
+    }catch(e){
+      setErrorMsg(e?.message||"No se pudo crear la Gift Card. No se registró ningún cambio.");
+    }finally{ setGuardando(false); }
   }
 
   const overlay  = { position:"fixed",inset:0,zIndex:9999,background:"rgba(0,0,0,0.45)",backdropFilter:"blur(6px)",
@@ -12247,13 +12797,14 @@ function SheetCrearGC({ onClose, onCreada }) {
               <label style={lbl}>Nota (opcional)</label>
               <input type="text" value={nota} onChange={e=>setNota(e.target.value)} placeholder="Ej: Regalo cumpleaños…" style={inp} onFocus={onFocus} onBlur={onBlur}/>
             </div>
-            <button onClick={crear} disabled={!monto||parseFloat(monto)<=0}
+            {errorMsg&&<div style={{fontSize:12,color:C.red,fontFamily:FONT_UI,fontWeight:500}}>⚠️ {errorMsg}</div>}
+            <button onClick={crear} disabled={!monto||parseFloat(monto)<=0||guardando}
               style={{marginTop:4,padding:"14px",borderRadius:14,border:"none",
-                background:(!monto||parseFloat(monto)<=0)?C.bg2:C.label,
-                color:(!monto||parseFloat(monto)<=0)?C.label3:C.bg0,
+                background:(!monto||parseFloat(monto)<=0||guardando)?C.bg2:C.label,
+                color:(!monto||parseFloat(monto)<=0||guardando)?C.label3:C.bg0,
                 fontSize:15,fontWeight:700,fontFamily:FONT_UI,
-                cursor:(!monto||parseFloat(monto)<=0)?"not-allowed":"pointer",transition:"all .15s"}}>
-              🎁 Crear Gift Card
+                cursor:(!monto||parseFloat(monto)<=0||guardando)?"not-allowed":"pointer",transition:"all .15s"}}>
+              {guardando?"Confirmando…":"🎁 Crear Gift Card"}
             </button>
           </div>
         )}
@@ -12263,7 +12814,7 @@ function SheetCrearGC({ onClose, onCreada }) {
 }
 
 // ── SheetUsarGC ──────────────────────────────────────────────────
-function SheetUsarGC({ onClose, onUsada }) {
+function SheetUsarGC({ onClose, onUsada, user, mode="legacy" }) {
   const isDesktop  = useIsDesktop();
   const [codigo,   setCodigo]   = useState("");
   const [monto,    setMonto]    = useState("");
@@ -12272,32 +12823,56 @@ function SheetUsarGC({ onClose, onUsada }) {
   const [busqMsg,  setBusqMsg]  = useState(null);
   const [done,     setDone]     = useState(false);
   const [errorMsg, setErrorMsg] = useState(null);
+  const [buscando, setBuscando] = useState(false);
+  const [procesando,setProcesando]=useState(false);
+  const [saldoFinal,setSaldoFinal]=useState(null);
 
-  function buscar() {
-    const lista = cargarGC();
-    const gc    = lista.find(g=>g.codigo.toLowerCase()===codigo.trim().toLowerCase());
-    if (!gc)                  { setBusqMsg("❌ Gift Card no encontrada"); setGcFound(null); return; }
-    const est = gcEstado(gc);
-    if (est==="agotada")      { setBusqMsg("⚠️ Gift Card ya agotada");   setGcFound(null); return; }
-    if (est==="vencida")      { setBusqMsg("⚠️ Gift Card vencida");      setGcFound(null); return; }
-    setGcFound(gc); setBusqMsg(null); setErrorMsg(null);
+  async function buscar() {
+    if(!codigo.trim()||buscando) return;
+    setBuscando(true); setBusqMsg(null); setErrorMsg(null);
+    try{
+      const gc=mode==="transactional"
+        ? await sbBuscarGiftCardCloud(codigo)
+        : cargarGC().find(g=>g.codigo.toLowerCase()===codigo.trim().toLowerCase());
+      if (!gc)                  { setBusqMsg("❌ Gift Card no encontrada"); setGcFound(null); return; }
+      const est = gcEstado(gc);
+      if (est==="agotada")      { setBusqMsg("⚠️ Gift Card ya agotada");   setGcFound(null); return; }
+      if (est==="vencida")      { setBusqMsg("⚠️ Gift Card vencida");      setGcFound(null); return; }
+      setGcFound(gc);
+    }catch(e){
+      setGcFound(null);
+      setBusqMsg(`❌ ${e?.message||"No se pudo consultar la Gift Card"}`);
+    }finally{ setBuscando(false); }
   }
 
-  function canjear() {
+  async function canjear() {
     const m = parseFloat(monto);
     if (!m||m<=0)            { setErrorMsg("Ingresa un monto válido"); return; }
-    if (!gcFound)             return;
+    if (!gcFound||procesando) return;
     if (m>gcFound.saldo)     { setErrorMsg(`Saldo insuficiente. Disponible: ${$(gcFound.saldo)}`); return; }
-    const lista   = cargarGC();
-    const updated = lista.map(g => g.codigo!==gcFound.codigo ? g : {
-      ...g,
-      saldo:    +(g.saldo-m).toFixed(2),
-      ultimoUso: hoy(),
-      usos:     [...(g.usos||[]),{fecha:hoy(),monto:m,nota:nota.trim()}],
-    });
-    guardarGC(updated);
-    setDone(true);
-    onUsada && onUsada(updated);
+    setProcesando(true); setErrorMsg(null);
+    try{
+      let updated=null;
+      let saldo=+(gcFound.saldo-m).toFixed(2);
+      if(mode==="transactional"){
+        const result=await sbCanjearGiftCardTransaccional(thUUID(),gcFound.codigo,m,nota,user);
+        saldo=Number(result.saldoDespues);
+      }else{
+        updated=cargarGC().map(g => g.codigo!==gcFound.codigo ? g : {
+          ...g,saldo,ultimoUso:hoy(),
+          usos:[...(g.usos||[]),{fecha:hoy(),monto:m,nota:nota.trim()}],
+        });
+        guardarGC(updated);
+        if(mode==="shadow") await sbRegistrarShadow(thUUID(),"CANJEAR_GIFT_CARD",{
+          codigo:gcFound.codigo,monto:m,nota:nota.trim(),saldoAntes:gcFound.saldo,saldoDespues:saldo,
+        },user);
+      }
+      setSaldoFinal(saldo);
+      setDone(true);
+      if(onUsada) await onUsada(updated);
+    }catch(e){
+      setErrorMsg(e?.message||"El canje no fue confirmado. El saldo no cambió.");
+    }finally{ setProcesando(false); }
   }
 
   const overlay = { position:"fixed",inset:0,zIndex:9999,background:"rgba(0,0,0,0.45)",backdropFilter:"blur(6px)",
@@ -12332,7 +12907,7 @@ function SheetUsarGC({ onClose, onUsada }) {
               <div style={{fontSize:14,fontWeight:700,color:C.green,fontFamily:FONT_UI,marginBottom:4}}>Canje exitoso</div>
               <div style={{fontSize:22,fontWeight:700,color:C.label,fontFamily:FONT_DISPLAY}}>{$(parseFloat(monto))} canjeados</div>
               <div style={{fontSize:13,color:C.label3,fontFamily:FONT_UI,marginTop:8}}>
-                Saldo restante: {$(Math.max(0,(gcFound?.saldo||0)-parseFloat(monto||0)))}
+                Saldo restante: {$(Math.max(0,saldoFinal??((gcFound?.saldo||0)-parseFloat(monto||0))))}
               </div>
             </div>
             <button onClick={onClose} style={{width:"100%",padding:"14px",borderRadius:14,border:"none",background:C.label,color:C.bg0,fontSize:15,fontWeight:700,fontFamily:FONT_UI,cursor:"pointer"}}>Listo</button>
@@ -12347,10 +12922,10 @@ function SheetUsarGC({ onClose, onUsada }) {
                   placeholder="GC-YYYYMMDD-XXXX"
                   style={{...inp,flex:1}} onFocus={onFocus} onBlur={onBlur}
                   onKeyDown={e=>e.key==="Enter"&&buscar()}/>
-                <button onClick={buscar}
+                <button onClick={buscar} disabled={buscando}
                   style={{padding:"13px 16px",borderRadius:12,border:"none",background:C.label,color:C.bg0,
                     fontSize:13,fontWeight:700,fontFamily:FONT_UI,cursor:"pointer",flexShrink:0}}>
-                  Buscar
+                  {buscando?"Buscando…":"Buscar"}
                 </button>
               </div>
               {busqMsg&&<div style={{fontSize:12,color:C.red,fontFamily:FONT_UI,marginTop:6,fontWeight:500}}>{busqMsg}</div>}
@@ -12386,13 +12961,13 @@ function SheetUsarGC({ onClose, onUsada }) {
                     placeholder="Ej: Venta N°123…" style={inp} onFocus={onFocus} onBlur={onBlur}/>
                 </div>
                 {errorMsg&&<div style={{fontSize:12,color:C.red,fontFamily:FONT_UI,fontWeight:500}}>⚠️ {errorMsg}</div>}
-                <button onClick={canjear} disabled={!monto||parseFloat(monto)<=0}
+                <button onClick={canjear} disabled={!monto||parseFloat(monto)<=0||procesando}
                   style={{padding:"14px",borderRadius:14,border:"none",
-                    background:(!monto||parseFloat(monto)<=0)?C.bg2:C.green,
-                    color:(!monto||parseFloat(monto)<=0)?C.label3:"#fff",
+                    background:(!monto||parseFloat(monto)<=0||procesando)?C.bg2:C.green,
+                    color:(!monto||parseFloat(monto)<=0||procesando)?C.label3:"#fff",
                     fontSize:15,fontWeight:700,fontFamily:FONT_UI,
-                    cursor:(!monto||parseFloat(monto)<=0)?"not-allowed":"pointer",transition:"all .15s"}}>
-                  💳 Canjear {monto?$(parseFloat(monto)):""}
+                    cursor:(!monto||parseFloat(monto)<=0||procesando)?"not-allowed":"pointer",transition:"all .15s"}}>
+                  {procesando?"Confirmando…":`💳 Canjear ${monto?$(parseFloat(monto)):""}`}
                 </button>
               </>
             )}
@@ -12406,11 +12981,7 @@ function SheetUsarGC({ onClose, onUsada }) {
 // ── SheetDetalleGC ───────────────────────────────────────────────
 function SheetDetalleGC({ gc: gcProp, onClose }) {
   const isDesktop = useIsDesktop();
-  const [gc, setGc] = useState(gcProp);
-  useEffect(()=>{
-    const found = cargarGC().find(g=>g.codigo===gcProp.codigo);
-    if (found) setGc(found);
-  },[gcProp.codigo]);
+  const gc = gcProp;
 
   const estado = gcEstado(gc);
   const ec     = {vigente:C.green,agotada:C.label3,vencida:C.red}[estado]||C.label3;
@@ -12551,7 +13122,7 @@ function SheetDetalleGC({ gc: gcProp, onClose }) {
 }
 
 // ── GiftCardsTab ─────────────────────────────────────────────────
-function GiftCardsTab() {
+function GiftCardsTab({user}) {
   const isDesktop = useIsDesktop();
   const [giftCards,   setGiftCards]  = useState(()=>cargarGC());
   const [fechaIni,    setFechaIni]   = useState("");
@@ -12564,8 +13135,70 @@ function GiftCardsTab() {
   const [shUsar,      setShUsar]     = useState(false);
   const [gcDetalle,   setGcDetalle]  = useState(null);
   const [exportando,  setExportando] = useState(false);
+  const [mode,        setMode]       = useState(null);
+  const [cargando,    setCargando]   = useState(true);
+  const [pendientes,  setPendientes] = useState([]);
+  const [migrando,    setMigrando]   = useState(false);
+  const [fuenteMsg,   setFuenteMsg]  = useState(null);
 
-  function reload(lista){ setGiftCards(lista||cargarGC()); }
+  async function cargarFuente(nextMode=mode){
+    if(nextMode!=="transactional"){
+      const local=cargarGC();
+      setGiftCards(local); setPendientes([]); setFuenteMsg(null);
+      return local;
+    }
+    const cloud=await sbCargarGiftCardsCloud();
+    if(cloud===null){
+      setFuenteMsg("No se pudo consultar la fuente central. No se habilitaron cambios de Gift Cards.");
+      return null;
+    }
+    const local=cargarGC();
+    const codigosNube=new Set(cloud.map(g=>g.codigo.trim().toUpperCase()));
+    const faltantes=local.filter(g=>!codigosNube.has(String(g.codigo||"").trim().toUpperCase()));
+    setPendientes(faltantes);
+    setGiftCards([...cloud,...faltantes.map(g=>({...g,_pendienteNube:true}))]);
+    setFuenteMsg(null);
+    if(!faltantes.length) guardarGC(cloud);
+    return cloud;
+  }
+
+  useEffect(()=>{
+    let active=true;
+    (async()=>{
+      setCargando(true);
+      const resolved=await sbResolverModoOperacion("GIFT_CARD_ADMIN",user);
+      if(!active) return;
+      setMode(resolved);
+      await cargarFuente(resolved);
+      if(active) setCargando(false);
+    })();
+    return()=>{active=false;};
+  },[user?.usuario]);
+
+  async function reload(lista){
+    if(lista){ setGiftCards(lista); return lista; }
+    setCargando(true);
+    try{return await cargarFuente(mode);}finally{setCargando(false);}
+  }
+
+  async function migrarHistoricas(){
+    if(!pendientes.length||migrando) return;
+    if(!window.confirm(`Se migrarán ${pendientes.length} Gift Card(s) históricas a la fuente central. La copia local se conservará como caché. ¿Continuar?`)) return;
+    setMigrando(true); setFuenteMsg(null);
+    const opKey="th_gc_import_operation_v1";
+    let operationId;
+    try{
+      operationId=localStorage.getItem(opKey)||thUUID();
+      localStorage.setItem(opKey,operationId);
+      const cards=pendientes.map(({_pendienteNube,_nube,...g})=>g);
+      const result=await sbImportarGiftCardsTransaccional(operationId,cards,user);
+      localStorage.removeItem(opKey);
+      await cargarFuente("transactional");
+      setFuenteMsg(`Migración confirmada: ${result.importadas||0} importadas, ${result.omitidas||0} ya existentes.`);
+    }catch(e){
+      setFuenteMsg(`Migración no confirmada: ${e?.message||"error desconocido"}. Puedes reintentar con la misma operación.`);
+    }finally{setMigrando(false);}
+  }
 
   function aplicarRango(tipo){
     setRangoActivo(tipo);
@@ -12622,6 +13255,7 @@ function GiftCardsTab() {
     cursor:"pointer",transition:"all .12s",border:`1px solid ${active?color:C.sep}`,
     background:active?`${color}18`:C.bg0, color:active?color:C.label3,
   });
+  const operacionesBloqueadas=cargando||mode===null||(mode==="transactional"&&pendientes.length>0);
 
   return (
     <div style={{paddingBottom:16}}>
@@ -12631,18 +13265,38 @@ function GiftCardsTab() {
         <div style={{fontSize:13,color:C.label3,fontFamily:FONT_UI}}>{gcFiltradas.length} tarjeta{gcFiltradas.length!==1?"s":""}  · {kpis.vigentes} vigente{kpis.vigentes!==1?"s":""}</div>
       </div>
 
+      {mode==="transactional"&&pendientes.length>0&&(
+        <div style={{padding:"14px 16px",borderRadius:14,marginBottom:14,background:`${C.amber}12`,border:`1px solid ${C.amber}35`}}>
+          <div style={{fontSize:13,fontWeight:700,color:C.amber,fontFamily:FONT_UI,marginBottom:5}}>
+            {pendientes.length} Gift Card{pendientes.length===1?"":"s"} histórica{pendientes.length===1?"":"s"} pendiente{pendientes.length===1?"":"s"} de migración
+          </div>
+          <div style={{fontSize:12,color:C.label2,fontFamily:FONT_UI,lineHeight:1.5,marginBottom:10}}>
+            La creación y el canje están pausados hasta copiar estas tarjetas a la fuente central auditada.
+          </div>
+          <button onClick={migrarHistoricas} disabled={migrando}
+            style={{padding:"9px 13px",borderRadius:10,border:"none",background:C.amber,color:"#fff",fontSize:12,fontWeight:700,fontFamily:FONT_UI,cursor:migrando?"wait":"pointer"}}>
+            {migrando?"Migrando…":"Migrar ahora de forma segura"}
+          </button>
+        </div>
+      )}
+      {fuenteMsg&&(
+        <div style={{padding:"10px 12px",borderRadius:10,marginBottom:14,background:C.bg2,border:`1px solid ${C.sep}`,fontSize:12,color:C.label2,fontFamily:FONT_UI}}>
+          {fuenteMsg}
+        </div>
+      )}
+
       {/* Acciones */}
       <div style={{display:"flex",gap:8,marginBottom:16}}>
-        <button onClick={()=>setShCrear(true)}
+        <button onClick={()=>setShCrear(true)} disabled={operacionesBloqueadas}
           style={{flex:1,padding:"12px",borderRadius:14,border:"none",background:C.label,color:C.bg0,
-            fontSize:14,fontWeight:700,fontFamily:FONT_UI,cursor:"pointer",
+            fontSize:14,fontWeight:700,fontFamily:FONT_UI,cursor:operacionesBloqueadas?"not-allowed":"pointer",opacity:operacionesBloqueadas?0.55:1,
             display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
           🎁 Nueva GC
         </button>
-        <button onClick={()=>setShUsar(true)}
+        <button onClick={()=>setShUsar(true)} disabled={operacionesBloqueadas}
           style={{flex:1,padding:"12px",borderRadius:14,
             border:`1px solid ${C.green}30`,background:`${C.green}18`,color:C.green,
-            fontSize:14,fontWeight:700,fontFamily:FONT_UI,cursor:"pointer",
+            fontSize:14,fontWeight:700,fontFamily:FONT_UI,cursor:operacionesBloqueadas?"not-allowed":"pointer",opacity:operacionesBloqueadas?0.55:1,
             display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
           💳 Canjear
         </button>
@@ -12813,8 +13467,12 @@ function GiftCardsTab() {
       )}
 
       {/* Sheets */}
-      {shCrear&&<SheetCrearGC onClose={()=>setShCrear(false)} onCreada={lista=>reload(lista)}/>}
-      {shUsar &&<SheetUsarGC  onClose={()=>setShUsar(false)}  onUsada={lista=>reload(lista)}/>}
+      {shCrear&&(
+        <SheetCrearGC onClose={()=>setShCrear(false)} onCreada={lista=>reload(lista)} user={user} mode={mode}/>
+      )}
+      {shUsar&&(
+        <SheetUsarGC onClose={()=>setShUsar(false)} onUsada={lista=>reload(lista)} user={user} mode={mode}/>
+      )}
       {gcDetalle&&<SheetDetalleGC gc={gcDetalle} onClose={()=>setGcDetalle(null)}/>}
     </div>
   );
@@ -12873,7 +13531,10 @@ function App(){
   const[tab,setTab]         =useState("inicio");
   // ── Persistencia local: ini desde localStorage, sync a nube con Supabase ──
   const[inv,setInv]     =useState(()=>{ try{return JSON.parse(localStorage.getItem("th_inv")||"[]");}catch{return[];} });
-  const[ventas,setVentas]=useState(()=>{ try{return JSON.parse(localStorage.getItem("th_ventas")||"[]");}catch{return[];} });
+  const[ventas,setVentas]=useState(()=>{
+    try{return JSON.parse(localStorage.getItem("th_ventas")||"[]").filter(v=>!thEsVentaTecnica(v));}
+    catch{return[];}
+  });
   const[factoryResetRecibido,setFactoryResetRecibido]=useState(false);
   const pingMs = usePingLatency();
   const clockDrift = useClockDrift();
@@ -12882,16 +13543,47 @@ function App(){
   const[descuentos,setDescuentos]=useState(()=>{ try{return JSON.parse(localStorage.getItem("th_descuentos")||"{}");}catch{return{};} });
   const[alertaDesc,setAlertaDesc]=useState(null); // toast: {marcaNombre,activo,pct,hasta,por,ts}
   useEffect(()=>{ try{localStorage.setItem("th_descuentos",JSON.stringify(descuentos));}catch{} },[descuentos]);
-  useEffect(()=>{ sbCargarDescuentos().then(m=>{ if(m) setDescuentos(m); }); },[]);
+  useEffect(()=>{
+    if(!user) return;
+    sbCargarDescuentos().then(m=>{ if(m) setDescuentos(m); });
+  },[user?.usuario]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Recibe cambios de descuento (broadcast o postgres_changes) → estado + toast
+  // Red de seguridad: al cargar/reconectar, avisa de descuentos de marca VIGENTES
+  // que este equipo aún no vio (p.ej. la marca los habilitó mientras la caja
+  // estaba cerrada, o se perdió el broadcast). No se repite gracias a la firma.
+  useEffect(()=>{
+    if(!user || user.rol==="marca") return;
+    const ack = descNotifAck();
+    const nuevos = MARCAS.filter(m=>{
+      if(descMarcaVigente(descuentos, m.id) <= 0) return false;
+      const d = descuentos[m.id];
+      return ack[m.id] !== descNotifSig({activo:true, pct:d.pct, hasta:d.hasta});
+    });
+    if(!nuevos.length) return;
+    nuevos.forEach(m=>{ const d=descuentos[m.id]; descNotifMarcar(m.id, descNotifSig({activo:true, pct:d.pct, hasta:d.hasta})); });
+    if(nuevos.length===1){
+      const m=nuevos[0], d=descuentos[m.id];
+      setAlertaDesc({marcaNombre:m.nombre, activo:true, pct:d.pct, hasta:d.hasta, ts:Date.now()});
+    }else{
+      setAlertaDesc({consolidado:true, marcas:nuevos.map(m=>m.nombre), ts:Date.now()});
+    }
+  },[descuentos, user?.usuario]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Recibe cambios de descuento (broadcast o postgres_changes) → estado + toast.
+  // El aviso se decide por FIRMA persistida (no por la vía): si este equipo aún
+  // no vio esta firma, avisa una vez; da igual si llegó por broadcast, por la
+  // tabla, o si el broadcast se perdió. La sesión de la propia marca no se auto-avisa.
   function onDescuentoMarcaRT(p){
     setDescuentos(prev=>({...prev,[p.marcaId]:{activo:p.activo,pct:p.pct,hasta:p.hasta||"",updatedBy:p.por||""}}));
-    if(!p._silencioso) setAlertaDesc({...p, ts:Date.now()});
+    if(user?.rol==="marca") return;
+    const sig = descNotifSig({activo:p.activo,pct:p.pct,hasta:p.hasta});
+    if(descNotifAck()[p.marcaId] === sig) return; // ya avisado en este equipo
+    descNotifMarcar(p.marcaId, sig);
+    setAlertaDesc({...p, ts:Date.now()});
   }
 
   // Guardar descuento (panel admin o portal de marca) — optimista + nube + alerta
-  function guardarDescuentoMarca(marcaId, patch){
+  async function guardarDescuentoMarca(marcaId, patch){
     const m = MARCAS.find(x=>x.id===marcaId);
     const prev = descuentos[marcaId]||{};
     const rec = {
@@ -12901,21 +13593,32 @@ function App(){
       hasta:  patch.hasta!==undefined ? (patch.hasta||"") : (prev.hasta||""),
       updatedBy: user?.nombre||user?.usuario||"",
     };
+    const mode=await sbResolverModoOperacion("DESCUENTO_MARCA",user);
+    if(mode==="transactional"){
+      try{await sbGuardarEstadoOperativoTransaccional(thUUID(),"DESCUENTO_MARCA",rec,user);}
+      catch(e){alert(`${e?.message||"No se pudo guardar el descuento"}\n\nNo se aplicó ningún cambio.`);return false;}
+    }
     setDescuentos(p=>({...p,[marcaId]:{activo:rec.activo,pct:rec.pct,hasta:rec.hasta,updatedBy:rec.updatedBy}}));
-    syncConRespaldo("descuentoMarca", rec, ()=>sbGuardarDescuentoMarca(rec));
+    descNotifMarcar(marcaId, descNotifSig({activo:rec.activo,pct:rec.pct,hasta:rec.hasta})); // el equipo que lo habilita no se auto-avisa
+    if(mode!=="transactional") syncConRespaldo("descuentoMarca", rec, ()=>sbGuardarDescuentoMarca(rec));
     rtBroadcast("descuento_marca", {marcaId, marcaNombre:rec.marcaNombre, activo:rec.activo, pct:rec.pct, hasta:rec.hasta, por:rec.updatedBy});
-    logAudit("DESCUENTO_MARCA", {
+    if(mode!=="transactional") logAudit("DESCUENTO_MARCA", {
       resumen: rec.activo
         ? `${rec.marcaNombre}: descuento ${rec.pct}% ACTIVADO${rec.hasta?` hasta ${rec.hasta.split("-").reverse().join("/")}`:""}`
         : `${rec.marcaNombre}: descuento desactivado`,
       marcaId, marca: rec.marcaNombre, pct: rec.pct, activo: rec.activo, hasta: rec.hasta,
     }, user);
+    if(mode==="shadow") sbRegistrarShadow(thUUID(),"DESCUENTO_MARCA",rec,user);
+    return true;
   }
 
   // ── Descuentos por código ──
   const[descCodigos,setDescCodigos]=useState(()=>{ try{return JSON.parse(localStorage.getItem("th_desc_codigos")||"{}");}catch{return{};} });
   useEffect(()=>{ try{localStorage.setItem("th_desc_codigos",JSON.stringify(descCodigos));}catch{} },[descCodigos]);
-  useEffect(()=>{ sbCargarDescuentosCodigo().then(m=>{ if(m) setDescCodigos(m); }); },[]);
+  useEffect(()=>{
+    if(!user) return;
+    sbCargarDescuentosCodigo().then(m=>{ if(m) setDescCodigos(m); });
+  },[user?.usuario]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Recibe cambios de descuento por código (broadcast o postgres_changes)
   function onDescuentoCodigoRT(p){
@@ -12926,30 +13629,44 @@ function App(){
   }
 
   // Guardar descuento de un código (portal de marca / admin)
-  function guardarDescuentoCodigo(codigo, {marcaId, marcaNombre, nombre, pct, hasta}){
+  async function guardarDescuentoCodigo(codigo, {marcaId, marcaNombre, nombre, pct, hasta}){
     const cod = (codigo||"").toUpperCase();
     const rec = { codigo:cod, marcaId, marcaNombre:marcaNombre||"", nombre:nombre||"",
       activo:true, pct:Number(pct)||0, hasta:hasta||"", updatedBy:user?.nombre||user?.usuario||"" };
+    const mode=await sbResolverModoOperacion("DESCUENTO_CODIGO",user);
+    if(mode==="transactional"){
+      try{await sbGuardarEstadoOperativoTransaccional(thUUID(),"DESCUENTO_CODIGO",rec,user);}
+      catch(e){alert(`${e?.message||"No se pudo guardar el descuento"}\n\nNo se aplicó ningún cambio.`);return false;}
+    }
     setDescCodigos(p=>({...p,[cod]:{marcaId:rec.marcaId,marcaNombre:rec.marcaNombre,nombre:rec.nombre,activo:true,pct:rec.pct,hasta:rec.hasta,updatedBy:rec.updatedBy}}));
-    syncConRespaldo("descuentoCodigo", rec, ()=>sbGuardarDescuentoCodigo(rec));
+    if(mode!=="transactional") syncConRespaldo("descuentoCodigo", rec, ()=>sbGuardarDescuentoCodigo(rec));
     rtBroadcast("descuento_codigo", {codigo:cod, marcaId:rec.marcaId, marcaNombre:rec.marcaNombre, nombre:rec.nombre, activo:true, pct:rec.pct, hasta:rec.hasta, por:rec.updatedBy});
-    logAudit("DESCUENTO_CODIGO", {
+    if(mode!=="transactional") logAudit("DESCUENTO_CODIGO", {
       resumen: `${rec.marcaNombre}: ${rec.nombre||cod} (${cod}) al ${rec.pct}%${rec.hasta?` hasta ${rec.hasta.split("-").reverse().join("/")}`:""}`,
       marcaId:rec.marcaId, marca:rec.marcaNombre, codigo:cod, pct:rec.pct, hasta:rec.hasta,
     }, user);
+    if(mode==="shadow") sbRegistrarShadow(thUUID(),"DESCUENTO_CODIGO",rec,user);
+    return true;
   }
 
   // Quitar descuento de un código
-  function eliminarDescuentoCodigo(codigo){
+  async function eliminarDescuentoCodigo(codigo){
     const cod = (codigo||"").toUpperCase();
     const rec = descCodigos[cod]||{};
+    const mode=await sbResolverModoOperacion("DESCUENTO_CODIGO",user);
+    if(mode==="transactional"){
+      try{await sbGuardarEstadoOperativoTransaccional(thUUID(),"ELIMINAR_DESCUENTO_CODIGO",{codigo:cod},user);}
+      catch(e){alert(`${e?.message||"No se pudo quitar el descuento"}\n\nNo se aplicó ningún cambio.`);return false;}
+    }
     setDescCodigos(p=>{ const n={...p}; delete n[cod]; return n; });
-    syncConRespaldo("eliminarDescuentoCodigo", {codigo:cod}, ()=>sbEliminarDescuentoCodigo(cod));
+    if(mode!=="transactional") syncConRespaldo("eliminarDescuentoCodigo", {codigo:cod}, ()=>sbEliminarDescuentoCodigo(cod));
     rtBroadcast("descuento_codigo", {codigo:cod, _eliminar:true});
-    logAudit("DESCUENTO_CODIGO", {
+    if(mode!=="transactional") logAudit("DESCUENTO_CODIGO", {
       resumen: `${rec.marcaNombre||""}: descuento quitado de ${rec.nombre||cod} (${cod})`,
       marcaId:rec.marcaId, marca:rec.marcaNombre||"", codigo:cod, pct:0, activo:false,
     }, user);
+    if(mode==="shadow") sbRegistrarShadow(thUUID(),"ELIMINAR_DESCUENTO_CODIGO",{codigo:cod},user);
+    return true;
   }
   const[alq,setAlq]     =useState(()=>{ try{return JSON.parse(localStorage.getItem("th_alq")||"[]");}catch{return[];} });
   const[cierres,setCierres]=useState(()=>{ try{return JSON.parse(localStorage.getItem("th_cierres")||"{}");}catch{return {};} });
@@ -12974,6 +13691,14 @@ function App(){
   const[repCant,setRepCant] =useState("");
   const[repPrecio,setRepPrecio]=useState("");
   const[repMsg,setRepMsg]   =useState(null);
+  const[operacionInvPendiente,setOperacionInvPendiente]=useState("");
+  const bajaOperationRef=useRef(null);
+  const repOperationRef=useRef(null);
+  const auditAdjustOperations=useRef({});
+  const cargaReversalOperations=useRef({});
+  const manualAddOperationRef=useRef(null);
+  const productEditOperations=useRef({});
+  const productDeactivateOperations=useRef({});
   const[bajasLista,setBajasLista]=useState([]);
   const[bajaDetalle,setBajaDetalle]=useState(null);
   const[busqInv,setBusqInv] =useState("");
@@ -12993,29 +13718,45 @@ function App(){
   const[marcasState,setMarcasState]       =useState(()=>cargarMarcas());
   const drive = useDriveSync();
 
-  // Guarda marca nueva o editada → actualiza React state + global + localStorage + Supabase
-  function onMarcaGuardada(marca, isNew, nuevoUsuario){
+  async function guardarMarcasSeguro(lista){
+    const custom=lista.filter(m=>!MARCAS_SEED.find(s=>s.id===m.id));
+    if(!custom.length) return true;
+    const mode=await sbResolverModoOperacion("CONFIG_MARCAS",user);
+    if(mode==="transactional"){
+      await sbGuardarEstadoOperativoTransaccional(thUUID(),"CONFIG_MARCAS",{items:custom},user);
+    }else{
+      syncConRespaldo("marcas",lista,()=>sbGuardarMarcas(lista));
+      if(mode==="shadow") sbRegistrarShadow(thUUID(),"CONFIG_MARCAS",{items:custom},user);
+    }
+    return true;
+  }
+
+  // Guarda marca nueva o editada sólo después de confirmación del motor activo.
+  async function onMarcaGuardada(marca, isNew, nuevoUsuario){
     const prev = marcasState;
     const lista = isNew
       ? [...prev, marca]
       : prev.map(m => m.id===marca.id ? {...m,...marca} : m);
+    try{await guardarMarcasSeguro(lista);}
+    catch(e){alert(`${e?.message||"No se pudo guardar la marca"}\n\nNo se aplicó ningún cambio.`);return false;}
     localStorage.setItem("th_marcas", JSON.stringify(lista));
     MARCAS = lista;
     setMarcasState(lista);
-    // Guardar a Supabase con reintento garantizado vía outbox.
-    // Si falla la red o RLS, la operación queda en cola y se reintenta hasta
-    // confirmar — así la marca SIEMPRE llega a la nube y a las demás sesiones.
-    syncConRespaldo("marcas", lista, ()=>sbGuardarMarcas(lista));
     // Si se pidió crear usuario brand, añadirlo y sincronizar a Supabase
     if(nuevoUsuario){
       const listaU = (() => {
         try{ return JSON.parse(localStorage.getItem("th_usuarios")||"null")||USUARIOS; }
         catch{ return USUARIOS; }
       })();
-      const nueva = [...listaU, nuevoUsuario];
+      const {password,...perfilUsuario}=nuevoUsuario;
+      const nueva = thUsuariosSinCredenciales([...listaU, perfilUsuario]);
       localStorage.setItem("th_usuarios", JSON.stringify(nueva));
-      syncConRespaldo("usuarios", nueva, ()=>sbGuardarUsuarios(nueva)); // ← también a la nube
+      if(password){
+        sbCrearAuthUsuario(perfilUsuario.usuario,password,perfilUsuario.nombre,perfilUsuario.rol,perfilUsuario.marcaId)
+          .then(ok=>{if(!ok) alert(`La marca se guardó, pero no se pudo crear el acceso @${perfilUsuario.usuario}. Reinténtalo desde Configuración → Equipo.`);});
+      }
     }
+    return true;
   }
 
   // ── Sync localStorage ← siempre que cambie inv, ventas, alq o cierres ──
@@ -13029,7 +13770,8 @@ function App(){
 
   // ── Realtime sync — cualquier cambio en Supabase (otro dispositivo) actualiza aquí ──
   useRealtimeSync(setVentas, setInv, setRetiros, setFactoryResetRecibido,
-    ()=>resyncDesdeNube("reconexión realtime"), onDescuentoMarcaRT, onDescuentoCodigoRT);
+    ()=>resyncDesdeNube("reconexión realtime"), onDescuentoMarcaRT, onDescuentoCodigoRT,
+    user?.usuario);
 
   // (reset de datos eliminado — localStorage persiste entre sesiones)
 
@@ -13056,24 +13798,28 @@ function App(){
 
   // Cargar retiros desde Supabase al inicio — merge con locales sin sincronizar
   useEffect(()=>{
+    if(!user) return;
     sbCargarRetiros().then(data=>{
       setRetiros(prev=>{
-        const sbIds = new Set(data.map(r=>String(r.id)));
-        const pendientes = prev.filter(r=>!sbIds.has(String(r.id)));
-        pendientes.forEach(r=>sbGuardarRetiro(r));
         if(data.length===0 && prev.length>0) return prev;
+        const sbIds = new Set(data.map(r=>String(r.id)));
+        const outboxIds=new Set(getOutbox().filter(op=>op?.tipo==="retiro")
+          .map(op=>String(op?.payload?.id||"")));
+        const pendientes = prev.filter(r=>!sbIds.has(String(r.id))&&outboxIds.has(String(r.id)));
         return pendientes.length>0 ? [...data, ...pendientes] : data;
       });
     });
-  },[]);
+  },[user?.usuario]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Cargar auditorías de inventario desde Supabase al inicio
   useEffect(()=>{
+    if(!user) return;
     sbCargarAuditorias().then(data=>{ if(data.length>0) setAuditorias(data); });
-  },[]);
+  },[user?.usuario]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Cargar trazabilidad de cargas a inventario desde Supabase al inicio
   useEffect(()=>{
+    if(!user) return;
     sbCargarCargas().then(data=>{
       if(data.length>0) setCargas(prev=>{
         const sbIds=new Set(data.map(c=>c.id));
@@ -13081,10 +13827,11 @@ function App(){
         return [...data,...locales];
       });
     });
-  },[]);
+  },[user?.usuario]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Realtime: cargas registradas en otros dispositivos ──
   useEffect(()=>{
+    if(!user) return;
     let channel=null, mounted=true;
     getSupabase().then(db=>{
       if(!mounted) return;
@@ -13097,9 +13844,22 @@ function App(){
             marcaId:c.marca_id, marcaNombre:c.marca_nombre,
             resumen:c.resumen, totalItems:c.total_items,
             nuevos:c.nuevos||0, actualizados:c.actualizados||0, items:c.detalle||[],
+            operationId:c.operation_id||null,revertida:c.revertida||false,
+            revertidaAt:c.revertida_at||null,revertidaPor:c.revertida_por||null,
+            archivoNombre:c.archivo_nombre||null,archivoUrl:c.archivo_url||null,
           };
           if(!mounted) return;
           setCargas(prev=>prev.some(x=>x.id===carga.id) ? prev : [carga, ...prev]);
+        })
+        .on("postgres_changes", {event:"UPDATE", schema:"public", table:"cargas_inventario"}, payload=>{
+          const c=payload.new;
+          if(!mounted) return;
+          setCargas(prev=>prev.map(x=>x.id===c.id?{...x,
+            verificado:c.verificado||false,verificadoTs:c.verificado_ts||null,verificadoPor:c.verificado_por||null,
+            revertida:c.revertida||false,revertidaAt:c.revertida_at||null,revertidaPor:c.revertida_por||null,
+            archivoNombre:c.archivo_nombre||x.archivoNombre,archivoUrl:c.archivo_url||x.archivoUrl,
+          }:x));
+          if(c.revertida) sbCargarInventario().then(lista=>{if(mounted&&Array.isArray(lista))setInv(lista);});
         })
         // ── Carga eliminada en otro dispositivo ──────────────────────────
         // Quita la carga local y RECARGA el inventario completo desde Supabase.
@@ -13116,10 +13876,11 @@ function App(){
         .subscribe();
     }).catch(()=>{});
     return ()=>{ mounted=false; if(channel) getSupabase().then(db=>db.removeChannel(channel)).catch(()=>{}); };
-  },[]);
+  },[user?.usuario]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Sync marcas custom con Supabase al inicio ──
   useEffect(()=>{
+    if(!user) return;
     const localCustom = cargarMarcas().filter(m=>!MARCAS_SEED.find(s=>s.id===m.id));
 
     function applyCustom(custom){
@@ -13145,13 +13906,14 @@ function App(){
       applyCustom(union);
       // Subir las que solo existían en este dispositivo (con reintento garantizado)
       if(soloLocales.length > 0){
-        syncConRespaldo("marcas", union, ()=>sbGuardarMarcas(union));
+        guardarMarcasSeguro(union).catch(e=>console.warn("Migración segura de marcas:",e.message));
       }
     }).catch(()=>{ if(localCustom.length > 0) applyCustom(localCustom); });
-  },[]);// eslint-disable-line
+  },[user?.usuario]);// eslint-disable-line
 
   // ── Realtime: marca nueva/editada en otro dispositivo ──
   useEffect(()=>{
+    if(!user) return;
     let channel=null, mounted=true;
     getSupabase().then(db=>{
       if(!mounted) return;
@@ -13171,7 +13933,7 @@ function App(){
         .subscribe();
     }).catch(()=>{});
     return ()=>{ mounted=false; if(channel) getSupabase().then(db=>db.removeChannel(channel)).catch(()=>{}); };
-  },[]);// eslint-disable-line
+  },[user?.usuario]);// eslint-disable-line
 
   // Cargas históricas: productos de inventario que ya existían antes de
   // habilitar la trazabilidad. Se calculan al vuelo (no se guardan en
@@ -13213,23 +13975,60 @@ function App(){
     return [...cargas, ...historicas];
   },[inv, cargas]);
 
-  function registrarAuditoria(aud){
-    setAuditorias(prev=>[aud, ...prev]);
-    syncConRespaldo("auditoria", aud, ()=>sbGuardarAuditoria(aud));
+  async function guardarAuditoriaSegura(aud){
+    const mode=await sbResolverModoOperacion("AUDITORIA_INVENTARIO",user);
+    if(mode==="transactional"){
+      await sbGuardarEstadoOperativoTransaccional(thUUID(),"AUDITORIA_INVENTARIO",aud,user);
+    }else{
+      syncConRespaldo("auditoria",aud,()=>sbGuardarAuditoria(aud));
+      if(mode==="shadow") sbRegistrarShadow(thUUID(),"AUDITORIA_INVENTARIO",aud,user);
+    }
+    return true;
   }
 
-  function actualizarAuditoria(aud){
+  async function registrarAuditoria(aud){
+    try{await guardarAuditoriaSegura(aud);}
+    catch(e){alert(`${e?.message||"No se pudo guardar la auditoría"}\n\nEl conteo sigue abierto y no se perdió.`);return false;}
+    setAuditorias(prev=>prev.some(a=>a.id===aud.id)?prev:[aud,...prev]);
+    return true;
+  }
+
+  async function actualizarAuditoria(aud){
+    try{await guardarAuditoriaSegura(aud);}
+    catch(e){alert(`${e?.message||"No se pudo actualizar la auditoría"}\n\nNo se aplicó ningún cambio.`);return false;}
     setAuditorias(prev=>prev.map(a=>a.id===aud.id?aud:a));
-    syncConRespaldo("auditoria", aud, ()=>sbGuardarAuditoria(aud));
+    return true;
   }
 
-  function cuadrarConAuditoria(aud){
+  async function cuadrarConAuditoria(aud){
     // Para cada ítem de la auditoría con diferencia ≠ 0, actualiza el stock
     // del inventario al valor contado y registra un log de auditoría.
     const cambios = (aud.detalle||[]).filter(d=>d.diferencia!==0 && d.contado>=0);
     if(cambios.length===0) return;
     const lineas = cambios.map(d=>`• ${d.codigo} ${d.nombre}: ${d.sistema} → ${d.contado} (${d.diferencia>0?"+":""}${d.diferencia})`).join("\n");
     if(!window.confirm(`¿Cuadrar inventario con esta verificación?\n\nSe actualizarán ${cambios.length} producto(s):\n\n${lineas}\n\nEsta acción no se puede deshacer.`)) return;
+    const operationId=auditAdjustOperations.current[aud.id]||thUUID();
+    auditAdjustOperations.current[aud.id]=operationId;
+    const mode=await sbResolverModoOperacion("AJUSTE_AUDITORIA",user);
+    const payload={
+      auditoriaId:aud.id,motivo:`Cuadre desde verificación ${aud.id}`,
+      items:cambios.map(d=>({
+        prodId:inv.find(p=>p.codigo===d.codigo)?.id||null,codigo:d.codigo,nombre:d.nombre,
+        stockSistema:d.sistema,stockObjetivo:Number(d.contado),diferencia:d.diferencia,
+      })),
+    };
+    if(mode==="transactional"){
+      try{
+        await sbAjusteBatchTransaccional(operationId,payload,user);
+        delete auditAdjustOperations.current[aud.id];
+        const invNube=await sbCargarInventario();
+        if(invNube) setInv(invNube);
+        alert(`✓ Inventario cuadrado de forma segura: ${cambios.length} producto(s).`);
+      }catch(e){
+        alert(`${e?.message||"No se pudo confirmar el cuadre"}\n\nNo se aplicó ningún ajuste parcial.`);
+      }
+      return;
+    }
     setInv(prev=>{
       const next=[...prev];
       cambios.forEach(d=>{
@@ -13245,6 +14044,8 @@ function App(){
       auditoriaId:aud.id, mes:aud.mes, anio:aud.anio, marcaId:aud.marcaId,
       cambios:cambios.map(d=>({codigo:d.codigo,nombre:d.nombre,antes:d.sistema,despues:d.contado})),
     },user);
+    delete auditAdjustOperations.current[aud.id];
+    if(mode==="shadow") sbRegistrarShadow(operationId,"AJUSTE_AUDITORIA",payload,user);
   }
 
   async function registrarCarga(carga, archivoBlob=null, archivoNombre=null){
@@ -13257,26 +14058,40 @@ function App(){
     syncConRespaldo("carga", cargaFinal, ()=>sbGuardarCarga(cargaFinal));
   }
 
-  function registrarRetiro(r){
-    const updated=[...retiros,r];
+  async function registrarRetiro(r){
+    const operationId=r.operationId||thUUID();
+    const mode=await sbResolverModoOperacion("RETIRO",user);
+    if(mode==="transactional"){
+      const result=await sbMovimientoTransaccional("th_registrar_retiro",operationId,r,user);
+      const confirmado={...r,id:result.entityId||r.id,operationId,engine:"transactional"};
+      setRetiros(prev=>prev.some(x=>x.id===confirmado.id)?prev:[...prev,confirmado]);
+      setInv(prev=>prev.map(i=>i.id===result.productoId?{...i,stock:result.stockDespues}:i));
+      rtBroadcast("retiro_nuevo",{r:confirmado});
+      rtBroadcast("inv_update",{p:{id:result.productoId,stock:result.stockDespues}});
+      return confirmado;
+    }
+    const retiroLegacy={...r,operationId,engine:"legacy"};
+    const updated=[...retiros,retiroLegacy];
     setRetiros(updated);
     try{localStorage.setItem("th_retiros_v1",JSON.stringify(updated));}catch{}
-    const prod = inv.find(i=>i.id===r.prodId);
+    const prod = inv.find(i=>i.id===retiroLegacy.prodId);
     const stockAntes = prod?.stock||0;
-    const stockDespues = Math.max(0, stockAntes - r.cantidad);
-    setInv(p=>p.map(i=>i.id===r.prodId?{...i,stock:stockDespues}:i));
-    syncConRespaldo("stock", {prodId:r.prodId, stock:stockDespues}, ()=>sbActualizarStock(r.prodId, stockDespues));
-    syncConRespaldo("retiro", r, ()=>sbGuardarRetiro(r));
+    const stockDespues = Math.max(0, stockAntes - retiroLegacy.cantidad);
+    setInv(p=>p.map(i=>i.id===retiroLegacy.prodId?{...i,stock:stockDespues}:i));
+    syncConRespaldo("stock", {prodId:retiroLegacy.prodId, stock:stockDespues}, ()=>sbActualizarStock(retiroLegacy.prodId, stockDespues));
+    syncConRespaldo("retiro", retiroLegacy, ()=>sbGuardarRetiro(retiroLegacy));
     // ── Audit forense ─────────────────────────────────────────────
     logAudit("RETIRO", {
-      resumen: `Retiro: ${prod?.nombre||r.codigo} × ${r.cantidad} u.`,
-      codigo: r.codigo, nombre: prod?.nombre||r.codigo,
+      resumen: `Retiro: ${prod?.nombre||retiroLegacy.codigo} × ${retiroLegacy.cantidad} u.`,
+      codigo: retiroLegacy.codigo, nombre: prod?.nombre||retiroLegacy.codigo,
       marca: prod?.marcaNombre||"—",
-      cantidad: r.cantidad,
-      destinatario: r.destinatario||"—",
-      motivo: r.motivo||"—",
+      cantidad: retiroLegacy.cantidad,
+      destinatario: retiroLegacy.destinatario||"—",
+      motivo: retiroLegacy.motivo||"—",
       stockAntes, stockDespues,
     }, user);
+    if(mode==="shadow") sbRegistrarShadow(operationId,"RETIRO",retiroLegacy,user);
+    return retiroLegacy;
   }
 
   // ── Carga completa desde Supabase — merge inteligente con localStorage ──
@@ -13302,11 +14117,10 @@ function App(){
       setVentas(prev=>{
         if(data.ventas.length===0 && prev.length>0) return prev;
         const sbIds = new Set(data.ventas.map(v=>String(v.id)));
-        const pendientes = prev.filter(v=>!sbIds.has(String(v.id)));
-        if(pendientes.length>0){
-          pendientes.forEach(v=>sbGuardarVenta(v));
-          return [...data.ventas, ...pendientes];
-        }
+        const outboxIds=new Set(getOutbox().filter(op=>op?.tipo==="venta")
+          .map(op=>String(op?.payload?.id||"")));
+        const pendientes = prev.filter(v=>!sbIds.has(String(v.id))&&outboxIds.has(String(v.id)));
+        if(pendientes.length>0) return [...data.ventas, ...pendientes];
         return data.ventas;
       });
 
@@ -13328,9 +14142,10 @@ function App(){
 
   // Cargar datos desde Supabase al inicio
   useEffect(()=>{
+    if(!user){ setCargando(false); return; }
     setDbStatus("connecting");
     cargarDesdeNube().then(()=>setCargando(false));
-  },[]); // eslint-disable-line react-hooks/exhaustive-deps
+  },[user?.usuario]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Re-sync al volver a foreground (iPad/Mac suspenden el WebSocket en
   // background) y al recuperar la conexión de red
@@ -13347,27 +14162,26 @@ function App(){
 
   // Sincronizar usuarios con Supabase al inicio
   useEffect(()=>{
+    if(!user) return;
     sbCargarUsuarios().then(sbUsers=>{
       if(sbUsers===null) return; // tabla no existe aún — ignorar
       const localUsers = (()=>{
-        try{ return JSON.parse(localStorage.getItem("th_usuarios")||"null")||USUARIOS; }
+        try{ return thUsuariosSinCredenciales(JSON.parse(localStorage.getItem("th_usuarios")||"null")||USUARIOS); }
         catch{ return USUARIOS; }
       })();
-      if(sbUsers.length===0 && localUsers.length>0){
-        // Supabase vacío pero hay usuarios locales → migrar a la nube
-        sbGuardarUsuarios(localUsers);
-      } else if(sbUsers.length>0){
+      try{localStorage.setItem("th_usuarios",JSON.stringify(localUsers));}catch{}
+      if(sbUsers.length>0){
         // Supabase tiene usuarios → actualizar localStorage con datos de la nube
         localStorage.setItem("th_usuarios", JSON.stringify(sbUsers));
       }
     }).catch(()=>{});
-  },[]);
+  },[user?.usuario]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const MK      =useMemo(()=>mkKey(mes,anio),[mes,anio]);
   // vMes excluye anuladas → se usa en cálculos financieros y liquidaciones
-  const vMes    =useMemo(()=>ventas.filter(v=>v.mk===MK&&!v.anulada),[ventas,MK]);
+  const vMes    =useMemo(()=>ventas.filter(v=>!thEsVentaTecnica(v)&&v.mk===MK&&!v.anulada),[ventas,MK]);
   // vMesAll incluye anuladas → se usa en historial/display
-  const vMesAll =useMemo(()=>ventas.filter(v=>v.mk===MK),[ventas,MK]);
+  const vMesAll =useMemo(()=>ventas.filter(v=>!thEsVentaTecnica(v)&&v.mk===MK),[ventas,MK]);
   const alqMes  =useMemo(()=>alq.filter(a=>a.mes===mes&&a.anio===anio),[alq,mes,anio]);
   const totalVtas=useMemo(()=>vMes.reduce((s,v)=>s+getDisplayTotal(v),0),[vMes]);
 
@@ -13378,7 +14192,7 @@ function App(){
     return r;
   },[inv,busqInv,filInvM]);
 
-  function addProd(){
+  async function addProd(){
     if(!fInv.marcaId||!fInv.nombre||!fInv.precio||!fInv.stock){alert("Completa todos los campos");return;}
     const idx=inv.length+1;
     const marca=MARCAS.find(m=>m.id===Number(fInv.marcaId));
@@ -13393,6 +14207,45 @@ function App(){
       marcaId:Number(fInv.marcaId),nombre:fInv.nombre,categoria:fInv.categoria||"General",
       precio:Number(fInv.precio),stock:Number(fInv.stock),stockInicial:Number(fInv.stock),fecha:fInv.fecha,
       marcaNombre:marca?.nombre||""};
+    const key=JSON.stringify({codigo,marcaId:prod.marcaId,nombre:prod.nombre,categoria:prod.categoria,
+      precio:prod.precio,stock:prod.stock,fecha:prod.fecha});
+    if(!manualAddOperationRef.current||manualAddOperationRef.current.key!==key){
+      const operationId=thUUID();
+      manualAddOperationRef.current={key,operationId,createdAt:Date.now(),cargaId:`CRG_${operationId.replace(/-/g,"")}`};
+    }
+    const manualOp=manualAddOperationRef.current;
+    const mode=await sbResolverModoOperacion("RECEPCION",user);
+    if(mode==="transactional"){
+      try{
+        const item={tipo:"create",codigo:prod.codigo,nombre:prod.nombre,marca:prod.marcaNombre,
+          marcaId:prod.marcaId,stock:prod.stock,stockSumado:prod.stock,precio:prod.precio,
+          categoria:prod.categoria,producto:{...prod,id:undefined}};
+        let cargaManual={
+          id:manualOp.cargaId,ts:manualOp.createdAt,fecha:prod.fecha,hora:new Date(manualOp.createdAt).toLocaleTimeString("es-BO",{hour:"2-digit",minute:"2-digit"}),
+          tipo:"MANUAL",usuario:user?.usuario,nombre:user?.nombre,rol:user?.rol,
+          marcaId:prod.marcaId,marcaNombre:prod.marcaNombre,
+          resumen:`Carga manual: ${prod.nombre} (${prod.codigo})`,totalItems:1,nuevos:1,actualizados:0,
+          items:[item],operationId:manualOp.operationId,engine:"transactional",
+        };
+        const blob=await generarExcelEvidenciaManual([{...prod}],prod.marcaNombre);
+        const archivoNombre=`manual_${prod.codigo}_${String(prod.fecha||hoy()).replace(/\//g,"-")}.xlsx`;
+        const archivoUrl=await sbSubirEvidencia(blob,archivoNombre,cargaManual.id);
+        if(archivoUrl) cargaManual={...cargaManual,archivoNombre,archivoUrl};
+        await sbImportacionTransaccional(manualOp.operationId,cargaManual,user);
+        const invNube=await sbCargarInventario();
+        if(invNube) setInv(invNube);
+        setCargas(prev=>prev.some(c=>c.id===cargaManual.id)?prev:[cargaManual,...prev]);
+        const confirmado=(invNube||[]).find(p=>p.codigo===prod.codigo)||prod;
+        drive.syncProducto(confirmado);
+        manualAddOperationRef.current=null;
+        setFInv({marcaId:"",nombre:"",categoria:"",precio:"",stock:"",fecha:hoy(),codigoManual:""});
+        setShInv(false);
+        setTimeout(()=>imprimirConCantidad(confirmado,marca?.nombre||"Toscana House"),300);
+      }catch(e){
+        alert(`${e?.message||"No se pudo confirmar la recepción"}\n\nNo se creó un producto parcial.`);
+      }
+      return;
+    }
     setInv(p=>[...p,prod]);
     drive.syncProducto(prod);
     syncConRespaldo("producto", prod, ()=>sbGuardarProducto(prod)); // guardar en nube
@@ -13416,12 +14269,14 @@ function App(){
       const nombre = `manual_${prod.codigo}_${hoy().replace(/\//g,"-")}.xlsx`;
       registrarCarga(cargaManual, blob, nombre);
     });
+    if(mode==="shadow") sbRegistrarShadow(manualOp.operationId,"RECEPCION",{...cargaManual,items:cargaManual.items},user);
+    manualAddOperationRef.current=null;
     setFInv({marcaId:"",nombre:"",categoria:"",precio:"",stock:"",fecha:hoy(),codigoManual:""});
     setShInv(false);
     setTimeout(()=>imprimirConCantidad(prod, marca?.nombre||"Toscana House"), 300);
   }
 
-  function darBaja(){
+  async function darBaja(){
     const cod=bajaCod.trim().toUpperCase();
     let prod=inv.find(i=>i.codigo.toUpperCase()===cod)||inv.find(i=>limpiarCod(i.codigo)===limpiarCod(cod));
     // Fallback: si no existe exacto, buscar variantes con ese prefijo (-A, -B, -C...)
@@ -13444,23 +14299,40 @@ function App(){
     if(!window.confirm(`¿Confirmar baja de "${prod.nombre}" (${cod})?\nStock actual: ${stockAntes} → ${stockDespues}${motivo?`\nMotivo: ${motivo}`:""}`)){
       return;
     }
-    registrarBaja(prod, stockAntes, cant, motivo);
-    setBajaMsg({ok:true,msg:`✓ "${prod.nombre}": stock ${stockAntes} → ${stockDespues}`});
-    setBajaCod(""); setBajaCant(""); setBajaMotivo("");
-    setShBaja(false);
-    setBajaDetalle({
-      id:"BJ-"+Date.now(),
-      prod, cant, motivo,
-      stockAntes, stockDespues,
-      fecha: hoy(),
-      hora: new Date().toLocaleTimeString("es-BO",{hour:"2-digit",minute:"2-digit"}),
-      operador: user?.nombre||user?.usuario||"—",
-    });
+    setOperacionInvPendiente("baja");
+    try{
+      const baja=await registrarBaja(prod,stockAntes,cant,motivo);
+      bajaOperationRef.current=null;
+      setBajaMsg({ok:true,msg:`✓ "${prod.nombre}": stock ${stockAntes} → ${baja.stockDespues}`});
+      setBajaCod(""); setBajaCant(""); setBajaMotivo("");
+      setShBaja(false);
+      setBajaDetalle(baja);
+    }catch(e){
+      setBajaMsg({ok:false,msg:`${e?.message||"No se pudo confirmar la baja"}. No se modificó el formulario.`});
+    }finally{ setOperacionInvPendiente(""); }
   }
 
   // Dar de baja — SOLO Inventario. No genera retiro (eso es exclusivo de Caja).
   // Permite baja parcial (ej. para corregir stock duplicado) y un motivo/detalle.
-  function registrarBaja(prod, stockAntes, cant, motivo){
+  async function registrarBaja(prod, stockAntes, cant, motivo){
+    const key=`${prod.id}|${cant}|${motivo}`;
+    if(!bajaOperationRef.current||bajaOperationRef.current.key!==key){
+      bajaOperationRef.current={key,operationId:thUUID(),id:`BJ-${Date.now()}`,createdAt:Date.now()};
+    }
+    const {operationId,id,createdAt}=bajaOperationRef.current;
+    const mode=await sbResolverModoOperacion("BAJA",user);
+    if(mode==="transactional"){
+      const result=await sbMovimientoTransaccional("th_registrar_baja",operationId,{
+        id,prodId:prod.id,codigo:prod.codigo,cantidad:cant,motivo,
+      },user);
+      setInv(p=>p.map(i=>i.id===prod.id?{...i,stock:result.stockDespues}:i));
+      const baja={id:result.entityId||id,operationId,engine:"transactional",prod,cant,motivo,
+        stockAntes:result.stockAntes,stockDespues:result.stockDespues,fecha:hoy(),hora:hora(),
+        operador:user?.nombre||user?.usuario||"—"};
+      setBajasLog(prev=>[baja,...prev]);
+      rtBroadcast("inv_update",{p:{id:prod.id,stock:result.stockDespues}});
+      return baja;
+    }
     const stockDespues = Math.max(0, stockAntes - cant);
     setInv(p=>p.map(i=>i.id===prod.id?{...i,stock:stockDespues}:i));
     syncConRespaldo("stock", {prodId:prod.id, stock:stockDespues}, ()=>sbActualizarStock(prod.id, stockDespues));
@@ -13488,11 +14360,15 @@ function App(){
       stockAntes, stockDespues,
     }, user);
     setBajasLog(prev=>[bajaEvt,...prev]);
+    if(mode==="shadow") sbRegistrarShadow(operationId,"BAJA",{prodId:prod.id,codigo:prod.codigo,cantidad:cant,motivo},user);
+    return {...bajaEvt,id,operationId,engine:"legacy",prod,cant,stockAntes,stockDespues,
+      fecha:hoy(),hora:new Date(createdAt).toLocaleTimeString("es-BO",{hour:"2-digit",minute:"2-digit"}),
+      operador:user?.nombre||user?.usuario||"—"};
   }
 
   // Reposición de stock — para etiquetas/códigos ya existentes (no crea
   // un producto nuevo ni una etiqueta nueva, solo suma unidades).
-  function reponerStock(){
+  async function reponerStock(){
     const cod=repCod.trim().toUpperCase();
     const prod=inv.find(i=>i.codigo.toUpperCase()===cod)||inv.find(i=>limpiarCod(i.codigo)===limpiarCod(cod));
     if(!prod){setRepMsg({ok:false,msg:`"${cod}" no encontrado`});return;}
@@ -13503,6 +14379,25 @@ function App(){
     // stockInicial = total histórico recibido → también sube al reponer
     const iniAntes=Number(prod.stockInicial)||stockAntes;
     const iniDespues=iniAntes+cant;
+    const key=`${prod.id}|${cant}`;
+    if(!repOperationRef.current||repOperationRef.current.key!==key){
+      repOperationRef.current={key,operationId:thUUID()};
+    }
+    const operationId=repOperationRef.current.operationId;
+    const mode=await sbResolverModoOperacion("REPOSICION",user);
+    setOperacionInvPendiente("reposicion");
+    try{
+      if(mode==="transactional"){
+        const result=await sbMovimientoTransaccional("th_registrar_reposicion",operationId,{
+          prodId:prod.id,codigo:prod.codigo,cantidad:cant,motivo:"Reposición manual de stock",
+        },user);
+        setInv(p=>p.map(i=>i.id===prod.id?{...i,stock:result.stockDespues,stockInicial:result.stockInicial}:i));
+        rtBroadcast("inv_update",{p:{id:prod.id,stock:result.stockDespues,stockInicial:result.stockInicial}});
+        repOperationRef.current=null;
+        setRepMsg({ok:true,msg:`✓ "${prod.nombre}": stock ${result.stockAntes} → ${result.stockDespues}`});
+        setRepCod(""); setRepCant("");
+        return;
+      }
     setInv(p=>p.map(i=>i.id===prod.id?{...i,stock:stockDespues,stockInicial:iniDespues}:i));
     syncConRespaldo("stock", {prodId:prod.id, stock:stockDespues, stock_inicial:iniDespues}, ()=>sbActualizarProductoPatch(prod.id, {stock:stockDespues, stock_inicial:iniDespues}));
     logAudit("STOCK_ADD", {
@@ -13511,41 +14406,60 @@ function App(){
       marca: prod.marcaNombre||"—",
       cantidad: cant, stockAntes, stockDespues,
     }, user);
+    if(mode==="shadow") sbRegistrarShadow(operationId,"REPOSICION",{prodId:prod.id,codigo:prod.codigo,cantidad:cant},user);
+    repOperationRef.current=null;
     setRepMsg({ok:true,msg:`✓ "${prod.nombre}": stock ${stockAntes} → ${stockDespues}`});
     setRepCod(""); setRepCant("");
+    }catch(e){
+      setRepMsg({ok:false,msg:`${e?.message||"No se pudo confirmar la reposición"}. No se modificó el formulario.`});
+    }finally{ setOperacionInvPendiente(""); }
   }
 
-  function modificarPrecio(){
+  async function modificarPrecio(){
     const cod=repCod.trim().toUpperCase();
     const prod=inv.find(i=>i.codigo.toUpperCase()===cod)||inv.find(i=>limpiarCod(i.codigo)===limpiarCod(cod));
     if(!prod){setRepMsg({ok:false,msg:`"${cod}" no encontrado`});return;}
     const nuevoPrecio=Number(repPrecio);
     if(!nuevoPrecio||nuevoPrecio<=0){setRepMsg({ok:false,msg:"Ingresa un precio válido"});return;}
     const precioAntes=prod.precio||0;
-    const prodActualizado={...prod,precio:nuevoPrecio};
-    setInv(p=>p.map(i=>i.id===prod.id?prodActualizado:i));
-    syncConRespaldo("producto", prodActualizado, ()=>sbGuardarProducto(prodActualizado));
-    logAudit("PRECIO_EDIT", {
-      resumen: `Modificación de precio: ${prod.nombre} (${prod.codigo}) Bs ${precioAntes} → Bs ${nuevoPrecio}`,
-      codigo: prod.codigo, nombre: prod.nombre,
-      marca: prod.marcaNombre||"—",
-      precioAntes, precioNuevo: nuevoPrecio,
-    }, user);
-    setRepMsg({ok:true,msg:`✓ "${prod.nombre}": precio Bs ${precioAntes} → Bs ${nuevoPrecio}`});
-    setRepCod(""); setRepPrecio("");
+    setOperacionInvPendiente("precio");
+    try{
+      await handleEditarProducto(prod.id,{precio:nuevoPrecio});
+      setRepMsg({ok:true,msg:`✓ "${prod.nombre}": precio Bs ${precioAntes} → Bs ${nuevoPrecio}`});
+      setRepCod(""); setRepPrecio("");
+    }catch(e){
+      setRepMsg({ok:false,msg:e?.message||"No se pudo confirmar el precio"});
+    }finally{ setOperacionInvPendiente(""); }
   }
 
   // Buffer de importación para consolidar en un solo evento de auditoría
-  const _importBuf = useRef({items:[], sbItems:[], ts:0, timer:null, archivo:null, archivoNombre:null});
+  const _importBuf = useRef({items:[], sbItems:[], ts:0, timer:null, archivo:null, archivoNombre:null, operationId:null});
 
   async function handleEditarProducto(prodId, campos){
     const prev = inv.find(p=>p.id===prodId);
+    if(!prev) throw new Error("Producto no encontrado");
     const { _motivo, ...rest } = campos; // _motivo es solo para auditoría, no es columna
+    const opKey=JSON.stringify({prodId,campos});
+    const operationId=productEditOperations.current[opKey]||thUUID();
+    productEditOperations.current[opKey]=operationId;
+    const mode=await sbResolverModoOperacion("EDICION_PRODUCTO",user);
+    if(mode==="transactional"){
+      const data={prodId,codigo:prev.codigo,nombre:rest.nombre,precio:rest.precio,
+        descripcion:rest.descripcion,subcat:rest.subcat,categoria:rest.categoria,
+        stockObjetivo:rest.stock,stockInicialObjetivo:rest.stockInicial,motivo:_motivo||""};
+      const result=await sbEditarProductoTransaccional(operationId,data,user);
+      delete productEditOperations.current[opKey];
+      setInv(p=>p.map(x=>x.id===prodId?{...x,nombre:result.nombre,precio:Number(result.precio),
+        descripcion:result.descripcion||"",stock:Number(result.stock),stockInicial:Number(result.stockInicial)}:x));
+      rtBroadcast("inv_update",{p:{id:prodId,nombre:result.nombre,precio:Number(result.precio),
+        descripcion:result.descripcion||"",stock:Number(result.stock),stockInicial:Number(result.stockInicial)}});
+      return true;
+    }
     setInv(p=>p.map(x=>x.id===prodId?{...x,...rest}:x));
     // Traducir a columnas de Supabase (estado local usa stockInicial; la tabla, stock_inicial)
     const cloud = {...rest};
     if("stockInicial" in cloud){ cloud.stock_inicial = cloud.stockInicial; delete cloud.stockInicial; }
-    await sbActualizarProductoPatch(prodId, cloud);
+    await syncConRespaldo("producto_patch",{prodId,...cloud},()=>sbActualizarProductoPatch(prodId,cloud));
     const inv2 = JSON.parse(localStorage.getItem("th_inv")||"[]");
     localStorage.setItem("th_inv", JSON.stringify(inv2.map(p=>p.id===prodId?{...p,...rest}:p)));
     // Auditoría forense si fue una corrección de stock a la baja (admin)
@@ -13558,10 +14472,28 @@ function App(){
         motivo:_motivo||"", usuario:user?.nombre,
       }, user);
     }
+    delete productEditOperations.current[opKey];
+    if(mode==="shadow") sbRegistrarShadow(operationId,"EDICION_PRODUCTO",{prodId,codigo:prev.codigo,...campos},user);
+    return true;
   }
 
   async function handleEliminarProducto(prodId){
     const prod = inv.find(p=>p.id===prodId);
+    if(!prod) return false;
+    const operationId=productDeactivateOperations.current[prodId]||thUUID();
+    productDeactivateOperations.current[prodId]=operationId;
+    const mode=await sbResolverModoOperacion("DESACTIVAR_PRODUCTO",user);
+    if(mode==="transactional"){
+      try{
+        await sbDesactivarProductoTransaccional(operationId,prodId,"Retiro solicitado desde inventario",user);
+        delete productDeactivateOperations.current[prodId];
+        setInv(prev=>prev.filter(p=>p.id!==prodId));
+        return true;
+      }catch(e){
+        alert(e?.message||"No se pudo retirar el producto");
+        return false;
+      }
+    }
     setInv(prev=>prev.filter(p=>p.id!==prodId));
     // Eliminar por código (robusto frente a ids temporales) con reintento vía outbox
     if(prod?.codigo){
@@ -13571,6 +14503,9 @@ function App(){
     }
     const inv2 = JSON.parse(localStorage.getItem("th_inv")||"[]");
     localStorage.setItem("th_inv", JSON.stringify(inv2.filter(p=>p.id!==prodId)));
+    delete productDeactivateOperations.current[prodId];
+    if(mode==="shadow") sbRegistrarShadow(operationId,"DESACTIVAR_PRODUCTO",{prodId,codigo:prod.codigo},user);
+    return true;
   }
 
   async function handleEliminarCarga(cargaId){
@@ -13586,6 +14521,23 @@ function App(){
       ? `¿Eliminar esta carga?\n\nEsto revertirá el inventario:\n${resumen}\n\nEsta acción no se puede deshacer.`
       : "¿Eliminar esta carga? Esta acción no se puede deshacer.";
     if(!window.confirm(msg)) return;
+
+    const mode=await sbResolverModoOperacion("REVERSO_CARGA",user);
+    if(mode==="transactional"){
+      const operationId=cargaReversalOperations.current[cargaId]||thUUID();
+      cargaReversalOperations.current[cargaId]=operationId;
+      try{
+        await sbRevertirCargaTransaccional(operationId,cargaId,"Reversión solicitada desde registro de cargas",user);
+        delete cargaReversalOperations.current[cargaId];
+        setCargas(prev=>prev.map(c=>c.id===cargaId?{...c,revertida:true,revertidaAt:new Date().toISOString(),revertidaPor:user?.nombre}:c));
+        const invNube=await sbCargarInventario();
+        if(invNube) setInv(invNube);
+        alert("✓ Carga revertida con movimientos compensatorios. El registro se conservó para auditoría.");
+      }catch(e){
+        alert(`${e?.message||"No se pudo revertir la carga"}\n\nNo se aplicó una reversión parcial.`);
+      }
+      return;
+    }
 
     // Códigos de productos nuevos que realmente existen en el inventario.
     // Se elimina por CÓDIGO (no por id): el id local puede ser temporal y no
@@ -13629,13 +14581,22 @@ function App(){
     }
     const c2 = JSON.parse(localStorage.getItem("th_cargas")||"[]");
     localStorage.setItem("th_cargas", JSON.stringify(c2.filter(c=>c.id!==cargaId)));
+    if(mode==="shadow") sbRegistrarShadow(thUUID(),"REVERSO_CARGA",{cargaId},user);
   }
 
-  function handleVerificarCarga(cargaId, verificado){
+  async function handleVerificarCarga(cargaId, verificado){
+    const mode=await sbResolverModoOperacion("VERIFICAR_CARGA",user);
+    if(mode==="transactional"){
+      try{
+        await sbGuardarEstadoOperativoTransaccional(thUUID(),"VERIFICAR_CARGA",{cargaId,verificado},user);
+      }catch(e){alert(`${e?.message||"No se pudo registrar la verificación"}\n\nNo se aplicó ningún cambio.`);return false;}
+    }
     setCargas(prev=>prev.map(c=>c.id===cargaId
       ? {...c, verificado, verificadoTs:verificado?new Date().toISOString():null, verificadoPor:verificado?user.nombre:null}
       : c));
-    sbMarcarCargaVerificada(cargaId, verificado, user.nombre);
+    if(mode!=="transactional") sbMarcarCargaVerificada(cargaId,verificado,user.nombre);
+    if(mode==="shadow") sbRegistrarShadow(thUUID(),"VERIFICAR_CARGA",{cargaId,verificado},user);
+    return true;
   }
 
   function handleImportarExcel({tipo, codigo, stock, producto, descripcion, nombre, subcat, color="", talla=""}){
@@ -13660,17 +14621,13 @@ function App(){
       if(descripcion) patch.descripcion = descripcion;
       if(subcat)      patch.subcat      = subcat;
       setInv(prev=>prev.map(p=>p.codigo===codigo?{...p,...patch}:p));
-      if(prod){
-        if(stock > 0) syncConRespaldo("stock", {prodId:prod.id, stock:stockNuevo, stock_inicial:iniNuevo}, ()=>sbActualizarProductoPatch(prod.id, {stock:stockNuevo, stock_inicial:iniNuevo}));
-        if(patch.descripcion||patch.subcat||patch.nombre){
-          syncConRespaldo("producto_patch", {prodId:prod.id,...patch}, ()=>sbActualizarProductoPatch(prod.id, patch));
-        }
-      }
+      if(prod) _importBuf.current.sbItems.push({...prod,...patch});
       // buffer audit — incluir talla y color para que RegistroCargas pueda imprimir correctamente
       const {t:_t, c:_c} = _parseDescTC(descripcion);
       _importBuf.current.items.push({tipo:"update", codigo, nombre:prod?.nombre||codigo,
         marca:prod?.marcaNombre||"—", marcaId:prod?.marcaId??null, stockAntes, stockNuevo, stockSumado:stock,
-        talla:talla||_t||subcat||"", color:color||_c||""});
+        talla:talla||_t||subcat||"", color:color||_c||"",
+        producto:prod?{...prod,...patch}:null});
     } else if(tipo==="create"){
       const localId = nextLocalId();
       const newProd = { id: localId, ...producto };
@@ -13682,47 +14639,64 @@ function App(){
       _importBuf.current.items.push({tipo:"create", codigo:producto.codigo,
         nombre:producto.nombre, marca:producto.marcaNombre||"—", marcaId:producto.marcaId??null,
         stock:producto.stock, precio:producto.precio, categoria:producto.categoria,
-        talla:_t||producto.subcat||"", color:_c||""});
+        talla:_t||producto.subcat||"", color:_c||"",producto});
     }
     // Flush: batch Supabase + audit después de 800ms sin más llamadas
     clearTimeout(_importBuf.current.timer);
     _importBuf.current.timer = setTimeout(async ()=>{
-      // ── Batch sync a Supabase (grupos de 50) ──────────────────────
-      // Red de seguridad: si un lote falla, cada producto va al outbox para
-      // reintento automático (re-upsert por código = idempotente). Antes el
-      // resultado se ignoraba y los productos que no llegaban a la nube se
-      // perdían silenciosamente (causa raíz de los códigos faltantes).
       const sbItems = _importBuf.current.sbItems.splice(0);
-      for(let i=0; i<sbItems.length; i+=50){
-        const chunk = sbItems.slice(i, i+50);
-        const ok = await sbGuardarProductosBatch(chunk);
-        if(!ok) chunk.forEach(p=>pushToOutbox("producto", p));
-      }
-      const buf = _importBuf.current.items;
+      const buf = _importBuf.current.items.splice(0);
       if(buf.length===0) return;
+      const archivoBlob = _importBuf.current.archivo;
+      const archivoNombre = _importBuf.current.archivoNombre;
+      const operationId=_importBuf.current.operationId||thUUID();
+      _importBuf.current.operationId=null;
+      _importBuf.current.archivo = null;
+      _importBuf.current.archivoNombre = null;
       const nuevos = buf.filter(i=>i.tipo==="create").length;
       const actualizados = buf.filter(i=>i.tipo==="update").length;
       const marcas = [...new Set(buf.map(i=>i.marca).filter(Boolean))].join(", ");
       const marcaIds = [...new Set(buf.map(i=>i.marcaId).filter(id=>id!=null))];
-      logAudit("IMPORT", {
-        resumen: `Importación: ${nuevos} nuevos + ${actualizados} actualizados · ${marcas}`,
-        nuevos, actualizados,
-        totalItems: buf.length,
-        marcas,
-        items: buf,
-      }, user);
-      const carga = crearCarga("IMPORT", user, {
+      let carga = crearCarga("IMPORT", user, {
         marcaId: marcaIds.length===1 ? marcaIds[0] : null,
         marcaNombre: marcas,
         resumen: `Importación: ${nuevos} nuevos + ${actualizados} actualizados · ${marcas}`,
         nuevos, actualizados, totalItems: buf.length, items: buf,
       });
-      const archivoBlob = _importBuf.current.archivo;
-      const archivoNombre = _importBuf.current.archivoNombre;
-      registrarCarga(carga, archivoBlob, archivoNombre);
-      _importBuf.current.items = [];
-      _importBuf.current.archivo = null;
-      _importBuf.current.archivoNombre = null;
+      const mode=await sbResolverModoOperacion("IMPORTACION",user);
+
+      if(mode==="transactional"){
+        try{
+          if(archivoBlob&&archivoNombre){
+            const url=await sbSubirEvidencia(archivoBlob,archivoNombre,carga.id);
+            if(url) carga={...carga,archivoUrl:url,archivoNombre};
+          }
+          const cargaSegura={...carga,operationId,items:buf,engine:"transactional"};
+          await sbImportacionTransaccional(operationId,cargaSegura,user);
+          setCargas(prev=>prev.some(c=>c.id===cargaSegura.id)?prev:[cargaSegura,...prev]);
+          const invNube=await sbCargarInventario();
+          if(invNube) setInv(invNube);
+          alert(`✓ Importación confirmada: ${nuevos} nuevos + ${actualizados} actualizados.`);
+        }catch(e){
+          const invNube=await sbCargarInventario();
+          if(invNube) setInv(invNube);
+          alert(`${e?.message||"La importación no fue confirmada"}\n\nNo se conservó ninguna carga parcial.`);
+        }
+        return;
+      }
+
+      // Motor legacy: batch idempotente por código y outbox de respaldo.
+      for(let i=0;i<sbItems.length;i+=50){
+        const chunk=sbItems.slice(i,i+50);
+        const ok=await sbGuardarProductosBatch(chunk);
+        if(!ok) chunk.forEach(p=>pushToOutbox("producto",p));
+      }
+      logAudit("IMPORT",{
+        resumen:`Importación: ${nuevos} nuevos + ${actualizados} actualizados · ${marcas}`,
+        nuevos,actualizados,totalItems:buf.length,marcas,items:buf,
+      },user);
+      await registrarCarga({...carga,operationId,engine:"legacy"},archivoBlob,archivoNombre);
+      if(mode==="shadow") sbRegistrarShadow(operationId,"IMPORTACION",{...carga,items:buf},user);
     }, 1200);
   }
 
@@ -13739,6 +14713,13 @@ function App(){
   // ── Forzar sincronización completa del inventario local → Supabase ─────
   // Útil cuando importaciones previas no llegaron a la nube.
   async function forzarSyncInventario(onProgress){
+    const mode=await sbResolverModoOperacion("RECUPERACION_INVENTARIO",user);
+    if(mode==="transactional"){
+      return {
+        ok:0,fail:inv.length,total:inv.length,blocked:true,
+        message:"La subida total está bloqueada en modo seguro. Usa una importación auditada o recarga desde Supabase.",
+      };
+    }
     const productos = inv;
     let ok = 0, fail = 0;
     const CHUNK = 50;
@@ -13751,12 +14732,34 @@ function App(){
     return { ok, fail, total: productos.length };
   }
 
-  function handleVenta(v){
-    const id=`V${Date.now()}`;
-    const vf={...v,id,fecha:hoy(),hora:hora(),mk:MK,mes,anio};
+  async function handleVenta(v){
+    const operationId=v.operationId||thUUID();
+    const operationCreatedAt=Number(v.operationCreatedAt)||Date.now();
+    const operationDate=new Date(operationCreatedAt);
+    const fechaOperacion=`${operationDate.getFullYear()}-${String(operationDate.getMonth()+1).padStart(2,"0")}-${String(operationDate.getDate()).padStart(2,"0")}`;
+    const horaOperacion=operationDate.toLocaleTimeString("es-BO",{hour:"2-digit",minute:"2-digit"});
+    const id=v.id||`V${operationId.replace(/-/g,"").toUpperCase()}`;
+    const items=(v.items||[]).map((it,idx)=>({...it,lineKey:it.lineKey||`${operationId}:${idx+1}`}));
+    const mode=await sbResolverModoOperacion("VENTA",user);
+    const vf={...v,items,id,fecha:fechaOperacion,hora:horaOperacion,mk:MK,mes,anio,
+      operationId,operationCreatedAt,engine:mode==="transactional"?"transactional":"legacy",
+      deviceId:thDeviceId(),clientVersion:thClientVersion()};
+
+    if(mode==="transactional"){
+      const result=await sbRegistrarVentaTransaccional(operationId,vf,user);
+      const confirmada={...vf,id:result.ventaId||id,engine:"transactional"};
+      setVentas(p=>p.some(x=>x.id===confirmada.id)?p:[...p,confirmada]);
+      const invNube=await sbCargarInventario();
+      if(invNube) setInv(invNube);
+      drive.syncVenta(confirmada);
+      const {etiquetaImg,...ventaBroadcast}=confirmada;
+      rtBroadcast("venta_nueva",{v:ventaBroadcast});
+      return confirmada;
+    }
+
     setVentas(p=>[...p,vf]);
     const stockCambios = [];
-    v.items.forEach(it=>{
+    items.forEach(it=>{
       const stockAntes = inv.find(i=>i.id===it.prodId)?.stock||0;
       const stockDespues = Math.max(0, stockAntes - it.cantidad);
       setInv(p=>p.map(i=>i.id===it.prodId?{...i,stock:stockDespues}:i));
@@ -13766,7 +14769,7 @@ function App(){
     drive.syncVenta(vf);
     syncConRespaldo("venta", vf, ()=>sbGuardarVenta(vf));
     // ── Audit forense ─────────────────────────────────────────────
-    const marcas = [...new Set(v.items.map(i=>i.marcaNombre))].join(", ");
+    const marcas = [...new Set(items.map(i=>i.marcaNombre))].join(", ");
     logAudit("VENTA", {
       resumen: `Venta Bs ${v.total} · ${v.items.length} ítem(s) · ${marcas}`,
       ventaId: id,
@@ -13781,18 +14784,20 @@ function App(){
       cliente: v.clienteNombre||"—",
       canal: v.canal||"Tienda",
       marcas,
-      items: v.items.map(it=>({
+      items: items.map(it=>({
         codigo: it.codigo, nombre: it.nombre,
         marca: it.marcaNombre, cantidad: it.cantidad,
         precioUnit: it.precioUnit, subtotal: it.subtotal,
       })),
       stockCambios,
     }, user);
+    if(mode==="shadow") sbRegistrarShadow(operationId,"VENTA",vf,user);
     return vf;
   }
 
-  function handleVentaHistorica(v){
-    const id = `VH${Date.now()}`;
+  async function handleVentaHistorica(v){
+    const operationId=v.operationId||thUUID();
+    const id = v.id||`VH${operationId.replace(/-/g,"").toUpperCase()}`;
     const fechaISO = v.fecha; // "2026-04-15"
     // ISO month is 1-indexed; app state mes is 0-indexed → subtract 1 for mk and mes fields
     const [anioH, mesISO] = fechaISO.split("-").map(Number);
@@ -13800,6 +14805,7 @@ function App(){
     const mkH  = mkKey(mesH, anioH); // mk correcto para liquidaciones históricas
     const vf = {
       ...v,
+      operationId,engine:"legacy",deviceId:thDeviceId(),clientVersion:thClientVersion(),
       id,
       fecha: fechaISO,
       hora: v.turno || "—",
@@ -13807,7 +14813,18 @@ function App(){
       mes: mesH,
       anio: anioH,
       origen: "HISTORICA",
+      items:(v.items||[]).map((it,idx)=>({...it,lineKey:it.lineKey||`${operationId}:${idx+1}`})),
     };
+    const mode=await sbResolverModoOperacion("VENTA_HISTORICA",user);
+    if(mode==="transactional"){
+      const segura={...vf,engine:"transactional"};
+      const result=await sbRegistrarVentaTransaccional(operationId,segura,user);
+      const confirmada={...segura,id:result.ventaId||id};
+      setVentas(p=>p.some(x=>x.id===confirmada.id)?p:[...p,confirmada]);
+      const invNube=await sbCargarInventario();
+      if(invNube) setInv(invNube);
+      return confirmada;
+    }
     setVentas(p => [...p, vf]);
     const stockCambios = [];
     v.items.forEach(it => {
@@ -13835,10 +14852,12 @@ function App(){
       })),
       stockCambios,
     }, user);
+    if(mode==="shadow") sbRegistrarShadow(operationId,"VENTA_HISTORICA",vf,user);
     return vf;
   }
 
-  function handleImportarVentasLibres(filas){
+  async function handleImportarVentasLibres(filas,options={}){
+    const batchOperationId=options.operationId||thUUID();
     // Agrupar por marca + fecha + turno + método de pago — cada combinación
     // única es una venta (la venta solo puede tener un metodoPago/fecha).
     const grupos = {};
@@ -13847,10 +14866,11 @@ function App(){
       if(!grupos[k]) grupos[k]={marcaId:f.marcaId,marcaNombre:f.marcaNombre,fecha:f.fecha,turno:f.turno,metodoPago:f.metodoPago,items:[]};
       grupos[k].items.push(f);
     });
+    const ventasLibres=[];
     let counter = 0;
     Object.values(grupos).forEach(g=>{
       counter++;
-      const id = `VL${Date.now()}${counter}`;
+      const id = `VL${batchOperationId.replace(/-/g,"").toUpperCase()}_${counter}`;
       const items = g.items.map(f=>({
         prodId: null,
         codigo: "LIBRE",
@@ -13873,6 +14893,20 @@ function App(){
         origen:"IMPORT_LIBRE",
         items,
       };
+      ventasLibres.push(vf);
+    });
+
+    const mode=await sbResolverModoOperacion("IMPORT_VENTAS_LIBRES",user);
+    if(mode==="transactional"){
+      await sbImportarVentasLibresTransaccional(batchOperationId,{filas:filas.length,ventas:ventasLibres},user);
+      const confirmadas=ventasLibres.map(v=>({...v,parentOperationId:batchOperationId,engine:"transactional"}));
+      setVentas(prev=>[...prev,...confirmadas.filter(v=>!prev.some(x=>x.id===v.id))]);
+      return counter;
+    }
+
+    ventasLibres.forEach((vf,idx)=>{
+      const operationId=thUUID();
+      vf={...vf,operationId,engine:"legacy",items:vf.items.map((it,lineIdx)=>({...it,lineKey:`${operationId}:${lineIdx+1}`}))};
       setVentas(p=>[...p,vf]);
       syncConRespaldo("venta", vf, ()=>sbGuardarVenta(vf));
       logAudit("IMPORT_VENTAS_LIBRES",{
@@ -13880,12 +14914,23 @@ function App(){
         ventaId:id, total, marca:g.marcaNombre, fecha:g.fecha,
       }, user);
     });
+    if(mode==="shadow") sbRegistrarShadow(batchOperationId,"IMPORT_VENTAS_LIBRES",{filas:filas.length,ventas:ventasLibres},user);
     return counter;
   }
 
-  function handleCambio(cambio){
+  async function handleCambio(cambio){
+    const operationId=cambio.operationId||thUUID();
+    const mode=await sbResolverModoOperacion("CAMBIO",user);
+    const cambioFinal={...cambio,operationId,engine:mode==="transactional"?"transactional":"legacy"};
+    if(mode==="transactional"){
+      const result=await sbRegistrarCambioTransaccional(operationId,cambioFinal,user);
+      const confirmado={...cambioFinal,id:result.cambioId||cambioFinal.id,engine:"transactional"};
+      const invNube=await sbCargarInventario();
+      if(invNube) setInv(invNube);
+      return confirmado;
+    }
     // Restaurar stock de items devueltos
-    cambio.itemsDevueltos.forEach(it=>{
+    cambioFinal.itemsDevueltos.forEach(it=>{
       const prod=inv.find(i=>i.id===it.prodId);
       if(!prod) return;
       const nuevoStock=prod.stock+it.cantidad;
@@ -13893,7 +14938,7 @@ function App(){
       syncConRespaldo("stock",{prodId:it.prodId,stock:nuevoStock},()=>sbActualizarStock(it.prodId,nuevoStock));
     });
     // Descontar stock de items nuevos
-    cambio.itemsNuevos.forEach(it=>{
+    cambioFinal.itemsNuevos.forEach(it=>{
       const prod=inv.find(i=>i.id===it.prodId);
       if(!prod) return;
       const nuevoStock=Math.max(0,prod.stock-it.cantidad);
@@ -13901,14 +14946,29 @@ function App(){
       syncConRespaldo("stock",{prodId:it.prodId,stock:nuevoStock},()=>sbActualizarStock(it.prodId,nuevoStock));
     });
     logAudit("CAMBIO",{
-      resumen:`Cambio ${cambio.id} · Venta origen ${cambio.ventaOriginalId} · Dif Bs ${cambio.diferencia.toFixed(2)}`,
-      ...cambio,
+      resumen:`Cambio ${cambioFinal.id} · Venta origen ${cambioFinal.ventaOriginalId} · Dif Bs ${cambioFinal.diferencia.toFixed(2)}`,
+      ...cambioFinal,
     },user);
+    if(mode==="shadow") sbRegistrarShadow(operationId,"CAMBIO",cambioFinal,user);
+    return cambioFinal;
   }
 
-  function handleAnularVenta(ventaId){
+  async function handleAnularVenta(ventaId,options={}){
     const v = ventas.find(x=>x.id===ventaId);
     if(!v||v.anulada) return;
+    const operationId=options.operationId||thUUID();
+    const motivo=options.motivo||"Anulación desde detalle de venta";
+    const mode=await sbResolverModoOperacion("ANULACION",user);
+    if(mode==="transactional"){
+      await sbAnularVentaTransaccional(operationId,ventaId,motivo,user);
+      const vAnulada={...v,anulada:true,fechaAnulacion:hoy(),operationIdAnulacion:operationId};
+      setVentas(p=>p.map(x=>x.id===ventaId?vAnulada:x));
+      setVentaDetalle(vAnulada);
+      const invNube=await sbCargarInventario();
+      if(invNube) setInv(invNube);
+      rtBroadcast("venta_anulada",{id:ventaId});
+      return vAnulada;
+    }
     const stockCambios = [];
     v.items.forEach(it=>{
       const actual = inv.find(i=>i.id===it.prodId)?.stock||0;
@@ -13928,22 +14988,84 @@ function App(){
       items: v.items.map(it=>({codigo:it.codigo, nombre:it.nombre, marca:it.marcaNombre, cantidad:it.cantidad, subtotal:it.subtotal})),
       stockCambios,
     }, user);
+    if(mode==="shadow") sbRegistrarShadow(operationId,"ANULACION",{ventaId,motivo},user);
+    return vAnulada;
   }
 
   function toggleAlq(marcaId){
     const e=alqMes.find(a=>a.marcaId===marcaId);
-    if(e) setAlq(p=>p.map(a=>a.marcaId===marcaId&&a.mes===mes&&a.anio===anio?{...a,pagado:!a.pagado,fechaPago:!a.pagado?hoy():""}:a));
-    else  setAlq(p=>[...p,{id:Date.now(),marcaId,mes,anio,pagado:true,fechaPago:hoy()}]);
+    const next=e
+      ? {...e,pagado:!e.pagado,fechaPago:!e.pagado?hoy():""}
+      : {id:`ALQ-${mkKey(mes,anio)}-${marcaId}`,marcaId,mes,anio,pagado:true,fechaPago:hoy()};
+    if(e) setAlq(p=>p.map(a=>a.marcaId===marcaId&&a.mes===mes&&a.anio===anio?next:a));
+    else setAlq(p=>[...p,next]);
+    guardarAlquilerEstado(next);
   }
 
   const [cfgLiqVersion, setCfgLiqVersion] = useState(0);
   function bumpCfgLiq(){ setCfgLiqVersion(v=>v+1); }
 
+  // La nube es la fuente compartida de configuraciones contables. En legacy
+  // se conserva el comportamiento local; al activar el flag transaccional,
+  // cada edición se serializa, audita y queda en outbox si falla la red.
+  useEffect(()=>{
+    let mounted=true;
+    sbCargarConfiguracionFinanciera().then(data=>{
+      if(!mounted||!data) return;
+      data.config.forEach(r=>{
+        try{localStorage.setItem(`th_liq_cfg_${r.marca_id}`,JSON.stringify({
+          pctTarjeta:Number(r.pct_tarjeta),pctComision:Number(r.pct_comision),alquiler:Number(r.alquiler),
+        }));}catch{}
+      });
+      data.periodos.forEach(r=>{
+        try{localStorage.setItem(`th_liq_gastos_${r.marca_id}_${r.mk}`,JSON.stringify(r.gastos||[]));}catch{}
+      });
+      if(data.alquileres.length>0) setAlq(data.alquileres.map(r=>({
+        id:r.id,marcaId:r.marca_id,mes:r.mes,anio:r.anio,pagado:r.pagado,fechaPago:r.fecha_pago||"",
+      })));
+      bumpCfgLiq();
+    });
+
+    const onFinancialState=event=>{
+      const tipo=event?.detail?.tipo;
+      const data=event?.detail?.data;
+      if(!tipo||!data) return;
+      const operationId=thUUID();
+      const context=thOperationContext(user);
+      thEnqueueFinancialSave(async()=>{
+        const mode=await sbResolverModoOperacion(tipo,user);
+        if(mode==="transactional"){
+          try{return await sbGuardarConfiguracionFinancieraTransaccional(operationId,tipo,data,user);}
+          catch(e){
+            if(!getOutbox().some(op=>op.tipo==="estadoFinanciero"&&op.payload?.operationId===operationId))
+              pushToOutbox("estadoFinanciero",{operationId,tipo,data,context});
+            throw e;
+          }
+        }
+        if(mode==="shadow") await sbRegistrarShadow(operationId,tipo,data,user);
+        return {ok:true,engine:mode};
+      }).catch(e=>console.warn("Configuración financiera pendiente:",e.message));
+    };
+    window.addEventListener("th-financial-state",onFinancialState);
+    return ()=>{mounted=false;window.removeEventListener("th-financial-state",onFinancialState);};
+  },[user?.usuario]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const getLiq=useCallback((marcaId)=>{
     const vM=vMes.filter(v=>v.items.some(i=>i.marcaId===marcaId));
     const liq=calcLiqMarca(vM, marcaId, MK);
+    const cierre=cierres[`${MK}-${marcaId}`];
+    const s=cierre?.cerrado?cierre.snapshot:null;
+    if(s) return {
+      ...liq,bruto:Number(s.bruto)||0,brutoEf:Number(s.efectivo)||0,brutoQR:Number(s.qr)||0,
+      brutoTJ:Number(s.tarjeta)||0,descTJ:Number(s.descuentoTarjeta)||0,
+      subBanco:Number(s.subtotalBanco)||0,comision:Number(s.comision)||0,
+      alquiler:Number(s.alquiler)||0,gastos:Array.isArray(s.gastos)?s.gastos:[],
+      totalGastos:Number(s.totalGastos)||0,neto:Number(s.neto)||0,
+      cfg:s.configuracion||liq.cfg,vMarca:vM,
+      alqPagado:alqMes.find(a=>a.marcaId===marcaId)?.pagado||false,desdeSnapshot:true,
+    };
     return{...liq, vMarca:vM, alqPagado:alqMes.find(a=>a.marcaId===marcaId)?.pagado||false};
-  },[vMes, alqMes, cfgLiqVersion, MK]);
+  },[vMes, alqMes, cfgLiqVersion, MK, cierres]);
 
   const getHist=useCallback((marcaId)=>{
     const map={};
@@ -13958,6 +15080,38 @@ function App(){
     });
     return Object.values(map).sort((a,b)=>b.mk.localeCompare(a.mk));
   },[ventas]);
+
+  async function cambiarCierreMensual(marcaId,cerrado){
+    const key=`${MK}-${marcaId}`;
+    const mode=await sbResolverModoOperacion("CIERRE_MENSUAL",user);
+    if(mode==="transactional"){
+      try{await thEsperarFinanzasPendientes();}
+      catch(e){alert(`${e?.message||"Hay una configuración financiera sin confirmar"}\n\nEl cierre no se realizó.`);return false;}
+      if(getOutbox().some(op=>op.tipo==="estadoFinanciero")){
+        alert("Hay cambios de comisión, alquiler o gastos pendientes de sincronizar. Reintenta la cola antes de cerrar el mes.");
+        return false;
+      }
+    }
+    const liq=getLiq(marcaId);
+    const snapshot={
+      bruto:liq.bruto,efectivo:liq.brutoEf,qr:liq.brutoQR,tarjeta:liq.brutoTJ,
+      descuentoTarjeta:liq.descTJ,subtotalBanco:liq.subBanco,comision:liq.comision,
+      alquiler:liq.alquiler,gastos:liq.gastos,totalGastos:liq.totalGastos,neto:liq.neto,
+      configuracion:liq.cfg,ventasIds:liq.vMarca.map(v=>v.id),ventasCantidad:liq.vMarca.length,
+      calculadoAt:new Date().toISOString(),
+    };
+    const data={id:key,marcaId,mk:MK,cerrado,fecha:cerrado?hoy():null,snapshot};
+    if(mode==="transactional"){
+      try{await sbGuardarEstadoOperativoTransaccional(thUUID(),"CIERRE_MENSUAL",data,user);}
+      catch(e){alert(`${e?.message||"No se pudo cambiar el cierre"}\n\nNo se aplicó ningún cambio.`);return false;}
+    }else{
+      const legacy={cerrado,fecha:data.fecha,mk:MK,marca_id:marcaId,metadata:{snapshot}};
+      syncConRespaldo("cierre",{key,data:legacy},()=>sbGuardarCierre(key,legacy));
+      if(mode==="shadow") sbRegistrarShadow(thUUID(),"CIERRE_MENSUAL",data,user);
+    }
+    setCierres(p=>({...p,[key]:{cerrado,fecha:data.fecha,mk:MK,snapshot}}));
+    return true;
+  }
 
   const TABS_ALL=[
     {id:"inicio",        icon:"⊞", label:"Inicio"},
@@ -13996,7 +15150,7 @@ function App(){
   if (!user) return <LoginScreen onLogin={login}/>;
 
   // Portal de marca (lectura)
-  if (user.rol === "marca") return <BrandPortal user={user} ventas={ventas} inv={inv} cargas={cargasCompletas} retiros={retiros} logout={logout} descuentos={descuentos} onGuardarDescuento={guardarDescuentoMarca} descCodigos={descCodigos} onGuardarDescCodigo={guardarDescuentoCodigo} onQuitarDescCodigo={eliminarDescuentoCodigo}/>;
+  if (user.rol === "marca") return <BrandPortal user={user} ventas={ventas} inv={inv} cargas={cargasCompletas} retiros={retiros} logout={logout} descuentos={descuentos} onGuardarDescuento={guardarDescuentoMarca} descCodigos={descCodigos} onGuardarDescCodigo={guardarDescuentoCodigo} onQuitarDescCodigo={eliminarDescuentoCodigo} financialVersion={cfgLiqVersion}/>;
 
   // ── Liquidaciones: métricas pre-calculadas — mixto distribuido ─────────────
   const _liqPagos   = sumPagos(vMes);
@@ -14319,10 +15473,11 @@ function App(){
             marcaId={marcaDetalle}
             inv={inv} ventas={ventas} vMes={vMes}
             mes={mes} anio={anio} MK={MK}
-            cierres={cierres} setCierres={setCierres}
+            cierres={cierres}
             getHist={getHist} getLiq={getLiq}
             auditorias={auditorias}
             onActualizarAuditoria={actualizarAuditoria}
+            onCambiarCierre={cambiarCierreMensual}
             user={user}
             retiros={retiros}
             onVentaClick={v=>setVentaDetalle(v)}
@@ -14434,7 +15589,7 @@ function App(){
               </div>
 
               {/* ── PANEL CONFIGURAR PORCENTAJES POR MARCA ── */}
-              <PctMarcasPanel onCfgChange={bumpCfgLiq}/>
+              <PctMarcasPanel onCfgChange={bumpCfgLiq} version={cfgLiqVersion}/>
 
               {/* Botones Excel + Planilla */}
               <div style={{display:"flex",gap:8,marginBottom:16,flexWrap:"wrap"}}>
@@ -14517,10 +15672,10 @@ function App(){
         )}
 
         {/* GIFT CARDS */}
-        {tab==="giftcards" && <GiftCardsTab/>}
+        {tab==="giftcards"&&<GiftCardsTab user={user}/>}
 
         {/* CAJAS */}
-        {tab==="cajas" && <CajasTab/>}
+        {tab==="cajas" && <CajasTab user={user}/>}
 
         {/* HISTORIAL */}
         {tab==="historial" && (
@@ -14582,7 +15737,9 @@ function App(){
             border:`1px solid ${(bajaMsg.ok?C.green:C.red)}40`,
             color:bajaMsg.ok?C.green:C.red,fontSize:14,fontFamily:FONT}}>{bajaMsg.msg}</div>
         )}
-        <IOSBtn onPress={darBaja} variant="danger" full disabled={!bajaCod.trim()}>Dar de Baja</IOSBtn>
+        <IOSBtn onPress={darBaja} variant="danger" full disabled={!bajaCod.trim()||operacionInvPendiente==="baja"}>
+          {operacionInvPendiente==="baja"?"Registrando de forma segura…":"Dar de Baja"}
+        </IOSBtn>
       </Sheet>
 
       {/* Sheet: Reponer Stock / Modificar Precio */}
@@ -14617,7 +15774,9 @@ function App(){
               border:`1px solid ${(repMsg.ok?C.green:C.red)}40`,
               color:repMsg.ok?C.green:C.red,fontSize:14,fontFamily:FONT}}>{repMsg.msg}</div>
           )}
-          <IOSBtn onPress={reponerStock} variant="primary" full disabled={!repCod.trim()||!repCant}>Reponer Stock</IOSBtn>
+          <IOSBtn onPress={reponerStock} variant="primary" full disabled={!repCod.trim()||!repCant||operacionInvPendiente==="reposicion"}>
+            {operacionInvPendiente==="reposicion"?"Registrando de forma segura…":"Reponer Stock"}
+          </IOSBtn>
         </>)}
 
         {repTab==="precio"&&(<>
@@ -14636,7 +15795,9 @@ function App(){
               border:`1px solid ${(repMsg.ok?C.green:C.red)}40`,
               color:repMsg.ok?C.green:C.red,fontSize:14,fontFamily:FONT}}>{repMsg.msg}</div>
           )}
-          <IOSBtn onPress={modificarPrecio} variant="primary" full disabled={!repCod.trim()||!repPrecio}>Actualizar Precio</IOSBtn>
+          <IOSBtn onPress={modificarPrecio} variant="primary" full disabled={!repCod.trim()||!repPrecio||operacionInvPendiente==="precio"}>
+            {operacionInvPendiente==="precio"?"Registrando de forma segura…":"Actualizar Precio"}
+          </IOSBtn>
         </>)}
       </Sheet>
 
@@ -14754,9 +15915,8 @@ function App(){
       {/* Sheet: Liquidación */}
       <LiqModal
         marcaId={mLiq} ventas={ventas} mes={mes} anio={anio}
-        MK={MK} cierres={cierres} setCierres={setCierres}
+        MK={MK} cierres={cierres} onCambiarCierre={cambiarCierreMensual}
         onClose={()=>setMLiq(null)}
-        syncCierre={drive.syncCierre}
         onCfgChange={bumpCfgLiq}
       />
 
@@ -14879,7 +16039,7 @@ function QRPagoPanel({total, refVenta}){
 // POS — Caja de ventas
 // ══════════════════════════════════════════════════════════
 function POS({inv,onVenta,onVerNota,user,descuentos={},descCodigos={}}){
-  var _hN135 = useState([]); var carrito = _hN135[0]; var setCarrito = _hN135[1];;
+  var _hN135 = useState(()=>{try{const d=JSON.parse(localStorage.getItem("th_pos_draft")||"null");return Array.isArray(d?.carrito)?d.carrito:[];}catch{return[];}}); var carrito = _hN135[0]; var setCarrito = _hN135[1];;
   var _hN136 = useState(""); var busq = _hN136[0]; var setBusq = _hN136[1];;
   var _hN137 = useState("efectivo"); var pago = _hN137[0]; var setPago = _hN137[1];;
   var _hN138 = useState(user?.nombre||""); var vendedor = _hN138[0]; var setVendedor = _hN138[1];;
@@ -14920,11 +16080,35 @@ function POS({inv,onVenta,onVerNota,user,descuentos={},descCodigos={}}){
   const [gcBusqMsg,    setGcBusqMsg]    = useState(null);
   const [gcMontoUsar,  setGcMontoUsar]  = useState("");
   const [metodoCompl,  setMetodoCompl]  = useState("efectivo");
+  const [gcBuscando,   setGcBuscando]   = useState(false);
   var _hN144 = useState(null); var scanStatus = _hN144[0]; var setScanStatus = _hN144[1];; // null | "leyendo" | "ok" | "notfound"
   var _hN145 = useState(""); var scanMsg = _hN145[0]; var setScanMsg = _hN145[1];;
   const [showScanner, setShowScanner] = useState(false);
+  const [cobrando, setCobrando] = useState(false);
+  const [cobroError, setCobroError] = useState("");
+  const cobroOperationRef = useRef(null);
   const inputRef=useRef();
   const fileRef=useRef();
+
+  // Un deploy o cierre accidental no debe borrar una venta todavía no confirmada.
+  useEffect(()=>{
+    try{
+      if(carrito.length){
+        localStorage.setItem("th_pos_draft",JSON.stringify({carrito,savedAt:Date.now()}));
+        sessionStorage.setItem("th_critical_ui_state_v1","1");
+      }else{
+        localStorage.removeItem("th_pos_draft");
+        sessionStorage.removeItem("th_critical_ui_state_v1");
+      }
+    }catch{}
+  },[carrito]);
+
+  // Si el cajero cambia cualquier dato después de un rechazo, el siguiente
+  // intento es una operación nueva. Si no cambia nada, conserva operationId.
+  useEffect(()=>{
+    cobroOperationRef.current=null;
+    setCobroError("");
+  },[carrito,pago,pagoMixto,montosMixtos,pagoGC,gcEncontrado,gcMontoUsar,metodoCompl,cliente,clienteTel,vendedor]);
 
   const resultados=useMemo(()=>{
     if(!busq.trim())return[];
@@ -15014,16 +16198,23 @@ function POS({inv,onVenta,onVerNota,user,descuentos={},descCodigos={}}){
   }
 
   // ── GC helpers ──────────────────────────────────────────────────
-  function buscarGCenPOS(){
-    const lista=cargarGC();
-    const gc=lista.find(g=>g.codigo.toLowerCase()===gcCodigo.trim().toLowerCase());
-    if(!gc)                              { setGcBusqMsg("❌ Gift Card no encontrada"); setGcEncontrado(null); return; }
-    const est=gcEstado(gc);
-    if(est==="agotada")                  { setGcBusqMsg("⚠️ Gift Card agotada (saldo cero)"); setGcEncontrado(null); return; }
-    if(est==="vencida")                  { setGcBusqMsg("⚠️ Gift Card vencida"); setGcEncontrado(null); return; }
-    setGcEncontrado(gc);
-    setGcMontoUsar(String(Math.min(gc.saldo, total).toFixed(2)));
-    setGcBusqMsg(null);
+  async function buscarGCenPOS(){
+    if(!gcCodigo.trim()||gcBuscando) return;
+    setGcBuscando(true); setGcBusqMsg(null); setGcEncontrado(null);
+    try{
+      const mode=await sbResolverModoOperacion("VENTA",user);
+      const gc=mode==="transactional"
+        ? await sbBuscarGiftCardCloud(gcCodigo)
+        : cargarGC().find(g=>g.codigo.toLowerCase()===gcCodigo.trim().toLowerCase());
+      if(!gc)                            { setGcBusqMsg("❌ Gift Card no encontrada"); return; }
+      const est=gcEstado(gc);
+      if(est==="agotada")                { setGcBusqMsg("⚠️ Gift Card agotada (saldo cero)"); return; }
+      if(est==="vencida")                { setGcBusqMsg("⚠️ Gift Card vencida"); return; }
+      setGcEncontrado(gc);
+      setGcMontoUsar(String(Math.min(gc.saldo,total).toFixed(2)));
+    }catch(e){
+      setGcBusqMsg(`❌ ${e?.message||"No se pudo verificar el saldo central"}`);
+    }finally{setGcBuscando(false);}
   }
 
   // GC allocation: distribute GC amount proportionally across brands
@@ -15043,8 +16234,8 @@ function POS({inv,onVenta,onVerNota,user,descuentos={},descCodigos={}}){
     }));
   }
 
-  function cobrar(){
-    if(!carrito.length) return;
+  async function cobrar(){
+    if(!carrito.length||cobrando) return;
     const sinStock=carrito.filter(it=>{const s=inv.find(i=>i.id===it.prodId)?.stock||0;return it.cantidad>s;});
     if(sinStock.length){alert(`Stock insuficiente:\n${sinStock.map(it=>{const s=inv.find(i=>i.id===it.prodId)?.stock||0;return`• ${it.nombre}: pedís ${it.cantidad}, hay ${s}`;}).join("\n")}`);return;}
     const items=carrito.map(it=>{
@@ -15058,6 +16249,9 @@ function POS({inv,onVenta,onVerNota,user,descuentos={},descCodigos={}}){
       };
     });
 
+    let ventaData=null;
+    let gcAplicacion=null;
+
     // ── Gift Card flow ───────────────────────────────────────
     if(pagoGC){
       if(!gcEncontrado){ alert("Busca y verifica la Gift Card primero"); return; }
@@ -15070,48 +16264,70 @@ function POS({inv,onVenta,onVerNota,user,descuentos={},descCodigos={}}){
         ? "giftcard"
         : `mixto|giftcard:${gcUsado}|${metodoCompl}:${extraMonto}`;
 
-      // Deducir saldo GC
-      const gcLista=cargarGC();
-      guardarGC(gcLista.map(g=>g.codigo!==gcEncontrado.codigo?g:{
-        ...g,
-        saldo:+(g.saldo-gcUsado).toFixed(2),
-        ultimoUso:hoy(),
-        usos:[...(g.usos||[]),{
-          fecha:hoy(), monto:gcUsado,
-          nota:`Venta POS — ${items.length} prod.`
-        }],
-      }));
-
-      const vf=onVenta({items,total,subtotal,descPct,
+      ventaData={items,total,subtotal,descPct,
         metodoPago:metodoPagoFinal,
         vendedor:vendedor||"Tienda",clienteNombre:cliente,clienteTelefono:clienteTel,etiquetaImg:etiqueta,
         gcId:gcEncontrado.codigo, gcUsado, gcAllocations,
-      });
+        efectivo:metodoCompl==="efectivo"?extraMonto:0,
+        qr:metodoCompl==="qr"?extraMonto:0,
+        tarjeta:metodoCompl==="tarjeta"?extraMonto:0,
+      };
+      gcAplicacion={gc:gcEncontrado,monto:gcUsado};
+    }else{
+      // ── Mixto flow ─────────────────────────────────────────
+      if(pagoMixto){
+        const suma=(parseFloat(montosMixtos.efectivo)||0)+(parseFloat(montosMixtos.qr)||0)+(parseFloat(montosMixtos.tarjeta)||0);
+        if(Math.abs(suma-total)>0.01){alert(`Los montos (${$(suma)}) no cuadran con el total (${$(total)})`);return;}
+      }
+      let metodoPagoFinal=pago;
+      if(pagoMixto){
+        const partes=[];
+        if(parseFloat(montosMixtos.efectivo)>0) partes.push("efectivo:"+montosMixtos.efectivo);
+        if(parseFloat(montosMixtos.qr)>0)       partes.push("qr:"+montosMixtos.qr);
+        if(parseFloat(montosMixtos.tarjeta)>0)  partes.push("tarjeta:"+montosMixtos.tarjeta);
+        metodoPagoFinal=partes.length>0?"mixto|"+partes.join("|"):pago;
+      }
+      ventaData={items,total,subtotal,descPct,metodoPago:metodoPagoFinal,
+        vendedor:vendedor||"Tienda",clienteNombre:cliente,clienteTelefono:clienteTel,etiquetaImg:etiqueta,
+        efectivo:pagoMixto?(parseFloat(montosMixtos.efectivo)||0):(pago==="efectivo"?total:0),
+        qr:pagoMixto?(parseFloat(montosMixtos.qr)||0):(pago==="qr"?total:0),
+        tarjeta:pagoMixto?(parseFloat(montosMixtos.tarjeta)||0):(pago==="tarjeta"?total:0),
+      };
+    }
+
+    if(!cobroOperationRef.current){
+      cobroOperationRef.current={operationId:thUUID(),operationCreatedAt:Date.now()};
+    }
+    const op=cobroOperationRef.current;
+    setCobrando(true);
+    setCobroError("");
+    try{
+      const vf=await onVenta({...ventaData,...op});
+
+      // El saldo local se mueve únicamente después de confirmar la venta.
+      if(gcAplicacion){
+        const gcLista=cargarGC();
+        guardarGC(gcLista.map(g=>g.codigo!==gcAplicacion.gc.codigo?g:{
+          ...g,
+          saldo:+(g.saldo-gcAplicacion.monto).toFixed(2),
+          ultimoUso:hoy(),
+          usos:[...(g.usos||[]),{fecha:hoy(),monto:gcAplicacion.monto,nota:`Venta POS — ${items.length} prod.`}],
+        }));
+      }
+
+      cobroOperationRef.current=null;
       setUltima(vf);setShowOk(true);setShowPago(false);
       autoDescargarNota(vf);
       setCarrito([]);setDescExtra(0);setDescMarcaManual({});setBusq("");setEtiqueta(null);setCliente("");setClienteTel("");
+      setPagoMixto(false);setMontosMixtos({efectivo:"",qr:"",tarjeta:""});
       setPagoGC(false);setGcCodigo("");setGcEncontrado(null);setGcBusqMsg(null);setGcMontoUsar("");
-      return;
+    }catch(e){
+      const msg=e?.message||"No se pudo confirmar la venta. El carrito se conservó.";
+      setCobroError(msg);
+      alert(`${msg}\n\nNo se vació el carrito. Puedes reintentar sin duplicar la venta.`);
+    }finally{
+      setCobrando(false);
     }
-
-    // ── Mixto flow ───────────────────────────────────────────
-    if(pagoMixto){
-      const suma=(parseFloat(montosMixtos.efectivo)||0)+(parseFloat(montosMixtos.qr)||0)+(parseFloat(montosMixtos.tarjeta)||0);
-      if(Math.abs(suma-total)>0.01){alert(`Los montos (${$(suma)}) no cuadran con el total (${$(total)})`);return;}
-    }
-    var metodoPagoFinal=pago;
-    if(pagoMixto){
-      var partes=[];
-      if(parseFloat(montosMixtos.efectivo)>0) partes.push("efectivo:"+montosMixtos.efectivo);
-      if(parseFloat(montosMixtos.qr)>0)       partes.push("qr:"+montosMixtos.qr);
-      if(parseFloat(montosMixtos.tarjeta)>0)  partes.push("tarjeta:"+montosMixtos.tarjeta);
-      metodoPagoFinal=partes.length>0?"mixto|"+partes.join("|"):pago;
-    }
-    const vf=onVenta({items,total,subtotal,descPct,metodoPago:metodoPagoFinal,vendedor:vendedor||"Tienda",clienteNombre:cliente,clienteTelefono:clienteTel,etiquetaImg:etiqueta});
-    setUltima(vf);setShowOk(true);setShowPago(false);
-    autoDescargarNota(vf);
-    setCarrito([]);setDescExtra(0);setBusq("");setEtiqueta(null);setCliente("");setClienteTel("");
-    setPagoMixto(false);setMontosMixtos({efectivo:"",qr:"",tarjeta:""});
   }
 
   // ── Pago QR: verificación con sonido + confirmación visual ──
@@ -15604,10 +16820,10 @@ function POS({inv,onVenta,onVerNota,user,descuentos={},descCodigos={}}){
                     WebkitAppearance:"none",appearance:"none"}}
                   onFocus={e=>e.target.style.borderColor="#7C3AED"}
                   onBlur={e=>e.target.style.borderColor=C.sep}/>
-                <button onClick={buscarGCenPOS}
+                <button onClick={buscarGCenPOS} disabled={gcBuscando}
                   style={{padding:"12px 16px",borderRadius:12,border:"none",
                     background:"#7C3AED",color:"#fff",fontSize:13,fontWeight:700,
-                    fontFamily:FONT_UI,cursor:"pointer",flexShrink:0}}>Buscar</button>
+                    fontFamily:FONT_UI,cursor:gcBuscando?"wait":"pointer",flexShrink:0}}>{gcBuscando?"Verificando…":"Buscar"}</button>
               </div>
               {gcBusqMsg&&<div style={{fontSize:12,color:C.red,fontFamily:FONT_UI,marginTop:6,fontWeight:500}}>{gcBusqMsg}</div>}
             </div>
@@ -15754,15 +16970,21 @@ function POS({inv,onVenta,onVerNota,user,descuentos={},descCodigos={}}){
 
         <IOSBtn onPress={esPagoQR ? verificarPagoQR : cobrar} full
           variant={esPagoQR ? "success" : "primary"}
-          disabled={(pagoGC&&(!gcEncontrado))||qrVerificando}
+          disabled={(pagoGC&&(!gcEncontrado))||qrVerificando||cobrando}
           style={{fontSize:18,padding:"17px"}}
           icon={pagoGC?"🎁":esPagoQR?"✓":"💳"}>
-          {pagoGC
+          {cobrando
+            ? "Registrando de forma segura…"
+            : pagoGC
             ? (gcEncontrado ? `Confirmar — ${$(total)}` : "Busca la Gift Card")
             : esPagoQR
             ? `Verificar pago QR — ${$(total)}`
             : `Cobrar ${$(total)}`}
         </IOSBtn>
+        {cobroError&&<div role="alert" style={{marginTop:10,padding:"10px 12px",borderRadius:10,
+          background:`${C.red}12`,color:C.red,fontSize:12.5,fontFamily:FONT,lineHeight:1.45}}>
+          {cobroError} · El carrito sigue intacto.
+        </div>}
       </Sheet>
 
       {/* ── Overlay: pago QR verificado ── */}
@@ -15798,6 +17020,7 @@ function SheetRecibir({open, onClose, inv, onAdd, fInv, setFInv}){
   var _hN146 = useState(""); var scanInvMsg = _hN146[0]; var setScanInvMsg = _hN146[1];;
   var _hN147 = useState(null); var scanInvStatus = _hN147[0]; var setScanInvStatus = _hN147[1];;
   var _hN148 = useState(false); var barcodeReady = _hN148[0]; var setBarcodeReady = _hN148[1];;
+  const [registrando,setRegistrando]=useState(false);
   const scanInvRef = useRef(null);
   
   const codigoAuto = fInv.marcaId && fInv.nombre
@@ -15853,6 +17076,12 @@ function SheetRecibir({open, onClose, inv, onAdd, fInv, setFInv}){
     if(t.includes("cre")||t.includes("per")||t.includes("jab")) return "Cuidado personal";
     if(t.includes("vel")||t.includes("arom")) return "Velas & Aromas";
     return "General";
+  }
+
+  async function registrarSeguro(){
+    if(registrando) return;
+    setRegistrando(true);
+    try{ await onAdd(); }finally{ setRegistrando(false); }
   }
 
   return (
@@ -15923,7 +17152,9 @@ function SheetRecibir({open, onClose, inv, onAdd, fInv, setFInv}){
         </div>
       )}
 
-      <IOSBtn onPress={onAdd} full variant="primary">Registrar e Imprimir Ticket</IOSBtn>
+      <IOSBtn onPress={registrarSeguro} full variant="primary" disabled={registrando}>
+        {registrando?"Registrando de forma segura…":"Registrar e Imprimir Ticket"}
+      </IOSBtn>
     </Sheet>
   );
 }
@@ -16011,7 +17242,7 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
 
   useEffect(()=>{
     let channel=null, mounted=true;
-    sbCrearSesionVerif(sesionId, MK, marcaSelec, baseTs)
+    sbCrearSesionVerif(sesionId, MK, marcaSelec, baseTs, user)
       .then(()=> sbObtenerSesionVerif(sesionId))
       .then(sesion=>{ if(mounted && sesion) mergeRemoteConteo(sesion.conteo); });
     getSupabase().then(db=>{
@@ -16071,7 +17302,11 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
       // Aviso inmediato a otros dispositivos (no espera la base de datos)
       channelRef.current?.send({type:"broadcast", event:"conteo", payload:{conteo:{[p.codigo]:res.cantNueva}}});
       // Persiste en Supabase (fuente de verdad / resolución de carreras)
-      sbIncrementarConteoVerif(sesionId,p.codigo).then(mergeRemoteConteo);
+      const operationId=thUUID();
+      sbIncrementarConteoVerif(sesionId,p.codigo,operationId,user).then(remote=>{
+        if(remote) mergeRemoteConteo(remote);
+        else flash(false,`${p.codigo}: no se confirmó el conteo en el servidor; verifica la conexión antes de cerrar`);
+      });
     }
     return res;
   }
@@ -16172,7 +17407,7 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
         localStorage.removeItem(`th_verif_doble_${MK}`);
         localStorage.removeItem(`th_verif_manual_${MK}`);
       }catch{}
-      sbResetSesionVerif(sesionId);
+      sbResetSesionVerif(sesionId,thUUID(),user,"reinicio_manual");
     }
   }
 
@@ -16189,7 +17424,7 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
       localStorage.removeItem(`th_verif_doble_${MK}`);
       localStorage.removeItem(`th_verif_manual_${MK}`);
     }catch{}
-    sbResetSesionVerif(sesionId);
+    sbResetSesionVerif(sesionId,thUUID(),user,"empezar_de_nuevo");
     setModoCierre(false);
     setModoVerif(false);
     setMarcaSelec(null);
@@ -16321,7 +17556,7 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
     return "handled";
   }
 
-  function confirmarCierre(){
+  async function confirmarCierre(){
     if(itemsContados===0){ flash(false,"Escanea o agrega al menos un producto antes de confirmar el cierre"); return; }
     const pendientesSinVerificar = discrepancias.length-verificadosCount;
     const avisoVerif = pendientesSinVerificar>0
@@ -16339,7 +17574,8 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
         verificado: r.estado==="OK" ? null : itemVerificado(r),
       })),
     };
-    onGuardarAuditoria(aud);
+    const guardada=await onGuardarAuditoria(aud);
+    if(guardada===false) return;
     // Generar automáticamente el Excel del cierre (todo lo inventariado:
     // sistema vs escaneado, con faltantes/sobrantes marcados)
     try{ exportAuditoriaExcel(aud); }catch(e){ console.error("Export cierre:",e); }
@@ -16349,7 +17585,7 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
       localStorage.removeItem(`th_verif_doble_${MK}`);
       localStorage.removeItem(`th_verif_manual_${MK}`);
     }catch{}
-    sbResetSesionVerif(sesionId);
+    sbResetSesionVerif(sesionId,thUUID(),user,"auditoria_confirmada");
     flash(true,"✓ Verificación guardada · Excel generado");
     setVista("historial");
   }
@@ -17093,6 +18329,14 @@ function CambiosTab({inv, ventas, onCambio}){
   const[vendedor,setVendedor]=useState("");
   const[notas,setNotas]=useState("");
   const[done,setDone]=useState(null);
+  const[guardandoCambio,setGuardandoCambio]=useState(false);
+  const[errorCambio,setErrorCambio]=useState("");
+  const cambioOperationRef=useRef(null);
+
+  useEffect(()=>{
+    cambioOperationRef.current=null;
+    setErrorCambio("");
+  },[ventaOrigen,devueltos,nuevos,metodoPago,vendedor,notas]);
 
   const resultadosBusq=useMemo(()=>{
     const q=busqVenta.trim().toUpperCase();
@@ -17145,8 +18389,15 @@ function CambiosTab({inv, ventas, onCambio}){
     setNuevos(p=>p.map(x=>x.id===id?{...x,cantidad:Math.max(1,Math.min(inv.find(i=>i.id===id)?.stock||1,n))}:x));
   }
 
-  function confirmar(){
-    const id=`CAM${Date.now()}`;
+  async function confirmar(){
+    if(guardandoCambio) return;
+    if(!cambioOperationRef.current){
+      cambioOperationRef.current={operationId:thUUID(),id:`CAM${Date.now()}`,createdAt:Date.now()};
+    }
+    const {id,operationId,createdAt}=cambioOperationRef.current;
+    const fechaCambio=new Date(createdAt);
+    const fechaCambioISO=`${fechaCambio.getFullYear()}-${String(fechaCambio.getMonth()+1).padStart(2,"0")}-${String(fechaCambio.getDate()).padStart(2,"0")}`;
+    const horaCambio=fechaCambio.toLocaleTimeString("es-BO",{hour:"2-digit",minute:"2-digit"});
     const itemsDevueltos=devueltos.filter(it=>it.selec).map(it=>({
       prodId:it.prodId,codigo:it.codigo,nombre:it.nombre,
       marcaId:it.marcaId,marcaNombre:it.marcaNombre,
@@ -17158,15 +18409,22 @@ function CambiosTab({inv, ventas, onCambio}){
       cantidad:it.cantidad,precioUnit:it.precio,
     }));
     const cambio={
-      id,fecha:hoy(),hora:hora(),
+      id,operationId,createdAt,fecha:fechaCambioISO,hora:horaCambio,
       ventaOriginalId:ventaOrigen.id,
       itemsDevueltos,itemsNuevos,
       totalDevuelto:totalDev,totalNuevo,diferencia,
       metodoPago:diferencia>0?metodoPago:"—",
       vendedor:vendedor||"Tienda",notas,
     };
-    onCambio(cambio);
-    setDone(cambio);
+    setGuardandoCambio(true);
+    setErrorCambio("");
+    try{
+      const confirmado=await onCambio(cambio);
+      cambioOperationRef.current=null;
+      setDone(confirmado||cambio);
+    }catch(e){
+      setErrorCambio(e?.message||"No se pudo confirmar el cambio. Los datos se conservaron.");
+    }finally{ setGuardandoCambio(false); }
   }
 
   function reset(){
@@ -17457,7 +18715,11 @@ ${c.diferencia>0.01?`Cliente paga diferencia: Bs ${fmt2(c.diferencia)} (${c.meto
       <IOSInput label="Observaciones (opcional)" value={notas}
         onChange={e=>setNotas(e.target.value)} placeholder="Motivo del cambio, talla incorrecta, etc."/>
 
-      <IOSBtn onPress={confirmar} variant="fill" full icon="✓">Confirmar cambio</IOSBtn>
+      <IOSBtn onPress={confirmar} variant="fill" full icon="✓" disabled={guardandoCambio}>
+        {guardandoCambio?"Registrando de forma segura…":"Confirmar cambio"}
+      </IOSBtn>
+      {errorCambio&&<div role="alert" style={{marginTop:9,padding:"9px 11px",borderRadius:9,
+        background:`${C.red}12`,color:C.red,fontSize:12,fontFamily:FONT}}>{errorCambio}</div>}
     </div>
   );
 }
@@ -17495,6 +18757,10 @@ function VentasAntiguas({inv, ventas, cargas, onVentaHistorica, onImportarVentas
   const [descPct,       setDescPct]       = React.useState("");
   const [montosMixtos,  setMontosMixtos]  = React.useState({efectivo:"", qr:"", tarjeta:""});
   const inputRef = React.useRef(null);
+  const ventaHistoricaOperationRef=React.useRef(null);
+
+  React.useEffect(()=>{ ventaHistoricaOperationRef.current=null; },
+    [fecha,turno,metodo,carrito,verificados,descPct,montosMixtos]);
 
   const total      = carrito.reduce((s,it)=>s+it.subtotal,0); // subtotal sin descuento
   const desc       = Math.min(100, Math.max(0, parseFloat(descPct)||0));
@@ -17596,13 +18862,18 @@ function VentasAntiguas({inv, ventas, cargas, onVentaHistorica, onImportarVentas
     }
     const venta = {
       fecha, turno, metodoPago:metodoPagoFinal, total:totalFinal, subtotal:total, descPct:desc, items:itemsFinal,
+      operationId:ventaHistoricaOperationRef.current||(ventaHistoricaOperationRef.current=thUUID()),
       ...(verificados.size>0 ? {advertencia:"ITEMS_VERIFICADOS_MANUALMENTE", itemsVerificados:itemsVerif, verificadoPor:user?.nombre||"Admin"} : {}),
     };
-    const vf = onVentaHistorica(venta);
-    setConfirmado({...vf, cantItems:carrito.length, conVerif:verificados.size>0});
-    setCarrito([]); setCodInput(""); setBusqueda([]); setVerificados(new Set()); setDescPct("");
-    setMontosMixtos({efectivo:"", qr:"", tarjeta:""});
-    setGuardando(false);
+    try{
+      const vf = await onVentaHistorica(venta);
+      ventaHistoricaOperationRef.current=null;
+      setConfirmado({...vf,cantItems:carrito.length,conVerif:verificados.size>0});
+      setCarrito([]);setCodInput("");setBusqueda([]);setVerificados(new Set());setDescPct("");
+      setMontosMixtos({efectivo:"",qr:"",tarjeta:""});
+    }catch(e){
+      alert(`${e?.message||"No se pudo confirmar la venta histórica"}\n\nLos datos se conservaron y el reintento no la duplicará.`);
+    }finally{ setGuardando(false); }
   }
 
   const METODOS = [{v:"efectivo",label:"Efectivo"},{v:"qr",label:"QR"},{v:"tarjeta",label:"Tarjeta"},{v:"mixto",label:"Mixto"}];
@@ -18266,14 +19537,18 @@ function RegistroCargas({cargas, marcas, marcaId=null, onVerificar=null, user=nu
                       })()}
 
                       {c.archivoUrl&&(
-                        <a href={c.archivoUrl} download={c.archivoNombre||"evidencia.xlsx"}
-                          onClick={e=>e.stopPropagation()}
+                        <button type="button"
+                          onClick={async e=>{
+                            e.stopPropagation();
+                            const ok=await sbDescargarArchivoSeguro(c.archivoUrl,c.archivoNombre||"evidencia.xlsx");
+                            if(!ok) alert("No se pudo abrir la evidencia. Verifica tu sesión e inténtalo nuevamente.");
+                          }}
                           style={{display:"flex",alignItems:"center",justifyContent:"center",gap:6,
-                            marginTop:10,padding:"9px",borderRadius:10,textDecoration:"none",
+                            width:"100%",marginTop:10,padding:"9px",borderRadius:10,textDecoration:"none",cursor:"pointer",
                             border:`1.5px solid ${C.indigo}`,background:`${C.indigo}10`,
                             color:C.indigo,fontSize:12,fontWeight:700,fontFamily:FONT_UI}}>
                           📄 Descargar Excel de evidencia
-                        </a>
+                        </button>
                       )}
                       {onVerificar&&(
                         <div style={{marginTop:10}}>
@@ -18293,13 +19568,19 @@ function RegistroCargas({cargas, marcas, marcaId=null, onVerificar=null, user=nu
                           </button>
                         </div>
                       )}
-                      {user?.rol==="admin"&&onEliminarCarga&&c.tipo!=="HISTORICO"&&(
-                        <button onClick={e=>{e.stopPropagation();if(window.confirm(`¿Eliminar este registro de carga?\n${c.resumen||c.id}`)) onEliminarCarga(c.id);}}
+                      {c.revertida&&(
+                        <div style={{marginTop:10,padding:"9px",borderRadius:10,textAlign:"center",
+                          background:`${C.amber}12`,color:C.amber,fontSize:11,fontWeight:700,fontFamily:FONT_UI}}>
+                          ↩ Carga revertida {c.revertidaPor?`por ${c.revertidaPor}`:""}
+                        </div>
+                      )}
+                      {user?.rol==="admin"&&onEliminarCarga&&c.tipo!=="HISTORICO"&&!c.revertida&&(
+                        <button onClick={e=>{e.stopPropagation();onEliminarCarga(c.id);}}
                           style={{width:"100%",marginTop:10,padding:"9px",borderRadius:10,
                             border:`1.5px solid #C94C4C`,background:"#C94C4C10",
                             color:"#C94C4C",fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:FONT_UI,
                             display:"flex",alignItems:"center",justifyContent:"center",gap:4}}>
-                          <i className="ti ti-trash" style={{fontSize:13}} aria-hidden="true"/>Eliminar registro de carga
+                          <i className="ti ti-history" style={{fontSize:13}} aria-hidden="true"/>Revertir / eliminar carga
                         </button>
                       )}
                     </div>
@@ -18370,9 +19651,12 @@ function InventarioPorMarca({inv, ventas, retiros=[], bajas=[], onRecibir, onBaj
       }
     }
     setEditGuardando(true);
-    await onEditarProducto(editProd.id, campos);
-    setEditGuardando(false);
-    setEditProd(null);
+    try{
+      await onEditarProducto(editProd.id, campos);
+      setEditProd(null);
+    }catch(e){
+      alert(`${e?.message||"No se pudo guardar la edición"}\n\nEl formulario se conservó.`);
+    }finally{ setEditGuardando(false); }
   }
 
   // Calcular unidades vendidas por producto
@@ -19308,7 +20592,7 @@ function InventarioPorMarca({inv, ventas, retiros=[], bajas=[], onRecibir, onBaj
 // ══════════════════════════════════════════════════════════
 // MARCA DETALLE — iOS navigation push style
 // ══════════════════════════════════════════════════════════
-function MarcaDetalle({marcaId,inv,ventas,vMes,mes,anio,MK,cierres,setCierres,getHist,getLiq,auditorias=[],onActualizarAuditoria,user,retiros=[],onVentaClick}){
+function MarcaDetalle({marcaId,inv,ventas,vMes,mes,anio,MK,cierres,getHist,getLiq,auditorias=[],onActualizarAuditoria,onCambiarCierre,user,retiros=[],onVentaClick}){
   const isDesktop = useIsDesktop();
   var _hN150 = useState("historial"); var sub = _hN150[0]; var setSub = _hN150[1];;
   const [agregandoA, setAgregandoA] = useState(null);
@@ -19699,11 +20983,11 @@ function MarcaDetalle({marcaId,inv,ventas,vMes,mes,anio,MK,cierres,setCierres,ge
           </div>
           {!cerrado
             ? <IOSBtn variant="success" full icon="✓"
-                onPress={()=>setCierres(p=>({...p,[`${MK}-${marcaId}`]:{cerrado:true,fecha:hoy(),mk:MK}}))}>
+                onPress={()=>onCambiarCierre(marcaId,true)}>
                 Confirmar Cierre Mensual
               </IOSBtn>
             : <IOSBtn variant="danger" full
-                onPress={()=>setCierres(p=>({...p,[`${MK}-${marcaId}`]:{cerrado:false,mk:MK}}))}>
+                onPress={()=>onCambiarCierre(marcaId,false)}>
                 Reabrir Liquidación
               </IOSBtn>
           }
@@ -20444,14 +21728,12 @@ function FacturacionConfig(){
     setSaved(true); setTimeout(()=>setSaved(false),2000);
   }
   async function testConexion(){
-    if(!cfg.apiKey){setTestMsg({ok:false,txt:"Ingresá el API Key primero."});return;}
     setTesting(true); setTestMsg(null);
     try{
-      const r=await fetch(cfg.endpoint.replace("/invoices","/health")||cfg.endpoint,{
-        headers:{"Authorization":`Bearer ${cfg.apiKey}`},
-        signal:AbortSignal.timeout(6000),
-      });
-      setTestMsg(r.ok?{ok:true,txt:`✓ Conexión OK (${r.status})`}:{ok:false,txt:`Error ${r.status}`});
+      const r=await llamarFacturacionSegura("health");
+      setTestMsg(r.configured
+        ? {ok:true,txt:`✓ Servidor CUCU configurado · ${r.environment||"ambiente definido"}`}
+        : {ok:false,txt:"Faltan secretos CUCU_API_KEY o CUCU_POINT_OF_SALE_ID en Supabase."});
     }catch(e){ setTestMsg({ok:false,txt:`Error: ${e.message.slice(0,80)}`}); }
     setTesting(false);
   }
@@ -20491,10 +21773,11 @@ function FacturacionConfig(){
 
       {cfg.modoApi!==false&&(
         <>
-          {fld("API Key CUCU","apiKey","Bearer token de tu cuenta CUCU")}
-          {fld("Endpoint","endpoint","https://app.cucu.bo/api/v1/invoices")}
-          {fld("Código Actividad Económica","codigoActividad","470000")}
-          {fld("Código Producto SIN","codigoProductoSin","58311")}
+          <div style={{padding:12,background:`${C.green}10`,border:`1px solid ${C.green}25`,
+            borderRadius:10,marginBottom:12,fontSize:12,color:C.label2,fontFamily:FONT,lineHeight:1.6}}>
+            🔒 La API Key, el punto de venta y los códigos SIAT se configuran como secretos de Supabase.
+            Nunca se guardan en este navegador.
+          </div>
 
           {testMsg&&<div style={{background:testMsg.ok?`${C.green}12`:`${C.red}12`,
             border:`1px solid ${testMsg.ok?C.green:C.red}30`,borderRadius:10,
@@ -20515,8 +21798,7 @@ function FacturacionConfig(){
         <div style={{fontSize:11,color:C.label3,fontFamily:FONT,lineHeight:1.7}}>
           📋 Obtener API Key → <strong>cucu.bo</strong><br/>
           Docs → <strong>docs.cucu.bo</strong><br/>
-          Actividad <strong>470000</strong> = Comercio al por menor<br/>
-          Código SIN <strong>58311</strong> = Prendas de vestir
+          Variables requeridas: <strong>CUCU_API_KEY</strong> y <strong>CUCU_POINT_OF_SALE_ID</strong>
         </div>
       </div>
 
@@ -20567,6 +21849,7 @@ function logAudit(tipo, detalle, usuario){
     const now = new Date();
     const evento = {
       id: "EVT_"+Date.now()+"_"+Math.random().toString(36).slice(2,6),
+      operationId:thUUID(),
       ts: Date.now(),
       fecha: now.toLocaleDateString("es-BO"),
       hora:  now.toLocaleTimeString("es-BO",{hour:"2-digit",minute:"2-digit",second:"2-digit"}),
@@ -20638,7 +21921,7 @@ function ToastStack({toasts}){
 }
 
 // ── Panel cambio contraseña propia ────────────────────────────────────────────
-function PanelCambiarPass({user, usuarios, onGuardar}){
+function PanelCambiarPass({user}){
   const [passActual,  setPassActual]  = useState("");
   const [passNueva,   setPassNueva]   = useState("");
   const [passConfirm, setPassConfirm] = useState("");
@@ -20648,19 +21931,12 @@ function PanelCambiarPass({user, usuarios, onGuardar}){
 
   async function cambiar(){
     setMsg(null);
-    if(passNueva.length<6){ setMsg({ok:false,txt:"Mínimo 6 caracteres"}); return; }
+    if(passNueva.length<8){ setMsg({ok:false,txt:"Mínimo 8 caracteres"}); return; }
     if(passNueva!==passConfirm){ setMsg({ok:false,txt:"Las contraseñas no coinciden"}); return; }
     setSaving(true);
-    // Verifica la contraseña actual contra Supabase (fuente de verdad del login).
-    // Si el usuario aún no tiene password seteada en la nube, se permite.
-    const actualNube = await sbLeerPassword(user.usuario);
-    const localU = usuarios.find(x=>x.usuario===user.usuario);
-    const actualReal = actualNube!=null ? actualNube : (localU?.password ?? "");
-    if(actualReal && actualReal !== passActual){
-      setSaving(false); setMsg({ok:false,txt:"Contraseña actual incorrecta"}); return;
-    }
-    onGuardar(usuarios.map(x=>x.usuario===user.usuario?{...x,password:passNueva}:x));
+    const result=await sbCambiarPasswordSegura(user.usuario,passActual,passNueva);
     setSaving(false);
+    if(!result.ok){ setMsg({ok:false,txt:result.error}); return; }
     setMsg({ok:true,txt:"✓ Contraseña actualizada · ya funciona en todos los dispositivos"});
     setPassActual(""); setPassNueva(""); setPassConfirm("");
   }
@@ -20686,7 +21962,7 @@ function PanelCambiarPass({user, usuarios, onGuardar}){
         <span>🔒</span> Cambiar contraseña
       </div>
       {ipt("Contraseña actual",   passActual,  setPassActual,  "••••••••")}
-      {ipt("Nueva contraseña",    passNueva,   setPassNueva,   "Mínimo 6 caracteres")}
+      {ipt("Nueva contraseña",    passNueva,   setPassNueva,   "Mínimo 8 caracteres")}
       {ipt("Confirmar contraseña",passConfirm, setPassConfirm, "Repetir nueva contraseña")}
       <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:14}}>
         <input type="checkbox" id="showPassCP" checked={show}
@@ -20727,22 +22003,22 @@ function UserFormModal({editUser, usuarios, onClose, onGuardar}){
   const [saving, setSaving] = useState(false);
   const [done,   setDone]   = useState(false);
 
-  function guardar(){
+  async function guardar(){
     setMsg(null);
     if(!f.nombre.trim()){ setMsg("Nombre requerido"); return; }
     if(!f.usuario.trim()){ setMsg("Usuario requerido"); return; }
     if(isNew&&!f.password){ setMsg("Contraseña requerida"); return; }
-    if(isNew&&f.password.length<6){ setMsg("Mínimo 6 caracteres en contraseña"); return; }
+    if(isNew&&f.password.length<8){ setMsg("Mínimo 8 caracteres en contraseña"); return; }
     if(f.rol==="marca"&&!f.marcaId){ setMsg("Seleccioná la marca"); return; }
     if(isNew&&usuarios.find(u=>u.usuario===f.usuario.toLowerCase())){
       setMsg("Ese nombre de usuario ya existe"); return;
     }
     setSaving(true);
-    setTimeout(()=>{
-      onGuardar({...f,usuario:f.usuario.toLowerCase().trim()},isNew);
-      setSaving(false); setDone(true);
-      setTimeout(()=>onClose(), 700);
-    }, 380);
+    const ok=await onGuardar({...f,usuario:f.usuario.toLowerCase().trim()},isNew);
+    setSaving(false);
+    if(ok===false){ setMsg("No se pudo guardar el usuario. Revisa la sesión administrativa."); return; }
+    setDone(true);
+    setTimeout(()=>onClose(),700);
   }
 
   const ipt=(label,val,set,placeholder,type="text",opts={})=>(
@@ -20801,7 +22077,7 @@ function UserFormModal({editUser, usuarios, onClose, onGuardar}){
             <div style={{position:"relative"}}>
               <input type={showP?"text":"password"} value={f.password}
                 onChange={e=>setF(p=>({...p,password:e.target.value}))}
-                placeholder={isNew?"Mínimo 6 caracteres":"Sin cambios"}
+                placeholder={isNew?"Mínimo 8 caracteres":"Sin cambios"}
                 style={{width:"100%",padding:"12px 44px 12px 14px",borderRadius:12,
                   border:`1.5px solid ${C.sep}`,background:C.bg0,
                   fontSize:15,color:C.label,fontFamily:FONT,outline:"none",
@@ -21385,6 +22661,7 @@ function SistemaTab({user, logout, onRecargarDesdeSupabase, onSyncCompleto}){
       case "marcas":         return "Configuración de marcas";
       case "usuarios":       return "Usuarios del sistema";
       case "auditLog":       return `Registro de auditoría (${p.tipo||""})`;
+      case "estadoFinanciero":return `Configuración financiera · ${p.tipo||""}`;
       default:               return op.tipo;
     }
   }
@@ -21398,59 +22675,10 @@ function SistemaTab({user, logout, onRecargarDesdeSupabase, onSyncCompleto}){
   ];
 
   async function runFactoryReset(){
-    setResetState("running");
-    const log = [];
-    const addLog = (msg, ok=true) => { log.push({msg, ok}); setResetLog([...log]); };
-    try{
-      const H = {
-        "apikey": SUPA_KEY,
-        "Authorization": `Bearer ${SUPA_KEY}`,
-        "Content-Type": "application/json",
-        "Prefer": "return=minimal"
-      };
-      const del = (t,q) => fetch(`${SUPA_URL}/rest/v1/${t}?${q}`,{method:"DELETE",headers:H});
-
-      addLog("Eliminando líneas de venta...");
-      const r1 = await del("venta_items","id=gt.0");
-      addLog(`venta_items — ${r1.ok ? "OK ✓" : "Error "+r1.status}`, r1.ok);
-
-      addLog("Eliminando ventas...");
-      const r2 = await del("ventas","id=neq.00000000-0000-0000-0000-000000000000");
-      addLog(`ventas — ${r2.ok ? "OK ✓" : "Error "+r2.status}`, r2.ok);
-
-      addLog("Eliminando cierres...");
-      const r3 = await del("cierres","id=neq.00000000-0000-0000-0000-000000000000");
-      addLog(`cierres — ${r3.ok ? "OK ✓" : "Error "+r3.status}`, r3.ok);
-
-      addLog("Eliminando inventario...");
-      const r4 = await del("inventario","stock=gte.0");
-      // also try id=gt.0 as fallback
-      if(!r4.ok){
-        const r4b = await del("inventario","id=gt.0");
-        addLog(`inventario — ${r4b.ok ? "OK ✓" : "Error "+r4b.status}`, r4b.ok);
-      } else {
-        addLog(`inventario — OK ✓`);
-      }
-
-      addLog("Limpiando caché local...");
-      const keys=["th_inv","th_ventas","th_alq","th_cierres","th_gc_v1","th_cajas_v1",
-        "th_liq_cfg","th_cucu_cfg","th_drive_url","th_sync_log","th_pos_draft"];
-      keys.forEach(k=>localStorage.removeItem(k));
-      Object.keys(localStorage).forEach(k=>{
-        if(k.startsWith("th_fac_")||k.startsWith("th_liq_")||k.startsWith("th_gc_"))
-          localStorage.removeItem(k);
-      });
-      addLog("Caché local — OK ✓");
-
-      // Notificar a todas las otras sesiones para que recarguen
-      rtBroadcast("factory_reset", {});
-      addLog("Notificando otras sesiones… ✓");
-
-      setResetState("done");
-    } catch(e){
-      addLog("Error inesperado: "+e.message, false);
-      setResetState("error");
-    }
+    // El borrado masivo desde un bundle público queda deliberadamente inutilizado.
+    // Una recuperación real exige respaldo verificado, ejecución server-side y doble autorización.
+    setResetLog([{msg:"Factory Reset bloqueado por seguridad. No se modificó ningún dato.",ok:false}]);
+    setResetState("error");
   }
 
   // ── Render idle (info + botón iniciar) ──
@@ -21489,8 +22717,9 @@ function SistemaTab({user, logout, onRecargarDesdeSupabase, onSyncCompleto}){
           <div style={{fontSize:12,color:C.label3,fontFamily:FONT,lineHeight:1.6,
             marginBottom: outboxOps.length ? 10 : 0}}>
             Cambios hechos en este dispositivo que aún no llegaron a Supabase.
-            Se reintentan solos cada 20 segundos con la app abierta. Cada operación
-            tiene ID único: al subir no se duplica nada.
+            Se reintentan solos cada 20 segundos con la app abierta. Las operaciones
+            transaccionales usan ID único; una cola legacy se bloquea para conciliación
+            cuando su motor seguro ya está activo.
           </div>
           {outboxOps.length>0 && (
             <>
@@ -21511,6 +22740,11 @@ function SistemaTab({user, logout, onRecargarDesdeSupabase, onSyncCompleto}){
                       <div style={{fontSize:11,color:C.amber,marginTop:2,fontFamily:FONT_UI}}>
                         ⚠ {op.intentos} intento{op.intentos===1?"":"s"} fallido{op.intentos===1?"":"s"}
                         {op.ultimoIntento?` · último: ${new Date(op.ultimoIntento).toLocaleTimeString("es-BO")}`:""}
+                      </div>
+                    )}
+                    {op.bloqueadaPorModoSeguro&&(
+                      <div style={{fontSize:11,color:C.red,marginTop:3,fontFamily:FONT_UI,fontWeight:600}}>
+                        🔒 No se reinyectó: {op.bloqueadaPorModoSeguro} ya usa motor seguro. Exporta y concilia esta operación.
                       </div>
                     )}
                   </div>
@@ -21631,7 +22865,7 @@ function SistemaTab({user, logout, onRecargarDesdeSupabase, onSyncCompleto}){
                 <button onClick={async()=>{
                   setSbMsg("Sincronizando…");
                   const r = await onSyncCompleto(()=>{});
-                  setSbMsg(r.fail>0?"err":"ok");
+                  setSbMsg(r.blocked?r.message:(r.fail>0?"err":"ok"));
                   setTimeout(()=>setSbMsg(null),4000);
                 }} style={{flex:1,padding:"11px",borderRadius:10,border:`1.5px solid ${C.sep}`,
                   background:C.bg2,cursor:"pointer",fontSize:13,fontWeight:600,
@@ -21680,20 +22914,20 @@ function SistemaTab({user, logout, onRecargarDesdeSupabase, onSyncCompleto}){
           <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
             <span style={{fontSize:20}}>⚠️</span>
             <span style={{fontSize:14,fontWeight:700,color:C.red,fontFamily:FONT}}>
-              Factory Reset
+              Factory Reset bloqueado
             </span>
           </div>
           <div style={{fontSize:12,color:C.label3,fontFamily:FONT,lineHeight:1.6,marginBottom:16}}>
-            Elimina <strong>todo</strong> el contenido del sistema: inventario, ventas, cierres y caché local.
-            El sistema quedará como recién instalado. <strong>Esta acción es irreversible.</strong>
+            El borrado masivo desde la aplicación fue deshabilitado. Una recuperación integral sólo puede
+            ejecutarse con respaldo verificado, desde el servidor y con doble autorización administrativa.
           </div>
-          <button onClick={()=>setResetState("confirm1")} style={{
+          <button disabled style={{
             width:"100%",padding:"12px",borderRadius:10,
             border:`1.5px solid ${C.red}50`,background:`${C.red}12`,
-            cursor:"pointer",fontSize:13,fontWeight:700,color:C.red,
+            cursor:"not-allowed",fontSize:13,fontWeight:700,color:C.red,opacity:.65,
             fontFamily:FONT,letterSpacing:"0.02em",
             WebkitTapHighlightColor:"transparent"}}>
-            Iniciar Factory Reset →
+            🔒 No disponible desde este dispositivo
           </button>
         </div>
       )}
@@ -21879,7 +23113,7 @@ function SistemaTab({user, logout, onRecargarDesdeSupabase, onSyncCompleto}){
 function ConfigTab({user, logout, onRecargarDesdeSupabase, onSyncCompleto}){
   const [subTab, setSubTab] = useState("perfil");
   const [usuarios, setUsuarios] = useState(()=>{
-    try{return JSON.parse(localStorage.getItem("th_usuarios")||"null")||USUARIOS;}
+    try{return thUsuariosSinCredenciales(JSON.parse(localStorage.getItem("th_usuarios")||"null")||USUARIOS);}
     catch{return USUARIOS;}
   });
   const [auditLog, setAuditLog] = useState(()=>{
@@ -21893,8 +23127,9 @@ function ConfigTab({user, logout, onRecargarDesdeSupabase, onSyncCompleto}){
       if(!data) return;
       setAuditLog(prev=>{
         const sbIds = new Set(data.map(e=>e.id));
-        const pendientes = prev.filter(e=>!sbIds.has(e.id));
-        pendientes.forEach(e=>syncConRespaldo("auditLog", e, ()=>sbGuardarAuditLog(e)));
+        const outboxIds=new Set(getOutbox().filter(op=>op?.tipo==="auditLog")
+          .map(op=>op?.payload?.id));
+        const pendientes = prev.filter(e=>!sbIds.has(e.id)&&outboxIds.has(e.id));
         const merged = [...pendientes, ...data].sort((a,b)=>(b.ts||0)-(a.ts||0)).slice(0,1000);
         try{localStorage.setItem(AUDIT_KEY, JSON.stringify(merged));}catch{}
         return merged;
@@ -21927,19 +23162,13 @@ function ConfigTab({user, logout, onRecargarDesdeSupabase, onSyncCompleto}){
 
   const {toasts, addToast} = useToast();
 
-  function guardarUsuarios(u, accion, afectado, toastMsg){
-    setUsuarios(u);
-    localStorage.setItem("th_usuarios", JSON.stringify(u));
-    // Metadata (nombre/rol/estado/marca) con reintento automático si no hay red
-    syncConRespaldo("usuarios", u, ()=>sbGuardarUsuarios(u));
-    // Password: se escribe en su propia columna, con reintento, por cada usuario
-    // que traiga una contraseña. El login la lee de Supabase → efectiva al instante
-    // en todas las sesiones. sbGuardarUsuarios NO toca password (no la pisa).
-    u.forEach(x=>{
-      if(typeof x.password === "string" && x.password.length>0){
-        syncConRespaldo("password", {usuario:x.usuario, password:x.password}, ()=>sbActualizarPassword(x.usuario, x.password));
-      }
-    });
+  function guardarUsuarios(u, accion, afectado, toastMsg, syncRemoto=false){
+    const seguros=thUsuariosSinCredenciales(u);
+    setUsuarios(seguros);
+    localStorage.setItem("th_usuarios", JSON.stringify(seguros));
+    // Los cambios remotos de identidad/rol se confirman antes mediante Edge Function.
+    // Esta función sólo refresca el cache de interfaz después de esa confirmación.
+    if(syncRemoto) console.warn("Sincronización directa de usuarios bloqueada por seguridad");
     if(accion&&afectado){
       agregarAudit(accion, afectado, user.nombre);
       setAuditLog(JSON.parse(localStorage.getItem(AUDIT_KEY)||"[]"));
@@ -21954,11 +23183,7 @@ function ConfigTab({user, logout, onRecargarDesdeSupabase, onSyncCompleto}){
     sbCargarUsuarios().then(u=>{
       if(u===null){ setSupaOk(false); return; }
       setSupaOk(true);
-      // Si Supabase está vacío pero hay usuarios locales → migrar ahora
-      if(u.length===0){
-        const local=(()=>{try{return JSON.parse(localStorage.getItem("th_usuarios")||"null")||USUARIOS;}catch{return USUARIOS;}})();
-        if(local.length>0) sbGuardarUsuarios(local).then(ok=>{ if(ok) setSupaOk(true); });
-      } else {
+      if(u.length>0){
         // Actualizar lista local con la de la nube
         setUsuarios(u);
         localStorage.setItem("th_usuarios", JSON.stringify(u));
@@ -22018,73 +23243,85 @@ function ConfigTab({user, logout, onRecargarDesdeSupabase, onSyncCompleto}){
   }
 
   // acciones
-  function handleResetPass(u){
+  async function handleResetPass(u){
     const temp=generarTempPassword();
-    // Guarda la contraseña temporal en la tabla usuarios (con reintento) → toma
-    // efecto de inmediato en todas las sesiones. Se muestra para entregársela.
-    guardarUsuarios(
-      usuarios.map(x=>x.usuario===u.usuario?{...x,password:temp}:x),
-      "Reseteó contraseña", u.usuario
-    );
+    const result=await sbAdminResetPassword(u.usuario,temp);
+    if(!result.ok){ addToast(result.error||"No se pudo resetear la contraseña","error"); return; }
+    agregarAudit("Reseteó contraseña",u.usuario,user.nombre);
+    setAuditLog(JSON.parse(localStorage.getItem(AUDIT_KEY)||"[]"));
     setTempPass({usuario:u.usuario,nombre:u.nombre,password:temp,soloManual:false});
     setConfirmAct(null); setMenuAbierto(null);
   }
-  function handleToggle(u){
+  async function handleToggle(u){
     const ns=u.estado==="inactivo"?"activo":"inactivo";
+    const result=await sbAdminUsuario("set_state",{usuario:u.usuario,estado:ns});
+    if(!result.ok){ addToast(result.error||"No se pudo cambiar el estado","error"); return; }
     guardarUsuarios(
       usuarios.map(x=>x.usuario===u.usuario?{...x,estado:ns}:x),
       `${ns==="inactivo"?"Desactivó":"Activó"} cuenta`, u.usuario,
-      `Cuenta de @${u.usuario} ${ns==="inactivo"?"desactivada":"activada"}`
+      `Cuenta de @${u.usuario} ${ns==="inactivo"?"desactivada":"activada"}`,false
     );
     setConfirmAct(null); setMenuAbierto(null);
   }
-  function handleEliminar(u){
-    sbEliminarUsuario(u.usuario);
-    sbEliminarAuthUsuario(u.usuario);
+  async function handleEliminar(u){
+    const eliminado=await sbEliminarAuthUsuario(u.usuario);
+    if(!eliminado){ addToast(`No se pudo eliminar @${u.usuario}`,"error"); return; }
     guardarUsuarios(
       usuarios.filter(x=>x.usuario!==u.usuario),
       "Eliminó usuario", u.usuario,
-      `Usuario @${u.usuario} eliminado`
+      `Usuario @${u.usuario} eliminado`,false
     );
     setConfirmAct(null); setMenuAbierto(null);
   }
-  function handleGuardarUsuario(data,isNew){
+  async function handleGuardarUsuario(data,isNew){
     if(isNew){
-      const nuevoUsuario = {...data,estado:"activo",marcaId:data.marcaId?Number(data.marcaId):undefined};
+      const creado=await sbCrearAuthUsuario(data.usuario,data.password,data.nombre,data.rol,data.marcaId);
+      if(!creado){ addToast(`No se pudo crear @${data.usuario} en Supabase Auth`,"error"); return false; }
+      const {password,...perfil}=data;
+      const nuevoUsuario = {...perfil,estado:"activo",marcaId:data.marcaId?Number(data.marcaId):undefined};
       guardarUsuarios(
         [...usuarios, nuevoUsuario],
         "Creó usuario", data.usuario,
-        `Usuario @${data.usuario} creado correctamente`
+        `Usuario @${data.usuario} creado correctamente`,false
       );
-      // Crear también en Supabase Auth
-      if(data.password) sbCrearAuthUsuario(data.usuario, data.password, data.nombre, data.rol, data.marcaId);
     } else {
       const update = {...data, marcaId:data.marcaId?Number(data.marcaId):undefined};
-      // Si el admin dejó el campo vacío, NO tocar la contraseña (no pisarla).
-      // Si escribió una nueva, se conserva y guardarUsuarios la persiste.
-      if(!update.password) delete update.password;
       const cambioPass = !!update.password;
+      const perfil=await sbAdminUsuario("update_profile",{
+        usuario:data.usuario,nombre:update.nombre,rol:update.rol,
+        marca_id:update.marcaId??null,estado:update.estado||"activo",
+      });
+      if(!perfil.ok){ addToast(perfil.error||"No se pudo editar el perfil","error"); return false; }
+      if(cambioPass){
+        const reset=await sbAdminResetPassword(data.usuario,update.password);
+        if(!reset.ok){ addToast(reset.error||"No se pudo cambiar la contraseña","error"); return false; }
+      }
+      delete update.password;
       guardarUsuarios(
         usuarios.map(u=>u.usuario===data.usuario ? {...u,...update} : u),
         cambioPass ? "Cambió contraseña" : "Editó usuario", data.usuario,
-        cambioPass ? `Contraseña de @${data.usuario} actualizada` : `Cambios de @${data.usuario} guardados`
+        cambioPass ? `Contraseña de @${data.usuario} actualizada` : `Cambios de @${data.usuario} guardados`,false
       );
     }
     setModalAdd(false); setEditando(null);
+    return true;
   }
 
   const SQL_USUARIOS = `create table if not exists usuarios (
   usuario text primary key,
-  password text not null,
   nombre text not null,
   rol text not null default 'caja',
   marca_id integer,
   estado text not null default 'activo',
+  auth_id uuid,
   created_at timestamptz default now()
 );
 alter table usuarios enable row level security;
-create policy "allow all usuarios" on usuarios
-  for all using (true) with check (true);`;
+create unique index if not exists usuarios_auth_id_uidx on usuarios(auth_id) where auth_id is not null;
+drop policy if exists usuarios_lectura_segura on usuarios;
+create policy usuarios_lectura_segura on usuarios for select to authenticated
+  using (auth.uid()=auth_id or exists(select 1 from th_current_profile() p where p.rol='admin'));
+-- Las escrituras se realizan únicamente mediante funciones administrativas de servidor.`;
 
   return (
     <div>

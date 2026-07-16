@@ -2,7 +2,11 @@
   "name": "toscana-house",
   "version": "1.0.0",
   "scripts": {
-    "build": "node build.js"
+    "build": "node build.js",
+    "check:build": "node scripts/check-app-build.mjs",
+    "check:sql": "node scripts/check-sql-structure.mjs .",
+    "test": "node --test tests/*.test.mjs",
+    "check": "npm run check:sql && npm test && npm run check:build"
   },
   "dependencies": {
     "react": "^19.2.5",

@@ -6,7 +6,11 @@
   var __getProtoOf = Object.getPrototypeOf;
   var __hasOwnProp = Object.prototype.hasOwnProperty;
   var __commonJS = (cb, mod) => function __require() {
-    return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
+    try {
+      return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
+    } catch (e) {
+      throw mod = 0, e;
+    }
   };
   var __export = (target, all) => {
     for (var name in all)
@@ -995,7 +999,7 @@
         exports.useTransition = function() {
           return resolveDispatcher().useTransition();
         };
-        exports.version = "19.2.5";
+        exports.version = "19.2.7";
         "undefined" !== typeof __REACT_DEVTOOLS_GLOBAL_HOOK__ && "function" === typeof __REACT_DEVTOOLS_GLOBAL_HOOK__.registerInternalModuleStop && __REACT_DEVTOOLS_GLOBAL_HOOK__.registerInternalModuleStop(Error());
       })();
     }
@@ -1522,7 +1526,7 @@
         exports.useFormStatus = function() {
           return resolveDispatcher().useHostTransitionStatus();
         };
-        exports.version = "19.2.5";
+        exports.version = "19.2.7";
         "undefined" !== typeof __REACT_DEVTOOLS_GLOBAL_HOOK__ && "function" === typeof __REACT_DEVTOOLS_GLOBAL_HOOK__.registerInternalModuleStop && __REACT_DEVTOOLS_GLOBAL_HOOK__.registerInternalModuleStop(Error());
       })();
     }
@@ -1546,9 +1550,9 @@
     "node_modules/react-dom/cjs/react-dom-client.development.js"(exports) {
       "use strict";
       (function() {
-        function findHook(fiber, id) {
-          for (fiber = fiber.memoizedState; null !== fiber && 0 < id; )
-            fiber = fiber.next, id--;
+        function findHook(fiber, id2) {
+          for (fiber = fiber.memoizedState; null !== fiber && 0 < id2; )
+            fiber = fiber.next, id2--;
           return fiber;
         }
         function copyWithSetImpl(obj, path, index, value) {
@@ -10886,19 +10890,19 @@
             else ref.current = null;
         }
         function commitProfiler(finishedWork, current2, commitStartTime2, effectDuration) {
-          var _finishedWork$memoize = finishedWork.memoizedProps, id = _finishedWork$memoize.id, onCommit = _finishedWork$memoize.onCommit;
+          var _finishedWork$memoize = finishedWork.memoizedProps, id2 = _finishedWork$memoize.id, onCommit = _finishedWork$memoize.onCommit;
           _finishedWork$memoize = _finishedWork$memoize.onRender;
           current2 = null === current2 ? "mount" : "update";
           currentUpdateIsNested && (current2 = "nested-update");
           "function" === typeof _finishedWork$memoize && _finishedWork$memoize(
-            id,
+            id2,
             current2,
             finishedWork.actualDuration,
             finishedWork.treeBaseDuration,
             finishedWork.actualStartTime,
             commitStartTime2
           );
-          "function" === typeof onCommit && onCommit(id, current2, effectDuration, commitStartTime2);
+          "function" === typeof onCommit && onCommit(id2, current2, effectDuration, commitStartTime2);
         }
         function commitProfilerPostCommitImpl(finishedWork, current2, commitStartTime2, passiveEffectDuration) {
           var _finishedWork$memoize2 = finishedWork.memoizedProps;
@@ -21220,17 +21224,17 @@
         }, badgeFormat = "%c%s%c", badgeStyle = "background: #e6e6e6;background: light-dark(rgba(0,0,0,0.1), rgba(255,255,255,0.25));color: #000000;color: light-dark(#000000, #ffffff);border-radius: 2px", resetStyle = "", pad = " ", bind = Function.prototype.bind;
         var didWarnAboutNestedUpdates = false;
         var overrideHookState = null, overrideHookStateDeletePath = null, overrideHookStateRenamePath = null, overrideProps = null, overridePropsDeletePath = null, overridePropsRenamePath = null, scheduleUpdate = null, scheduleRetry = null, setErrorHandler = null, setSuspenseHandler = null;
-        overrideHookState = function(fiber, id, path, value) {
-          id = findHook(fiber, id);
-          null !== id && (path = copyWithSetImpl(id.memoizedState, path, 0, value), id.memoizedState = path, id.baseState = path, fiber.memoizedProps = assign({}, fiber.memoizedProps), path = enqueueConcurrentRenderForLane(fiber, 2), null !== path && scheduleUpdateOnFiber(path, fiber, 2));
+        overrideHookState = function(fiber, id2, path, value) {
+          id2 = findHook(fiber, id2);
+          null !== id2 && (path = copyWithSetImpl(id2.memoizedState, path, 0, value), id2.memoizedState = path, id2.baseState = path, fiber.memoizedProps = assign({}, fiber.memoizedProps), path = enqueueConcurrentRenderForLane(fiber, 2), null !== path && scheduleUpdateOnFiber(path, fiber, 2));
         };
-        overrideHookStateDeletePath = function(fiber, id, path) {
-          id = findHook(fiber, id);
-          null !== id && (path = copyWithDeleteImpl(id.memoizedState, path, 0), id.memoizedState = path, id.baseState = path, fiber.memoizedProps = assign({}, fiber.memoizedProps), path = enqueueConcurrentRenderForLane(fiber, 2), null !== path && scheduleUpdateOnFiber(path, fiber, 2));
+        overrideHookStateDeletePath = function(fiber, id2, path) {
+          id2 = findHook(fiber, id2);
+          null !== id2 && (path = copyWithDeleteImpl(id2.memoizedState, path, 0), id2.memoizedState = path, id2.baseState = path, fiber.memoizedProps = assign({}, fiber.memoizedProps), path = enqueueConcurrentRenderForLane(fiber, 2), null !== path && scheduleUpdateOnFiber(path, fiber, 2));
         };
-        overrideHookStateRenamePath = function(fiber, id, oldPath, newPath) {
-          id = findHook(fiber, id);
-          null !== id && (oldPath = copyWithRename(id.memoizedState, oldPath, newPath), id.memoizedState = oldPath, id.baseState = oldPath, fiber.memoizedProps = assign({}, fiber.memoizedProps), oldPath = enqueueConcurrentRenderForLane(fiber, 2), null !== oldPath && scheduleUpdateOnFiber(oldPath, fiber, 2));
+        overrideHookStateRenamePath = function(fiber, id2, oldPath, newPath) {
+          id2 = findHook(fiber, id2);
+          null !== id2 && (oldPath = copyWithRename(id2.memoizedState, oldPath, newPath), id2.memoizedState = oldPath, id2.baseState = oldPath, fiber.memoizedProps = assign({}, fiber.memoizedProps), oldPath = enqueueConcurrentRenderForLane(fiber, 2), null !== oldPath && scheduleUpdateOnFiber(oldPath, fiber, 2));
         };
         overrideProps = function(fiber, path, value) {
           fiber.pendingProps = copyWithSetImpl(fiber.memoizedProps, path, 0, value);
@@ -21314,9 +21318,9 @@
         };
         (function() {
           var isomorphicReactPackageVersion = React2.version;
-          if ("19.2.5" !== isomorphicReactPackageVersion)
+          if ("19.2.7" !== isomorphicReactPackageVersion)
             throw Error(
-              'Incompatible React versions: The "react" and "react-dom" packages must have the exact same version. Instead got:\n  - react:      ' + (isomorphicReactPackageVersion + "\n  - react-dom:  19.2.5\nLearn more: https://react.dev/warnings/version-mismatch")
+              'Incompatible React versions: The "react" and "react-dom" packages must have the exact same version. Instead got:\n  - react:      ' + (isomorphicReactPackageVersion + "\n  - react-dom:  19.2.7\nLearn more: https://react.dev/warnings/version-mismatch")
             );
         })();
         "function" === typeof Map && null != Map.prototype && "function" === typeof Map.prototype.forEach && "function" === typeof Set && null != Set.prototype && "function" === typeof Set.prototype.clear && "function" === typeof Set.prototype.forEach || console.error(
@@ -21340,10 +21344,10 @@
         if (!(function() {
           var internals = {
             bundleType: 1,
-            version: "19.2.5",
+            version: "19.2.7",
             rendererPackageName: "react-dom",
             currentDispatcherRef: ReactSharedInternals,
-            reconcilerVersion: "19.2.5"
+            reconcilerVersion: "19.2.7"
           };
           internals.overrideHookState = overrideHookState;
           internals.overrideHookStateDeletePath = overrideHookStateDeletePath;
@@ -21434,7 +21438,7 @@
           listenToAllSupportedEvents(container);
           return new ReactDOMHydrationRoot(initialChildren);
         };
-        exports.version = "19.2.5";
+        exports.version = "19.2.7";
         "undefined" !== typeof __REACT_DEVTOOLS_GLOBAL_HOOK__ && "function" === typeof __REACT_DEVTOOLS_GLOBAL_HOOK__.registerInternalModuleStop && __REACT_DEVTOOLS_GLOBAL_HOOK__.registerInternalModuleStop(Error());
       })();
     }
@@ -25230,10 +25234,10 @@
   }
   function safegetzipfile(zip, file) {
     var k = zip.FullPaths || keys(zip.files);
-    var f = file.toLowerCase().replace(/[\/]/g, "\\"), g = f.replace(/\\/g, "/");
+    var f = file.toLowerCase().replace(/[\/]/g, "\\"), g2 = f.replace(/\\/g, "/");
     for (var i = 0; i < k.length; ++i) {
       var n = k[i].replace(/^Root Entry[\/]/, "").toLowerCase();
-      if (f == n || g == n) return zip.files ? zip.files[k[i]] : zip.FileIndex[i];
+      if (f == n || g2 == n) return zip.files ? zip.files[k[i]] : zip.FileIndex[i];
     }
     return null;
   }
@@ -25518,10 +25522,10 @@
   };
   var matchtag = /* @__PURE__ */ (function() {
     var mtcache = {};
-    return function matchtag2(f, g) {
-      var t = f + "|" + (g || "");
+    return function matchtag2(f, g2) {
+      var t = f + "|" + (g2 || "");
       if (mtcache[t]) return mtcache[t];
-      return mtcache[t] = new RegExp("<(?:\\w+:)?" + f + '(?: xml:space="preserve")?(?:[^>]*)>([\\s\\S]*?)</(?:\\w+:)?' + f + ">", g || "");
+      return mtcache[t] = new RegExp("<(?:\\w+:)?" + f + '(?: xml:space="preserve")?(?:[^>]*)>([\\s\\S]*?)</(?:\\w+:)?' + f + ">", g2 || "");
     };
   })();
   var htmldecode = /* @__PURE__ */ (function() {
@@ -25566,16 +25570,16 @@
     return res;
   }
   var wtregex = /(^\s|\s$|\n)/;
-  function writetag(f, g) {
-    return "<" + f + (g.match(wtregex) ? ' xml:space="preserve"' : "") + ">" + g + "</" + f + ">";
+  function writetag(f, g2) {
+    return "<" + f + (g2.match(wtregex) ? ' xml:space="preserve"' : "") + ">" + g2 + "</" + f + ">";
   }
   function wxt_helper(h) {
     return keys(h).map(function(k) {
       return " " + k + '="' + h[k] + '"';
     }).join("");
   }
-  function writextag(f, g, h) {
-    return "<" + f + (h != null ? wxt_helper(h) : "") + (g != null ? (g.match(wtregex) ? ' xml:space="preserve"' : "") + ">" + g + "</" + f : "/") + ">";
+  function writextag(f, g2, h) {
+    return "<" + f + (h != null ? wxt_helper(h) : "") + (g2 != null ? (g2.match(wtregex) ? ' xml:space="preserve"' : "") + ">" + g2 + "</" + f : "/") + ">";
   }
   function write_w3cdtf(d, t) {
     try {
@@ -27588,8 +27592,8 @@
     var r = new Array(CORE_PROPS.length);
     for (var i = 0; i < CORE_PROPS.length; ++i) {
       var f = CORE_PROPS[i];
-      var g = "(?:" + f[0].slice(0, f[0].indexOf(":")) + ":)" + f[0].slice(f[0].indexOf(":") + 1);
-      r[i] = new RegExp("<" + g + "[^>]*>([\\s\\S]*?)</" + g + ">");
+      var g2 = "(?:" + f[0].slice(0, f[0].indexOf(":")) + ":)" + f[0].slice(f[0].indexOf(":") + 1);
+      r[i] = new RegExp("<" + g2 + "[^>]*>([\\s\\S]*?)</" + g2 + ">");
     }
     return r;
   })();
@@ -27603,11 +27607,11 @@
     }
     return p;
   }
-  function cp_doit(f, g, h, o, p) {
-    if (p[f] != null || g == null || g === "") return;
-    p[f] = g;
-    g = escapexml(g);
-    o[o.length] = h ? writextag(f, g, h) : writetag(f, g);
+  function cp_doit(f, g2, h, o, p) {
+    if (p[f] != null || g2 == null || g2 === "") return;
+    p[f] = g2;
+    g2 = escapexml(g2);
+    o[o.length] = h ? writextag(f, g2, h) : writetag(f, g2);
   }
   function write_core_props(cp, _opts) {
     var opts = _opts || {};
@@ -28655,8 +28659,8 @@
     return out.slice(0, out.l);
   }
   function parse_LongRGBA(blob) {
-    var r = blob.read_shift(1), g = blob.read_shift(1), b = blob.read_shift(1), a = blob.read_shift(1);
-    return [r, g, b, a];
+    var r = blob.read_shift(1), g2 = blob.read_shift(1), b = blob.read_shift(1), a = blob.read_shift(1);
+    return [r, g2, b, a];
   }
   function parse_LongRGB(blob, length) {
     var x = parse_LongRGBA(blob, length);
@@ -28732,10 +28736,10 @@
   function parse_FtCmo(blob) {
     blob.l += 4;
     var ot = blob.read_shift(2);
-    var id = blob.read_shift(2);
+    var id2 = blob.read_shift(2);
     var flags = blob.read_shift(2);
     blob.l += 12;
-    return [id, ot, flags];
+    return [id2, ot, flags];
   }
   function parse_FtNts(blob) {
     var out = {};
@@ -29474,7 +29478,7 @@
   function parse_BIFF5Obj(blob, length, opts) {
     blob.l += 4;
     var ot = blob.read_shift(2);
-    var id = blob.read_shift(2);
+    var id2 = blob.read_shift(2);
     var grbit = blob.read_shift(2);
     blob.l += 2;
     blob.l += 2;
@@ -29489,7 +29493,7 @@
     length -= 36;
     var fts = [];
     fts.push((parse_BIFF5OT[ot] || parsenoop)(blob, length, opts));
-    return { cmo: [id, ot, grbit], ft: fts };
+    return { cmo: [id2, ot, grbit], ft: fts };
   }
   function parse_TxO(blob, length, opts) {
     var s = blob.l;
@@ -31849,12 +31853,12 @@
     }
     function parse_SHEETINFOQP(blob, length, opts) {
       if (!opts.qpro || length < 21) return;
-      var id = blob.read_shift(1);
+      var id2 = blob.read_shift(1);
       blob.l += 17;
       blob.l += 1;
       blob.l += 2;
       var nm = blob.read_shift(length - 21, "cstr");
-      return [id, nm];
+      return [id2, nm];
     }
     function parse_XFORMAT(blob, length) {
       var o = {}, tgt = blob.l + length;
@@ -34800,8 +34804,8 @@
   }
   function parse_drawing(data, rels) {
     if (!data) return "??";
-    var id = (data.match(/<c:chart [^>]*r:id="([^"]*)"/) || ["", ""])[1];
-    return rels["!id"][id].Target;
+    var id2 = (data.match(/<c:chart [^>]*r:id="([^"]*)"/) || ["", ""])[1];
+    return rels["!id"][id2].Target;
   }
   var _shapeid = 1024;
   function write_comments_vml(rId, comments) {
@@ -36045,12 +36049,12 @@
   }
   function parse_Rgce(blob, length, opts) {
     var target = blob.l + length;
-    var R, id, ptgs = [];
+    var R, id2, ptgs = [];
     while (target != blob.l) {
       length = target - blob.l;
-      id = blob[blob.l];
-      R = PtgTypes[id] || PtgTypes[PtgDupes[id]];
-      if (id === 24 || id === 25) R = (id === 24 ? Ptg18 : Ptg19)[blob[blob.l + 1]];
+      id2 = blob[blob.l];
+      R = PtgTypes[id2] || PtgTypes[PtgDupes[id2]];
+      if (id2 === 24 || id2 === 25) R = (id2 === 24 ? Ptg18 : Ptg19)[blob[blob.l + 1]];
       if (!R || !R.f) {
         parsenoop(blob, length);
       } else {
@@ -41812,12 +41816,12 @@
   }
   function write_sty_xlml(wb, opts) {
     var styles = ['<Style ss:ID="Default" ss:Name="Normal"><NumberFormat/></Style>'];
-    opts.cellXfs.forEach(function(xf, id) {
+    opts.cellXfs.forEach(function(xf, id2) {
       var payload = [];
       payload.push(writextag("NumberFormat", null, { "ss:Format": escapexml(table_fmt[xf.numFmtId]) }));
       var o = (
         /*::(*/
-        { "ss:ID": "s" + (21 + id) }
+        { "ss:ID": "s" + (21 + id2) }
       );
       styles.push(writextag("Style", payload.join(""), o));
     });
@@ -53400,12 +53404,28 @@
   (function autoUpdater() {
     const BUNDLE_ACTUAL = document.querySelector('script[src^="bundle-"]')?.src?.match(/bundle-(\d+)\.js/)?.[1];
     if (!BUNDLE_ACTUAL) return;
+    function hayTrabajoProtegido() {
+      try {
+        if (sessionStorage.getItem("th_critical_ui_state_v1") === "1") return true;
+      } catch {
+      }
+      try {
+        const draft = JSON.parse(localStorage.getItem("th_pos_draft") || "null");
+        if (Array.isArray(draft?.carrito) && draft.carrito.length > 0) return true;
+      } catch {
+      }
+      return false;
+    }
     async function checkVersion() {
       try {
         const r = await fetch("/version.json?_=" + Date.now(), { cache: "no-store" });
         if (!r.ok) return;
         const { v } = await r.json();
         if (String(v) !== String(BUNDLE_ACTUAL)) {
+          if (hayTrabajoProtegido()) {
+            console.log("[TH] Actualizaci\xF3n pendiente \u2014 se aplicar\xE1 cuando termine la operaci\xF3n activa");
+            return;
+          }
           console.log("[TH] Nueva versi\xF3n detectada \u2014 recargando...");
           window.location.reload(true);
         }
@@ -53438,6 +53458,302 @@
     });
     _supabase = window.supabase.createClient(SUPA_URL, SUPA_KEY, SUPA_OPTS);
     return _supabase;
+  }
+  var TH_DEVICE_KEY = "th_device_id_v1";
+  var TH_FEATURE_CACHE_KEY = "th_feature_modes_v1";
+  var TH_VALID_MODES = /* @__PURE__ */ new Set(["legacy", "shadow", "transactional"]);
+  function thUUID() {
+    if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
+    return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+      const r = Math.random() * 16 | 0, v = c === "x" ? r : r & 3 | 8;
+      return v.toString(16);
+    });
+  }
+  function thDeviceId() {
+    try {
+      let id2 = localStorage.getItem(TH_DEVICE_KEY);
+      if (!id2) {
+        id2 = thUUID();
+        localStorage.setItem(TH_DEVICE_KEY, id2);
+      }
+      return id2;
+    } catch {
+      return "device-unknown";
+    }
+  }
+  function thClientVersion() {
+    return document.querySelector('script[src^="bundle-"]')?.src?.match(/bundle-(\d+)\.js/)?.[1] || "dev";
+  }
+  function thEnvironment() {
+    const buildEnvironment = "";
+    if (["local", "staging", "production"].includes(buildEnvironment)) return buildEnvironment;
+    const host = (globalThis.location?.hostname || "").toLowerCase();
+    if (host === "localhost" || host === "127.0.0.1" || host === "") return "local";
+    if (host.endsWith(".vercel.app")) return "staging";
+    return "production";
+  }
+  function thEsVentaTecnica(venta) {
+    const id2 = String(venta?.id || "").trim().toUpperCase();
+    const origen = String(venta?.origen || "").trim().toUpperCase();
+    const metadata = venta?.metadata || {};
+    return metadata.excludeFromReports === true || origen === "PRUEBA_CANARIO" || id2.startsWith("TEST_CANARY_");
+  }
+  function thOperationContext(user) {
+    return {
+      usuario: user?.usuario || "",
+      nombre: user?.nombre || "",
+      rol: user?.rol || "",
+      marcaId: user?.marcaId ?? null,
+      deviceId: thDeviceId(),
+      clientVersion: thClientVersion(),
+      environment: thEnvironment()
+    };
+  }
+  function thFeatureCache() {
+    try {
+      return JSON.parse(localStorage.getItem(TH_FEATURE_CACHE_KEY) || "{}");
+    } catch {
+      return {};
+    }
+  }
+  function thSetCachedMode(key, modo) {
+    try {
+      const all = thFeatureCache();
+      all[key] = { modo, checkedAt: Date.now() };
+      localStorage.setItem(TH_FEATURE_CACHE_KEY, JSON.stringify(all));
+    } catch {
+    }
+  }
+  async function sbResolverModoOperacion(operacion, user) {
+    const ambiente = thEnvironment();
+    const usuario = user?.usuario || "*";
+    const deviceId = thDeviceId();
+    const key = `${ambiente}|${operacion}|${usuario}|${deviceId}`;
+    const cached = thFeatureCache()[key]?.modo;
+    if (typeof navigator !== "undefined" && navigator.onLine === false) return TH_VALID_MODES.has(cached) ? cached : "legacy";
+    try {
+      const db = await getSupabase();
+      const { data, error } = await db.rpc("th_resolver_feature_flag", {
+        p_ambiente: ambiente,
+        p_operacion: operacion,
+        p_usuario: usuario,
+        p_device_id: deviceId
+      });
+      if (error) throw error;
+      const modo = TH_VALID_MODES.has(data) ? data : "legacy";
+      thSetCachedMode(key, modo);
+      return modo;
+    } catch (e) {
+      console.warn(`[Blindaje] flag ${operacion}:`, e.message);
+      return TH_VALID_MODES.has(cached) ? cached : "legacy";
+    }
+  }
+  var THOperationError = class extends Error {
+    constructor(result, fallback = "La operaci\xF3n no fue confirmada") {
+      super(result?.message || fallback);
+      this.name = "THOperationError";
+      this.code = result?.code || "OPERATION_REJECTED";
+      this.result = result || null;
+    }
+  };
+  async function sbEjecutarRPCTransaccional(nombre, args) {
+    if (typeof navigator !== "undefined" && navigator.onLine === false) {
+      throw new THOperationError({ code: "OFFLINE", message: "Esta operaci\xF3n segura necesita conexi\xF3n. No se modific\xF3 ning\xFAn dato." });
+    }
+    const db = await getSupabase();
+    const { data, error } = await db.rpc(nombre, args);
+    if (error) throw new THOperationError({ code: error.code || "RPC_ERROR", message: error.message });
+    if (!data || data.ok !== true) throw new THOperationError(data);
+    return data;
+  }
+  async function sbRegistrarVentaTransaccional(operationId, venta, user) {
+    const { items: items2, ...ventaHeader } = venta;
+    return sbEjecutarRPCTransaccional("th_registrar_venta", {
+      p_operation_id: operationId,
+      p_venta: ventaHeader,
+      p_items: items2,
+      p_context: thOperationContext(user)
+    });
+  }
+  async function sbAnularVentaTransaccional(operationId, ventaId, motivo, user) {
+    return sbEjecutarRPCTransaccional("th_anular_venta", {
+      p_operation_id: operationId,
+      p_venta_id: ventaId,
+      p_motivo: motivo || "",
+      p_context: thOperationContext(user)
+    });
+  }
+  async function sbRegistrarCambioTransaccional(operationId, cambio, user) {
+    return sbEjecutarRPCTransaccional("th_registrar_cambio", {
+      p_operation_id: operationId,
+      p_cambio: cambio,
+      p_context: thOperationContext(user)
+    });
+  }
+  async function sbMovimientoTransaccional(rpc, operationId, data, user) {
+    return sbEjecutarRPCTransaccional(rpc, {
+      p_operation_id: operationId,
+      p_data: data,
+      p_context: thOperationContext(user)
+    });
+  }
+  async function sbImportacionTransaccional(operationId, carga, user) {
+    return sbEjecutarRPCTransaccional("th_registrar_importacion", {
+      p_operation_id: operationId,
+      p_carga: carga,
+      p_context: thOperationContext(user)
+    });
+  }
+  async function sbAjusteBatchTransaccional(operationId, ajuste, user) {
+    return sbEjecutarRPCTransaccional("th_ajustar_inventario_batch", {
+      p_operation_id: operationId,
+      p_ajuste: ajuste,
+      p_context: thOperationContext(user)
+    });
+  }
+  async function sbRevertirCargaTransaccional(operationId, cargaId, motivo, user) {
+    return sbEjecutarRPCTransaccional("th_revertir_carga", {
+      p_operation_id: operationId,
+      p_carga_id: cargaId,
+      p_motivo: motivo || "",
+      p_context: thOperationContext(user)
+    });
+  }
+  async function sbEditarProductoTransaccional(operationId, data, user) {
+    return sbEjecutarRPCTransaccional("th_editar_producto", {
+      p_operation_id: operationId,
+      p_data: data,
+      p_context: thOperationContext(user)
+    });
+  }
+  async function sbDesactivarProductoTransaccional(operationId, productoId, motivo, user) {
+    return sbEjecutarRPCTransaccional("th_desactivar_producto", {
+      p_operation_id: operationId,
+      p_producto_id: productoId,
+      p_motivo: motivo || "",
+      p_context: thOperationContext(user)
+    });
+  }
+  async function sbImportarVentasLibresTransaccional(operationId, data, user) {
+    return sbEjecutarRPCTransaccional("th_importar_ventas_libres", {
+      p_operation_id: operationId,
+      p_data: data,
+      p_context: thOperationContext(user)
+    });
+  }
+  async function sbCrearGiftCardTransaccional(operationId, data, user) {
+    return sbEjecutarRPCTransaccional("th_crear_gift_card", {
+      p_operation_id: operationId,
+      p_data: data,
+      p_context: thOperationContext(user)
+    });
+  }
+  async function sbCanjearGiftCardTransaccional(operationId, codigo, monto, nota, user) {
+    return sbEjecutarRPCTransaccional("th_canjear_gift_card", {
+      p_operation_id: operationId,
+      p_codigo: codigo,
+      p_monto: monto,
+      p_nota: nota || "",
+      p_context: thOperationContext(user)
+    });
+  }
+  async function sbImportarGiftCardsTransaccional(operationId, cards, user) {
+    return sbEjecutarRPCTransaccional("th_importar_gift_cards", {
+      p_operation_id: operationId,
+      p_cards: cards,
+      p_context: thOperationContext(user)
+    });
+  }
+  async function sbGuardarEstadoOperativoTransaccional(operationId, tipo, data, user) {
+    return sbEjecutarRPCTransaccional("th_guardar_estado_operativo", {
+      p_operation_id: operationId,
+      p_tipo: tipo,
+      p_data: data,
+      p_context: thOperationContext(user)
+    });
+  }
+  async function sbGuardarConfiguracionFinancieraTransaccional(operationId, tipo, data, user) {
+    return sbEjecutarRPCTransaccional("th_guardar_configuracion_financiera", {
+      p_operation_id: operationId,
+      p_tipo: tipo,
+      p_data: data,
+      p_context: thOperationContext(user)
+    });
+  }
+  async function sbGuardarConfiguracionFinancieraPendiente(payload) {
+    return sbEjecutarRPCTransaccional("th_guardar_configuracion_financiera", {
+      p_operation_id: payload.operationId,
+      p_tipo: payload.tipo,
+      p_data: payload.data,
+      p_context: payload.context || {}
+    }).then(() => true);
+  }
+  async function sbCargarConfiguracionFinanciera() {
+    try {
+      const db = await getSupabase();
+      const [{ data: config, error: e1 }, { data: periodos, error: e2 }, { data: alquileres, error: e3 }] = await Promise.all([
+        db.from("liquidacion_config").select("*"),
+        db.from("liquidacion_periodos").select("*"),
+        db.from("alquiler_estados").select("*")
+      ]);
+      if (e1 || e2 || e3) throw e1 || e2 || e3;
+      return { config: config || [], periodos: periodos || [], alquileres: alquileres || [] };
+    } catch (e) {
+      console.warn("Supabase configuraci\xF3n financiera:", e.message);
+      return null;
+    }
+  }
+  async function sbCargarCajasSeguras() {
+    try {
+      const db = await getSupabase();
+      const [{ data: cajas, error: e1 }, { data: turnos, error: e2 }] = await Promise.all([
+        db.from("cajas").select("id,codigo,nombre,activa").eq("activa", true).order("id"),
+        db.from("caja_turnos").select("*").order("abierta_at", { ascending: false }).limit(500)
+      ]);
+      if (e1 || e2) throw e1 || e2;
+      return (cajas || []).map((c) => {
+        const lista = (turnos || []).filter((t) => Number(t.caja_id) === Number(c.id));
+        const abierto = lista.find((t) => !t.cerrada_at);
+        const ultimo = lista.find((t) => t.cerrada_at);
+        return {
+          id: c.id,
+          codigo: c.codigo,
+          nombre: c.nombre,
+          isOpen: !!abierto,
+          turnoId: abierto?.id || null,
+          ultimoCierre: ultimo?.cerrada_at ? new Date(ultimo.cerrada_at).toLocaleDateString("es-BO") : null,
+          balanceCierre: Number(ultimo?.balance_cierre) || 0
+        };
+      });
+    } catch (e) {
+      console.warn("Supabase cajas:", e.message);
+      return null;
+    }
+  }
+  async function sbCambiarTurnoCaja(operationId, cajaId, accion, balance, user) {
+    return sbEjecutarRPCTransaccional("th_cambiar_turno_caja", {
+      p_operation_id: operationId,
+      p_caja_id: cajaId,
+      p_accion: accion,
+      p_balance: balance ?? null,
+      p_context: thOperationContext(user)
+    });
+  }
+  async function sbRegistrarShadow(operationId, tipo, payload, user) {
+    try {
+      const db = await getSupabase();
+      const { error } = await db.rpc("th_registrar_shadow", {
+        p_operation_id: operationId,
+        p_tipo: tipo,
+        p_payload: payload,
+        p_context: thOperationContext(user)
+      });
+      if (error) throw error;
+      return true;
+    } catch (e) {
+      console.warn(`[Blindaje] shadow ${tipo}:`, e.message);
+      return false;
+    }
   }
   var _rtChannel = null;
   function rtBroadcast(event, payload) {
@@ -53605,10 +53921,22 @@
         vendedor: venta.vendedor,
         etiqueta_img: venta.etiquetaImg || null,
         cliente_nombre: venta.clienteNombre || null,
-        cliente_telefono: venta.clienteTelefono || null
+        cliente_telefono: venta.clienteTelefono || null,
+        origen: venta.origen || null,
+        canal: venta.canal || null,
+        efectivo: venta.efectivo || null,
+        qr: venta.qr || null,
+        tarjeta: venta.tarjeta || null,
+        gc_id: venta.gcId || null,
+        gc_usado: venta.gcUsado || null,
+        gc_allocations: venta.gcAllocations || null,
+        operation_id: venta.operationId || null,
+        engine: venta.engine || "legacy",
+        device_id: venta.deviceId || thDeviceId(),
+        client_version: venta.clientVersion || thClientVersion()
       });
       if (errVenta) throw errVenta;
-      const items = venta.items.map((it) => ({
+      const items2 = venta.items.map((it, idx) => ({
         venta_id: venta.id,
         prod_id: it.prodId,
         codigo: it.codigo,
@@ -53617,9 +53945,11 @@
         marca_nombre: it.marcaNombre,
         cantidad: it.cantidad,
         precio_unit: it.precioUnit,
-        subtotal: it.subtotal
+        subtotal: it.subtotal,
+        desc_pct: it.descPct || 0,
+        line_key: it.lineKey || `${venta.operationId || venta.id}:${idx + 1}`
       }));
-      const { error: errItems } = await db.from("venta_items").insert(items);
+      const { error: errItems } = await db.from("venta_items").upsert(items2, { onConflict: "venta_id,line_key" });
       if (errItems) throw errItems;
       return true;
     } catch (e) {
@@ -53649,10 +53979,10 @@
       return false;
     }
   }
-  async function sbObtenerSesionVerif(id) {
+  async function sbObtenerSesionVerif(id2) {
     try {
       const db = await getSupabase();
-      const { data, error } = await db.from("th_verif_sesion").select("*").eq("id", id).maybeSingle();
+      const { data, error } = await db.from("th_verif_sesion").select("*").eq("id", id2).maybeSingle();
       if (error) throw error;
       return data;
     } catch (e) {
@@ -53660,34 +53990,49 @@
       return null;
     }
   }
-  async function sbCrearSesionVerif(id, mk, marcaId, baseTs) {
+  async function sbCrearSesionVerif(id2, mk, marcaId, baseTs, user) {
     try {
       const db = await getSupabase();
-      await db.from("th_verif_sesion").upsert(
-        { id, mk, marca_id: marcaId, base_ts: baseTs.toISOString(), conteo: {} },
-        { onConflict: "id", ignoreDuplicates: true }
-      );
-    } catch (e) {
-      console.warn("Supabase crear sesi\xF3n verif:", e.message);
-    }
-  }
-  async function sbIncrementarConteoVerif(id, codigo) {
-    try {
-      const db = await getSupabase();
-      const { data, error } = await db.rpc("incrementar_conteo_verif", { p_id: id, p_codigo: codigo });
+      const { data, error } = await db.rpc("th_iniciar_sesion_verificacion", {
+        p_id: id2,
+        p_mk: mk,
+        p_marca_id: marcaId ?? null,
+        p_base_ts: baseTs.toISOString(),
+        p_context: thOperationContext(user)
+      });
       if (error) throw error;
       return data;
+    } catch (e) {
+      console.warn("Supabase crear sesi\xF3n verif:", e.message);
+      return null;
+    }
+  }
+  async function sbIncrementarConteoVerif(id2, codigo, operationId, user) {
+    try {
+      const data = await sbEjecutarRPCTransaccional("th_incrementar_conteo_verificacion", {
+        p_operation_id: operationId,
+        p_id: id2,
+        p_codigo: codigo,
+        p_context: thOperationContext(user)
+      });
+      return data?.conteo || null;
     } catch (e) {
       console.warn("Supabase incrementar conteo verif:", e.message);
       return null;
     }
   }
-  async function sbResetSesionVerif(id) {
+  async function sbResetSesionVerif(id2, operationId, user, motivo = "reinicio_manual") {
     try {
-      const db = await getSupabase();
-      await db.from("th_verif_sesion").update({ conteo: {} }).eq("id", id);
+      const data = await sbEjecutarRPCTransaccional("th_reiniciar_sesion_verificacion", {
+        p_operation_id: operationId,
+        p_id: id2,
+        p_motivo: motivo,
+        p_context: thOperationContext(user)
+      });
+      return data;
     } catch (e) {
       console.warn("Supabase reset sesi\xF3n verif:", e.message);
+      return null;
     }
   }
   async function sbGuardarRetiro(retiro) {
@@ -53753,7 +54098,7 @@
   async function sbGuardarCarga(c) {
     try {
       const db = await getSupabase();
-      const { error } = await db.from("cargas_inventario").insert({
+      const { error } = await db.from("cargas_inventario").upsert({
         id: c.id,
         ts: c.ts,
         fecha: c.fecha,
@@ -53770,8 +54115,9 @@
         actualizados: c.actualizados || 0,
         detalle: c.items || [],
         archivo_nombre: c.archivoNombre || null,
-        archivo_url: c.archivoUrl || null
-      });
+        archivo_url: c.archivoUrl || null,
+        operation_id: c.operationId || null
+      }, { onConflict: "id" });
       if (error) throw error;
       return true;
     } catch (e) {
@@ -53788,18 +54134,60 @@
         contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
       });
       if (error) throw error;
-      const { data } = db.storage.from("cargas-evidencia").getPublicUrl(path);
-      return data.publicUrl;
+      return `storage://cargas-evidencia/${path}`;
     } catch (e) {
       console.warn("Supabase subir evidencia:", e.message);
       return null;
     }
   }
-  async function generarExcelEvidenciaManual(items, titulo) {
+  async function sbResolverArchivoSeguro(ref, expiresIn = 600, downloadName = "") {
+    if (!ref) return null;
+    const value = String(ref);
+    let raw = "";
+    if (value.startsWith("storage://")) raw = value.slice("storage://".length);
+    else {
+      try {
+        const url = new URL(value);
+        const marker = "/storage/v1/object/public/";
+        if (!url.pathname.startsWith(marker)) return value;
+        raw = decodeURIComponent(url.pathname.slice(marker.length));
+      } catch {
+        return value;
+      }
+    }
+    const slash = raw.indexOf("/");
+    if (slash <= 0) return null;
+    const bucket = raw.slice(0, slash), path = raw.slice(slash + 1);
+    if (!["cargas-evidencia", "notas"].includes(bucket) || !path) return null;
+    const db = await getSupabase();
+    const options = downloadName ? { download: downloadName } : void 0;
+    const { data, error } = await db.storage.from(bucket).createSignedUrl(path, expiresIn, options);
+    if (error) throw error;
+    return data?.signedUrl || null;
+  }
+  async function sbDescargarArchivoSeguro(ref, downloadName = "archivo") {
+    try {
+      const url = await sbResolverArchivoSeguro(ref, 600, downloadName);
+      if (!url) throw new Error("No se pudo generar el enlace temporal");
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = downloadName;
+      a.target = "_blank";
+      a.rel = "noopener noreferrer";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      return true;
+    } catch (e) {
+      console.warn("Descarga segura:", e.message);
+      return false;
+    }
+  }
+  async function generarExcelEvidenciaManual(items2, titulo) {
     const XLSX2 = await loadXLSX();
     const filas = [
       ["CODIGO", "NOMBRE", "MARCA", "PRECIO (Bs)", "STOCK", "CATEGORIA"],
-      ...items.map((it) => [it.codigo || "", it.nombre || "", it.marcaNombre || "", it.precio || 0, it.stock || 0, it.categoria || ""])
+      ...items2.map((it) => [it.codigo || "", it.nombre || "", it.marcaNombre || "", it.precio || 0, it.stock || 0, it.categoria || ""])
     ];
     const ws = XLSX2.utils.aoa_to_sheet(filas);
     ws["!cols"] = [20, 35, 18, 14, 8, 18].map((w) => ({ wch: w }));
@@ -53830,7 +54218,13 @@
         items: c.detalle || [],
         verificado: c.verificado || false,
         verificadoTs: c.verificado_ts || null,
-        verificadoPor: c.verificado_por || null
+        verificadoPor: c.verificado_por || null,
+        operationId: c.operation_id || null,
+        revertida: c.revertida || false,
+        revertidaAt: c.revertida_at || null,
+        revertidaPor: c.revertida_por || null,
+        archivoNombre: c.archivo_nombre || null,
+        archivoUrl: c.archivo_url || null
       }));
     } catch (e) {
       console.warn("Supabase load cargas:", e.message);
@@ -53894,43 +54288,56 @@
       return [];
     }
   }
-  async function sbGuardarUsuarios(lista) {
-    try {
-      const db = await getSupabase();
-      const rows = lista.map((u) => ({
-        usuario: u.usuario,
-        nombre: u.nombre,
-        rol: u.rol || "caja",
-        marca_id: u.marcaId ? Number(u.marcaId) : null,
-        estado: u.estado || "activo"
-      }));
-      const { error } = await db.from("usuarios").upsert(rows, { onConflict: "usuario" });
-      if (error) throw error;
-      return true;
-    } catch (e) {
-      console.warn("Supabase save usuarios:", e.message);
-      return false;
-    }
+  function thUsuariosSinCredenciales(lista) {
+    return (Array.isArray(lista) ? lista : []).map(({ password, ...u }) => u);
   }
-  async function sbActualizarPassword(usuario, password) {
+  function thPurgarCredencialesLocales() {
     try {
-      const db = await getSupabase();
-      const { error } = await db.from("usuarios").update({ password }).eq("usuario", usuario);
-      if (error) throw error;
-      return true;
-    } catch (e) {
-      console.warn("Supabase update password:", e.message);
-      return false;
-    }
-  }
-  async function sbLeerPassword(usuario) {
-    try {
-      const db = await getSupabase();
-      const { data } = await db.from("usuarios").select("password").eq("usuario", usuario).maybeSingle();
-      return data ? data.password || "" : null;
+      const usuarios = JSON.parse(localStorage.getItem("th_usuarios") || "[]");
+      if (Array.isArray(usuarios)) localStorage.setItem("th_usuarios", JSON.stringify(thUsuariosSinCredenciales(usuarios)));
+      const outbox = JSON.parse(localStorage.getItem("th_sync_outbox") || "[]");
+      if (Array.isArray(outbox)) localStorage.setItem("th_sync_outbox", JSON.stringify(
+        outbox.filter((op) => !["password", "usuarios"].includes(op?.tipo))
+      ));
     } catch {
-      return null;
     }
+  }
+  thPurgarCredencialesLocales();
+  async function sbCambiarPasswordSegura(usuario, passwordActual, passwordNueva) {
+    try {
+      const db = await getSupabase();
+      const { error: loginError } = await db.auth.signInWithPassword({
+        email: `${usuario.toLowerCase().trim()}@th.internal`,
+        password: passwordActual
+      });
+      if (loginError) return { ok: false, error: "Contrase\xF1a actual incorrecta" };
+      const { error } = await db.auth.updateUser({ password: passwordNueva });
+      if (error) throw error;
+      return { ok: true };
+    } catch (e) {
+      return { ok: false, error: e.message || "No se pudo actualizar la contrase\xF1a" };
+    }
+  }
+  async function sbAdminUsuario(action, payload = {}) {
+    try {
+      const db = await getSupabase();
+      const { data: { session } } = await db.auth.getSession();
+      if (!session) throw new Error("Sesi\xF3n administrativa requerida");
+      const res = await fetch(`${SUPA_URL}/functions/v1/admin-usuario`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${session.access_token}` },
+        body: JSON.stringify({ action, operationId: payload.operationId || thUUID(), ...payload })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.ok === false) throw new Error(data.error || "Operaci\xF3n administrativa rechazada");
+      return { ok: true, data };
+    } catch (e) {
+      console.warn("admin-usuario:", e.message);
+      return { ok: false, error: e.message };
+    }
+  }
+  async function sbAdminResetPassword(usuario, password) {
+    return sbAdminUsuario("reset_password", { usuario, password });
   }
   async function sbCargarUsuarios() {
     try {
@@ -53974,20 +54381,20 @@
       return null;
     }
   }
-  async function sbCrearAuthUsuario(usuario, password, nombre, rol, marcaId) {
+  async function sbCrearAuthUsuario(usuario, password, nombre, rol, marcaId, operationId = thUUID()) {
     try {
       const db = await getSupabase();
       const { data: { session } } = await db.auth.getSession();
       if (!session) return false;
       const res = await fetch(
-        "https://uqphxiixdulqscbfyxhz.supabase.co/functions/v1/crear-usuario",
+        `${SUPA_URL}/functions/v1/crear-usuario`,
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
             "Authorization": `Bearer ${session.access_token}`
           },
-          body: JSON.stringify({ usuario, password, nombre, rol, marca_id: marcaId || null })
+          body: JSON.stringify({ usuario, password, nombre, rol, marca_id: marcaId || null, operationId })
         }
       );
       const data = await res.json();
@@ -54002,22 +54409,8 @@
     }
   }
   async function sbEliminarAuthUsuario(usuario) {
-    try {
-      const db = await getSupabase();
-      await db.rpc("admin_eliminar_usuario", { p_usuario: usuario });
-      return true;
-    } catch (e) {
-      console.warn("eliminar auth usuario:", e.message);
-      return false;
-    }
-  }
-  async function sbEliminarUsuario(usuario) {
-    try {
-      const db = await getSupabase();
-      await db.from("usuarios").delete().eq("usuario", usuario);
-    } catch (e) {
-      console.warn("Supabase delete usuario:", e.message);
-    }
+    const result = await sbAdminUsuario("delete", { usuario });
+    return result.ok;
   }
   async function sbSelectAll(db, tabla, columns = "*") {
     const PAGE = 1e3;
@@ -54034,7 +54427,7 @@
   async function sbCargarTodo() {
     try {
       const db = await getSupabase();
-      const [inv, ventas, items, cierres] = await Promise.all([
+      const [inv, ventas, items2, cierres] = await Promise.all([
         sbSelectAll(db, "inventario"),
         sbSelectAll(db, "ventas"),
         sbSelectAll(db, "venta_items"),
@@ -54055,8 +54448,19 @@
         etiquetaImg: v.etiqueta_img,
         clienteNombre: v.cliente_nombre || "",
         clienteTelefono: v.cliente_telefono || "",
+        origen: v.origen || "",
+        canal: v.canal || "",
+        efectivo: Number(v.efectivo) || 0,
+        qr: Number(v.qr) || 0,
+        tarjeta: Number(v.tarjeta) || 0,
+        gcId: v.gc_id || "",
+        gcUsado: Number(v.gc_usado) || 0,
+        gcAllocations: v.gc_allocations || null,
+        operationId: v.operation_id || null,
+        engine: v.engine || "legacy",
+        metadata: v.metadata || {},
         anulada: v.anulada || false,
-        items: (items || []).filter((i) => i.venta_id === v.id).map((i) => ({
+        items: (items2 || []).filter((i) => i.venta_id === v.id).map((i) => ({
           prodId: i.prod_id,
           codigo: i.codigo,
           nombre: i.nombre,
@@ -54066,8 +54470,8 @@
           precioUnit: i.precio_unit,
           subtotal: i.subtotal
         }))
-      }));
-      const invCompleto = (inv || []).map((p) => ({
+      })).filter((v) => !thEsVentaTecnica(v));
+      const invCompleto = (inv || []).filter((p) => p.activo !== false).map((p) => ({
         id: p.id,
         codigo: p.codigo,
         marcaId: p.marca_id,
@@ -54083,7 +54487,12 @@
       }));
       const cierresObj = {};
       (cierres || []).forEach((c) => {
-        cierresObj[c.id] = { cerrado: c.cerrado, fecha: c.fecha, mk: c.mk };
+        cierresObj[c.id] = {
+          cerrado: c.cerrado,
+          fecha: c.fecha,
+          mk: c.mk,
+          snapshot: c.metadata?.snapshot || null
+        };
       });
       return { inv: invCompleto, ventas: ventasCompletas, cierres: cierresObj };
     } catch (e) {
@@ -54130,6 +54539,28 @@
     if (!d || !d.activo) return 0;
     if (d.hasta && hoy() > d.hasta) return 0;
     return Math.min(50, Math.max(0, Number(d.pct) || 0));
+  }
+  function descNotifSig(d) {
+    return (d && d.activo ? 1 : 0) + "|" + (Number(d?.pct) || 0) + "|" + (d?.hasta || "");
+  }
+  var _descNotifAck = null;
+  function descNotifAck() {
+    if (!_descNotifAck) {
+      try {
+        _descNotifAck = JSON.parse(localStorage.getItem("th_desc_notif_ack") || "{}");
+      } catch {
+        _descNotifAck = {};
+      }
+    }
+    return _descNotifAck;
+  }
+  function descNotifMarcar(marcaId, sig) {
+    const a = descNotifAck();
+    a[marcaId] = sig;
+    try {
+      localStorage.setItem("th_desc_notif_ack", JSON.stringify(a));
+    } catch {
+    }
   }
   function descCodigoVigente(descCodigos, codigo) {
     const d = descCodigos?.[(codigo || "").toUpperCase()];
@@ -54203,7 +54634,7 @@
     try {
       const db = await getSupabase();
       const data = await sbSelectAll(db, "inventario");
-      return (data || []).map((p) => ({
+      return (data || []).filter((p) => p.activo !== false).map((p) => ({
         id: p.id,
         codigo: p.codigo,
         marcaId: p.marca_id,
@@ -54225,10 +54656,17 @@
   async function sbGuardarAuditLog(evento) {
     try {
       const db = await getSupabase();
-      const { id, ts, fecha, hora: hora2, tipo, usuario, nombre, rol, ...detalle } = evento;
-      const { error } = await db.from("audit_log").upsert({ id, ts, fecha, hora: hora2, tipo, usuario, nombre, rol, detalle });
+      const { data, error } = await db.rpc("th_registrar_evento_cliente", {
+        p_evento: evento,
+        p_context: thOperationContext({
+          usuario: evento.usuario,
+          nombre: evento.nombre,
+          rol: evento.rol,
+          marcaId: evento.marcaId
+        })
+      });
       if (error) throw error;
-      return true;
+      return data?.ok === true;
     } catch (e) {
       console.warn("Supabase save audit_log:", e.message);
       return false;
@@ -54278,8 +54716,8 @@
     setOutbox([...getOutbox(), op]);
     return op.id;
   }
-  function removeFromOutbox(id) {
-    setOutbox(getOutbox().filter((o) => o.id !== id));
+  function removeFromOutbox(id2) {
+    setOutbox(getOutbox().filter((o) => o.id !== id2));
   }
   async function ejecutarOpOutbox(op) {
     switch (op.tipo) {
@@ -54287,8 +54725,10 @@
         return !!await sbGuardarProducto(op.payload);
       case "stock":
         return op.payload.stock_inicial != null ? await sbActualizarProductoPatch(op.payload.prodId, { stock: Math.max(0, op.payload.stock), stock_inicial: op.payload.stock_inicial }) : await sbActualizarStock(op.payload.prodId, op.payload.stock);
-      case "producto_patch":
-        return await sbActualizarProductoPatch(op.payload.prodId, op.payload);
+      case "producto_patch": {
+        const { prodId, ...campos } = op.payload;
+        return await sbActualizarProductoPatch(prodId, campos);
+      }
       case "venta":
         return await sbGuardarVenta(op.payload);
       case "anularVenta":
@@ -54304,9 +54744,11 @@
       case "auditLog":
         return await sbGuardarAuditLog(op.payload);
       case "usuarios":
-        return await sbGuardarUsuarios(op.payload);
+        return true;
+      // perfiles y roles sólo se modifican mediante Edge Functions administrativas
       case "password":
-        return await sbActualizarPassword(op.payload.usuario, op.payload.password);
+        return true;
+      // descarta colas antiguas con credenciales legacy
       case "marcas":
         return await sbGuardarMarcas(op.payload);
       case "descuentoMarca":
@@ -54321,9 +54763,54 @@
         return await sbEliminarProductosPorCodigos(op.payload.codigos);
       case "eliminarCarga":
         return await sbEliminarCarga(op.payload.cargaId);
+      case "estadoFinanciero":
+        return await sbGuardarConfiguracionFinancieraPendiente(op.payload);
       default:
-        return true;
+        return false;
     }
+  }
+  var TH_OUTBOX_OPERATION_MAP = {
+    venta: ["VENTA"],
+    anularVenta: ["ANULACION"],
+    retiro: ["RETIRO"],
+    cierre: ["CIERRE_MENSUAL"],
+    carga: ["IMPORTACION", "RECEPCION"],
+    auditoria: ["AUDITORIA_INVENTARIO"],
+    marcas: ["CONFIG_MARCAS"],
+    descuentoMarca: ["DESCUENTO_MARCA"],
+    descuentoCodigo: ["DESCUENTO_CODIGO"],
+    eliminarDescuentoCodigo: ["DESCUENTO_CODIGO"],
+    eliminarCarga: ["REVERSO_CARGA"],
+    producto: ["RECEPCION", "IMPORTACION", "RECUPERACION_INVENTARIO"],
+    producto_patch: ["EDICION_PRODUCTO", "REPOSICION", "AJUSTE_AUDITORIA"],
+    eliminarProductoCodigo: ["DESACTIVAR_PRODUCTO"],
+    eliminarProductosCodigos: ["REVERSO_CARGA"],
+    stock: ["VENTA", "ANULACION", "CAMBIO", "RETIRO", "BAJA", "REPOSICION", "RECEPCION", "IMPORTACION", "AJUSTE_AUDITORIA", "REVERSO_CARGA"]
+  };
+  var _outboxUserCache = null;
+  async function thUsuarioActualOutbox() {
+    if (_outboxUserCache && Date.now() - _outboxUserCache.ts < 6e4) return _outboxUserCache.user;
+    try {
+      const db = await getSupabase();
+      const { data: { user } } = await db.auth.getUser();
+      if (!user) return null;
+      const { data } = await db.from("usuarios").select("usuario,nombre,rol,marca_id").eq("auth_id", user.id).maybeSingle();
+      const perfil = data ? { usuario: data.usuario, nombre: data.nombre, rol: data.rol, marcaId: data.marca_id } : null;
+      _outboxUserCache = { ts: Date.now(), user: perfil };
+      return perfil;
+    } catch {
+      return null;
+    }
+  }
+  async function thBloqueoModoSeguroOutbox(op) {
+    if (["auditLog", "estadoFinanciero", "usuarios", "password"].includes(op?.tipo)) return null;
+    const operaciones = TH_OUTBOX_OPERATION_MAP[op?.tipo] || [];
+    if (!operaciones.length) return null;
+    const user = await thUsuarioActualOutbox();
+    for (const operacion of operaciones) {
+      if (await sbResolverModoOperacion(operacion, user || {}) === "transactional") return operacion;
+    }
+    return null;
   }
   var _procesandoOutbox = false;
   async function procesarOutbox() {
@@ -54333,6 +54820,17 @@
     _procesandoOutbox = true;
     try {
       for (const op of getOutbox()) {
+        const bloqueo = await thBloqueoModoSeguroOutbox(op);
+        if (bloqueo) {
+          const actual = getOutbox();
+          const idx = actual.findIndex((o) => o.id === op.id);
+          if (idx >= 0) {
+            actual[idx].bloqueadaPorModoSeguro = bloqueo;
+            actual[idx].ultimoIntento = Date.now();
+            setOutbox(actual);
+          }
+          continue;
+        }
         let ok = false;
         try {
           ok = await ejecutarOpOutbox(op);
@@ -54409,8 +54907,9 @@
       return false;
     }
   }
-  function useRealtimeSync(setVentas, setInv, setRetiros, setFactoryResetRecibido, onResync, onDescuentoMarca, onDescuentoCodigo) {
+  function useRealtimeSync(setVentas, setInv, setRetiros, setFactoryResetRecibido, onResync, onDescuentoMarca, onDescuentoCodigo, userKey) {
     (0, import_react.useEffect)(() => {
+      if (!userKey) return;
       let channel = null;
       let mounted = true;
       let wasConnected = false;
@@ -54418,6 +54917,7 @@
         if (!mounted) return;
         channel = db.channel("toscana-realtime-v3").on("postgres_changes", { event: "INSERT", schema: "public", table: "ventas" }, async (payload) => {
           const v = payload.new;
+          if (thEsVentaTecnica(v)) return;
           try {
             const { data: rawItems } = await db.from("venta_items").select("*").eq("venta_id", v.id);
             const venta = {
@@ -54433,6 +54933,15 @@
               metodoPago: v.metodo_pago,
               vendedor: v.vendedor,
               etiquetaImg: v.etiqueta_img,
+              clienteNombre: v.cliente_nombre || "",
+              clienteTelefono: v.cliente_telefono || "",
+              origen: v.origen || "",
+              canal: v.canal || "",
+              operationId: v.operation_id || null,
+              engine: v.engine || "legacy",
+              gcId: v.gc_id || "",
+              gcUsado: Number(v.gc_usado) || 0,
+              metadata: v.metadata || {},
               anulada: v.anulada || false,
               items: (rawItems || []).map((i) => ({
                 prodId: i.prod_id,
@@ -54453,15 +54962,17 @@
           }
         }).on("postgres_changes", { event: "UPDATE", schema: "public", table: "ventas" }, (payload) => {
           const v = payload.new;
-          if (mounted) setVentas((prev) => prev.map((x) => x.id === v.id ? {
+          if (mounted) setVentas((prev) => thEsVentaTecnica(v) ? prev.filter((x) => x.id !== v.id) : prev.map((x) => x.id === v.id ? {
             ...x,
             anulada: v.anulada || false,
             total: v.total,
             subtotal: v.subtotal,
-            metodoPago: v.metodo_pago
+            metodoPago: v.metodo_pago,
+            metadata: v.metadata || x.metadata || {}
           } : x));
         }).on("postgres_changes", { event: "INSERT", schema: "public", table: "inventario" }, (payload) => {
           const p = payload.new;
+          if (p.activo === false) return;
           const prod = {
             id: p.id,
             codigo: p.codigo,
@@ -54479,18 +54990,27 @@
           );
         }).on("postgres_changes", { event: "UPDATE", schema: "public", table: "inventario" }, (payload) => {
           const p = payload.new;
-          if (mounted) setInv((prev) => prev.map((i) => i.id === p.id ? {
-            ...i,
-            codigo: p.codigo || i.codigo,
-            stock: p.stock,
-            nombre: p.nombre,
-            precio: p.precio,
-            categoria: p.categoria,
-            descripcion: p.descripcion || i.descripcion
-          } : i));
+          if (mounted) setInv((prev) => {
+            if (p.activo === false) return prev.filter((i) => i.id !== p.id);
+            const patch = {
+              id: p.id,
+              codigo: p.codigo,
+              marcaId: p.marca_id,
+              marcaNombre: p.marca_nombre,
+              nombre: p.nombre,
+              categoria: p.categoria,
+              precio: p.precio,
+              descripcion: p.descripcion || "",
+              subcat: p.subcat || "",
+              stock: p.stock,
+              stockInicial: p.stock_inicial,
+              fecha: p.fecha
+            };
+            return prev.some((i) => i.id === p.id) ? prev.map((i) => i.id === p.id ? { ...i, ...patch } : i) : [...prev, patch];
+          });
         }).on("postgres_changes", { event: "DELETE", schema: "public", table: "inventario" }, (payload) => {
-          const id = payload.old?.id;
-          if (mounted && id) setInv((prev) => prev.filter((i) => i.id !== id));
+          const id2 = payload.old?.id;
+          if (mounted && id2) setInv((prev) => prev.filter((i) => i.id !== id2));
         }).on("postgres_changes", { event: "INSERT", schema: "public", table: "retiros" }, (payload) => {
           const r = payload.new;
           const retiro = {
@@ -54511,7 +55031,7 @@
           );
         }).on("broadcast", { event: "venta_nueva" }, ({ payload }) => {
           const v = payload?.v;
-          if (mounted && v?.id) setVentas((prev) => prev.some((x) => x.id === v.id) ? prev : [...prev, v]);
+          if (mounted && v?.id && !thEsVentaTecnica(v)) setVentas((prev) => prev.some((x) => x.id === v.id) ? prev : [...prev, v]);
         }).on("broadcast", { event: "inv_update" }, ({ payload }) => {
           const p = payload?.p;
           if (mounted && p?.id) setInv((prev) => prev.map((i) => i.id === p.id ? { ...i, ...p } : i));
@@ -54519,8 +55039,8 @@
           const r = payload?.r;
           if (mounted && r?.id && setRetiros) setRetiros((prev) => prev.some((x) => x.id === r.id) ? prev : [...prev, r]);
         }).on("broadcast", { event: "venta_anulada" }, ({ payload }) => {
-          const id = payload?.id;
-          if (mounted && id) setVentas((prev) => prev.map((x) => x.id === id ? { ...x, anulada: true } : x));
+          const id2 = payload?.id;
+          if (mounted && id2) setVentas((prev) => prev.map((x) => x.id === id2 ? { ...x, anulada: true } : x));
         }).on("broadcast", { event: "descuento_marca" }, ({ payload }) => {
           if (mounted && payload?.marcaId != null && onDescuentoMarca) onDescuentoMarca(payload);
         }).on("postgres_changes", { event: "*", schema: "public", table: "config_descuentos" }, (payload) => {
@@ -54531,9 +55051,8 @@
             activo: !!d.activo,
             pct: Number(d.pct) || 0,
             hasta: d.hasta || "",
-            por: d.updated_by || "",
-            _silencioso: true
-            // sin toast (el broadcast ya avisó)
+            por: d.updated_by || ""
+            // vía confiable: el dedup por firma evita repetir el aviso del broadcast
           });
         }).on("broadcast", { event: "descuento_codigo" }, ({ payload }) => {
           if (mounted && payload?.codigo && onDescuentoCodigo) onDescuentoCodigo(payload);
@@ -54593,7 +55112,7 @@
           });
         }
       };
-    }, []);
+    }, [userKey]);
   }
   function useClockDrift() {
     var _hCD = (0, import_react.useState)(0);
@@ -54611,8 +55130,8 @@
           minute: "2-digit",
           hour12: false
         }).formatToParts(dt);
-        const g = (t) => +parts.find((x) => x.type === t).value;
-        return Date.UTC(g("year"), g("month") - 1, g("day"), g("hour") % 24, g("minute")) / 6e4;
+        const g2 = (t) => +parts.find((x) => x.type === t).value;
+        return Date.UTC(g2("year"), g2("month") - 1, g2("day"), g2("hour") % 24, g2("minute")) / 6e4;
       };
       async function medir() {
         try {
@@ -54659,10 +55178,41 @@
   function AlertaDescuento({ data, onClose }) {
     (0, import_react.useEffect)(() => {
       if (!data) return;
-      const t = setTimeout(onClose, 6e3);
+      const t = setTimeout(onClose, 14e3);
       return () => clearTimeout(t);
     }, [data, onClose]);
     if (!data) return null;
+    if (data.consolidado) {
+      const nombres = data.marcas || [];
+      const lista = nombres.slice(0, 3).join(", ") + (nombres.length > 3 ? ` y ${nombres.length - 3} m\xE1s` : "");
+      return /* @__PURE__ */ import_react.default.createElement("div", { style: {
+        position: "fixed",
+        top: 12,
+        left: "50%",
+        transform: "translateX(-50%)",
+        zIndex: 99997,
+        width: "calc(100% - 32px)",
+        maxWidth: 440,
+        background: C.bg1,
+        border: `2px solid ${C.green}`,
+        borderRadius: 14,
+        padding: "12px 14px",
+        display: "flex",
+        alignItems: "center",
+        gap: 11,
+        boxShadow: "0 8px 24px rgba(0,0,0,0.18)",
+        backdropFilter: "blur(10px)",
+        WebkitBackdropFilter: "blur(10px)"
+      } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 22 } }, "\u{1F3F7}\uFE0F"), /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, fontWeight: 600, color: C.label, fontFamily: FONT } }, nombres.length, " marcas con descuento activo"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT_UI, marginTop: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, lista)), /* @__PURE__ */ import_react.default.createElement("button", { onClick: onClose, style: {
+        background: "none",
+        border: "none",
+        cursor: "pointer",
+        color: C.label3,
+        fontSize: 16,
+        padding: 4,
+        flexShrink: 0
+      } }, "\u2715"));
+    }
     const activo = !!data.activo;
     const hastaTxt = data.hasta ? ` \xB7 v\xE1lido hasta ${data.hasta.split("-").reverse().join("/")}` : "";
     return /* @__PURE__ */ import_react.default.createElement("div", { style: {
@@ -54851,9 +55401,9 @@
   }
   function getDisplayTotal(v) {
     if (!v) return 0;
-    const items = v.items || [];
-    if (!items.length) return v.total || 0;
-    const sum = items.reduce((s, it) => s + netItemSub(v, it), 0);
+    const items2 = v.items || [];
+    if (!items2.length) return v.total || 0;
+    const sum = items2.reduce((s, it) => s + netItemSub(v, it), 0);
     return sum || v.total || 0;
   }
   function abreviarNombre(nombre, maxLen = 90) {
@@ -54904,9 +55454,9 @@
   function nextLocalId() {
     return Date.now() * 1e3 + _localIdSeq++ % 1e3;
   }
-  function expandirPorStock(items) {
+  function expandirPorStock(items2) {
     const out = [];
-    for (const it of items) {
+    for (const it of items2) {
       const n = Math.max(0, Number(it.stock) || 0);
       for (let i = 0; i < n; i++) out.push(it);
     }
@@ -54928,17 +55478,17 @@
     const cant = Math.max(1, Math.min(parseInt(input) || 1, 9999));
     imprimirEtiquetasLote(expandirPorStock([{ ...item, stock: cant }]));
   }
-  function imprimirEtiquetasLote(items) {
-    if (!items || items.length === 0) return;
+  function imprimirEtiquetasLote(items2) {
+    if (!items2 || items2.length === 0) return;
     const win = window.open("", "_blank", "width=900,height=700");
     if (!win) {
       alert("Activ\xE1 las ventanas emergentes para imprimir");
       return;
     }
-    items = items.slice().sort(
+    items2 = items2.slice().sort(
       (a, b) => (a.codigo || a.sku || "").localeCompare(b.codigo || b.sku || "", void 0, { numeric: true, sensitivity: "base" })
     );
-    const etiquetas = items.map((it, idx) => {
+    const etiquetas = items2.map((it, idx) => {
       const codigo = (it.codigo || it.sku || "").toUpperCase();
       const precio = it.precio || 0;
       const marca = it.marcaNombre || it.marca || "";
@@ -54960,7 +55510,7 @@
         </div>
       </div>`;
     }).join("");
-    const barcodeScripts = items.map((it, idx) => {
+    const barcodeScripts = items2.map((it, idx) => {
       const codigo = (it.codigo || it.sku || "").toUpperCase();
       return `try{JsBarcode("#bc-${idx}","${codigo}",{format:"CODE128",width:1.56,height:38.4,displayValue:false,margin:0});}catch(e){}`;
     }).join("\n");
@@ -54968,7 +55518,7 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>Etiquetas \u2014 ${items.length} items</title>
+  <title>Etiquetas \u2014 ${items2.length} items</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.5/JsBarcode.all.min.js"><\/script>
   <style>
     @page { size: 50mm 25mm; margin: 0; }
@@ -55011,8 +55561,8 @@
 </head>
 <body>
   <div class="controls">
-    <button class="btn-print" onclick="window.print()">\u{1F5A8} Imprimir ${items.length} etiqueta${items.length !== 1 ? "s" : ""}</button>
-    <span class="info">${items.length} etiqueta${items.length !== 1 ? "s" : ""} generadas \xB7 50x25mm</span>
+    <button class="btn-print" onclick="window.print()">\u{1F5A8} Imprimir ${items2.length} etiqueta${items2.length !== 1 ? "s" : ""}</button>
+    <span class="info">${items2.length} etiqueta${items2.length !== 1 ? "s" : ""} generadas \xB7 50x25mm</span>
   </div>
   <div class="print-note">
     \u26A0\uFE0F Para que la etiqueta salga correcta: en la ventana de impresi\xF3n, hac\xE9 clic en
@@ -55441,7 +55991,7 @@
     }
     return PAGOS.find((p) => p.id === mp)?.icon || "";
   }
-  function parsePago(metodoPago, total) {
+  function parsePago(metodoPago, total2) {
     const res = { efectivo: 0, qr: 0, tarjeta: 0, giftcard: 0 };
     if (!metodoPago) return res;
     if (metodoPago.startsWith("mixto|")) {
@@ -55451,8 +56001,8 @@
       });
       return res;
     }
-    if (metodoPago in res) res[metodoPago] = total;
-    else res.efectivo = total;
+    if (metodoPago in res) res[metodoPago] = total2;
+    else res.efectivo = total2;
     return res;
   }
   function sumPagos(ventas) {
@@ -55468,7 +56018,7 @@
   var _PAGO_ICON = { efectivo: "\u{1F4B5}", qr: "\u{1F4F1}", tarjeta: "\u{1F4B3}", giftcard: "\u{1F381}" };
   var _PAGO_COL = { efectivo: C.green, qr: C.blue, tarjeta: C.amber, giftcard: "#7C3AED" };
   var _PAGO_LBL = { efectivo: "Efectivo", qr: "QR", tarjeta: "Tarjeta", giftcard: "GC" };
-  function PagoDisplay({ mp, total, small, inline }) {
+  function PagoDisplay({ mp, total: total2, small, inline }) {
     if (!mp) return null;
     if (mp.startsWith("mixto|")) {
       const partes = mp.split("|").slice(1).map((p) => {
@@ -55685,14 +56235,14 @@
       const ctx = new (window.AudioContext || window.webkitAudioContext)();
       [[1318.5, 0], [1975.5, 0.14]].forEach(([freq, delay]) => {
         const o = ctx.createOscillator();
-        const g = ctx.createGain();
+        const g2 = ctx.createGain();
         o.type = "sine";
         o.frequency.value = freq;
-        g.gain.setValueAtTime(1e-4, ctx.currentTime + delay);
-        g.gain.exponentialRampToValueAtTime(0.4, ctx.currentTime + delay + 0.02);
-        g.gain.exponentialRampToValueAtTime(1e-4, ctx.currentTime + delay + 0.55);
-        o.connect(g);
-        g.connect(ctx.destination);
+        g2.gain.setValueAtTime(1e-4, ctx.currentTime + delay);
+        g2.gain.exponentialRampToValueAtTime(0.4, ctx.currentTime + delay + 0.02);
+        g2.gain.exponentialRampToValueAtTime(1e-4, ctx.currentTime + delay + 0.55);
+        o.connect(g2);
+        g2.connect(ctx.destination);
         o.start(ctx.currentTime + delay);
         o.stop(ctx.currentTime + delay + 0.6);
       });
@@ -55959,6 +56509,13 @@
       localStorage.setItem(key, JSON.stringify(cfg));
     } catch {
     }
+    try {
+      window.dispatchEvent(new CustomEvent("th-financial-state", { detail: {
+        tipo: "LIQUIDACION_CONFIG",
+        data: { marcaId: Number(marcaId), configuracion: cfg }
+      } }));
+    } catch {
+    }
   }
   function leerGastosLiq(marcaId, MK) {
     const key = `th_liq_gastos_${marcaId}_${MK}`;
@@ -55974,8 +56531,32 @@
       localStorage.setItem(key, JSON.stringify(gastos));
     } catch {
     }
+    try {
+      window.dispatchEvent(new CustomEvent("th-financial-state", { detail: {
+        tipo: "LIQUIDACION_GASTOS",
+        data: { marcaId: Number(marcaId), mk: MK, gastos }
+      } }));
+    } catch {
+    }
   }
-  function parseMixtoXls(metodoPago, total) {
+  function guardarAlquilerEstado(estado) {
+    try {
+      window.dispatchEvent(new CustomEvent("th-financial-state", { detail: {
+        tipo: "ALQUILER_ESTADO",
+        data: estado
+      } }));
+    } catch {
+    }
+  }
+  var thFinancialSaveQueue = Promise.resolve();
+  function thEnqueueFinancialSave(task) {
+    thFinancialSaveQueue = thFinancialSaveQueue.then(task, task);
+    return thFinancialSaveQueue;
+  }
+  async function thEsperarFinanzasPendientes() {
+    return thFinancialSaveQueue;
+  }
+  function parseMixtoXls(metodoPago, total2) {
     if (metodoPago?.startsWith("mixto|")) {
       const obj = { efectivo: 0, qr: 0, tarjeta: 0, giftcard: 0 };
       metodoPago.split("|").slice(1).forEach((p) => {
@@ -55984,12 +56565,12 @@
       });
       obj.efectivo += obj.giftcard;
       const s = obj.efectivo + obj.qr + obj.tarjeta;
-      return s > 0 ? { efectivo: obj.efectivo, qr: obj.qr, tarjeta: obj.tarjeta } : { efectivo: total, qr: 0, tarjeta: 0 };
+      return s > 0 ? { efectivo: obj.efectivo, qr: obj.qr, tarjeta: obj.tarjeta } : { efectivo: total2, qr: 0, tarjeta: 0 };
     }
-    if (metodoPago === "qr") return { efectivo: 0, qr: total, tarjeta: 0 };
-    if (metodoPago === "tarjeta") return { efectivo: 0, qr: 0, tarjeta: total };
-    if (metodoPago === "giftcard") return { efectivo: total, qr: 0, tarjeta: 0 };
-    return { efectivo: total, qr: 0, tarjeta: 0 };
+    if (metodoPago === "qr") return { efectivo: 0, qr: total2, tarjeta: 0 };
+    if (metodoPago === "tarjeta") return { efectivo: 0, qr: 0, tarjeta: total2 };
+    if (metodoPago === "giftcard") return { efectivo: total2, qr: 0, tarjeta: 0 };
+    return { efectivo: total2, qr: 0, tarjeta: 0 };
   }
   function calcLiqMarca(vMarca, marcaId, MK) {
     const cfg = leerCfgLiq(marcaId);
@@ -56009,22 +56590,20 @@
     const comision = subBanco * (Number(cfg.pctComision) || 0) / 100;
     const alquiler = Number(cfg.alquiler) || 0;
     const gastos = MK ? leerGastosLiq(marcaId, MK) : [];
-    const totalGastos = gastos.reduce((s, g) => s + (Number(g.monto) || 0), 0);
+    const totalGastos = gastos.reduce((s, g2) => s + (Number(g2.monto) || 0), 0);
     const neto = subBanco - comision - alquiler - totalGastos;
     return { bruto, brutoEf, brutoQR, brutoTJ, descTJ, subBanco, comision, alquiler, gastos, totalGastos, neto, cfg };
   }
   var CUCU_CFG_KEY = "th_cucu_cfg";
-  var CUCU_DEF = {
-    apiKey: "",
-    endpoint: "https://app.cucu.bo/api/v1/invoices",
-    codigoActividad: "470000",
-    codigoProductoSin: "58311",
-    modoApi: true
-  };
-  var CUCU_MP = { efectivo: 1, qr: 5, tarjeta: 2, transferencia: 4 };
+  var CUCU_DEF = { modoApi: true };
   function leerCfgCUCU() {
     try {
-      return { ...CUCU_DEF, ...JSON.parse(localStorage.getItem(CUCU_CFG_KEY) || "{}") };
+      const raw = JSON.parse(localStorage.getItem(CUCU_CFG_KEY) || "{}");
+      const safe = { ...CUCU_DEF, modoApi: raw.modoApi !== false };
+      if (raw.apiKey || raw.endpoint || raw.codigoActividad || raw.codigoProductoSin) {
+        localStorage.setItem(CUCU_CFG_KEY, JSON.stringify(safe));
+      }
+      return safe;
     } catch {
       return CUCU_DEF;
     }
@@ -56042,83 +56621,45 @@
       return null;
     }
   }
-  async function emitirFacturaCUCU(venta, nitComprador, nombreComprador) {
-    const cfg = leerCfgCUCU();
-    if (!cfg.apiKey) throw new Error("API Key de CUCU no configurada. Ir a Config \u2192 Sistema \u2192 Facturaci\xF3n.");
-    const mp = venta.metodoPago;
-    let codPago = 1;
-    if (mp?.startsWith("mixto|")) {
-      const obj = { efectivo: 0, qr: 0, tarjeta: 0 };
-      mp.split("|").slice(1).forEach((p) => {
-        const [k, v] = p.split(":");
-        obj[k] = parseFloat(v) || 0;
-      });
-      const dom = Object.keys(obj).reduce((a, b) => obj[a] >= obj[b] ? a : b, "efectivo");
-      codPago = CUCU_MP[dom] || 1;
-    } else {
-      codPago = CUCU_MP[mp] || 1;
-    }
-    const payload = {
-      actividadEconomica: cfg.codigoActividad,
-      metodoPago: codPago,
-      cliente: { nit: Number(nitComprador) || 0, razonSocial: (nombreComprador || "Sin Nombre").trim() },
-      items: venta.items.map((it) => ({
-        codigoProducto: Number(cfg.codigoProductoSin) || 58311,
-        descripcion: (it.nombre || "Producto").slice(0, 100),
-        cantidad: it.cantidad || 1,
-        precioUnitario: it.precioUnit || 0,
-        descuento: 0,
-        subtotal: it.subtotal || 0
-      })),
-      total: venta.total || 0
-    };
-    const r = await fetch(cfg.endpoint, {
+  async function llamarFacturacionSegura(action, payload = {}) {
+    const db = await getSupabase();
+    const { data: { session } } = await db.auth.getSession();
+    if (!session) throw new Error("Sesi\xF3n expirada. Vuelve a iniciar sesi\xF3n.");
+    const r = await fetch(`${SUPA_URL}/functions/v1/cucu-facturacion`, {
       method: "POST",
-      headers: { "Authorization": `Bearer ${cfg.apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
+      headers: { "Authorization": `Bearer ${session.access_token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ action, ...payload }),
+      signal: AbortSignal.timeout(3e4)
     });
-    if (!r.ok) {
-      let msg = "";
-      try {
-        const j = await r.json();
-        msg = j.message || j.error || JSON.stringify(j);
-      } catch {
-        msg = await r.text();
-      }
-      throw new Error(`CUCU ${r.status}: ${msg.slice(0, 200)}`);
-    }
-    const body = await r.json();
-    const d = body.data || body;
-    return {
-      cuf: d.cuf || d.CUF || d.codigoCuf || "",
-      numero: d.numero || d.nroFactura || d.numeroFactura || d.number || "",
-      qrUrl: d.qr || d.qrUrl || d.urlQr || "",
-      pdf: d.pdf || d.pdfUrl || d.urlPdf || "",
-      nitComprador: Number(nitComprador) || 0,
-      nombreComprador: (nombreComprador || "Sin Nombre").trim()
-    };
+    const data = await r.json().catch(() => ({ ok: false, error: `Respuesta inv\xE1lida (${r.status})` }));
+    if (!r.ok || !data.ok) throw new Error(data.error || `Facturaci\xF3n ${r.status}`);
+    return data;
   }
-  async function anularFacturaCUCU(cuf) {
-    const cfg = leerCfgCUCU();
-    if (!cfg.apiKey) throw new Error("Sin API Key de CUCU \u2014 ir a Config \u2192 Facturaci\xF3n.");
-    const base = cfg.endpoint.replace(/\/invoices\/?$/, "");
-    const url = `${base}/invoices/${encodeURIComponent(cuf)}`;
-    const r = await fetch(url, {
-      method: "DELETE",
-      headers: { "Authorization": `Bearer ${cfg.apiKey}`, "Content-Type": "application/json" },
-      signal: AbortSignal.timeout(1e4)
+  async function emitirFacturaCUCU(venta, nitComprador, nombreComprador, telefono, operationId) {
+    return llamarFacturacionSegura("issue", {
+      ventaId: venta.id,
+      nit: String(nitComprador || 0),
+      nombre: (nombreComprador || "Sin Nombre").trim(),
+      telefono: (telefono || "").trim(),
+      operationId
     });
-    if (!r.ok && r.status !== 404) {
-      let msg = "";
-      try {
-        const j = await r.json();
-        msg = j.message || j.error || JSON.stringify(j);
-      } catch {
-        msg = await r.text();
-      }
-      throw new Error(`CUCU ${r.status}: ${msg.slice(0, 200)}`);
-    }
-    return r.status === 204 ? {} : await r.json().catch(() => ({}));
+  }
+  async function registrarFacturaManual(venta, nitComprador, nombreComprador, telefono, numero, cuf, operationId) {
+    return llamarFacturacionSegura("manual", {
+      ventaId: venta.id,
+      nit: String(nitComprador || 0),
+      nombre: (nombreComprador || "Sin Nombre").trim(),
+      telefono: (telefono || "").trim(),
+      numero,
+      cuf,
+      operationId
+    });
+  }
+  async function cargarFacturaServidor(ventaId) {
+    return llamarFacturacionSegura("get", { ventaId });
+  }
+  async function anularFacturaCUCU(ventaId, operationId, motivo = 1) {
+    return llamarFacturacionSegura("void", { ventaId, operationId, motivo });
   }
   async function generarExcelMensual(ventas, inventario, mes, anio, setGenerando, retiros) {
     setGenerando(true);
@@ -56200,8 +56741,8 @@
           ["", "", "", "", "", "", "", "SUBTOTAL BANCO", +liqM.subBanco.toFixed(2), "", "", ""],
           ["", "", "", "", "", "", "", `\u2212 Comisi\xF3n (${liqM.cfg.pctComision}%)`, -liqM.comision.toFixed(2), "", "", ""],
           ["", "", "", "", "", "", "", "\u2212 Alquiler", -liqM.alquiler.toFixed(2), "", "", ""],
-          ...liqM.gastos.filter((g) => g.desc || Number(g.monto) > 0).map(
-            (g) => ["", "", "", "", "", "", "", `\u2212 ${g.desc || "Gasto extra"}`, -(Number(g.monto) || 0), "", "", ""]
+          ...liqM.gastos.filter((g2) => g2.desc || Number(g2.monto) > 0).map(
+            (g2) => ["", "", "", "", "", "", "", `\u2212 ${g2.desc || "Gasto extra"}`, -(Number(g2.monto) || 0), "", "", ""]
           ),
           ["", "", "", "", "", "", "", "NETO A PAGAR", +liqM.neto.toFixed(2), "", "", ""]
         );
@@ -56345,8 +56886,8 @@
             ["", "", "", "", "", "", "", `Subtotal -${liqP.cfg.pctTarjeta}%`, +liqP.subBanco.toFixed(2), "", "", ""],
             ["", "", "", "", "", "", "", `\u2212 Comisi\xF3n (${liqP.cfg.pctComision}%)`, -liqP.comision.toFixed(2), "", "", ""],
             ["", "", "", "", "", "", "", "\u2212 Alquiler", -liqP.alquiler.toFixed(2), "", "", ""],
-            ...liqP.gastos.filter((g) => g.desc || Number(g.monto) > 0).map(
-              (g) => ["", "", "", "", "", "", "", `\u2212 ${g.desc || "Gasto extra"}`, -(Number(g.monto) || 0), "", "", ""]
+            ...liqP.gastos.filter((g2) => g2.desc || Number(g2.monto) > 0).map(
+              (g2) => ["", "", "", "", "", "", "", `\u2212 ${g2.desc || "Gasto extra"}`, -(Number(g2.monto) || 0), "", "", ""]
             ),
             ["", "", "", "", "", "", "", "Neto", +liqP.neto.toFixed(2), "", "", ""]
           );
@@ -56436,7 +56977,7 @@
     try {
       const XLSX2 = await loadXLSX();
       const wb = XLSX2.utils.book_new();
-      const marcaNom = (id) => marcas.find((m) => m.id === id)?.nombre || id || "\u2014";
+      const marcaNom = (id2) => marcas.find((m) => m.id === id2)?.nombre || id2 || "\u2014";
       const invRows = [
         ["C\xF3digo", "Producto", "Marca", "Categor\xEDa", "Subcategor\xEDa", "Precio (Bs)", "Stock inicial", "Stock actual", "Fecha ingreso", "ID"],
         ...inv.map((p) => [p.codigo, p.nombre, p.marcaNombre || marcaNom(p.marcaId), p.categoria || "", p.subcat || "", p.precio, p.stockInicial, p.stock, p.fecha, p.id])
@@ -56647,8 +57188,8 @@
       [`Subtotal -${liq.cfg.pctTarjeta}%`, liq.subBanco],
       [`Comisi\xF3n ventas (${liq.cfg.pctComision}%)`, -liq.comision],
       ["Alquiler", -liq.alquiler],
-      ...liq.gastos.filter((g) => g.desc || Number(g.monto) > 0).map(
-        (g) => [g.desc || "Gasto extra", -(Number(g.monto) || 0)]
+      ...liq.gastos.filter((g2) => g2.desc || Number(g2.monto) > 0).map(
+        (g2) => [g2.desc || "Gasto extra", -(Number(g2.monto) || 0)]
       )
     ];
     const rDesgloseStart = rows.length;
@@ -56923,8 +57464,8 @@
     const NC = HEAD.length;
     const filas = [];
     cargas.forEach((c) => {
-      const items = c.items && c.items.length ? c.items : [{}];
-      items.forEach((it) => {
+      const items2 = c.items && c.items.length ? c.items : [{}];
+      items2.forEach((it) => {
         filas.push([
           c.fecha,
           c.hora,
@@ -57029,8 +57570,8 @@
     lines.push(`\u2212 Alquiler: -${$1(alquiler)}`);
     if (totalGastos > 0) {
       lines.push(`\u2212 Gastos extra: -${$1(totalGastos)}`);
-      gastos.filter((g) => g.desc || Number(g.monto) > 0).forEach((g) => {
-        lines.push(`   \xB7 ${g.desc || "Gasto extra"}: -${$1(Number(g.monto) || 0)}`);
+      gastos.filter((g2) => g2.desc || Number(g2.monto) > 0).forEach((g2) => {
+        lines.push(`   \xB7 ${g2.desc || "Gasto extra"}: -${$1(Number(g2.monto) || 0)}`);
       });
     }
     lines.push(
@@ -57049,8 +57590,8 @@
       liq.descTJ > 0 ? [`= Subtotal -${liq.cfg?.pctTarjeta ?? 0}%`, $1(liq.subBanco), false] : null,
       liq.cfg?.pctComision > 0 ? [`\u2212 Comisi\xF3n ventas (${liq.cfg?.pctComision ?? 0}%)`, `-${$1(liq.comision)}`, false] : null,
       liq.alquiler > 0 ? ["\u2212 Alquiler", `-${$1(liq.alquiler)}`, false] : null,
-      ...liq.gastos.filter((g) => g.desc || Number(g.monto) > 0).map(
-        (g) => [`\u2212 ${g.desc || "Gasto extra"}`, `-${$1(Number(g.monto) || 0)}`, false]
+      ...liq.gastos.filter((g2) => g2.desc || Number(g2.monto) > 0).map(
+        (g2) => [`\u2212 ${g2.desc || "Gasto extra"}`, `-${$1(Number(g2.monto) || 0)}`, false]
       ),
       ["Neto a liquidar", $1(liq.neto), true]
     ].filter(Boolean);
@@ -57113,8 +57654,8 @@
       [`= Subtotal -${d.pctTarjeta ?? 0}%`, $1(d.subtotalBanco), false],
       [`\u2212 Comisi\xF3n ventas (${d.pctComision ?? 0}%)`, `-${$1(d.comision)}`, false],
       ["\u2212 Alquiler", `-${$1(d.alquiler)}`, false],
-      ...d.gastos.filter((g) => g.desc || Number(g.monto) > 0).map(
-        (g) => [`\u2212 ${g.desc || "Gasto extra"}`, `-${$1(Number(g.monto) || 0)}`, false]
+      ...d.gastos.filter((g2) => g2.desc || Number(g2.monto) > 0).map(
+        (g2) => [`\u2212 ${g2.desc || "Gasto extra"}`, `-${$1(Number(g2.monto) || 0)}`, false]
       ),
       ["Neto a liquidar", $1(d.neto), true]
     ].filter(Boolean);
@@ -57311,11 +57852,11 @@
     const fmt2 = (n) => Number(n || 0).toLocaleString("es-BO", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     const W = 210, M = 20;
     let y = 24;
-    const items = venta.items || [];
+    const items2 = venta.items || [];
     const itemDesc = (it) => it.descPct != null ? Number(it.descPct) || 0 : getManualDescPct(venta);
-    const subtotalBruto = items.reduce((s, i) => s + (i.precioUnit || 0) * (i.cantidad || 1), 0);
-    const total = getDisplayTotal(venta);
-    const descBs = subtotalBruto - total;
+    const subtotalBruto = items2.reduce((s, i) => s + (i.precioUnit || 0) * (i.cantidad || 1), 0);
+    const total2 = getDisplayTotal(venta);
+    const descBs = subtotalBruto - total2;
     if (venta.anulada) {
       doc.saveGraphicsState();
       doc.setGState(new doc.GState({ opacity: 0.1 }));
@@ -57393,7 +57934,7 @@
     doc.setFont("helvetica", "normal");
     doc.setFontSize(9);
     doc.setTextColor(24, 20, 16);
-    items.forEach((it) => {
+    items2.forEach((it) => {
       const linea = (it.precioUnit || 0) * (it.cantidad || 1);
       doc.setFont("courier", "normal");
       doc.setFontSize(8);
@@ -57437,13 +57978,13 @@
     doc.setFontSize(13);
     doc.setTextColor(24, 20, 16);
     doc.text("TOTAL", tx, y + 4);
-    doc.text("Bs " + fmt2(total), vx, y + 4, { align: "right" });
+    doc.text("Bs " + fmt2(total2), vx, y + 4, { align: "right" });
     y += 12;
     if (typeof numeroALetras === "function") {
       doc.setFont("helvetica", "italic");
       doc.setFontSize(8);
       doc.setTextColor(90, 90, 90);
-      const son = doc.splitTextToSize("Son: " + numeroALetras(total), W - 2 * M);
+      const son = doc.splitTextToSize("Son: " + numeroALetras(total2), W - 2 * M);
       doc.text(son, M, y);
       y += son.length * 4 + 4;
     }
@@ -57471,7 +58012,7 @@
         console.warn("subir nota:", error.message);
         return null;
       }
-      return sb.storage.from("notas").getPublicUrl(path).data.publicUrl;
+      return await sbResolverArchivoSeguro(`storage://notas/${path}`, 604800);
     } catch (e) {
       console.warn("subir nota:", e.message);
       return null;
@@ -57480,7 +58021,7 @@
   function resumenVentaTexto(venta, url) {
     const fmt = (n) => "Bs " + Number(n || 0).toLocaleString("es-BO", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     const num = String(venta.id || "").replace(/\D/g, "").slice(-6);
-    const total = getDisplayTotal(venta);
+    const total2 = getDisplayTotal(venta);
     const marcas = [...new Set((venta.items || []).map((i) => i.marcaNombre).filter(Boolean))];
     const metodo = (typeof labelPago === "function" ? labelPago(venta.metodoPago) : venta.metodoPago) || "";
     const L = [];
@@ -57499,7 +58040,7 @@
     L.push("");
     let metodoLinea = "M\xE9todo de pago: " + metodo;
     if (String(venta.metodoPago || "").startsWith("mixto|") && typeof parsePago === "function") {
-      const p = parsePago(venta.metodoPago, total);
+      const p = parsePago(venta.metodoPago, total2);
       const partes = [];
       if (p.efectivo > 0) partes.push("efectivo " + fmt(p.efectivo));
       if (p.qr > 0) partes.push("QR " + fmt(p.qr));
@@ -57507,7 +58048,7 @@
       if (partes.length) metodoLinea += " (" + partes.join(", ") + ")";
     }
     L.push(metodoLinea);
-    L.push("*TOTAL: " + fmt(total) + "*");
+    L.push("*TOTAL: " + fmt(total2) + "*");
     if (url) {
       L.push("");
       L.push("Nota en PDF: " + url);
@@ -58027,7 +58568,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       label
     );
   }
-  function DotsMenu({ items, open, onToggle, align = "right" }) {
+  function DotsMenu({ items: items2, open, onToggle, align = "right" }) {
     return /* @__PURE__ */ import_react.default.createElement("div", { style: { position: "relative", display: "inline-flex" } }, /* @__PURE__ */ import_react.default.createElement(
       "button",
       {
@@ -58067,7 +58608,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       zIndex: 500,
       minWidth: 160,
       animation: "fadeIn .12s ease"
-    } }, /* @__PURE__ */ import_react.default.createElement("style", null, `@keyframes fadeIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}`), items.map((item, i) => /* @__PURE__ */ import_react.default.createElement(
+    } }, /* @__PURE__ */ import_react.default.createElement("style", null, `@keyframes fadeIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}`), items2.map((item, i) => /* @__PURE__ */ import_react.default.createElement(
       "button",
       {
         key: i,
@@ -58278,7 +58819,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       display: "flex",
       flexDirection: "column",
       overflow: "hidden"
-    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { padding: "22px 22px 18px", borderBottom: `1px solid ${C.sep}`, flexShrink: 0 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontFamily: FONT_DISPLAY, fontSize: 22, fontWeight: 400, color: C.label, letterSpacing: ".14em", lineHeight: 1 } }, "T H"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 9, letterSpacing: ".22em", textTransform: "uppercase", color: C.label3, marginTop: 3 } }, "Casa de Moda")), /* @__PURE__ */ import_react.default.createElement("nav", { style: { flex: 1, padding: "14px 10px", overflowY: "auto" } }, GROUPS.map((g) => /* @__PURE__ */ import_react.default.createElement("div", { key: g.label, style: { marginBottom: 4 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { padding: "22px 22px 18px", borderBottom: `1px solid ${C.sep}`, flexShrink: 0 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontFamily: FONT_DISPLAY, fontSize: 22, fontWeight: 400, color: C.label, letterSpacing: ".14em", lineHeight: 1 } }, "T H"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 9, letterSpacing: ".22em", textTransform: "uppercase", color: C.label3, marginTop: 3 } }, "Casa de Moda")), /* @__PURE__ */ import_react.default.createElement("nav", { style: { flex: 1, padding: "14px 10px", overflowY: "auto" } }, GROUPS.map((g2) => /* @__PURE__ */ import_react.default.createElement("div", { key: g2.label, style: { marginBottom: 4 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
       fontSize: 9,
       letterSpacing: ".18em",
       textTransform: "uppercase",
@@ -58286,7 +58827,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       padding: "4px 10px",
       margin: "14px 0 5px",
       fontWeight: 500
-    } }, g.label), tabs.filter((t) => g.ids.includes(t.id)).map((t) => {
+    } }, g2.label), tabs.filter((t) => g2.ids.includes(t.id)).map((t) => {
       const isActive = active === t.id;
       return /* @__PURE__ */ import_react.default.createElement("button", { key: t.id, onClick: () => onChange(t.id), style: {
         display: "flex",
@@ -58694,7 +59235,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       fontWeight: 500
     } }, label));
   }
-  function PctMarcasPanel({ onCfgChange }) {
+  function PctMarcasPanel({ onCfgChange, version: version2 = 0 }) {
     const [open, setOpen] = (0, import_react.useState)(false);
     const [cfgs, setCfgs] = (0, import_react.useState)(() => {
       const obj = {};
@@ -58703,6 +59244,13 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       });
       return obj;
     });
+    (0, import_react.useEffect)(() => {
+      const obj = {};
+      MARCAS.forEach((m) => {
+        obj[m.id] = leerCfgLiq(m.id);
+      });
+      setCfgs(obj);
+    }, [version2]);
     function handleChange(marcaId, field, val) {
       const newCfg = { ...cfgs[marcaId], [field]: val };
       setCfgs((prev) => ({ ...prev, [marcaId]: newCfg }));
@@ -58884,38 +59432,48 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       flexShrink: 0
     } }), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 11, color: C.label3, fontFamily: FONT } }, "Los cambios se guardan autom\xE1ticamente y aplican a todas las pesta\xF1as"))));
   }
-  function LiqModal({ marcaId, ventas, mes, anio, MK, cierres, setCierres, onClose, syncCierre, onCfgChange }) {
+  function LiqModal({ marcaId, ventas, mes, anio, MK, cierres, onCambiarCierre, onClose, onCfgChange }) {
     if (!marcaId) return null;
     const marca = MARCAS.find((x) => x.id === marcaId);
-    const [cfg, setCfg] = (0, import_react.useState)(() => leerCfgLiq(marcaId));
+    const cierreActual = cierres[`${MK}-${marcaId}`];
+    const cerrado = !!cierreActual?.cerrado;
+    const cierreSnapshot = cerrado ? cierreActual?.snapshot : null;
+    const [cfg, setCfg] = (0, import_react.useState)(() => cierreSnapshot?.configuracion || leerCfgLiq(marcaId));
     const [showCfg, setShowCfg] = (0, import_react.useState)(false);
     const [imgPreview, setImgPreview] = (0, import_react.useState)(null);
-    const pctTarjeta = Number(cfg.pctTarjeta) || 0;
-    const pctComision = Number(cfg.pctComision) || 0;
-    const alquiler = Number(cfg.alquiler) || 0;
+    const pctTarjeta = Number(cierreSnapshot?.configuracion?.pctTarjeta ?? cfg.pctTarjeta) || 0;
+    const pctComision = Number(cierreSnapshot?.configuracion?.pctComision ?? cfg.pctComision) || 0;
+    const alquiler = Number(cierreSnapshot?.alquiler ?? cfg.alquiler) || 0;
     function saveCfg(newCfg) {
+      if (cerrado) {
+        alert("La liquidaci\xF3n est\xE1 cerrada. Re\xE1brela antes de cambiar su configuraci\xF3n.");
+        return;
+      }
       setCfg(newCfg);
       guardarCfgLiq(marcaId, newCfg);
       if (typeof onCfgChange === "function") onCfgChange();
     }
-    const [gastos, setGastos] = (0, import_react.useState)(() => leerGastosLiq(marcaId, MK));
+    const [gastos, setGastos] = (0, import_react.useState)(() => cierreSnapshot?.gastos || leerGastosLiq(marcaId, MK));
     function updateGastos(next) {
+      if (cerrado) {
+        alert("La liquidaci\xF3n est\xE1 cerrada. Re\xE1brela antes de cambiar sus gastos.");
+        return;
+      }
       setGastos(next);
       guardarGastosLiq(marcaId, MK, next);
     }
     function addGasto() {
       updateGastos([...gastos, { id: Date.now(), desc: "", monto: "" }]);
     }
-    function removeGasto(id) {
-      updateGastos(gastos.filter((g) => g.id !== id));
+    function removeGasto(id2) {
+      updateGastos(gastos.filter((g2) => g2.id !== id2));
     }
-    function changeGasto(id, field, val) {
-      updateGastos(gastos.map((g) => g.id === id ? { ...g, [field]: val } : g));
+    function changeGasto(id2, field, val) {
+      updateGastos(gastos.map((g2) => g2.id === id2 ? { ...g2, [field]: val } : g2));
     }
-    const totalGastos = gastos.reduce((s, g) => s + (Number(g.monto) || 0), 0);
+    const totalGastos = cierreSnapshot ? Number(cierreSnapshot.totalGastos) || 0 : gastos.reduce((s, g2) => s + (Number(g2.monto) || 0), 0);
     const vMes = ventas.filter((v) => v.mk === MK && !v.anulada);
     const vMarca = vMes.filter((v) => v.items.some((i) => i.marcaId === marcaId));
-    const cerrado = cierres[`${MK}-${marcaId}`]?.cerrado;
     function getMontosMixtos(venta) {
       if (venta.metodoPago?.startsWith("mixto|")) {
         const parts = venta.metodoPago.split("|").slice(1);
@@ -58924,8 +59482,8 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
           const [k, v] = p.split(":");
           obj[k] = parseFloat(v) || 0;
         });
-        const total = obj.efectivo + obj.qr + obj.tarjeta;
-        return total > 0 ? obj : { efectivo: venta.total, qr: 0, tarjeta: 0 };
+        const total2 = obj.efectivo + obj.qr + obj.tarjeta;
+        return total2 > 0 ? obj : { efectivo: venta.total, qr: 0, tarjeta: 0 };
       }
       if (venta.metodoPago === "qr") return { efectivo: 0, qr: venta.total, tarjeta: 0 };
       if (venta.metodoPago === "tarjeta") return { efectivo: 0, qr: 0, tarjeta: venta.total };
@@ -58941,11 +59499,16 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       brutoQR += montos.qr * pct;
       brutoTarjeta += montos.tarjeta * pct;
     });
-    const bruto = brutoEfect + brutoQR + brutoTarjeta;
-    const descTarjeta = brutoTarjeta * pctTarjeta / 100;
-    const subtotalBanco = bruto - descTarjeta;
-    const comision = subtotalBanco * pctComision / 100;
-    const neto = subtotalBanco - comision - alquiler - totalGastos;
+    if (cierreSnapshot) {
+      brutoEfect = Number(cierreSnapshot.efectivo) || 0;
+      brutoQR = Number(cierreSnapshot.qr) || 0;
+      brutoTarjeta = Number(cierreSnapshot.tarjeta) || 0;
+    }
+    const bruto = cierreSnapshot ? Number(cierreSnapshot.bruto) || 0 : brutoEfect + brutoQR + brutoTarjeta;
+    const descTarjeta = cierreSnapshot ? Number(cierreSnapshot.descuentoTarjeta) || 0 : brutoTarjeta * pctTarjeta / 100;
+    const subtotalBanco = cierreSnapshot ? Number(cierreSnapshot.subtotalBanco) || 0 : bruto - descTarjeta;
+    const comision = cierreSnapshot ? Number(cierreSnapshot.comision) || 0 : subtotalBanco * pctComision / 100;
+    const neto = cierreSnapshot ? Number(cierreSnapshot.neto) || 0 : subtotalBanco - comision - alquiler - totalGastos;
     return /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, null, /* @__PURE__ */ import_react.default.createElement(Sheet, { open: !!marcaId, onClose, title: `${marca?.emoji} ${marca?.nombre} \u2014 ${MESES[mes]}`, tall: true }, /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 16 } }, /* @__PURE__ */ import_react.default.createElement("button", { onClick: () => setShowCfg((s) => !s), style: {
       width: "100%",
       background: C.bg2,
@@ -59018,13 +59581,13 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       alignItems: "center",
       justifyContent: "center",
       WebkitTapHighlightColor: "transparent"
-    } }, "+")), gastos.map((g) => /* @__PURE__ */ import_react.default.createElement("div", { key: g.id, style: { display: "flex", gap: 8, marginBottom: 8, alignItems: "center" } }, /* @__PURE__ */ import_react.default.createElement(
+    } }, "+")), gastos.map((g2) => /* @__PURE__ */ import_react.default.createElement("div", { key: g2.id, style: { display: "flex", gap: 8, marginBottom: 8, alignItems: "center" } }, /* @__PURE__ */ import_react.default.createElement(
       "input",
       {
         type: "text",
         placeholder: "Descripci\xF3n del gasto",
-        value: g.desc,
-        onChange: (e) => changeGasto(g.id, "desc", e.target.value),
+        value: g2.desc,
+        onChange: (e) => changeGasto(g2.id, "desc", e.target.value),
         style: {
           flex: 1,
           padding: "9px 10px",
@@ -59045,8 +59608,8 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
         min: "0",
         step: "0.01",
         placeholder: "Bs",
-        value: g.monto,
-        onChange: (e) => changeGasto(g.id, "monto", e.target.value),
+        value: g2.monto,
+        onChange: (e) => changeGasto(g2.id, "monto", e.target.value),
         style: {
           width: 90,
           padding: "9px 10px",
@@ -59061,7 +59624,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
           textAlign: "right"
         }
       }
-    ), /* @__PURE__ */ import_react.default.createElement("button", { onClick: () => removeGasto(g.id), style: {
+    ), /* @__PURE__ */ import_react.default.createElement("button", { onClick: () => removeGasto(g2.id), style: {
       width: 28,
       height: 28,
       borderRadius: 8,
@@ -59100,8 +59663,8 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       [`\u2212 Comisi\xF3n ventas (${pctComision}%)`, `-${$1(comision)}`, C.red],
       [`= Subtotal -${pctComision}%`, $1(subtotalBanco - comision), C.label2],
       alquiler > 0 ? [`\u2212 Alquiler`, `-${$1(alquiler)}`, C.amber] : null,
-      ...gastos.filter((g) => g.desc || Number(g.monto) > 0).map(
-        (g) => [`\u2212 ${g.desc || "Gasto extra"}`, `-${$1(Number(g.monto) || 0)}`, C.red]
+      ...gastos.filter((g2) => g2.desc || Number(g2.monto) > 0).map(
+        (g2) => [`\u2212 ${g2.desc || "Gasto extra"}`, `-${$1(Number(g2.monto) || 0)}`, C.red]
       )
     ].filter(Boolean).map(([k, v, c], i, arr) => /* @__PURE__ */ import_react.default.createElement("div", { key: `${k}-${i}`, style: {
       display: "flex",
@@ -59154,24 +59717,16 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
         icon: "\u{1F4E4}"
       },
       "Compartir liquidaci\xF3n"
-    ), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => exportExcelLiquidacion(marca, ventas, mes, anio), variant: "fill", icon: "\u2B07" }, "Exportar Excel"), !cerrado ? /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => {
-      const key = `${MK}-${marcaId}`, data = { cerrado: true, fecha: hoy(), mk: MK, marca_id: marcaId };
-      setCierres((p) => ({ ...p, [key]: { cerrado: true, fecha: hoy(), mk: MK } }));
-      syncConRespaldo("cierre", { key, data }, () => sbGuardarCierre(key, data));
-      onClose();
-    }, variant: "success", icon: "\u2713" }, "Confirmar Cierre Mensual") : /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => {
-      setCierres((p) => ({ ...p, [`${MK}-${marcaId}`]: { cerrado: false, mk: MK } }));
-      onClose();
+    ), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => exportExcelLiquidacion(marca, ventas, mes, anio), variant: "fill", icon: "\u2B07" }, "Exportar Excel"), !cerrado ? /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: async () => {
+      if (await onCambiarCierre(marcaId, true)) onClose();
+    }, variant: "success", icon: "\u2713" }, "Confirmar Cierre Mensual") : /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: async () => {
+      if (await onCambiarCierre(marcaId, false)) onClose();
     }, variant: "danger" }, "Reabrir Liquidaci\xF3n"))), /* @__PURE__ */ import_react.default.createElement(ImagenLiqPreviewModal, { data: imgPreview, onClose: () => {
       if (imgPreview) URL.revokeObjectURL(imgPreview.url);
       setImgPreview(null);
     } }));
   }
-  var USUARIOS = [
-    { usuario: "toscana", password: "casa2024", nombre: "Toscana House", rol: "admin" },
-    { usuario: "caja", password: "caja2024", nombre: "Vendedor Caja", rol: "caja" },
-    { usuario: "tatiana", password: "toscana2024", nombre: "Tatiana", rol: "admin" }
-  ];
+  var USUARIOS = [];
   function useAuth() {
     var _hN108 = (0, import_react.useState)(null);
     var user = _hN108[0];
@@ -59220,13 +59775,6 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
     async function login(usuario, password) {
       const uLow = usuario.toLowerCase().trim();
       const pass = password.trim();
-      const FALLBACK = [
-        { usuario: "toscana", password: "casa2024", nombre: "Carolina Granier", rol: "admin" },
-        { usuario: "caja", password: "caja2024", nombre: "Vendedor Caja", rol: "caja" },
-        { usuario: "tatiana", password: "toscana2024", nombre: "Tatiana", rol: "admin" },
-        { usuario: "jpanezc", password: "123456", nombre: "Juan Pablo Anez", rol: "admin" },
-        { usuario: "juanpa", password: "123456", nombre: "Jp", rol: "marca" }
-      ];
       try {
         const db = await getSupabase();
         const email = uLow + "@th.internal";
@@ -59242,28 +59790,9 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
             return { ok: true };
           }
         }
+        if (error) console.warn("Supabase Auth:", error.message);
       } catch (e) {
-      }
-      const found = FALLBACK.find((u) => u.usuario === uLow && u.password === pass);
-      if (found) {
-        setUser({ ...found, loginAt: Date.now() });
-        return { ok: true };
-      }
-      try {
-        const db = await getSupabase();
-        const { data } = await db.from("usuarios").select("usuario,nombre,rol,estado,marca_id,password").eq("usuario", uLow).single();
-        if (data && data.estado !== "inactivo" && data.password && data.password === pass) {
-          setUser({
-            usuario: data.usuario,
-            nombre: data.nombre,
-            rol: data.rol,
-            estado: data.estado,
-            marcaId: data.marca_id,
-            loginAt: Date.now()
-          });
-          return { ok: true };
-        }
-      } catch (e) {
+        console.warn("Supabase Auth:", e.message);
       }
       return { ok: false, error: "Usuario o contrase\xF1a incorrectos" };
     }
@@ -59569,7 +60098,12 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
     const [scanStatus, setScanStatus] = (0, import_react.useState)(null);
     const [scanMsg, setScanMsg] = (0, import_react.useState)("");
     const [showScanner, setShowScanner] = (0, import_react.useState)(false);
+    const [guardandoRetiro, setGuardandoRetiro] = (0, import_react.useState)(false);
+    const retiroOperationRef = (0, import_react.useRef)(null);
     const fileRef = (0, import_react.useRef)(null);
+    (0, import_react.useEffect)(() => {
+      retiroOperationRef.current = null;
+    }, [prodEncontrado, cantidad, destinatario, motivo]);
     function buscarProdPorCod(cod) {
       const c = cod.trim().toUpperCase();
       if (!c) return false;
@@ -59618,7 +60152,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       }, 4e3);
       e.target.value = "";
     }
-    function confirmarRetiro() {
+    async function confirmarRetiro() {
       if (!prodEncontrado) return;
       if (!destinatario.trim()) {
         setMsg({ ok: false, txt: "Ingresa el nombre del destinatario" });
@@ -59629,8 +60163,10 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
         setMsg({ ok: false, txt: `Stock insuficiente (disponible: ${prodEncontrado.stock})` });
         return;
       }
+      if (!retiroOperationRef.current) retiroOperationRef.current = thUUID();
       const r = {
         id: `RET-${Date.now()}`,
+        operationId: retiroOperationRef.current,
         fecha: hoy(),
         hora: hora(),
         prodId: prodEncontrado.id,
@@ -59642,13 +60178,21 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
         destinatario: destinatario.trim(),
         motivo: motivo.trim()
       };
-      onRetiro(r);
-      setMsg({ ok: true, txt: `\u2713 "${prodEncontrado.nombre}" retirado para ${destinatario.trim()}` });
-      setProdEncontrado(null);
-      setCodBusq("");
-      setDestinatario("");
-      setMotivo("");
-      setCantidad("1");
+      setGuardandoRetiro(true);
+      try {
+        await onRetiro(r);
+        retiroOperationRef.current = null;
+        setMsg({ ok: true, txt: `\u2713 "${prodEncontrado.nombre}" retirado para ${destinatario.trim()}` });
+        setProdEncontrado(null);
+        setCodBusq("");
+        setDestinatario("");
+        setMotivo("");
+        setCantidad("1");
+      } catch (e) {
+        setMsg({ ok: false, txt: `${e?.message || "No se pudo confirmar el retiro"}. Los datos siguen en el formulario.` });
+      } finally {
+        setGuardandoRetiro(false);
+      }
     }
     const retirosFiltrados = (0, import_react.useMemo)(() => {
       let lista = [...retiros].reverse();
@@ -59846,7 +60390,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       "button",
       {
         onClick: confirmarRetiro,
-        disabled: !prodEncontrado || !destinatario.trim(),
+        disabled: !prodEncontrado || !destinatario.trim() || guardandoRetiro,
         style: {
           width: "100%",
           background: !prodEncontrado || !destinatario.trim() ? "#E0E0E0" : C.amber,
@@ -59861,7 +60405,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
           WebkitTapHighlightColor: "transparent"
         }
       },
-      "\u{1F4E4} Confirmar Retiro"
+      guardandoRetiro ? "Registrando de forma segura\u2026" : "\u{1F4E4} Confirmar Retiro"
     )), /* @__PURE__ */ import_react.default.createElement("div", { style: {
       background: C.bg1,
       borderRadius: 16,
@@ -59998,6 +60542,8 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
     const [errMsg, setErrMsg] = (0, import_react.useState)("");
     const [manNro, setManNro] = (0, import_react.useState)("");
     const [manCuf, setManCuf] = (0, import_react.useState)("");
+    const [factExist, setFactExist] = (0, import_react.useState)(() => venta ? leerFacturaLocal(venta.id) : null);
+    const facturaOperationRef = (0, import_react.useRef)(null);
     const cfg = leerCfgCUCU();
     (0, import_react.useEffect)(() => {
       if (open) {
@@ -60010,16 +60556,32 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
         setErrMsg("");
         setManNro("");
         setManCuf("");
+        facturaOperationRef.current = null;
+        const cached = venta ? leerFacturaLocal(venta.id) : null;
+        setFactExist(cached);
+        if (venta?.id) cargarFacturaServidor(venta.id).then((data) => {
+          if (data.factura) {
+            guardarFacturaLocal(venta.id, data.factura);
+            setFactExist(data.factura);
+          } else if (data.estado) {
+            setErrMsg(data.mensaje || "La factura requiere revisi\xF3n administrativa.");
+            setEstado("bloqueada");
+          }
+        }).catch((e) => {
+          setErrMsg(e.message || "No se pudo verificar la factura en el servidor");
+        });
       }
-    }, [open]);
-    const factExist = venta ? leerFacturaLocal(venta.id) : null;
+    }, [open, venta?.id]);
     async function emitir() {
       setEstado("enviando");
       setErrMsg("");
       try {
-        const r = await emitirFacturaCUCU(venta, nit, nombre);
-        guardarFacturaLocal(venta.id, { ...r, telefono: telefono.trim() });
-        setResultado({ ...r, telefono: telefono.trim() });
+        if (!facturaOperationRef.current) facturaOperationRef.current = thUUID();
+        const r = await emitirFacturaCUCU(venta, nit, nombre, telefono, facturaOperationRef.current);
+        facturaOperationRef.current = null;
+        guardarFacturaLocal(venta.id, r);
+        setFactExist(r);
+        setResultado(r);
         setEstado("ok");
         onFacturada && onFacturada(r);
       } catch (e) {
@@ -60027,24 +60589,26 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
         setEstado("error");
       }
     }
-    function guardarManual() {
+    async function guardarManual() {
       if (!manNro && !manCuf) {
         setErrMsg("Ingres\xE1 el n\xFAmero de factura o CUF.");
         return;
       }
-      const r = {
-        cuf: manCuf,
-        numero: manNro,
-        qrUrl: "",
-        pdf: "",
-        nitComprador: Number(nit) || 0,
-        nombreComprador: nombre.trim(),
-        telefono: telefono.trim()
-      };
-      guardarFacturaLocal(venta.id, r);
-      setResultado(r);
-      setEstado("ok");
-      onFacturada && onFacturada(r);
+      setEstado("enviando");
+      setErrMsg("");
+      try {
+        if (!facturaOperationRef.current) facturaOperationRef.current = thUUID();
+        const r = await registrarFacturaManual(venta, nit, nombre, telefono, manNro, manCuf, facturaOperationRef.current);
+        facturaOperationRef.current = null;
+        guardarFacturaLocal(venta.id, r);
+        setFactExist(r);
+        setResultado(r);
+        setEstado("ok");
+        onFacturada && onFacturada(r);
+      } catch (e) {
+        setErrMsg(e.message);
+        setEstado("error");
+      }
     }
     const FacturaOK = ({ r }) => /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center", marginBottom: 20 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
       width: 60,
@@ -60111,7 +60675,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       justifyContent: "center",
       gap: 10,
       WebkitTapHighlightColor: "transparent"
-    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 20 } }, "\u{1F4F2}"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 14, fontWeight: 700, color: "#fff", fontFamily: FONT_UI } }, factExist.telefono ? `Enviar a ${factExist.telefono}` : "Enviar por WhatsApp")), factExist.pdf && /* @__PURE__ */ import_react.default.createElement("a", { href: factExist.pdf, target: "_blank", rel: "noopener noreferrer", style: { textDecoration: "none" } }, /* @__PURE__ */ import_react.default.createElement(IOSBtn, { variant: "fill", full: true, icon: "\u{1F4C4}" }, "Ver PDF Factura")), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => setEstado("form"), variant: "fill", full: true }, "Emitir nueva factura"))) : estado === "ok" && resultado ? /* @__PURE__ */ import_react.default.createElement(FacturaOK, { r: resultado }) : (
+    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 20 } }, "\u{1F4F2}"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 14, fontWeight: 700, color: "#fff", fontFamily: FONT_UI } }, factExist.telefono ? `Enviar a ${factExist.telefono}` : "Enviar por WhatsApp")), factExist.pdf && /* @__PURE__ */ import_react.default.createElement("a", { href: factExist.pdf, target: "_blank", rel: "noopener noreferrer", style: { textDecoration: "none" } }, /* @__PURE__ */ import_react.default.createElement(IOSBtn, { variant: "fill", full: true, icon: "\u{1F4C4}" }, "Ver PDF Factura")))) : estado === "ok" && resultado ? /* @__PURE__ */ import_react.default.createElement(FacturaOK, { r: resultado }) : (
       /* ── Formulario ── */
       /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, null, /* @__PURE__ */ import_react.default.createElement("div", { style: { background: C.bg2, borderRadius: 14, padding: 14, marginBottom: 16, border: `1px solid ${C.sep}` } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
         fontSize: 11,
@@ -60129,7 +60693,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
         borderTop: `1px solid ${C.sep}`
       } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 15, fontWeight: 700, color: C.label, fontFamily: FONT } }, "Total"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 17, fontWeight: 700, color: C.label, fontFamily: FONT } }, $2(venta?.total)))), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 8, marginBottom: 16 } }, [["api", "\u{1F310} API CUCU"], ["manual", "Manual"]].map(([m, l]) => /* @__PURE__ */ import_react.default.createElement("button", { key: m, onClick: () => {
         setModo(m);
-        setErrMsg("");
+        if (estado !== "bloqueada") setErrMsg("");
       }, style: {
         flex: 1,
         padding: "10px",
@@ -60207,7 +60771,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
         padding: 12,
         marginBottom: 16,
         border: `1px solid ${C.blue}20`
-      } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.blue, fontFamily: FONT, lineHeight: 1.7 } }, "\u{1F3E2} ", /* @__PURE__ */ import_react.default.createElement("strong", null, "SYLVIA CAROLINA GRANIER ZALLES"), /* @__PURE__ */ import_react.default.createElement("br", null), "NIT Emisor: ", /* @__PURE__ */ import_react.default.createElement("strong", null, NIT_EMPRESA), !cfg.apiKey && /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, null, /* @__PURE__ */ import_react.default.createElement("br", null), /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.red } }, "\u26A0 Sin API Key \u2014 ir a Config \u2192 Sistema \u2192 Facturaci\xF3n")))), errMsg && /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.blue, fontFamily: FONT, lineHeight: 1.7 } }, "\u{1F3E2} ", /* @__PURE__ */ import_react.default.createElement("strong", null, "SYLVIA CAROLINA GRANIER ZALLES"), /* @__PURE__ */ import_react.default.createElement("br", null), "NIT Emisor: ", /* @__PURE__ */ import_react.default.createElement("strong", null, NIT_EMPRESA), /* @__PURE__ */ import_react.default.createElement("br", null), /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.green } }, "\u{1F512} Credenciales protegidas en el servidor"))), errMsg && /* @__PURE__ */ import_react.default.createElement("div", { style: {
         background: `${C.red}12`,
         border: `1px solid ${C.red}30`,
         borderRadius: 12,
@@ -60219,10 +60783,10 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
           onPress: emitir,
           variant: "primary",
           full: true,
-          disabled: estado === "enviando",
+          disabled: estado === "enviando" || estado === "bloqueada",
           icon: estado === "enviando" ? "\u23F3" : "\u{1F9FE}"
         },
-        estado === "enviando" ? "Emitiendo\u2026" : "Emitir Factura SIAT"
+        estado === "enviando" ? "Emitiendo\u2026" : estado === "bloqueada" ? "Emisi\xF3n bloqueada para revisi\xF3n" : "Emitir Factura SIAT"
       )), modo === "manual" && /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, null, /* @__PURE__ */ import_react.default.createElement(
         IOSInput,
         {
@@ -60246,14 +60810,14 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
         borderRadius: 12,
         padding: 12,
         marginBottom: 16
-      } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.red, fontFamily: FONT } }, "\u26A0 ", errMsg)), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: guardarManual, variant: "primary", full: true, icon: "\u{1F4BE}" }, "Guardar Factura")))
+      } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.red, fontFamily: FONT } }, "\u26A0 ", errMsg)), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: guardarManual, variant: "primary", full: true, icon: "\u{1F4BE}", disabled: estado === "enviando" || estado === "bloqueada" }, estado === "enviando" ? "Guardando\u2026" : estado === "bloqueada" ? "Emisi\xF3n bloqueada para revisi\xF3n" : "Guardar Factura")))
     ));
   }
   function NotaBajaModal({ baja, onClose }) {
     if (!baja) return null;
-    const { prod, cant, motivo, stockAntes, stockDespues, fecha, hora: hora2, operador, id } = baja;
+    const { prod, cant, motivo, stockAntes, stockDespues, fecha, hora: hora2, operador, id: id2 } = baja;
     const fila = (lbl, val) => /* @__PURE__ */ import_react.default.createElement("div", { style: { borderBottom: `1px solid ${C.sep}`, padding: "10px 0", display: "flex", justifyContent: "space-between", alignItems: "center" } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, color: C.label3, fontFamily: FONT } }, lbl), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, fontWeight: 500, color: C.label, fontFamily: FONT } }, val));
-    return /* @__PURE__ */ import_react.default.createElement(Sheet, { open: !!baja, onClose, title: "Comprobante de Baja", tall: true }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 16, flexWrap: "wrap" } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontFamily: "monospace", fontSize: 13, fontWeight: 700, color: C.label } }, id), /* @__PURE__ */ import_react.default.createElement(Chip, { color: "#C94C4C" }, "\u{1F6AB} BAJA")), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+    return /* @__PURE__ */ import_react.default.createElement(Sheet, { open: !!baja, onClose, title: "Comprobante de Baja", tall: true }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 16, flexWrap: "wrap" } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontFamily: "monospace", fontSize: 13, fontWeight: 700, color: C.label } }, id2), /* @__PURE__ */ import_react.default.createElement(Chip, { color: "#C94C4C" }, "\u{1F6AB} BAJA")), /* @__PURE__ */ import_react.default.createElement("div", { style: {
       background: C.bg2,
       borderRadius: 14,
       padding: "14px 16px",
@@ -60287,26 +60851,47 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
     const [confirmAnulF, setConfirmAnulF] = (0, import_react.useState)(false);
     const [anulandoFac, setAnulandoFac] = (0, import_react.useState)(false);
     const [anulFacMsg, setAnulFacMsg] = (0, import_react.useState)(null);
+    const [anulandoVenta, setAnulandoVenta] = (0, import_react.useState)(false);
+    const [anulVentaMsg, setAnulVentaMsg] = (0, import_react.useState)(null);
+    const anulVentaOperationRef = (0, import_react.useRef)(null);
+    const anulFacturaOperationRef = (0, import_react.useRef)(null);
     const [previewNota, setPreviewNota] = (0, import_react.useState)(null);
     const num = numVenta || venta.id.replace(/\D/g, "").slice(-4).padStart(4, "0");
     const facturaGuardada = leerFacturaLocal(venta.id);
     async function ejecutarAnularFactura() {
       const fac = leerFacturaLocal(venta.id);
-      if (!fac?.cuf) {
-        setAnulFacMsg({ ok: false, txt: "No hay CUF registrado para esta factura." });
+      if (!fac) {
+        setAnulFacMsg({ ok: false, txt: "No hay factura registrada para esta venta." });
         return;
       }
       setAnulandoFac(true);
       setAnulFacMsg(null);
       setConfirmAnulF(false);
       try {
-        await anularFacturaCUCU(fac.cuf);
+        if (!anulFacturaOperationRef.current) anulFacturaOperationRef.current = thUUID();
+        await anularFacturaCUCU(venta.id, anulFacturaOperationRef.current, 1);
+        anulFacturaOperationRef.current = null;
         guardarFacturaLocal(venta.id, { ...fac, anulada: true, fechaAnulacion: (/* @__PURE__ */ new Date()).toLocaleDateString("es-BO") });
         setAnulFacMsg({ ok: true, txt: "\u2713 Factura anulada en SIAT / CUCU" });
       } catch (e) {
         setAnulFacMsg({ ok: false, txt: e.message });
       }
       setAnulandoFac(false);
+    }
+    async function ejecutarAnularVenta() {
+      if (!onAnularVenta || anulandoVenta) return;
+      if (!anulVentaOperationRef.current) anulVentaOperationRef.current = thUUID();
+      setAnulandoVenta(true);
+      setAnulVentaMsg(null);
+      try {
+        await onAnularVenta(venta.id, { operationId: anulVentaOperationRef.current, motivo: "Anulaci\xF3n confirmada desde detalle" });
+        anulVentaOperationRef.current = null;
+        setConfirmAnulV(false);
+      } catch (e) {
+        setAnulVentaMsg({ ok: false, txt: e?.message || "No se pudo confirmar la anulaci\xF3n. La venta sigue activa." });
+      } finally {
+        setAnulandoVenta(false);
+      }
     }
     const filaInfo = (lbl, val) => /* @__PURE__ */ import_react.default.createElement("div", { style: { borderBottom: `1px solid ${C.sep}`, padding: "10px 0", display: "flex", justifyContent: "space-between", alignItems: "center" } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, color: C.label3, fontFamily: FONT } }, lbl), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, fontWeight: 500, color: C.label, fontFamily: FONT } }, val));
     return /* @__PURE__ */ import_react.default.createElement(Sheet, { open: !!venta, onClose, title: "Detalle de Nota de venta", tall: true }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 16, flexWrap: "wrap" } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontFamily: "monospace", fontSize: 14, fontWeight: 700, color: C.label } }, "# ", num), /* @__PURE__ */ import_react.default.createElement(PagoDisplay, { mp: venta.metodoPago, total: getDisplayTotal(venta) }), venta.anulada ? /* @__PURE__ */ import_react.default.createElement(Chip, { color: C.red }, "\u2298 ANULADA") : /* @__PURE__ */ import_react.default.createElement(Chip, { color: C.green }, "\u2713 Pagado"), facturaGuardada && !facturaGuardada.anulada && /* @__PURE__ */ import_react.default.createElement(Chip, { color: C.blue }, "\u{1F9FE} Facturada"), facturaGuardada?.anulada && /* @__PURE__ */ import_react.default.createElement(Chip, { color: C.amber }, "\u{1F9FE} Factura anulada")), /* @__PURE__ */ import_react.default.createElement("div", { style: {
@@ -60534,10 +61119,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       fontSize: 13,
       color: C.label2,
       WebkitTapHighlightColor: "transparent"
-    } }, "Cancelar"), /* @__PURE__ */ import_react.default.createElement("button", { onClick: () => {
-      onAnularVenta && onAnularVenta(venta.id);
-      setConfirmAnulV(false);
-    }, style: {
+    } }, "Cancelar"), /* @__PURE__ */ import_react.default.createElement("button", { onClick: ejecutarAnularVenta, disabled: anulandoVenta, style: {
       flex: 1,
       padding: "10px",
       borderRadius: 11,
@@ -60549,7 +61131,13 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       fontWeight: 700,
       color: "#fff",
       WebkitTapHighlightColor: "transparent"
-    } }, "S\xED, anular")))), venta.anulada && /* @__PURE__ */ import_react.default.createElement("div", { style: {
+    } }, anulandoVenta ? "Anulando\u2026" : "S\xED, anular")), anulVentaMsg && /* @__PURE__ */ import_react.default.createElement("div", { role: "alert", style: {
+      marginTop: 8,
+      fontSize: 12,
+      color: C.red,
+      fontFamily: FONT,
+      textAlign: "center"
+    } }, anulVentaMsg.txt))), venta.anulada && /* @__PURE__ */ import_react.default.createElement("div", { style: {
       background: `${C.red}10`,
       border: `1.5px solid ${C.red}30`,
       borderRadius: 14,
@@ -60614,7 +61202,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       }
     ), /* @__PURE__ */ import_react.default.createElement(NotaImgPreviewModal, { data: previewNota, onClose: () => setPreviewNota(null) }));
   }
-  function CajasTab() {
+  function CajasTab({ user }) {
     const CAJAS_KEY = "th_cajas_v1";
     const defaultCajas = [
       { id: 1, nombre: "Caja Turno en la ma\xF1ana", isOpen: false, ultimoCierre: null, balanceCierre: 0 },
@@ -60629,6 +61217,12 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
     });
     const [balInput, setBalInput] = (0, import_react.useState)({});
     const [showBal, setShowBal] = (0, import_react.useState)(null);
+    const [procesando, setProcesando] = (0, import_react.useState)(null);
+    (0, import_react.useEffect)(() => {
+      sbCargarCajasSeguras().then((remoto) => {
+        if (Array.isArray(remoto) && remoto.length > 0) saveCajas(remoto);
+      });
+    }, []);
     function saveCajas(updated) {
       setCajas(updated);
       try {
@@ -60636,14 +61230,40 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       } catch {
       }
     }
-    function abrirCaja(id) {
-      saveCajas(cajas.map((c) => c.id === id ? { ...c, isOpen: true } : c));
+    async function abrirCaja(id2) {
+      setProcesando(id2);
+      try {
+        const operationId = thUUID();
+        const mode = await sbResolverModoOperacion("CAJA_TURNO", user);
+        if (mode === "transactional") await sbCambiarTurnoCaja(operationId, id2, "ABRIR", 0, user);
+        saveCajas(cajas.map((c) => c.id === id2 ? { ...c, isOpen: true } : c));
+        if (mode === "shadow") await sbRegistrarShadow(operationId, "CAJA_TURNO", { cajaId: id2, accion: "ABRIR" }, user);
+      } catch (e) {
+        alert(`${e?.message || "No se pudo abrir la caja"}
+
+No se cambi\xF3 el turno.`);
+      } finally {
+        setProcesando(null);
+      }
     }
-    function cerrarCaja(id) {
-      const bal = parseFloat(balInput[id]) || 0;
-      saveCajas(cajas.map((c) => c.id === id ? { ...c, isOpen: false, ultimoCierre: hoy(), balanceCierre: bal } : c));
-      setShowBal(null);
-      setBalInput((p) => ({ ...p, [id]: "" }));
+    async function cerrarCaja(id2) {
+      const bal = parseFloat(balInput[id2]) || 0;
+      setProcesando(id2);
+      try {
+        const operationId = thUUID();
+        const mode = await sbResolverModoOperacion("CAJA_TURNO", user);
+        if (mode === "transactional") await sbCambiarTurnoCaja(operationId, id2, "CERRAR", bal, user);
+        saveCajas(cajas.map((c) => c.id === id2 ? { ...c, isOpen: false, ultimoCierre: hoy(), balanceCierre: bal } : c));
+        if (mode === "shadow") await sbRegistrarShadow(operationId, "CAJA_TURNO", { cajaId: id2, accion: "CERRAR", balance: bal }, user);
+        setShowBal(null);
+        setBalInput((p) => ({ ...p, [id2]: "" }));
+      } catch (e) {
+        alert(`${e?.message || "No se pudo cerrar la caja"}
+
+No se registr\xF3 un cierre parcial.`);
+      } finally {
+        setProcesando(null);
+      }
     }
     const abiertas = cajas.filter((c) => c.isOpen).length;
     const porAbrir = cajas.filter((c) => !c.isOpen).length;
@@ -60697,7 +61317,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       fontFamily: FONT,
       WebkitTapHighlightColor: "transparent",
       whiteSpace: "nowrap"
-    } }, "CERRAR CAJA") : /* @__PURE__ */ import_react.default.createElement("button", { onClick: () => abrirCaja(c.id), style: {
+    } }, "CERRAR CAJA") : /* @__PURE__ */ import_react.default.createElement("button", { onClick: () => abrirCaja(c.id), disabled: procesando === c.id, style: {
       background: C.green,
       border: "none",
       borderRadius: 12,
@@ -60709,7 +61329,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       fontFamily: FONT,
       WebkitTapHighlightColor: "transparent",
       whiteSpace: "nowrap"
-    } }, "ABRIR CAJA"))), c.isOpen && /* @__PURE__ */ import_react.default.createElement("div", { style: {
+    } }, procesando === c.id ? "PROCESANDO\u2026" : "ABRIR CAJA"))), c.isOpen && /* @__PURE__ */ import_react.default.createElement("div", { style: {
       marginTop: 10,
       paddingTop: 10,
       borderTop: `1px solid ${C.sep}`,
@@ -60742,7 +61362,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       cursor: "pointer",
       fontFamily: FONT,
       WebkitTapHighlightColor: "transparent"
-    } }, "Cancelar"), /* @__PURE__ */ import_react.default.createElement("button", { onClick: () => cerrarCaja(c.id), style: {
+    } }, "Cancelar"), /* @__PURE__ */ import_react.default.createElement("button", { onClick: () => cerrarCaja(c.id), disabled: procesando === c.id, style: {
       flex: 1,
       background: "#1565C0",
       border: "none",
@@ -60754,7 +61374,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       cursor: "pointer",
       fontFamily: FONT,
       WebkitTapHighlightColor: "transparent"
-    } }, "Confirmar Cierre"))))));
+    } }, procesando === c.id ? "Procesando\u2026" : "Confirmar Cierre"))))));
   }
   function generarPlanillaAlquileres(ventas, mes, anio) {
     const MK = `${mes}-${anio}`;
@@ -61017,11 +61637,11 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       }
       try {
         const ac = new (window.AudioContext || window.webkitAudioContext)();
-        const o = ac.createOscillator(), g = ac.createGain();
-        o.connect(g);
-        g.connect(ac.destination);
+        const o = ac.createOscillator(), g2 = ac.createGain();
+        o.connect(g2);
+        g2.connect(ac.destination);
         o.frequency.value = 1046;
-        g.gain.value = 0.25;
+        g2.gain.value = 0.25;
         o.start();
         o.stop(ac.currentTime + 0.12);
         setTimeout(() => ac.close(), 500);
@@ -61035,12 +61655,12 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       }
       try {
         const ac = new (window.AudioContext || window.webkitAudioContext)();
-        const o = ac.createOscillator(), g = ac.createGain();
-        o.connect(g);
-        g.connect(ac.destination);
+        const o = ac.createOscillator(), g2 = ac.createGain();
+        o.connect(g2);
+        g2.connect(ac.destination);
         o.type = "square";
         o.frequency.value = 220;
-        g.gain.value = 0.2;
+        g2.gain.value = 0.2;
         o.start();
         o.stop(ac.currentTime + 0.22);
         setTimeout(() => ac.close(), 500);
@@ -61258,11 +61878,11 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
   function beep(remoto) {
     try {
       const ac = new (window.AudioContext || window.webkitAudioContext)();
-      const o = ac.createOscillator(), g = ac.createGain();
-      o.connect(g);
-      g.connect(ac.destination);
+      const o = ac.createOscillator(), g2 = ac.createGain();
+      o.connect(g2);
+      g2.connect(ac.destination);
       o.frequency.value = remoto ? 1568 : 1046;
-      g.gain.value = 0.22;
+      g2.gain.value = 0.22;
       o.start();
       o.stop(ac.currentTime + 0.1);
       setTimeout(() => ac.close(), 400);
@@ -61272,12 +61892,12 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
   function beepError() {
     try {
       const ac = new (window.AudioContext || window.webkitAudioContext)();
-      const o = ac.createOscillator(), g = ac.createGain();
-      o.connect(g);
-      g.connect(ac.destination);
+      const o = ac.createOscillator(), g2 = ac.createGain();
+      o.connect(g2);
+      g2.connect(ac.destination);
       o.type = "square";
       o.frequency.value = 220;
-      g.gain.value = 0.18;
+      g2.gain.value = 0.18;
       o.start();
       o.stop(ac.currentTime + 0.22);
       setTimeout(() => ac.close(), 400);
@@ -62522,6 +63142,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
     const [filas, setFilas] = (0, import_react.useState)([]);
     const [resultado, setResultado] = (0, import_react.useState)(null);
     const fileRef = (0, import_react.useRef)(null);
+    const importOperationRef = (0, import_react.useRef)(null);
     function norm(s) {
       return String(s || "").trim().normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
     }
@@ -62673,6 +63294,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
         }
         clearTimeout(timeoutId);
         setFilas(parsed);
+        importOperationRef.current = null;
         setEstado("preview");
       } catch (e) {
         clearTimeout(timeoutId);
@@ -62684,9 +63306,18 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       const validas2 = filas.filter((f) => f._ok);
       if (!validas2.length) return;
       setEstado("importando");
-      const nVentas = await onImportar(validas2);
-      setResultado({ total: validas2.length, nVentas, marcas: [...new Set(validas2.map((f) => f.marcaNombre))] });
-      setEstado("done");
+      if (!importOperationRef.current) importOperationRef.current = thUUID();
+      try {
+        const nVentas = await onImportar(validas2, { operationId: importOperationRef.current });
+        importOperationRef.current = null;
+        setResultado({ total: validas2.length, nVentas, marcas: [...new Set(validas2.map((f) => f.marcaNombre))] });
+        setEstado("done");
+      } catch (e) {
+        setEstado("preview");
+        alert(`${e?.message || "No se pudo confirmar la importaci\xF3n"}
+
+No se guard\xF3 una importaci\xF3n parcial; puedes reintentar.`);
+      }
     }
     async function descargarPlantilla() {
       const XLSX2 = await getXLSXRead();
@@ -62896,9 +63527,9 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
         const d = /* @__PURE__ */ new Date();
         d.setDate(d.getDate() - i);
         const str = d.toISOString().slice(0, 10);
-        const total = ventas.filter((v) => v.fecha === str && !v.anulada).reduce((s, v) => s + getDisplayTotal(v), 0);
+        const total2 = ventas.filter((v) => v.fecha === str && !v.anulada).reduce((s, v) => s + getDisplayTotal(v), 0);
         const label = d.toLocaleDateString("es-BO", { weekday: "short" }).slice(0, 3);
-        days2.push({ str, total, label });
+        days2.push({ str, total: total2, label });
       }
       return days2;
     }, [ventas]);
@@ -62909,7 +63540,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       vMes.forEach((v) => v.items.forEach((it) => {
         map[it.marcaId] = (map[it.marcaId] || 0) + it.subtotal;
       }));
-      return Object.entries(map).map(([id, total]) => ({ marca: MARCAS.find((m) => m.id === Number(id)), total })).filter((x) => x.marca).sort((a, b) => b.total - a.total).slice(0, 5);
+      return Object.entries(map).map(([id2, total2]) => ({ marca: MARCAS.find((m) => m.id === Number(id2)), total: total2 })).filter((x) => x.marca).sort((a, b) => b.total - a.total).slice(0, 5);
     }, [vMes]);
     const maxMarca = Math.max(...topMarcas.map((m) => m.total), 1);
     const ultVentas = (0, import_react.useMemo)(
@@ -63240,8 +63871,8 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
     if (!venta) return null;
     const fac = leerFacturaLocal(venta.id);
     const num = venta.id.replace(/\D/g, "").slice(-4).padStart(4, "0");
-    const items = venta.items.filter((i) => i.marcaId === marca.id);
-    const sub = items.reduce((s, i) => s + i.subtotal, 0);
+    const items2 = venta.items.filter((i) => i.marcaId === marca.id);
+    const sub = items2.reduce((s, i) => s + i.subtotal, 0);
     const FilaInfo = ({ lbl, val }) => /* @__PURE__ */ import_react.default.createElement("div", { style: {
       display: "flex",
       justifyContent: "space-between",
@@ -63339,7 +63970,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
         letterSpacing: 0.6,
         fontFamily: FONT,
         marginBottom: 10
-      } }, "Productos de ", marca.nombre, " (", items.length, ")"), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      } }, "Productos de ", marca.nombre, " (", items2.length, ")"), /* @__PURE__ */ import_react.default.createElement("div", { style: {
         background: C.bg1,
         borderRadius: 14,
         overflow: "hidden",
@@ -63361,12 +63992,12 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
         textTransform: "uppercase",
         letterSpacing: 0.4,
         textAlign: h === "Producto / SKU" ? "left" : "right"
-      } }, h))), items.map((it, i) => /* @__PURE__ */ import_react.default.createElement("div", { key: i, style: {
+      } }, h))), items2.map((it, i) => /* @__PURE__ */ import_react.default.createElement("div", { key: i, style: {
         display: "grid",
         gridTemplateColumns: "1fr auto auto",
         gap: 8,
         padding: "10px 14px",
-        borderBottom: i < items.length - 1 ? `1px solid ${C.sep}` : "",
+        borderBottom: i < items2.length - 1 ? `1px solid ${C.sep}` : "",
         alignItems: "center"
       } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: {
         fontSize: 13,
@@ -63960,7 +64591,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       );
     })), busq.trim() && resultados.length === 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT_UI, padding: "8px 4px" } }, 'Ning\xFAn producto tuyo coincide con "', busq, '"')), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT_UI, marginTop: 10, lineHeight: 1.5 } }, "\u2139\uFE0F El descuento por producto se descuenta de tu liquidaci\xF3n y manda sobre el descuento general. Los dem\xE1s productos usan el general (si est\xE1 activo).")));
   }
-  function BrandPortal({ user, ventas, inv, cargas, retiros = [], logout, descuentos = {}, onGuardarDescuento, descCodigos = {}, onGuardarDescCodigo, onQuitarDescCodigo }) {
+  function BrandPortal({ user, ventas, inv, cargas, retiros = [], logout, descuentos = {}, onGuardarDescuento, descCodigos = {}, onGuardarDescCodigo, onQuitarDescCodigo, financialVersion = 0 }) {
     const isDesktop = useIsDesktop();
     const now = /* @__PURE__ */ new Date();
     const [mes, setMes] = (0, import_react.useState)(now.getMonth());
@@ -64040,7 +64671,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       }));
       return map;
     }, [vMes, mid]);
-    const liq = (0, import_react.useMemo)(() => calcLiqMarca(vMes, mid, MK), [vMes, mid, MK]);
+    const liq = (0, import_react.useMemo)(() => calcLiqMarca(vMes, mid, MK), [vMes, mid, MK, financialVersion]);
     const gastos = liq.gastos;
     const gcMarca = (0, import_react.useMemo)(() => vMes.reduce((s, v) => {
       const a = v.gcAllocations?.find((x) => x.marcaId === mid);
@@ -64781,7 +65412,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       { label: "Agotados", prods: invFiltrado.filter((i) => i.stock === 0), color: C.red },
       { label: "Bajo stock", prods: invFiltrado.filter((i) => i.stock > 0 && i.stock <= 2), color: C.amber },
       { label: "En stock", prods: invFiltrado.filter((i) => i.stock > 2), color: C.green }
-    ].filter((g) => g.prods.length > 0).map((g) => /* @__PURE__ */ import_react.default.createElement("div", { key: g.label, style: { marginBottom: 20 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+    ].filter((g2) => g2.prods.length > 0).map((g2) => /* @__PURE__ */ import_react.default.createElement("div", { key: g2.label, style: { marginBottom: 20 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
       fontSize: 10,
       letterSpacing: 1.2,
       textTransform: "uppercase",
@@ -64797,9 +65428,9 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       width: 6,
       height: 6,
       borderRadius: "50%",
-      background: g.color,
+      background: g2.color,
       opacity: 0.7
-    } }), g.label, " \xB7 ", g.prods.length), g.prods.map((p) => {
+    } }), g2.label, " \xB7 ", g2.prods.length), g2.prods.map((p) => {
       const vendTot = vendidasPorCodigo[p.codigo] || 0;
       const vendMes = vendidasMesPorCodigo[p.codigo] || 0;
       const stockReal = p.stock;
@@ -64971,7 +65602,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       { label: `= Subtotal`, value: liq.subBanco, sign: "", muted: false, bold: false },
       { label: `\u2212 Comisi\xF3n Toscana (${liq.cfg.pctComision}%)`, value: liq.comision, sign: "\u2212", muted: false, bold: false, red: true },
       ...liq.alquiler > 0 ? [{ label: "\u2212 Alquiler", value: liq.alquiler, sign: "\u2212", muted: false, bold: false, red: true }] : [],
-      ...gastos.filter((g) => g.desc || Number(g.monto) > 0).map((g) => ({ label: `\u2212 ${g.desc || "Gasto extra"}`, value: Number(g.monto) || 0, sign: "\u2212", muted: false, bold: false, red: true, sub: true })),
+      ...gastos.filter((g2) => g2.desc || Number(g2.monto) > 0).map((g2) => ({ label: `\u2212 ${g2.desc || "Gasto extra"}`, value: Number(g2.monto) || 0, sign: "\u2212", muted: false, bold: false, red: true, sub: true })),
       { label: "Neto a liquidar", value: liq.neto, sign: "", muted: false, bold: true }
     ].map((row, i, arr) => /* @__PURE__ */ import_react.default.createElement("div", { key: row.label, style: {
       display: "flex",
@@ -65492,7 +66123,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       setLogoEditorFile(file);
       e.target.value = "";
     }
-    function guardar() {
+    async function guardar() {
       setMsg(null);
       if (!f.nombre.trim()) {
         setMsg("El nombre de la marca es requerido");
@@ -65512,8 +66143,8 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
           setMsg("Ese nombre de usuario ya existe");
           return;
         }
-        if (!uPass || uPass.length < 6) {
-          setMsg("Contrase\xF1a m\xEDnimo 6 caracteres");
+        if (!uPass || uPass.length < 8) {
+          setMsg("Contrase\xF1a m\xEDnimo 8 caracteres");
           return;
         }
       }
@@ -65549,7 +66180,11 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
           estado: "activo"
         };
       }
-      onGuardar(marca, isNew, nuevoUsuario);
+      const ok = await onGuardar(marca, isNew, nuevoUsuario);
+      if (ok === false) {
+        setMsg("No se pudo confirmar la marca. No se aplic\xF3 ning\xFAn cambio.");
+        return;
+      }
       setDone(true);
       setTimeout(() => onClose(), 600);
     }
@@ -66022,7 +66657,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
         type: showPass ? "text" : "password",
         value: uPass,
         onChange: (e) => setUPass(e.target.value),
-        placeholder: "M\xEDnimo 6 caracteres",
+        placeholder: "M\xEDnimo 8 caracteres",
         style: {
           width: "100%",
           padding: "12px 44px 12px 14px",
@@ -66186,6 +66821,63 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
     } catch {
     }
   }
+  function mapGiftCardsNube(cards, usos = []) {
+    const porTarjeta = /* @__PURE__ */ new Map();
+    usos.forEach((u) => {
+      const item = {
+        id: u.id,
+        fecha: String(u.created_at || "").slice(0, 10),
+        monto: Number(u.monto) || 0,
+        nota: u.nota || "",
+        ventaId: u.venta_id || null,
+        operationId: u.operation_id || null
+      };
+      if (!porTarjeta.has(u.gift_card_id)) porTarjeta.set(u.gift_card_id, []);
+      porTarjeta.get(u.gift_card_id).push(item);
+    });
+    return (cards || []).map((g2) => {
+      const historial = porTarjeta.get(g2.id) || [];
+      return {
+        id: g2.id,
+        codigo: g2.codigo,
+        monto: Number(g2.monto) || 0,
+        saldo: Number(g2.saldo) || 0,
+        emision: g2.emision,
+        vencimiento: g2.vencimiento || null,
+        nota: g2.nota || "",
+        estado: g2.estado || "vigente",
+        usos: historial,
+        ultimoUso: historial.length ? historial[historial.length - 1].fecha : null,
+        rowVersion: Number(g2.row_version) || 0,
+        _nube: true
+      };
+    });
+  }
+  async function sbCargarGiftCardsCloud() {
+    try {
+      const db = await getSupabase();
+      const { data: cards, error } = await db.from("gift_cards").select("*").order("emision", { ascending: false });
+      if (error) throw error;
+      if (!cards?.length) return [];
+      const { data: usos, error: usosError } = await db.from("gift_card_usos").select("*").in("gift_card_id", cards.map((g2) => g2.id)).order("created_at", { ascending: true });
+      if (usosError) throw usosError;
+      return mapGiftCardsNube(cards, usos || []);
+    } catch (e) {
+      console.warn("[Gift Cards] No se pudo cargar la fuente central:", e.message);
+      return null;
+    }
+  }
+  async function sbBuscarGiftCardCloud(codigo) {
+    const normalizado = String(codigo || "").trim().toUpperCase();
+    if (!normalizado) return null;
+    const db = await getSupabase();
+    const { data: card, error } = await db.from("gift_cards").select("*").eq("codigo", normalizado).maybeSingle();
+    if (error) throw error;
+    if (!card) return null;
+    const { data: usos, error: usosError } = await db.from("gift_card_usos").select("*").eq("gift_card_id", card.id).order("created_at", { ascending: true });
+    if (usosError) throw usosError;
+    return mapGiftCardsNube([card], usos || [])[0] || null;
+  }
   function gcEstado(gc) {
     if ((gc.saldo || 0) <= 0) return "agotada";
     if (gc.vencimiento && gc.vencimiento < hoy()) return "vencida";
@@ -66251,9 +66943,9 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
         "TOTALES",
         "",
         "",
-        +gcFiltradas.reduce((s, g) => s + (g.monto || 0), 0).toFixed(2),
-        +gcFiltradas.reduce((s, g) => s + (g.saldo || 0), 0).toFixed(2),
-        +gcFiltradas.reduce((s, g) => s + ((g.monto || 0) - (g.saldo || 0)), 0).toFixed(2)
+        +gcFiltradas.reduce((s, g2) => s + (g2.monto || 0), 0).toFixed(2),
+        +gcFiltradas.reduce((s, g2) => s + (g2.saldo || 0), 0).toFixed(2),
+        +gcFiltradas.reduce((s, g2) => s + ((g2.monto || 0) - (g2.saldo || 0)), 0).toFixed(2)
       ]
     ];
     const ws = XLSX2.utils.aoa_to_sheet(rows);
@@ -66278,20 +66970,24 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
     const sfx = (fechaIni || "todo").replace(/-/g, "") + "_" + (fechaFin || "todo").replace(/-/g, "");
     descargarArchivo(blob, `ToscanaHouse_GiftCards_${sfx}.xlsx`);
   }
-  function SheetCrearGC({ onClose, onCreada }) {
+  function SheetCrearGC({ onClose, onCreada, user, mode = "legacy" }) {
     const isDesktop = useIsDesktop();
     const [monto, setMonto] = (0, import_react.useState)("");
     const [vencimiento, setVencimiento] = (0, import_react.useState)("");
     const [nota, setNota] = (0, import_react.useState)("");
     const [done, setDone] = (0, import_react.useState)(false);
     const [nuevaGC, setNuevaGC] = (0, import_react.useState)(null);
-    function crear() {
+    const [guardando, setGuardando] = (0, import_react.useState)(false);
+    const [errorMsg, setErrorMsg] = (0, import_react.useState)(null);
+    async function crear() {
       const m = parseFloat(monto);
-      if (!m || m <= 0) return;
-      const id = genGCId();
+      if (!m || m <= 0 || guardando) return;
+      setGuardando(true);
+      setErrorMsg(null);
+      const id2 = genGCId();
       const gc = {
-        id,
-        codigo: id,
+        id: id2,
+        codigo: id2,
         monto: m,
         saldo: m,
         emision: hoy(),
@@ -66300,11 +66996,27 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
         usos: [],
         ultimoUso: null
       };
-      const lista = [...cargarGC(), gc];
-      guardarGC(lista);
-      setNuevaGC(gc);
-      setDone(true);
-      onCreada && onCreada(lista);
+      try {
+        let lista = null;
+        if (mode === "transactional") {
+          const result = await sbCrearGiftCardTransaccional(thUUID(), gc, user);
+          gc.id = result.giftCardId || gc.id;
+          gc.codigo = result.codigo || gc.codigo;
+          gc.saldo = Number(result.saldo ?? gc.saldo);
+          gc._nube = true;
+        } else {
+          lista = [...cargarGC(), gc];
+          guardarGC(lista);
+          if (mode === "shadow") await sbRegistrarShadow(thUUID(), "CREAR_GIFT_CARD", gc, user);
+        }
+        setNuevaGC(gc);
+        setDone(true);
+        if (onCreada) await onCreada(lista);
+      } catch (e) {
+        setErrorMsg(e?.message || "No se pudo crear la Gift Card. No se registr\xF3 ning\xFAn cambio.");
+      } finally {
+        setGuardando(false);
+      }
     }
     const overlay = {
       position: "fixed",
@@ -66353,29 +67065,29 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
     };
     const onFocus = (e) => e.target.style.borderColor = C.gold;
     const onBlur = (e) => e.target.style.borderColor = C.sep;
-    return /* @__PURE__ */ import_react.default.createElement("div", { style: overlay, onClick: (e) => e.target === e.currentTarget && onClose() }, /* @__PURE__ */ import_react.default.createElement("div", { style: card }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 20, fontWeight: 700, color: C.label, fontFamily: FONT_DISPLAY, letterSpacing: "0.01em" } }, "Nueva Gift Card"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.label3, fontFamily: FONT_UI, marginTop: 2 } }, "Crear tarjeta de regalo")), /* @__PURE__ */ import_react.default.createElement("button", { onClick: onClose, style: { background: "none", border: "none", fontSize: 22, cursor: "pointer", color: C.label3, padding: "4px 8px", lineHeight: 1 } }, "\u2715")), done && nuevaGC ? /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { background: `${C.green}10`, border: `1px solid ${C.green}30`, borderRadius: 16, padding: "20px", textAlign: "center", marginBottom: 20 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 32, marginBottom: 8 } }, "\u{1F381}"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 14, fontWeight: 700, color: C.green, fontFamily: FONT_UI, marginBottom: 4 } }, "Gift Card creada"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 22, fontWeight: 700, color: C.label, fontFamily: FONT_DISPLAY, marginBottom: 4 } }, $2(nuevaGC.monto)), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT_UI, fontWeight: 600, letterSpacing: 0.5, textTransform: "uppercase", marginTop: 4 } }, nuevaGC.codigo), nuevaGC.vencimiento && /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.amber, fontFamily: FONT_UI, marginTop: 6 } }, "Vence: ", nuevaGC.vencimiento)), /* @__PURE__ */ import_react.default.createElement("button", { onClick: onClose, style: { width: "100%", padding: "14px", borderRadius: 14, border: "none", background: C.label, color: C.bg0, fontSize: 15, fontWeight: 700, fontFamily: FONT_UI, cursor: "pointer" } }, "Listo")) : /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 16 } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("label", { style: lbl }, "Monto (Bs) *"), /* @__PURE__ */ import_react.default.createElement("input", { type: "number", min: "1", step: "0.01", value: monto, onChange: (e) => setMonto(e.target.value), placeholder: "0.00", style: inp, onFocus, onBlur })), /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("label", { style: lbl }, "Vencimiento (opcional)"), /* @__PURE__ */ import_react.default.createElement("input", { type: "date", value: vencimiento, onChange: (e) => setVencimiento(e.target.value), style: inp, onFocus, onBlur })), /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("label", { style: lbl }, "Nota (opcional)"), /* @__PURE__ */ import_react.default.createElement("input", { type: "text", value: nota, onChange: (e) => setNota(e.target.value), placeholder: "Ej: Regalo cumplea\xF1os\u2026", style: inp, onFocus, onBlur })), /* @__PURE__ */ import_react.default.createElement(
+    return /* @__PURE__ */ import_react.default.createElement("div", { style: overlay, onClick: (e) => e.target === e.currentTarget && onClose() }, /* @__PURE__ */ import_react.default.createElement("div", { style: card }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 20, fontWeight: 700, color: C.label, fontFamily: FONT_DISPLAY, letterSpacing: "0.01em" } }, "Nueva Gift Card"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.label3, fontFamily: FONT_UI, marginTop: 2 } }, "Crear tarjeta de regalo")), /* @__PURE__ */ import_react.default.createElement("button", { onClick: onClose, style: { background: "none", border: "none", fontSize: 22, cursor: "pointer", color: C.label3, padding: "4px 8px", lineHeight: 1 } }, "\u2715")), done && nuevaGC ? /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { background: `${C.green}10`, border: `1px solid ${C.green}30`, borderRadius: 16, padding: "20px", textAlign: "center", marginBottom: 20 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 32, marginBottom: 8 } }, "\u{1F381}"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 14, fontWeight: 700, color: C.green, fontFamily: FONT_UI, marginBottom: 4 } }, "Gift Card creada"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 22, fontWeight: 700, color: C.label, fontFamily: FONT_DISPLAY, marginBottom: 4 } }, $2(nuevaGC.monto)), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT_UI, fontWeight: 600, letterSpacing: 0.5, textTransform: "uppercase", marginTop: 4 } }, nuevaGC.codigo), nuevaGC.vencimiento && /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.amber, fontFamily: FONT_UI, marginTop: 6 } }, "Vence: ", nuevaGC.vencimiento)), /* @__PURE__ */ import_react.default.createElement("button", { onClick: onClose, style: { width: "100%", padding: "14px", borderRadius: 14, border: "none", background: C.label, color: C.bg0, fontSize: 15, fontWeight: 700, fontFamily: FONT_UI, cursor: "pointer" } }, "Listo")) : /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 16 } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("label", { style: lbl }, "Monto (Bs) *"), /* @__PURE__ */ import_react.default.createElement("input", { type: "number", min: "1", step: "0.01", value: monto, onChange: (e) => setMonto(e.target.value), placeholder: "0.00", style: inp, onFocus, onBlur })), /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("label", { style: lbl }, "Vencimiento (opcional)"), /* @__PURE__ */ import_react.default.createElement("input", { type: "date", value: vencimiento, onChange: (e) => setVencimiento(e.target.value), style: inp, onFocus, onBlur })), /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("label", { style: lbl }, "Nota (opcional)"), /* @__PURE__ */ import_react.default.createElement("input", { type: "text", value: nota, onChange: (e) => setNota(e.target.value), placeholder: "Ej: Regalo cumplea\xF1os\u2026", style: inp, onFocus, onBlur })), errorMsg && /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.red, fontFamily: FONT_UI, fontWeight: 500 } }, "\u26A0\uFE0F ", errorMsg), /* @__PURE__ */ import_react.default.createElement(
       "button",
       {
         onClick: crear,
-        disabled: !monto || parseFloat(monto) <= 0,
+        disabled: !monto || parseFloat(monto) <= 0 || guardando,
         style: {
           marginTop: 4,
           padding: "14px",
           borderRadius: 14,
           border: "none",
-          background: !monto || parseFloat(monto) <= 0 ? C.bg2 : C.label,
-          color: !monto || parseFloat(monto) <= 0 ? C.label3 : C.bg0,
+          background: !monto || parseFloat(monto) <= 0 || guardando ? C.bg2 : C.label,
+          color: !monto || parseFloat(monto) <= 0 || guardando ? C.label3 : C.bg0,
           fontSize: 15,
           fontWeight: 700,
           fontFamily: FONT_UI,
-          cursor: !monto || parseFloat(monto) <= 0 ? "not-allowed" : "pointer",
+          cursor: !monto || parseFloat(monto) <= 0 || guardando ? "not-allowed" : "pointer",
           transition: "all .15s"
         }
       },
-      "\u{1F381} Crear Gift Card"
+      guardando ? "Confirmando\u2026" : "\u{1F381} Crear Gift Card"
     ))));
   }
-  function SheetUsarGC({ onClose, onUsada }) {
+  function SheetUsarGC({ onClose, onUsada, user, mode = "legacy" }) {
     const isDesktop = useIsDesktop();
     const [codigo, setCodigo] = (0, import_react.useState)("");
     const [monto, setMonto] = (0, import_react.useState)("");
@@ -66384,50 +67096,83 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
     const [busqMsg, setBusqMsg] = (0, import_react.useState)(null);
     const [done, setDone] = (0, import_react.useState)(false);
     const [errorMsg, setErrorMsg] = (0, import_react.useState)(null);
-    function buscar() {
-      const lista = cargarGC();
-      const gc = lista.find((g) => g.codigo.toLowerCase() === codigo.trim().toLowerCase());
-      if (!gc) {
-        setBusqMsg("\u274C Gift Card no encontrada");
-        setGcFound(null);
-        return;
-      }
-      const est = gcEstado(gc);
-      if (est === "agotada") {
-        setBusqMsg("\u26A0\uFE0F Gift Card ya agotada");
-        setGcFound(null);
-        return;
-      }
-      if (est === "vencida") {
-        setBusqMsg("\u26A0\uFE0F Gift Card vencida");
-        setGcFound(null);
-        return;
-      }
-      setGcFound(gc);
+    const [buscando, setBuscando] = (0, import_react.useState)(false);
+    const [procesando, setProcesando] = (0, import_react.useState)(false);
+    const [saldoFinal, setSaldoFinal] = (0, import_react.useState)(null);
+    async function buscar() {
+      if (!codigo.trim() || buscando) return;
+      setBuscando(true);
       setBusqMsg(null);
       setErrorMsg(null);
+      try {
+        const gc = mode === "transactional" ? await sbBuscarGiftCardCloud(codigo) : cargarGC().find((g2) => g2.codigo.toLowerCase() === codigo.trim().toLowerCase());
+        if (!gc) {
+          setBusqMsg("\u274C Gift Card no encontrada");
+          setGcFound(null);
+          return;
+        }
+        const est = gcEstado(gc);
+        if (est === "agotada") {
+          setBusqMsg("\u26A0\uFE0F Gift Card ya agotada");
+          setGcFound(null);
+          return;
+        }
+        if (est === "vencida") {
+          setBusqMsg("\u26A0\uFE0F Gift Card vencida");
+          setGcFound(null);
+          return;
+        }
+        setGcFound(gc);
+      } catch (e) {
+        setGcFound(null);
+        setBusqMsg(`\u274C ${e?.message || "No se pudo consultar la Gift Card"}`);
+      } finally {
+        setBuscando(false);
+      }
     }
-    function canjear() {
+    async function canjear() {
       const m = parseFloat(monto);
       if (!m || m <= 0) {
         setErrorMsg("Ingresa un monto v\xE1lido");
         return;
       }
-      if (!gcFound) return;
+      if (!gcFound || procesando) return;
       if (m > gcFound.saldo) {
         setErrorMsg(`Saldo insuficiente. Disponible: ${$2(gcFound.saldo)}`);
         return;
       }
-      const lista = cargarGC();
-      const updated = lista.map((g) => g.codigo !== gcFound.codigo ? g : {
-        ...g,
-        saldo: +(g.saldo - m).toFixed(2),
-        ultimoUso: hoy(),
-        usos: [...g.usos || [], { fecha: hoy(), monto: m, nota: nota.trim() }]
-      });
-      guardarGC(updated);
-      setDone(true);
-      onUsada && onUsada(updated);
+      setProcesando(true);
+      setErrorMsg(null);
+      try {
+        let updated = null;
+        let saldo = +(gcFound.saldo - m).toFixed(2);
+        if (mode === "transactional") {
+          const result = await sbCanjearGiftCardTransaccional(thUUID(), gcFound.codigo, m, nota, user);
+          saldo = Number(result.saldoDespues);
+        } else {
+          updated = cargarGC().map((g2) => g2.codigo !== gcFound.codigo ? g2 : {
+            ...g2,
+            saldo,
+            ultimoUso: hoy(),
+            usos: [...g2.usos || [], { fecha: hoy(), monto: m, nota: nota.trim() }]
+          });
+          guardarGC(updated);
+          if (mode === "shadow") await sbRegistrarShadow(thUUID(), "CANJEAR_GIFT_CARD", {
+            codigo: gcFound.codigo,
+            monto: m,
+            nota: nota.trim(),
+            saldoAntes: gcFound.saldo,
+            saldoDespues: saldo
+          }, user);
+        }
+        setSaldoFinal(saldo);
+        setDone(true);
+        if (onUsada) await onUsada(updated);
+      } catch (e) {
+        setErrorMsg(e?.message || "El canje no fue confirmado. El saldo no cambi\xF3.");
+      } finally {
+        setProcesando(false);
+      }
     }
     const overlay = {
       position: "fixed",
@@ -66476,7 +67221,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
     };
     const onFocus = (e) => e.target.style.borderColor = C.gold;
     const onBlur = (e) => e.target.style.borderColor = C.sep;
-    return /* @__PURE__ */ import_react.default.createElement("div", { style: overlay, onClick: (e) => e.target === e.currentTarget && onClose() }, /* @__PURE__ */ import_react.default.createElement("div", { style: card }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 20, fontWeight: 700, color: C.label, fontFamily: FONT_DISPLAY, letterSpacing: "0.01em" } }, "Canjear Gift Card"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.label3, fontFamily: FONT_UI, marginTop: 2 } }, "Aplicar saldo de tarjeta de regalo")), /* @__PURE__ */ import_react.default.createElement("button", { onClick: onClose, style: { background: "none", border: "none", fontSize: 22, cursor: "pointer", color: C.label3, padding: "4px 8px", lineHeight: 1 } }, "\u2715")), done ? /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { background: `${C.green}10`, border: `1px solid ${C.green}30`, borderRadius: 16, padding: "20px", textAlign: "center", marginBottom: 20 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 32, marginBottom: 8 } }, "\u2705"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 14, fontWeight: 700, color: C.green, fontFamily: FONT_UI, marginBottom: 4 } }, "Canje exitoso"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 22, fontWeight: 700, color: C.label, fontFamily: FONT_DISPLAY } }, $2(parseFloat(monto)), " canjeados"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.label3, fontFamily: FONT_UI, marginTop: 8 } }, "Saldo restante: ", $2(Math.max(0, (gcFound?.saldo || 0) - parseFloat(monto || 0))))), /* @__PURE__ */ import_react.default.createElement("button", { onClick: onClose, style: { width: "100%", padding: "14px", borderRadius: 14, border: "none", background: C.label, color: C.bg0, fontSize: 15, fontWeight: 700, fontFamily: FONT_UI, cursor: "pointer" } }, "Listo")) : /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 16 } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("label", { style: lbl }, "C\xF3digo de Gift Card *"), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 8 } }, /* @__PURE__ */ import_react.default.createElement(
+    return /* @__PURE__ */ import_react.default.createElement("div", { style: overlay, onClick: (e) => e.target === e.currentTarget && onClose() }, /* @__PURE__ */ import_react.default.createElement("div", { style: card }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 20, fontWeight: 700, color: C.label, fontFamily: FONT_DISPLAY, letterSpacing: "0.01em" } }, "Canjear Gift Card"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.label3, fontFamily: FONT_UI, marginTop: 2 } }, "Aplicar saldo de tarjeta de regalo")), /* @__PURE__ */ import_react.default.createElement("button", { onClick: onClose, style: { background: "none", border: "none", fontSize: 22, cursor: "pointer", color: C.label3, padding: "4px 8px", lineHeight: 1 } }, "\u2715")), done ? /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { background: `${C.green}10`, border: `1px solid ${C.green}30`, borderRadius: 16, padding: "20px", textAlign: "center", marginBottom: 20 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 32, marginBottom: 8 } }, "\u2705"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 14, fontWeight: 700, color: C.green, fontFamily: FONT_UI, marginBottom: 4 } }, "Canje exitoso"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 22, fontWeight: 700, color: C.label, fontFamily: FONT_DISPLAY } }, $2(parseFloat(monto)), " canjeados"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.label3, fontFamily: FONT_UI, marginTop: 8 } }, "Saldo restante: ", $2(Math.max(0, saldoFinal ?? (gcFound?.saldo || 0) - parseFloat(monto || 0))))), /* @__PURE__ */ import_react.default.createElement("button", { onClick: onClose, style: { width: "100%", padding: "14px", borderRadius: 14, border: "none", background: C.label, color: C.bg0, fontSize: 15, fontWeight: 700, fontFamily: FONT_UI, cursor: "pointer" } }, "Listo")) : /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 16 } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("label", { style: lbl }, "C\xF3digo de Gift Card *"), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 8 } }, /* @__PURE__ */ import_react.default.createElement(
       "input",
       {
         type: "text",
@@ -66496,6 +67241,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       "button",
       {
         onClick: buscar,
+        disabled: buscando,
         style: {
           padding: "13px 16px",
           borderRadius: 12,
@@ -66509,7 +67255,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
           flexShrink: 0
         }
       },
-      "Buscar"
+      buscando ? "Buscando\u2026" : "Buscar"
     )), busqMsg && /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.red, fontFamily: FONT_UI, marginTop: 6, fontWeight: 500 } }, busqMsg)), gcFound && /* @__PURE__ */ import_react.default.createElement("div", { style: { background: `${C.gold}10`, border: `1px solid ${C.gold}30`, borderRadius: 14, padding: "14px 16px" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center" } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: C.gold, fontFamily: FONT_UI, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 2 } }, "Gift Card encontrada"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.label, fontFamily: FONT_UI } }, gcFound.codigo)), /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "right" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 18, fontWeight: 700, color: C.label, fontFamily: FONT_DISPLAY } }, $2(gcFound.saldo)), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT_UI } }, "saldo disponible"))), gcFound.vencimiento && /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.amber, fontFamily: FONT_UI, marginTop: 6, fontWeight: 500 } }, "Vence: ", gcFound.vencimiento)), gcFound && /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, null, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("label", { style: lbl }, "Monto a canjear (Bs) *"), /* @__PURE__ */ import_react.default.createElement(
       "input",
       {
@@ -66542,31 +67288,26 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       "button",
       {
         onClick: canjear,
-        disabled: !monto || parseFloat(monto) <= 0,
+        disabled: !monto || parseFloat(monto) <= 0 || procesando,
         style: {
           padding: "14px",
           borderRadius: 14,
           border: "none",
-          background: !monto || parseFloat(monto) <= 0 ? C.bg2 : C.green,
-          color: !monto || parseFloat(monto) <= 0 ? C.label3 : "#fff",
+          background: !monto || parseFloat(monto) <= 0 || procesando ? C.bg2 : C.green,
+          color: !monto || parseFloat(monto) <= 0 || procesando ? C.label3 : "#fff",
           fontSize: 15,
           fontWeight: 700,
           fontFamily: FONT_UI,
-          cursor: !monto || parseFloat(monto) <= 0 ? "not-allowed" : "pointer",
+          cursor: !monto || parseFloat(monto) <= 0 || procesando ? "not-allowed" : "pointer",
           transition: "all .15s"
         }
       },
-      "\u{1F4B3} Canjear ",
-      monto ? $2(parseFloat(monto)) : ""
+      procesando ? "Confirmando\u2026" : `\u{1F4B3} Canjear ${monto ? $2(parseFloat(monto)) : ""}`
     )))));
   }
   function SheetDetalleGC({ gc: gcProp, onClose }) {
     const isDesktop = useIsDesktop();
-    const [gc, setGc] = (0, import_react.useState)(gcProp);
-    (0, import_react.useEffect)(() => {
-      const found = cargarGC().find((g) => g.codigo === gcProp.codigo);
-      if (found) setGc(found);
-    }, [gcProp.codigo]);
+    const gc = gcProp;
     const estado = gcEstado(gc);
     const ec = { vigente: C.green, agotada: C.label3, vencida: C.red }[estado] || C.label3;
     const consumido = (gc.monto || 0) - (gc.saldo || 0);
@@ -66689,7 +67430,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       border: `1px solid ${C.sep}`
     } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, fontWeight: 600, color: C.label, fontFamily: FONT_UI } }, u.fecha), u.nota && /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT_UI, marginTop: 2 } }, u.nota)), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 15, fontWeight: 700, color: C.red, fontFamily: FONT_UI } }, "\u2212", $2(u.monto)))))) : /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center", padding: "20px 0", color: C.label3, fontSize: 13, fontFamily: FONT_UI } }, "A\xFAn no tiene usos registrados"), /* @__PURE__ */ import_react.default.createElement("button", { onClick: onClose, style: { marginTop: 20, width: "100%", padding: "14px", borderRadius: 14, border: "none", background: C.bg2, color: C.label, fontSize: 15, fontWeight: 700, fontFamily: FONT_UI, cursor: "pointer" } }, "Cerrar")));
   }
-  function GiftCardsTab() {
+  function GiftCardsTab({ user }) {
     const isDesktop = useIsDesktop();
     const [giftCards, setGiftCards] = (0, import_react.useState)(() => cargarGC());
     const [fechaIni, setFechaIni] = (0, import_react.useState)("");
@@ -66702,8 +67443,79 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
     const [shUsar, setShUsar] = (0, import_react.useState)(false);
     const [gcDetalle, setGcDetalle] = (0, import_react.useState)(null);
     const [exportando, setExportando] = (0, import_react.useState)(false);
-    function reload(lista) {
-      setGiftCards(lista || cargarGC());
+    const [mode, setMode] = (0, import_react.useState)(null);
+    const [cargando, setCargando] = (0, import_react.useState)(true);
+    const [pendientes, setPendientes] = (0, import_react.useState)([]);
+    const [migrando, setMigrando] = (0, import_react.useState)(false);
+    const [fuenteMsg, setFuenteMsg] = (0, import_react.useState)(null);
+    async function cargarFuente(nextMode = mode) {
+      if (nextMode !== "transactional") {
+        const local2 = cargarGC();
+        setGiftCards(local2);
+        setPendientes([]);
+        setFuenteMsg(null);
+        return local2;
+      }
+      const cloud = await sbCargarGiftCardsCloud();
+      if (cloud === null) {
+        setFuenteMsg("No se pudo consultar la fuente central. No se habilitaron cambios de Gift Cards.");
+        return null;
+      }
+      const local = cargarGC();
+      const codigosNube = new Set(cloud.map((g2) => g2.codigo.trim().toUpperCase()));
+      const faltantes = local.filter((g2) => !codigosNube.has(String(g2.codigo || "").trim().toUpperCase()));
+      setPendientes(faltantes);
+      setGiftCards([...cloud, ...faltantes.map((g2) => ({ ...g2, _pendienteNube: true }))]);
+      setFuenteMsg(null);
+      if (!faltantes.length) guardarGC(cloud);
+      return cloud;
+    }
+    (0, import_react.useEffect)(() => {
+      let active = true;
+      (async () => {
+        setCargando(true);
+        const resolved = await sbResolverModoOperacion("GIFT_CARD_ADMIN", user);
+        if (!active) return;
+        setMode(resolved);
+        await cargarFuente(resolved);
+        if (active) setCargando(false);
+      })();
+      return () => {
+        active = false;
+      };
+    }, [user?.usuario]);
+    async function reload(lista) {
+      if (lista) {
+        setGiftCards(lista);
+        return lista;
+      }
+      setCargando(true);
+      try {
+        return await cargarFuente(mode);
+      } finally {
+        setCargando(false);
+      }
+    }
+    async function migrarHistoricas() {
+      if (!pendientes.length || migrando) return;
+      if (!window.confirm(`Se migrar\xE1n ${pendientes.length} Gift Card(s) hist\xF3ricas a la fuente central. La copia local se conservar\xE1 como cach\xE9. \xBFContinuar?`)) return;
+      setMigrando(true);
+      setFuenteMsg(null);
+      const opKey = "th_gc_import_operation_v1";
+      let operationId;
+      try {
+        operationId = localStorage.getItem(opKey) || thUUID();
+        localStorage.setItem(opKey, operationId);
+        const cards = pendientes.map(({ _pendienteNube, _nube, ...g2 }) => g2);
+        const result = await sbImportarGiftCardsTransaccional(operationId, cards, user);
+        localStorage.removeItem(opKey);
+        await cargarFuente("transactional");
+        setFuenteMsg(`Migraci\xF3n confirmada: ${result.importadas || 0} importadas, ${result.omitidas || 0} ya existentes.`);
+      } catch (e) {
+        setFuenteMsg(`Migraci\xF3n no confirmada: ${e?.message || "error desconocido"}. Puedes reintentar con la misma operaci\xF3n.`);
+      } finally {
+        setMigrando(false);
+      }
     }
     function aplicarRango(tipo) {
       setRangoActivo(tipo);
@@ -66735,13 +67547,13 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       return lista;
     }, [giftCards, fechaIni, fechaFin, campo, estadoFil, busq]);
     const kpis = (0, import_react.useMemo)(() => {
-      const emitido = gcFiltradas.reduce((s, g) => s + (g.monto || 0), 0);
-      const disponible = gcFiltradas.reduce((s, g) => s + (g.saldo || 0), 0);
+      const emitido = gcFiltradas.reduce((s, g2) => s + (g2.monto || 0), 0);
+      const disponible = gcFiltradas.reduce((s, g2) => s + (g2.saldo || 0), 0);
       return {
         total: gcFiltradas.length,
-        vigentes: gcFiltradas.filter((g) => gcEstado(g) === "vigente").length,
-        agotadas: gcFiltradas.filter((g) => gcEstado(g) === "agotada").length,
-        vencidas: gcFiltradas.filter((g) => gcEstado(g) === "vencida").length,
+        vigentes: gcFiltradas.filter((g2) => gcEstado(g2) === "vigente").length,
+        agotadas: gcFiltradas.filter((g2) => gcEstado(g2) === "agotada").length,
+        vencidas: gcFiltradas.filter((g2) => gcEstado(g2) === "vencida").length,
         emitido,
         disponible,
         consumido: emitido - disponible
@@ -66773,10 +67585,20 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       background: active ? `${color}18` : C.bg0,
       color: active ? color : C.label3
     });
-    return /* @__PURE__ */ import_react.default.createElement("div", { style: { paddingBottom: 16 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 20 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 22, fontWeight: 700, color: C.label, fontFamily: FONT_DISPLAY, letterSpacing: "0.01em", marginBottom: 2 } }, "Gift Cards"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.label3, fontFamily: FONT_UI } }, gcFiltradas.length, " tarjeta", gcFiltradas.length !== 1 ? "s" : "", "  \xB7 ", kpis.vigentes, " vigente", kpis.vigentes !== 1 ? "s" : "")), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 8, marginBottom: 16 } }, /* @__PURE__ */ import_react.default.createElement(
+    const operacionesBloqueadas = cargando || mode === null || mode === "transactional" && pendientes.length > 0;
+    return /* @__PURE__ */ import_react.default.createElement("div", { style: { paddingBottom: 16 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 20 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 22, fontWeight: 700, color: C.label, fontFamily: FONT_DISPLAY, letterSpacing: "0.01em", marginBottom: 2 } }, "Gift Cards"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.label3, fontFamily: FONT_UI } }, gcFiltradas.length, " tarjeta", gcFiltradas.length !== 1 ? "s" : "", "  \xB7 ", kpis.vigentes, " vigente", kpis.vigentes !== 1 ? "s" : "")), mode === "transactional" && pendientes.length > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: { padding: "14px 16px", borderRadius: 14, marginBottom: 14, background: `${C.amber}12`, border: `1px solid ${C.amber}35` } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, fontWeight: 700, color: C.amber, fontFamily: FONT_UI, marginBottom: 5 } }, pendientes.length, " Gift Card", pendientes.length === 1 ? "" : "s", " hist\xF3rica", pendientes.length === 1 ? "" : "s", " pendiente", pendientes.length === 1 ? "" : "s", " de migraci\xF3n"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label2, fontFamily: FONT_UI, lineHeight: 1.5, marginBottom: 10 } }, "La creaci\xF3n y el canje est\xE1n pausados hasta copiar estas tarjetas a la fuente central auditada."), /* @__PURE__ */ import_react.default.createElement(
+      "button",
+      {
+        onClick: migrarHistoricas,
+        disabled: migrando,
+        style: { padding: "9px 13px", borderRadius: 10, border: "none", background: C.amber, color: "#fff", fontSize: 12, fontWeight: 700, fontFamily: FONT_UI, cursor: migrando ? "wait" : "pointer" }
+      },
+      migrando ? "Migrando\u2026" : "Migrar ahora de forma segura"
+    )), fuenteMsg && /* @__PURE__ */ import_react.default.createElement("div", { style: { padding: "10px 12px", borderRadius: 10, marginBottom: 14, background: C.bg2, border: `1px solid ${C.sep}`, fontSize: 12, color: C.label2, fontFamily: FONT_UI } }, fuenteMsg), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 8, marginBottom: 16 } }, /* @__PURE__ */ import_react.default.createElement(
       "button",
       {
         onClick: () => setShCrear(true),
+        disabled: operacionesBloqueadas,
         style: {
           flex: 1,
           padding: "12px",
@@ -66787,7 +67609,8 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
           fontSize: 14,
           fontWeight: 700,
           fontFamily: FONT_UI,
-          cursor: "pointer",
+          cursor: operacionesBloqueadas ? "not-allowed" : "pointer",
+          opacity: operacionesBloqueadas ? 0.55 : 1,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
@@ -66799,6 +67622,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       "button",
       {
         onClick: () => setShUsar(true),
+        disabled: operacionesBloqueadas,
         style: {
           flex: 1,
           padding: "12px",
@@ -66809,7 +67633,8 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
           fontSize: 14,
           fontWeight: 700,
           fontFamily: FONT_UI,
-          cursor: "pointer",
+          cursor: operacionesBloqueadas ? "not-allowed" : "pointer",
+          opacity: operacionesBloqueadas ? 0.55 : 1,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
@@ -66996,7 +67821,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
         gc.vencimiento && /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.amber, fontFamily: FONT_UI, marginTop: 8, fontWeight: 500 } }, "\u23F1 Vence: ", gc.vencimiento),
         gc.nota && /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT_UI, marginTop: 6, fontStyle: "italic" } }, '"', gc.nota, '"')
       );
-    })), shCrear && /* @__PURE__ */ import_react.default.createElement(SheetCrearGC, { onClose: () => setShCrear(false), onCreada: (lista) => reload(lista) }), shUsar && /* @__PURE__ */ import_react.default.createElement(SheetUsarGC, { onClose: () => setShUsar(false), onUsada: (lista) => reload(lista) }), gcDetalle && /* @__PURE__ */ import_react.default.createElement(SheetDetalleGC, { gc: gcDetalle, onClose: () => setGcDetalle(null) }));
+    })), shCrear && /* @__PURE__ */ import_react.default.createElement(SheetCrearGC, { onClose: () => setShCrear(false), onCreada: (lista) => reload(lista), user, mode }), shUsar && /* @__PURE__ */ import_react.default.createElement(SheetUsarGC, { onClose: () => setShUsar(false), onUsada: (lista) => reload(lista), user, mode }), gcDetalle && /* @__PURE__ */ import_react.default.createElement(SheetDetalleGC, { gc: gcDetalle, onClose: () => setGcDetalle(null) }));
   }
   function DescargarTodasNotasBtn({ ventas }) {
     var _d = (0, import_react.useState)(false);
@@ -67061,7 +67886,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
     });
     const [ventas, setVentas] = (0, import_react.useState)(() => {
       try {
-        return JSON.parse(localStorage.getItem("th_ventas") || "[]");
+        return JSON.parse(localStorage.getItem("th_ventas") || "[]").filter((v) => !thEsVentaTecnica(v));
       } catch {
         return [];
       }
@@ -67084,15 +67909,40 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       }
     }, [descuentos]);
     (0, import_react.useEffect)(() => {
+      if (!user) return;
       sbCargarDescuentos().then((m) => {
         if (m) setDescuentos(m);
       });
-    }, []);
+    }, [user?.usuario]);
+    (0, import_react.useEffect)(() => {
+      if (!user || user.rol === "marca") return;
+      const ack = descNotifAck();
+      const nuevos = MARCAS.filter((m) => {
+        if (descMarcaVigente(descuentos, m.id) <= 0) return false;
+        const d = descuentos[m.id];
+        return ack[m.id] !== descNotifSig({ activo: true, pct: d.pct, hasta: d.hasta });
+      });
+      if (!nuevos.length) return;
+      nuevos.forEach((m) => {
+        const d = descuentos[m.id];
+        descNotifMarcar(m.id, descNotifSig({ activo: true, pct: d.pct, hasta: d.hasta }));
+      });
+      if (nuevos.length === 1) {
+        const m = nuevos[0], d = descuentos[m.id];
+        setAlertaDesc({ marcaNombre: m.nombre, activo: true, pct: d.pct, hasta: d.hasta, ts: Date.now() });
+      } else {
+        setAlertaDesc({ consolidado: true, marcas: nuevos.map((m) => m.nombre), ts: Date.now() });
+      }
+    }, [descuentos, user?.usuario]);
     function onDescuentoMarcaRT(p) {
       setDescuentos((prev) => ({ ...prev, [p.marcaId]: { activo: p.activo, pct: p.pct, hasta: p.hasta || "", updatedBy: p.por || "" } }));
-      if (!p._silencioso) setAlertaDesc({ ...p, ts: Date.now() });
+      if (user?.rol === "marca") return;
+      const sig = descNotifSig({ activo: p.activo, pct: p.pct, hasta: p.hasta });
+      if (descNotifAck()[p.marcaId] === sig) return;
+      descNotifMarcar(p.marcaId, sig);
+      setAlertaDesc({ ...p, ts: Date.now() });
     }
-    function guardarDescuentoMarca(marcaId, patch) {
+    async function guardarDescuentoMarca(marcaId, patch) {
       const m = MARCAS.find((x) => x.id === marcaId);
       const prev = descuentos[marcaId] || {};
       const rec = {
@@ -67103,10 +67953,22 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
         hasta: patch.hasta !== void 0 ? patch.hasta || "" : prev.hasta || "",
         updatedBy: user?.nombre || user?.usuario || ""
       };
+      const mode = await sbResolverModoOperacion("DESCUENTO_MARCA", user);
+      if (mode === "transactional") {
+        try {
+          await sbGuardarEstadoOperativoTransaccional(thUUID(), "DESCUENTO_MARCA", rec, user);
+        } catch (e) {
+          alert(`${e?.message || "No se pudo guardar el descuento"}
+
+No se aplic\xF3 ning\xFAn cambio.`);
+          return false;
+        }
+      }
       setDescuentos((p) => ({ ...p, [marcaId]: { activo: rec.activo, pct: rec.pct, hasta: rec.hasta, updatedBy: rec.updatedBy } }));
-      syncConRespaldo("descuentoMarca", rec, () => sbGuardarDescuentoMarca(rec));
+      descNotifMarcar(marcaId, descNotifSig({ activo: rec.activo, pct: rec.pct, hasta: rec.hasta }));
+      if (mode !== "transactional") syncConRespaldo("descuentoMarca", rec, () => sbGuardarDescuentoMarca(rec));
       rtBroadcast("descuento_marca", { marcaId, marcaNombre: rec.marcaNombre, activo: rec.activo, pct: rec.pct, hasta: rec.hasta, por: rec.updatedBy });
-      logAudit("DESCUENTO_MARCA", {
+      if (mode !== "transactional") logAudit("DESCUENTO_MARCA", {
         resumen: rec.activo ? `${rec.marcaNombre}: descuento ${rec.pct}% ACTIVADO${rec.hasta ? ` hasta ${rec.hasta.split("-").reverse().join("/")}` : ""}` : `${rec.marcaNombre}: descuento desactivado`,
         marcaId,
         marca: rec.marcaNombre,
@@ -67114,6 +67976,8 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
         activo: rec.activo,
         hasta: rec.hasta
       }, user);
+      if (mode === "shadow") sbRegistrarShadow(thUUID(), "DESCUENTO_MARCA", rec, user);
+      return true;
     }
     const [descCodigos, setDescCodigos] = (0, import_react.useState)(() => {
       try {
@@ -67129,10 +67993,11 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       }
     }, [descCodigos]);
     (0, import_react.useEffect)(() => {
+      if (!user) return;
       sbCargarDescuentosCodigo().then((m) => {
         if (m) setDescCodigos(m);
       });
-    }, []);
+    }, [user?.usuario]);
     function onDescuentoCodigoRT(p) {
       const cod = (p.codigo || "").toUpperCase();
       if (p._eliminar) {
@@ -67146,7 +68011,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       setDescCodigos((prev) => ({ ...prev, [cod]: { marcaId: p.marcaId, marcaNombre: p.marcaNombre || "", nombre: p.nombre || "", activo: p.activo, pct: p.pct, hasta: p.hasta || "", updatedBy: p.por || p.updatedBy || "" } }));
       if (!p._silencioso) setAlertaDesc({ marcaNombre: p.marcaNombre, activo: p.activo, pct: p.pct, hasta: p.hasta, porCodigo: p.nombre || cod, ts: Date.now() });
     }
-    function guardarDescuentoCodigo(codigo, { marcaId, marcaNombre, nombre, pct, hasta }) {
+    async function guardarDescuentoCodigo(codigo, { marcaId, marcaNombre, nombre, pct, hasta }) {
       const cod = (codigo || "").toUpperCase();
       const rec = {
         codigo: cod,
@@ -67158,10 +68023,21 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
         hasta: hasta || "",
         updatedBy: user?.nombre || user?.usuario || ""
       };
+      const mode = await sbResolverModoOperacion("DESCUENTO_CODIGO", user);
+      if (mode === "transactional") {
+        try {
+          await sbGuardarEstadoOperativoTransaccional(thUUID(), "DESCUENTO_CODIGO", rec, user);
+        } catch (e) {
+          alert(`${e?.message || "No se pudo guardar el descuento"}
+
+No se aplic\xF3 ning\xFAn cambio.`);
+          return false;
+        }
+      }
       setDescCodigos((p) => ({ ...p, [cod]: { marcaId: rec.marcaId, marcaNombre: rec.marcaNombre, nombre: rec.nombre, activo: true, pct: rec.pct, hasta: rec.hasta, updatedBy: rec.updatedBy } }));
-      syncConRespaldo("descuentoCodigo", rec, () => sbGuardarDescuentoCodigo(rec));
+      if (mode !== "transactional") syncConRespaldo("descuentoCodigo", rec, () => sbGuardarDescuentoCodigo(rec));
       rtBroadcast("descuento_codigo", { codigo: cod, marcaId: rec.marcaId, marcaNombre: rec.marcaNombre, nombre: rec.nombre, activo: true, pct: rec.pct, hasta: rec.hasta, por: rec.updatedBy });
-      logAudit("DESCUENTO_CODIGO", {
+      if (mode !== "transactional") logAudit("DESCUENTO_CODIGO", {
         resumen: `${rec.marcaNombre}: ${rec.nombre || cod} (${cod}) al ${rec.pct}%${rec.hasta ? ` hasta ${rec.hasta.split("-").reverse().join("/")}` : ""}`,
         marcaId: rec.marcaId,
         marca: rec.marcaNombre,
@@ -67169,18 +68045,31 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
         pct: rec.pct,
         hasta: rec.hasta
       }, user);
+      if (mode === "shadow") sbRegistrarShadow(thUUID(), "DESCUENTO_CODIGO", rec, user);
+      return true;
     }
-    function eliminarDescuentoCodigo(codigo) {
+    async function eliminarDescuentoCodigo(codigo) {
       const cod = (codigo || "").toUpperCase();
       const rec = descCodigos[cod] || {};
+      const mode = await sbResolverModoOperacion("DESCUENTO_CODIGO", user);
+      if (mode === "transactional") {
+        try {
+          await sbGuardarEstadoOperativoTransaccional(thUUID(), "ELIMINAR_DESCUENTO_CODIGO", { codigo: cod }, user);
+        } catch (e) {
+          alert(`${e?.message || "No se pudo quitar el descuento"}
+
+No se aplic\xF3 ning\xFAn cambio.`);
+          return false;
+        }
+      }
       setDescCodigos((p) => {
         const n = { ...p };
         delete n[cod];
         return n;
       });
-      syncConRespaldo("eliminarDescuentoCodigo", { codigo: cod }, () => sbEliminarDescuentoCodigo(cod));
+      if (mode !== "transactional") syncConRespaldo("eliminarDescuentoCodigo", { codigo: cod }, () => sbEliminarDescuentoCodigo(cod));
       rtBroadcast("descuento_codigo", { codigo: cod, _eliminar: true });
-      logAudit("DESCUENTO_CODIGO", {
+      if (mode !== "transactional") logAudit("DESCUENTO_CODIGO", {
         resumen: `${rec.marcaNombre || ""}: descuento quitado de ${rec.nombre || cod} (${cod})`,
         marcaId: rec.marcaId,
         marca: rec.marcaNombre || "",
@@ -67188,6 +68077,8 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
         pct: 0,
         activo: false
       }, user);
+      if (mode === "shadow") sbRegistrarShadow(thUUID(), "ELIMINAR_DESCUENTO_CODIGO", { codigo: cod }, user);
+      return true;
     }
     const [alq, setAlq] = (0, import_react.useState)(() => {
       try {
@@ -67224,6 +68115,14 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
     const [repCant, setRepCant] = (0, import_react.useState)("");
     const [repPrecio, setRepPrecio] = (0, import_react.useState)("");
     const [repMsg, setRepMsg] = (0, import_react.useState)(null);
+    const [operacionInvPendiente, setOperacionInvPendiente] = (0, import_react.useState)("");
+    const bajaOperationRef = (0, import_react.useRef)(null);
+    const repOperationRef = (0, import_react.useRef)(null);
+    const auditAdjustOperations = (0, import_react.useRef)({});
+    const cargaReversalOperations = (0, import_react.useRef)({});
+    const manualAddOperationRef = (0, import_react.useRef)(null);
+    const productEditOperations = (0, import_react.useRef)({});
+    const productDeactivateOperations = (0, import_react.useRef)({});
     const [bajasLista, setBajasLista] = (0, import_react.useState)([]);
     const [bajaDetalle, setBajaDetalle] = (0, import_react.useState)(null);
     const [busqInv, setBusqInv] = (0, import_react.useState)("");
@@ -67270,13 +68169,32 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
     const [editMarca, setEditMarca] = (0, import_react.useState)(null);
     const [marcasState, setMarcasState] = (0, import_react.useState)(() => cargarMarcas());
     const drive = useDriveSync();
-    function onMarcaGuardada(marca, isNew, nuevoUsuario) {
+    async function guardarMarcasSeguro(lista) {
+      const custom = lista.filter((m) => !MARCAS_SEED.find((s) => s.id === m.id));
+      if (!custom.length) return true;
+      const mode = await sbResolverModoOperacion("CONFIG_MARCAS", user);
+      if (mode === "transactional") {
+        await sbGuardarEstadoOperativoTransaccional(thUUID(), "CONFIG_MARCAS", { items: custom }, user);
+      } else {
+        syncConRespaldo("marcas", lista, () => sbGuardarMarcas(lista));
+        if (mode === "shadow") sbRegistrarShadow(thUUID(), "CONFIG_MARCAS", { items: custom }, user);
+      }
+      return true;
+    }
+    async function onMarcaGuardada(marca, isNew, nuevoUsuario) {
       const prev = marcasState;
       const lista = isNew ? [...prev, marca] : prev.map((m) => m.id === marca.id ? { ...m, ...marca } : m);
+      try {
+        await guardarMarcasSeguro(lista);
+      } catch (e) {
+        alert(`${e?.message || "No se pudo guardar la marca"}
+
+No se aplic\xF3 ning\xFAn cambio.`);
+        return false;
+      }
       localStorage.setItem("th_marcas", JSON.stringify(lista));
       MARCAS = lista;
       setMarcasState(lista);
-      syncConRespaldo("marcas", lista, () => sbGuardarMarcas(lista));
       if (nuevoUsuario) {
         const listaU = (() => {
           try {
@@ -67285,10 +68203,16 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
             return USUARIOS;
           }
         })();
-        const nueva = [...listaU, nuevoUsuario];
+        const { password, ...perfilUsuario } = nuevoUsuario;
+        const nueva = thUsuariosSinCredenciales([...listaU, perfilUsuario]);
         localStorage.setItem("th_usuarios", JSON.stringify(nueva));
-        syncConRespaldo("usuarios", nueva, () => sbGuardarUsuarios(nueva));
+        if (password) {
+          sbCrearAuthUsuario(perfilUsuario.usuario, password, perfilUsuario.nombre, perfilUsuario.rol, perfilUsuario.marcaId).then((ok) => {
+            if (!ok) alert(`La marca se guard\xF3, pero no se pudo crear el acceso @${perfilUsuario.usuario}. Reint\xE9ntalo desde Configuraci\xF3n \u2192 Equipo.`);
+          });
+        }
       }
+      return true;
     }
     (0, import_react.useEffect)(() => {
       try {
@@ -67339,7 +68263,8 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       setFactoryResetRecibido,
       () => resyncDesdeNube("reconexi\xF3n realtime"),
       onDescuentoMarcaRT,
-      onDescuentoCodigoRT
+      onDescuentoCodigoRT,
+      user?.usuario
     );
     (0, import_react.useEffect)(() => {
       setMarcasState((prev) => {
@@ -67364,22 +68289,25 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       });
     }, []);
     (0, import_react.useEffect)(() => {
+      if (!user) return;
       sbCargarRetiros().then((data) => {
         setRetiros((prev) => {
-          const sbIds = new Set(data.map((r) => String(r.id)));
-          const pendientes = prev.filter((r) => !sbIds.has(String(r.id)));
-          pendientes.forEach((r) => sbGuardarRetiro(r));
           if (data.length === 0 && prev.length > 0) return prev;
+          const sbIds = new Set(data.map((r) => String(r.id)));
+          const outboxIds = new Set(getOutbox().filter((op) => op?.tipo === "retiro").map((op) => String(op?.payload?.id || "")));
+          const pendientes = prev.filter((r) => !sbIds.has(String(r.id)) && outboxIds.has(String(r.id)));
           return pendientes.length > 0 ? [...data, ...pendientes] : data;
         });
       });
-    }, []);
+    }, [user?.usuario]);
     (0, import_react.useEffect)(() => {
+      if (!user) return;
       sbCargarAuditorias().then((data) => {
         if (data.length > 0) setAuditorias(data);
       });
-    }, []);
+    }, [user?.usuario]);
     (0, import_react.useEffect)(() => {
+      if (!user) return;
       sbCargarCargas().then((data) => {
         if (data.length > 0) setCargas((prev) => {
           const sbIds = new Set(data.map((c) => c.id));
@@ -67387,8 +68315,9 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
           return [...data, ...locales];
         });
       });
-    }, []);
+    }, [user?.usuario]);
     (0, import_react.useEffect)(() => {
+      if (!user) return;
       let channel = null, mounted = true;
       getSupabase().then((db) => {
         if (!mounted) return;
@@ -67409,10 +68338,33 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
             totalItems: c.total_items,
             nuevos: c.nuevos || 0,
             actualizados: c.actualizados || 0,
-            items: c.detalle || []
+            items: c.detalle || [],
+            operationId: c.operation_id || null,
+            revertida: c.revertida || false,
+            revertidaAt: c.revertida_at || null,
+            revertidaPor: c.revertida_por || null,
+            archivoNombre: c.archivo_nombre || null,
+            archivoUrl: c.archivo_url || null
           };
           if (!mounted) return;
           setCargas((prev) => prev.some((x) => x.id === carga.id) ? prev : [carga, ...prev]);
+        }).on("postgres_changes", { event: "UPDATE", schema: "public", table: "cargas_inventario" }, (payload) => {
+          const c = payload.new;
+          if (!mounted) return;
+          setCargas((prev) => prev.map((x) => x.id === c.id ? {
+            ...x,
+            verificado: c.verificado || false,
+            verificadoTs: c.verificado_ts || null,
+            verificadoPor: c.verificado_por || null,
+            revertida: c.revertida || false,
+            revertidaAt: c.revertida_at || null,
+            revertidaPor: c.revertida_por || null,
+            archivoNombre: c.archivo_nombre || x.archivoNombre,
+            archivoUrl: c.archivo_url || x.archivoUrl
+          } : x));
+          if (c.revertida) sbCargarInventario().then((lista) => {
+            if (mounted && Array.isArray(lista)) setInv(lista);
+          });
         }).on("postgres_changes", { event: "DELETE", schema: "public", table: "cargas_inventario" }, (payload) => {
           if (!mounted) return;
           const cargaId = payload.old?.id;
@@ -67428,8 +68380,9 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
         if (channel) getSupabase().then((db) => db.removeChannel(channel)).catch(() => {
         });
       };
-    }, []);
+    }, [user?.usuario]);
     (0, import_react.useEffect)(() => {
+      if (!user) return;
       const localCustom = cargarMarcas().filter((m) => !MARCAS_SEED.find((s) => s.id === m.id));
       function applyCustom(custom) {
         const merged = [...MARCAS_SEED];
@@ -67457,13 +68410,14 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
         const union = [...byId.values()];
         applyCustom(union);
         if (soloLocales.length > 0) {
-          syncConRespaldo("marcas", union, () => sbGuardarMarcas(union));
+          guardarMarcasSeguro(union).catch((e) => console.warn("Migraci\xF3n segura de marcas:", e.message));
         }
       }).catch(() => {
         if (localCustom.length > 0) applyCustom(localCustom);
       });
-    }, []);
+    }, [user?.usuario]);
     (0, import_react.useEffect)(() => {
+      if (!user) return;
       let channel = null, mounted = true;
       getSupabase().then((db) => {
         if (!mounted) return;
@@ -67490,7 +68444,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
         if (channel) getSupabase().then((db) => db.removeChannel(channel)).catch(() => {
         });
       };
-    }, []);
+    }, [user?.usuario]);
     const cargasCompletas = (0, import_react.useMemo)(() => {
       const yaRegistrados = /* @__PURE__ */ new Set();
       cargas.forEach((c) => (c.items || []).forEach((it) => {
@@ -67503,17 +68457,17 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
         const key = `${p.fecha || "\u2014"}__${p.marcaId ?? "\u2014"}`;
         (grupos[key] = grupos[key] || []).push(p);
       });
-      const historicas = Object.entries(grupos).map(([key, items]) => {
-        const marcaIds = [...new Set(items.map((i) => i.marcaId).filter((id) => id != null))];
-        const marcaNombres = [...new Set(items.map((i) => i.marcaNombre).filter(Boolean))].join(", ");
+      const historicas = Object.entries(grupos).map(([key, items2]) => {
+        const marcaIds = [...new Set(items2.map((i) => i.marcaId).filter((id2) => id2 != null))];
+        const marcaNombres = [...new Set(items2.map((i) => i.marcaNombre).filter(Boolean))].join(", ");
         const carga = crearCarga("HISTORICO", { usuario: "sistema", nombre: "Sistema (hist\xF3rico)", rol: "\u2014" }, {
           marcaId: marcaIds.length === 1 ? marcaIds[0] : null,
           marcaNombre: marcaNombres || "\u2014",
-          resumen: `Carga hist\xF3rica: ${items.length} producto${items.length !== 1 ? "s" : ""} \xB7 ${marcaNombres || "\u2014"}`,
-          nuevos: items.length,
+          resumen: `Carga hist\xF3rica: ${items2.length} producto${items2.length !== 1 ? "s" : ""} \xB7 ${marcaNombres || "\u2014"}`,
+          nuevos: items2.length,
           actualizados: 0,
-          totalItems: items.length,
-          items: items.map((p) => ({
+          totalItems: items2.length,
+          items: items2.map((p) => ({
             tipo: "create",
             codigo: p.codigo,
             nombre: p.nombre,
@@ -67525,7 +68479,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
           }))
         });
         carga.id = "CRG_HIST_" + key;
-        const fechaIso = items[0].fecha;
+        const fechaIso = items2[0].fecha;
         const partes = (fechaIso || "").split("-").map(Number);
         const y = partes[0], m = partes[1], d = partes[2];
         if (y && m && d) {
@@ -67541,15 +68495,41 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       });
       return [...cargas, ...historicas];
     }, [inv, cargas]);
-    function registrarAuditoria(aud) {
-      setAuditorias((prev) => [aud, ...prev]);
-      syncConRespaldo("auditoria", aud, () => sbGuardarAuditoria(aud));
+    async function guardarAuditoriaSegura(aud) {
+      const mode = await sbResolverModoOperacion("AUDITORIA_INVENTARIO", user);
+      if (mode === "transactional") {
+        await sbGuardarEstadoOperativoTransaccional(thUUID(), "AUDITORIA_INVENTARIO", aud, user);
+      } else {
+        syncConRespaldo("auditoria", aud, () => sbGuardarAuditoria(aud));
+        if (mode === "shadow") sbRegistrarShadow(thUUID(), "AUDITORIA_INVENTARIO", aud, user);
+      }
+      return true;
     }
-    function actualizarAuditoria(aud) {
+    async function registrarAuditoria(aud) {
+      try {
+        await guardarAuditoriaSegura(aud);
+      } catch (e) {
+        alert(`${e?.message || "No se pudo guardar la auditor\xEDa"}
+
+El conteo sigue abierto y no se perdi\xF3.`);
+        return false;
+      }
+      setAuditorias((prev) => prev.some((a) => a.id === aud.id) ? prev : [aud, ...prev]);
+      return true;
+    }
+    async function actualizarAuditoria(aud) {
+      try {
+        await guardarAuditoriaSegura(aud);
+      } catch (e) {
+        alert(`${e?.message || "No se pudo actualizar la auditor\xEDa"}
+
+No se aplic\xF3 ning\xFAn cambio.`);
+        return false;
+      }
       setAuditorias((prev) => prev.map((a) => a.id === aud.id ? aud : a));
-      syncConRespaldo("auditoria", aud, () => sbGuardarAuditoria(aud));
+      return true;
     }
-    function cuadrarConAuditoria(aud) {
+    async function cuadrarConAuditoria(aud) {
       const cambios = (aud.detalle || []).filter((d) => d.diferencia !== 0 && d.contado >= 0);
       if (cambios.length === 0) return;
       const lineas = cambios.map((d) => `\u2022 ${d.codigo} ${d.nombre}: ${d.sistema} \u2192 ${d.contado} (${d.diferencia > 0 ? "+" : ""}${d.diferencia})`).join("\n");
@@ -67560,6 +68540,35 @@ Se actualizar\xE1n ${cambios.length} producto(s):
 ${lineas}
 
 Esta acci\xF3n no se puede deshacer.`)) return;
+      const operationId = auditAdjustOperations.current[aud.id] || thUUID();
+      auditAdjustOperations.current[aud.id] = operationId;
+      const mode = await sbResolverModoOperacion("AJUSTE_AUDITORIA", user);
+      const payload = {
+        auditoriaId: aud.id,
+        motivo: `Cuadre desde verificaci\xF3n ${aud.id}`,
+        items: cambios.map((d) => ({
+          prodId: inv.find((p) => p.codigo === d.codigo)?.id || null,
+          codigo: d.codigo,
+          nombre: d.nombre,
+          stockSistema: d.sistema,
+          stockObjetivo: Number(d.contado),
+          diferencia: d.diferencia
+        }))
+      };
+      if (mode === "transactional") {
+        try {
+          await sbAjusteBatchTransaccional(operationId, payload, user);
+          delete auditAdjustOperations.current[aud.id];
+          const invNube = await sbCargarInventario();
+          if (invNube) setInv(invNube);
+          alert(`\u2713 Inventario cuadrado de forma segura: ${cambios.length} producto(s).`);
+        } catch (e) {
+          alert(`${e?.message || "No se pudo confirmar el cuadre"}
+
+No se aplic\xF3 ning\xFAn ajuste parcial.`);
+        }
+        return;
+      }
       setInv((prev) => {
         const next = [...prev];
         cambios.forEach((d) => {
@@ -67578,6 +68587,8 @@ Esta acci\xF3n no se puede deshacer.`)) return;
         marcaId: aud.marcaId,
         cambios: cambios.map((d) => ({ codigo: d.codigo, nombre: d.nombre, antes: d.sistema, despues: d.contado }))
       }, user);
+      delete auditAdjustOperations.current[aud.id];
+      if (mode === "shadow") sbRegistrarShadow(operationId, "AJUSTE_AUDITORIA", payload, user);
     }
     async function registrarCarga(carga, archivoBlob = null, archivoNombre = null) {
       let cargaFinal = { ...carga };
@@ -67591,30 +68602,44 @@ Esta acci\xF3n no se puede deshacer.`)) return;
       setCargas((prev) => [cargaFinal, ...prev]);
       syncConRespaldo("carga", cargaFinal, () => sbGuardarCarga(cargaFinal));
     }
-    function registrarRetiro(r) {
-      const updated = [...retiros, r];
+    async function registrarRetiro(r) {
+      const operationId = r.operationId || thUUID();
+      const mode = await sbResolverModoOperacion("RETIRO", user);
+      if (mode === "transactional") {
+        const result = await sbMovimientoTransaccional("th_registrar_retiro", operationId, r, user);
+        const confirmado = { ...r, id: result.entityId || r.id, operationId, engine: "transactional" };
+        setRetiros((prev) => prev.some((x) => x.id === confirmado.id) ? prev : [...prev, confirmado]);
+        setInv((prev) => prev.map((i) => i.id === result.productoId ? { ...i, stock: result.stockDespues } : i));
+        rtBroadcast("retiro_nuevo", { r: confirmado });
+        rtBroadcast("inv_update", { p: { id: result.productoId, stock: result.stockDespues } });
+        return confirmado;
+      }
+      const retiroLegacy = { ...r, operationId, engine: "legacy" };
+      const updated = [...retiros, retiroLegacy];
       setRetiros(updated);
       try {
         localStorage.setItem("th_retiros_v1", JSON.stringify(updated));
       } catch {
       }
-      const prod = inv.find((i) => i.id === r.prodId);
+      const prod = inv.find((i) => i.id === retiroLegacy.prodId);
       const stockAntes = prod?.stock || 0;
-      const stockDespues = Math.max(0, stockAntes - r.cantidad);
-      setInv((p) => p.map((i) => i.id === r.prodId ? { ...i, stock: stockDespues } : i));
-      syncConRespaldo("stock", { prodId: r.prodId, stock: stockDespues }, () => sbActualizarStock(r.prodId, stockDespues));
-      syncConRespaldo("retiro", r, () => sbGuardarRetiro(r));
+      const stockDespues = Math.max(0, stockAntes - retiroLegacy.cantidad);
+      setInv((p) => p.map((i) => i.id === retiroLegacy.prodId ? { ...i, stock: stockDespues } : i));
+      syncConRespaldo("stock", { prodId: retiroLegacy.prodId, stock: stockDespues }, () => sbActualizarStock(retiroLegacy.prodId, stockDespues));
+      syncConRespaldo("retiro", retiroLegacy, () => sbGuardarRetiro(retiroLegacy));
       logAudit("RETIRO", {
-        resumen: `Retiro: ${prod?.nombre || r.codigo} \xD7 ${r.cantidad} u.`,
-        codigo: r.codigo,
-        nombre: prod?.nombre || r.codigo,
+        resumen: `Retiro: ${prod?.nombre || retiroLegacy.codigo} \xD7 ${retiroLegacy.cantidad} u.`,
+        codigo: retiroLegacy.codigo,
+        nombre: prod?.nombre || retiroLegacy.codigo,
         marca: prod?.marcaNombre || "\u2014",
-        cantidad: r.cantidad,
-        destinatario: r.destinatario || "\u2014",
-        motivo: r.motivo || "\u2014",
+        cantidad: retiroLegacy.cantidad,
+        destinatario: retiroLegacy.destinatario || "\u2014",
+        motivo: retiroLegacy.motivo || "\u2014",
         stockAntes,
         stockDespues
       }, user);
+      if (mode === "shadow") sbRegistrarShadow(operationId, "RETIRO", retiroLegacy, user);
+      return retiroLegacy;
     }
     const _lastResync = (0, import_react.useRef)(0);
     async function cargarDesdeNube() {
@@ -67630,11 +68655,9 @@ Esta acci\xF3n no se puede deshacer.`)) return;
         setVentas((prev) => {
           if (data.ventas.length === 0 && prev.length > 0) return prev;
           const sbIds = new Set(data.ventas.map((v) => String(v.id)));
-          const pendientes = prev.filter((v) => !sbIds.has(String(v.id)));
-          if (pendientes.length > 0) {
-            pendientes.forEach((v) => sbGuardarVenta(v));
-            return [...data.ventas, ...pendientes];
-          }
+          const outboxIds = new Set(getOutbox().filter((op) => op?.tipo === "venta").map((op) => String(op?.payload?.id || "")));
+          const pendientes = prev.filter((v) => !sbIds.has(String(v.id)) && outboxIds.has(String(v.id)));
+          if (pendientes.length > 0) return [...data.ventas, ...pendientes];
           return data.ventas;
         });
         if (Object.keys(data.cierres).length > 0) setCierres(data.cierres);
@@ -67650,9 +68673,13 @@ Esta acci\xF3n no se puede deshacer.`)) return;
       cargarDesdeNube();
     }
     (0, import_react.useEffect)(() => {
+      if (!user) {
+        setCargando(false);
+        return;
+      }
       setDbStatus("connecting");
       cargarDesdeNube().then(() => setCargando(false));
-    }, []);
+    }, [user?.usuario]);
     (0, import_react.useEffect)(() => {
       const onVis = () => {
         if (document.visibilityState === "visible") resyncDesdeNube("volvi\xF3 a foreground");
@@ -67666,26 +68693,29 @@ Esta acci\xF3n no se puede deshacer.`)) return;
       };
     }, []);
     (0, import_react.useEffect)(() => {
+      if (!user) return;
       sbCargarUsuarios().then((sbUsers) => {
         if (sbUsers === null) return;
         const localUsers = (() => {
           try {
-            return JSON.parse(localStorage.getItem("th_usuarios") || "null") || USUARIOS;
+            return thUsuariosSinCredenciales(JSON.parse(localStorage.getItem("th_usuarios") || "null") || USUARIOS);
           } catch {
             return USUARIOS;
           }
         })();
-        if (sbUsers.length === 0 && localUsers.length > 0) {
-          sbGuardarUsuarios(localUsers);
-        } else if (sbUsers.length > 0) {
+        try {
+          localStorage.setItem("th_usuarios", JSON.stringify(localUsers));
+        } catch {
+        }
+        if (sbUsers.length > 0) {
           localStorage.setItem("th_usuarios", JSON.stringify(sbUsers));
         }
       }).catch(() => {
       });
-    }, []);
+    }, [user?.usuario]);
     const MK = (0, import_react.useMemo)(() => mkKey(mes, anio), [mes, anio]);
-    const vMes = (0, import_react.useMemo)(() => ventas.filter((v) => v.mk === MK && !v.anulada), [ventas, MK]);
-    const vMesAll = (0, import_react.useMemo)(() => ventas.filter((v) => v.mk === MK), [ventas, MK]);
+    const vMes = (0, import_react.useMemo)(() => ventas.filter((v) => !thEsVentaTecnica(v) && v.mk === MK && !v.anulada), [ventas, MK]);
+    const vMesAll = (0, import_react.useMemo)(() => ventas.filter((v) => !thEsVentaTecnica(v) && v.mk === MK), [ventas, MK]);
     const alqMes = (0, import_react.useMemo)(() => alq.filter((a) => a.mes === mes && a.anio === anio), [alq, mes, anio]);
     const totalVtas = (0, import_react.useMemo)(() => vMes.reduce((s, v) => s + getDisplayTotal(v), 0), [vMes]);
     const invFil = (0, import_react.useMemo)(() => {
@@ -67697,7 +68727,7 @@ Esta acci\xF3n no se puede deshacer.`)) return;
       if (filInvM) r = r.filter((i) => i.marcaId === Number(filInvM));
       return r;
     }, [inv, busqInv, filInvM]);
-    function addProd() {
+    async function addProd() {
       if (!fInv.marcaId || !fInv.nombre || !fInv.precio || !fInv.stock) {
         alert("Completa todos los campos");
         return;
@@ -67722,6 +68752,75 @@ Esta acci\xF3n no se puede deshacer.`)) return;
         fecha: fInv.fecha,
         marcaNombre: marca?.nombre || ""
       };
+      const key = JSON.stringify({
+        codigo,
+        marcaId: prod.marcaId,
+        nombre: prod.nombre,
+        categoria: prod.categoria,
+        precio: prod.precio,
+        stock: prod.stock,
+        fecha: prod.fecha
+      });
+      if (!manualAddOperationRef.current || manualAddOperationRef.current.key !== key) {
+        const operationId = thUUID();
+        manualAddOperationRef.current = { key, operationId, createdAt: Date.now(), cargaId: `CRG_${operationId.replace(/-/g, "")}` };
+      }
+      const manualOp = manualAddOperationRef.current;
+      const mode = await sbResolverModoOperacion("RECEPCION", user);
+      if (mode === "transactional") {
+        try {
+          const item = {
+            tipo: "create",
+            codigo: prod.codigo,
+            nombre: prod.nombre,
+            marca: prod.marcaNombre,
+            marcaId: prod.marcaId,
+            stock: prod.stock,
+            stockSumado: prod.stock,
+            precio: prod.precio,
+            categoria: prod.categoria,
+            producto: { ...prod, id: void 0 }
+          };
+          let cargaManual2 = {
+            id: manualOp.cargaId,
+            ts: manualOp.createdAt,
+            fecha: prod.fecha,
+            hora: new Date(manualOp.createdAt).toLocaleTimeString("es-BO", { hour: "2-digit", minute: "2-digit" }),
+            tipo: "MANUAL",
+            usuario: user?.usuario,
+            nombre: user?.nombre,
+            rol: user?.rol,
+            marcaId: prod.marcaId,
+            marcaNombre: prod.marcaNombre,
+            resumen: `Carga manual: ${prod.nombre} (${prod.codigo})`,
+            totalItems: 1,
+            nuevos: 1,
+            actualizados: 0,
+            items: [item],
+            operationId: manualOp.operationId,
+            engine: "transactional"
+          };
+          const blob = await generarExcelEvidenciaManual([{ ...prod }], prod.marcaNombre);
+          const archivoNombre = `manual_${prod.codigo}_${String(prod.fecha || hoy()).replace(/\//g, "-")}.xlsx`;
+          const archivoUrl = await sbSubirEvidencia(blob, archivoNombre, cargaManual2.id);
+          if (archivoUrl) cargaManual2 = { ...cargaManual2, archivoNombre, archivoUrl };
+          await sbImportacionTransaccional(manualOp.operationId, cargaManual2, user);
+          const invNube = await sbCargarInventario();
+          if (invNube) setInv(invNube);
+          setCargas((prev) => prev.some((c) => c.id === cargaManual2.id) ? prev : [cargaManual2, ...prev]);
+          const confirmado = (invNube || []).find((p) => p.codigo === prod.codigo) || prod;
+          drive.syncProducto(confirmado);
+          manualAddOperationRef.current = null;
+          setFInv({ marcaId: "", nombre: "", categoria: "", precio: "", stock: "", fecha: hoy(), codigoManual: "" });
+          setShInv(false);
+          setTimeout(() => imprimirConCantidad(confirmado, marca?.nombre || "Toscana House"), 300);
+        } catch (e) {
+          alert(`${e?.message || "No se pudo confirmar la recepci\xF3n"}
+
+No se cre\xF3 un producto parcial.`);
+        }
+        return;
+      }
       setInv((p) => [...p, prod]);
       drive.syncProducto(prod);
       syncConRespaldo("producto", prod, () => sbGuardarProducto(prod));
@@ -67764,11 +68863,13 @@ Esta acci\xF3n no se puede deshacer.`)) return;
         const nombre = `manual_${prod.codigo}_${hoy().replace(/\//g, "-")}.xlsx`;
         registrarCarga(cargaManual, blob, nombre);
       });
+      if (mode === "shadow") sbRegistrarShadow(manualOp.operationId, "RECEPCION", { ...cargaManual, items: cargaManual.items }, user);
+      manualAddOperationRef.current = null;
       setFInv({ marcaId: "", nombre: "", categoria: "", precio: "", stock: "", fecha: hoy(), codigoManual: "" });
       setShInv(false);
       setTimeout(() => imprimirConCantidad(prod, marca?.nombre || "Toscana House"), 300);
     }
-    function darBaja() {
+    async function darBaja() {
       const cod = bajaCod.trim().toUpperCase();
       let prod = inv.find((i) => i.codigo.toUpperCase() === cod) || inv.find((i) => limpiarCod(i.codigo) === limpiarCod(cod));
       if (!prod) {
@@ -67800,25 +68901,55 @@ Stock actual: ${stockAntes} \u2192 ${stockDespues}${motivo ? `
 Motivo: ${motivo}` : ""}`)) {
         return;
       }
-      registrarBaja(prod, stockAntes, cant, motivo);
-      setBajaMsg({ ok: true, msg: `\u2713 "${prod.nombre}": stock ${stockAntes} \u2192 ${stockDespues}` });
-      setBajaCod("");
-      setBajaCant("");
-      setBajaMotivo("");
-      setShBaja(false);
-      setBajaDetalle({
-        id: "BJ-" + Date.now(),
-        prod,
-        cant,
-        motivo,
-        stockAntes,
-        stockDespues,
-        fecha: hoy(),
-        hora: (/* @__PURE__ */ new Date()).toLocaleTimeString("es-BO", { hour: "2-digit", minute: "2-digit" }),
-        operador: user?.nombre || user?.usuario || "\u2014"
-      });
+      setOperacionInvPendiente("baja");
+      try {
+        const baja = await registrarBaja(prod, stockAntes, cant, motivo);
+        bajaOperationRef.current = null;
+        setBajaMsg({ ok: true, msg: `\u2713 "${prod.nombre}": stock ${stockAntes} \u2192 ${baja.stockDespues}` });
+        setBajaCod("");
+        setBajaCant("");
+        setBajaMotivo("");
+        setShBaja(false);
+        setBajaDetalle(baja);
+      } catch (e) {
+        setBajaMsg({ ok: false, msg: `${e?.message || "No se pudo confirmar la baja"}. No se modific\xF3 el formulario.` });
+      } finally {
+        setOperacionInvPendiente("");
+      }
     }
-    function registrarBaja(prod, stockAntes, cant, motivo) {
+    async function registrarBaja(prod, stockAntes, cant, motivo) {
+      const key = `${prod.id}|${cant}|${motivo}`;
+      if (!bajaOperationRef.current || bajaOperationRef.current.key !== key) {
+        bajaOperationRef.current = { key, operationId: thUUID(), id: `BJ-${Date.now()}`, createdAt: Date.now() };
+      }
+      const { operationId, id: id2, createdAt } = bajaOperationRef.current;
+      const mode = await sbResolverModoOperacion("BAJA", user);
+      if (mode === "transactional") {
+        const result = await sbMovimientoTransaccional("th_registrar_baja", operationId, {
+          id: id2,
+          prodId: prod.id,
+          codigo: prod.codigo,
+          cantidad: cant,
+          motivo
+        }, user);
+        setInv((p) => p.map((i) => i.id === prod.id ? { ...i, stock: result.stockDespues } : i));
+        const baja = {
+          id: result.entityId || id2,
+          operationId,
+          engine: "transactional",
+          prod,
+          cant,
+          motivo,
+          stockAntes: result.stockAntes,
+          stockDespues: result.stockDespues,
+          fecha: hoy(),
+          hora: hora(),
+          operador: user?.nombre || user?.usuario || "\u2014"
+        };
+        setBajasLog((prev) => [baja, ...prev]);
+        rtBroadcast("inv_update", { p: { id: prod.id, stock: result.stockDespues } });
+        return baja;
+      }
       const stockDespues = Math.max(0, stockAntes - cant);
       setInv((p) => p.map((i) => i.id === prod.id ? { ...i, stock: stockDespues } : i));
       syncConRespaldo("stock", { prodId: prod.id, stock: stockDespues }, () => sbActualizarStock(prod.id, stockDespues));
@@ -67852,8 +68983,22 @@ Motivo: ${motivo}` : ""}`)) {
         stockDespues
       }, user);
       setBajasLog((prev) => [bajaEvt, ...prev]);
+      if (mode === "shadow") sbRegistrarShadow(operationId, "BAJA", { prodId: prod.id, codigo: prod.codigo, cantidad: cant, motivo }, user);
+      return {
+        ...bajaEvt,
+        id: id2,
+        operationId,
+        engine: "legacy",
+        prod,
+        cant,
+        stockAntes,
+        stockDespues,
+        fecha: hoy(),
+        hora: new Date(createdAt).toLocaleTimeString("es-BO", { hour: "2-digit", minute: "2-digit" }),
+        operador: user?.nombre || user?.usuario || "\u2014"
+      };
     }
-    function reponerStock() {
+    async function reponerStock() {
       const cod = repCod.trim().toUpperCase();
       const prod = inv.find((i) => i.codigo.toUpperCase() === cod) || inv.find((i) => limpiarCod(i.codigo) === limpiarCod(cod));
       if (!prod) {
@@ -67869,22 +69014,52 @@ Motivo: ${motivo}` : ""}`)) {
       const stockDespues = stockAntes + cant;
       const iniAntes = Number(prod.stockInicial) || stockAntes;
       const iniDespues = iniAntes + cant;
-      setInv((p) => p.map((i) => i.id === prod.id ? { ...i, stock: stockDespues, stockInicial: iniDespues } : i));
-      syncConRespaldo("stock", { prodId: prod.id, stock: stockDespues, stock_inicial: iniDespues }, () => sbActualizarProductoPatch(prod.id, { stock: stockDespues, stock_inicial: iniDespues }));
-      logAudit("STOCK_ADD", {
-        resumen: `Entrada de stock: ${prod.nombre} (${prod.codigo}) +${cant} \xB7 stock ${stockAntes}\u2192${stockDespues}`,
-        codigo: prod.codigo,
-        nombre: prod.nombre,
-        marca: prod.marcaNombre || "\u2014",
-        cantidad: cant,
-        stockAntes,
-        stockDespues
-      }, user);
-      setRepMsg({ ok: true, msg: `\u2713 "${prod.nombre}": stock ${stockAntes} \u2192 ${stockDespues}` });
-      setRepCod("");
-      setRepCant("");
+      const key = `${prod.id}|${cant}`;
+      if (!repOperationRef.current || repOperationRef.current.key !== key) {
+        repOperationRef.current = { key, operationId: thUUID() };
+      }
+      const operationId = repOperationRef.current.operationId;
+      const mode = await sbResolverModoOperacion("REPOSICION", user);
+      setOperacionInvPendiente("reposicion");
+      try {
+        if (mode === "transactional") {
+          const result = await sbMovimientoTransaccional("th_registrar_reposicion", operationId, {
+            prodId: prod.id,
+            codigo: prod.codigo,
+            cantidad: cant,
+            motivo: "Reposici\xF3n manual de stock"
+          }, user);
+          setInv((p) => p.map((i) => i.id === prod.id ? { ...i, stock: result.stockDespues, stockInicial: result.stockInicial } : i));
+          rtBroadcast("inv_update", { p: { id: prod.id, stock: result.stockDespues, stockInicial: result.stockInicial } });
+          repOperationRef.current = null;
+          setRepMsg({ ok: true, msg: `\u2713 "${prod.nombre}": stock ${result.stockAntes} \u2192 ${result.stockDespues}` });
+          setRepCod("");
+          setRepCant("");
+          return;
+        }
+        setInv((p) => p.map((i) => i.id === prod.id ? { ...i, stock: stockDespues, stockInicial: iniDespues } : i));
+        syncConRespaldo("stock", { prodId: prod.id, stock: stockDespues, stock_inicial: iniDespues }, () => sbActualizarProductoPatch(prod.id, { stock: stockDespues, stock_inicial: iniDespues }));
+        logAudit("STOCK_ADD", {
+          resumen: `Entrada de stock: ${prod.nombre} (${prod.codigo}) +${cant} \xB7 stock ${stockAntes}\u2192${stockDespues}`,
+          codigo: prod.codigo,
+          nombre: prod.nombre,
+          marca: prod.marcaNombre || "\u2014",
+          cantidad: cant,
+          stockAntes,
+          stockDespues
+        }, user);
+        if (mode === "shadow") sbRegistrarShadow(operationId, "REPOSICION", { prodId: prod.id, codigo: prod.codigo, cantidad: cant }, user);
+        repOperationRef.current = null;
+        setRepMsg({ ok: true, msg: `\u2713 "${prod.nombre}": stock ${stockAntes} \u2192 ${stockDespues}` });
+        setRepCod("");
+        setRepCant("");
+      } catch (e) {
+        setRepMsg({ ok: false, msg: `${e?.message || "No se pudo confirmar la reposici\xF3n"}. No se modific\xF3 el formulario.` });
+      } finally {
+        setOperacionInvPendiente("");
+      }
     }
-    function modificarPrecio() {
+    async function modificarPrecio() {
       const cod = repCod.trim().toUpperCase();
       const prod = inv.find((i) => i.codigo.toUpperCase() === cod) || inv.find((i) => limpiarCod(i.codigo) === limpiarCod(cod));
       if (!prod) {
@@ -67897,32 +69072,67 @@ Motivo: ${motivo}` : ""}`)) {
         return;
       }
       const precioAntes = prod.precio || 0;
-      const prodActualizado = { ...prod, precio: nuevoPrecio };
-      setInv((p) => p.map((i) => i.id === prod.id ? prodActualizado : i));
-      syncConRespaldo("producto", prodActualizado, () => sbGuardarProducto(prodActualizado));
-      logAudit("PRECIO_EDIT", {
-        resumen: `Modificaci\xF3n de precio: ${prod.nombre} (${prod.codigo}) Bs ${precioAntes} \u2192 Bs ${nuevoPrecio}`,
-        codigo: prod.codigo,
-        nombre: prod.nombre,
-        marca: prod.marcaNombre || "\u2014",
-        precioAntes,
-        precioNuevo: nuevoPrecio
-      }, user);
-      setRepMsg({ ok: true, msg: `\u2713 "${prod.nombre}": precio Bs ${precioAntes} \u2192 Bs ${nuevoPrecio}` });
-      setRepCod("");
-      setRepPrecio("");
+      setOperacionInvPendiente("precio");
+      try {
+        await handleEditarProducto(prod.id, { precio: nuevoPrecio });
+        setRepMsg({ ok: true, msg: `\u2713 "${prod.nombre}": precio Bs ${precioAntes} \u2192 Bs ${nuevoPrecio}` });
+        setRepCod("");
+        setRepPrecio("");
+      } catch (e) {
+        setRepMsg({ ok: false, msg: e?.message || "No se pudo confirmar el precio" });
+      } finally {
+        setOperacionInvPendiente("");
+      }
     }
-    const _importBuf = (0, import_react.useRef)({ items: [], sbItems: [], ts: 0, timer: null, archivo: null, archivoNombre: null });
+    const _importBuf = (0, import_react.useRef)({ items: [], sbItems: [], ts: 0, timer: null, archivo: null, archivoNombre: null, operationId: null });
     async function handleEditarProducto(prodId, campos) {
       const prev = inv.find((p) => p.id === prodId);
+      if (!prev) throw new Error("Producto no encontrado");
       const { _motivo, ...rest } = campos;
+      const opKey = JSON.stringify({ prodId, campos });
+      const operationId = productEditOperations.current[opKey] || thUUID();
+      productEditOperations.current[opKey] = operationId;
+      const mode = await sbResolverModoOperacion("EDICION_PRODUCTO", user);
+      if (mode === "transactional") {
+        const data = {
+          prodId,
+          codigo: prev.codigo,
+          nombre: rest.nombre,
+          precio: rest.precio,
+          descripcion: rest.descripcion,
+          subcat: rest.subcat,
+          categoria: rest.categoria,
+          stockObjetivo: rest.stock,
+          stockInicialObjetivo: rest.stockInicial,
+          motivo: _motivo || ""
+        };
+        const result = await sbEditarProductoTransaccional(operationId, data, user);
+        delete productEditOperations.current[opKey];
+        setInv((p) => p.map((x) => x.id === prodId ? {
+          ...x,
+          nombre: result.nombre,
+          precio: Number(result.precio),
+          descripcion: result.descripcion || "",
+          stock: Number(result.stock),
+          stockInicial: Number(result.stockInicial)
+        } : x));
+        rtBroadcast("inv_update", { p: {
+          id: prodId,
+          nombre: result.nombre,
+          precio: Number(result.precio),
+          descripcion: result.descripcion || "",
+          stock: Number(result.stock),
+          stockInicial: Number(result.stockInicial)
+        } });
+        return true;
+      }
       setInv((p) => p.map((x) => x.id === prodId ? { ...x, ...rest } : x));
       const cloud = { ...rest };
       if ("stockInicial" in cloud) {
         cloud.stock_inicial = cloud.stockInicial;
         delete cloud.stockInicial;
       }
-      await sbActualizarProductoPatch(prodId, cloud);
+      await syncConRespaldo("producto_patch", { prodId, ...cloud }, () => sbActualizarProductoPatch(prodId, cloud));
       const inv2 = JSON.parse(localStorage.getItem("th_inv") || "[]");
       localStorage.setItem("th_inv", JSON.stringify(inv2.map((p) => p.id === prodId ? { ...p, ...rest } : p)));
       if (prev && typeof rest.stock === "number" && rest.stock < (Number(prev.stock) || 0)) {
@@ -67939,9 +69149,27 @@ Motivo: ${motivo}` : ""}`)) {
           usuario: user?.nombre
         }, user);
       }
+      delete productEditOperations.current[opKey];
+      if (mode === "shadow") sbRegistrarShadow(operationId, "EDICION_PRODUCTO", { prodId, codigo: prev.codigo, ...campos }, user);
+      return true;
     }
     async function handleEliminarProducto(prodId) {
       const prod = inv.find((p) => p.id === prodId);
+      if (!prod) return false;
+      const operationId = productDeactivateOperations.current[prodId] || thUUID();
+      productDeactivateOperations.current[prodId] = operationId;
+      const mode = await sbResolverModoOperacion("DESACTIVAR_PRODUCTO", user);
+      if (mode === "transactional") {
+        try {
+          await sbDesactivarProductoTransaccional(operationId, prodId, "Retiro solicitado desde inventario", user);
+          delete productDeactivateOperations.current[prodId];
+          setInv((prev) => prev.filter((p) => p.id !== prodId));
+          return true;
+        } catch (e) {
+          alert(e?.message || "No se pudo retirar el producto");
+          return false;
+        }
+      }
       setInv((prev) => prev.filter((p) => p.id !== prodId));
       if (prod?.codigo) {
         syncConRespaldo("eliminarProductoCodigo", { codigo: prod.codigo }, () => sbEliminarProductoPorCodigo(prod.codigo));
@@ -67950,12 +69178,15 @@ Motivo: ${motivo}` : ""}`)) {
       }
       const inv2 = JSON.parse(localStorage.getItem("th_inv") || "[]");
       localStorage.setItem("th_inv", JSON.stringify(inv2.filter((p) => p.id !== prodId)));
+      delete productDeactivateOperations.current[prodId];
+      if (mode === "shadow") sbRegistrarShadow(operationId, "DESACTIVAR_PRODUCTO", { prodId, codigo: prod.codigo }, user);
+      return true;
     }
     async function handleEliminarCarga(cargaId) {
       const carga = cargas.find((c) => c.id === cargaId);
-      const items = carga?.items || [];
-      const nuevos = items.filter((it) => it.tipo === "create");
-      const updates = items.filter((it) => it.tipo === "update");
+      const items2 = carga?.items || [];
+      const nuevos = items2.filter((it) => it.tipo === "create");
+      const updates = items2.filter((it) => it.tipo === "update");
       const resumen = [
         nuevos.length && `Eliminar ${nuevos.length} producto${nuevos.length !== 1 ? "s" : ""} nuevos`,
         updates.length && `Restaurar stock anterior de ${updates.length} producto${updates.length !== 1 ? "s" : ""}`
@@ -67967,6 +69198,24 @@ ${resumen}
 
 Esta acci\xF3n no se puede deshacer.` : "\xBFEliminar esta carga? Esta acci\xF3n no se puede deshacer.";
       if (!window.confirm(msg)) return;
+      const mode = await sbResolverModoOperacion("REVERSO_CARGA", user);
+      if (mode === "transactional") {
+        const operationId = cargaReversalOperations.current[cargaId] || thUUID();
+        cargaReversalOperations.current[cargaId] = operationId;
+        try {
+          await sbRevertirCargaTransaccional(operationId, cargaId, "Reversi\xF3n solicitada desde registro de cargas", user);
+          delete cargaReversalOperations.current[cargaId];
+          setCargas((prev) => prev.map((c) => c.id === cargaId ? { ...c, revertida: true, revertidaAt: (/* @__PURE__ */ new Date()).toISOString(), revertidaPor: user?.nombre } : c));
+          const invNube = await sbCargarInventario();
+          if (invNube) setInv(invNube);
+          alert("\u2713 Carga revertida con movimientos compensatorios. El registro se conserv\xF3 para auditor\xEDa.");
+        } catch (e) {
+          alert(`${e?.message || "No se pudo revertir la carga"}
+
+No se aplic\xF3 una reversi\xF3n parcial.`);
+        }
+        return;
+      }
       const codigosABorrar = nuevos.map((it) => inv.find((p) => p.codigo === it.codigo)?.codigo).filter(Boolean);
       if (codigosABorrar.length) {
         const setCods = new Set(codigosABorrar);
@@ -67993,10 +69242,24 @@ Esta acci\xF3n no se puede deshacer.` : "\xBFEliminar esta carga? Esta acci\xF3n
       }
       const c2 = JSON.parse(localStorage.getItem("th_cargas") || "[]");
       localStorage.setItem("th_cargas", JSON.stringify(c2.filter((c) => c.id !== cargaId)));
+      if (mode === "shadow") sbRegistrarShadow(thUUID(), "REVERSO_CARGA", { cargaId }, user);
     }
-    function handleVerificarCarga(cargaId, verificado) {
+    async function handleVerificarCarga(cargaId, verificado) {
+      const mode = await sbResolverModoOperacion("VERIFICAR_CARGA", user);
+      if (mode === "transactional") {
+        try {
+          await sbGuardarEstadoOperativoTransaccional(thUUID(), "VERIFICAR_CARGA", { cargaId, verificado }, user);
+        } catch (e) {
+          alert(`${e?.message || "No se pudo registrar la verificaci\xF3n"}
+
+No se aplic\xF3 ning\xFAn cambio.`);
+          return false;
+        }
+      }
       setCargas((prev) => prev.map((c) => c.id === cargaId ? { ...c, verificado, verificadoTs: verificado ? (/* @__PURE__ */ new Date()).toISOString() : null, verificadoPor: verificado ? user.nombre : null } : c));
-      sbMarcarCargaVerificada(cargaId, verificado, user.nombre);
+      if (mode !== "transactional") sbMarcarCargaVerificada(cargaId, verificado, user.nombre);
+      if (mode === "shadow") sbRegistrarShadow(thUUID(), "VERIFICAR_CARGA", { cargaId, verificado }, user);
+      return true;
     }
     function handleImportarExcel({ tipo, codigo, stock, producto, descripcion, nombre, subcat, color = "", talla = "" }) {
       function _parseDescTC(d) {
@@ -68018,12 +69281,7 @@ Esta acci\xF3n no se puede deshacer.` : "\xBFEliminar esta carga? Esta acci\xF3n
         if (descripcion) patch.descripcion = descripcion;
         if (subcat) patch.subcat = subcat;
         setInv((prev) => prev.map((p) => p.codigo === codigo ? { ...p, ...patch } : p));
-        if (prod) {
-          if (stock > 0) syncConRespaldo("stock", { prodId: prod.id, stock: stockNuevo, stock_inicial: iniNuevo }, () => sbActualizarProductoPatch(prod.id, { stock: stockNuevo, stock_inicial: iniNuevo }));
-          if (patch.descripcion || patch.subcat || patch.nombre) {
-            syncConRespaldo("producto_patch", { prodId: prod.id, ...patch }, () => sbActualizarProductoPatch(prod.id, patch));
-          }
-        }
+        if (prod) _importBuf.current.sbItems.push({ ...prod, ...patch });
         const { t: _t, c: _c } = _parseDescTC(descripcion);
         _importBuf.current.items.push({
           tipo: "update",
@@ -68035,7 +69293,8 @@ Esta acci\xF3n no se puede deshacer.` : "\xBFEliminar esta carga? Esta acci\xF3n
           stockNuevo,
           stockSumado: stock,
           talla: talla || _t || subcat || "",
-          color: color || _c || ""
+          color: color || _c || "",
+          producto: prod ? { ...prod, ...patch } : null
         });
       } else if (tipo === "create") {
         const localId = nextLocalId();
@@ -68053,32 +69312,26 @@ Esta acci\xF3n no se puede deshacer.` : "\xBFEliminar esta carga? Esta acci\xF3n
           precio: producto.precio,
           categoria: producto.categoria,
           talla: _t || producto.subcat || "",
-          color: _c || ""
+          color: _c || "",
+          producto
         });
       }
       clearTimeout(_importBuf.current.timer);
       _importBuf.current.timer = setTimeout(async () => {
         const sbItems = _importBuf.current.sbItems.splice(0);
-        for (let i = 0; i < sbItems.length; i += 50) {
-          const chunk = sbItems.slice(i, i + 50);
-          const ok = await sbGuardarProductosBatch(chunk);
-          if (!ok) chunk.forEach((p) => pushToOutbox("producto", p));
-        }
-        const buf = _importBuf.current.items;
+        const buf = _importBuf.current.items.splice(0);
         if (buf.length === 0) return;
+        const archivoBlob = _importBuf.current.archivo;
+        const archivoNombre = _importBuf.current.archivoNombre;
+        const operationId = _importBuf.current.operationId || thUUID();
+        _importBuf.current.operationId = null;
+        _importBuf.current.archivo = null;
+        _importBuf.current.archivoNombre = null;
         const nuevos = buf.filter((i) => i.tipo === "create").length;
         const actualizados = buf.filter((i) => i.tipo === "update").length;
         const marcas = [...new Set(buf.map((i) => i.marca).filter(Boolean))].join(", ");
-        const marcaIds = [...new Set(buf.map((i) => i.marcaId).filter((id) => id != null))];
-        logAudit("IMPORT", {
-          resumen: `Importaci\xF3n: ${nuevos} nuevos + ${actualizados} actualizados \xB7 ${marcas}`,
-          nuevos,
-          actualizados,
-          totalItems: buf.length,
-          marcas,
-          items: buf
-        }, user);
-        const carga = crearCarga("IMPORT", user, {
+        const marcaIds = [...new Set(buf.map((i) => i.marcaId).filter((id2) => id2 != null))];
+        let carga = crearCarga("IMPORT", user, {
           marcaId: marcaIds.length === 1 ? marcaIds[0] : null,
           marcaNombre: marcas,
           resumen: `Importaci\xF3n: ${nuevos} nuevos + ${actualizados} actualizados \xB7 ${marcas}`,
@@ -68087,12 +69340,43 @@ Esta acci\xF3n no se puede deshacer.` : "\xBFEliminar esta carga? Esta acci\xF3n
           totalItems: buf.length,
           items: buf
         });
-        const archivoBlob = _importBuf.current.archivo;
-        const archivoNombre = _importBuf.current.archivoNombre;
-        registrarCarga(carga, archivoBlob, archivoNombre);
-        _importBuf.current.items = [];
-        _importBuf.current.archivo = null;
-        _importBuf.current.archivoNombre = null;
+        const mode = await sbResolverModoOperacion("IMPORTACION", user);
+        if (mode === "transactional") {
+          try {
+            if (archivoBlob && archivoNombre) {
+              const url = await sbSubirEvidencia(archivoBlob, archivoNombre, carga.id);
+              if (url) carga = { ...carga, archivoUrl: url, archivoNombre };
+            }
+            const cargaSegura = { ...carga, operationId, items: buf, engine: "transactional" };
+            await sbImportacionTransaccional(operationId, cargaSegura, user);
+            setCargas((prev) => prev.some((c) => c.id === cargaSegura.id) ? prev : [cargaSegura, ...prev]);
+            const invNube = await sbCargarInventario();
+            if (invNube) setInv(invNube);
+            alert(`\u2713 Importaci\xF3n confirmada: ${nuevos} nuevos + ${actualizados} actualizados.`);
+          } catch (e) {
+            const invNube = await sbCargarInventario();
+            if (invNube) setInv(invNube);
+            alert(`${e?.message || "La importaci\xF3n no fue confirmada"}
+
+No se conserv\xF3 ninguna carga parcial.`);
+          }
+          return;
+        }
+        for (let i = 0; i < sbItems.length; i += 50) {
+          const chunk = sbItems.slice(i, i + 50);
+          const ok = await sbGuardarProductosBatch(chunk);
+          if (!ok) chunk.forEach((p) => pushToOutbox("producto", p));
+        }
+        logAudit("IMPORT", {
+          resumen: `Importaci\xF3n: ${nuevos} nuevos + ${actualizados} actualizados \xB7 ${marcas}`,
+          nuevos,
+          actualizados,
+          totalItems: buf.length,
+          marcas,
+          items: buf
+        }, user);
+        await registrarCarga({ ...carga, operationId, engine: "legacy" }, archivoBlob, archivoNombre);
+        if (mode === "shadow") sbRegistrarShadow(operationId, "IMPORTACION", { ...carga, items: buf }, user);
       }, 1200);
     }
     async function recargarDesdeSupabase() {
@@ -68104,6 +69388,16 @@ Esta acci\xF3n no se puede deshacer.` : "\xBFEliminar esta carga? Esta acci\xF3n
       return true;
     }
     async function forzarSyncInventario(onProgress) {
+      const mode = await sbResolverModoOperacion("RECUPERACION_INVENTARIO", user);
+      if (mode === "transactional") {
+        return {
+          ok: 0,
+          fail: inv.length,
+          total: inv.length,
+          blocked: true,
+          message: "La subida total est\xE1 bloqueada en modo seguro. Usa una importaci\xF3n auditada o recarga desde Supabase."
+        };
+      }
       const productos = inv;
       let ok = 0, fail = 0;
       const CHUNK = 50;
@@ -68116,12 +69410,44 @@ Esta acci\xF3n no se puede deshacer.` : "\xBFEliminar esta carga? Esta acci\xF3n
       }
       return { ok, fail, total: productos.length };
     }
-    function handleVenta(v) {
-      const id = `V${Date.now()}`;
-      const vf = { ...v, id, fecha: hoy(), hora: hora(), mk: MK, mes, anio };
+    async function handleVenta(v) {
+      const operationId = v.operationId || thUUID();
+      const operationCreatedAt = Number(v.operationCreatedAt) || Date.now();
+      const operationDate = new Date(operationCreatedAt);
+      const fechaOperacion = `${operationDate.getFullYear()}-${String(operationDate.getMonth() + 1).padStart(2, "0")}-${String(operationDate.getDate()).padStart(2, "0")}`;
+      const horaOperacion = operationDate.toLocaleTimeString("es-BO", { hour: "2-digit", minute: "2-digit" });
+      const id2 = v.id || `V${operationId.replace(/-/g, "").toUpperCase()}`;
+      const items2 = (v.items || []).map((it, idx) => ({ ...it, lineKey: it.lineKey || `${operationId}:${idx + 1}` }));
+      const mode = await sbResolverModoOperacion("VENTA", user);
+      const vf = {
+        ...v,
+        items: items2,
+        id: id2,
+        fecha: fechaOperacion,
+        hora: horaOperacion,
+        mk: MK,
+        mes,
+        anio,
+        operationId,
+        operationCreatedAt,
+        engine: mode === "transactional" ? "transactional" : "legacy",
+        deviceId: thDeviceId(),
+        clientVersion: thClientVersion()
+      };
+      if (mode === "transactional") {
+        const result = await sbRegistrarVentaTransaccional(operationId, vf, user);
+        const confirmada = { ...vf, id: result.ventaId || id2, engine: "transactional" };
+        setVentas((p) => p.some((x) => x.id === confirmada.id) ? p : [...p, confirmada]);
+        const invNube = await sbCargarInventario();
+        if (invNube) setInv(invNube);
+        drive.syncVenta(confirmada);
+        const { etiquetaImg, ...ventaBroadcast } = confirmada;
+        rtBroadcast("venta_nueva", { v: ventaBroadcast });
+        return confirmada;
+      }
       setVentas((p) => [...p, vf]);
       const stockCambios = [];
-      v.items.forEach((it) => {
+      items2.forEach((it) => {
         const stockAntes = inv.find((i) => i.id === it.prodId)?.stock || 0;
         const stockDespues = Math.max(0, stockAntes - it.cantidad);
         setInv((p) => p.map((i) => i.id === it.prodId ? { ...i, stock: stockDespues } : i));
@@ -68130,10 +69456,10 @@ Esta acci\xF3n no se puede deshacer.` : "\xBFEliminar esta carga? Esta acci\xF3n
       });
       drive.syncVenta(vf);
       syncConRespaldo("venta", vf, () => sbGuardarVenta(vf));
-      const marcas = [...new Set(v.items.map((i) => i.marcaNombre))].join(", ");
+      const marcas = [...new Set(items2.map((i) => i.marcaNombre))].join(", ");
       logAudit("VENTA", {
         resumen: `Venta Bs ${v.total} \xB7 ${v.items.length} \xEDtem(s) \xB7 ${marcas}`,
-        ventaId: id,
+        ventaId: id2,
         total: v.total,
         subtotal: v.subtotal,
         descuento: v.descPct || 0,
@@ -68145,7 +69471,7 @@ Esta acci\xF3n no se puede deshacer.` : "\xBFEliminar esta carga? Esta acci\xF3n
         cliente: v.clienteNombre || "\u2014",
         canal: v.canal || "Tienda",
         marcas,
-        items: v.items.map((it) => ({
+        items: items2.map((it) => ({
           codigo: it.codigo,
           nombre: it.nombre,
           marca: it.marcaNombre,
@@ -68155,24 +69481,41 @@ Esta acci\xF3n no se puede deshacer.` : "\xBFEliminar esta carga? Esta acci\xF3n
         })),
         stockCambios
       }, user);
+      if (mode === "shadow") sbRegistrarShadow(operationId, "VENTA", vf, user);
       return vf;
     }
-    function handleVentaHistorica(v) {
-      const id = `VH${Date.now()}`;
+    async function handleVentaHistorica(v) {
+      const operationId = v.operationId || thUUID();
+      const id2 = v.id || `VH${operationId.replace(/-/g, "").toUpperCase()}`;
       const fechaISO = v.fecha;
       const [anioH, mesISO] = fechaISO.split("-").map(Number);
       const mesH = mesISO - 1;
       const mkH = mkKey(mesH, anioH);
       const vf = {
         ...v,
-        id,
+        operationId,
+        engine: "legacy",
+        deviceId: thDeviceId(),
+        clientVersion: thClientVersion(),
+        id: id2,
         fecha: fechaISO,
         hora: v.turno || "\u2014",
         mk: mkH,
         mes: mesH,
         anio: anioH,
-        origen: "HISTORICA"
+        origen: "HISTORICA",
+        items: (v.items || []).map((it, idx) => ({ ...it, lineKey: it.lineKey || `${operationId}:${idx + 1}` }))
       };
+      const mode = await sbResolverModoOperacion("VENTA_HISTORICA", user);
+      if (mode === "transactional") {
+        const segura = { ...vf, engine: "transactional" };
+        const result = await sbRegistrarVentaTransaccional(operationId, segura, user);
+        const confirmada = { ...segura, id: result.ventaId || id2 };
+        setVentas((p) => p.some((x) => x.id === confirmada.id) ? p : [...p, confirmada]);
+        const invNube = await sbCargarInventario();
+        if (invNube) setInv(invNube);
+        return confirmada;
+      }
       setVentas((p) => [...p, vf]);
       const stockCambios = [];
       v.items.forEach((it) => {
@@ -68186,7 +69529,7 @@ Esta acci\xF3n no se puede deshacer.` : "\xBFEliminar esta carga? Esta acci\xF3n
       const marcasNombres = [...new Set(v.items.map((i) => i.marcaNombre))].join(", ");
       logAudit("VENTA_HISTORICA", {
         resumen: `Venta hist\xF3rica ${fechaISO} \xB7 Bs ${v.total} \xB7 ${v.items.length} \xEDtem(s) \xB7 ${marcasNombres}`,
-        ventaId: id,
+        ventaId: id2,
         total: v.total,
         subtotal: v.subtotal,
         descuento: v.descPct || 0,
@@ -68203,20 +69546,23 @@ Esta acci\xF3n no se puede deshacer.` : "\xBFEliminar esta carga? Esta acci\xF3n
         })),
         stockCambios
       }, user);
+      if (mode === "shadow") sbRegistrarShadow(operationId, "VENTA_HISTORICA", vf, user);
       return vf;
     }
-    function handleImportarVentasLibres(filas) {
+    async function handleImportarVentasLibres(filas, options = {}) {
+      const batchOperationId = options.operationId || thUUID();
       const grupos = {};
       filas.forEach((f) => {
         const k = `${f.marcaId}|${f.fecha}|${f.turno}|${f.metodoPago}`;
         if (!grupos[k]) grupos[k] = { marcaId: f.marcaId, marcaNombre: f.marcaNombre, fecha: f.fecha, turno: f.turno, metodoPago: f.metodoPago, items: [] };
         grupos[k].items.push(f);
       });
+      const ventasLibres = [];
       let counter = 0;
-      Object.values(grupos).forEach((g) => {
+      Object.values(grupos).forEach((g2) => {
         counter++;
-        const id = `VL${Date.now()}${counter}`;
-        const items = g.items.map((f) => ({
+        const id2 = `VL${batchOperationId.replace(/-/g, "").toUpperCase()}_${counter}`;
+        const items2 = g2.items.map((f) => ({
           prodId: null,
           codigo: "LIBRE",
           nombre: f.descripcion,
@@ -68226,25 +69572,37 @@ Esta acci\xF3n no se puede deshacer.` : "\xBFEliminar esta carga? Esta acci\xF3n
           precioUnit: f.precio,
           subtotal: f.precio
         }));
-        const total = items.reduce((s, it) => s + it.subtotal, 0);
-        const [anioH, mesISO] = g.fecha.split("-").map(Number);
+        const total2 = items2.reduce((s, it) => s + it.subtotal, 0);
+        const [anioH, mesISO] = g2.fecha.split("-").map(Number);
         const mesH = mesISO - 1;
         const mkH = mkKey(mesH, anioH);
         const vf = {
-          id,
-          fecha: g.fecha,
-          hora: g.turno,
+          id: id2,
+          fecha: g2.fecha,
+          hora: g2.turno,
           mk: mkH,
           mes: mesH,
           anio: anioH,
-          total,
-          subtotal: total,
+          total: total2,
+          subtotal: total2,
           descPct: 0,
-          metodoPago: g.metodoPago,
+          metodoPago: g2.metodoPago,
           vendedor: user?.nombre || "Admin",
           origen: "IMPORT_LIBRE",
-          items
+          items: items2
         };
+        ventasLibres.push(vf);
+      });
+      const mode = await sbResolverModoOperacion("IMPORT_VENTAS_LIBRES", user);
+      if (mode === "transactional") {
+        await sbImportarVentasLibresTransaccional(batchOperationId, { filas: filas.length, ventas: ventasLibres }, user);
+        const confirmadas = ventasLibres.map((v) => ({ ...v, parentOperationId: batchOperationId, engine: "transactional" }));
+        setVentas((prev) => [...prev, ...confirmadas.filter((v) => !prev.some((x) => x.id === v.id))]);
+        return counter;
+      }
+      ventasLibres.forEach((vf, idx) => {
+        const operationId = thUUID();
+        vf = { ...vf, operationId, engine: "legacy", items: vf.items.map((it, lineIdx) => ({ ...it, lineKey: `${operationId}:${lineIdx + 1}` })) };
         setVentas((p) => [...p, vf]);
         syncConRespaldo("venta", vf, () => sbGuardarVenta(vf));
         logAudit("IMPORT_VENTAS_LIBRES", {
@@ -68255,17 +69613,28 @@ Esta acci\xF3n no se puede deshacer.` : "\xBFEliminar esta carga? Esta acci\xF3n
           fecha: g.fecha
         }, user);
       });
+      if (mode === "shadow") sbRegistrarShadow(batchOperationId, "IMPORT_VENTAS_LIBRES", { filas: filas.length, ventas: ventasLibres }, user);
       return counter;
     }
-    function handleCambio(cambio) {
-      cambio.itemsDevueltos.forEach((it) => {
+    async function handleCambio(cambio) {
+      const operationId = cambio.operationId || thUUID();
+      const mode = await sbResolverModoOperacion("CAMBIO", user);
+      const cambioFinal = { ...cambio, operationId, engine: mode === "transactional" ? "transactional" : "legacy" };
+      if (mode === "transactional") {
+        const result = await sbRegistrarCambioTransaccional(operationId, cambioFinal, user);
+        const confirmado = { ...cambioFinal, id: result.cambioId || cambioFinal.id, engine: "transactional" };
+        const invNube = await sbCargarInventario();
+        if (invNube) setInv(invNube);
+        return confirmado;
+      }
+      cambioFinal.itemsDevueltos.forEach((it) => {
         const prod = inv.find((i) => i.id === it.prodId);
         if (!prod) return;
         const nuevoStock = prod.stock + it.cantidad;
         setInv((p) => p.map((i) => i.id === it.prodId ? { ...i, stock: nuevoStock } : i));
         syncConRespaldo("stock", { prodId: it.prodId, stock: nuevoStock }, () => sbActualizarStock(it.prodId, nuevoStock));
       });
-      cambio.itemsNuevos.forEach((it) => {
+      cambioFinal.itemsNuevos.forEach((it) => {
         const prod = inv.find((i) => i.id === it.prodId);
         if (!prod) return;
         const nuevoStock = Math.max(0, prod.stock - it.cantidad);
@@ -68273,13 +69642,28 @@ Esta acci\xF3n no se puede deshacer.` : "\xBFEliminar esta carga? Esta acci\xF3n
         syncConRespaldo("stock", { prodId: it.prodId, stock: nuevoStock }, () => sbActualizarStock(it.prodId, nuevoStock));
       });
       logAudit("CAMBIO", {
-        resumen: `Cambio ${cambio.id} \xB7 Venta origen ${cambio.ventaOriginalId} \xB7 Dif Bs ${cambio.diferencia.toFixed(2)}`,
-        ...cambio
+        resumen: `Cambio ${cambioFinal.id} \xB7 Venta origen ${cambioFinal.ventaOriginalId} \xB7 Dif Bs ${cambioFinal.diferencia.toFixed(2)}`,
+        ...cambioFinal
       }, user);
+      if (mode === "shadow") sbRegistrarShadow(operationId, "CAMBIO", cambioFinal, user);
+      return cambioFinal;
     }
-    function handleAnularVenta(ventaId) {
+    async function handleAnularVenta(ventaId, options = {}) {
       const v = ventas.find((x) => x.id === ventaId);
       if (!v || v.anulada) return;
+      const operationId = options.operationId || thUUID();
+      const motivo = options.motivo || "Anulaci\xF3n desde detalle de venta";
+      const mode = await sbResolverModoOperacion("ANULACION", user);
+      if (mode === "transactional") {
+        await sbAnularVentaTransaccional(operationId, ventaId, motivo, user);
+        const vAnulada2 = { ...v, anulada: true, fechaAnulacion: hoy(), operationIdAnulacion: operationId };
+        setVentas((p) => p.map((x) => x.id === ventaId ? vAnulada2 : x));
+        setVentaDetalle(vAnulada2);
+        const invNube = await sbCargarInventario();
+        if (invNube) setInv(invNube);
+        rtBroadcast("venta_anulada", { id: ventaId });
+        return vAnulada2;
+      }
       const stockCambios = [];
       v.items.forEach((it) => {
         const actual = inv.find((i) => i.id === it.prodId)?.stock || 0;
@@ -68299,21 +69683,102 @@ Esta acci\xF3n no se puede deshacer.` : "\xBFEliminar esta carga? Esta acci\xF3n
         items: v.items.map((it) => ({ codigo: it.codigo, nombre: it.nombre, marca: it.marcaNombre, cantidad: it.cantidad, subtotal: it.subtotal })),
         stockCambios
       }, user);
+      if (mode === "shadow") sbRegistrarShadow(operationId, "ANULACION", { ventaId, motivo }, user);
+      return vAnulada;
     }
     function toggleAlq(marcaId) {
       const e = alqMes.find((a) => a.marcaId === marcaId);
-      if (e) setAlq((p) => p.map((a) => a.marcaId === marcaId && a.mes === mes && a.anio === anio ? { ...a, pagado: !a.pagado, fechaPago: !a.pagado ? hoy() : "" } : a));
-      else setAlq((p) => [...p, { id: Date.now(), marcaId, mes, anio, pagado: true, fechaPago: hoy() }]);
+      const next = e ? { ...e, pagado: !e.pagado, fechaPago: !e.pagado ? hoy() : "" } : { id: `ALQ-${mkKey(mes, anio)}-${marcaId}`, marcaId, mes, anio, pagado: true, fechaPago: hoy() };
+      if (e) setAlq((p) => p.map((a) => a.marcaId === marcaId && a.mes === mes && a.anio === anio ? next : a));
+      else setAlq((p) => [...p, next]);
+      guardarAlquilerEstado(next);
     }
     const [cfgLiqVersion, setCfgLiqVersion] = (0, import_react.useState)(0);
     function bumpCfgLiq() {
       setCfgLiqVersion((v) => v + 1);
     }
+    (0, import_react.useEffect)(() => {
+      let mounted = true;
+      sbCargarConfiguracionFinanciera().then((data) => {
+        if (!mounted || !data) return;
+        data.config.forEach((r) => {
+          try {
+            localStorage.setItem(`th_liq_cfg_${r.marca_id}`, JSON.stringify({
+              pctTarjeta: Number(r.pct_tarjeta),
+              pctComision: Number(r.pct_comision),
+              alquiler: Number(r.alquiler)
+            }));
+          } catch {
+          }
+        });
+        data.periodos.forEach((r) => {
+          try {
+            localStorage.setItem(`th_liq_gastos_${r.marca_id}_${r.mk}`, JSON.stringify(r.gastos || []));
+          } catch {
+          }
+        });
+        if (data.alquileres.length > 0) setAlq(data.alquileres.map((r) => ({
+          id: r.id,
+          marcaId: r.marca_id,
+          mes: r.mes,
+          anio: r.anio,
+          pagado: r.pagado,
+          fechaPago: r.fecha_pago || ""
+        })));
+        bumpCfgLiq();
+      });
+      const onFinancialState = (event) => {
+        const tipo = event?.detail?.tipo;
+        const data = event?.detail?.data;
+        if (!tipo || !data) return;
+        const operationId = thUUID();
+        const context = thOperationContext(user);
+        thEnqueueFinancialSave(async () => {
+          const mode = await sbResolverModoOperacion(tipo, user);
+          if (mode === "transactional") {
+            try {
+              return await sbGuardarConfiguracionFinancieraTransaccional(operationId, tipo, data, user);
+            } catch (e) {
+              if (!getOutbox().some((op) => op.tipo === "estadoFinanciero" && op.payload?.operationId === operationId))
+                pushToOutbox("estadoFinanciero", { operationId, tipo, data, context });
+              throw e;
+            }
+          }
+          if (mode === "shadow") await sbRegistrarShadow(operationId, tipo, data, user);
+          return { ok: true, engine: mode };
+        }).catch((e) => console.warn("Configuraci\xF3n financiera pendiente:", e.message));
+      };
+      window.addEventListener("th-financial-state", onFinancialState);
+      return () => {
+        mounted = false;
+        window.removeEventListener("th-financial-state", onFinancialState);
+      };
+    }, [user?.usuario]);
     const getLiq = (0, import_react.useCallback)((marcaId) => {
       const vM = vMes.filter((v) => v.items.some((i) => i.marcaId === marcaId));
       const liq = calcLiqMarca(vM, marcaId, MK);
+      const cierre = cierres[`${MK}-${marcaId}`];
+      const s = cierre?.cerrado ? cierre.snapshot : null;
+      if (s) return {
+        ...liq,
+        bruto: Number(s.bruto) || 0,
+        brutoEf: Number(s.efectivo) || 0,
+        brutoQR: Number(s.qr) || 0,
+        brutoTJ: Number(s.tarjeta) || 0,
+        descTJ: Number(s.descuentoTarjeta) || 0,
+        subBanco: Number(s.subtotalBanco) || 0,
+        comision: Number(s.comision) || 0,
+        alquiler: Number(s.alquiler) || 0,
+        gastos: Array.isArray(s.gastos) ? s.gastos : [],
+        totalGastos: Number(s.totalGastos) || 0,
+        neto: Number(s.neto) || 0,
+        cfg: s.configuracion || liq.cfg,
+        vMarca: vM,
+        alqPagado: alqMes.find((a) => a.marcaId === marcaId)?.pagado || false,
+        desdeSnapshot: true
+      };
       return { ...liq, vMarca: vM, alqPagado: alqMes.find((a) => a.marcaId === marcaId)?.pagado || false };
-    }, [vMes, alqMes, cfgLiqVersion, MK]);
+    }, [vMes, alqMes, cfgLiqVersion, MK, cierres]);
     const getHist = (0, import_react.useCallback)((marcaId) => {
       const map = {};
       ventas.forEach((v) => {
@@ -68327,6 +69792,59 @@ Esta acci\xF3n no se puede deshacer.` : "\xBFEliminar esta carga? Esta acci\xF3n
       });
       return Object.values(map).sort((a, b) => b.mk.localeCompare(a.mk));
     }, [ventas]);
+    async function cambiarCierreMensual(marcaId, cerrado) {
+      const key = `${MK}-${marcaId}`;
+      const mode = await sbResolverModoOperacion("CIERRE_MENSUAL", user);
+      if (mode === "transactional") {
+        try {
+          await thEsperarFinanzasPendientes();
+        } catch (e) {
+          alert(`${e?.message || "Hay una configuraci\xF3n financiera sin confirmar"}
+
+El cierre no se realiz\xF3.`);
+          return false;
+        }
+        if (getOutbox().some((op) => op.tipo === "estadoFinanciero")) {
+          alert("Hay cambios de comisi\xF3n, alquiler o gastos pendientes de sincronizar. Reintenta la cola antes de cerrar el mes.");
+          return false;
+        }
+      }
+      const liq = getLiq(marcaId);
+      const snapshot = {
+        bruto: liq.bruto,
+        efectivo: liq.brutoEf,
+        qr: liq.brutoQR,
+        tarjeta: liq.brutoTJ,
+        descuentoTarjeta: liq.descTJ,
+        subtotalBanco: liq.subBanco,
+        comision: liq.comision,
+        alquiler: liq.alquiler,
+        gastos: liq.gastos,
+        totalGastos: liq.totalGastos,
+        neto: liq.neto,
+        configuracion: liq.cfg,
+        ventasIds: liq.vMarca.map((v) => v.id),
+        ventasCantidad: liq.vMarca.length,
+        calculadoAt: (/* @__PURE__ */ new Date()).toISOString()
+      };
+      const data = { id: key, marcaId, mk: MK, cerrado, fecha: cerrado ? hoy() : null, snapshot };
+      if (mode === "transactional") {
+        try {
+          await sbGuardarEstadoOperativoTransaccional(thUUID(), "CIERRE_MENSUAL", data, user);
+        } catch (e) {
+          alert(`${e?.message || "No se pudo cambiar el cierre"}
+
+No se aplic\xF3 ning\xFAn cambio.`);
+          return false;
+        }
+      } else {
+        const legacy = { cerrado, fecha: data.fecha, mk: MK, marca_id: marcaId, metadata: { snapshot } };
+        syncConRespaldo("cierre", { key, data: legacy }, () => sbGuardarCierre(key, legacy));
+        if (mode === "shadow") sbRegistrarShadow(thUUID(), "CIERRE_MENSUAL", data, user);
+      }
+      setCierres((p) => ({ ...p, [key]: { cerrado, fecha: data.fecha, mk: MK, snapshot } }));
+      return true;
+    }
     const TABS_ALL = [
       { id: "inicio", icon: "\u229E", label: "Inicio" },
       { id: "pos", icon: "\u2295", label: "Caja" },
@@ -68352,7 +69870,7 @@ Esta acci\xF3n no se puede deshacer.` : "\xBFEliminar esta carga? Esta acci\xF3n
       fontFamily: FONT
     } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center", color: "#999" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 28, marginBottom: 12 } }, "\u{1F510}"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 14 } }, "Verificando sesi\xF3n\u2026")));
     if (!user) return /* @__PURE__ */ import_react.default.createElement(LoginScreen, { onLogin: login });
-    if (user.rol === "marca") return /* @__PURE__ */ import_react.default.createElement(BrandPortal, { user, ventas, inv, cargas: cargasCompletas, retiros, logout, descuentos, onGuardarDescuento: guardarDescuentoMarca, descCodigos, onGuardarDescCodigo: guardarDescuentoCodigo, onQuitarDescCodigo: eliminarDescuentoCodigo });
+    if (user.rol === "marca") return /* @__PURE__ */ import_react.default.createElement(BrandPortal, { user, ventas, inv, cargas: cargasCompletas, retiros, logout, descuentos, onGuardarDescuento: guardarDescuentoMarca, descCodigos, onGuardarDescCodigo: guardarDescuentoCodigo, onQuitarDescCodigo: eliminarDescuentoCodigo, financialVersion: cfgLiqVersion });
     const _liqPagos = sumPagos(vMes);
     const liqEf = _liqPagos.efectivo;
     const liqQr = _liqPagos.qr;
@@ -68584,7 +70102,7 @@ Esta acci\xF3n no se puede deshacer.` : "\xBFEliminar esta carga? Esta acci\xF3n
       flexDirection: isDesktop ? void 0 : "column",
       gap: isDesktop ? 6 : 2
     } }, marcasState.map((m, i) => {
-      const total = vMes.reduce((s, v) => s + v.items.filter((it) => it.marcaId === m.id).reduce((ss, it) => ss + it.subtotal, 0), 0);
+      const total2 = vMes.reduce((s, v) => s + v.items.filter((it) => it.marcaId === m.id).reduce((ss, it) => ss + it.subtotal, 0), 0);
       const prods = inv.filter((it) => it.marcaId === m.id).filter((p) => p.stock > 0).length;
       const cerrado = cierres[`${MK}-${m.id}`]?.cerrado;
       const inactiva = m.estado === "inactiva";
@@ -68671,7 +70189,7 @@ Esta acci\xF3n no se puede deshacer.` : "\xBFEliminar esta carga? Esta acci\xF3n
           borderRadius: 3,
           background: prods > 0 ? C.green : C.label4,
           flexShrink: 0
-        } }), prods, " producto", prods !== 1 ? "s" : "", total > 0 && /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.label, fontWeight: 700 } }, " \xB7 ", $2(total)))),
+        } }), prods, " producto", prods !== 1 ? "s" : "", total2 > 0 && /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.label, fontWeight: 700 } }, " \xB7 ", $2(total2)))),
         /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6, flexShrink: 0 } }, cerrado && /* @__PURE__ */ import_react.default.createElement(Chip, { color: C.green, small: true }, "\u2713"), user.rol === "admin" && /* @__PURE__ */ import_react.default.createElement(
           MarcaEditBtn,
           {
@@ -68695,11 +70213,11 @@ Esta acci\xF3n no se puede deshacer.` : "\xBFEliminar esta carga? Esta acci\xF3n
         anio,
         MK,
         cierres,
-        setCierres,
         getHist,
         getLiq,
         auditorias,
         onActualizarAuditoria: actualizarAuditoria,
+        onCambiarCierre: cambiarCierreMensual,
         user,
         retiros,
         onVentaClick: (v) => setVentaDetalle(v)
@@ -68793,7 +70311,7 @@ Esta acci\xF3n no se puede deshacer.` : "\xBFEliminar esta carga? Esta acci\xF3n
       background: liqPct === 100 ? C.green : C.amber,
       borderRadius: 4,
       transition: "width .3s"
-    } })), liqPct === 100 && /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.green, fontFamily: FONT_UI, marginTop: 6, textAlign: "center", fontWeight: 600 } }, "\u2713 Todas las marcas con ventas est\xE1n cerradas"))), /* @__PURE__ */ import_react.default.createElement(PctMarcasPanel, { onCfgChange: bumpCfgLiq }), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" } }, /* @__PURE__ */ import_react.default.createElement(
+    } })), liqPct === 100 && /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.green, fontFamily: FONT_UI, marginTop: 6, textAlign: "center", fontWeight: 600 } }, "\u2713 Todas las marcas con ventas est\xE1n cerradas"))), /* @__PURE__ */ import_react.default.createElement(PctMarcasPanel, { onCfgChange: bumpCfgLiq, version: cfgLiqVersion }), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" } }, /* @__PURE__ */ import_react.default.createElement(
       "button",
       {
         onClick: () => generarPlanillaAlquileres(ventas, mes, anio),
@@ -68913,7 +70431,7 @@ Esta acci\xF3n no se puede deshacer.` : "\xBFEliminar esta carga? Esta acci\xF3n
         /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: isDesktop ? 14 : 16, fontWeight: 600, color: C.label, fontFamily: FONT, letterSpacing: "0.02em" } }, m.nombre), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: isDesktop ? 12 : 13, color: liq.bruto > 0 ? C.gold : C.label3, fontFamily: FONT } }, liq.bruto > 0 ? `${$2(liq.neto)} neto` : "Sin ventas")),
         /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } }, cerrado ? /* @__PURE__ */ import_react.default.createElement(Chip, { color: C.green, small: true }, "\u2713 Cerrado") : liq.bruto > 0 && /* @__PURE__ */ import_react.default.createElement(Chip, { color: C.amber, small: true }, "Pendiente"), /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.label3, fontSize: 22 } }, "\u203A"))
       );
-    }))), tab === "giftcards" && /* @__PURE__ */ import_react.default.createElement(GiftCardsTab, null), tab === "cajas" && /* @__PURE__ */ import_react.default.createElement(CajasTab, null), tab === "historial" && /* @__PURE__ */ import_react.default.createElement(
+    }))), tab === "giftcards" && /* @__PURE__ */ import_react.default.createElement(GiftCardsTab, { user }), tab === "cajas" && /* @__PURE__ */ import_react.default.createElement(CajasTab, { user }), tab === "historial" && /* @__PURE__ */ import_react.default.createElement(
       HistorialTab,
       {
         ventas,
@@ -68983,7 +70501,7 @@ Esta acci\xF3n no se puede deshacer.` : "\xBFEliminar esta carga? Esta acci\xF3n
       color: bajaMsg.ok ? C.green : C.red,
       fontSize: 14,
       fontFamily: FONT
-    } }, bajaMsg.msg), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: darBaja, variant: "danger", full: true, disabled: !bajaCod.trim() }, "Dar de Baja")), /* @__PURE__ */ import_react.default.createElement(Sheet, { open: sheetReponer, onClose: () => setShReponer(false), title: "Reponer Stock" }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 6, marginBottom: 20 } }, [{ id: "stock", l: "\u{1F4E6} Reponer Stock" }, { id: "precio", l: "\u{1F4B0} Modificar Precio" }].map((t) => /* @__PURE__ */ import_react.default.createElement(
+    } }, bajaMsg.msg), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: darBaja, variant: "danger", full: true, disabled: !bajaCod.trim() || operacionInvPendiente === "baja" }, operacionInvPendiente === "baja" ? "Registrando de forma segura\u2026" : "Dar de Baja")), /* @__PURE__ */ import_react.default.createElement(Sheet, { open: sheetReponer, onClose: () => setShReponer(false), title: "Reponer Stock" }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 6, marginBottom: 20 } }, [{ id: "stock", l: "\u{1F4E6} Reponer Stock" }, { id: "precio", l: "\u{1F4B0} Modificar Precio" }].map((t) => /* @__PURE__ */ import_react.default.createElement(
       "button",
       {
         key: t.id,
@@ -69043,7 +70561,7 @@ Esta acci\xF3n no se puede deshacer.` : "\xBFEliminar esta carga? Esta acci\xF3n
       color: repMsg.ok ? C.green : C.red,
       fontSize: 14,
       fontFamily: FONT
-    } }, repMsg.msg), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: reponerStock, variant: "primary", full: true, disabled: !repCod.trim() || !repCant }, "Reponer Stock")), repTab === "precio" && /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, null, /* @__PURE__ */ import_react.default.createElement("p", { style: { color: C.label2, fontFamily: FONT, fontSize: 14, margin: "0 0 16px" } }, "Actualiza el precio de venta de un producto existente. El cambio queda registrado en auditor\xEDa."), /* @__PURE__ */ import_react.default.createElement(
+    } }, repMsg.msg), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: reponerStock, variant: "primary", full: true, disabled: !repCod.trim() || !repCant || operacionInvPendiente === "reposicion" }, operacionInvPendiente === "reposicion" ? "Registrando de forma segura\u2026" : "Reponer Stock")), repTab === "precio" && /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, null, /* @__PURE__ */ import_react.default.createElement("p", { style: { color: C.label2, fontFamily: FONT, fontSize: 14, margin: "0 0 16px" } }, "Actualiza el precio de venta de un producto existente. El cambio queda registrado en auditor\xEDa."), /* @__PURE__ */ import_react.default.createElement(
       IOSInput,
       {
         label: "C\xF3digo del producto",
@@ -69076,7 +70594,7 @@ Esta acci\xF3n no se puede deshacer.` : "\xBFEliminar esta carga? Esta acci\xF3n
       color: repMsg.ok ? C.green : C.red,
       fontSize: 14,
       fontFamily: FONT
-    } }, repMsg.msg), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: modificarPrecio, variant: "primary", full: true, disabled: !repCod.trim() || !repPrecio }, "Actualizar Precio"))), /* @__PURE__ */ import_react.default.createElement(Sheet, { open: sheetDrive, onClose: () => setShDrive(false), title: "\u2601 Google Drive", tall: true }, /* @__PURE__ */ import_react.default.createElement(DescargarTodasNotasBtn, { ventas }), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+    } }, repMsg.msg), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: modificarPrecio, variant: "primary", full: true, disabled: !repCod.trim() || !repPrecio || operacionInvPendiente === "precio" }, operacionInvPendiente === "precio" ? "Registrando de forma segura\u2026" : "Actualizar Precio"))), /* @__PURE__ */ import_react.default.createElement(Sheet, { open: sheetDrive, onClose: () => setShDrive(false), title: "\u2601 Google Drive", tall: true }, /* @__PURE__ */ import_react.default.createElement(DescargarTodasNotasBtn, { ventas }), /* @__PURE__ */ import_react.default.createElement("div", { style: {
       background: `${C.gold}10`,
       borderRadius: 16,
       padding: "16px",
@@ -69188,9 +70706,8 @@ Esta acci\xF3n no se puede deshacer.` : "\xBFEliminar esta carga? Esta acci\xF3n
         anio,
         MK,
         cierres,
-        setCierres,
+        onCambiarCierre: cambiarCierreMensual,
         onClose: () => setMLiq(null),
-        syncCierre: drive.syncCierre,
         onCfgChange: bumpCfgLiq
       }
     ), shImportarExcel && /* @__PURE__ */ import_react.default.createElement(ImportarExcelModal, { inv, onImportar: handleImportarExcel, onClose: () => setShImportarExcel(false), onArchivoCapturado: (f) => {
@@ -69236,7 +70753,7 @@ Esta acci\xF3n no se puede deshacer.` : "\xBFEliminar esta carga? Esta acci\xF3n
       WebkitTapHighlightColor: "transparent"
     } }, t.label))), subTab === "venta" ? /* @__PURE__ */ import_react.default.createElement(POS, { inv, onVenta, onVerNota, user, descuentos, descCodigos }) : /* @__PURE__ */ import_react.default.createElement(RetirosTab, { inv, retiros, onRetiro }));
   }
-  function QRPagoPanel({ total, refVenta }) {
+  function QRPagoPanel({ total: total2, refVenta }) {
     const [qrBanco, setQrBanco] = (0, import_react.useState)(cargarQRBanco);
     const [qrGen, setQrGen] = (0, import_react.useState)(null);
     const fileRef = (0, import_react.useRef)();
@@ -69249,7 +70766,7 @@ Esta acci\xF3n no se puede deshacer.` : "\xBFEliminar esta carga? Esta acci\xF3n
       loadQR().then((qrcode) => {
         if (!on) return;
         const qr = qrcode(0, "M");
-        qr.addData(`TOSCANA HOUSE|COBRO|BS:${total.toFixed(2)}|REF:${refVenta}`);
+        qr.addData(`TOSCANA HOUSE|COBRO|BS:${total2.toFixed(2)}|REF:${refVenta}`);
         qr.make();
         setQrGen(qr.createDataURL(7, 10));
       }).catch(() => {
@@ -69257,7 +70774,7 @@ Esta acci\xF3n no se puede deshacer.` : "\xBFEliminar esta carga? Esta acci\xF3n
       return () => {
         on = false;
       };
-    }, [total, refVenta, qrBanco]);
+    }, [total2, refVenta, qrBanco]);
     function subirQRBanco(e) {
       const f = e.target.files?.[0];
       if (!f) return;
@@ -69305,7 +70822,7 @@ Esta acci\xF3n no se puede deshacer.` : "\xBFEliminar esta carga? Esta acci\xF3n
       color: C.label3,
       fontSize: 13,
       fontFamily: FONT
-    } }, "Generando QR\u2026"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 26, fontWeight: 800, color: C.label, fontFamily: FONT, marginTop: 12 } }, $2(total)), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11.5, color: C.label3, fontFamily: FONT, marginTop: 4, lineHeight: 1.5 } }, "El cliente escanea y paga desde su app bancaria.", /* @__PURE__ */ import_react.default.createElement("br", null), "Cuando llegue la notificaci\xF3n del banco, presiona ", /* @__PURE__ */ import_react.default.createElement("b", null, "Verificar pago"), "."), /* @__PURE__ */ import_react.default.createElement("div", { style: { marginTop: 10, display: "flex", justifyContent: "center", gap: 14 } }, /* @__PURE__ */ import_react.default.createElement("button", { onClick: () => fileRef.current?.click(), style: {
+    } }, "Generando QR\u2026"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 26, fontWeight: 800, color: C.label, fontFamily: FONT, marginTop: 12 } }, $2(total2)), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11.5, color: C.label3, fontFamily: FONT, marginTop: 4, lineHeight: 1.5 } }, "El cliente escanea y paga desde su app bancaria.", /* @__PURE__ */ import_react.default.createElement("br", null), "Cuando llegue la notificaci\xF3n del banco, presiona ", /* @__PURE__ */ import_react.default.createElement("b", null, "Verificar pago"), "."), /* @__PURE__ */ import_react.default.createElement("div", { style: { marginTop: 10, display: "flex", justifyContent: "center", gap: 14 } }, /* @__PURE__ */ import_react.default.createElement("button", { onClick: () => fileRef.current?.click(), style: {
       background: "none",
       border: "none",
       fontSize: 11,
@@ -69329,7 +70846,14 @@ Esta acci\xF3n no se puede deshacer.` : "\xBFEliminar esta carga? Esta acci\xF3n
     } }, "Quitar")), /* @__PURE__ */ import_react.default.createElement("input", { ref: fileRef, type: "file", accept: "image/*", onChange: subirQRBanco, style: { display: "none" } }));
   }
   function POS({ inv, onVenta, onVerNota, user, descuentos = {}, descCodigos = {} }) {
-    var _hN135 = (0, import_react.useState)([]);
+    var _hN135 = (0, import_react.useState)(() => {
+      try {
+        const d = JSON.parse(localStorage.getItem("th_pos_draft") || "null");
+        return Array.isArray(d?.carrito) ? d.carrito : [];
+      } catch {
+        return [];
+      }
+    });
     var carrito = _hN135[0];
     var setCarrito = _hN135[1];
     ;
@@ -69409,6 +70933,7 @@ Esta acci\xF3n no se puede deshacer.` : "\xBFEliminar esta carga? Esta acci\xF3n
     const [gcBusqMsg, setGcBusqMsg] = (0, import_react.useState)(null);
     const [gcMontoUsar, setGcMontoUsar] = (0, import_react.useState)("");
     const [metodoCompl, setMetodoCompl] = (0, import_react.useState)("efectivo");
+    const [gcBuscando, setGcBuscando] = (0, import_react.useState)(false);
     var _hN144 = (0, import_react.useState)(null);
     var scanStatus = _hN144[0];
     var setScanStatus = _hN144[1];
@@ -69418,8 +70943,27 @@ Esta acci\xF3n no se puede deshacer.` : "\xBFEliminar esta carga? Esta acci\xF3n
     var setScanMsg = _hN145[1];
     ;
     const [showScanner, setShowScanner] = (0, import_react.useState)(false);
+    const [cobrando, setCobrando] = (0, import_react.useState)(false);
+    const [cobroError, setCobroError] = (0, import_react.useState)("");
+    const cobroOperationRef = (0, import_react.useRef)(null);
     const inputRef = (0, import_react.useRef)();
     const fileRef = (0, import_react.useRef)();
+    (0, import_react.useEffect)(() => {
+      try {
+        if (carrito.length) {
+          localStorage.setItem("th_pos_draft", JSON.stringify({ carrito, savedAt: Date.now() }));
+          sessionStorage.setItem("th_critical_ui_state_v1", "1");
+        } else {
+          localStorage.removeItem("th_pos_draft");
+          sessionStorage.removeItem("th_critical_ui_state_v1");
+        }
+      } catch {
+      }
+    }, [carrito]);
+    (0, import_react.useEffect)(() => {
+      cobroOperationRef.current = null;
+      setCobroError("");
+    }, [carrito, pago, pagoMixto, montosMixtos, pagoGC, gcEncontrado, gcMontoUsar, metodoCompl, cliente, clienteTel, vendedor]);
     const resultados = (0, import_react.useMemo)(() => {
       if (!busq.trim()) return [];
       const q = busq.toLowerCase().replace(/'/g, "-");
@@ -69430,8 +70974,8 @@ Esta acci\xF3n no se puede deshacer.` : "\xBFEliminar esta carga? Esta acci\xF3n
     const subtotal = carrito.reduce((s, it) => s + it.precio * it.cantidad, 0);
     const descItemInfo = (it) => descEfectivoCodigo(descuentos, descCodigos, it.marcaId, it.codigo);
     const descItemPct = (it) => Math.min(60, descItemInfo(it).pct + (Number(descMarcaManual[it.marcaId]) || 0) + Number(descExtra || 0));
-    const total = carrito.reduce((s, it) => s + it.precio * it.cantidad * (1 - descItemPct(it) / 100), 0);
-    const descTotalBs = subtotal - total;
+    const total2 = carrito.reduce((s, it) => s + it.precio * it.cantidad * (1 - descItemPct(it) / 100), 0);
+    const descTotalBs = subtotal - total2;
     const descPct = subtotal > 0 ? +(descTotalBs / subtotal * 100).toFixed(2) : 0;
     const hayDescMarca = carrito.some((it) => descItemInfo(it).pct > 0);
     const porMarca = (0, import_react.useMemo)(() => {
@@ -69509,32 +71053,38 @@ Esta acci\xF3n no se puede deshacer.` : "\xBFEliminar esta carga? Esta acci\xF3n
       }
       setTimeout(() => setScanStatus(null), 4e3);
     }
-    function buscarGCenPOS() {
-      const lista = cargarGC();
-      const gc = lista.find((g) => g.codigo.toLowerCase() === gcCodigo.trim().toLowerCase());
-      if (!gc) {
-        setGcBusqMsg("\u274C Gift Card no encontrada");
-        setGcEncontrado(null);
-        return;
-      }
-      const est = gcEstado(gc);
-      if (est === "agotada") {
-        setGcBusqMsg("\u26A0\uFE0F Gift Card agotada (saldo cero)");
-        setGcEncontrado(null);
-        return;
-      }
-      if (est === "vencida") {
-        setGcBusqMsg("\u26A0\uFE0F Gift Card vencida");
-        setGcEncontrado(null);
-        return;
-      }
-      setGcEncontrado(gc);
-      setGcMontoUsar(String(Math.min(gc.saldo, total).toFixed(2)));
+    async function buscarGCenPOS() {
+      if (!gcCodigo.trim() || gcBuscando) return;
+      setGcBuscando(true);
       setGcBusqMsg(null);
+      setGcEncontrado(null);
+      try {
+        const mode = await sbResolverModoOperacion("VENTA", user);
+        const gc = mode === "transactional" ? await sbBuscarGiftCardCloud(gcCodigo) : cargarGC().find((g2) => g2.codigo.toLowerCase() === gcCodigo.trim().toLowerCase());
+        if (!gc) {
+          setGcBusqMsg("\u274C Gift Card no encontrada");
+          return;
+        }
+        const est = gcEstado(gc);
+        if (est === "agotada") {
+          setGcBusqMsg("\u26A0\uFE0F Gift Card agotada (saldo cero)");
+          return;
+        }
+        if (est === "vencida") {
+          setGcBusqMsg("\u26A0\uFE0F Gift Card vencida");
+          return;
+        }
+        setGcEncontrado(gc);
+        setGcMontoUsar(String(Math.min(gc.saldo, total2).toFixed(2)));
+      } catch (e) {
+        setGcBusqMsg(`\u274C ${e?.message || "No se pudo verificar el saldo central"}`);
+      } finally {
+        setGcBuscando(false);
+      }
     }
-    function calcGCAllocations(items, totalVenta, gcUsado) {
+    function calcGCAllocations(items2, totalVenta, gcUsado) {
       const brands = {};
-      items.forEach((it) => {
+      items2.forEach((it) => {
         if (!brands[it.marcaId]) brands[it.marcaId] = { marcaId: it.marcaId, marcaNombre: it.marcaNombre, subtotal: 0 };
         brands[it.marcaId].subtotal += it.subtotal;
       });
@@ -69547,8 +71097,8 @@ Esta acci\xF3n no se puede deshacer.` : "\xBFEliminar esta carga? Esta acci\xF3n
         extraAmount: +(b.subtotal / totalVenta * extra).toFixed(2)
       }));
     }
-    function cobrar() {
-      if (!carrito.length) return;
+    async function cobrar() {
+      if (!carrito.length || cobrando) return;
       const sinStock = carrito.filter((it) => {
         const s = inv.find((i) => i.id === it.prodId)?.stock || 0;
         return it.cantidad > s;
@@ -69561,7 +71111,7 @@ ${sinStock.map((it) => {
         }).join("\n")}`);
         return;
       }
-      const items = carrito.map((it) => {
+      const items2 = carrito.map((it) => {
         const d = descItemPct(it);
         return {
           prodId: it.prodId,
@@ -69576,48 +71126,92 @@ ${sinStock.map((it) => {
           subtotal: +(it.precio * it.cantidad * (1 - d / 100)).toFixed(2)
         };
       });
+      let ventaData = null;
+      let gcAplicacion = null;
       if (pagoGC) {
         if (!gcEncontrado) {
           alert("Busca y verifica la Gift Card primero");
           return;
         }
-        const gcUsado = +Math.min(gcEncontrado.saldo, total, parseFloat(gcMontoUsar) || total).toFixed(2);
-        const extraMonto = +(total - gcUsado).toFixed(2);
+        const gcUsado = +Math.min(gcEncontrado.saldo, total2, parseFloat(gcMontoUsar) || total2).toFixed(2);
+        const extraMonto = +(total2 - gcUsado).toFixed(2);
         if (extraMonto > 0.01 && !metodoCompl) {
           alert("Selecciona m\xE9todo de pago complementario");
           return;
         }
-        const gcAllocations = calcGCAllocations(items, total, gcUsado);
-        const metodoPagoFinal2 = extraMonto <= 0.01 ? "giftcard" : `mixto|giftcard:${gcUsado}|${metodoCompl}:${extraMonto}`;
-        const gcLista = cargarGC();
-        guardarGC(gcLista.map((g) => g.codigo !== gcEncontrado.codigo ? g : {
-          ...g,
-          saldo: +(g.saldo - gcUsado).toFixed(2),
-          ultimoUso: hoy(),
-          usos: [...g.usos || [], {
-            fecha: hoy(),
-            monto: gcUsado,
-            nota: `Venta POS \u2014 ${items.length} prod.`
-          }]
-        }));
-        const vf2 = onVenta({
-          items,
-          total,
+        const gcAllocations = calcGCAllocations(items2, total2, gcUsado);
+        const metodoPagoFinal = extraMonto <= 0.01 ? "giftcard" : `mixto|giftcard:${gcUsado}|${metodoCompl}:${extraMonto}`;
+        ventaData = {
+          items: items2,
+          total: total2,
           subtotal,
           descPct,
-          metodoPago: metodoPagoFinal2,
+          metodoPago: metodoPagoFinal,
           vendedor: vendedor || "Tienda",
           clienteNombre: cliente,
           clienteTelefono: clienteTel,
           etiquetaImg: etiqueta,
           gcId: gcEncontrado.codigo,
           gcUsado,
-          gcAllocations
-        });
-        setUltima(vf2);
+          gcAllocations,
+          efectivo: metodoCompl === "efectivo" ? extraMonto : 0,
+          qr: metodoCompl === "qr" ? extraMonto : 0,
+          tarjeta: metodoCompl === "tarjeta" ? extraMonto : 0
+        };
+        gcAplicacion = { gc: gcEncontrado, monto: gcUsado };
+      } else {
+        if (pagoMixto) {
+          const suma = (parseFloat(montosMixtos.efectivo) || 0) + (parseFloat(montosMixtos.qr) || 0) + (parseFloat(montosMixtos.tarjeta) || 0);
+          if (Math.abs(suma - total2) > 0.01) {
+            alert(`Los montos (${$2(suma)}) no cuadran con el total (${$2(total2)})`);
+            return;
+          }
+        }
+        let metodoPagoFinal = pago;
+        if (pagoMixto) {
+          const partes = [];
+          if (parseFloat(montosMixtos.efectivo) > 0) partes.push("efectivo:" + montosMixtos.efectivo);
+          if (parseFloat(montosMixtos.qr) > 0) partes.push("qr:" + montosMixtos.qr);
+          if (parseFloat(montosMixtos.tarjeta) > 0) partes.push("tarjeta:" + montosMixtos.tarjeta);
+          metodoPagoFinal = partes.length > 0 ? "mixto|" + partes.join("|") : pago;
+        }
+        ventaData = {
+          items: items2,
+          total: total2,
+          subtotal,
+          descPct,
+          metodoPago: metodoPagoFinal,
+          vendedor: vendedor || "Tienda",
+          clienteNombre: cliente,
+          clienteTelefono: clienteTel,
+          etiquetaImg: etiqueta,
+          efectivo: pagoMixto ? parseFloat(montosMixtos.efectivo) || 0 : pago === "efectivo" ? total2 : 0,
+          qr: pagoMixto ? parseFloat(montosMixtos.qr) || 0 : pago === "qr" ? total2 : 0,
+          tarjeta: pagoMixto ? parseFloat(montosMixtos.tarjeta) || 0 : pago === "tarjeta" ? total2 : 0
+        };
+      }
+      if (!cobroOperationRef.current) {
+        cobroOperationRef.current = { operationId: thUUID(), operationCreatedAt: Date.now() };
+      }
+      const op = cobroOperationRef.current;
+      setCobrando(true);
+      setCobroError("");
+      try {
+        const vf = await onVenta({ ...ventaData, ...op });
+        if (gcAplicacion) {
+          const gcLista = cargarGC();
+          guardarGC(gcLista.map((g2) => g2.codigo !== gcAplicacion.gc.codigo ? g2 : {
+            ...g2,
+            saldo: +(g2.saldo - gcAplicacion.monto).toFixed(2),
+            ultimoUso: hoy(),
+            usos: [...g2.usos || [], { fecha: hoy(), monto: gcAplicacion.monto, nota: `Venta POS \u2014 ${items2.length} prod.` }]
+          }));
+        }
+        cobroOperationRef.current = null;
+        setUltima(vf);
         setShowOk(true);
         setShowPago(false);
-        autoDescargarNota(vf2);
+        autoDescargarNota(vf);
         setCarrito([]);
         setDescExtra(0);
         setDescMarcaManual({});
@@ -69625,49 +71219,30 @@ ${sinStock.map((it) => {
         setEtiqueta(null);
         setCliente("");
         setClienteTel("");
+        setPagoMixto(false);
+        setMontosMixtos({ efectivo: "", qr: "", tarjeta: "" });
         setPagoGC(false);
         setGcCodigo("");
         setGcEncontrado(null);
         setGcBusqMsg(null);
         setGcMontoUsar("");
-        return;
+      } catch (e) {
+        const msg = e?.message || "No se pudo confirmar la venta. El carrito se conserv\xF3.";
+        setCobroError(msg);
+        alert(`${msg}
+
+No se vaci\xF3 el carrito. Puedes reintentar sin duplicar la venta.`);
+      } finally {
+        setCobrando(false);
       }
-      if (pagoMixto) {
-        const suma = (parseFloat(montosMixtos.efectivo) || 0) + (parseFloat(montosMixtos.qr) || 0) + (parseFloat(montosMixtos.tarjeta) || 0);
-        if (Math.abs(suma - total) > 0.01) {
-          alert(`Los montos (${$2(suma)}) no cuadran con el total (${$2(total)})`);
-          return;
-        }
-      }
-      var metodoPagoFinal = pago;
-      if (pagoMixto) {
-        var partes = [];
-        if (parseFloat(montosMixtos.efectivo) > 0) partes.push("efectivo:" + montosMixtos.efectivo);
-        if (parseFloat(montosMixtos.qr) > 0) partes.push("qr:" + montosMixtos.qr);
-        if (parseFloat(montosMixtos.tarjeta) > 0) partes.push("tarjeta:" + montosMixtos.tarjeta);
-        metodoPagoFinal = partes.length > 0 ? "mixto|" + partes.join("|") : pago;
-      }
-      const vf = onVenta({ items, total, subtotal, descPct, metodoPago: metodoPagoFinal, vendedor: vendedor || "Tienda", clienteNombre: cliente, clienteTelefono: clienteTel, etiquetaImg: etiqueta });
-      setUltima(vf);
-      setShowOk(true);
-      setShowPago(false);
-      autoDescargarNota(vf);
-      setCarrito([]);
-      setDescExtra(0);
-      setBusq("");
-      setEtiqueta(null);
-      setCliente("");
-      setClienteTel("");
-      setPagoMixto(false);
-      setMontosMixtos({ efectivo: "", qr: "", tarjeta: "" });
     }
     const esPagoQR = !pagoGC && (!pagoMixto && pago === "qr" || pagoMixto && (parseFloat(montosMixtos.qr) || 0) > 0);
     function verificarPagoQR() {
       if (!carrito.length || qrVerificando) return;
       if (pagoMixto) {
         const suma = (parseFloat(montosMixtos.efectivo) || 0) + (parseFloat(montosMixtos.qr) || 0) + (parseFloat(montosMixtos.tarjeta) || 0);
-        if (Math.abs(suma - total) > 0.01) {
-          alert(`Los montos (${$2(suma)}) no cuadran con el total (${$2(total)})`);
+        if (Math.abs(suma - total2) > 0.01) {
+          alert(`Los montos (${$2(suma)}) no cuadran con el total (${$2(total2)})`);
           return;
         }
       }
@@ -69678,8 +71253,8 @@ ${sinStock.map((it) => {
         cobrar();
       }, 1500);
     }
-    const gcUsadoUI = +Math.min(gcEncontrado?.saldo || 0, total, parseFloat(gcMontoUsar) || 0).toFixed(2);
-    const extraMontoUI = gcEncontrado ? +(total - gcUsadoUI).toFixed(2) : 0;
+    const gcUsadoUI = +Math.min(gcEncontrado?.saldo || 0, total2, parseFloat(gcMontoUsar) || 0).toFixed(2);
+    const extraMontoUI = gcEncontrado ? +(total2 - gcUsadoUI).toFixed(2) : 0;
     const cubreTotalUI = extraMontoUI <= 0.01;
     const _gcBrands = {};
     carrito.forEach((it) => {
@@ -69689,8 +71264,8 @@ ${sinStock.map((it) => {
     });
     const gcAllocsDisplay = Object.values(_gcBrands).map((b) => ({
       ...b,
-      gcAmt: total > 0 ? +(b.subtotal / total * gcUsadoUI).toFixed(2) : 0,
-      xtra: total > 0 ? +(b.subtotal / total * extraMontoUI).toFixed(2) : 0
+      gcAmt: total2 > 0 ? +(b.subtotal / total2 * gcUsadoUI).toFixed(2) : 0,
+      xtra: total2 > 0 ? +(b.subtotal / total2 * extraMontoUI).toFixed(2) : 0
     }));
     return /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { position: "relative", marginBottom: 14 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", fontSize: 16, color: C.label3 } }, "\u{1F50D}"), /* @__PURE__ */ import_react.default.createElement(
       "input",
@@ -69899,7 +71474,7 @@ ${sinStock.map((it) => {
         disabled: !carrito.length,
         style: { fontSize: 18, padding: "17px" }
       },
-      carrito.length ? `\u{1F4B3}  COBRAR ${$2(total)}` : "Agrega productos"
+      carrito.length ? `\u{1F4B3}  COBRAR ${$2(total2)}` : "Agrega productos"
     ), showOk && ultima && /* @__PURE__ */ import_react.default.createElement("div", { style: {
       background: C.bg1,
       border: `1px solid ${C.green}30`,
@@ -69975,16 +71550,16 @@ ${sinStock.map((it) => {
       padding: "20px",
       marginBottom: 20,
       textAlign: "center"
-    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.label3, fontFamily: FONT, marginBottom: 6 } }, "Total a cobrar"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 40, fontWeight: 700, color: C.label, fontFamily: FONT, lineHeight: 1 } }, $2(total)), descTotalBs > 5e-3 && /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.label3, fontFamily: FONT, marginTop: 6 } }, "Subtotal ", $2(subtotal), " \xB7 descuentos \u2212", $2(descTotalBs)), descTotalBs > 5e-3 && /* @__PURE__ */ import_react.default.createElement("div", { style: {
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.label3, fontFamily: FONT, marginBottom: 6 } }, "Total a cobrar"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 40, fontWeight: 700, color: C.label, fontFamily: FONT, lineHeight: 1 } }, $2(total2)), descTotalBs > 5e-3 && /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.label3, fontFamily: FONT, marginTop: 6 } }, "Subtotal ", $2(subtotal), " \xB7 descuentos \u2212", $2(descTotalBs)), descTotalBs > 5e-3 && /* @__PURE__ */ import_react.default.createElement("div", { style: {
       marginTop: 10,
       paddingTop: 10,
       borderTop: `1px solid ${C.gold}25`,
       display: "flex",
       flexDirection: "column",
       gap: 3
-    } }, porMarca.filter(([, d]) => d.total > d.neto + 5e-3).map(([id, d]) => {
+    } }, porMarca.filter(([, d]) => d.total > d.neto + 5e-3).map(([id2, d]) => {
       const pctEf = Math.round((d.total - d.neto) / d.total * 100);
-      return /* @__PURE__ */ import_react.default.createElement("div", { key: id, style: { display: "flex", justifyContent: "space-between", fontSize: 12, fontFamily: FONT } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.label2 } }, d.emoji, " ", d.nombre, " ", /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.green, fontWeight: 700 } }, "\u2212", pctEf, "%")), /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.label2 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { textDecoration: "line-through", color: C.label3, fontSize: 11 } }, $2(d.total)), " ", $2(d.neto)));
+      return /* @__PURE__ */ import_react.default.createElement("div", { key: id2, style: { display: "flex", justifyContent: "space-between", fontSize: 12, fontFamily: FONT } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.label2 } }, d.emoji, " ", d.nombre, " ", /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.green, fontWeight: 700 } }, "\u2212", pctEf, "%")), /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.label2 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { textDecoration: "line-through", color: C.label3, fontSize: 11 } }, $2(d.total)), " ", $2(d.neto)));
     }))), porMarca.length > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 20 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
       fontSize: 13,
       fontWeight: 600,
@@ -69992,10 +71567,10 @@ ${sinStock.map((it) => {
       textTransform: "uppercase",
       letterSpacing: 0.6,
       marginBottom: 10
-    } }, "Descuento adicional por marca"), /* @__PURE__ */ import_react.default.createElement("div", { style: { border: `1px solid ${C.sep}`, borderRadius: 14, overflow: "hidden" } }, porMarca.map(([id, d], i) => {
-      const on = id in descMarcaManual;
-      const manual = Number(descMarcaManual[id]) || 0;
-      return /* @__PURE__ */ import_react.default.createElement("div", { key: id, style: {
+    } }, "Descuento adicional por marca"), /* @__PURE__ */ import_react.default.createElement("div", { style: { border: `1px solid ${C.sep}`, borderRadius: 14, overflow: "hidden" } }, porMarca.map(([id2, d], i) => {
+      const on = id2 in descMarcaManual;
+      const manual = Number(descMarcaManual[id2]) || 0;
+      return /* @__PURE__ */ import_react.default.createElement("div", { key: id2, style: {
         padding: "11px 14px",
         borderBottom: i < porMarca.length - 1 ? `1px solid ${C.sep}` : "none",
         background: on ? `${C.green}0a` : "transparent"
@@ -70004,8 +71579,8 @@ ${sinStock.map((it) => {
         {
           onClick: () => setDescMarcaManual((prev) => {
             const n = { ...prev };
-            if (id in n) delete n[id];
-            else n[id] = 10;
+            if (id2 in n) delete n[id2];
+            else n[id2] = 10;
             return n;
           }),
           "aria-label": "Descuento adicional",
@@ -70037,7 +71612,7 @@ ${sinStock.map((it) => {
         "button",
         {
           key: v,
-          onClick: () => setDescMarcaManual((prev) => ({ ...prev, [id]: v })),
+          onClick: () => setDescMarcaManual((prev) => ({ ...prev, [id2]: v })),
           style: {
             padding: "8px 0",
             borderRadius: 999,
@@ -70111,7 +71686,7 @@ ${sinStock.map((it) => {
       fontSize: 13,
       color: C.amber,
       fontFamily: FONT
-    } }, "\u{1F4B3} Comisi\xF3n bancaria 1.8% se descuenta de la liquidaci\xF3n de la marca"), pago === "qr" && total > 0 && /* @__PURE__ */ import_react.default.createElement(QRPagoPanel, { total, refVenta: qrRefVenta })), pagoMixto && !pagoGC && /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 16 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { background: C.bg2, borderRadius: 14, padding: 16, border: `1px solid ${C.sep}`, marginBottom: 10 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT, marginBottom: 12, textAlign: "center" } }, "Total a cobrar: ", /* @__PURE__ */ import_react.default.createElement("strong", { style: { color: C.label } }, $2(total)), " \u2014 distribuye entre los m\xE9todos"), PAGOS.map(function(p) {
+    } }, "\u{1F4B3} Comisi\xF3n bancaria 1.8% se descuenta de la liquidaci\xF3n de la marca"), pago === "qr" && total2 > 0 && /* @__PURE__ */ import_react.default.createElement(QRPagoPanel, { total: total2, refVenta: qrRefVenta })), pagoMixto && !pagoGC && /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 16 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { background: C.bg2, borderRadius: 14, padding: 16, border: `1px solid ${C.sep}`, marginBottom: 10 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT, marginBottom: 12, textAlign: "center" } }, "Total a cobrar: ", /* @__PURE__ */ import_react.default.createElement("strong", { style: { color: C.label } }, $2(total2)), " \u2014 distribuye entre los m\xE9todos"), PAGOS.map(function(p) {
       var val = montosMixtos[p.id] || "";
       return /* @__PURE__ */ import_react.default.createElement("div", { key: p.id, style: { marginBottom: 12 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10, marginBottom: 6 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 20 } }, p.icon), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 14, fontWeight: 600, color: C.label, fontFamily: FONT } }, p.label)), /* @__PURE__ */ import_react.default.createElement("div", { style: { position: "relative" } }, /* @__PURE__ */ import_react.default.createElement("span", { style: {
         position: "absolute",
@@ -70153,7 +71728,7 @@ ${sinStock.map((it) => {
       )));
     }), (function() {
       var suma = (parseFloat(montosMixtos.efectivo) || 0) + (parseFloat(montosMixtos.qr) || 0) + (parseFloat(montosMixtos.tarjeta) || 0);
-      var diff = total - suma;
+      var diff = total2 - suma;
       return /* @__PURE__ */ import_react.default.createElement("div", { style: {
         padding: "10px 12px",
         borderRadius: 10,
@@ -70192,6 +71767,7 @@ ${sinStock.map((it) => {
       "button",
       {
         onClick: buscarGCenPOS,
+        disabled: gcBuscando,
         style: {
           padding: "12px 16px",
           borderRadius: 12,
@@ -70201,11 +71777,11 @@ ${sinStock.map((it) => {
           fontSize: 13,
           fontWeight: 700,
           fontFamily: FONT_UI,
-          cursor: "pointer",
+          cursor: gcBuscando ? "wait" : "pointer",
           flexShrink: 0
         }
       },
-      "Buscar"
+      gcBuscando ? "Verificando\u2026" : "Buscar"
     )), gcBusqMsg && /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.red, fontFamily: FONT_UI, marginTop: 6, fontWeight: 500 } }, gcBusqMsg)), gcEncontrado && /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: {
       background: "#7C3AED18",
       border: "1px solid #7C3AED30",
@@ -70218,7 +71794,7 @@ ${sinStock.map((it) => {
         type: "number",
         min: "0.01",
         step: "0.01",
-        max: Math.min(gcEncontrado.saldo, total),
+        max: Math.min(gcEncontrado.saldo, total2),
         value: gcMontoUsar,
         onChange: (e) => setGcMontoUsar(e.target.value),
         style: {
@@ -70237,7 +71813,7 @@ ${sinStock.map((it) => {
         }
       }
     ))), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 } }, [
-      { l: "Total venta", v: $2(total), c: C.label },
+      { l: "Total venta", v: $2(total2), c: C.label },
       { l: "Gift Card", v: `\u2212${$2(gcUsadoUI)}`, c: "#7C3AED" },
       { l: "Pago extra", v: $2(extraMontoUI), c: extraMontoUI > 0.01 ? C.amber : C.green }
     ].map((k) => /* @__PURE__ */ import_react.default.createElement("div", { key: k.l, style: { background: C.bg0, borderRadius: 8, padding: "8px", textAlign: "center" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 9, color: C.label3, textTransform: "uppercase", letterSpacing: 0.5, fontFamily: FONT_UI, marginBottom: 2 } }, k.l), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, fontWeight: 700, color: k.c, fontFamily: FONT_UI } }, k.v))))), extraMontoUI > 0.01 && /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 12 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: C.label3, textTransform: "uppercase", letterSpacing: 0.7, marginBottom: 8, fontFamily: FONT_UI } }, "Pago complementario (", $2(extraMontoUI), ")"), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 } }, PAGOS.map((p) => /* @__PURE__ */ import_react.default.createElement(
@@ -70316,7 +71892,7 @@ ${sinStock.map((it) => {
       textTransform: "uppercase",
       letterSpacing: 0.6,
       marginBottom: 10
-    } }, "Apropiaci\xF3n por Marca"), /* @__PURE__ */ import_react.default.createElement("div", { style: { background: C.bg2, borderRadius: 14, overflow: "hidden" } }, porMarca.map(([id, d], i) => /* @__PURE__ */ import_react.default.createElement("div", { key: id, style: {
+    } }, "Apropiaci\xF3n por Marca"), /* @__PURE__ */ import_react.default.createElement("div", { style: { background: C.bg2, borderRadius: 14, overflow: "hidden" } }, porMarca.map(([id2, d], i) => /* @__PURE__ */ import_react.default.createElement("div", { key: id2, style: {
       display: "flex",
       justifyContent: "space-between",
       alignItems: "center",
@@ -70328,12 +71904,21 @@ ${sinStock.map((it) => {
         onPress: esPagoQR ? verificarPagoQR : cobrar,
         full: true,
         variant: esPagoQR ? "success" : "primary",
-        disabled: pagoGC && !gcEncontrado || qrVerificando,
+        disabled: pagoGC && !gcEncontrado || qrVerificando || cobrando,
         style: { fontSize: 18, padding: "17px" },
         icon: pagoGC ? "\u{1F381}" : esPagoQR ? "\u2713" : "\u{1F4B3}"
       },
-      pagoGC ? gcEncontrado ? `Confirmar \u2014 ${$2(total)}` : "Busca la Gift Card" : esPagoQR ? `Verificar pago QR \u2014 ${$2(total)}` : `Cobrar ${$2(total)}`
-    )), qrVerificando && /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      cobrando ? "Registrando de forma segura\u2026" : pagoGC ? gcEncontrado ? `Confirmar \u2014 ${$2(total2)}` : "Busca la Gift Card" : esPagoQR ? `Verificar pago QR \u2014 ${$2(total2)}` : `Cobrar ${$2(total2)}`
+    ), cobroError && /* @__PURE__ */ import_react.default.createElement("div", { role: "alert", style: {
+      marginTop: 10,
+      padding: "10px 12px",
+      borderRadius: 10,
+      background: `${C.red}12`,
+      color: C.red,
+      fontSize: 12.5,
+      fontFamily: FONT,
+      lineHeight: 1.45
+    } }, cobroError, " \xB7 El carrito sigue intacto.")), qrVerificando && /* @__PURE__ */ import_react.default.createElement("div", { style: {
       position: "fixed",
       inset: 0,
       zIndex: 9999,
@@ -70360,7 +71945,7 @@ ${sinStock.map((it) => {
       color: "#fff",
       fontFamily: FONT,
       letterSpacing: "-0.01em"
-    } }, "Pago verificado"), /* @__PURE__ */ import_react.default.createElement("div", { style: { marginTop: 6, fontSize: 30, fontWeight: 800, color: "#fff", fontFamily: FONT } }, $2(total)), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+    } }, "Pago verificado"), /* @__PURE__ */ import_react.default.createElement("div", { style: { marginTop: 6, fontSize: 30, fontWeight: 800, color: "#fff", fontFamily: FONT } }, $2(total2)), /* @__PURE__ */ import_react.default.createElement("div", { style: {
       marginTop: 10,
       fontSize: 12,
       color: "rgba(255,255,255,0.75)",
@@ -70383,6 +71968,7 @@ ${sinStock.map((it) => {
     var barcodeReady = _hN148[0];
     var setBarcodeReady = _hN148[1];
     ;
+    const [registrando, setRegistrando] = (0, import_react.useState)(false);
     const scanInvRef = (0, import_react.useRef)(null);
     const codigoAuto = fInv.marcaId && fInv.nombre ? genCod(Number(fInv.marcaId), fInv.nombre, inv.length + 1) : "";
     const codManual = (fInv.codigoManual || "").trim().toUpperCase();
@@ -70432,6 +72018,15 @@ ${sinStock.map((it) => {
       if (t.includes("cre") || t.includes("per") || t.includes("jab")) return "Cuidado personal";
       if (t.includes("vel") || t.includes("arom")) return "Velas & Aromas";
       return "General";
+    }
+    async function registrarSeguro() {
+      if (registrando) return;
+      setRegistrando(true);
+      try {
+        await onAdd();
+      } finally {
+        setRegistrando(false);
+      }
     }
     return /* @__PURE__ */ import_react.default.createElement(Sheet, { open, onClose: () => {
       onClose();
@@ -70545,7 +72140,7 @@ ${sinStock.map((it) => {
       fontWeight: 700,
       color: C.gold,
       marginBottom: 10
-    } }, codigoGenerado), /* @__PURE__ */ import_react.default.createElement(BarcodeDisplay, { codigo: codigoGenerado }), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT, marginTop: 8 } }, fInv.nombre && /* @__PURE__ */ import_react.default.createElement("strong", { style: { color: C.label2 } }, fInv.nombre), fInv.categoria && /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.label3 } }, " \xB7 ", fInv.categoria))), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: onAdd, full: true, variant: "primary" }, "Registrar e Imprimir Ticket"));
+    } }, codigoGenerado), /* @__PURE__ */ import_react.default.createElement(BarcodeDisplay, { codigo: codigoGenerado }), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT, marginTop: 8 } }, fInv.nombre && /* @__PURE__ */ import_react.default.createElement("strong", { style: { color: C.label2 } }, fInv.nombre), fInv.categoria && /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.label3 } }, " \xB7 ", fInv.categoria))), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: registrarSeguro, full: true, variant: "primary", disabled: registrando }, registrando ? "Registrando de forma segura\u2026" : "Registrar e Imprimir Ticket"));
   }
   function AuditoriaInventario({ inv, ventas, cargas, mes, anio, MK, auditorias, onGuardarAuditoria, onActualizarAuditoria, onCuadrarConAuditoria, user, onGoVerif, tabActual }) {
     const isDesktop = useIsDesktop();
@@ -70620,8 +72215,8 @@ ${sinStock.map((it) => {
       setConteo((prev) => {
         const next = { ...prev };
         Object.entries(remoteConteo).forEach(([codigo, cant]) => {
-          const id = codigoToId[codigo.toUpperCase()];
-          if (id != null) next[id] = cant;
+          const id2 = codigoToId[codigo.toUpperCase()];
+          if (id2 != null) next[id2] = cant;
         });
         return next;
       });
@@ -70660,7 +72255,7 @@ ${sinStock.map((it) => {
     const channelRef = (0, import_react.useRef)(null);
     (0, import_react.useEffect)(() => {
       let channel = null, mounted = true;
-      sbCrearSesionVerif(sesionId, MK, marcaSelec, baseTs).then(() => sbObtenerSesionVerif(sesionId)).then((sesion) => {
+      sbCrearSesionVerif(sesionId, MK, marcaSelec, baseTs, user).then(() => sbObtenerSesionVerif(sesionId)).then((sesion) => {
         if (mounted && sesion) mergeRemoteConteo(sesion.conteo);
       });
       getSupabase().then((db) => {
@@ -70716,7 +72311,11 @@ ${sinStock.map((it) => {
       });
       if (res.ok) {
         channelRef.current?.send({ type: "broadcast", event: "conteo", payload: { conteo: { [p.codigo]: res.cantNueva } } });
-        sbIncrementarConteoVerif(sesionId, p.codigo).then(mergeRemoteConteo);
+        const operationId = thUUID();
+        sbIncrementarConteoVerif(sesionId, p.codigo, operationId, user).then((remote) => {
+          if (remote) mergeRemoteConteo(remote);
+          else flash(false, `${p.codigo}: no se confirm\xF3 el conteo en el servidor; verifica la conexi\xF3n antes de cerrar`);
+        });
       }
       return res;
     }
@@ -70812,7 +72411,7 @@ ${sinStock.map((it) => {
           localStorage.removeItem(`th_verif_manual_${MK}`);
         } catch {
         }
-        sbResetSesionVerif(sesionId);
+        sbResetSesionVerif(sesionId, thUUID(), user, "reinicio_manual");
       }
     }
     function finalizarYEmpezarDeNuevo() {
@@ -70828,7 +72427,7 @@ ${sinStock.map((it) => {
         localStorage.removeItem(`th_verif_manual_${MK}`);
       } catch {
       }
-      sbResetSesionVerif(sesionId);
+      sbResetSesionVerif(sesionId, thUUID(), user, "empezar_de_nuevo");
       setModoCierre(false);
       setModoVerif(false);
       setMarcaSelec(null);
@@ -70957,7 +72556,7 @@ ${sinStock.map((it) => {
       }
       return "handled";
     }
-    function confirmarCierre() {
+    async function confirmarCierre() {
       if (itemsContados === 0) {
         flash(false, "Escanea o agrega al menos un producto antes de confirmar el cierre");
         return;
@@ -71001,7 +72600,8 @@ Base de inventario tomada: ${baseTs.toLocaleString("es-BO")}`)) return;
           verificado: r.estado === "OK" ? null : itemVerificado(r)
         }))
       };
-      onGuardarAuditoria(aud);
+      const guardada = await onGuardarAuditoria(aud);
+      if (guardada === false) return;
       try {
         exportAuditoriaExcel(aud);
       } catch (e) {
@@ -71016,7 +72616,7 @@ Base de inventario tomada: ${baseTs.toLocaleString("es-BO")}`)) return;
         localStorage.removeItem(`th_verif_manual_${MK}`);
       } catch {
       }
-      sbResetSesionVerif(sesionId);
+      sbResetSesionVerif(sesionId, thUUID(), user, "auditoria_confirmada");
       flash(true, "\u2713 Verificaci\xF3n guardada \xB7 Excel generado");
       setVista("historial");
     }
@@ -71861,6 +73461,13 @@ Se registrar\xE1 que los faltantes/sobrantes fueron verificados f\xEDsicamente y
     const [vendedor, setVendedor] = (0, import_react.useState)("");
     const [notas, setNotas] = (0, import_react.useState)("");
     const [done, setDone] = (0, import_react.useState)(null);
+    const [guardandoCambio, setGuardandoCambio] = (0, import_react.useState)(false);
+    const [errorCambio, setErrorCambio] = (0, import_react.useState)("");
+    const cambioOperationRef = (0, import_react.useRef)(null);
+    (0, import_react.useEffect)(() => {
+      cambioOperationRef.current = null;
+      setErrorCambio("");
+    }, [ventaOrigen, devueltos, nuevos, metodoPago, vendedor, notas]);
     const resultadosBusq = (0, import_react.useMemo)(() => {
       const q = busqVenta.trim().toUpperCase();
       if (!q) return [];
@@ -71896,14 +73503,21 @@ Se registrar\xE1 que los faltantes/sobrantes fueron verificados f\xEDsicamente y
       });
       setBusqNuevo("");
     }
-    function quitarNuevo(id) {
-      setNuevos((p) => p.filter((x) => x.id !== id));
+    function quitarNuevo(id2) {
+      setNuevos((p) => p.filter((x) => x.id !== id2));
     }
-    function setCantNuevo(id, n) {
-      setNuevos((p) => p.map((x) => x.id === id ? { ...x, cantidad: Math.max(1, Math.min(inv.find((i) => i.id === id)?.stock || 1, n)) } : x));
+    function setCantNuevo(id2, n) {
+      setNuevos((p) => p.map((x) => x.id === id2 ? { ...x, cantidad: Math.max(1, Math.min(inv.find((i) => i.id === id2)?.stock || 1, n)) } : x));
     }
-    function confirmar() {
-      const id = `CAM${Date.now()}`;
+    async function confirmar() {
+      if (guardandoCambio) return;
+      if (!cambioOperationRef.current) {
+        cambioOperationRef.current = { operationId: thUUID(), id: `CAM${Date.now()}`, createdAt: Date.now() };
+      }
+      const { id: id2, operationId, createdAt } = cambioOperationRef.current;
+      const fechaCambio = new Date(createdAt);
+      const fechaCambioISO = `${fechaCambio.getFullYear()}-${String(fechaCambio.getMonth() + 1).padStart(2, "0")}-${String(fechaCambio.getDate()).padStart(2, "0")}`;
+      const horaCambio = fechaCambio.toLocaleTimeString("es-BO", { hour: "2-digit", minute: "2-digit" });
       const itemsDevueltos = devueltos.filter((it) => it.selec).map((it) => ({
         prodId: it.prodId,
         codigo: it.codigo,
@@ -71923,9 +73537,11 @@ Se registrar\xE1 que los faltantes/sobrantes fueron verificados f\xEDsicamente y
         precioUnit: it.precio
       }));
       const cambio = {
-        id,
-        fecha: hoy(),
-        hora: hora(),
+        id: id2,
+        operationId,
+        createdAt,
+        fecha: fechaCambioISO,
+        hora: horaCambio,
         ventaOriginalId: ventaOrigen.id,
         itemsDevueltos,
         itemsNuevos,
@@ -71936,8 +73552,17 @@ Se registrar\xE1 que los faltantes/sobrantes fueron verificados f\xEDsicamente y
         vendedor: vendedor || "Tienda",
         notas
       };
-      onCambio(cambio);
-      setDone(cambio);
+      setGuardandoCambio(true);
+      setErrorCambio("");
+      try {
+        const confirmado = await onCambio(cambio);
+        cambioOperationRef.current = null;
+        setDone(confirmado || cambio);
+      } catch (e) {
+        setErrorCambio(e?.message || "No se pudo confirmar el cambio. Los datos se conservaron.");
+      } finally {
+        setGuardandoCambio(false);
+      }
     }
     function reset() {
       setPaso(1);
@@ -72286,7 +73911,15 @@ ${c.diferencia > 0.01 ? `Cliente paga diferencia: Bs ${fmt2(c.diferencia)} (${c.
         onChange: (e) => setNotas(e.target.value),
         placeholder: "Motivo del cambio, talla incorrecta, etc."
       }
-    ), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: confirmar, variant: "fill", full: true, icon: "\u2713" }, "Confirmar cambio"));
+    ), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: confirmar, variant: "fill", full: true, icon: "\u2713", disabled: guardandoCambio }, guardandoCambio ? "Registrando de forma segura\u2026" : "Confirmar cambio"), errorCambio && /* @__PURE__ */ import_react.default.createElement("div", { role: "alert", style: {
+      marginTop: 9,
+      padding: "9px 11px",
+      borderRadius: 9,
+      background: `${C.red}12`,
+      color: C.red,
+      fontSize: 12,
+      fontFamily: FONT
+    } }, errorCambio));
   }
   function VentasAntiguas({ inv, ventas, cargas, onVentaHistorica, onImportarVentasLibres, user }) {
     const hoyISO = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
@@ -72314,9 +73947,16 @@ ${c.diferencia > 0.01 ? `Cliente paga diferencia: Bs ${fmt2(c.diferencia)} (${c.
     const [descPct, setDescPct] = import_react.default.useState("");
     const [montosMixtos, setMontosMixtos] = import_react.default.useState({ efectivo: "", qr: "", tarjeta: "" });
     const inputRef = import_react.default.useRef(null);
-    const total = carrito.reduce((s, it) => s + it.subtotal, 0);
+    const ventaHistoricaOperationRef = import_react.default.useRef(null);
+    import_react.default.useEffect(
+      () => {
+        ventaHistoricaOperationRef.current = null;
+      },
+      [fecha, turno, metodo, carrito, verificados, descPct, montosMixtos]
+    );
+    const total2 = carrito.reduce((s, it) => s + it.subtotal, 0);
     const desc = Math.min(100, Math.max(0, parseFloat(descPct) || 0));
-    const totalFinal = +(total * (1 - desc / 100)).toFixed(2);
+    const totalFinal = +(total2 * (1 - desc / 100)).toFixed(2);
     const sumaMixto = (parseFloat(montosMixtos.efectivo) || 0) + (parseFloat(montosMixtos.qr) || 0) + (parseFloat(montosMixtos.tarjeta) || 0);
     const mixtoCuadra = Math.abs(sumaMixto - totalFinal) < 0.01;
     function getConflictoItem(it) {
@@ -72399,7 +74039,7 @@ ${c.diferencia > 0.01 ? `Cliente paga diferencia: Bs ${fmt2(c.diferencia)} (${c.
       setCarrito((prev) => prev.filter((it) => !conflictivos.has(it.prodId)));
       setVerificados((prev) => {
         const s = new Set(prev);
-        conflictivos.forEach((id) => s.delete(id));
+        conflictivos.forEach((id2) => s.delete(id2));
         return s;
       });
     }
@@ -72422,20 +74062,29 @@ ${c.diferencia > 0.01 ? `Cliente paga diferencia: Bs ${fmt2(c.diferencia)} (${c.
         turno,
         metodoPago: metodoPagoFinal,
         total: totalFinal,
-        subtotal: total,
+        subtotal: total2,
         descPct: desc,
         items: itemsFinal,
+        operationId: ventaHistoricaOperationRef.current || (ventaHistoricaOperationRef.current = thUUID()),
         ...verificados.size > 0 ? { advertencia: "ITEMS_VERIFICADOS_MANUALMENTE", itemsVerificados: itemsVerif, verificadoPor: user?.nombre || "Admin" } : {}
       };
-      const vf = onVentaHistorica(venta);
-      setConfirmado({ ...vf, cantItems: carrito.length, conVerif: verificados.size > 0 });
-      setCarrito([]);
-      setCodInput("");
-      setBusqueda([]);
-      setVerificados(/* @__PURE__ */ new Set());
-      setDescPct("");
-      setMontosMixtos({ efectivo: "", qr: "", tarjeta: "" });
-      setGuardando(false);
+      try {
+        const vf = await onVentaHistorica(venta);
+        ventaHistoricaOperationRef.current = null;
+        setConfirmado({ ...vf, cantItems: carrito.length, conVerif: verificados.size > 0 });
+        setCarrito([]);
+        setCodInput("");
+        setBusqueda([]);
+        setVerificados(/* @__PURE__ */ new Set());
+        setDescPct("");
+        setMontosMixtos({ efectivo: "", qr: "", tarjeta: "" });
+      } catch (e) {
+        alert(`${e?.message || "No se pudo confirmar la venta hist\xF3rica"}
+
+Los datos se conservaron y el reintento no la duplicar\xE1.`);
+      } finally {
+        setGuardando(false);
+      }
     }
     const METODOS = [{ v: "efectivo", label: "Efectivo" }, { v: "qr", label: "QR" }, { v: "tarjeta", label: "Tarjeta" }, { v: "mixto", label: "Mixto" }];
     const TURNOS = ["Ma\xF1ana", "Tarde", "Noche"];
@@ -72886,7 +74535,7 @@ ${c.diferencia > 0.01 ? `Cliente paga diferencia: Bs ${fmt2(c.diferencia)} (${c.
           }
         }
       ), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 11, color: estaVerif ? "#F57F17" : "#C62828", lineHeight: 1.5 } }, "Verifiqu\xE9 que ", /* @__PURE__ */ import_react.default.createElement("b", null, it.nombre), " (", it.marcaNombre, ") con fecha ", /* @__PURE__ */ import_react.default.createElement("b", null, fecha), " no est\xE1 registrado en el sistema"))));
-    }), /* @__PURE__ */ import_react.default.createElement("div", { style: { padding: "10px 14px", background: C.bg2, borderTop: `1px solid ${C.sep}` } }, desc > 0 && /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, null, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 3 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 11, color: C.label3 } }, "Subtotal"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 12, color: C.label2, fontFamily: FONT } }, "Bs ", total)), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 5 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 11, color: C.green, fontWeight: 600 } }, "Descuento (", desc, "%)"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 12, color: C.green, fontWeight: 600, fontFamily: FONT } }, "\u2212Bs ", +(total - totalFinal).toFixed(2)))), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+    }), /* @__PURE__ */ import_react.default.createElement("div", { style: { padding: "10px 14px", background: C.bg2, borderTop: `1px solid ${C.sep}` } }, desc > 0 && /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, null, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 3 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 11, color: C.label3 } }, "Subtotal"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 12, color: C.label2, fontFamily: FONT } }, "Bs ", total2)), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 5 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 11, color: C.green, fontWeight: 600 } }, "Descuento (", desc, "%)"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 12, color: C.green, fontWeight: 600, fontFamily: FONT } }, "\u2212Bs ", +(total2 - totalFinal).toFixed(2)))), /* @__PURE__ */ import_react.default.createElement("div", { style: {
       display: "flex",
       justifyContent: "space-between",
       alignItems: "center",
@@ -72947,7 +74596,7 @@ ${c.diferencia > 0.01 ? `Cliente paga diferencia: Bs ${fmt2(c.diferencia)} (${c.
         }
       },
       /* @__PURE__ */ import_react.default.createElement("i", { className: "ti ti-clock-check", style: { fontSize: 16 }, "aria-hidden": "true" }),
-      guardando ? "Registrando\u2026" : hayConflictos ? `Verific\xE1 los ${itemsConConflicto.length} \xEDtem${itemsConConflicto.length !== 1 ? "s" : ""} en conflicto` : metodo === "mixto" && !mixtoCuadra && carrito.length > 0 ? "Cuadr\xE1 los montos del pago mixto" : `Registrar venta hist\xF3rica${total > 0 ? " \u2014 Bs " + totalFinal : ""}`
+      guardando ? "Registrando\u2026" : hayConflictos ? `Verific\xE1 los ${itemsConConflicto.length} \xEDtem${itemsConConflicto.length !== 1 ? "s" : ""} en conflicto` : metodo === "mixto" && !mixtoCuadra && carrito.length > 0 ? "Cuadr\xE1 los montos del pago mixto" : `Registrar venta hist\xF3rica${total2 > 0 ? " \u2014 Bs " + totalFinal : ""}`
     ), /* @__PURE__ */ import_react.default.createElement("div", { style: {
       marginTop: 12,
       background: "#EEEDFE",
@@ -73118,7 +74767,7 @@ ${c.diferencia > 0.01 ? `Cliente paga diferencia: Bs ${fmt2(c.diferencia)} (${c.
       }
     ) : /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 10 } }, filtradas.map((c) => {
       const abierto = abierta === c.id;
-      const items = itemsDe(c);
+      const items2 = itemsDe(c);
       const tipoInfo = c.tipo === "IMPORT" ? { label: "Importaci\xF3n Excel", icon: "\u{1F4E5}", color: C.blue } : c.tipo === "HISTORICO" ? { label: "Carga hist\xF3rica", icon: "\u{1F553}", color: C.label3 } : { label: "Carga manual", icon: "\u270D\uFE0F", color: C.green };
       return /* @__PURE__ */ import_react.default.createElement("div", { key: c.id, style: {
         background: C.bg1,
@@ -73141,7 +74790,7 @@ ${c.diferencia > 0.01 ? `Cliente paga diferencia: Bs ${fmt2(c.diferencia)} (${c.
         overflow: "hidden",
         textOverflow: "ellipsis",
         whiteSpace: "nowrap"
-      } }, c.resumen || "Carga de inventario"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT, marginTop: 2 } }, c.fecha, " \xB7 ", c.hora, " \xB7 ", c.nombre, " (", c.rol, ") \xB7 ", items.length, " \xEDtem", items.length !== 1 ? "s" : "")), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4, flexShrink: 0 } }, /* @__PURE__ */ import_react.default.createElement(Chip, { color: tipoInfo.color, small: true }, tipoInfo.icon, " ", tipoInfo.label), c.verificado && /* @__PURE__ */ import_react.default.createElement("span", { style: {
+      } }, c.resumen || "Carga de inventario"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT, marginTop: 2 } }, c.fecha, " \xB7 ", c.hora, " \xB7 ", c.nombre, " (", c.rol, ") \xB7 ", items2.length, " \xEDtem", items2.length !== 1 ? "s" : "")), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4, flexShrink: 0 } }, /* @__PURE__ */ import_react.default.createElement(Chip, { color: tipoInfo.color, small: true }, tipoInfo.icon, " ", tipoInfo.label), c.verificado && /* @__PURE__ */ import_react.default.createElement("span", { style: {
         fontSize: 10,
         fontWeight: 700,
         color: C.green,
@@ -73158,7 +74807,7 @@ ${c.diferencia > 0.01 ? `Cliente paga diferencia: Bs ${fmt2(c.diferencia)} (${c.
         gap: 6,
         maxHeight: 320,
         overflowY: "auto"
-      } }, items.length === 0 ? /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT } }, "Sin \xEDtems para esta marca") : items.map((it, i) => /* @__PURE__ */ import_react.default.createElement("div", { key: i, style: {
+      } }, items2.length === 0 ? /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT } }, "Sin \xEDtems para esta marca") : items2.map((it, i) => /* @__PURE__ */ import_react.default.createElement("div", { key: i, style: {
         display: "flex",
         alignItems: "center",
         gap: 8,
@@ -73181,9 +74830,9 @@ ${c.diferencia > 0.01 ? `Cliente paga diferencia: Bs ${fmt2(c.diferencia)} (${c.
         overflow: "hidden",
         textOverflow: "ellipsis",
         whiteSpace: "nowrap"
-      } }, (it.nombre || "").toUpperCase()), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: C.label3, fontFamily: FONT_MONO } }, it.codigo, " \xB7 ", it.marca || "\u2014")), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label2, fontFamily: FONT, textAlign: "right", flexShrink: 0 } }, it.tipo === "update" ? `${it.stockAntes} \u2192 ${it.stockNuevo} (+${it.stockSumado})` : `Stock ${it.stock}${it.precio ? ` \xB7 ${$2(it.precio)}` : ""}`)))), items.filter((it) => it.codigo && it.nombre && Number(it.stock || it.stockNuevo || 1) > 0).length > 0 && (() => {
+      } }, (it.nombre || "").toUpperCase()), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: C.label3, fontFamily: FONT_MONO } }, it.codigo, " \xB7 ", it.marca || "\u2014")), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label2, fontFamily: FONT, textAlign: "right", flexShrink: 0 } }, it.tipo === "update" ? `${it.stockAntes} \u2192 ${it.stockNuevo} (+${it.stockSumado})` : `Stock ${it.stock}${it.precio ? ` \xB7 ${$2(it.precio)}` : ""}`)))), items2.filter((it) => it.codigo && it.nombre && Number(it.stock || it.stockNuevo || 1) > 0).length > 0 && (() => {
         const _COLORES = /* @__PURE__ */ new Set(["NEGRO", "NEGRA", "NEGROS", "NEGRAS", "BLANCO", "BLANCA", "BLANCOS", "BLANCAS", "BEIGE", "ROSA", "ROJO", "ROJA", "AZUL", "VERDE", "GRIS", "CAFE", "CAF\xC9", "MARRON", "MARR\xD3N", "MORADO", "MORADA", "LILA", "LILA", "AMARILLO", "AMARILLA", "NARANJA", "CELESTE", "TURQUESA", "CREMA", "NATURAL", "NUDE", "CORAL", "SALMON", "SALM\xD3N", "BORDO", "BORD\xD3", "VINO", "MARFIL", "IVORY", "KHAKI", "KAKI", "MOSTAZA", "TERRACOTA", "MAGENTA", "VIOLETA", "PLATEADO", "PLATEADA", "DORADO", "DORADA", "ARENA", "INDIGO", "\xCDNDIGO", "MARENGO", "AQUA", "MENTA", "LAVANDA", "DURAZNO", "NUDE", "CAMEL", "TOSTADO", "TOSTADA", "CHOCOLATE", "PERLA", "CIELO", "PIEDRA", "HUESO", "COBRE", "BRONCE", "GRAFITO", "ESMERALDA", "BURDEOS", "FRESA", "MELON", "MEL\xD3N", "LIMA", "CANELA", "GRANATE", "NAVY"]);
-        const paraImprimir = items.filter((it) => it.codigo && it.nombre).map((it) => {
+        const paraImprimir = items2.filter((it) => it.codigo && it.nombre).map((it) => {
           const prodInv = inv.find((p) => (p.codigo || "").toLowerCase() === (it.codigo || "").toLowerCase());
           const _palabras = (it.nombre || "").toUpperCase().split(/\s+/);
           const _segs = (it.codigo || "").toUpperCase().split("-");
@@ -73243,20 +74892,25 @@ ${c.diferencia > 0.01 ? `Cliente paga diferencia: Bs ${fmt2(c.diferencia)} (${c.
           " de esta carga"
         );
       })(), c.archivoUrl && /* @__PURE__ */ import_react.default.createElement(
-        "a",
+        "button",
         {
-          href: c.archivoUrl,
-          download: c.archivoNombre || "evidencia.xlsx",
-          onClick: (e) => e.stopPropagation(),
+          type: "button",
+          onClick: async (e) => {
+            e.stopPropagation();
+            const ok = await sbDescargarArchivoSeguro(c.archivoUrl, c.archivoNombre || "evidencia.xlsx");
+            if (!ok) alert("No se pudo abrir la evidencia. Verifica tu sesi\xF3n e int\xE9ntalo nuevamente.");
+          },
           style: {
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
             gap: 6,
+            width: "100%",
             marginTop: 10,
             padding: "9px",
             borderRadius: 10,
             textDecoration: "none",
+            cursor: "pointer",
             border: `1.5px solid ${C.indigo}`,
             background: `${C.indigo}10`,
             color: C.indigo,
@@ -73288,13 +74942,22 @@ ${c.diferencia > 0.01 ? `Cliente paga diferencia: Bs ${fmt2(c.diferencia)} (${c.
           }
         },
         c.verificado ? "\u2713 Verificado \u2014 quitar marca" : "Marcar como verificado \u2713"
-      )), user?.rol === "admin" && onEliminarCarga && c.tipo !== "HISTORICO" && /* @__PURE__ */ import_react.default.createElement(
+      )), c.revertida && /* @__PURE__ */ import_react.default.createElement("div", { style: {
+        marginTop: 10,
+        padding: "9px",
+        borderRadius: 10,
+        textAlign: "center",
+        background: `${C.amber}12`,
+        color: C.amber,
+        fontSize: 11,
+        fontWeight: 700,
+        fontFamily: FONT_UI
+      } }, "\u21A9 Carga revertida ", c.revertidaPor ? `por ${c.revertidaPor}` : ""), user?.rol === "admin" && onEliminarCarga && c.tipo !== "HISTORICO" && !c.revertida && /* @__PURE__ */ import_react.default.createElement(
         "button",
         {
           onClick: (e) => {
             e.stopPropagation();
-            if (window.confirm(`\xBFEliminar este registro de carga?
-${c.resumen || c.id}`)) onEliminarCarga(c.id);
+            onEliminarCarga(c.id);
           },
           style: {
             width: "100%",
@@ -73314,8 +74977,8 @@ ${c.resumen || c.id}`)) onEliminarCarga(c.id);
             gap: 4
           }
         },
-        /* @__PURE__ */ import_react.default.createElement("i", { className: "ti ti-trash", style: { fontSize: 13 }, "aria-hidden": "true" }),
-        "Eliminar registro de carga"
+        /* @__PURE__ */ import_react.default.createElement("i", { className: "ti ti-history", style: { fontSize: 13 }, "aria-hidden": "true" }),
+        "Revertir / eliminar carga"
       )));
     })));
   }
@@ -73386,9 +75049,16 @@ ${c.resumen || c.id}`)) onEliminarCarga(c.id);
         }
       }
       setEditGuardando(true);
-      await onEditarProducto(editProd.id, campos);
-      setEditGuardando(false);
-      setEditProd(null);
+      try {
+        await onEditarProducto(editProd.id, campos);
+        setEditProd(null);
+      } catch (e) {
+        alert(`${e?.message || "No se pudo guardar la edici\xF3n"}
+
+El formulario se conserv\xF3.`);
+      } finally {
+        setEditGuardando(false);
+      }
     }
     const vendidosPorProd = (0, import_react.useMemo)(() => {
       const map = {};
@@ -74684,7 +76354,7 @@ ${c.resumen || c.id}`)) onEliminarCarga(c.id);
       )));
     })());
   }
-  function MarcaDetalle({ marcaId, inv, ventas, vMes, mes, anio, MK, cierres, setCierres, getHist, getLiq, auditorias = [], onActualizarAuditoria, user, retiros = [], onVentaClick }) {
+  function MarcaDetalle({ marcaId, inv, ventas, vMes, mes, anio, MK, cierres, getHist, getLiq, auditorias = [], onActualizarAuditoria, onCambiarCierre, user, retiros = [], onVentaClick }) {
     const isDesktop = useIsDesktop();
     var _hN150 = (0, import_react.useState)("historial");
     var sub = _hN150[0];
@@ -74851,11 +76521,11 @@ ${c.resumen || c.id}`)) onEliminarCarga(c.id);
         if (!pf) return false;
         return pf.mes0 === periodo.mes && pf.anio === periodo.anio;
       });
-      const items = [
+      const items2 = [
         ...periodo.ventas.map((v) => ({ tipo: "venta", fecha: v.fecha, hora: v.hora || "", data: v })),
         ...retirosPeriodo.map((r) => ({ tipo: "retiro", fecha: r.fecha, hora: r.hora || "", data: r }))
       ].sort((a, b) => tsVenta(b) - tsVenta(a));
-      return items.map((item, i) => {
+      return items2.map((item, i) => {
         if (item.tipo === "venta") {
           const v = item.data;
           return /* @__PURE__ */ import_react.default.createElement(
@@ -74865,7 +76535,7 @@ ${c.resumen || c.id}`)) onEliminarCarga(c.id);
               onClick: () => onVentaClick && onVentaClick(v),
               style: {
                 padding: "14px 0",
-                borderBottom: i < items.length - 1 ? `1px solid ${C.sep}` : "none",
+                borderBottom: i < items2.length - 1 ? `1px solid ${C.sep}` : "none",
                 cursor: onVentaClick ? "pointer" : "default"
               }
             },
@@ -74896,7 +76566,7 @@ ${c.resumen || c.id}`)) onEliminarCarga(c.id);
           );
         } else {
           const r = item.data;
-          return /* @__PURE__ */ import_react.default.createElement("div", { key: r.id || `ret-${i}`, style: { padding: "14px 0", borderBottom: i < items.length - 1 ? `1px solid ${C.sep}` : "none" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "flex-start" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 5 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: {
+          return /* @__PURE__ */ import_react.default.createElement("div", { key: r.id || `ret-${i}`, style: { padding: "14px 0", borderBottom: i < items2.length - 1 ? `1px solid ${C.sep}` : "none" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "flex-start" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 5 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: {
             fontFamily: "monospace",
             fontSize: 11,
             color: C.amber,
@@ -74997,8 +76667,8 @@ ${c.resumen || c.id}`)) onEliminarCarga(c.id);
       [`= Subtotal`, $1(liq.subBanco), false, false],
       [`\u2212 Comisi\xF3n (${liq.cfg?.pctComision ?? 0}%)`, `-${$1(liq.comision)}`, true, false],
       liq.alquiler > 0 ? [`\u2212 Alquiler`, `-${$1(liq.alquiler)}`, true, false] : null,
-      ...liq.gastos.filter((g) => g.desc || Number(g.monto) > 0).map(
-        (g) => [`\u2212 ${g.desc || "Gasto extra"}`, `-${$1(Number(g.monto) || 0)}`, true, false]
+      ...liq.gastos.filter((g2) => g2.desc || Number(g2.monto) > 0).map(
+        (g2) => [`\u2212 ${g2.desc || "Gasto extra"}`, `-${$1(Number(g2.monto) || 0)}`, true, false]
       ),
       ["Neto a liquidar", $1(liq.neto), false, true]
     ].filter(Boolean).map(([k, v, muted, bold], i, arr) => /* @__PURE__ */ import_react.default.createElement("div", { key: k, style: {
@@ -75043,7 +76713,7 @@ ${c.resumen || c.id}`)) onEliminarCarga(c.id);
         variant: "success",
         full: true,
         icon: "\u2713",
-        onPress: () => setCierres((p) => ({ ...p, [`${MK}-${marcaId}`]: { cerrado: true, fecha: hoy(), mk: MK } }))
+        onPress: () => onCambiarCierre(marcaId, true)
       },
       "Confirmar Cierre Mensual"
     ) : /* @__PURE__ */ import_react.default.createElement(
@@ -75051,7 +76721,7 @@ ${c.resumen || c.id}`)) onEliminarCarga(c.id);
       {
         variant: "danger",
         full: true,
-        onPress: () => setCierres((p) => ({ ...p, [`${MK}-${marcaId}`]: { cerrado: false, mk: MK } }))
+        onPress: () => onCambiarCierre(marcaId, false)
       },
       "Reabrir Liquidaci\xF3n"
     ), liq.vMarca.length > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: { marginTop: 32 } }, /* @__PURE__ */ import_react.default.createElement(SLabel, null, "Ventas del per\xEDodo \xB7 ", liq.vMarca.length), liq.vMarca.map((v, vi) => {
@@ -75427,11 +77097,11 @@ ${c.resumen || c.id}`)) onEliminarCarga(c.id);
     const tarjetaPer = _pagPer.tarjeta;
     const porMarcaPer = (0, import_react.useMemo)(
       () => MARCAS.map((m) => {
-        let total = 0, ef = 0, qr = 0, tj = 0;
+        let total2 = 0, ef = 0, qr = 0, tj = 0;
         ventasPerActivas.forEach((v) => {
           const brandSub = v.items.filter((i) => i.marcaId === m.id).reduce((s, i) => s + i.subtotal, 0);
           if (brandSub === 0) return;
-          total += brandSub;
+          total2 += brandSub;
           const p = parsePago(v.metodoPago, v.total);
           const pct = v.total > 0 ? brandSub / v.total : 0;
           ef += p.efectivo * pct;
@@ -75439,7 +77109,7 @@ ${c.resumen || c.id}`)) onEliminarCarga(c.id);
           tj += p.tarjeta * pct;
         });
         const txs = ventasPerActivas.filter((v) => v.items.some((i) => i.marcaId === m.id)).length;
-        return { marca: m, total, ef, qr, tj, txs };
+        return { marca: m, total: total2, ef, qr, tj, txs };
       }).filter((x) => x.total > 0).sort((a, b) => b.total - a.total),
       [ventasPerActivas]
     );
@@ -75748,18 +77418,11 @@ ${c.resumen || c.id}`)) onEliminarCarga(c.id);
       setTimeout(() => setSaved(false), 2e3);
     }
     async function testConexion() {
-      if (!cfg.apiKey) {
-        setTestMsg({ ok: false, txt: "Ingres\xE1 el API Key primero." });
-        return;
-      }
       setTesting(true);
       setTestMsg(null);
       try {
-        const r = await fetch(cfg.endpoint.replace("/invoices", "/health") || cfg.endpoint, {
-          headers: { "Authorization": `Bearer ${cfg.apiKey}` },
-          signal: AbortSignal.timeout(6e3)
-        });
-        setTestMsg(r.ok ? { ok: true, txt: `\u2713 Conexi\xF3n OK (${r.status})` } : { ok: false, txt: `Error ${r.status}` });
+        const r = await llamarFacturacionSegura("health");
+        setTestMsg(r.configured ? { ok: true, txt: `\u2713 Servidor CUCU configurado \xB7 ${r.environment || "ambiente definido"}` } : { ok: false, txt: "Faltan secretos CUCU_API_KEY o CUCU_POINT_OF_SALE_ID en Supabase." });
       } catch (e) {
         setTestMsg({ ok: false, txt: `Error: ${e.message.slice(0, 80)}` });
       }
@@ -75811,7 +77474,17 @@ ${c.resumen || c.id}`)) onEliminarCarga(c.id);
         fontWeight: active ? 700 : 400,
         WebkitTapHighlightColor: "transparent"
       } }, l);
-    })), cfg.modoApi !== false && /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, null, fld("API Key CUCU", "apiKey", "Bearer token de tu cuenta CUCU"), fld("Endpoint", "endpoint", "https://app.cucu.bo/api/v1/invoices"), fld("C\xF3digo Actividad Econ\xF3mica", "codigoActividad", "470000"), fld("C\xF3digo Producto SIN", "codigoProductoSin", "58311"), testMsg && /* @__PURE__ */ import_react.default.createElement("div", { style: {
+    })), cfg.modoApi !== false && /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, null, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      padding: 12,
+      background: `${C.green}10`,
+      border: `1px solid ${C.green}25`,
+      borderRadius: 10,
+      marginBottom: 12,
+      fontSize: 12,
+      color: C.label2,
+      fontFamily: FONT,
+      lineHeight: 1.6
+    } }, "\u{1F512} La API Key, el punto de venta y los c\xF3digos SIAT se configuran como secretos de Supabase. Nunca se guardan en este navegador."), testMsg && /* @__PURE__ */ import_react.default.createElement("div", { style: {
       background: testMsg.ok ? `${C.green}12` : `${C.red}12`,
       border: `1px solid ${testMsg.ok ? C.green : C.red}30`,
       borderRadius: 10,
@@ -75833,7 +77506,7 @@ ${c.resumen || c.id}`)) onEliminarCarga(c.id);
       fontWeight: 600,
       marginBottom: 10,
       WebkitTapHighlightColor: "transparent"
-    } }, testing ? "Probando\u2026" : "Probar conexi\xF3n")), /* @__PURE__ */ import_react.default.createElement("div", { style: { padding: 10, background: C.bg3, borderRadius: 10, border: `1px solid ${C.sep}`, marginBottom: 12 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT, lineHeight: 1.7 } }, "\u{1F4CB} Obtener API Key \u2192 ", /* @__PURE__ */ import_react.default.createElement("strong", null, "cucu.bo"), /* @__PURE__ */ import_react.default.createElement("br", null), "Docs \u2192 ", /* @__PURE__ */ import_react.default.createElement("strong", null, "docs.cucu.bo"), /* @__PURE__ */ import_react.default.createElement("br", null), "Actividad ", /* @__PURE__ */ import_react.default.createElement("strong", null, "470000"), " = Comercio al por menor", /* @__PURE__ */ import_react.default.createElement("br", null), "C\xF3digo SIN ", /* @__PURE__ */ import_react.default.createElement("strong", null, "58311"), " = Prendas de vestir")), saved && /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.green, fontFamily: FONT, textAlign: "center", marginBottom: 8 } }, "\u2713 Guardado"), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => save(cfg), variant: "primary", full: true, icon: "\u{1F4BE}" }, "Guardar Configuraci\xF3n"));
+    } }, testing ? "Probando\u2026" : "Probar conexi\xF3n")), /* @__PURE__ */ import_react.default.createElement("div", { style: { padding: 10, background: C.bg3, borderRadius: 10, border: `1px solid ${C.sep}`, marginBottom: 12 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT, lineHeight: 1.7 } }, "\u{1F4CB} Obtener API Key \u2192 ", /* @__PURE__ */ import_react.default.createElement("strong", null, "cucu.bo"), /* @__PURE__ */ import_react.default.createElement("br", null), "Docs \u2192 ", /* @__PURE__ */ import_react.default.createElement("strong", null, "docs.cucu.bo"), /* @__PURE__ */ import_react.default.createElement("br", null), "Variables requeridas: ", /* @__PURE__ */ import_react.default.createElement("strong", null, "CUCU_API_KEY"), " y ", /* @__PURE__ */ import_react.default.createElement("strong", null, "CUCU_POINT_OF_SALE_ID"))), saved && /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.green, fontFamily: FONT, textAlign: "center", marginBottom: 8 } }, "\u2713 Guardado"), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => save(cfg), variant: "primary", full: true, icon: "\u{1F4BE}" }, "Guardar Configuraci\xF3n"));
   }
   var AUDIT_KEY = "th_audit_v2";
   var AUDIT_TIPOS = {
@@ -75876,6 +77549,7 @@ ${c.resumen || c.id}`)) onEliminarCarga(c.id);
       const now = /* @__PURE__ */ new Date();
       const evento = {
         id: "EVT_" + Date.now() + "_" + Math.random().toString(36).slice(2, 6),
+        operationId: thUUID(),
         ts: Date.now(),
         fecha: now.toLocaleDateString("es-BO"),
         hora: now.toLocaleTimeString("es-BO", { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
@@ -75918,9 +77592,9 @@ ${c.resumen || c.id}`)) onEliminarCarga(c.id);
   function useToast() {
     const [toasts, setToasts] = (0, import_react.useState)([]);
     function addToast(msg, type = "success") {
-      const id = Date.now() + Math.random();
-      setToasts((p) => [...p, { id, msg, type }]);
-      setTimeout(() => setToasts((p) => p.filter((t) => t.id !== id)), 3800);
+      const id2 = Date.now() + Math.random();
+      setToasts((p) => [...p, { id: id2, msg, type }]);
+      setTimeout(() => setToasts((p) => p.filter((t) => t.id !== id2)), 3800);
     }
     return { toasts, addToast };
   }
@@ -75952,7 +77626,7 @@ ${c.resumen || c.id}`)) onEliminarCarga(c.id);
       animation: "slideInRight .22s cubic-bezier(.3,0,.2,1)"
     } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 18, lineHeight: 1, flexShrink: 0, marginTop: 1 } }, t.type === "error" ? "\u274C" : t.type === "warn" ? "\u26A0\uFE0F" : "\u2705"), /* @__PURE__ */ import_react.default.createElement("span", null, t.msg))), /* @__PURE__ */ import_react.default.createElement("style", null, `@keyframes slideInRight{from{opacity:0;transform:translateX(24px)}to{opacity:1;transform:none}}`));
   }
-  function PanelCambiarPass({ user, usuarios, onGuardar }) {
+  function PanelCambiarPass({ user }) {
     const [passActual, setPassActual] = (0, import_react.useState)("");
     const [passNueva, setPassNueva] = (0, import_react.useState)("");
     const [passConfirm, setPassConfirm] = (0, import_react.useState)("");
@@ -75961,8 +77635,8 @@ ${c.resumen || c.id}`)) onEliminarCarga(c.id);
     const [saving, setSaving] = (0, import_react.useState)(false);
     async function cambiar() {
       setMsg(null);
-      if (passNueva.length < 6) {
-        setMsg({ ok: false, txt: "M\xEDnimo 6 caracteres" });
+      if (passNueva.length < 8) {
+        setMsg({ ok: false, txt: "M\xEDnimo 8 caracteres" });
         return;
       }
       if (passNueva !== passConfirm) {
@@ -75970,16 +77644,12 @@ ${c.resumen || c.id}`)) onEliminarCarga(c.id);
         return;
       }
       setSaving(true);
-      const actualNube = await sbLeerPassword(user.usuario);
-      const localU = usuarios.find((x) => x.usuario === user.usuario);
-      const actualReal = actualNube != null ? actualNube : localU?.password ?? "";
-      if (actualReal && actualReal !== passActual) {
-        setSaving(false);
-        setMsg({ ok: false, txt: "Contrase\xF1a actual incorrecta" });
+      const result = await sbCambiarPasswordSegura(user.usuario, passActual, passNueva);
+      setSaving(false);
+      if (!result.ok) {
+        setMsg({ ok: false, txt: result.error });
         return;
       }
-      onGuardar(usuarios.map((x) => x.usuario === user.usuario ? { ...x, password: passNueva } : x));
-      setSaving(false);
       setMsg({ ok: true, txt: "\u2713 Contrase\xF1a actualizada \xB7 ya funciona en todos los dispositivos" });
       setPassActual("");
       setPassNueva("");
@@ -76029,7 +77699,7 @@ ${c.resumen || c.id}`)) onEliminarCarga(c.id);
       display: "flex",
       alignItems: "center",
       gap: 8
-    } }, /* @__PURE__ */ import_react.default.createElement("span", null, "\u{1F512}"), " Cambiar contrase\xF1a"), ipt("Contrase\xF1a actual", passActual, setPassActual, "\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022"), ipt("Nueva contrase\xF1a", passNueva, setPassNueva, "M\xEDnimo 6 caracteres"), ipt("Confirmar contrase\xF1a", passConfirm, setPassConfirm, "Repetir nueva contrase\xF1a"), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 14 } }, /* @__PURE__ */ import_react.default.createElement(
+    } }, /* @__PURE__ */ import_react.default.createElement("span", null, "\u{1F512}"), " Cambiar contrase\xF1a"), ipt("Contrase\xF1a actual", passActual, setPassActual, "\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022"), ipt("Nueva contrase\xF1a", passNueva, setPassNueva, "M\xEDnimo 8 caracteres"), ipt("Confirmar contrase\xF1a", passConfirm, setPassConfirm, "Repetir nueva contrase\xF1a"), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 14 } }, /* @__PURE__ */ import_react.default.createElement(
       "input",
       {
         type: "checkbox",
@@ -76081,7 +77751,7 @@ ${c.resumen || c.id}`)) onEliminarCarga(c.id);
     const [showP, setShowP] = (0, import_react.useState)(false);
     const [saving, setSaving] = (0, import_react.useState)(false);
     const [done, setDone] = (0, import_react.useState)(false);
-    function guardar() {
+    async function guardar() {
       setMsg(null);
       if (!f.nombre.trim()) {
         setMsg("Nombre requerido");
@@ -76095,8 +77765,8 @@ ${c.resumen || c.id}`)) onEliminarCarga(c.id);
         setMsg("Contrase\xF1a requerida");
         return;
       }
-      if (isNew && f.password.length < 6) {
-        setMsg("M\xEDnimo 6 caracteres en contrase\xF1a");
+      if (isNew && f.password.length < 8) {
+        setMsg("M\xEDnimo 8 caracteres en contrase\xF1a");
         return;
       }
       if (f.rol === "marca" && !f.marcaId) {
@@ -76108,12 +77778,14 @@ ${c.resumen || c.id}`)) onEliminarCarga(c.id);
         return;
       }
       setSaving(true);
-      setTimeout(() => {
-        onGuardar({ ...f, usuario: f.usuario.toLowerCase().trim() }, isNew);
-        setSaving(false);
-        setDone(true);
-        setTimeout(() => onClose(), 700);
-      }, 380);
+      const ok = await onGuardar({ ...f, usuario: f.usuario.toLowerCase().trim() }, isNew);
+      setSaving(false);
+      if (ok === false) {
+        setMsg("No se pudo guardar el usuario. Revisa la sesi\xF3n administrativa.");
+        return;
+      }
+      setDone(true);
+      setTimeout(() => onClose(), 700);
     }
     const ipt = (label, val, set, placeholder, type = "text", opts = {}) => /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 14 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
       fontSize: 11,
@@ -76216,7 +77888,7 @@ ${c.resumen || c.id}`)) onEliminarCarga(c.id);
         type: showP ? "text" : "password",
         value: f.password,
         onChange: (e) => setF((p) => ({ ...p, password: e.target.value })),
-        placeholder: isNew ? "M\xEDnimo 6 caracteres" : "Sin cambios",
+        placeholder: isNew ? "M\xEDnimo 8 caracteres" : "Sin cambios",
         style: {
           width: "100%",
           padding: "12px 44px 12px 14px",
@@ -76832,6 +78504,8 @@ ${c.resumen || c.id}`)) onEliminarCarga(c.id);
           return "Usuarios del sistema";
         case "auditLog":
           return `Registro de auditor\xEDa (${p.tipo || ""})`;
+        case "estadoFinanciero":
+          return `Configuraci\xF3n financiera \xB7 ${p.tipo || ""}`;
         default:
           return op.tipo;
       }
@@ -76844,64 +78518,8 @@ ${c.resumen || c.id}`)) onEliminarCarga(c.id);
       ["Rol", user?.rol === "admin" ? "Administrador" : user?.rol === "caja" ? "Caja" : "Marca"]
     ];
     async function runFactoryReset() {
-      setResetState("running");
-      const log = [];
-      const addLog = (msg, ok = true) => {
-        log.push({ msg, ok });
-        setResetLog([...log]);
-      };
-      try {
-        const H = {
-          "apikey": SUPA_KEY,
-          "Authorization": `Bearer ${SUPA_KEY}`,
-          "Content-Type": "application/json",
-          "Prefer": "return=minimal"
-        };
-        const del = (t, q) => fetch(`${SUPA_URL}/rest/v1/${t}?${q}`, { method: "DELETE", headers: H });
-        addLog("Eliminando l\xEDneas de venta...");
-        const r1 = await del("venta_items", "id=gt.0");
-        addLog(`venta_items \u2014 ${r1.ok ? "OK \u2713" : "Error " + r1.status}`, r1.ok);
-        addLog("Eliminando ventas...");
-        const r2 = await del("ventas", "id=neq.00000000-0000-0000-0000-000000000000");
-        addLog(`ventas \u2014 ${r2.ok ? "OK \u2713" : "Error " + r2.status}`, r2.ok);
-        addLog("Eliminando cierres...");
-        const r3 = await del("cierres", "id=neq.00000000-0000-0000-0000-000000000000");
-        addLog(`cierres \u2014 ${r3.ok ? "OK \u2713" : "Error " + r3.status}`, r3.ok);
-        addLog("Eliminando inventario...");
-        const r4 = await del("inventario", "stock=gte.0");
-        if (!r4.ok) {
-          const r4b = await del("inventario", "id=gt.0");
-          addLog(`inventario \u2014 ${r4b.ok ? "OK \u2713" : "Error " + r4b.status}`, r4b.ok);
-        } else {
-          addLog(`inventario \u2014 OK \u2713`);
-        }
-        addLog("Limpiando cach\xE9 local...");
-        const keys2 = [
-          "th_inv",
-          "th_ventas",
-          "th_alq",
-          "th_cierres",
-          "th_gc_v1",
-          "th_cajas_v1",
-          "th_liq_cfg",
-          "th_cucu_cfg",
-          "th_drive_url",
-          "th_sync_log",
-          "th_pos_draft"
-        ];
-        keys2.forEach((k) => localStorage.removeItem(k));
-        Object.keys(localStorage).forEach((k) => {
-          if (k.startsWith("th_fac_") || k.startsWith("th_liq_") || k.startsWith("th_gc_"))
-            localStorage.removeItem(k);
-        });
-        addLog("Cach\xE9 local \u2014 OK \u2713");
-        rtBroadcast("factory_reset", {});
-        addLog("Notificando otras sesiones\u2026 \u2713");
-        setResetState("done");
-      } catch (e) {
-        addLog("Error inesperado: " + e.message, false);
-        setResetState("error");
-      }
+      setResetLog([{ msg: "Factory Reset bloqueado por seguridad. No se modific\xF3 ning\xFAn dato.", ok: false }]);
+      setResetState("error");
     }
     const renderIdle = () => /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, null, /* @__PURE__ */ import_react.default.createElement("div", { style: {
       background: C.bg1,
@@ -76934,7 +78552,7 @@ ${c.resumen || c.id}`)) onEliminarCarga(c.id);
       fontFamily: FONT,
       lineHeight: 1.6,
       marginBottom: outboxOps.length ? 10 : 0
-    } }, "Cambios hechos en este dispositivo que a\xFAn no llegaron a Supabase. Se reintentan solos cada 20 segundos con la app abierta. Cada operaci\xF3n tiene ID \xFAnico: al subir no se duplica nada."), outboxOps.length > 0 && /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, null, /* @__PURE__ */ import_react.default.createElement("div", { style: { maxHeight: 220, overflowY: "auto", marginBottom: 10 } }, outboxOps.map((op) => /* @__PURE__ */ import_react.default.createElement("div", { key: op.id, style: {
+    } }, "Cambios hechos en este dispositivo que a\xFAn no llegaron a Supabase. Se reintentan solos cada 20 segundos con la app abierta. Las operaciones transaccionales usan ID \xFAnico; una cola legacy se bloquea para conciliaci\xF3n cuando su motor seguro ya est\xE1 activo."), outboxOps.length > 0 && /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, null, /* @__PURE__ */ import_react.default.createElement("div", { style: { maxHeight: 220, overflowY: "auto", marginBottom: 10 } }, outboxOps.map((op) => /* @__PURE__ */ import_react.default.createElement("div", { key: op.id, style: {
       padding: "8px 12px",
       borderRadius: 10,
       background: C.bg2,
@@ -76948,7 +78566,7 @@ ${c.resumen || c.id}`)) onEliminarCarga(c.id);
       overflow: "hidden",
       textOverflow: "ellipsis",
       whiteSpace: "nowrap"
-    } }, resumenOp(op)), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 11, color: C.label3, fontFamily: "monospace", flexShrink: 0 } }, new Date(op.ts).toLocaleString("es-BO"))), op.intentos > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.amber, marginTop: 2, fontFamily: FONT_UI } }, "\u26A0 ", op.intentos, " intento", op.intentos === 1 ? "" : "s", " fallido", op.intentos === 1 ? "" : "s", op.ultimoIntento ? ` \xB7 \xFAltimo: ${new Date(op.ultimoIntento).toLocaleTimeString("es-BO")}` : "")))), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 8 } }, /* @__PURE__ */ import_react.default.createElement("button", { onClick: reintentarOutbox, disabled: outboxProc, style: {
+    } }, resumenOp(op)), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 11, color: C.label3, fontFamily: "monospace", flexShrink: 0 } }, new Date(op.ts).toLocaleString("es-BO"))), op.intentos > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.amber, marginTop: 2, fontFamily: FONT_UI } }, "\u26A0 ", op.intentos, " intento", op.intentos === 1 ? "" : "s", " fallido", op.intentos === 1 ? "" : "s", op.ultimoIntento ? ` \xB7 \xFAltimo: ${new Date(op.ultimoIntento).toLocaleTimeString("es-BO")}` : ""), op.bloqueadaPorModoSeguro && /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.red, marginTop: 3, fontFamily: FONT_UI, fontWeight: 600 } }, "\u{1F512} No se reinyect\xF3: ", op.bloqueadaPorModoSeguro, " ya usa motor seguro. Exporta y concilia esta operaci\xF3n.")))), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 8 } }, /* @__PURE__ */ import_react.default.createElement("button", { onClick: reintentarOutbox, disabled: outboxProc, style: {
       flex: 1,
       padding: "11px",
       borderRadius: 10,
@@ -77059,7 +78677,7 @@ ${c.resumen || c.id}`)) onEliminarCarga(c.id);
         setSbMsg("Sincronizando\u2026");
         const r = await onSyncCompleto(() => {
         });
-        setSbMsg(r.fail > 0 ? "err" : "ok");
+        setSbMsg(r.blocked ? r.message : r.fail > 0 ? "err" : "ok");
         setTimeout(() => setSbMsg(null), 4e3);
       }, style: {
         flex: 1,
@@ -77120,20 +78738,21 @@ ${c.resumen || c.id}`)) onEliminarCarga(c.id);
       border: `2px solid ${C.red}30`,
       padding: "20px",
       marginBottom: 16
-    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 8 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 20 } }, "\u26A0\uFE0F"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 14, fontWeight: 700, color: C.red, fontFamily: FONT } }, "Factory Reset")), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT, lineHeight: 1.6, marginBottom: 16 } }, "Elimina ", /* @__PURE__ */ import_react.default.createElement("strong", null, "todo"), " el contenido del sistema: inventario, ventas, cierres y cach\xE9 local. El sistema quedar\xE1 como reci\xE9n instalado. ", /* @__PURE__ */ import_react.default.createElement("strong", null, "Esta acci\xF3n es irreversible.")), /* @__PURE__ */ import_react.default.createElement("button", { onClick: () => setResetState("confirm1"), style: {
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 8 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 20 } }, "\u26A0\uFE0F"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 14, fontWeight: 700, color: C.red, fontFamily: FONT } }, "Factory Reset bloqueado")), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT, lineHeight: 1.6, marginBottom: 16 } }, "El borrado masivo desde la aplicaci\xF3n fue deshabilitado. Una recuperaci\xF3n integral s\xF3lo puede ejecutarse con respaldo verificado, desde el servidor y con doble autorizaci\xF3n administrativa."), /* @__PURE__ */ import_react.default.createElement("button", { disabled: true, style: {
       width: "100%",
       padding: "12px",
       borderRadius: 10,
       border: `1.5px solid ${C.red}50`,
       background: `${C.red}12`,
-      cursor: "pointer",
+      cursor: "not-allowed",
       fontSize: 13,
       fontWeight: 700,
       color: C.red,
+      opacity: 0.65,
       fontFamily: FONT,
       letterSpacing: "0.02em",
       WebkitTapHighlightColor: "transparent"
-    } }, "Iniciar Factory Reset \u2192")), /* @__PURE__ */ import_react.default.createElement("button", { onClick: logout, style: {
+    } }, "\u{1F512} No disponible desde este dispositivo")), /* @__PURE__ */ import_react.default.createElement("button", { onClick: logout, style: {
       width: "100%",
       padding: "14px",
       borderRadius: 14,
@@ -77317,7 +78936,7 @@ ${c.resumen || c.id}`)) onEliminarCarga(c.id);
     const [subTab, setSubTab] = (0, import_react.useState)("perfil");
     const [usuarios, setUsuarios] = (0, import_react.useState)(() => {
       try {
-        return JSON.parse(localStorage.getItem("th_usuarios") || "null") || USUARIOS;
+        return thUsuariosSinCredenciales(JSON.parse(localStorage.getItem("th_usuarios") || "null") || USUARIOS);
       } catch {
         return USUARIOS;
       }
@@ -77334,8 +78953,8 @@ ${c.resumen || c.id}`)) onEliminarCarga(c.id);
         if (!data) return;
         setAuditLog((prev) => {
           const sbIds = new Set(data.map((e) => e.id));
-          const pendientes = prev.filter((e) => !sbIds.has(e.id));
-          pendientes.forEach((e) => syncConRespaldo("auditLog", e, () => sbGuardarAuditLog(e)));
+          const outboxIds = new Set(getOutbox().filter((op) => op?.tipo === "auditLog").map((op) => op?.payload?.id));
+          const pendientes = prev.filter((e) => !sbIds.has(e.id) && outboxIds.has(e.id));
           const merged = [...pendientes, ...data].sort((a, b) => (b.ts || 0) - (a.ts || 0)).slice(0, 1e3);
           try {
             localStorage.setItem(AUDIT_KEY, JSON.stringify(merged));
@@ -77382,15 +79001,11 @@ ${c.resumen || c.id}`)) onEliminarCarga(c.id);
       };
     }, []);
     const { toasts, addToast } = useToast();
-    function guardarUsuarios(u, accion, afectado, toastMsg) {
-      setUsuarios(u);
-      localStorage.setItem("th_usuarios", JSON.stringify(u));
-      syncConRespaldo("usuarios", u, () => sbGuardarUsuarios(u));
-      u.forEach((x) => {
-        if (typeof x.password === "string" && x.password.length > 0) {
-          syncConRespaldo("password", { usuario: x.usuario, password: x.password }, () => sbActualizarPassword(x.usuario, x.password));
-        }
-      });
+    function guardarUsuarios(u, accion, afectado, toastMsg, syncRemoto = false) {
+      const seguros = thUsuariosSinCredenciales(u);
+      setUsuarios(seguros);
+      localStorage.setItem("th_usuarios", JSON.stringify(seguros));
+      if (syncRemoto) console.warn("Sincronizaci\xF3n directa de usuarios bloqueada por seguridad");
       if (accion && afectado) {
         agregarAudit(accion, afectado, user.nombre);
         setAuditLog(JSON.parse(localStorage.getItem(AUDIT_KEY) || "[]"));
@@ -77406,18 +79021,7 @@ ${c.resumen || c.id}`)) onEliminarCarga(c.id);
           return;
         }
         setSupaOk(true);
-        if (u.length === 0) {
-          const local = (() => {
-            try {
-              return JSON.parse(localStorage.getItem("th_usuarios") || "null") || USUARIOS;
-            } catch {
-              return USUARIOS;
-            }
-          })();
-          if (local.length > 0) sbGuardarUsuarios(local).then((ok) => {
-            if (ok) setSupaOk(true);
-          });
-        } else {
+        if (u.length > 0) {
           setUsuarios(u);
           localStorage.setItem("th_usuarios", JSON.stringify(u));
         }
@@ -77489,76 +79093,117 @@ ${c.resumen || c.id}`)) onEliminarCarga(c.id);
         fontSize: 20
       } }, u.rol === "marca" ? m?.emoji || "\u{1F3F7}" : rc.icon);
     }
-    function handleResetPass(u) {
+    async function handleResetPass(u) {
       const temp = generarTempPassword();
-      guardarUsuarios(
-        usuarios.map((x) => x.usuario === u.usuario ? { ...x, password: temp } : x),
-        "Resete\xF3 contrase\xF1a",
-        u.usuario
-      );
+      const result = await sbAdminResetPassword(u.usuario, temp);
+      if (!result.ok) {
+        addToast(result.error || "No se pudo resetear la contrase\xF1a", "error");
+        return;
+      }
+      agregarAudit("Resete\xF3 contrase\xF1a", u.usuario, user.nombre);
+      setAuditLog(JSON.parse(localStorage.getItem(AUDIT_KEY) || "[]"));
       setTempPass({ usuario: u.usuario, nombre: u.nombre, password: temp, soloManual: false });
       setConfirmAct(null);
       setMenuAbierto(null);
     }
-    function handleToggle(u) {
+    async function handleToggle(u) {
       const ns = u.estado === "inactivo" ? "activo" : "inactivo";
+      const result = await sbAdminUsuario("set_state", { usuario: u.usuario, estado: ns });
+      if (!result.ok) {
+        addToast(result.error || "No se pudo cambiar el estado", "error");
+        return;
+      }
       guardarUsuarios(
         usuarios.map((x) => x.usuario === u.usuario ? { ...x, estado: ns } : x),
         `${ns === "inactivo" ? "Desactiv\xF3" : "Activ\xF3"} cuenta`,
         u.usuario,
-        `Cuenta de @${u.usuario} ${ns === "inactivo" ? "desactivada" : "activada"}`
+        `Cuenta de @${u.usuario} ${ns === "inactivo" ? "desactivada" : "activada"}`,
+        false
       );
       setConfirmAct(null);
       setMenuAbierto(null);
     }
-    function handleEliminar(u) {
-      sbEliminarUsuario(u.usuario);
-      sbEliminarAuthUsuario(u.usuario);
+    async function handleEliminar(u) {
+      const eliminado = await sbEliminarAuthUsuario(u.usuario);
+      if (!eliminado) {
+        addToast(`No se pudo eliminar @${u.usuario}`, "error");
+        return;
+      }
       guardarUsuarios(
         usuarios.filter((x) => x.usuario !== u.usuario),
         "Elimin\xF3 usuario",
         u.usuario,
-        `Usuario @${u.usuario} eliminado`
+        `Usuario @${u.usuario} eliminado`,
+        false
       );
       setConfirmAct(null);
       setMenuAbierto(null);
     }
-    function handleGuardarUsuario(data, isNew) {
+    async function handleGuardarUsuario(data, isNew) {
       if (isNew) {
-        const nuevoUsuario = { ...data, estado: "activo", marcaId: data.marcaId ? Number(data.marcaId) : void 0 };
+        const creado = await sbCrearAuthUsuario(data.usuario, data.password, data.nombre, data.rol, data.marcaId);
+        if (!creado) {
+          addToast(`No se pudo crear @${data.usuario} en Supabase Auth`, "error");
+          return false;
+        }
+        const { password, ...perfil } = data;
+        const nuevoUsuario = { ...perfil, estado: "activo", marcaId: data.marcaId ? Number(data.marcaId) : void 0 };
         guardarUsuarios(
           [...usuarios, nuevoUsuario],
           "Cre\xF3 usuario",
           data.usuario,
-          `Usuario @${data.usuario} creado correctamente`
+          `Usuario @${data.usuario} creado correctamente`,
+          false
         );
-        if (data.password) sbCrearAuthUsuario(data.usuario, data.password, data.nombre, data.rol, data.marcaId);
       } else {
         const update = { ...data, marcaId: data.marcaId ? Number(data.marcaId) : void 0 };
-        if (!update.password) delete update.password;
         const cambioPass = !!update.password;
+        const perfil = await sbAdminUsuario("update_profile", {
+          usuario: data.usuario,
+          nombre: update.nombre,
+          rol: update.rol,
+          marca_id: update.marcaId ?? null,
+          estado: update.estado || "activo"
+        });
+        if (!perfil.ok) {
+          addToast(perfil.error || "No se pudo editar el perfil", "error");
+          return false;
+        }
+        if (cambioPass) {
+          const reset = await sbAdminResetPassword(data.usuario, update.password);
+          if (!reset.ok) {
+            addToast(reset.error || "No se pudo cambiar la contrase\xF1a", "error");
+            return false;
+          }
+        }
+        delete update.password;
         guardarUsuarios(
           usuarios.map((u) => u.usuario === data.usuario ? { ...u, ...update } : u),
           cambioPass ? "Cambi\xF3 contrase\xF1a" : "Edit\xF3 usuario",
           data.usuario,
-          cambioPass ? `Contrase\xF1a de @${data.usuario} actualizada` : `Cambios de @${data.usuario} guardados`
+          cambioPass ? `Contrase\xF1a de @${data.usuario} actualizada` : `Cambios de @${data.usuario} guardados`,
+          false
         );
       }
       setModalAdd(false);
       setEditando(null);
+      return true;
     }
     const SQL_USUARIOS = `create table if not exists usuarios (
   usuario text primary key,
-  password text not null,
   nombre text not null,
   rol text not null default 'caja',
   marca_id integer,
   estado text not null default 'activo',
+  auth_id uuid,
   created_at timestamptz default now()
 );
 alter table usuarios enable row level security;
-create policy "allow all usuarios" on usuarios
-  for all using (true) with check (true);`;
+create unique index if not exists usuarios_auth_id_uidx on usuarios(auth_id) where auth_id is not null;
+drop policy if exists usuarios_lectura_segura on usuarios;
+create policy usuarios_lectura_segura on usuarios for select to authenticated
+  using (auth.uid()=auth_id or exists(select 1 from th_current_profile() p where p.rol='admin'));
+-- Las escrituras se realizan \xFAnicamente mediante funciones administrativas de servidor.`;
     return /* @__PURE__ */ import_react.default.createElement("div", null, isAdmin && supa_ok === false && /* @__PURE__ */ import_react.default.createElement("div", { style: {
       background: "#FFF8E1",
       border: "1.5px solid #F9A825",
@@ -78367,11 +80012,11 @@ Esta acci\xF3n no se puede deshacer.`,
     const vMesActivas = (0, import_react.useMemo)(() => vMes.filter((v) => !v.anulada), [vMes]);
     const porMarca = (0, import_react.useMemo)(() => {
       return MARCAS.map((m) => {
-        let efectivo = 0, qr = 0, tarjeta = 0, total = 0;
+        let efectivo = 0, qr = 0, tarjeta = 0, total2 = 0;
         vMesActivas.forEach((v) => {
           const brandSub = v.items.filter((i) => i.marcaId === m.id).reduce((s, i) => s + i.subtotal, 0);
           if (brandSub === 0) return;
-          total += brandSub;
+          total2 += brandSub;
           const p = parsePago(v.metodoPago, v.total);
           const pct = v.total > 0 ? brandSub / v.total : 0;
           efectivo += p.efectivo * pct;
@@ -78379,7 +80024,7 @@ Esta acci\xF3n no se puede deshacer.`,
           tarjeta += p.tarjeta * pct;
         });
         const txs = vMesActivas.filter((v) => v.items.some((i) => i.marcaId === m.id)).length;
-        return { marca: m, total, efectivo, qr, tarjeta, txs };
+        return { marca: m, total: total2, efectivo, qr, tarjeta, txs };
       }).filter((x) => x.total > 0).sort((a, b) => b.total - a.total);
     }, [vMesActivas]);
     const _pagMes = sumPagos(vMesActivas);
@@ -78631,13 +80276,13 @@ Esta acci\xF3n no se puede deshacer.`,
             acc[it.marcaId].sub += it.subtotal;
             return acc;
           }, {})
-        ).map((g) => /* @__PURE__ */ import_react.default.createElement("div", { key: g.marca?.id, style: {
+        ).map((g2) => /* @__PURE__ */ import_react.default.createElement("div", { key: g2.marca?.id, style: {
           marginBottom: isDesktop ? 3 : 3,
           padding: isDesktop ? "4px 8px" : "4px 8px",
-          background: `${g.marca?.color}10`,
+          background: `${g2.marca?.color}10`,
           borderRadius: 6,
-          borderLeft: `3px solid ${g.marca?.color}`
-        } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 1 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 5 } }, /* @__PURE__ */ import_react.default.createElement(MarcaIcon, { marca: g.marca, size: 12, radius: 3 }), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 11, fontWeight: 600, color: g.marca?.color, fontFamily: FONT } }, g.marca?.nombre)), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 12, fontWeight: 700, color: C.label, fontFamily: FONT, letterSpacing: "-0.01em" } }, $2(g.sub))), g.items.map((it, ii) => /* @__PURE__ */ import_react.default.createElement("div", { key: ii, style: { fontSize: 10, color: C.label2, fontFamily: FONT, lineHeight: "1.2" } }, "\xB7 ", it.nombre, " \xD7", it.cantidad, " = ", $2(it.subtotal))))),
+          borderLeft: `3px solid ${g2.marca?.color}`
+        } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 1 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 5 } }, /* @__PURE__ */ import_react.default.createElement(MarcaIcon, { marca: g2.marca, size: 12, radius: 3 }), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 11, fontWeight: 600, color: g2.marca?.color, fontFamily: FONT } }, g2.marca?.nombre)), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 12, fontWeight: 700, color: C.label, fontFamily: FONT, letterSpacing: "-0.01em" } }, $2(g2.sub))), g2.items.map((it, ii) => /* @__PURE__ */ import_react.default.createElement("div", { key: ii, style: { fontSize: 10, color: C.label2, fontFamily: FONT, lineHeight: "1.2" } }, "\xB7 ", it.nombre, " \xD7", it.cantidad, " = ", $2(it.subtotal))))),
         !isDesktop && /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => enviarNotaVentaWhatsApp(v), variant: "fill", small: true, full: true, icon: "\u{1F4F2}" }, "Enviar por WhatsApp"),
         v.etiquetaImg && /* @__PURE__ */ import_react.default.createElement(
           "img",
