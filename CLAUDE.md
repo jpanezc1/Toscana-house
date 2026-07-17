@@ -4,6 +4,35 @@ Sistema de inventario, ventas y liquidaciones para Toscana House (casa de moda m
 
 > El `README.md` es boilerplate viejo de Create React App y **no aplica** — el build real es esbuild (ver abajo). Ignorarlo.
 
+## ESTADO ACTUAL — LEER PRIMERO (2026-07-16)
+
+**Producción = rama `main`** (frontend "clásico": anon key + login a nivel app leyendo
+`usuarios.password`, acceso directo a las tablas, RLS permisivo/apagado). NO usa Supabase
+Auth. Este es el modelo que describe el resto de este documento.
+
+**El "blindaje transaccional" fue REVERTIDO.** Entre el 2026-07-14 y el 07-16 se desplegó a
+producción una rearquitectura enorme (rama `codex/blindaje-transaccional`: Supabase Auth,
+RPC transaccionales, RLS por rol, Storage privado, 23 migraciones SQL). Rompió las cargas
+masivas y se hizo rollback al sistema clásico. Esa rama queda **ARCHIVADA, no desplegar
+desde ahí.** Su trabajo sigue en la rama por si se retoma con calma, pero producción es
+`main`.
+
+**REGLAS DE ORO para no repetir el descalce que causó todo el lío:**
+1. **Una sola fuente de verdad: `main`.** Todo deploy sale de `main`. Nunca desplegar un
+   frontend viejo o de otra rama sobre la base de producción.
+2. **Una sola carpeta de trabajo.** Hubo varias copias del repo en el Mac y varias sesiones
+   (Claude/codex) trabajando en paralelo cada una por su lado; eso fue exactamente lo que
+   descalzó código y base. Trabajar siempre desde la misma carpeta clonada de `main`.
+3. **Los permisos/RLS de Supabase se cambian SOLO por migración versionada o dejando
+   registro.** El blindaje revocó permisos de `anon` a mano, fuera de las migraciones, y el
+   código dejó de reflejar la base. Si tocás permisos, que quede en git.
+4. Antes de desplegar, confirmá que la rama y la base están alineadas (mismo modelo de auth
+   y de acceso a tablas).
+
+Rollback documentado en la memoria del usuario (`toscana-rollback-blindaje`). El fix de las
+cargas ya está en `main` (commit 2520034: el import respeta el código exacto, no re-mapea
+por descripción).
+
 ## Stack y build
 
 - **React 19** en un único archivo gigante: `App.jsx` (~21.000 líneas). No hay módulos; todo vive ahí.
