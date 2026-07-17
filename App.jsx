@@ -8156,12 +8156,19 @@ function ImportarExcelModal({inv, onImportar, onClose, onArchivoCapturado}){
         if(!marcaEnc)      fila._errs.push(`Marca "${marcaRaw||"—"}" no encontrada`);
 
         // ── Detectar duplicado por código exacto O misma descripción ────
+        // Si el Excel trae SKU explícito, el código ES la identidad del producto:
+        // solo matchear por código exacto. El match por descripción aplica únicamente
+        // a filas con código auto-generado — con descripciones genéricas de plantilla
+        // ("Aretes" sin talla/color) agrupaba productos distintos y les reasignaba
+        // el código de otro item del inventario.
         const dk = descKey(fila.marcaNombre, fila.desc, fila.talla, fila.color);
         const dkSinColor = descKey(fila.marcaNombre, fila.desc, fila.talla, "");
         const dkSoloNombre = descKey(fila.marcaNombre, fila.desc, "", "");
         const prodExistente = codigosExistentes.has(sku)
           ? inv.find(p=>p.codigo.toUpperCase()===sku)
-          : descExistente.get(dk) || descExistenteSinColor.get(dkSinColor) || descExistenteSinTallaColor.get(dkSoloNombre) || null;
+          : (autoSKU
+              ? descExistente.get(dk) || descExistenteSinColor.get(dkSinColor) || descExistenteSinTallaColor.get(dkSoloNombre) || null
+              : null);
 
         if(prodExistente){
           const colorExistente = ((prodExistente.descripcion||"").match(/COLOR:\s*([^·\n]+)/i)?.[1]||"").trim().toUpperCase();
