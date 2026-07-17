@@ -61752,7 +61752,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
           const dk = descKey(fila.marcaNombre, fila.desc, fila.talla, fila.color);
           const dkSinColor = descKey(fila.marcaNombre, fila.desc, fila.talla, "");
           const dkSoloNombre = descKey(fila.marcaNombre, fila.desc, "", "");
-          const prodExistente = codigosExistentes.has(sku) ? inv.find((p) => p.codigo.toUpperCase() === sku) : descExistente.get(dk) || descExistenteSinColor.get(dkSinColor) || descExistenteSinTallaColor.get(dkSoloNombre) || null;
+          const prodExistente = codigosExistentes.has(sku) ? inv.find((p) => p.codigo.toUpperCase() === sku) : autoSKU ? descExistente.get(dk) || descExistenteSinColor.get(dkSinColor) || descExistenteSinTallaColor.get(dkSoloNombre) || null : null;
           if (prodExistente) {
             const colorExistente = ((prodExistente.descripcion || "").match(/COLOR:\s*([^·\n]+)/i)?.[1] || "").trim().toUpperCase();
             const colorNuevo = (fila.color || "").trim().toUpperCase();
