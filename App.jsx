@@ -18931,17 +18931,24 @@ function InventarioPorMarca({inv, ventas, retiros=[], bajas=[], onRecibir, onBaj
         const totalUdsGlobal  = inv.reduce((s,p)=>s+p.stock,0);
         const hayFiltroActivo = hayFiltro || marcaSelec;
         return (<>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:8, marginBottom: hayFiltroActivo ? 6 : 14}}>
+        <div className="fos-in" style={{
+          background:"linear-gradient(135deg,#7C7468 0%,#5C5449 45%,#938A7E 100%)",
+          borderRadius:22,padding:isDesktop?"16px 22px":"14px 16px",
+          marginBottom: hayFiltroActivo ? 8 : 14,color:FOS.bone,
+          boxShadow:"0 18px 36px -16px rgba(92,84,73,.45)",
+          display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:10,
+        }}>
           {[
-            {label:"SKUs",          value:productos.length, color:C.label},
-            {label:"Uds. en stock", value:totalStock,       color:C.green},
-            {label:"Vendidas",      value:totalVendidas,    color:C.blue},
-            {label:"Agotados",      value:agotados,         color:C.red},
+            {label:"SKUs",          value:productos.length},
+            {label:"Uds. en stock", value:totalStock},
+            {label:"Vendidas",      value:totalVendidas},
+            {label:"Agotados",      value:agotados},
           ].map(s=>(
-            <div key={s.label} style={{background:C.bg2,borderRadius:14,padding: isDesktop ? "10px 8px" : "12px 10px",
-              border:`1px solid ${C.sep}`,textAlign:"center"}}>
-              <div style={{fontSize:18,fontWeight:700,color:s.color,fontFamily:FONT,marginBottom:2}}>{s.value}</div>
-              <div style={{fontSize:9,color:C.label3,fontFamily:FONT_UI,textTransform:"uppercase",letterSpacing:.7}}>{s.label}</div>
+            <div key={s.label} style={{textAlign:"center"}}>
+              <div style={{fontSize:isDesktop?22:19,fontWeight:800,fontFamily:FOS.sans,
+                letterSpacing:"-0.02em",fontVariantNumeric:"tabular-nums",marginBottom:3}}>{s.value}</div>
+              <div style={{fontFamily:FOS.mono,fontSize:8.5,color:"#E7E1D5",
+                textTransform:"uppercase",letterSpacing:".16em"}}>{s.label}</div>
             </div>
           ))}
         </div>
@@ -23181,23 +23188,31 @@ function VentasTab({vMes, totalVtas, mes, anio, onVentaClick, retiros=[], bajas=
   return (
     <>
     <div>
-      {/* Stats globales */}
-      <div style={{display:"grid",gridTemplateColumns: isDesktop ? "2fr 1fr 1fr 1fr" : "1fr 1fr",gap: isDesktop ? 8 : 10,marginBottom: isDesktop ? 12 : 16}}>
-        <div style={{background:C.bg2,borderRadius:16,padding: isDesktop ? "12px 16px" : "16px 20px",
-          border:`1px solid ${C.sep}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-          <div>
-            <div style={{fontSize:11,color:C.label3,fontWeight:700,textTransform:"uppercase",letterSpacing:.7,marginBottom:3}}>Total {MESES[mes]}</div>
-            <div style={{fontSize: isDesktop ? 22 : 28,fontWeight:700,color:C.label,fontFamily:FONT,lineHeight:1}}>{$(totalVtas)}</div>
-            <div style={{fontSize:12,color:C.label3,fontFamily:FONT,marginTop:3}}>{vMesActivas.length} transacciones · {porMarca.length} marcas activas</div>
+      {/* Héroe del módulo (facelift ForgeOS) */}
+      <div className="fos-in" style={{
+        background:"linear-gradient(135deg,#7C7468 0%,#5C5449 45%,#938A7E 100%)",
+        borderRadius:24,padding:isDesktop?"20px 26px":"18px 20px",marginBottom:isDesktop?12:14,
+        color:FOS.bone,boxShadow:"0 20px 40px -18px rgba(92,84,73,.45)",
+        display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:14,
+      }}>
+        <div>
+          <div style={fosMono({color:"#E7E1D5",marginBottom:7})}>Ventas · {MESES[mes]} {anio}</div>
+          <div style={{fontFamily:FOS.sans,fontWeight:800,fontSize:isDesktop?32:27,
+            letterSpacing:"-0.03em",lineHeight:1,fontVariantNumeric:"tabular-nums"}}>
+            <FosCount value={totalVtas} prefix="Bs "/>
           </div>
-          <div style={{fontSize: isDesktop ? 28 : 36,opacity:.4}}>💰</div>
         </div>
+        <div style={fosMono({color:"#E7E1D5",textAlign:"right"})}>
+          {vMesActivas.length} transacciones<br/>{porMarca.length} marcas activas
+        </div>
+      </div>
+      <div style={{display:"grid",gridTemplateColumns: isDesktop ? "1fr 1fr 1fr" : "1fr 1fr",gap: isDesktop ? 10 : 10,marginBottom: isDesktop ? 12 : 16}}>
         {[
-          {icon:"💵",label:"Efectivo",value:totalEfectivo,color:"#4A9B6F"},
-          {icon:"📱",label:"QR",value:totalQR,color:"#5B8DB8"},
-          {icon:"💳",label:"Tarjeta",value:totalTarjeta,color:"#C8922A"},
+          {label:"Efectivo",value:totalEfectivo,color:"#4A9B6F"},
+          {label:"QR",value:totalQR,color:"#5B8DB8"},
+          {label:"Tarjeta",value:totalTarjeta,color:"#C8922A"},
         ].map(s=>(
-          <StatCard key={s.label} icon={s.icon} label={s.label} value={$(s.value)}
+          <StatCard key={s.label} label={s.label} value={$(s.value)}
             sub={`${Math.round(totalVtas>0?(s.value/totalVtas)*100:0)}% del total`} color={s.color} compact={isDesktop}/>
         ))}
       </div>
@@ -23783,7 +23798,13 @@ function FilterPill({label,color,active,onPress}){
 function EmptyState({icon,title,sub}){
   return (
     <div style={{textAlign:"center",padding:"48px 20px",color:C.label3}}>
-      <div style={{fontSize:44,marginBottom:12,opacity:.5}}>{icon}</div>
+      <div style={{width:52,height:52,borderRadius:16,background:FOS.lavBg,margin:"0 auto 14px",
+        display:"flex",alignItems:"center",justifyContent:"center"}}>
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={FOS.lavDeep}
+          strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/>
+        </svg>
+      </div>
       <div style={{fontSize:17,fontWeight:600,color:C.label2,fontFamily:FONT,marginBottom:6}}>{title}</div>
       {sub&&<div style={{fontSize:14,color:C.label3,fontFamily:FONT}}>{sub}</div>}
     </div>
