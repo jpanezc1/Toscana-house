@@ -4328,8 +4328,8 @@ function imprimirNotaRetiro(r){abrirNotaRetiro(r,true);}
 // ══════════════════════════════════════════════════════════
 
 // Font stack — Inter para UI, Cormorant para display editorial
-const FONT = "'Inter', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif";
-const FONT_UI = "'Inter', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif";
+const FONT = "'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif";
+const FONT_UI = "'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif";
 const FONT_DISPLAY = "'Cormorant Garamond', Georgia, 'Times New Roman', serif";
 const FONT_MONO = "'DM Mono', 'Fira Code', 'SF Mono', 'Menlo', monospace";
 
@@ -4853,13 +4853,14 @@ function DesktopSidebar({tabs, active, onChange, user, logout, groups: customGro
               return (
                 <button key={t.id} onClick={()=>onChange(t.id)} style={{
                   display:"flex",alignItems:"center",gap:10,
-                  width:"100%",padding:"8px 10px",borderRadius:8,border:"none",
-                  background:isActive?C.bg1:"transparent",
+                  width:"100%",padding:"9px 11px",borderRadius:12,
+                  border:isActive?"1px solid rgba(20,19,24,.055)":"1px solid transparent",
+                  background:isActive?"linear-gradient(180deg,#FFFFFF,#FCFBF9)":"transparent",
                   color:isActive?C.label:C.label2,
-                  fontFamily:FONT,fontSize:13,fontWeight:isActive?600:400,
-                  cursor:"pointer",transition:"background .12s",
-                  boxShadow:isActive?"0 1px 3px rgba(0,0,0,.06),0 1px 2px rgba(0,0,0,.04)":"none",
-                  textAlign:"left",marginBottom:1,
+                  fontFamily:FONT,fontSize:13,fontWeight:isActive?700:400,
+                  cursor:"pointer",transition:`background .2s, box-shadow .3s ${FOS.spring}, transform .3s ${FOS.spring}`,
+                  boxShadow:isActive?"0 1px 2px rgba(20,19,24,.04),0 8px 20px -10px rgba(20,19,24,.18),inset 0 1.5px 0 #fff":"none",
+                  textAlign:"left",marginBottom:2,
                   WebkitTapHighlightColor:"transparent",
                   letterSpacing:"-0.01em",
                 }}>
@@ -4876,9 +4877,13 @@ function DesktopSidebar({tabs, active, onChange, user, logout, groups: customGro
       </nav>
 
       {/* FORGE branding */}
-      <div style={{padding:"8px 14px 4px",display:"flex",alignItems:"center",gap:6}}>
-        <span style={{fontSize:10.5,color:"#8a7f96",letterSpacing:".22em",fontFamily:FONT_DISPLAY,fontWeight:600,textTransform:"uppercase"}}>Powered by</span>
-        <span style={{fontSize:15.5,fontWeight:900,color:"#0c0c0f",letterSpacing:"-0.04em",fontFamily:FONT_DISPLAY,lineHeight:1}}>FORGE<span style={{color:"#7c6d8a"}}>.</span></span>
+      <div style={{padding:"8px 14px 4px"}}>
+        <div style={{fontSize:14,fontWeight:800,color:"#0c0c0f",letterSpacing:"-0.03em",fontFamily:FONT,lineHeight:1}}>
+          ForgeOS<span style={{color:FOS.lav}}>.</span>
+        </div>
+        <div style={{fontSize:8.5,color:"#8a7f96",letterSpacing:".2em",fontFamily:FOS.mono,textTransform:"uppercase",marginTop:3}}>
+          Powered by FORGE.
+        </div>
       </div>
 
       {/* User footer */}
@@ -5056,7 +5061,8 @@ function Sheet({open,onClose,title,children,tall}){
         transform:anim?"translateY(0)":"translateY(100%)",
         transition:"transform .32s cubic-bezier(.32,.72,0,1)",
         paddingBottom:"env(safe-area-inset-bottom,24px)",
-        boxShadow:"0 -2px 40px rgba(0,0,0,0.08)",
+        border:"1px solid rgba(20,19,24,.06)",
+        boxShadow:"0 24px 60px -12px rgba(20,19,24,.35), inset 0 1.5px 0 #fff",
       }}>
         {/* Handle */}
         <div style={{display:"flex",justifyContent:"center",padding:"14px 0 6px"}}>
@@ -5093,10 +5099,11 @@ function IOSInput({label,prefix,style:st={},...p}){
           color:C.label3,fontSize:15,fontFamily:FONT,pointerEvents:"none"}}>{prefix}</span>}
         <input autoComplete="off" autoCorrect="off" spellCheck={false} {...p} style={{
           width:"100%",padding:"12px 14px",paddingLeft:prefix?"38px":"14px",
-          borderRadius:10,border:`1px solid ${C.sep}`,
+          borderRadius:12,border:`1px solid ${C.sep}`,
           background:C.bg2,fontSize:14,color:C.label,
           outline:"none",fontFamily:FONT,boxSizing:"border-box",
           WebkitAppearance:"none",fontWeight:400,
+          boxShadow:"inset 0 1px 3px rgba(20,19,24,.05)",
           transition:"border-color .15s, background .15s, box-shadow .15s",
           ...st
         }}
@@ -5112,20 +5119,22 @@ function IOSInput({label,prefix,style:st={},...p}){
 function SegControl({options,value,onChange}){
   return (
     <div style={{
-      background:C.bg2,borderRadius:10,padding:3,
+      background:C.bg2,borderRadius:13,padding:3,
       display:"flex",gap:2,border:`1px solid ${C.sep}`,
       overflowX:"auto",WebkitOverflowScrolling:"touch",
       scrollbarWidth:"none",
+      boxShadow:"inset 0 1px 3px rgba(20,19,24,.06)",
     }}>
       {options.map(o=>(
         <button key={o.value} onClick={()=>onChange(o.value)} style={{
           flex:"1 0 auto",minWidth:0,whiteSpace:"nowrap",
-          padding:"7px 10px",borderRadius:8,border:"none",
-          background:value===o.value?C.bg1:"transparent",
+          padding:"7px 11px",borderRadius:10,
+          border:value===o.value?"1px solid rgba(20,19,24,.05)":"1px solid transparent",
+          background:value===o.value?"linear-gradient(180deg,#FFFFFF,#FCFBF9)":"transparent",
           color:value===o.value?C.label:C.label3,
-          fontFamily:FONT,fontSize:12,fontWeight:value===o.value?600:400,
-          cursor:"pointer",transition:"all .15s ease",
-          boxShadow:value===o.value?"0 1px 3px rgba(0,0,0,0.06),0 1px 2px rgba(0,0,0,0.04)":"none",
+          fontFamily:FONT,fontSize:12,fontWeight:value===o.value?700:400,
+          cursor:"pointer",transition:`all .25s ${FOS.spring}`,
+          boxShadow:value===o.value?"0 1px 2px rgba(20,19,24,.06),0 6px 14px -6px rgba(20,19,24,.16),inset 0 1px 0 #fff":"none",
           WebkitTapHighlightColor:"transparent",
           letterSpacing:"0.01em",
         }}>{o.label}</button>
@@ -5158,11 +5167,11 @@ function IOSSel({label,children,style:st={},...p}){
 function StatCard({icon,label,value,sub,color=C.gold,compact}){
   return (
     <div style={{
-      background:C.bg1,
-      borderRadius:10,
+      background:"linear-gradient(180deg,#FFFFFF,#FCFBF9)",
+      borderRadius:18,
       padding: compact ? "14px 16px" : "16px 18px",
-      border:`1px solid ${C.sep}`,
-      boxShadow:"0 1px 3px rgba(0,0,0,0.06),0 1px 2px rgba(0,0,0,0.04)",
+      border:"1px solid rgba(20,19,24,.055)",
+      boxShadow:"0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.15),inset 0 1.5px 0 #fff",
       textAlign:"center",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",
     }}>
       {sub&&<span style={{
@@ -7281,28 +7290,28 @@ function generarPlanillaAlquileres(ventas, mes, anio) {
 // ══════════════════════════════════════════════════════════
 function KPICard({icon, label, val, sub, color, compact}){
   return (
-    <div style={{
-      background:C.bg1,
-      borderRadius: compact ? 10 : 12,
-      padding: compact ? "14px 16px" : "18px 20px",
-      border:`1px solid ${C.sep}`,
-      boxShadow:"0 1px 3px rgba(0,0,0,0.06),0 1px 2px rgba(0,0,0,0.04)",
-      textAlign:"center",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",
+    <div className="fos-bub" style={{
+      padding: compact ? "15px 16px" : "18px 20px",
+      textAlign:"left",display:"flex",flexDirection:"column",justifyContent:"center",
     }}>
-      <span style={{fontSize: compact ? 16 : 18, opacity:.7, marginBottom: compact ? 6 : 8}}>{icon}</span>
+      <div style={{display:"flex",alignItems:"center",gap:6,marginBottom: compact ? 7 : 9}}>
+        <span style={{width:7,height:7,borderRadius:3,background:color||FOS.lav,flexShrink:0,
+          boxShadow:`0 0 6px ${(color||FOS.lav)}55`}}/>
+        <span style={{
+          fontSize:10,color:C.label3,fontFamily:FOS.mono,fontWeight:500,
+          letterSpacing:"0.14em",textTransform:"uppercase",
+        }}>{label}</span>
+      </div>
       <div style={{
-        fontSize: compact ? 22 : 26,
-        fontWeight:700,
+        fontSize: compact ? 23 : 27,
+        fontWeight:800,
         color: C.label,
         fontFamily:FONT,
         lineHeight:1,letterSpacing:"-0.03em",
-        marginBottom: compact ? 6 : 8,
+        fontVariantNumeric:"tabular-nums",
+        marginBottom: compact ? 5 : 7,
       }}>{val}</div>
-      <span style={{
-        fontSize:10,color:C.label3,fontFamily:FONT,fontWeight:600,
-        letterSpacing:"0.1em",textTransform:"uppercase",
-      }}>{label}</span>
-      {sub&&<div style={{fontSize:11,color:C.label3,fontFamily:FONT,marginTop: compact ? 4 : 6}}>{sub}</div>}
+      {sub&&<div style={{fontSize:11,color:C.label3,fontFamily:FONT}}>{sub}</div>}
     </div>
   );
 }
@@ -9449,46 +9458,56 @@ function HomeDashboard({ventas, inv, vMes, mes, anio, onGoTab}){
   const fmtBs = n => `Bs ${new Intl.NumberFormat("es-BO",{minimumFractionDigits:0,maximumFractionDigits:0}).format(n)}`;
 
   const cardStyle = {
-    background:C.bg1, borderRadius:16, padding: isDesktop ? "12px 16px" : "16px 18px",
-    border:`1px solid ${C.sep}`,
-    boxShadow:"0 2px 8px rgba(120,113,108,0.06)",
-    marginBottom: isDesktop ? 10 : 14,
+    background:"linear-gradient(180deg,#FFFFFF,#FCFBF9)", borderRadius:20,
+    padding: isDesktop ? "14px 18px" : "16px 18px",
+    border:"1px solid rgba(20,19,24,.055)",
+    boxShadow:"0 1px 2px rgba(20,19,24,.04),0 10px 28px -12px rgba(20,19,24,.15),inset 0 1.5px 0 #fff",
+    marginBottom: isDesktop ? 12 : 14,
   };
 
   return (
     <div style={{paddingBottom:8}}>
 
-      {/* ── Logo editorial ── */}
-      <div style={{textAlign:"center",marginBottom: isDesktop ? 10 : 16, paddingTop: isDesktop ? 0 : 4}}>
-        <div style={{
-          display:"inline-flex",flexDirection:"column",alignItems:"center",gap:0,
-          background:C.bg1,borderRadius:20,padding: isDesktop ? "12px 28px 10px" : "20px 36px 16px",
-          border:`1px solid ${C.sep}`,
-          boxShadow:"0 4px 24px rgba(120,113,108,0.08)",
-          marginBottom:4,
-        }}>
-          <div style={{
-            fontSize: isDesktop ? 38 : 52, fontWeight:300,color:C.label,
-            fontFamily:FONT_DISPLAY,
-            letterSpacing:8,lineHeight:1,
-          }}>TH</div>
-          <div style={{width:64,height:1,background:`${C.gold}60`,margin: isDesktop ? "6px 0 4px" : "8px 0 5px"}}/>
-          <div style={{
-            fontSize:13,fontWeight:500,color:C.label,
-            fontFamily:FONT_UI,letterSpacing:6,lineHeight:1,
-            textTransform:"uppercase",
-          }}>TOSCANA HOUSE</div>
-          <div style={{
-            fontSize:9,fontWeight:400,color:C.label3,
-            fontFamily:FONT_UI,letterSpacing:5,lineHeight:1.6,
-            textTransform:"uppercase",
-          }}>CASA DE MODA</div>
+      {/* ── HÉROE void (facelift ForgeOS) ── */}
+      <div className="fos-in" style={{
+        background:"linear-gradient(135deg,#18161D 0%,#141318 55%,#1A1721 100%)",
+        borderRadius:28,padding: isDesktop ? "26px 30px" : "22px 20px",
+        marginBottom: isDesktop ? 12 : 16,color:FOS.bone,
+        boxShadow:"0 24px 48px -18px rgba(20,19,24,.5), inset 0 1px 0 rgba(255,255,255,.07)",
+        position:"relative",overflow:"hidden",
+      }}>
+        <div style={{position:"absolute",top:-70,right:-40,width:260,height:260,borderRadius:"50%",
+          background:"radial-gradient(circle, rgba(155,143,160,.26), transparent 65%)",pointerEvents:"none"}}/>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",
+          flexWrap:"wrap",gap:18,position:"relative"}}>
+          <div>
+            <div style={{fontFamily:FOS.mono,fontSize:10.5,letterSpacing:".2em",
+              textTransform:"uppercase",color:FOS.lavL,marginBottom:8}}>{dateStr}</div>
+            <div style={{display:"flex",alignItems:"baseline",gap:12,flexWrap:"wrap"}}>
+              <div style={{fontFamily:FONT_DISPLAY,fontSize:isDesktop?34:28,fontWeight:400,
+                letterSpacing:".12em",lineHeight:1}}>T H</div>
+              <div style={{fontFamily:FONT,fontWeight:800,fontSize:isDesktop?24:19,
+                letterSpacing:"-0.02em",lineHeight:1}}>Toscana House</div>
+            </div>
+            <div style={{fontFamily:FOS.mono,fontSize:9.5,letterSpacing:".26em",
+              textTransform:"uppercase",color:"#8B8791",marginTop:7}}>Casa de moda · Santa Cruz</div>
+          </div>
+          <div style={{display:"flex",gap:22,alignItems:"center"}}>
+            <div style={{textAlign:"right"}}>
+              <div style={{fontFamily:FOS.mono,fontSize:10,letterSpacing:".16em",
+                textTransform:"uppercase",color:"#8B8791",marginBottom:6}}>Ventas hoy</div>
+              <div style={{fontFamily:FONT,fontWeight:800,fontSize:isDesktop?32:26,
+                letterSpacing:"-0.03em",fontVariantNumeric:"tabular-nums",lineHeight:1}}>
+                <FosCount value={totalHoy} prefix="Bs "/>
+              </div>
+              <div style={{fontFamily:FOS.mono,fontSize:10,letterSpacing:".14em",
+                color:"#8B8791",marginTop:6,textTransform:"uppercase"}}>
+                {vHoy.length} transacci{vHoy.length===1?"ón":"ones"}
+              </div>
+            </div>
+            <FosRing pct={progresoDias} size={84} label="DEL MES"/>
+          </div>
         </div>
-      </div>
-
-      {/* ── Fecha ── */}
-      <div style={{textAlign:"center", marginBottom: isDesktop ? 10 : 16, marginTop:-6}}>
-        <div style={{fontSize:12, color:C.label3, fontFamily:FONT_UI}}>{dateStr}</div>
       </div>
 
       {/* ── KPI grid ── */}
@@ -9516,9 +9535,9 @@ function HomeDashboard({ventas, inv, vMes, mes, anio, onGoTab}){
       </div>
 
       {/* ── Proyección de cierre mensual ── */}
-      <div style={{
-        background:C.bg1, borderRadius:16, padding: isDesktop ? "14px 18px" : "16px 18px",
-        border:`1px solid ${C.sep}`, marginBottom: isDesktop ? 10 : 14,
+      <div className="fos-bub" style={{
+        padding: isDesktop ? "14px 18px" : "16px 18px",
+        marginBottom: isDesktop ? 10 : 14,
       }}>
         <div style={{display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:10}}>
           <div>
@@ -10684,14 +10703,15 @@ function BrandPortal({user, ventas, inv, cargas, retiros=[], logout, descuentos=
 
   // KPI card limpio — sin emoji, monocromático
   const KCard=({label,value,sub,accent=false})=>(
-    <div style={{background:C.bg1,borderRadius:14,padding:"16px",border:`1px solid ${C.sep}`,
-      textAlign:"center",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center"}}>
-      <div style={{fontSize:10,letterSpacing:1.2,textTransform:"uppercase",color:C.label3,
-        fontFamily:FONT_UI,marginBottom:8,opacity:.65}}>{label}</div>
-      <div style={{fontSize:22,fontWeight:700,color:accent?C.green:C.label,
-        fontFamily:FONT,lineHeight:1,letterSpacing:"-0.03em",marginBottom:sub?6:0}}>{value}</div>
+    <div className="fos-bub" style={{padding:"16px 18px",
+      display:"flex",flexDirection:"column",justifyContent:"center"}}>
+      <div style={{fontSize:10,letterSpacing:"0.14em",textTransform:"uppercase",color:C.label3,
+        fontFamily:FOS.mono,fontWeight:500,marginBottom:8}}>{label}</div>
+      <div style={{fontSize:24,fontWeight:800,color:accent?FOS.lavDeep:C.label,
+        fontFamily:FONT,lineHeight:1,letterSpacing:"-0.03em",fontVariantNumeric:"tabular-nums",
+        marginBottom:sub?6:0}}>{value}</div>
       {sub&&<div style={{fontSize:11,fontWeight:600,
-        color:sub.startsWith("+")?C.green:sub.startsWith("-")?C.red:C.label3,
+        color:sub.startsWith("+")?FOS.ok:sub.startsWith("-")?C.red:C.label3,
         fontFamily:FONT_UI}}>{sub}</div>}
     </div>
   );
@@ -14332,6 +14352,7 @@ function App(){
       )}
 
       {/* ── DESKTOP SIDEBAR ── */}
+      <FosStyles/>
       {isDesktop&&<DesktopSidebar tabs={TABS} active={tab} onChange={t=>{setTab(t);setMD(null);}} user={user} logout={logout}/>}
 
       {/* ── MAIN CONTENT AREA (desktop: flex-1 scroll) ── */}
