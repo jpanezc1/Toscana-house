@@ -4877,13 +4877,9 @@ function DesktopSidebar({tabs, active, onChange, user, logout, groups: customGro
       </nav>
 
       {/* FORGE branding */}
-      <div style={{padding:"8px 14px 4px"}}>
-        <div style={{fontSize:14,fontWeight:800,color:"#0c0c0f",letterSpacing:"-0.03em",fontFamily:FONT,lineHeight:1}}>
-          ForgeOS<span style={{color:FOS.lav}}>.</span>
-        </div>
-        <div style={{fontSize:8.5,color:"#8a7f96",letterSpacing:".2em",fontFamily:FOS.mono,textTransform:"uppercase",marginTop:3}}>
-          Powered by FORGE.
-        </div>
+      <div style={{padding:"8px 14px 4px",display:"flex",alignItems:"center",gap:6}}>
+        <span style={{fontSize:10.5,color:"#8a7f96",letterSpacing:".22em",fontFamily:FONT_DISPLAY,fontWeight:600,textTransform:"uppercase"}}>Powered by</span>
+        <span style={{fontSize:15.5,fontWeight:900,color:"#0c0c0f",letterSpacing:"-0.04em",fontFamily:FONT_DISPLAY,lineHeight:1}}>FORGE<span style={{color:"#7c6d8a"}}>.</span></span>
       </div>
 
       {/* User footer */}
