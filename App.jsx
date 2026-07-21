@@ -4813,62 +4813,85 @@ function NavBar({title, subtitle, back, onBack, right}){
 }
 
 // ── Atelier Desktop Sidebar ──────────────────────────────────────────────────
+// Íconos SVG de navegación (trazo fino, heredan color) — riel ForgeOS
+const FOS_NAV_PATHS = {
+  inicio:    "M3 11l9-7 9 7v9a2 2 0 01-2 2h-4v-6h-6v6H5a2 2 0 01-2-2z",
+  dashboard: "M3 11l9-7 9 7v9a2 2 0 01-2 2h-4v-6h-6v6H5a2 2 0 01-2-2z",
+  pos:       "M2 3h3l2.6 12.4A2 2 0 009.6 17h8.9a2 2 0 002-1.6L22 7H6 M9 21h.01M19 21h.01",
+  ventas:    "M3 17l6-6 4 4 8-8 M21 7v6h-6",
+  cambios:   "M7 16V5 M7 5L3 9 M7 5l4 4 M17 8v11 M17 19l4-4 M17 19l-4-4",
+  inventario:"M21 8l-9-5-9 5 9 5 9-5z M3 8v8l9 5 9-5V8 M12 13v8",
+  marcas:    "M20.6 13.4L11 3H4v7l9.6 10.4a2 2 0 002.8 0l4.2-4.2a2 2 0 000-2.8z M8 8h.01",
+  liquidaciones:"M19 4H5a2 2 0 00-2 2v12a2 2 0 002 2h14a2 2 0 002-2V6a2 2 0 00-2-2z M7 9h6 M7 13h10 M7 17h4",
+  liquidacion:"M19 4H5a2 2 0 00-2 2v12a2 2 0 002 2h14a2 2 0 002-2V6a2 2 0 00-2-2z M7 9h6 M7 13h10 M7 17h4",
+  giftcards: "M20 12v9H4v-9 M2 7h20v5H2z M12 7v14 M12 7c-1.5 0-4-1-4-3s2.5-2 4 3z M12 7c1.5 0 4-1 4-3s-2.5-2-4 3z",
+  auditoria: "M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z",
+  cargas:    "M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4 M7 8l5-5 5 5 M12 3v12",
+  ventas_ant:"M12 21a9 9 0 100-18 9 9 0 000 18z M12 7v5l3 3",
+  config:    "M4 21v-7 M4 10V3 M12 21v-9 M12 8V3 M20 21v-5 M20 12V3 M1 14h6 M9 8h6 M17 16h6",
+  retiros:   "M9 14l-4-4 4-4 M5 10h9a6 6 0 016 6v2",
+};
+function FosNavIcon({id}){
+  const d = FOS_NAV_PATHS[id];
+  if(!d) return <span style={{width:16,flexShrink:0}}/>;
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}>
+      {d.split(" M").map((p,i)=><path key={i} d={(i?"M":"")+p}/>)}
+    </svg>
+  );
+}
+
 function DesktopSidebar({tabs, active, onChange, user, logout, groups: customGroups, dotColors: customDot}){
   const GROUPS = customGroups || [
     {label:"Principal", ids:["inicio","pos","ventas","cambios"]},
     {label:"Gestión",   ids:["inventario","marcas","liquidaciones","giftcards"]},
     {label:"Sistema",   ids:["auditoria","cargas","ventas_ant","config"]},
   ];
-  const DOT = customDot || {
-    inicio:"#8A6418",pos:"#1A1714",ventas:"#1E3A5F",
-    inventario:"#166534",auditoria:"#7A1F1F",cargas:"#1565C0",marcas:"#5B2D8E",liquidaciones:"#991B1B",
-    giftcards:"#92400E",config:C.label3,
-  };
+  const esMarca = user?.rol==="marca";
   return (
     <div style={{
-      width:220,flexShrink:0,
+      width:224,flexShrink:0,
       height:"100vh",position:"sticky",top:0,
-      background:C.bg2,
-      borderRight:`1px solid ${C.sep}`,
+      background:"linear-gradient(180deg,#7C7468 0%,#5C5449 45%,#7E766B 100%)",
       display:"flex",flexDirection:"column",
       overflow:"hidden",
     }}>
       {/* Logo */}
-      <div style={{padding:"22px 22px 18px",borderBottom:`1px solid ${C.sep}`,flexShrink:0}}>
-        <div style={{fontFamily:FONT_DISPLAY,fontSize:22,fontWeight:400,color:C.label,letterSpacing:".14em",lineHeight:1}}>T H</div>
-        <div style={{fontSize:9,letterSpacing:".22em",textTransform:"uppercase",color:C.label3,marginTop:3}}>Casa de Moda</div>
+      <div style={{padding:"24px 22px 16px",flexShrink:0}}>
+        <div style={{fontFamily:FONT_DISPLAY,fontSize:24,fontWeight:400,color:FOS.bone,letterSpacing:".16em",lineHeight:1}}>T H</div>
+        <div style={{fontFamily:FOS.mono,fontSize:8.5,letterSpacing:".26em",textTransform:"uppercase",color:"#D5CEC0",marginTop:6}}>
+          {esMarca?"Portal de marca":"Toscana House · Casa de moda"}
+        </div>
       </div>
 
       {/* Nav groups */}
-      <nav style={{flex:1,padding:"14px 10px",overflowY:"auto"}}>
+      <nav style={{flex:1,padding:"4px 12px",overflowY:"auto"}}>
         {GROUPS.map(g=>(
           <div key={g.label} style={{marginBottom:4}}>
             <div style={{
-              fontSize:9,letterSpacing:".18em",textTransform:"uppercase",
-              color:C.label3,padding:"4px 10px",
-              margin:"14px 0 5px",fontWeight:500,
+              fontFamily:FOS.mono,fontSize:9,letterSpacing:".24em",textTransform:"uppercase",
+              color:"#CFC8BA",padding:"4px 12px",
+              margin:"14px 0 6px",fontWeight:500,opacity:.85,
             }}>{g.label}</div>
             {tabs.filter(t=>g.ids.includes(t.id)).map(t=>{
               const isActive=active===t.id;
               return (
                 <button key={t.id} onClick={()=>onChange(t.id)} style={{
-                  display:"flex",alignItems:"center",gap:10,
-                  width:"100%",padding:"9px 11px",borderRadius:12,
-                  border:isActive?"1px solid rgba(20,19,24,.055)":"1px solid transparent",
-                  background:isActive?"linear-gradient(180deg,#FFFFFF,#FCFBF9)":"transparent",
-                  color:isActive?C.label:C.label2,
-                  fontFamily:FONT,fontSize:13,fontWeight:isActive?700:400,
-                  cursor:"pointer",transition:`background .2s, box-shadow .3s ${FOS.spring}, transform .3s ${FOS.spring}`,
-                  boxShadow:isActive?"0 1px 2px rgba(20,19,24,.04),0 8px 20px -10px rgba(20,19,24,.18),inset 0 1px 0 rgba(255,255,255,.45)":"none",
-                  textAlign:"left",marginBottom:2,
+                  display:"flex",alignItems:"center",gap:11,
+                  width:"100%",padding:"10px 12px",borderRadius:13,border:"none",
+                  background:isActive?"linear-gradient(180deg,#FBFAF7,#F0EDE7)":"transparent",
+                  color:isActive?C.label:"#DAD4C8",
+                  fontFamily:FONT,fontSize:13,fontWeight:isActive?700:600,
+                  cursor:"pointer",transition:`all .3s ${FOS.spring}`,
+                  boxShadow:isActive?"0 8px 20px -8px rgba(0,0,0,.3),inset 0 1px 0 rgba(255,255,255,.45)":"none",
+                  textAlign:"left",marginBottom:3,
                   WebkitTapHighlightColor:"transparent",
                   letterSpacing:"-0.01em",
                 }}>
-                  <span style={{width:6,height:6,borderRadius:2,flexShrink:0,
-                    background:isActive?(DOT[t.id]||C.gold):"rgba(26,23,20,.15)",
-                    transition:"background .12s",
-                  }}/>
+                  <FosNavIcon id={t.id}/>
                   <span style={{flex:1}}>{t.label}</span>
+                  {isActive&&<span style={{width:6,height:6,borderRadius:3,flexShrink:0,background:C.gold}}/>}
                 </button>
               );
             })}
@@ -4876,34 +4899,35 @@ function DesktopSidebar({tabs, active, onChange, user, logout, groups: customGro
         ))}
       </nav>
 
-      {/* FORGE branding */}
-      <div style={{padding:"8px 14px 4px",display:"flex",alignItems:"center",gap:6}}>
-        <span style={{fontSize:10.5,color:"#8a7f96",letterSpacing:".22em",fontFamily:FONT_DISPLAY,fontWeight:600,textTransform:"uppercase"}}>Powered by</span>
-        <span style={{fontSize:15.5,fontWeight:900,color:"#0c0c0f",letterSpacing:"-0.04em",fontFamily:FONT_DISPLAY,lineHeight:1}}>FORGE<span style={{color:"#7c6d8a"}}>.</span></span>
-      </div>
-
-      {/* User footer */}
+      {/* User chip */}
       <div style={{
-        padding:"12px 14px",borderTop:`1px solid ${C.sep}`,
+        margin:"10px 14px 10px",padding:"11px 13px",borderRadius:15,
+        background:"rgba(255,255,255,.12)",border:"1px solid rgba(255,255,255,.08)",
         display:"flex",alignItems:"center",gap:10,flexShrink:0,
       }}>
         <div style={{
-          width:30,height:30,borderRadius:8,
-          background:C.label,color:"#fff",
+          width:30,height:30,borderRadius:9,
+          background:FOS.bone,color:C.label,
           display:"flex",alignItems:"center",justifyContent:"center",
-          fontSize:10,fontWeight:700,flexShrink:0,fontFamily:FONT,
-        }}>TH</div>
+          fontSize:10.5,fontWeight:800,flexShrink:0,fontFamily:FONT,
+        }}>{(user?.nombre||"TH").split(" ").map(x=>x[0]).slice(0,2).join("").toUpperCase()}</div>
         <div style={{flex:1,minWidth:0}}>
-          <div style={{fontSize:12,fontWeight:600,color:C.label,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+          <div style={{fontSize:12,fontWeight:700,color:FOS.bone,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
             {user?.nombre||"Toscana House"}
           </div>
-          <div style={{fontSize:10,color:C.label3,textTransform:"capitalize"}}>{user?.rol||"Admin"}</div>
+          <div style={{fontSize:10,color:"#D5CEC0",textTransform:"capitalize"}}>{user?.rol||"Admin"}</div>
         </div>
         <button onClick={logout} style={{
-          background:"none",border:"none",color:C.label3,
-          fontSize:11,cursor:"pointer",fontFamily:FONT,padding:"4px",
+          background:"none",border:"none",color:"#D5CEC0",
+          fontSize:11,cursor:"pointer",fontFamily:FONT,padding:"4px",fontWeight:600,
           WebkitTapHighlightColor:"transparent",
         }}>Salir</button>
+      </div>
+
+      {/* FORGE branding */}
+      <div style={{padding:"0 22px 16px",display:"flex",alignItems:"center",gap:6,flexShrink:0}}>
+        <span style={{fontFamily:FOS.mono,fontSize:8.5,color:"#CFC8BA",letterSpacing:".22em",textTransform:"uppercase"}}>Powered by</span>
+        <span style={{fontSize:13,fontWeight:600,color:FOS.bone,letterSpacing:".06em",fontFamily:FONT_DISPLAY,lineHeight:1}}>FORGE<span style={{color:"#D9C48C"}}>.</span></span>
       </div>
     </div>
   );
