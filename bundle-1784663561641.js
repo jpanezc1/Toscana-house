@@ -59806,7 +59806,8 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       return Object.values(map).sort((a, b) => a.marcaNombre.localeCompare(b.marcaNombre));
     }, [retirosFiltrados]);
     return /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      background: C.bg1,
+      background: "linear-gradient(180deg,#FFFFFF,#FCFBF9)",
+      boxShadow: "0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1.5px 0 #fff",
       borderRadius: 16,
       padding: 20,
       marginBottom: 16,
@@ -59997,7 +59998,8 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       },
       "\u{1F4E4} Confirmar Retiro"
     )), /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      background: C.bg1,
+      background: "linear-gradient(180deg,#FFFFFF,#FCFBF9)",
+      boxShadow: "0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1.5px 0 #fff",
       borderRadius: 16,
       padding: 20,
       border: `1px solid ${C.sep}`,
@@ -63497,7 +63499,8 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
         fontFamily: FONT,
         marginBottom: 10
       } }, "Informaci\xF3n general"), /* @__PURE__ */ import_react.default.createElement("div", { style: {
-        background: C.bg1,
+        background: "linear-gradient(180deg,#FFFFFF,#FCFBF9)",
+        boxShadow: "0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1.5px 0 #fff",
         borderRadius: 14,
         padding: "0 14px",
         border: `1px solid ${C.sep}`,
@@ -63512,7 +63515,8 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
         fontFamily: FONT,
         marginBottom: 10
       } }, "Productos de ", marca.nombre, " (", items.length, ")"), /* @__PURE__ */ import_react.default.createElement("div", { style: {
-        background: C.bg1,
+        background: "linear-gradient(180deg,#FFFFFF,#FCFBF9)",
+        boxShadow: "0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1.5px 0 #fff",
         borderRadius: 14,
         overflow: "hidden",
         border: `1px solid ${C.sep}`,
@@ -63574,7 +63578,8 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
         fontFamily: FONT,
         marginBottom: 10
       } }, "Cliente"), /* @__PURE__ */ import_react.default.createElement("div", { style: {
-        background: C.bg1,
+        background: "linear-gradient(180deg,#FFFFFF,#FCFBF9)",
+        boxShadow: "0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1.5px 0 #fff",
         borderRadius: 14,
         padding: "0 14px",
         border: `1px solid ${C.sep}`,
@@ -63589,7 +63594,8 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
         fontFamily: FONT,
         marginBottom: 10
       } }, "Nota de venta"), /* @__PURE__ */ import_react.default.createElement("div", { style: {
-        background: C.bg1,
+        background: "linear-gradient(180deg,#FFFFFF,#FCFBF9)",
+        boxShadow: "0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1.5px 0 #fff",
         borderRadius: 14,
         padding: 14,
         border: `1px solid ${C.sep}`,
@@ -64657,40 +64663,26 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
         onQuitar: onQuitarDescCodigo
       }
     ), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 } }, /* @__PURE__ */ import_react.default.createElement("div", { className: "fos-bub", style: { padding: "18px 20px" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: fosMono({ marginBottom: 8 }) }, "Neto estimado"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontFamily: FOS.sans, fontWeight: 800, fontSize: 24, letterSpacing: "-0.03em", color: FOS.lavDeep } }, $2(liq.neto)), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11.5, color: FOS.mut, marginTop: 3, fontFamily: FOS.sans } }, "despu\xE9s de comisiones y alquiler")), /* @__PURE__ */ import_react.default.createElement("div", { className: "fos-bub", style: { padding: "18px 20px" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: fosMono({ marginBottom: 8 }) }, "Mejor mes"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontFamily: FOS.sans, fontWeight: 800, fontSize: 24, letterSpacing: "-0.03em" } }, mejorMes ? $2(mejorMes.tot) : "\u2014"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11.5, color: FOS.mut, marginTop: 3, fontFamily: FOS.sans } }, mejorMes ? `tu r\xE9cord hist\xF3rico` : "todav\xEDa sin historial"))), /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      background: C.bg1,
+      background: "linear-gradient(180deg,#FFFFFF,#FCFBF9)",
+      boxShadow: "0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1.5px 0 #fff",
       borderRadius: 14,
       padding: "16px",
       marginBottom: 16,
       border: `1px solid ${C.sep}`
-    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      fontSize: 10,
-      letterSpacing: 1.2,
-      textTransform: "uppercase",
-      color: C.label3,
-      fontFamily: FONT_UI,
-      marginBottom: 14,
-      opacity: 0.65
-    } }, "Evoluci\xF3n mensual"), /* @__PURE__ */ import_react.default.createElement(MiniBarChart, { data: hist6, color: C.label, height: 64 }), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, letterSpacing: "0.14em", textTransform: "uppercase", color: C.label3, fontFamily: FOS.mono, fontWeight: 500, fontFamily: FONT_UI, marginBottom: 14, opacity: 0.65 } }, "Evoluci\xF3n mensual"), /* @__PURE__ */ import_react.default.createElement(MiniBarChart, { data: hist6, color: C.label, height: 64 }), /* @__PURE__ */ import_react.default.createElement("div", { style: {
       display: "flex",
       justifyContent: "space-between",
       marginTop: 12,
       paddingTop: 12,
       borderTop: `1px solid ${C.sep}`
     } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: C.label3, fontFamily: FONT_UI, letterSpacing: 0.5, opacity: 0.6, marginBottom: 3 } }, "MES ANTERIOR"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 15, fontWeight: 700, color: C.label, fontFamily: FONT, letterSpacing: "-0.02em" } }, $2(brutoPrev))), /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "right" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: C.label3, fontFamily: FONT_UI, letterSpacing: 0.5, opacity: 0.6, marginBottom: 3 } }, "PROYECCI\xD3N"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 15, fontWeight: 700, color: C.label, fontFamily: FONT, letterSpacing: "-0.02em" } }, $2(proyeccion))))), topProds.length > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      background: C.bg1,
+      background: "linear-gradient(180deg,#FFFFFF,#FCFBF9)",
+      boxShadow: "0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1.5px 0 #fff",
       borderRadius: 14,
       padding: "16px",
       marginBottom: 16,
       border: `1px solid ${C.sep}`
-    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      fontSize: 10,
-      letterSpacing: 1.2,
-      textTransform: "uppercase",
-      color: C.label3,
-      fontFamily: FONT_UI,
-      marginBottom: 14,
-      opacity: 0.65
-    } }, "Top productos \xB7 ", MESES[mes]), topProds.map((p, i) => /* @__PURE__ */ import_react.default.createElement("div", { key: p.codigo, style: {
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, letterSpacing: "0.14em", textTransform: "uppercase", color: C.label3, fontFamily: FOS.mono, fontWeight: 500, fontFamily: FONT_UI, marginBottom: 14, opacity: 0.65 } }, "Top productos \xB7 ", MESES[mes]), topProds.map((p, i) => /* @__PURE__ */ import_react.default.createElement("div", { key: p.codigo, style: {
       display: "flex",
       alignItems: "center",
       gap: 12,
@@ -64715,20 +64707,13 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       whiteSpace: "nowrap",
       marginBottom: 2
     } }, p.nombre), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: C.label3, fontFamily: "monospace", opacity: 0.55 } }, p.codigo)), /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "right", flexShrink: 0 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, fontWeight: 700, color: C.label, fontFamily: FONT, letterSpacing: "-0.01em" } }, $2(p.total)), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: C.label3, fontFamily: FONT_UI, opacity: 0.6, marginTop: 2 } }, p.uds, " uds"))))), /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      background: C.bg1,
+      background: "linear-gradient(180deg,#FFFFFF,#FCFBF9)",
+      boxShadow: "0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1.5px 0 #fff",
       borderRadius: 14,
       padding: "16px",
       marginBottom: 16,
       border: `1px solid ${C.sep}`
-    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      fontSize: 10,
-      letterSpacing: 1.2,
-      textTransform: "uppercase",
-      color: C.label3,
-      fontFamily: FONT_UI,
-      marginBottom: 14,
-      opacity: 0.65
-    } }, "Stock actual"), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, letterSpacing: "0.14em", textTransform: "uppercase", color: C.label3, fontFamily: FOS.mono, fontWeight: 500, fontFamily: FONT_UI, marginBottom: 14, opacity: 0.65 } }, "Stock actual"), /* @__PURE__ */ import_react.default.createElement("div", { style: {
       display: "grid",
       gridTemplateColumns: "1fr 1fr 1fr",
       gap: 1,
@@ -64766,20 +64751,13 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       margin: "6px auto 0",
       opacity: 0.6
     } }))))), /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      background: C.bg1,
+      background: "linear-gradient(180deg,#FFFFFF,#FCFBF9)",
+      boxShadow: "0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1.5px 0 #fff",
       borderRadius: 14,
       padding: "16px",
       marginBottom: 16,
       border: `1px solid ${C.sep}`
-    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      fontSize: 10,
-      letterSpacing: 1.2,
-      textTransform: "uppercase",
-      color: C.label3,
-      fontFamily: FONT_UI,
-      marginBottom: 14,
-      opacity: 0.65
-    } }, "vs ", MESES[mPrev]), [
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, letterSpacing: "0.14em", textTransform: "uppercase", color: C.label3, fontFamily: FOS.mono, fontWeight: 500, fontFamily: FONT_UI, marginBottom: 14, opacity: 0.65 } }, "vs ", MESES[mPrev]), [
       ["Ventas brutas", $2(brutoPrev), $2(brutoMes), varBruto],
       ["\xCDtems vendidos", udsPrev, udsMes, varUds],
       ["Transacciones", vMesPrev.length, vMes.length, vMesPrev.length > 0 ? (vMes.length - vMesPrev.length) / vMesPrev.length * 100 : 0]
@@ -65006,7 +64984,8 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       { label: "Vendidas", value: invFiltrado.reduce((s, i) => s + (vendidasPorCodigo[i.codigo] || 0), 0), color: C.blue },
       { label: "Agotados", value: invFiltrado.filter((i) => i.stock === 0).length, color: C.red }
     ].map((s) => /* @__PURE__ */ import_react.default.createElement("div", { key: s.label, style: {
-      background: C.bg1,
+      background: "linear-gradient(180deg,#FFFFFF,#FCFBF9)",
+      boxShadow: "0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1.5px 0 #fff",
       borderRadius: 12,
       padding: "10px 8px",
       border: `1px solid ${C.sep}`,
@@ -65218,7 +65197,8 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
         return prod ? Number(prod.marcaId) === mid : false;
       }).slice().reverse();
       return /* @__PURE__ */ import_react.default.createElement("div", { style: {
-        background: C.bg1,
+        background: "linear-gradient(180deg,#FFFFFF,#FCFBF9)",
+        boxShadow: "0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1.5px 0 #fff",
         borderRadius: 16,
         padding: 20,
         border: `1px solid ${C.sep}`,
@@ -65257,15 +65237,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
         },
         "\u{1F4C4} Nota"
       ))))));
-    })(), tab === "cargas" && /* @__PURE__ */ import_react.default.createElement(RegistroCargas, { cargas: cargas || [], marcas: MARCAS, marcaId: mid, inv }), tab === "liquidacion" && /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 24 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      fontSize: 10,
-      letterSpacing: 1.2,
-      textTransform: "uppercase",
-      color: C.label3,
-      fontFamily: FONT_UI,
-      marginBottom: 4,
-      opacity: 0.65
-    } }, "Liquidaci\xF3n estimada"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.label2, fontFamily: FONT } }, MESES[mes], " ", anio, " \xB7 Basado en configuraci\xF3n Toscana House")), /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 24 } }, [
+    })(), tab === "cargas" && /* @__PURE__ */ import_react.default.createElement(RegistroCargas, { cargas: cargas || [], marcas: MARCAS, marcaId: mid, inv }), tab === "liquidacion" && /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 24 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, letterSpacing: "0.14em", textTransform: "uppercase", color: C.label3, fontFamily: FOS.mono, fontWeight: 500, fontFamily: FONT_UI, marginBottom: 4, opacity: 0.65 } }, "Liquidaci\xF3n estimada"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.label2, fontFamily: FONT } }, MESES[mes], " ", anio, " \xB7 Basado en configuraci\xF3n Toscana House")), /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 24 } }, [
       { label: "Ventas brutas", value: liq.bruto, sign: "", muted: false, bold: false },
       { label: "Efectivo", value: liq.brutoEf, sign: "", muted: true, bold: false, sub: true },
       { label: "QR", value: liq.brutoQR, sign: "", muted: true, bold: false, sub: true },
@@ -67234,7 +67206,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       marginBottom: 4,
       fontFamily: FONT_UI,
       opacity: 0.8
-    } }, k.label), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: k.fmt === "bs" ? 13 : 20, fontWeight: 700, color: k.color, fontFamily: FONT_UI } }, k.fmt === "bs" ? $2(k.val) : k.val)))), gcFiltradas.length === 0 ? /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center", padding: "40px 20px", color: C.label3, fontFamily: FONT_UI } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 40, marginBottom: 12 } }, "\u{1F381}"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 15, fontWeight: 600, marginBottom: 6 } }, "Sin resultados"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13 } }, "Ajusta los filtros o crea una nueva Gift Card")) : isDesktop ? /* @__PURE__ */ import_react.default.createElement("div", { style: { background: C.bg1, borderRadius: 16, border: `1px solid ${C.sep}`, overflow: "hidden" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+    } }, k.label), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: k.fmt === "bs" ? 13 : 20, fontWeight: 700, color: k.color, fontFamily: FONT_UI } }, k.fmt === "bs" ? $2(k.val) : k.val)))), gcFiltradas.length === 0 ? /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center", padding: "40px 20px", color: C.label3, fontFamily: FONT_UI } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 40, marginBottom: 12 } }, "\u{1F381}"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 15, fontWeight: 600, marginBottom: 6 } }, "Sin resultados"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13 } }, "Ajusta los filtros o crea una nueva Gift Card")) : isDesktop ? /* @__PURE__ */ import_react.default.createElement("div", { style: { background: "linear-gradient(180deg,#FFFFFF,#FCFBF9)", boxShadow: "0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1.5px 0 #fff", borderRadius: 16, border: `1px solid ${C.sep}`, overflow: "hidden" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
       display: "grid",
       gridTemplateColumns: "2fr 1fr 1fr 1fr 1fr 1fr 70px",
       padding: "10px 16px",
@@ -71355,7 +71327,8 @@ Base de inventario tomada: ${baseTs.toLocaleString("es-BO")}`)) return;
       flexShrink: 0,
       boxShadow: "0 0 0 3px rgba(105,240,174,0.3)"
     } }), /* @__PURE__ */ import_react.default.createElement("div", { style: { lineHeight: 1.3 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, fontWeight: 700, color: "#fff", fontFamily: FONT } }, "Verificaci\xF3n activa"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: "rgba(255,255,255,0.8)", fontFamily: FONT } }, totalContado, " \xEDtem", totalContado !== 1 ? "s" : "", " escaneado", totalContado !== 1 ? "s" : "")), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: "rgba(255,255,255,0.7)", fontFamily: FONT, marginLeft: 4 } }, "Volver \u203A")), /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      background: C.bg1,
+      background: "linear-gradient(180deg,#FFFFFF,#FCFBF9)",
+      boxShadow: "0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1.5px 0 #fff",
       borderRadius: 16,
       padding: 18,
       marginBottom: 14,
@@ -71415,7 +71388,8 @@ Base de inventario tomada: ${baseTs.toLocaleString("es-BO")}`)) return;
       background: C.greenBg,
       border: `1px solid ${C.green}33`
     } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13 } }, "\u{1F4E6}"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 11, color: C.green, fontFamily: FONT, lineHeight: 1.4, fontWeight: 600 } }, totalAjustePorCargas, " unidad", totalAjustePorCargas !== 1 ? "es" : "", " recibida", totalAjustePorCargas !== 1 ? "s" : "", " durante este conteo \u2014 ya sumada", totalAjustePorCargas !== 1 ? "s" : "", " al stock del sistema en el cruce"))), /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      background: C.bg1,
+      background: "linear-gradient(180deg,#FFFFFF,#FCFBF9)",
+      boxShadow: "0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1.5px 0 #fff",
       borderRadius: 14,
       padding: "12px 14px",
       marginBottom: 14,
@@ -71732,7 +71706,8 @@ Base de inventario tomada: ${baseTs.toLocaleString("es-BO")}`)) return;
         letterSpacing: "0.02em"
       } }, ei.label)));
     })), faltantes.length > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      background: C.bg1,
+      background: "linear-gradient(180deg,#FFFFFF,#FCFBF9)",
+      boxShadow: "0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1.5px 0 #fff",
       borderRadius: 14,
       padding: 16,
       marginBottom: 16,
@@ -71944,7 +71919,8 @@ Confirmas que el conteo de ${r.contado} unidad(es) es correcto.`)) {
         const marcaNombre = a.marcaId ? MARCAS.find((m) => m.id === a.marcaId)?.nombre || "\u2014" : "Todas las marcas";
         const abierta = auditoriaAbierta === a.id;
         return /* @__PURE__ */ import_react.default.createElement("div", { key: a.id, style: {
-          background: C.bg1,
+          background: "linear-gradient(180deg,#FFFFFF,#FCFBF9)",
+          boxShadow: "0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1.5px 0 #fff",
           borderRadius: 14,
           border: `1px solid ${C.sep}`,
           overflow: "hidden",
@@ -73306,7 +73282,8 @@ ${c.diferencia > 0.01 ? `Cliente paga diferencia: Bs ${fmt2(c.diferencia)} (${c.
       }
     }
     return /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      background: C.bg1,
+      background: "linear-gradient(180deg,#FFFFFF,#FCFBF9)",
+      boxShadow: "0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1.5px 0 #fff",
       borderRadius: 16,
       padding: 18,
       marginBottom: 14,
@@ -73425,7 +73402,8 @@ ${c.diferencia > 0.01 ? `Cliente paga diferencia: Bs ${fmt2(c.diferencia)} (${c.
       const items = itemsDe(c);
       const tipoInfo = c.tipo === "IMPORT" ? { label: "Importaci\xF3n Excel", icon: "\u{1F4E5}", color: C.blue } : c.tipo === "HISTORICO" ? { label: "Carga hist\xF3rica", icon: "\u{1F553}", color: C.label3 } : { label: "Carga manual", icon: "\u270D\uFE0F", color: C.green };
       return /* @__PURE__ */ import_react.default.createElement("div", { key: c.id, style: {
-        background: C.bg1,
+        background: "linear-gradient(180deg,#FFFFFF,#FCFBF9)",
+        boxShadow: "0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1.5px 0 #fff",
         borderRadius: 14,
         border: `1px solid ${C.sep}`,
         overflow: "hidden",
@@ -76319,7 +76297,8 @@ ${c.resumen || c.id}`)) onEliminarCarga(c.id);
       }
     ));
     return /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      background: C.bg1,
+      background: "linear-gradient(180deg,#FFFFFF,#FCFBF9)",
+      boxShadow: "0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1.5px 0 #fff",
       borderRadius: 18,
       padding: 18,
       border: `1px solid ${C.sep}`,
@@ -76836,7 +76815,7 @@ ${c.resumen || c.id}`)) onEliminarCarga(c.id);
           marginBottom: 12
         }
       }
-    ), trazCod && (trazLogs.length === 0 ? /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center", padding: 24, color: C.label3, fontFamily: FONT, fontSize: 13 } }, 'Sin movimientos registrados para "', trazCod, '"') : /* @__PURE__ */ import_react.default.createElement("div", { style: { background: C.bg1, borderRadius: 16, border: `1px solid ${C.sep}`, overflow: "hidden" } }, trazLogs.map((e, i) => {
+    ), trazCod && (trazLogs.length === 0 ? /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center", padding: 24, color: C.label3, fontFamily: FONT, fontSize: 13 } }, 'Sin movimientos registrados para "', trazCod, '"') : /* @__PURE__ */ import_react.default.createElement("div", { style: { background: "linear-gradient(180deg,#FFFFFF,#FCFBF9)", boxShadow: "0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1.5px 0 #fff", borderRadius: 16, border: `1px solid ${C.sep}`, overflow: "hidden" } }, trazLogs.map((e, i) => {
       const t = tc(e.tipo);
       const itemEsp = e.items?.find((it) => it.codigo?.toUpperCase() === trazCod) || e.stockCambios?.find((it) => it.codigo?.toUpperCase() === trazCod);
       return /* @__PURE__ */ import_react.default.createElement(
@@ -76867,7 +76846,8 @@ ${c.resumen || c.id}`)) onEliminarCarga(c.id);
         /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", gap: 8 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, fontWeight: 700, color: t.color, fontFamily: FONT } }, t.label), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 10, color: C.label3, fontFamily: FONT } }, e.fecha, " ", e.hora)), itemEsp && /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label, fontFamily: FONT, marginTop: 2 } }, e.tipo === "VENTA" && `Vendido \xD7${itemEsp.cantidad} \xB7 Bs ${itemEsp.subtotal}`, e.tipo === "RETIRO" && `Retirado \xD7${e.cantidad}`, e.tipo === "BAJA" && `Dado de baja \xB7 stock ${itemEsp.stockAntes || e.stockAntes}\u21920`, e.tipo === "IMPORT" && `${itemEsp.tipo === "create" ? "Ingresado" : "Actualizado"} \xB7 stock ${itemEsp.stock || itemEsp.stockNuevo}`, e.tipo === "ANULACION" && `Venta anulada \xB7 stock devuelto \xD7${itemEsp.cantidad || ""}`, e.tipo === "STOCK_ADD" && `Stock ${itemEsp.stockAntes}\u2192${itemEsp.stockDespues}`), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT, marginTop: 1 } }, "@", e.usuario, " \xB7 ", e.nombre))
       );
     })))), vista === "timeline" && /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT, marginBottom: 8 } }, logFiltrado.length, " evento", logFiltrado.length !== 1 ? "s" : "", " \xB7 \xFAltimos 1000 registrados", auditLog.length === 0 && " \u2014 los nuevos movimientos aparecer\xE1n aqu\xED en tiempo real"), logFiltrado.length === 0 ? /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center", padding: "48px 0", color: C.label3 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 40, marginBottom: 8, opacity: 0.3 } }, "\u{1F52C}"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontFamily: FONT, fontSize: 14 } }, "Sin eventos registrados"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontFamily: FONT, fontSize: 12, marginTop: 4, opacity: 0.7 } }, "Los movimientos (ventas, retiros, bajas, imports) aparecen aqu\xED al instante")) : /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      background: C.bg1,
+      background: "linear-gradient(180deg,#FFFFFF,#FCFBF9)",
+      boxShadow: "0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1.5px 0 #fff",
       borderRadius: 16,
       overflow: "hidden",
       border: `1px solid ${C.sep}`,
@@ -77208,7 +77188,8 @@ ${c.resumen || c.id}`)) onEliminarCarga(c.id);
       }
     }
     const renderIdle = () => /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, null, /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      background: C.bg1,
+      background: "linear-gradient(180deg,#FFFFFF,#FCFBF9)",
+      boxShadow: "0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1.5px 0 #fff",
       borderRadius: 16,
       overflow: "hidden",
       border: `1px solid ${C.sep}`,
@@ -77220,7 +77201,8 @@ ${c.resumen || c.id}`)) onEliminarCarga(c.id);
       padding: "13px 16px",
       borderBottom: i < arr.length - 1 ? `1px solid ${C.sep}` : ""
     } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 14, color: C.label2, fontFamily: FONT } }, k), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 14, fontWeight: 500, color: C.label, fontFamily: FONT } }, v)))), isAdmin && /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      background: C.bg1,
+      background: "linear-gradient(180deg,#FFFFFF,#FCFBF9)",
+      boxShadow: "0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1.5px 0 #fff",
       borderRadius: 16,
       border: `1px solid ${C.sep}`,
       padding: "16px",
@@ -77286,7 +77268,8 @@ ${c.resumen || c.id}`)) onEliminarCarga(c.id);
         });
       }, []);
       return /* @__PURE__ */ import_react.default.createElement("div", { style: {
-        background: C.bg1,
+        background: "linear-gradient(180deg,#FFFFFF,#FCFBF9)",
+        boxShadow: "0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1.5px 0 #fff",
         borderRadius: 16,
         border: `1px solid ${C.sep}`,
         padding: "16px",
@@ -77330,7 +77313,8 @@ ${c.resumen || c.id}`)) onEliminarCarga(c.id);
     })(), (onRecargarDesdeSupabase || onSyncCompleto) && (() => {
       const [sbMsg, setSbMsg] = import_react.default.useState(null);
       return /* @__PURE__ */ import_react.default.createElement("div", { style: {
-        background: C.bg1,
+        background: "linear-gradient(180deg,#FFFFFF,#FCFBF9)",
+        boxShadow: "0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1.5px 0 #fff",
         borderRadius: 16,
         border: `1px solid ${C.sep}`,
         padding: "16px",
@@ -77379,7 +77363,8 @@ ${c.resumen || c.id}`)) onEliminarCarga(c.id);
         WebkitTapHighlightColor: "transparent"
       } }, "\u2601\uFE0F Subir a Supabase")));
     })(), /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      background: C.bg1,
+      background: "linear-gradient(180deg,#FFFFFF,#FCFBF9)",
+      boxShadow: "0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1.5px 0 #fff",
       borderRadius: 16,
       border: `1px solid ${C.sep}`,
       padding: "16px",
@@ -77419,7 +77404,8 @@ ${c.resumen || c.id}`)) onEliminarCarga(c.id);
       fontFamily: FONT,
       WebkitTapHighlightColor: "transparent"
     } }, "\u{1F5D1} Limpiar cach\xE9 ahora")), isAdmin && /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      background: C.bg1,
+      background: "linear-gradient(180deg,#FFFFFF,#FCFBF9)",
+      boxShadow: "0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1.5px 0 #fff",
       borderRadius: 16,
       border: `2px solid ${C.red}30`,
       padding: "20px",
@@ -77455,7 +77441,8 @@ ${c.resumen || c.id}`)) onEliminarCarga(c.id);
       WebkitTapHighlightColor: "transparent"
     } }, "\u{1F6AA} Cerrar sesi\xF3n"));
     const renderConfirm1 = () => /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      background: C.bg1,
+      background: "linear-gradient(180deg,#FFFFFF,#FCFBF9)",
+      boxShadow: "0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1.5px 0 #fff",
       borderRadius: 20,
       border: `2px solid ${C.red}40`,
       padding: "28px 20px",
@@ -77487,7 +77474,8 @@ ${c.resumen || c.id}`)) onEliminarCarga(c.id);
       fontFamily: FONT
     } }, "S\xED, continuar \u2192")));
     const renderConfirm2 = () => /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      background: C.bg1,
+      background: "linear-gradient(180deg,#FFFFFF,#FCFBF9)",
+      boxShadow: "0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1.5px 0 #fff",
       borderRadius: 20,
       border: `2px solid ${C.red}50`,
       padding: "28px 20px",
@@ -77550,7 +77538,8 @@ ${c.resumen || c.id}`)) onEliminarCarga(c.id);
       "\u{1F5D1} Borrar todo"
     )));
     const renderRunning = () => /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      background: C.bg1,
+      background: "linear-gradient(180deg,#FFFFFF,#FCFBF9)",
+      boxShadow: "0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1.5px 0 #fff",
       borderRadius: 20,
       border: `1px solid ${C.sep}`,
       padding: "28px 20px"
@@ -77565,7 +77554,8 @@ ${c.resumen || c.id}`)) onEliminarCarga(c.id);
       gap: 6
     } }, /* @__PURE__ */ import_react.default.createElement("span", null, l.ok ? "\u2713" : "\u2717"), /* @__PURE__ */ import_react.default.createElement("span", null, l.msg))), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT, marginTop: 12, textAlign: "center" } }, "No cierres esta ventana..."));
     const renderDone = () => /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      background: C.bg1,
+      background: "linear-gradient(180deg,#FFFFFF,#FCFBF9)",
+      boxShadow: "0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1.5px 0 #fff",
       borderRadius: 20,
       border: `1px solid ${C.sep}`,
       padding: "32px 20px",
@@ -77591,7 +77581,8 @@ ${c.resumen || c.id}`)) onEliminarCarga(c.id);
       WebkitTapHighlightColor: "transparent"
     } }, "Recargar app \u2192"));
     const renderError = () => /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      background: C.bg1,
+      background: "linear-gradient(180deg,#FFFFFF,#FCFBF9)",
+      boxShadow: "0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1.5px 0 #fff",
       borderRadius: 20,
       border: `2px solid ${C.red}40`,
       padding: "28px 20px",
@@ -77945,7 +77936,8 @@ create policy "allow all usuarios" on usuarios
       transition: "background .15s",
       WebkitTapHighlightColor: "transparent"
     } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 14 } }, t.icon), t.label)))), subTab === "perfil" && /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      background: C.bg1,
+      background: "linear-gradient(180deg,#FFFFFF,#FCFBF9)",
+      boxShadow: "0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1.5px 0 #fff",
       borderRadius: 20,
       padding: 20,
       marginBottom: 20,
@@ -77995,7 +77987,8 @@ create policy "allow all usuarios" on usuarios
       { l: "Staff", v: usuarios.filter((u) => u.rol === "caja").length, i: "\u{1F6D2}" },
       { l: "Brands", v: usuarios.filter((u) => u.rol === "marca").length, i: "\u{1F3F7}" }
     ].map((s) => /* @__PURE__ */ import_react.default.createElement("div", { key: s.l, style: {
-      background: C.bg1,
+      background: "linear-gradient(180deg,#FFFFFF,#FCFBF9)",
+      boxShadow: "0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1.5px 0 #fff",
       borderRadius: 14,
       padding: "10px 8px",
       textAlign: "center",
@@ -78035,7 +78028,8 @@ create policy "allow all usuarios" on usuarios
       const m = u.rol === "marca" ? MARCAS.find((x) => x.id === Number(u.marcaId)) : null;
       const open = menuAbierto === u.usuario;
       return /* @__PURE__ */ import_react.default.createElement("div", { key: u.usuario, style: {
-        background: C.bg1,
+        background: "linear-gradient(180deg,#FFFFFF,#FCFBF9)",
+        boxShadow: "0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1.5px 0 #fff",
         borderRadius: 18,
         border: `1px solid ${C.sep}`,
         overflow: "visible",
@@ -78108,7 +78102,8 @@ Esta acci\xF3n no se puede deshacer.`,
         }
       ))));
     }))), subTab === "auditoria" && isAdmin && /* @__PURE__ */ import_react.default.createElement(AuditoriaTab, { auditLog, setAuditLog }), subTab === "seguridad" && /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      background: C.bg1,
+      background: "linear-gradient(180deg,#FFFFFF,#FCFBF9)",
+      boxShadow: "0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1.5px 0 #fff",
       borderRadius: 16,
       padding: 16,
       border: `1px solid ${C.sep}`,
@@ -78193,7 +78188,8 @@ Esta acci\xF3n no se puede deshacer.`,
       justifyContent: "center",
       padding: 20
     } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      background: C.bg1,
+      background: "linear-gradient(180deg,#FFFFFF,#FCFBF9)",
+      boxShadow: "0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1.5px 0 #fff",
       borderRadius: 28,
       padding: 28,
       maxWidth: 360,
@@ -78267,7 +78263,8 @@ Esta acci\xF3n no se puede deshacer.`,
       justifyContent: "center",
       padding: 20
     } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      background: C.bg1,
+      background: "linear-gradient(180deg,#FFFFFF,#FCFBF9)",
+      boxShadow: "0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1.5px 0 #fff",
       borderRadius: 28,
       padding: 28,
       maxWidth: 360,
@@ -78386,7 +78383,8 @@ Esta acci\xF3n no se puede deshacer.`,
     }, [ventasFiltradasActivas]);
     const totalUdsView = (0, import_react.useMemo)(() => itemsView.reduce((s, i) => s + i.cant, 0), [itemsView]);
     return /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      background: C.bg1,
+      background: "linear-gradient(180deg,#FFFFFF,#FCFBF9)",
+      boxShadow: "0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1.5px 0 #fff",
       borderRadius: 14,
       padding: 16,
       marginBottom: 14,
@@ -78478,13 +78476,15 @@ Esta acci\xF3n no se puede deshacer.`,
       { icon: "\u{1F4F1}", label: "QR", val: qrFil, color: C.blue },
       { icon: "\u{1F4B3}", label: "Tarjeta", val: tarjetaFil, color: C.amber }
     ].map((s) => /* @__PURE__ */ import_react.default.createElement("div", { key: s.label, style: {
-      background: C.bg1,
+      background: "linear-gradient(180deg,#FFFFFF,#FCFBF9)",
+      boxShadow: "0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1.5px 0 #fff",
       borderRadius: 12,
       padding: "14px 16px",
       border: `1px solid ${C.sep}`,
       boxShadow: "0 1px 3px rgba(0,0,0,0.05)"
     } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 6 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 18 } }, s.icon), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 12, color: C.label3, fontFamily: FONT } }, s.label)), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 16, fontWeight: 700, color: C.label, fontFamily: FONT } }, $2(s.val)), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT, marginTop: 2 } }, Math.round(totalFil > 0 ? s.val / totalFil * 100 : 0), "% del total")))), porMarcaFil.length > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      background: C.bg1,
+      background: "linear-gradient(180deg,#FFFFFF,#FCFBF9)",
+      boxShadow: "0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1.5px 0 #fff",
       borderRadius: 14,
       padding: 16,
       border: `1px solid ${C.sep}`,
@@ -78504,11 +78504,12 @@ Esta acci\xF3n no se puede deshacer.`,
       justifyContent: "space-between",
       alignItems: "center",
       marginBottom: 12,
-      background: C.bg1,
+      background: "linear-gradient(180deg,#FFFFFF,#FCFBF9)",
+      boxShadow: "0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1.5px 0 #fff",
       borderRadius: 12,
       padding: "12px 16px",
       border: `1px solid ${C.sep}`
-    } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT_UI, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5 } }, "Items vendidos"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 20, fontWeight: 700, color: C.gold, fontFamily: FONT_UI } }, totalUdsView, " unidades")), /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "right" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT_UI, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5 } }, "Revenue"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 20, fontWeight: 700, color: C.label, fontFamily: FONT_UI } }, $2(totalFil)))), itemsView.length === 0 ? /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center", padding: "30px 0", color: C.label3, fontFamily: FONT_UI, fontSize: 13 } }, "Sin items en el per\xEDodo") : /* @__PURE__ */ import_react.default.createElement("div", { style: { background: C.bg1, borderRadius: 14, overflow: "hidden", border: `1px solid ${C.sep}` } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+    } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT_UI, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5 } }, "Items vendidos"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 20, fontWeight: 700, color: C.gold, fontFamily: FONT_UI } }, totalUdsView, " unidades")), /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "right" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT_UI, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5 } }, "Revenue"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 20, fontWeight: 700, color: C.label, fontFamily: FONT_UI } }, $2(totalFil)))), itemsView.length === 0 ? /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center", padding: "30px 0", color: C.label3, fontFamily: FONT_UI, fontSize: 13 } }, "Sin items en el per\xEDodo") : /* @__PURE__ */ import_react.default.createElement("div", { style: { background: "linear-gradient(180deg,#FFFFFF,#FCFBF9)", boxShadow: "0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1.5px 0 #fff", borderRadius: 14, overflow: "hidden", border: `1px solid ${C.sep}` } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
       display: "grid",
       gridTemplateColumns: "1fr 60px 70px",
       gap: 0,
