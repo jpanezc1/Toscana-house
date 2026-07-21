@@ -4337,7 +4337,7 @@ const FONT_MONO = "'DM Mono', 'Fira Code', 'SF Mono', 'Menlo', monospace";
 const FOS = {
   bone:"#F5F2EE", bone2:"#E8E4DC", card:"#FFFFFF",
   void:"#141318", void2:"#3A3841", mut:"#8B8791",
-  lav:"#B29455", lavL:"#D9C48C", lavBg:"#F3EEE1", lavDeep:"#8A6418",
+  lav:"#B29455", lavL:"#CFBA82", lavBg:"#F3EEE1", lavDeep:"#8A6418",
   live:"#4ADE80", ok:"#1F8A4C", okBg:"#E8F6EE", warn:"#B4750F", warnBg:"#FBF3E2",
   sans:"'Plus Jakarta Sans', 'Inter', -apple-system, sans-serif",
   mono:FONT_MONO,
@@ -4346,9 +4346,9 @@ const FOS = {
 // Burbuja con relieve (sombra en capas + brillo interior). Usar con className="fos-bub".
 const FOS_CSS = `
   .fos-bub{background:linear-gradient(180deg,#FFFFFF 0%,#FCFBF9 100%);border:1px solid rgba(20,19,24,.055);border-radius:24px;
-    box-shadow:0 1px 2px rgba(20,19,24,.04),0 10px 30px -12px rgba(20,19,24,.16),inset 0 1.5px 0 #FFFFFF;
+    box-shadow:0 1px 2px rgba(20,19,24,.04),0 10px 30px -12px rgba(20,19,24,.16),inset 0 1px 0 rgba(255,255,255,.45);
     transition:transform .3s ${FOS.spring},box-shadow .3s ${FOS.spring}}
-  .fos-bub:hover{transform:translateY(-3px);box-shadow:0 2px 3px rgba(20,19,24,.05),0 22px 44px -14px rgba(20,19,24,.22),inset 0 1.5px 0 #fff}
+  .fos-bub:hover{transform:translateY(-3px);box-shadow:0 2px 3px rgba(20,19,24,.05),0 22px 44px -14px rgba(20,19,24,.22),inset 0 1px 0 rgba(255,255,255,.45)}
   .fos-in{opacity:0;transform:translateY(16px) scale(.985);animation:fosIn .75s ${FOS.spring} forwards}
   @keyframes fosIn{to{opacity:1;transform:none}}
   @keyframes fosPulse{0%,100%{opacity:1}50%{opacity:.25}}
@@ -4859,7 +4859,7 @@ function DesktopSidebar({tabs, active, onChange, user, logout, groups: customGro
                   color:isActive?C.label:C.label2,
                   fontFamily:FONT,fontSize:13,fontWeight:isActive?700:400,
                   cursor:"pointer",transition:`background .2s, box-shadow .3s ${FOS.spring}, transform .3s ${FOS.spring}`,
-                  boxShadow:isActive?"0 1px 2px rgba(20,19,24,.04),0 8px 20px -10px rgba(20,19,24,.18),inset 0 1.5px 0 #fff":"none",
+                  boxShadow:isActive?"0 1px 2px rgba(20,19,24,.04),0 8px 20px -10px rgba(20,19,24,.18),inset 0 1px 0 rgba(255,255,255,.45)":"none",
                   textAlign:"left",marginBottom:2,
                   WebkitTapHighlightColor:"transparent",
                   letterSpacing:"-0.01em",
@@ -5058,7 +5058,7 @@ function Sheet({open,onClose,title,children,tall}){
         transition:"transform .32s cubic-bezier(.32,.72,0,1)",
         paddingBottom:"env(safe-area-inset-bottom,24px)",
         border:"1px solid rgba(20,19,24,.06)",
-        boxShadow:"0 24px 60px -12px rgba(20,19,24,.35), inset 0 1.5px 0 #fff",
+        boxShadow:"0 24px 60px -12px rgba(20,19,24,.35), inset 0 1px 0 rgba(255,255,255,.45)",
       }}>
         {/* Handle */}
         <div style={{display:"flex",justifyContent:"center",padding:"14px 0 6px"}}>
@@ -5167,7 +5167,7 @@ function StatCard({icon,label,value,sub,color=C.gold,compact}){
       borderRadius:18,
       padding: compact ? "14px 16px" : "16px 18px",
       border:"1px solid rgba(20,19,24,.055)",
-      boxShadow:"0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.15),inset 0 1.5px 0 #fff",
+      boxShadow:"0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.15),inset 0 1px 0 rgba(255,255,255,.45)",
       textAlign:"center",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",
     }}>
       {sub&&<span style={{
@@ -5999,7 +5999,7 @@ function RetirosTab({inv, retiros, onRetiro}){
   return (
     <div>
       {/* ── Formulario retiro ── */}
-      <div style={{background:"linear-gradient(180deg,#FFFFFF,#FCFBF9)",boxShadow:"0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1.5px 0 #fff",borderRadius:16,padding:20,marginBottom:16,
+      <div style={{background:"linear-gradient(180deg,#FFFFFF,#FCFBF9)",boxShadow:"0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1px 0 rgba(255,255,255,.45)",borderRadius:16,padding:20,marginBottom:16,
         border:`1px solid ${C.sep}`,boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}>
         <div style={{fontSize:16,fontWeight:700,color:C.label,fontFamily:FONT,marginBottom:16,
           display:"flex",alignItems:"center",gap:8}}>
@@ -6144,7 +6144,7 @@ function RetirosTab({inv, retiros, onRetiro}){
       </div>
 
       {/* ── Historial de retiros ── */}
-      <div style={{background:"linear-gradient(180deg,#FFFFFF,#FCFBF9)",boxShadow:"0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1.5px 0 #fff",borderRadius:16,padding:20,
+      <div style={{background:"linear-gradient(180deg,#FFFFFF,#FCFBF9)",boxShadow:"0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1px 0 rgba(255,255,255,.45)",borderRadius:16,padding:20,
         border:`1px solid ${C.sep}`,boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}>
         <div style={{fontSize:16,fontWeight:700,color:C.label,fontFamily:FONT,marginBottom:12,
           display:"flex",alignItems:"center",justifyContent:"space-between"}}>
@@ -7292,7 +7292,7 @@ function KPICard({icon, label, val, sub, color, compact}){
     }}>
       <div style={{display:"flex",alignItems:"center",gap:6,marginBottom: compact ? 7 : 9}}>
         <span style={{width:7,height:7,borderRadius:3,background:color||FOS.lav,flexShrink:0,
-          boxShadow:`0 0 6px ${(color||FOS.lav)}55`}}/>
+          boxShadow:"none"}}/>
         <span style={{
           fontSize:10,color:C.label3,fontFamily:FOS.mono,fontWeight:500,
           letterSpacing:"0.14em",textTransform:"uppercase",
@@ -9457,7 +9457,7 @@ function HomeDashboard({ventas, inv, vMes, mes, anio, onGoTab}){
     background:"linear-gradient(180deg,#FFFFFF,#FCFBF9)", borderRadius:20,
     padding: isDesktop ? "14px 18px" : "16px 18px",
     border:"1px solid rgba(20,19,24,.055)",
-    boxShadow:"0 1px 2px rgba(20,19,24,.04),0 10px 28px -12px rgba(20,19,24,.15),inset 0 1.5px 0 #fff",
+    boxShadow:"0 1px 2px rgba(20,19,24,.04),0 10px 28px -12px rgba(20,19,24,.15),inset 0 1px 0 rgba(255,255,255,.45)",
     marginBottom: isDesktop ? 12 : 14,
   };
 
@@ -9466,14 +9466,14 @@ function HomeDashboard({ventas, inv, vMes, mes, anio, onGoTab}){
 
       {/* ── HÉROE void (facelift ForgeOS) ── */}
       <div className="fos-in" style={{
-        background:"linear-gradient(135deg,#7C7468 0%,#5C5449 45%,#A69D90 100%)",
+        background:"linear-gradient(135deg,#7C7468 0%,#5C5449 45%,#938A7E 100%)",
         borderRadius:28,padding: isDesktop ? "26px 30px" : "22px 20px",
         marginBottom: isDesktop ? 12 : 16,color:FOS.bone,
         boxShadow:"0 20px 40px -18px rgba(92,84,73,.45), inset 0 1px 0 rgba(255,255,255,.07)",
         position:"relative",overflow:"hidden",
       }}>
         <div style={{position:"absolute",top:-70,right:-40,width:260,height:260,borderRadius:"50%",
-          background:"radial-gradient(circle, rgba(196,154,60,.18), transparent 65%)",pointerEvents:"none"}}/>
+          background:"radial-gradient(circle, rgba(196,154,60,.08), transparent 65%)",pointerEvents:"none"}}/>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",
           flexWrap:"wrap",gap:18,position:"relative"}}>
           <div>
@@ -9891,7 +9891,7 @@ function BrandVentaModal({venta, marca, onClose}){
           {/* ═══ INFO GENERAL ═══ */}
           <div style={{fontSize:11,fontWeight:700,color:C.label3,textTransform:"uppercase",
             letterSpacing:.6,fontFamily:FONT,marginBottom:10}}>Información general</div>
-          <div style={{background:"linear-gradient(180deg,#FFFFFF,#FCFBF9)",boxShadow:"0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1.5px 0 #fff",borderRadius:14,padding:"0 14px",
+          <div style={{background:"linear-gradient(180deg,#FFFFFF,#FCFBF9)",boxShadow:"0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1px 0 rgba(255,255,255,.45)",borderRadius:14,padding:"0 14px",
             border:`1px solid ${C.sep}`,marginBottom:20,
             boxShadow:"0 1px 6px rgba(0,0,0,0.04)"}}>
             <FilaInfo lbl="Fecha" val={`${venta.fecha} ${venta.hora}`}/>
@@ -9906,7 +9906,7 @@ function BrandVentaModal({venta, marca, onClose}){
             letterSpacing:.6,fontFamily:FONT,marginBottom:10}}>
             Productos de {marca.nombre} ({items.length})
           </div>
-          <div style={{background:"linear-gradient(180deg,#FFFFFF,#FCFBF9)",boxShadow:"0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1.5px 0 #fff",borderRadius:14,overflow:"hidden",
+          <div style={{background:"linear-gradient(180deg,#FFFFFF,#FCFBF9)",boxShadow:"0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1px 0 rgba(255,255,255,.45)",borderRadius:14,overflow:"hidden",
             border:`1px solid ${C.sep}`,marginBottom:20,
             boxShadow:"0 1px 6px rgba(0,0,0,0.04)"}}>
             {/* Encabezado tabla */}
@@ -9953,7 +9953,7 @@ function BrandVentaModal({venta, marca, onClose}){
             <>
               <div style={{fontSize:11,fontWeight:700,color:C.label3,textTransform:"uppercase",
                 letterSpacing:.6,fontFamily:FONT,marginBottom:10}}>Cliente</div>
-              <div style={{background:"linear-gradient(180deg,#FFFFFF,#FCFBF9)",boxShadow:"0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1.5px 0 #fff",borderRadius:14,padding:"0 14px",
+              <div style={{background:"linear-gradient(180deg,#FFFFFF,#FCFBF9)",boxShadow:"0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1px 0 rgba(255,255,255,.45)",borderRadius:14,padding:"0 14px",
                 border:`1px solid ${C.sep}`,marginBottom:20,
                 boxShadow:"0 1px 6px rgba(0,0,0,0.04)"}}>
                 <FilaInfo lbl="Razón social" val={fac.nombreComprador||"Sin Nombre"}/>
@@ -9966,7 +9966,7 @@ function BrandVentaModal({venta, marca, onClose}){
           {/* ═══ NOTA DE VENTA ═══ */}
           <div style={{fontSize:11,fontWeight:700,color:C.label3,textTransform:"uppercase",
             letterSpacing:.6,fontFamily:FONT,marginBottom:10}}>Nota de venta</div>
-          <div style={{background:"linear-gradient(180deg,#FFFFFF,#FCFBF9)",boxShadow:"0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1.5px 0 #fff",borderRadius:14,padding:14,
+          <div style={{background:"linear-gradient(180deg,#FFFFFF,#FCFBF9)",boxShadow:"0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1px 0 rgba(255,255,255,.45)",borderRadius:14,padding:14,
             border:`1px solid ${C.sep}`,marginBottom:20,
             boxShadow:"0 1px 6px rgba(0,0,0,0.04)"}}>
             <div style={{display:"flex",justifyContent:"space-between",
@@ -10813,12 +10813,12 @@ function BrandPortal({user, ventas, inv, cargas, retiros=[], logout, descuentos=
           <div>
             {/* ── HÉROE void: la marca + ventas del mes + meta ── */}
             <div className="fos-in" style={{
-              background:"linear-gradient(135deg,#7C7468 0%,#5C5449 45%,#A69D90 100%)",
+              background:"linear-gradient(135deg,#7C7468 0%,#5C5449 45%,#938A7E 100%)",
               borderRadius:28,padding:isDesktop?"28px 30px":"22px 20px",marginBottom:16,color:FOS.bone,
               boxShadow:"0 20px 40px -18px rgba(92,84,73,.45), inset 0 1px 0 rgba(255,255,255,.07)",
               position:"relative",overflow:"hidden"}}>
               <div style={{position:"absolute",top:-70,right:-40,width:260,height:260,borderRadius:"50%",
-                background:"radial-gradient(circle, rgba(196,154,60,.18), transparent 65%)",pointerEvents:"none"}}/>
+                background:"radial-gradient(circle, rgba(196,154,60,.08), transparent 65%)",pointerEvents:"none"}}/>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",
                 flexWrap:"wrap",gap:20,position:"relative"}}>
                 <div>
@@ -10963,7 +10963,7 @@ function BrandPortal({user, ventas, inv, cargas, retiros=[], logout, descuentos=
             </div>
 
             {/* ── Evolución 6 meses ── */}
-            <div style={{background:"linear-gradient(180deg,#FFFFFF,#FCFBF9)",boxShadow:"0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1.5px 0 #fff",borderRadius:14,padding:"16px",marginBottom:16,
+            <div style={{background:"linear-gradient(180deg,#FFFFFF,#FCFBF9)",boxShadow:"0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1px 0 rgba(255,255,255,.45)",borderRadius:14,padding:"16px",marginBottom:16,
               border:`1px solid ${C.sep}`}}>
               <div style={{fontSize:10,letterSpacing:"0.14em",textTransform:"uppercase",color:C.label3,fontFamily:FOS.mono,fontWeight:500,                fontFamily:FONT_UI,marginBottom:14,opacity:.65}}>Evolución mensual</div>
               <MiniBarChart data={hist6} color={C.label} height={64}/>
@@ -10986,7 +10986,7 @@ function BrandPortal({user, ventas, inv, cargas, retiros=[], logout, descuentos=
 
             {/* ── Top productos ── */}
             {topProds.length>0&&(
-              <div style={{background:"linear-gradient(180deg,#FFFFFF,#FCFBF9)",boxShadow:"0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1.5px 0 #fff",borderRadius:14,padding:"16px",marginBottom:16,
+              <div style={{background:"linear-gradient(180deg,#FFFFFF,#FCFBF9)",boxShadow:"0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1px 0 rgba(255,255,255,.45)",borderRadius:14,padding:"16px",marginBottom:16,
                 border:`1px solid ${C.sep}`}}>
                 <div style={{fontSize:10,letterSpacing:"0.14em",textTransform:"uppercase",color:C.label3,fontFamily:FOS.mono,fontWeight:500,                  fontFamily:FONT_UI,marginBottom:14,opacity:.65}}>Top productos · {MESES[mes]}</div>
                 {topProds.map((p,i)=>(
@@ -11011,7 +11011,7 @@ function BrandPortal({user, ventas, inv, cargas, retiros=[], logout, descuentos=
             )}
 
             {/* ── Stock ── */}
-            <div style={{background:"linear-gradient(180deg,#FFFFFF,#FCFBF9)",boxShadow:"0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1.5px 0 #fff",borderRadius:14,padding:"16px",marginBottom:16,
+            <div style={{background:"linear-gradient(180deg,#FFFFFF,#FCFBF9)",boxShadow:"0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1px 0 rgba(255,255,255,.45)",borderRadius:14,padding:"16px",marginBottom:16,
               border:`1px solid ${C.sep}`}}>
               <div style={{fontSize:10,letterSpacing:"0.14em",textTransform:"uppercase",color:C.label3,fontFamily:FOS.mono,fontWeight:500,                fontFamily:FONT_UI,marginBottom:14,opacity:.65}}>Stock actual</div>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:1,
@@ -11037,7 +11037,7 @@ function BrandPortal({user, ventas, inv, cargas, retiros=[], logout, descuentos=
             </div>
 
             {/* ── Comparativo mes anterior ── */}
-            <div style={{background:"linear-gradient(180deg,#FFFFFF,#FCFBF9)",boxShadow:"0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1.5px 0 #fff",borderRadius:14,padding:"16px",marginBottom:16,
+            <div style={{background:"linear-gradient(180deg,#FFFFFF,#FCFBF9)",boxShadow:"0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1px 0 rgba(255,255,255,.45)",borderRadius:14,padding:"16px",marginBottom:16,
               border:`1px solid ${C.sep}`}}>
               <div style={{fontSize:10,letterSpacing:"0.14em",textTransform:"uppercase",color:C.label3,fontFamily:FOS.mono,fontWeight:500,                fontFamily:FONT_UI,marginBottom:14,opacity:.65}}>vs {MESES[mPrev]}</div>
               {[
@@ -11210,7 +11210,7 @@ function BrandPortal({user, ventas, inv, cargas, retiros=[], logout, descuentos=
                 {label:"Vendidas",      value:invFiltrado.reduce((s,i)=>s+(vendidasPorCodigo[i.codigo]||0),0),color:C.blue},
                 {label:"Agotados",      value:invFiltrado.filter(i=>i.stock===0).length,                      color:C.red},
               ].map(s=>(
-                <div key={s.label} style={{background:"linear-gradient(180deg,#FFFFFF,#FCFBF9)",boxShadow:"0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1.5px 0 #fff",borderRadius:12,padding:"10px 8px",
+                <div key={s.label} style={{background:"linear-gradient(180deg,#FFFFFF,#FCFBF9)",boxShadow:"0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1px 0 rgba(255,255,255,.45)",borderRadius:12,padding:"10px 8px",
                   border:`1px solid ${C.sep}`,textAlign:"center"}}>
                   <div style={{fontSize:18,fontWeight:700,color:s.color,fontFamily:FONT,marginBottom:2}}>{s.value}</div>
                   <div style={{fontSize:9,color:C.label3,fontFamily:FONT_UI,textTransform:"uppercase",letterSpacing:.7}}>{s.label}</div>
@@ -11355,7 +11355,7 @@ function BrandPortal({user, ventas, inv, cargas, retiros=[], logout, descuentos=
             return prod ? Number(prod.marcaId)===mid : false;
           }).slice().reverse();
           return (
-            <div style={{background:"linear-gradient(180deg,#FFFFFF,#FCFBF9)",boxShadow:"0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1.5px 0 #fff",borderRadius:16,padding:20,
+            <div style={{background:"linear-gradient(180deg,#FFFFFF,#FCFBF9)",boxShadow:"0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1px 0 rgba(255,255,255,.45)",borderRadius:16,padding:20,
               border:`1px solid ${C.sep}`,boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}>
               <div style={{fontSize:16,fontWeight:700,color:C.label,fontFamily:FONT,marginBottom:16,
                 display:"flex",alignItems:"center",justifyContent:"space-between"}}>
@@ -13025,7 +13025,7 @@ function GiftCardsTab() {
           <div style={{fontSize:13}}>Ajusta los filtros o crea una nueva Gift Card</div>
         </div>
       ) : isDesktop ? (
-        <div style={{background:"linear-gradient(180deg,#FFFFFF,#FCFBF9)",boxShadow:"0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1.5px 0 #fff",borderRadius:16,border:`1px solid ${C.sep}`,overflow:"hidden"}}>
+        <div style={{background:"linear-gradient(180deg,#FFFFFF,#FCFBF9)",boxShadow:"0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1px 0 rgba(255,255,255,.45)",borderRadius:16,border:`1px solid ${C.sep}`,overflow:"hidden"}}>
           <div style={{display:"grid",gridTemplateColumns:"2fr 1fr 1fr 1fr 1fr 1fr 70px",
             padding:"10px 16px",background:C.bg2,borderBottom:`1px solid ${C.sep}`}}>
             {["Código","Emisión","Vence","Monto","Saldo","Estado",""].map(h=>(
@@ -16670,7 +16670,7 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
       )}
 
       {/* ── Encabezado ── */}
-      <div style={{background:"linear-gradient(180deg,#FFFFFF,#FCFBF9)",boxShadow:"0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1.5px 0 #fff",borderRadius:16,padding:18,marginBottom:14,
+      <div style={{background:"linear-gradient(180deg,#FFFFFF,#FCFBF9)",boxShadow:"0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1px 0 rgba(255,255,255,.45)",borderRadius:16,padding:18,marginBottom:14,
         border:`1px solid ${C.sep}`,boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}>
         <div style={{fontSize:16,fontWeight:700,color:C.label,fontFamily:FONT,marginBottom:6,
           display:"flex",alignItems:"center",justifyContent:"space-between",gap:8}}>
@@ -16726,7 +16726,7 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
       </div>
 
       {/* ── Alcance del cierre: todas las marcas o solo una ── */}
-      <div style={{background:"linear-gradient(180deg,#FFFFFF,#FCFBF9)",boxShadow:"0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1.5px 0 #fff",borderRadius:14,padding:"12px 14px",marginBottom:14,
+      <div style={{background:"linear-gradient(180deg,#FFFFFF,#FCFBF9)",boxShadow:"0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1px 0 rgba(255,255,255,.45)",borderRadius:14,padding:"12px 14px",marginBottom:14,
         border:`1px solid ${marcaSelec?MARCAS.find(m=>m.id===marcaSelec)?.color+"66":C.sep}`}}>
         <div style={{fontSize:10,fontWeight:700,color:C.label3,textTransform:"uppercase",
           letterSpacing:.8,marginBottom:8,paddingLeft:2,display:"flex",justifyContent:"space-between"}}>
@@ -16998,7 +16998,7 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
           }
 
           {faltantes.length>0&&(
-            <div style={{background:"linear-gradient(180deg,#FFFFFF,#FCFBF9)",boxShadow:"0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1.5px 0 #fff",borderRadius:14,padding:16,marginBottom:16,
+            <div style={{background:"linear-gradient(180deg,#FFFFFF,#FCFBF9)",boxShadow:"0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1px 0 rgba(255,255,255,.45)",borderRadius:14,padding:16,marginBottom:16,
               border:`1px solid ${C.sep}`,display:"flex",flexDirection:"column",gap:8}}>
               <div style={{display:"flex",justifyContent:"space-between",fontSize:13,fontFamily:FONT}}>
                 <span style={{color:C.label2}}>Valor estimado de fuga ({faltantes.length} ítem{faltantes.length!==1?"s":""})</span>
@@ -17184,7 +17184,7 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
                 const marcaNombre = a.marcaId ? (MARCAS.find(m=>m.id===a.marcaId)?.nombre||"—") : "Todas las marcas";
                 const abierta = auditoriaAbierta===a.id;
                 return (
-                  <div key={a.id} style={{background:"linear-gradient(180deg,#FFFFFF,#FCFBF9)",boxShadow:"0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1.5px 0 #fff",borderRadius:14,border:`1px solid ${C.sep}`,
+                  <div key={a.id} style={{background:"linear-gradient(180deg,#FFFFFF,#FCFBF9)",boxShadow:"0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1px 0 rgba(255,255,255,.45)",borderRadius:14,border:`1px solid ${C.sep}`,
                     overflow:"hidden",boxShadow:"0 1px 3px rgba(0,0,0,.06)"}}>
                     <div onClick={()=>setAuditoriaAbierta(abierta?null:a.id)} style={{padding:14,cursor:"pointer",
                       display:"flex",justifyContent:"space-between",alignItems:"center",gap:10}}>
@@ -18338,7 +18338,7 @@ function RegistroCargas({cargas, marcas, marcaId=null, onVerificar=null, user=nu
   return (
     <div>
       {/* ── Encabezado ── */}
-      <div style={{background:"linear-gradient(180deg,#FFFFFF,#FCFBF9)",boxShadow:"0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1.5px 0 #fff",borderRadius:16,padding:18,marginBottom:14,
+      <div style={{background:"linear-gradient(180deg,#FFFFFF,#FCFBF9)",boxShadow:"0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1px 0 rgba(255,255,255,.45)",borderRadius:16,padding:18,marginBottom:14,
         border:`1px solid ${C.sep}`,boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}>
         <div style={{fontSize:16,fontWeight:700,color:C.label,fontFamily:FONT,marginBottom:6,
           display:"flex",alignItems:"center",gap:8}}>
@@ -18438,7 +18438,7 @@ function RegistroCargas({cargas, marcas, marcaId=null, onVerificar=null, user=nu
                 ? {label:"Carga histórica", icon:"🕓", color:C.label3}
                 : {label:"Carga manual", icon:"✍️", color:C.green};
               return (
-                <div key={c.id} style={{background:"linear-gradient(180deg,#FFFFFF,#FCFBF9)",boxShadow:"0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1.5px 0 #fff",borderRadius:14,border:`1px solid ${C.sep}`,
+                <div key={c.id} style={{background:"linear-gradient(180deg,#FFFFFF,#FCFBF9)",boxShadow:"0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1px 0 rgba(255,255,255,.45)",borderRadius:14,border:`1px solid ${C.sep}`,
                   overflow:"hidden",boxShadow:"0 1px 3px rgba(0,0,0,.06)"}}>
                   <div onClick={()=>setAbierta(abierto?null:c.id)} style={{padding:14,cursor:"pointer",
                     display:"flex",justifyContent:"space-between",alignItems:"center",gap:10}}>
@@ -20957,7 +20957,7 @@ function PanelCambiarPass({user, usuarios, onGuardar}){
   );
 
   return (
-    <div style={{background:"linear-gradient(180deg,#FFFFFF,#FCFBF9)",boxShadow:"0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1.5px 0 #fff",borderRadius:18,padding:18,
+    <div style={{background:"linear-gradient(180deg,#FFFFFF,#FCFBF9)",boxShadow:"0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1px 0 rgba(255,255,255,.45)",borderRadius:18,padding:18,
       border:`1px solid ${C.sep}`,boxShadow:"0 1px 8px rgba(0,0,0,0.05)"}}>
       <div style={{fontSize:14,fontWeight:700,color:C.label,fontFamily:FONT,marginBottom:16,
         display:"flex",alignItems:"center",gap:8}}>
@@ -21306,7 +21306,7 @@ function AuditoriaTab({auditLog, setAuditLog}){
               ? <div style={{textAlign:"center",padding:24,color:C.label3,fontFamily:FONT,fontSize:13}}>
                   Sin movimientos registrados para "{trazCod}"
                 </div>
-              : <div style={{background:"linear-gradient(180deg,#FFFFFF,#FCFBF9)",boxShadow:"0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1.5px 0 #fff",borderRadius:16,border:`1px solid ${C.sep}`,overflow:"hidden"}}>
+              : <div style={{background:"linear-gradient(180deg,#FFFFFF,#FCFBF9)",boxShadow:"0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1px 0 rgba(255,255,255,.45)",borderRadius:16,border:`1px solid ${C.sep}`,overflow:"hidden"}}>
                   {trazLogs.map((e,i)=>{
                     const t=tc(e.tipo);
                     // ítem específico de ese código
@@ -21362,7 +21362,7 @@ function AuditoriaTab({auditLog, setAuditLog}){
                   Los movimientos (ventas, retiros, bajas, imports) aparecen aquí al instante
                 </div>
               </div>
-            : <div style={{background:"linear-gradient(180deg,#FFFFFF,#FCFBF9)",boxShadow:"0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1.5px 0 #fff",borderRadius:16,overflow:"hidden",
+            : <div style={{background:"linear-gradient(180deg,#FFFFFF,#FCFBF9)",boxShadow:"0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1px 0 rgba(255,255,255,.45)",borderRadius:16,overflow:"hidden",
                 border:`1px solid ${C.sep}`,boxShadow:"0 1px 6px rgba(0,0,0,0.04)"}}>
                 {logFiltrado.slice(0,200).map((e,i)=>{
                   const t = tc(e.tipo);
@@ -21735,7 +21735,7 @@ function SistemaTab({user, logout, onRecargarDesdeSupabase, onSyncCompleto}){
   const renderIdle = () => (
     <>
       {/* Info del sistema */}
-      <div style={{background:"linear-gradient(180deg,#FFFFFF,#FCFBF9)",boxShadow:"0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1.5px 0 #fff",borderRadius:16,overflow:"hidden",
+      <div style={{background:"linear-gradient(180deg,#FFFFFF,#FCFBF9)",boxShadow:"0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1px 0 rgba(255,255,255,.45)",borderRadius:16,overflow:"hidden",
         border:`1px solid ${C.sep}`,marginBottom:20,
         boxShadow:"0 1px 6px rgba(0,0,0,0.04)"}}>
         {INFO_ROWS.map(([k,v],i,arr)=>(
@@ -21750,7 +21750,7 @@ function SistemaTab({user, logout, onRecargarDesdeSupabase, onSyncCompleto}){
 
       {/* Cola de sincronización — cambios de ESTE dispositivo pendientes de subir */}
       {isAdmin && (
-        <div style={{background:"linear-gradient(180deg,#FFFFFF,#FCFBF9)",boxShadow:"0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1.5px 0 #fff",borderRadius:16,border:`1px solid ${C.sep}`,
+        <div style={{background:"linear-gradient(180deg,#FFFFFF,#FCFBF9)",boxShadow:"0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1px 0 rgba(255,255,255,.45)",borderRadius:16,border:`1px solid ${C.sep}`,
           padding:"16px",marginBottom:12,boxShadow:"0 1px 6px rgba(0,0,0,0.04)"}}>
           <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
             <span style={{fontSize:16}}>📤</span>
@@ -21824,7 +21824,7 @@ function SistemaTab({user, logout, onRecargarDesdeSupabase, onSyncCompleto}){
           _fsaIdb("get").then(h=>{ if(h) setCarpetaNombre(h.name||"Carpeta configurada"); });
         },[]);
         return (
-          <div style={{background:"linear-gradient(180deg,#FFFFFF,#FCFBF9)",boxShadow:"0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1.5px 0 #fff",borderRadius:16,border:`1px solid ${C.sep}`,
+          <div style={{background:"linear-gradient(180deg,#FFFFFF,#FCFBF9)",boxShadow:"0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1px 0 rgba(255,255,255,.45)",borderRadius:16,border:`1px solid ${C.sep}`,
             padding:"16px",marginBottom:12,boxShadow:"0 1px 6px rgba(0,0,0,0.04)"}}>
             <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
               <span style={{fontSize:16}}>📁</span>
@@ -21878,7 +21878,7 @@ function SistemaTab({user, logout, onRecargarDesdeSupabase, onSyncCompleto}){
       {(onRecargarDesdeSupabase||onSyncCompleto) && (()=>{
         const [sbMsg, setSbMsg] = React.useState(null);
         return (
-          <div style={{background:"linear-gradient(180deg,#FFFFFF,#FCFBF9)",boxShadow:"0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1.5px 0 #fff",borderRadius:16,border:`1px solid ${C.sep}`,
+          <div style={{background:"linear-gradient(180deg,#FFFFFF,#FCFBF9)",boxShadow:"0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1px 0 rgba(255,255,255,.45)",borderRadius:16,border:`1px solid ${C.sep}`,
             padding:"16px",marginBottom:12,boxShadow:"0 1px 6px rgba(0,0,0,0.04)"}}>
             <div style={{fontSize:13,fontWeight:700,color:C.label,fontFamily:FONT,marginBottom:4}}>
               ☁️ Sincronización con Supabase
@@ -21923,7 +21923,7 @@ function SistemaTab({user, logout, onRecargarDesdeSupabase, onSyncCompleto}){
       })()}
 
       {/* Cache local (siempre visible) */}
-      <div style={{background:"linear-gradient(180deg,#FFFFFF,#FCFBF9)",boxShadow:"0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1.5px 0 #fff",borderRadius:16,border:`1px solid ${C.sep}`,
+      <div style={{background:"linear-gradient(180deg,#FFFFFF,#FCFBF9)",boxShadow:"0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1px 0 rgba(255,255,255,.45)",borderRadius:16,border:`1px solid ${C.sep}`,
         padding:"16px",marginBottom:12,boxShadow:"0 1px 6px rgba(0,0,0,0.04)"}}>
         <div style={{fontSize:13,fontWeight:700,color:C.label,fontFamily:FONT,marginBottom:4}}>
           🗑 Limpiar caché local
@@ -21952,7 +21952,7 @@ function SistemaTab({user, logout, onRecargarDesdeSupabase, onSyncCompleto}){
 
       {/* Factory Reset — solo admin */}
       {isAdmin && (
-        <div style={{background:"linear-gradient(180deg,#FFFFFF,#FCFBF9)",boxShadow:"0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1.5px 0 #fff",borderRadius:16,
+        <div style={{background:"linear-gradient(180deg,#FFFFFF,#FCFBF9)",boxShadow:"0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1px 0 rgba(255,255,255,.45)",borderRadius:16,
           border:`2px solid ${C.red}30`,
           padding:"20px",marginBottom:16}}>
           <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
@@ -21990,7 +21990,7 @@ function SistemaTab({user, logout, onRecargarDesdeSupabase, onSyncCompleto}){
 
   // ── Confirm step 1 ──
   const renderConfirm1 = () => (
-    <div style={{background:"linear-gradient(180deg,#FFFFFF,#FCFBF9)",boxShadow:"0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1.5px 0 #fff",borderRadius:20,border:`2px solid ${C.red}40`,
+    <div style={{background:"linear-gradient(180deg,#FFFFFF,#FCFBF9)",boxShadow:"0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1px 0 rgba(255,255,255,.45)",borderRadius:20,border:`2px solid ${C.red}40`,
       padding:"28px 20px",textAlign:"center"}}>
       <div style={{fontSize:48,marginBottom:12}}>⚠️</div>
       <div style={{fontSize:17,fontWeight:700,color:C.red,fontFamily:FONT,marginBottom:8}}>
@@ -22020,7 +22020,7 @@ function SistemaTab({user, logout, onRecargarDesdeSupabase, onSyncCompleto}){
 
   // ── Confirm step 2: type "RESET" ──
   const renderConfirm2 = () => (
-    <div style={{background:"linear-gradient(180deg,#FFFFFF,#FCFBF9)",boxShadow:"0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1.5px 0 #fff",borderRadius:20,border:`2px solid ${C.red}50`,
+    <div style={{background:"linear-gradient(180deg,#FFFFFF,#FCFBF9)",boxShadow:"0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1px 0 rgba(255,255,255,.45)",borderRadius:20,border:`2px solid ${C.red}50`,
       padding:"28px 20px",textAlign:"center"}}>
       <div style={{fontSize:36,marginBottom:12}}>🔐</div>
       <div style={{fontSize:16,fontWeight:700,color:C.label,fontFamily:FONT,marginBottom:8}}>
@@ -22069,7 +22069,7 @@ function SistemaTab({user, logout, onRecargarDesdeSupabase, onSyncCompleto}){
 
   // ── Running ──
   const renderRunning = () => (
-    <div style={{background:"linear-gradient(180deg,#FFFFFF,#FCFBF9)",boxShadow:"0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1.5px 0 #fff",borderRadius:20,border:`1px solid ${C.sep}`,
+    <div style={{background:"linear-gradient(180deg,#FFFFFF,#FCFBF9)",boxShadow:"0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1px 0 rgba(255,255,255,.45)",borderRadius:20,border:`1px solid ${C.sep}`,
       padding:"28px 20px"}}>
       <div style={{fontSize:14,fontWeight:700,color:C.label,fontFamily:FONT,marginBottom:16,textAlign:"center"}}>
         ⏳ Ejecutando reset...
@@ -22091,7 +22091,7 @@ function SistemaTab({user, logout, onRecargarDesdeSupabase, onSyncCompleto}){
 
   // ── Done ──
   const renderDone = () => (
-    <div style={{background:"linear-gradient(180deg,#FFFFFF,#FCFBF9)",boxShadow:"0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1.5px 0 #fff",borderRadius:20,border:`1px solid ${C.sep}`,
+    <div style={{background:"linear-gradient(180deg,#FFFFFF,#FCFBF9)",boxShadow:"0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1px 0 rgba(255,255,255,.45)",borderRadius:20,border:`1px solid ${C.sep}`,
       padding:"32px 20px",textAlign:"center"}}>
       <div style={{fontSize:52,marginBottom:12}}>✅</div>
       <div style={{fontSize:17,fontWeight:700,color:C.label,fontFamily:FONT,marginBottom:8}}>
@@ -22120,7 +22120,7 @@ function SistemaTab({user, logout, onRecargarDesdeSupabase, onSyncCompleto}){
 
   // ── Error ──
   const renderError = () => (
-    <div style={{background:"linear-gradient(180deg,#FFFFFF,#FCFBF9)",boxShadow:"0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1.5px 0 #fff",borderRadius:20,border:`2px solid ${C.red}40`,
+    <div style={{background:"linear-gradient(180deg,#FFFFFF,#FCFBF9)",boxShadow:"0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1px 0 rgba(255,255,255,.45)",borderRadius:20,border:`2px solid ${C.red}40`,
       padding:"28px 20px",textAlign:"center"}}>
       <div style={{fontSize:40,marginBottom:8}}>❌</div>
       <div style={{fontSize:15,fontWeight:700,color:C.red,fontFamily:FONT,marginBottom:8}}>
@@ -22425,7 +22425,7 @@ create policy "allow all usuarios" on usuarios
       {/* ════ PERFIL ════ */}
       {subTab==="perfil"&&(
         <div>
-          <div style={{background:"linear-gradient(180deg,#FFFFFF,#FCFBF9)",boxShadow:"0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1.5px 0 #fff",borderRadius:20,padding:20,marginBottom:20,
+          <div style={{background:"linear-gradient(180deg,#FFFFFF,#FCFBF9)",boxShadow:"0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1px 0 rgba(255,255,255,.45)",borderRadius:20,padding:20,marginBottom:20,
             border:`1px solid ${C.sep}`,boxShadow:"0 2px 12px rgba(0,0,0,0.05)"}}>
             <div style={{display:"flex",alignItems:"center",gap:16,marginBottom:16,
               paddingBottom:16,borderBottom:`1px solid ${C.sep}`}}>
@@ -22471,7 +22471,7 @@ create policy "allow all usuarios" on usuarios
               {l:"Staff",  v:usuarios.filter(u=>u.rol==="caja").length,    i:"🛒"},
               {l:"Brands", v:usuarios.filter(u=>u.rol==="marca").length,   i:"🏷"},
             ].map(s=>(
-              <div key={s.l} style={{background:"linear-gradient(180deg,#FFFFFF,#FCFBF9)",boxShadow:"0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1.5px 0 #fff",borderRadius:14,padding:"10px 8px",
+              <div key={s.l} style={{background:"linear-gradient(180deg,#FFFFFF,#FCFBF9)",boxShadow:"0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1px 0 rgba(255,255,255,.45)",borderRadius:14,padding:"10px 8px",
                 textAlign:"center",border:`1px solid ${C.sep}`,
                 boxShadow:"0 1px 6px rgba(0,0,0,0.04)"}}>
                 <div style={{fontSize:18,marginBottom:2}}>{s.i}</div>
@@ -22500,7 +22500,7 @@ create policy "allow all usuarios" on usuarios
               const m=u.rol==="marca"?MARCAS.find(x=>x.id===Number(u.marcaId)):null;
               const open=menuAbierto===u.usuario;
               return (
-                <div key={u.usuario} style={{background:"linear-gradient(180deg,#FFFFFF,#FCFBF9)",boxShadow:"0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1.5px 0 #fff",borderRadius:18,
+                <div key={u.usuario} style={{background:"linear-gradient(180deg,#FFFFFF,#FCFBF9)",boxShadow:"0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1px 0 rgba(255,255,255,.45)",borderRadius:18,
                   border:`1px solid ${C.sep}`,overflow:"visible",
                   boxShadow:"0 1px 8px rgba(0,0,0,0.05)",
                   opacity:u.estado==="inactivo"?0.65:1}}>
@@ -22576,7 +22576,7 @@ create policy "allow all usuarios" on usuarios
       {/* ════ SEGURIDAD ════ */}
       {subTab==="seguridad"&&(
         <div>
-          <div style={{background:"linear-gradient(180deg,#FFFFFF,#FCFBF9)",boxShadow:"0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1.5px 0 #fff",borderRadius:16,padding:16,
+          <div style={{background:"linear-gradient(180deg,#FFFFFF,#FCFBF9)",boxShadow:"0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1px 0 rgba(255,255,255,.45)",borderRadius:16,padding:16,
             border:`1px solid ${C.sep}`,marginBottom:20,
             boxShadow:"0 1px 6px rgba(0,0,0,0.04)"}}>
             <div style={{fontSize:13,fontWeight:700,color:C.label,
@@ -22650,7 +22650,7 @@ create policy "allow all usuarios" on usuarios
           background:"rgba(0,0,0,0.5)",backdropFilter:"blur(8px)",
           display:"flex",alignItems:"center",justifyContent:"center",
           padding:20}}>
-          <div style={{background:"linear-gradient(180deg,#FFFFFF,#FCFBF9)",boxShadow:"0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1.5px 0 #fff",borderRadius:28,padding:28,
+          <div style={{background:"linear-gradient(180deg,#FFFFFF,#FCFBF9)",boxShadow:"0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1px 0 rgba(255,255,255,.45)",borderRadius:28,padding:28,
             maxWidth:360,width:"100%",
             boxShadow:"0 28px 70px rgba(0,0,0,0.25)"}}>
             <div style={{fontSize:44,textAlign:"center",marginBottom:14}}>
@@ -22699,7 +22699,7 @@ create policy "allow all usuarios" on usuarios
           background:"rgba(0,0,0,0.5)",backdropFilter:"blur(8px)",
           display:"flex",alignItems:"center",justifyContent:"center",
           padding:20}}>
-          <div style={{background:"linear-gradient(180deg,#FFFFFF,#FCFBF9)",boxShadow:"0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1.5px 0 #fff",borderRadius:28,padding:28,
+          <div style={{background:"linear-gradient(180deg,#FFFFFF,#FCFBF9)",boxShadow:"0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1px 0 rgba(255,255,255,.45)",borderRadius:28,padding:28,
             maxWidth:360,width:"100%",
             boxShadow:"0 28px 70px rgba(0,0,0,0.25)"}}>
             <div style={{fontSize:44,textAlign:"center",marginBottom:12}}>🔑</div>
@@ -22809,7 +22809,7 @@ function DashboardVentas({ventas, onVentaClick}){
   return (
     <div>
       {/* Filtro fechas */}
-      <div style={{background:"linear-gradient(180deg,#FFFFFF,#FCFBF9)",boxShadow:"0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1.5px 0 #fff",borderRadius:14,padding:16,marginBottom:14,
+      <div style={{background:"linear-gradient(180deg,#FFFFFF,#FCFBF9)",boxShadow:"0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1px 0 rgba(255,255,255,.45)",borderRadius:14,padding:16,marginBottom:14,
         border:`1px solid ${C.sep}`,boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}>
         <div style={{fontSize:12,fontWeight:600,color:C.label3,textTransform:"uppercase",
           letterSpacing:.6,marginBottom:10,fontFamily:FONT}}>Período</div>
@@ -22872,7 +22872,7 @@ function DashboardVentas({ventas, onVentaClick}){
               {icon:"📱",label:"QR",val:qrFil,color:C.blue},
               {icon:"💳",label:"Tarjeta",val:tarjetaFil,color:C.amber},
             ].map(s=>(
-              <div key={s.label} style={{background:"linear-gradient(180deg,#FFFFFF,#FCFBF9)",boxShadow:"0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1.5px 0 #fff",borderRadius:12,padding:"14px 16px",
+              <div key={s.label} style={{background:"linear-gradient(180deg,#FFFFFF,#FCFBF9)",boxShadow:"0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1px 0 rgba(255,255,255,.45)",borderRadius:12,padding:"14px 16px",
                 border:`1px solid ${C.sep}`,boxShadow:"0 1px 3px rgba(0,0,0,0.05)"}}>
                 <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
                   <span style={{fontSize:18}}>{s.icon}</span>
@@ -22888,7 +22888,7 @@ function DashboardVentas({ventas, onVentaClick}){
 
           {/* Por marca */}
           {porMarcaFil.length>0&&(
-            <div style={{background:"linear-gradient(180deg,#FFFFFF,#FCFBF9)",boxShadow:"0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1.5px 0 #fff",borderRadius:14,padding:16,
+            <div style={{background:"linear-gradient(180deg,#FFFFFF,#FCFBF9)",boxShadow:"0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1px 0 rgba(255,255,255,.45)",borderRadius:14,padding:16,
               border:`1px solid ${C.sep}`,boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}>
               <div style={{fontSize:13,fontWeight:700,color:C.label,fontFamily:FONT,marginBottom:12}}>
                 Ventas por marca
@@ -22936,7 +22936,7 @@ function DashboardVentas({ventas, onVentaClick}){
       {vistaD==="items"&&(
         <div>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12,
-            background:"linear-gradient(180deg,#FFFFFF,#FCFBF9)",boxShadow:"0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1.5px 0 #fff",borderRadius:12,padding:"12px 16px",border:`1px solid ${C.sep}`}}>
+            background:"linear-gradient(180deg,#FFFFFF,#FCFBF9)",boxShadow:"0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1px 0 rgba(255,255,255,.45)",borderRadius:12,padding:"12px 16px",border:`1px solid ${C.sep}`}}>
             <div>
               <div style={{fontSize:12,color:C.label3,fontFamily:FONT_UI,fontWeight:600,textTransform:"uppercase",letterSpacing:.5}}>Items vendidos</div>
               <div style={{fontSize:20,fontWeight:700,color:C.gold,fontFamily:FONT_UI}}>{totalUdsView} unidades</div>
@@ -22948,7 +22948,7 @@ function DashboardVentas({ventas, onVentaClick}){
           </div>
           {itemsView.length===0
             ? <div style={{textAlign:"center",padding:"30px 0",color:C.label3,fontFamily:FONT_UI,fontSize:13}}>Sin items en el período</div>
-            : <div style={{background:"linear-gradient(180deg,#FFFFFF,#FCFBF9)",boxShadow:"0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1.5px 0 #fff",borderRadius:14,overflow:"hidden",border:`1px solid ${C.sep}`}}>
+            : <div style={{background:"linear-gradient(180deg,#FFFFFF,#FCFBF9)",boxShadow:"0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1px 0 rgba(255,255,255,.45)",borderRadius:14,overflow:"hidden",border:`1px solid ${C.sep}`}}>
                 {/* Header */}
                 <div style={{display:"grid",gridTemplateColumns:"1fr 60px 70px",gap:0,
                   background:C.bg3,padding:"8px 14px",borderBottom:`1px solid ${C.sep}`}}>
