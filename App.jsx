@@ -4333,6 +4333,83 @@ const FONT_UI = "'Inter', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', s
 const FONT_DISPLAY = "'Cormorant Garamond', Georgia, 'Times New Roman', serif";
 const FONT_MONO = "'DM Mono', 'Fira Code', 'SF Mono', 'Menlo', monospace";
 
+// ── ForgeOS design system (facelift 2026-07) — bone / void / lavanda ────────
+const FOS = {
+  bone:"#F5F2EE", bone2:"#E8E4DC", card:"#FFFFFF",
+  void:"#141318", void2:"#3A3841", mut:"#8B8791",
+  lav:"#9B8FA0", lavL:"#C8C2D0", lavBg:"#EFECF1", lavDeep:"#6E6277",
+  live:"#4ADE80", ok:"#1F8A4C", okBg:"#E8F6EE", warn:"#B4750F", warnBg:"#FBF3E2",
+  sans:"'Plus Jakarta Sans', 'Inter', -apple-system, sans-serif",
+  mono:FONT_MONO,
+  spring:"cubic-bezier(.16,1,.3,1)",
+};
+// Burbuja con relieve (sombra en capas + brillo interior). Usar con className="fos-bub".
+const FOS_CSS = `
+  .fos-bub{background:linear-gradient(180deg,#FFFFFF 0%,#FCFBF9 100%);border:1px solid rgba(20,19,24,.055);border-radius:24px;
+    box-shadow:0 1px 2px rgba(20,19,24,.04),0 10px 30px -12px rgba(20,19,24,.16),inset 0 1.5px 0 #FFFFFF;
+    transition:transform .3s ${FOS.spring},box-shadow .3s ${FOS.spring}}
+  .fos-bub:hover{transform:translateY(-3px);box-shadow:0 2px 3px rgba(20,19,24,.05),0 22px 44px -14px rgba(20,19,24,.22),inset 0 1.5px 0 #fff}
+  .fos-in{opacity:0;transform:translateY(16px) scale(.985);animation:fosIn .75s ${FOS.spring} forwards}
+  @keyframes fosIn{to{opacity:1;transform:none}}
+  @keyframes fosPulse{0%,100%{opacity:1}50%{opacity:.25}}
+  @media(prefers-reduced-motion:reduce){.fos-in{animation:none;opacity:1;transform:none}.fos-bub,.fos-bub:hover{transition:none;transform:none}}
+`;
+function FosStyles(){ return <style>{FOS_CSS}</style>; }
+const fosMono = (extra={}) => ({fontFamily:FOS.mono,fontSize:11,letterSpacing:"0.16em",
+  textTransform:"uppercase",color:FOS.mut,fontWeight:500,...extra});
+
+// Número que cuenta hasta su valor (respeta reduced motion)
+function FosCount({value, prefix="", suffix="", dur=900, format}){
+  const fmt = format || (n=>Math.round(n).toLocaleString("es-BO"));
+  const [v,setV] = useState(0);
+  useEffect(()=>{
+    const to = Number(value)||0;
+    if(typeof matchMedia!=="undefined" && matchMedia("(prefers-reduced-motion: reduce)").matches){ setV(to); return; }
+    let raf, t0=null;
+    const step = ts => { if(t0==null) t0=ts;
+      const p=Math.min((ts-t0)/dur,1), e=1-Math.pow(1-p,3);
+      setV(to*e); if(p<1) raf=requestAnimationFrame(step); };
+    raf=requestAnimationFrame(step);
+    return ()=>cancelAnimationFrame(raf);
+  },[value]); // eslint-disable-line
+  return <>{prefix}{fmt(v)}{suffix}</>;
+}
+
+// Barra con canal hundido y relleno lavanda que crece al montar
+function FosBar({pct, height=9}){
+  const [w,setW]=useState(0);
+  useEffect(()=>{ const t=setTimeout(()=>setW(Math.max(0,Math.min(100,pct))),80); return ()=>clearTimeout(t); },[pct]);
+  return (
+    <div style={{height,borderRadius:99,background:FOS.bone2,overflow:"hidden",
+      boxShadow:"inset 0 1px 2px rgba(20,19,24,.08)"}}>
+      <div style={{height:"100%",width:`${w}%`,borderRadius:99,
+        background:`linear-gradient(90deg,${FOS.lav},${FOS.lavL})`,
+        transition:`width 1.2s ${FOS.spring}`}}/>
+    </div>
+  );
+}
+
+// Anillo de progreso (meta) sobre fondo oscuro del héroe
+function FosRing({pct, size=92, label="META"}){
+  const r=(size/2)-7, circ=2*Math.PI*r;
+  const [off,setOff]=useState(circ);
+  useEffect(()=>{ const t=setTimeout(()=>setOff(circ-circ*Math.max(0,Math.min(100,pct))/100),150); return ()=>clearTimeout(t); },[pct,circ]);
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+      <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="rgba(255,255,255,.09)" strokeWidth="8"/>
+      <circle cx={size/2} cy={size/2} r={r} fill="none" stroke={FOS.lav} strokeWidth="8" strokeLinecap="round"
+        strokeDasharray={circ} strokeDashoffset={off} transform={`rotate(-90 ${size/2} ${size/2})`}
+        style={{transition:`stroke-dashoffset 1.4s ${FOS.spring}`}}/>
+      <text x={size/2} y={size/2-3} textAnchor="middle" fill="#F5F2EE"
+        style={{fontFamily:FOS.sans,fontWeight:800,fontSize:19}}>
+        <FosCount value={pct} suffix="%"/>
+      </text>
+      <text x={size/2} y={size/2+13} textAnchor="middle" fill="#8B8791"
+        style={{fontFamily:FOS.mono,fontSize:8,letterSpacing:".12em"}}>{label}</text>
+    </svg>
+  );
+}
+
 // Logo SVG inline de Toscana House
 const LOGO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 120" fill="none">
   <text x="100" y="52" textAnchor="middle" fontFamily="Georgia,serif" fontSize="44" fontWeight="700" fill="currentColor" letterSpacing="2">TH</text>
@@ -10426,6 +10503,68 @@ function BrandPortal({user, ventas, inv, cargas, retiros=[], logout, descuentos=
   // Inventario de la marca
   const invMarca = useMemo(()=>inv.filter(i=>i.marcaId===mid),[inv, mid]);
 
+  // ── Facelift ForgeOS: métricas nuevas del dashboard ────────────────────────
+  // Ticket estrella: la venta del mes con mayor monto de ESTA marca
+  const ticketEstrella = useMemo(()=>{
+    let best=null;
+    vMes.forEach(v=>{
+      const its=v.items.filter(i=>i.marcaId===mid);
+      const sub=its.reduce((s,i)=>s+i.subtotal,0);
+      if(sub>0&&(!best||sub>best.sub)) best={sub,uds:its.reduce((s,i)=>s+i.cantidad,0),venta:v};
+    });
+    return best;
+  },[vMes,mid]);
+
+  // Rotación histórica: vendido vs cargado, y saldo actual
+  const rotacion = useMemo(()=>{
+    const cargado=invMarca.reduce((s,p)=>s+(Number(p.stockInicial)||Number(p.stock)||0),0);
+    const vendidas=Object.values(vendidasPorCodigo).reduce((s,n)=>s+n,0);
+    const saldo=invMarca.reduce((s,p)=>s+(Number(p.stock)||0),0);
+    return {cargado,vendidas,saldo,pct:cargado>0?Math.round(vendidas/cargado*100):0};
+  },[invMarca,vendidasPorCodigo]);
+
+  // Mejor mes histórico (excluye el mes visto) → meta implícita "tu récord"
+  const mejorMes = useMemo(()=>{
+    const by={};
+    todasMarca.forEach(v=>{
+      if(v.mk===MK) return;
+      const sub=v.items.filter(i=>i.marcaId===mid).reduce((s,i)=>s+i.subtotal,0);
+      if(sub>0) by[v.mk]=(by[v.mk]||0)+sub;
+    });
+    let best=null;
+    Object.entries(by).forEach(([k,tot])=>{ if(!best||tot>best.tot) best={mk:k,tot}; });
+    return best;
+  },[todasMarca,MK,mid]);
+  const metaPct = mejorMes&&mejorMes.tot>0 ? Math.min(100,Math.round(brutoMes/mejorMes.tot*100)) : 0;
+
+  // Alertas automáticas de la marca (computadas de los datos, sin backend nuevo)
+  const alertasMarca = useMemo(()=>{
+    const out=[];
+    const topCod=Object.entries(vendidasMesPorCodigo).sort((a,b)=>b[1]-a[1])[0];
+    if(topCod){
+      const p=invMarca.find(x=>x.codigo===topCod[0]);
+      if(p&&p.stock>0&&p.stock<=3) out.push({tipo:"warn",
+        t:`Quedan ${p.stock} ${p.stock===1?"unidad":"unidades"} de tu prenda estrella`,
+        s:`${p.nombre} · considerá reponer`});
+    }
+    const lastSale={};
+    todasMarca.forEach(v=>v.items.filter(i=>i.marcaId===mid).forEach(it=>{
+      if(!lastSale[it.codigo]||v.fecha>lastSale[it.codigo]) lastSale[it.codigo]=v.fecha;
+    }));
+    const lim=new Date(Date.now()-30*864e5).toISOString().slice(0,10);
+    const frias=invMarca.filter(p=>(Number(p.stock)||0)>0&&(lastSale[p.codigo]||"0000")<lim).length;
+    if(frias>0) out.push({tipo:"info",
+      t:`${frias} prenda${frias===1?"":"s"} sin ventas hace 30 días`,
+      s:"Un descuento por código puede moverlas"});
+    if(mejorMes&&brutoMes>mejorMes.tot&&vMes.length>0) out.push({tipo:"ok",
+      t:"Este mes ya es tu récord de ventas",
+      s:`Superaste tu mejor mes anterior (${$(mejorMes.tot)})`});
+    else if(mejorMes&&metaPct>=80&&vMes.length>0) out.push({tipo:"ok",
+      t:"Vas camino a tu récord",
+      s:`Estás al ${metaPct}% de tu mejor mes (${$(mejorMes.tot)})`});
+    return out;
+  },[vendidasMesPorCodigo,invMarca,todasMarca,mid,mejorMes,brutoMes,metaPct,vMes.length]);
+
   // ── Estado UI adicional (ventas modal, búsquedas, filtros) ──
   const [ventaSeleccionada, setVentaSeleccionada] = useState(null);
   const [ventasCodigo, setVentasCodigo] = useState(null); // {codigo, lista:[]}
@@ -10613,6 +10752,7 @@ function BrandPortal({user, ventas, inv, cargas, retiros=[], logout, descuentos=
       display: isDesktop ? "flex" : "block",
     }}>
       <style>{`@keyframes pulse-dot{0%,100%{opacity:1}50%{opacity:.4}}`}</style>
+      <FosStyles/>
 
       {/* ── Sidebar (desktop) ── */}
       {isDesktop&&<DesktopSidebar
@@ -10652,9 +10792,130 @@ function BrandPortal({user, ventas, inv, cargas, retiros=[], logout, descuentos=
       {/* ── Content ── */}
       <div style={{padding: isDesktop ? "16px 28px 0" : "16px 16px 0", maxWidth: isDesktop ? 900 : 780, margin:"0 auto"}}>
 
-        {/* ══ DASHBOARD ══ */}
+        {/* ══ DASHBOARD (facelift ForgeOS) ══ */}
         {tab==="dashboard"&&(
           <div>
+            {/* ── HÉROE void: la marca + ventas del mes + meta ── */}
+            <div className="fos-in" style={{
+              background:"linear-gradient(135deg,#18161D 0%,#141318 55%,#1A1721 100%)",
+              borderRadius:28,padding:isDesktop?"28px 30px":"22px 20px",marginBottom:16,color:FOS.bone,
+              boxShadow:"0 24px 48px -18px rgba(20,19,24,.5), inset 0 1px 0 rgba(255,255,255,.07)",
+              position:"relative",overflow:"hidden"}}>
+              <div style={{position:"absolute",top:-70,right:-40,width:260,height:260,borderRadius:"50%",
+                background:"radial-gradient(circle, rgba(155,143,160,.28), transparent 65%)",pointerEvents:"none"}}/>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",
+                flexWrap:"wrap",gap:20,position:"relative"}}>
+                <div>
+                  <div style={fosMono({color:FOS.lavL,marginBottom:8})}>{MESES[mes]} {anio}</div>
+                  <div style={{fontFamily:FOS.sans,fontWeight:800,fontSize:isDesktop?38:30,
+                    letterSpacing:"-0.03em",lineHeight:1}}>{marca.nombre}</div>
+                  <div style={{display:"flex",gap:8,marginTop:14,flexWrap:"wrap"}}>
+                    {varBruto!==0&&(
+                      <span style={{fontFamily:FOS.mono,fontSize:10.5,letterSpacing:".12em",padding:"6px 12px",
+                        borderRadius:999,background:varBruto>0?"rgba(74,222,128,.14)":"rgba(226,75,74,.16)",
+                        color:varBruto>0?"#7DE8A4":"#F0A5A5"}}>
+                        {varBruto>0?"▲":"▼"} {Math.abs(varBruto).toFixed(0)}% VS MES ANT.
+                      </span>
+                    )}
+                    <span style={{fontFamily:FOS.mono,fontSize:10.5,letterSpacing:".12em",padding:"6px 12px",
+                      borderRadius:999,background:"rgba(155,143,160,.18)",color:FOS.lavL}}>
+                      {vMes.length} VENTAS
+                    </span>
+                    <span style={{fontFamily:FOS.mono,fontSize:10.5,letterSpacing:".12em",padding:"6px 12px",
+                      borderRadius:999,background:"rgba(155,143,160,.12)",color:FOS.lavL}}>
+                      HOY {$(brutoHoy)} · {udsHoy} UDS
+                    </span>
+                  </div>
+                </div>
+                <div style={{display:"flex",gap:26,alignItems:"center",flexWrap:"wrap"}}>
+                  <div>
+                    <div style={fosMono({color:"#8B8791",marginBottom:6})}>Ventas del mes</div>
+                    <div style={{fontFamily:FOS.sans,fontWeight:800,fontSize:isDesktop?42:34,
+                      letterSpacing:"-0.03em",fontVariantNumeric:"tabular-nums",lineHeight:1}}>
+                      <FosCount value={brutoMes} prefix="Bs "/>
+                    </div>
+                    <div style={fosMono({color:"#8B8791",marginTop:8})}>
+                      Proyección <span style={{color:FOS.lavL}}>{$(proyeccion)}</span>
+                    </div>
+                  </div>
+                  {mejorMes&&<FosRing pct={metaPct} label="TU RÉCORD"/>}
+                </div>
+              </div>
+            </div>
+
+            {/* ── KPI burbujas ── */}
+            <div style={{display:"grid",gridTemplateColumns:isDesktop?"repeat(4,1fr)":"1fr 1fr",
+              gap:12,marginBottom:16}}>
+              <div className="fos-bub fos-in" style={{padding:"18px 20px",animationDelay:".07s"}}>
+                <div style={fosMono({marginBottom:8})}>Unidades</div>
+                <div style={{fontFamily:FOS.sans,fontWeight:800,fontSize:28,letterSpacing:"-0.03em"}}>
+                  <FosCount value={udsMes}/>
+                </div>
+                <div style={{fontSize:12,color:varUds>=0?FOS.ok:C.red,fontWeight:600,marginTop:3,fontFamily:FOS.sans}}>
+                  {varUds!==0?`${varUds>0?"▲":"▼"} ${Math.abs(varUds).toFixed(0)}% vs mes ant.`:"—"}
+                </div>
+              </div>
+              <div className="fos-bub fos-in" style={{padding:"18px 20px",animationDelay:".14s"}}>
+                <div style={fosMono({marginBottom:8})}>Ticket promedio</div>
+                <div style={{fontFamily:FOS.sans,fontWeight:800,fontSize:28,letterSpacing:"-0.03em"}}>
+                  <FosCount value={tktProm} prefix="Bs "/>
+                </div>
+                <div style={{fontSize:12,color:FOS.mut,marginTop:3,fontFamily:FOS.sans}}>por venta</div>
+              </div>
+              <div className="fos-bub fos-in" style={{padding:"18px 20px",animationDelay:".21s"}}>
+                <div style={fosMono({marginBottom:8})}>Ticket estrella</div>
+                <div style={{fontFamily:FOS.sans,fontWeight:800,fontSize:28,letterSpacing:"-0.03em"}}>
+                  {ticketEstrella?<FosCount value={ticketEstrella.sub} prefix="Bs "/>:"—"}
+                </div>
+                <div style={{fontSize:12,color:FOS.mut,marginTop:3,fontFamily:FOS.sans}}>
+                  {ticketEstrella?`${ticketEstrella.uds} ítem${ticketEstrella.uds===1?"":"s"} · ${(ticketEstrella.venta.fecha||"").slice(8,10)}/${(ticketEstrella.venta.fecha||"").slice(5,7)}`:"sin ventas aún"}
+                </div>
+              </div>
+              <div className="fos-bub fos-in" style={{padding:"18px 20px",animationDelay:".28s"}}>
+                <div style={fosMono({marginBottom:8})}>Rotación</div>
+                <div style={{fontFamily:FOS.sans,fontWeight:800,fontSize:28,letterSpacing:"-0.03em"}}>
+                  <FosCount value={rotacion.pct}/><span style={{fontSize:16,color:FOS.mut,fontWeight:600}}>%</span>
+                </div>
+                <div style={{margin:"8px 0 6px"}}><FosBar pct={rotacion.pct} height={8}/></div>
+                <div style={{fontSize:11.5,color:FOS.mut,fontFamily:FOS.sans}}>
+                  Saldo {rotacion.saldo.toLocaleString("es-BO")} de {rotacion.cargado.toLocaleString("es-BO")} uds
+                </div>
+              </div>
+            </div>
+
+            {/* ── Alertas de tu marca ── */}
+            {alertasMarca.length>0&&(
+              <div className="fos-bub fos-in" style={{padding:"20px 22px",marginBottom:16,animationDelay:".33s"}}>
+                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:6}}>
+                  <div style={{fontFamily:FOS.sans,fontWeight:700,fontSize:15,color:FOS.void}}>Alertas de tu marca</div>
+                  <span style={{fontFamily:FOS.mono,fontSize:10,letterSpacing:".14em",padding:"5px 11px",
+                    borderRadius:999,background:FOS.lavBg,color:FOS.lavDeep}}>AUTO</span>
+                </div>
+                {alertasMarca.map((a,i)=>(
+                  <div key={i} style={{display:"flex",alignItems:"center",gap:13,padding:"11px 0",
+                    borderBottom:i<alertasMarca.length-1?"1px solid rgba(20,19,24,.06)":"none"}}>
+                    <div style={{width:36,height:36,borderRadius:12,flexShrink:0,display:"flex",
+                      alignItems:"center",justifyContent:"center",
+                      background:a.tipo==="warn"?FOS.warnBg:a.tipo==="ok"?FOS.okBg:FOS.lavBg}}>
+                      <svg width="17" height="17" viewBox="0 0 24 24" fill="none"
+                        stroke={a.tipo==="warn"?FOS.warn:a.tipo==="ok"?FOS.ok:FOS.lavDeep}
+                        strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                        {a.tipo==="warn"
+                          ?<path d="M12 9v4M12 17h.01M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/>
+                          :a.tipo==="ok"
+                          ?<path d="M8 21h8M12 17v4M7 4h10v4a5 5 0 01-10 0zM17 5h3a2 2 0 01-2 4M7 5H4a2 2 0 002 4"/>
+                          :<><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></>}
+                      </svg>
+                    </div>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontFamily:FOS.sans,fontWeight:600,fontSize:13.5,color:FOS.void}}>{a.t}</div>
+                      <div style={{fontSize:12,color:FOS.mut,fontFamily:FOS.sans,marginTop:1}}>{a.s}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
             {/* ── Descuento en tienda (autogestión de la marca) ── */}
             <DescuentoMarcaCard
               actual={descuentos[marcaId]}
@@ -10665,26 +10926,24 @@ function BrandPortal({user, ventas, inv, cargas, retiros=[], logout, descuentos=
               marca={marca} inv={inv} descCodigos={descCodigos}
               onGuardar={onGuardarDescCodigo} onQuitar={onQuitarDescCodigo}/>
 
-            {/* ── Sección Hoy ── */}
-            <div style={{fontSize:10,letterSpacing:1.2,textTransform:"uppercase",color:C.label3,
-              fontFamily:FONT_UI,marginBottom:12,opacity:.65}}>Hoy</div>
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:24}}>
-              <KCard label="Ingresos" value={$(brutoHoy)}/>
-              <KCard label="Ítems vendidos" value={udsHoy}/>
-            </div>
-
-            {/* ── Sección Mes ── */}
-            <div style={{fontSize:10,letterSpacing:1.2,textTransform:"uppercase",color:C.label3,
-              fontFamily:FONT_UI,marginBottom:12,opacity:.65}}>{MESES[mes]} {anio}</div>
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:24}}>
-              <KCard label="Ventas brutas" value={$(brutoMes)}
-                sub={varBruto!==0?(varBruto>0?`+${varBruto.toFixed(0)}% vs mes ant.`:`${varBruto.toFixed(0)}% vs mes ant.`):undefined}/>
-              <KCard label="Ítems vendidos" value={udsMes}
-                sub={varUds!==0?(varUds>0?`+${varUds.toFixed(0)}%`:`${varUds.toFixed(0)}%`):undefined}/>
-              <KCard label="Transacciones" value={vMes.length}/>
-              <KCard label="Ticket promedio" value={$(tktProm)}/>
-              <KCard label="Neto estimado" value={$(liq.neto)} accent/>
-              <KCard label="Proyección cierre" value={$(proyeccion)}/>
+            {/* ── Neto estimado (liquidación) ── */}
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:16}}>
+              <div className="fos-bub" style={{padding:"18px 20px"}}>
+                <div style={fosMono({marginBottom:8})}>Neto estimado</div>
+                <div style={{fontFamily:FOS.sans,fontWeight:800,fontSize:24,letterSpacing:"-0.03em",color:FOS.lavDeep}}>
+                  {$(liq.neto)}
+                </div>
+                <div style={{fontSize:11.5,color:FOS.mut,marginTop:3,fontFamily:FOS.sans}}>después de comisiones y alquiler</div>
+              </div>
+              <div className="fos-bub" style={{padding:"18px 20px"}}>
+                <div style={fosMono({marginBottom:8})}>Mejor mes</div>
+                <div style={{fontFamily:FOS.sans,fontWeight:800,fontSize:24,letterSpacing:"-0.03em"}}>
+                  {mejorMes?$(mejorMes.tot):"—"}
+                </div>
+                <div style={{fontSize:11.5,color:FOS.mut,marginTop:3,fontFamily:FOS.sans}}>
+                  {mejorMes?`tu récord histórico`:"todavía sin historial"}
+                </div>
+              </div>
             </div>
 
             {/* ── Evolución 6 meses ── */}
