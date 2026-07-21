@@ -645,12 +645,62 @@ function descCodigoVigente(descCodigos, codigo){
 
 // Descuento EFECTIVO de un artículo: el del código manda sobre el general
 // de la marca. Devuelve {pct, fuente:"codigo"|"marca"|null}.
+// ── Campañas programadas (tabla campanas_descuento) ─────────────────
+// Cache a nivel módulo: la actualiza el App al cargar/recibir realtime, y así
+// descEfectivoCodigo las considera sin cambiar la firma en todos los call sites.
+let CAMPANAS_CACHE = [];
+function campEstado(c){
+  const h = hoy();
+  if(!c.activa) return "apagada";
+  if(h < c.desde) return "programada";
+  if(h > c.hasta) return "terminada";
+  return "activa";
+}
+function descCampanaPct(marcaId, codigo){
+  let best = 0;
+  CAMPANAS_CACHE.forEach(c=>{
+    if(Number(c.marca_id)!==Number(marcaId)) return;
+    if(campEstado(c)!=="activa") return;
+    const cods = Array.isArray(c.codigos)?c.codigos:[];
+    if(cods.length>0 && (!codigo || !cods.includes(String(codigo).toUpperCase()))) return;
+    best = Math.max(best, Number(c.pct)||0);
+  });
+  return Math.min(60, best);
+}
+
 function descEfectivoCodigo(descuentos, descCodigos, marcaId, codigo){
   const pc = descCodigoVigente(descCodigos, codigo);
   if(pc>0) return {pct:pc, fuente:"codigo"};
   const pm = descMarcaVigente(descuentos, marcaId);
+  const pcamp = descCampanaPct(marcaId, codigo);
+  if(pcamp>0 && pcamp>=pm) return {pct:pcamp, fuente:"campana"};
   if(pm>0) return {pct:pm, fuente:"marca"};
   return {pct:0, fuente:null};
+}
+
+async function sbCargarCampanas(){
+  try{
+    const db = await getSupabase();
+    const {data, error} = await db.from("campanas_descuento").select("*").order("desde",{ascending:false});
+    if(error) throw error;
+    return data||[];
+  }catch(e){ console.warn("campanas load:", e.message); return null; }
+}
+async function sbGuardarCampana(c){
+  try{
+    const db = await getSupabase();
+    const {data, error} = await db.from("campanas_descuento").upsert(c).select().single();
+    if(error) throw error;
+    return data;
+  }catch(e){ console.warn("campana save:", e.message); return null; }
+}
+async function sbEliminarCampana(id){
+  try{
+    const db = await getSupabase();
+    const {error} = await db.from("campanas_descuento").delete().eq("id", id);
+    if(error) throw error;
+    return true;
+  }catch(e){ console.warn("campana del:", e.message); return false; }
 }
 
 // ── Descuentos por código (tabla descuentos_codigo) ─────────────────
@@ -10417,7 +10467,113 @@ function DescuentosPorCodigoCard({marca, inv, descCodigos={}, onGuardar, onQuita
   );
 }
 
-function BrandPortal({user, ventas, inv, cargas, retiros=[], logout, descuentos={}, onGuardarDescuento, descCodigos={}, onGuardarDescCodigo, onQuitarDescCodigo}){
+// ── Campañas de descuento programadas (portal de marca) ─────────────────────
+function CampanasCard({marca, campanas=[], onGuardar, onEliminar}){
+  const [abierto,setAbierto]=useState(false);
+  const [nombre,setNombre]=useState("");
+  const [pct,setPct]=useState(20);
+  const [desde,setDesde]=useState("");
+  const [hasta,setHasta]=useState("");
+  const [cods,setCods]=useState("");
+  const [msg,setMsg]=useState(null);
+  const mias=campanas.filter(c=>Number(c.marca_id)===Number(marca?.id))
+    .sort((a,b)=>String(b.desde).localeCompare(String(a.desde)));
+  const EST={activa:{t:"ACTIVA",bg:FOS.okBg,c:FOS.ok},programada:{t:"PROGRAMADA",bg:FOS.lavBg,c:FOS.lavDeep},
+    terminada:{t:"TERMINADA",bg:C.bg3,c:C.label3},apagada:{t:"APAGADA",bg:C.bg3,c:C.label3}};
+  async function crear(){
+    setMsg(null);
+    if(!desde||!hasta){ setMsg("Elegí desde y hasta"); return; }
+    if(hasta<desde){ setMsg("La fecha final es anterior al inicio"); return; }
+    const codigos=cods.split(",").map(s=>s.trim().toUpperCase()).filter(Boolean);
+    const ok=await onGuardar({
+      marca_id:marca.id, nombre:nombre.trim()||`Campaña -${pct}%`,
+      pct:Number(pct)||0, desde, hasta, codigos, activa:true,
+      creada_por:marca?.nombre||"", updated_at:new Date().toISOString(),
+    });
+    if(ok){ setAbierto(false); setNombre(""); setCods(""); setDesde(""); setHasta(""); }
+    else setMsg("No se pudo guardar, probá de nuevo");
+  }
+  return (
+    <div className="fos-bub" style={{padding:"20px 22px",marginBottom:16}}>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
+        <div style={{fontFamily:FOS.sans,fontWeight:700,fontSize:15,color:C.label}}>Campañas de descuento</div>
+        <span style={{fontFamily:FOS.mono,fontSize:10,letterSpacing:".14em",padding:"5px 11px",
+          borderRadius:999,background:FOS.lavBg,color:FOS.lavDeep}}>PROGRAMABLES</span>
+      </div>
+      {mias.length===0&&!abierto&&(
+        <div style={{fontSize:13,color:C.label3,fontFamily:FONT,marginBottom:12}}>
+          Programá un descuento con fecha de inicio y fin: se prende y se apaga solo.
+        </div>
+      )}
+      {mias.map(c=>{
+        const e=EST[campEstado(c)];
+        const nCods=Array.isArray(c.codigos)?c.codigos.length:0;
+        return (
+          <div key={c.id} style={{display:"flex",alignItems:"center",gap:12,padding:"11px 13px",
+            borderRadius:14,background:campEstado(c)==="activa"?FOS.okBg:C.bg0,marginBottom:8}}>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontWeight:600,fontSize:13.5,color:C.label,fontFamily:FONT}}>
+                {c.nombre} · -{Number(c.pct)}%
+              </div>
+              <div style={{fontSize:11.5,color:C.label2,fontFamily:FONT,marginTop:1}}>
+                {String(c.desde).split("-").reverse().join("/")} al {String(c.hasta).split("-").reverse().join("/")}
+                {nCods>0?` · ${nCods} código${nCods===1?"":"s"}`:" · toda la marca"}
+              </div>
+            </div>
+            <span style={{fontFamily:FOS.mono,fontSize:9.5,letterSpacing:".12em",padding:"4px 10px",
+              borderRadius:999,background:e.bg,color:e.c,flexShrink:0}}>{e.t}</span>
+            <button onClick={()=>{ if(confirm(`¿Eliminar "${c.nombre}"?`)) onEliminar(c.id); }}
+              style={{background:"none",border:"none",color:C.label3,fontSize:15,cursor:"pointer",
+                padding:4,flexShrink:0,WebkitTapHighlightColor:"transparent"}}>✕</button>
+          </div>
+        );
+      })}
+      {abierto?(
+        <div style={{marginTop:6}}>
+          <IOSInput label="Nombre" placeholder="Pre-temporada primavera" value={nombre}
+            onChange={e=>setNombre(e.target.value)}/>
+          <div style={{fontSize:11,fontWeight:600,color:C.label3,fontFamily:FONT,
+            marginBottom:6,paddingLeft:2,textTransform:"uppercase",letterSpacing:"0.07em"}}>Descuento</div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:6,marginBottom:14}}>
+            {[10,15,20,25,30,40,50,60].map(p=>(
+              <button key={p} onClick={()=>setPct(p)} style={{
+                padding:"9px 0",borderRadius:11,fontFamily:FONT,fontSize:13,cursor:"pointer",
+                fontWeight:pct===p?700:500,
+                border:pct===p?`1.5px solid ${C.gold}`:`1px solid ${C.sep}`,
+                background:pct===p?FOS.lavBg:C.bg2,color:pct===p?FOS.lavDeep:C.label2,
+                WebkitTapHighlightColor:"transparent"}}>{p}%</button>
+            ))}
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+            <IOSInput label="Desde" type="date" value={desde} onChange={e=>setDesde(e.target.value)}/>
+            <IOSInput label="Hasta" type="date" value={hasta} onChange={e=>setHasta(e.target.value)}/>
+          </div>
+          <IOSInput label="Códigos (opcional, separados por coma)" placeholder="vacío = toda la marca"
+            value={cods} onChange={e=>setCods(e.target.value)}/>
+          {msg&&<div style={{fontSize:12.5,color:C.red,fontFamily:FONT,marginBottom:10}}>{msg}</div>}
+          <div style={{display:"flex",gap:8}}>
+            <button onClick={crear} style={{flex:1,padding:"13px 0",borderRadius:13,border:"none",
+              background:"#5C5449",color:"#fff",fontFamily:FONT,fontSize:14,fontWeight:700,cursor:"pointer",
+              boxShadow:"0 10px 22px -8px rgba(92,84,73,.45)",WebkitTapHighlightColor:"transparent"}}>
+              Programar campaña
+            </button>
+            <button onClick={()=>{setAbierto(false);setMsg(null);}} style={{padding:"13px 18px",borderRadius:13,
+              border:`1px solid ${C.sep}`,background:C.bg1,color:C.label2,fontFamily:FONT,fontSize:14,
+              fontWeight:600,cursor:"pointer",WebkitTapHighlightColor:"transparent"}}>Cancelar</button>
+          </div>
+        </div>
+      ):(
+        <button onClick={()=>setAbierto(true)} style={{width:"100%",padding:"12px 0",borderRadius:13,
+          border:`1px dashed ${C.sepH}`,background:"transparent",color:C.label2,fontFamily:FONT,
+          fontSize:13.5,fontWeight:600,cursor:"pointer",WebkitTapHighlightColor:"transparent"}}>
+          + Nueva campaña
+        </button>
+      )}
+    </div>
+  );
+}
+
+function BrandPortal({user, ventas, inv, cargas, retiros=[], logout, descuentos={}, onGuardarDescuento, descCodigos={}, onGuardarDescCodigo, onQuitarDescCodigo, campanas=[], onGuardarCampana, onEliminarCampana}){
   // ── TODOS los hooks ANTES de cualquier return condicional ──
   const isDesktop = useIsDesktop();
   const now = new Date();
@@ -10965,6 +11121,10 @@ function BrandPortal({user, ventas, inv, cargas, retiros=[], logout, descuentos=
             <DescuentosPorCodigoCard
               marca={marca} inv={inv} descCodigos={descCodigos}
               onGuardar={onGuardarDescCodigo} onQuitar={onQuitarDescCodigo}/>
+
+            {/* ── Campañas programadas ── */}
+            <CampanasCard marca={marca} campanas={campanas}
+              onGuardar={onGuardarCampana} onEliminar={onEliminarCampana}/>
 
             {/* ── Neto estimado (liquidación) ── */}
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:16}}>
@@ -13185,6 +13345,35 @@ function App(){
   useEffect(()=>{ try{localStorage.setItem("th_descuentos",JSON.stringify(descuentos));}catch{} },[descuentos]);
   useEffect(()=>{ sbCargarDescuentos().then(m=>{ if(m) setDescuentos(m); }); },[]);
 
+  // ── Campañas programadas ──────────────────────────────────────────────────
+  const[campanas,setCampanas]=useState(()=>{ try{return JSON.parse(localStorage.getItem("th_campanas")||"[]");}catch{return[];} });
+  useEffect(()=>{ CAMPANAS_CACHE=campanas; try{localStorage.setItem("th_campanas",JSON.stringify(campanas));}catch{} },[campanas]);
+  useEffect(()=>{ sbCargarCampanas().then(l=>{ if(l) setCampanas(l); }); },[]);
+  useEffect(()=>{
+    let ch=null, m=true;
+    getSupabase().then(db=>{
+      if(!m) return;
+      ch=db.channel("campanas-rt")
+        .on("postgres_changes",{event:"*",schema:"public",table:"campanas_descuento"},()=>{
+          sbCargarCampanas().then(l=>{ if(m&&l) setCampanas(l); });
+        }).subscribe();
+    }).catch(()=>{});
+    return ()=>{ m=false; if(ch) getSupabase().then(db=>db.removeChannel(ch)).catch(()=>{}); };
+  },[]);
+  async function guardarCampana(rec){
+    const saved=await sbGuardarCampana(rec);
+    if(!saved) return false;
+    setCampanas(p=>{ const i=p.findIndex(x=>x.id===saved.id);
+      if(i>=0){ const n=[...p]; n[i]=saved; return n; }
+      return [saved,...p]; });
+    return true;
+  }
+  async function eliminarCampana(id){
+    const ok=await sbEliminarCampana(id);
+    if(ok) setCampanas(p=>p.filter(x=>x.id!==id));
+    return ok;
+  }
+
   // Recibe cambios de descuento (broadcast o postgres_changes) → estado + toast
   function onDescuentoMarcaRT(p){
     setDescuentos(prev=>({...prev,[p.marcaId]:{activo:p.activo,pct:p.pct,hasta:p.hasta||"",updatedBy:p.por||""}}));
@@ -14297,7 +14486,7 @@ function App(){
   if (!user) return <LoginScreen onLogin={login}/>;
 
   // Portal de marca (lectura)
-  if (user.rol === "marca") return <BrandPortal user={user} ventas={ventas} inv={inv} cargas={cargasCompletas} retiros={retiros} logout={logout} descuentos={descuentos} onGuardarDescuento={guardarDescuentoMarca} descCodigos={descCodigos} onGuardarDescCodigo={guardarDescuentoCodigo} onQuitarDescCodigo={eliminarDescuentoCodigo}/>;
+  if (user.rol === "marca") return <BrandPortal user={user} ventas={ventas} inv={inv} cargas={cargasCompletas} retiros={retiros} logout={logout} descuentos={descuentos} onGuardarDescuento={guardarDescuentoMarca} descCodigos={descCodigos} onGuardarDescCodigo={guardarDescuentoCodigo} onQuitarDescCodigo={eliminarDescuentoCodigo} campanas={campanas} onGuardarCampana={guardarCampana} onEliminarCampana={eliminarCampana}/>;
 
   // ── Liquidaciones: métricas pre-calculadas — mixto distribuido ─────────────
   const _liqPagos   = sumPagos(vMes);
