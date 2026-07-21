@@ -4396,7 +4396,7 @@ function FosRing({pct, size=92, label="META"}){
   useEffect(()=>{ const t=setTimeout(()=>setOff(circ-circ*Math.max(0,Math.min(100,pct))/100),150); return ()=>clearTimeout(t); },[pct,circ]);
   return (
     <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-      <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="rgba(255,255,255,.09)" strokeWidth="8"/>
+      <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="rgba(255,255,255,.22)" strokeWidth="8"/>
       <circle cx={size/2} cy={size/2} r={r} fill="none" stroke={FOS.lav} strokeWidth="8" strokeLinecap="round"
         strokeDasharray={circ} strokeDashoffset={off} transform={`rotate(-90 ${size/2} ${size/2})`}
         style={{transition:`stroke-dashoffset 1.4s ${FOS.spring}`}}/>
@@ -4404,7 +4404,7 @@ function FosRing({pct, size=92, label="META"}){
         style={{fontFamily:FOS.sans,fontWeight:800,fontSize:19}}>
         <FosCount value={pct} suffix="%"/>
       </text>
-      <text x={size/2} y={size/2+13} textAnchor="middle" fill="#8B8791"
+      <text x={size/2} y={size/2+13} textAnchor="middle" fill="#D8D4DF"
         style={{fontFamily:FOS.mono,fontSize:8,letterSpacing:".12em"}}>{label}</text>
     </svg>
   );
@@ -9466,10 +9466,10 @@ function HomeDashboard({ventas, inv, vMes, mes, anio, onGoTab}){
 
       {/* ── HÉROE void (facelift ForgeOS) ── */}
       <div className="fos-in" style={{
-        background:"linear-gradient(135deg,#18161D 0%,#141318 55%,#1A1721 100%)",
+        background:"linear-gradient(135deg,#6A6376 0%,#4E4859 45%,#8A8496 100%)",
         borderRadius:28,padding: isDesktop ? "26px 30px" : "22px 20px",
         marginBottom: isDesktop ? 12 : 16,color:FOS.bone,
-        boxShadow:"0 24px 48px -18px rgba(20,19,24,.5), inset 0 1px 0 rgba(255,255,255,.07)",
+        boxShadow:"0 20px 40px -18px rgba(78,72,89,.45), inset 0 1px 0 rgba(255,255,255,.07)",
         position:"relative",overflow:"hidden",
       }}>
         <div style={{position:"absolute",top:-70,right:-40,width:260,height:260,borderRadius:"50%",
@@ -9486,18 +9486,18 @@ function HomeDashboard({ventas, inv, vMes, mes, anio, onGoTab}){
                 letterSpacing:"-0.02em",lineHeight:1}}>Toscana House</div>
             </div>
             <div style={{fontFamily:FOS.mono,fontSize:9.5,letterSpacing:".26em",
-              textTransform:"uppercase",color:"#8B8791",marginTop:7}}>Casa de moda · Santa Cruz</div>
+              textTransform:"uppercase",color:"#D8D4DF",marginTop:7}}>Casa de moda · Santa Cruz</div>
           </div>
           <div style={{display:"flex",gap:22,alignItems:"center"}}>
             <div style={{textAlign:"right"}}>
               <div style={{fontFamily:FOS.mono,fontSize:10,letterSpacing:".16em",
-                textTransform:"uppercase",color:"#8B8791",marginBottom:6}}>Ventas hoy</div>
+                textTransform:"uppercase",color:"#D8D4DF",marginBottom:6}}>Ventas hoy</div>
               <div style={{fontFamily:FONT,fontWeight:800,fontSize:isDesktop?32:26,
                 letterSpacing:"-0.03em",fontVariantNumeric:"tabular-nums",lineHeight:1}}>
                 <FosCount value={totalHoy} prefix="Bs "/>
               </div>
               <div style={{fontFamily:FOS.mono,fontSize:10,letterSpacing:".14em",
-                color:"#8B8791",marginTop:6,textTransform:"uppercase"}}>
+                color:"#D8D4DF",marginTop:6,textTransform:"uppercase"}}>
                 {vHoy.length} transacci{vHoy.length===1?"ón":"ones"}
               </div>
             </div>
@@ -10813,9 +10813,9 @@ function BrandPortal({user, ventas, inv, cargas, retiros=[], logout, descuentos=
           <div>
             {/* ── HÉROE void: la marca + ventas del mes + meta ── */}
             <div className="fos-in" style={{
-              background:"linear-gradient(135deg,#18161D 0%,#141318 55%,#1A1721 100%)",
+              background:"linear-gradient(135deg,#6A6376 0%,#4E4859 45%,#8A8496 100%)",
               borderRadius:28,padding:isDesktop?"28px 30px":"22px 20px",marginBottom:16,color:FOS.bone,
-              boxShadow:"0 24px 48px -18px rgba(20,19,24,.5), inset 0 1px 0 rgba(255,255,255,.07)",
+              boxShadow:"0 20px 40px -18px rgba(78,72,89,.45), inset 0 1px 0 rgba(255,255,255,.07)",
               position:"relative",overflow:"hidden"}}>
               <div style={{position:"absolute",top:-70,right:-40,width:260,height:260,borderRadius:"50%",
                 background:"radial-gradient(circle, rgba(155,143,160,.28), transparent 65%)",pointerEvents:"none"}}/>
@@ -10845,12 +10845,12 @@ function BrandPortal({user, ventas, inv, cargas, retiros=[], logout, descuentos=
                 </div>
                 <div style={{display:"flex",gap:26,alignItems:"center",flexWrap:"wrap"}}>
                   <div>
-                    <div style={fosMono({color:"#8B8791",marginBottom:6})}>Ventas del mes</div>
+                    <div style={fosMono({color:"#D8D4DF",marginBottom:6})}>Ventas del mes</div>
                     <div style={{fontFamily:FOS.sans,fontWeight:800,fontSize:isDesktop?42:34,
                       letterSpacing:"-0.03em",fontVariantNumeric:"tabular-nums",lineHeight:1}}>
                       <FosCount value={brutoMes} prefix="Bs "/>
                     </div>
-                    <div style={fosMono({color:"#8B8791",marginTop:8})}>
+                    <div style={fosMono({color:"#D8D4DF",marginTop:8})}>
                       Proyección <span style={{color:FOS.lavL}}>{$(proyeccion)}</span>
                     </div>
                   </div>
