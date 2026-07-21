@@ -10718,6 +10718,165 @@ function BrandPortal({user, ventas, inv, cargas, retiros=[], logout, descuentos=
     return {cargado,vendidas,saldo,pct:cargado>0?Math.round(vendidas/cargado*100):0};
   },[invMarca,vendidasPorCodigo]);
 
+  // ── Tu asesor: hallazgos inteligentes calculados de los datos ──────────────
+  const hallazgos = useMemo(()=>{
+    const out=[];
+    const lim60=new Date(Date.now()-60*864e5).toISOString().slice(0,10);
+    const lim30=new Date(Date.now()-30*864e5).toISOString().slice(0,10);
+    const v60=todasMarca.filter(v=>(v.fecha||"")>=lim60);
+    const itemsDe=v=>v.items.filter(i=>i.marcaId===mid);
+    const uds60=v60.reduce((s,v)=>s+itemsDe(v).reduce((ss,i)=>ss+i.cantidad,0),0);
+
+    // 1. Mejor día de la semana (últimos 60 días)
+    if(uds60>=8){
+      const porDia=[0,0,0,0,0,0,0];
+      v60.forEach(v=>{ const d=new Date(v.fecha+"T12:00:00").getDay();
+        porDia[d]+=itemsDe(v).reduce((s,i)=>s+i.cantidad,0); });
+      const max=Math.max(...porDia), tot=porDia.reduce((a,b)=>a+b,0);
+      const idx=porDia.indexOf(max);
+      const DIAS=["domingo","lunes","martes","miércoles","jueves","viernes","sábado"];
+      if(tot>0&&max/tot>=0.3) out.push({score:max/tot*100, badge:"DATO",
+        t:`Tus prendas venden más los ${DIAS[idx]}s`,
+        s:`${Math.round(max/tot*100)}% de tus unidades de los últimos 2 meses`});
+    }
+
+    // 2. Punto dulce de precio (últimos 60 días)
+    if(uds60>=8){
+      const buckets=[[0,150],[150,250],[250,350],[350,Infinity]];
+      const cnt=[0,0,0,0];
+      v60.forEach(v=>itemsDe(v).forEach(it=>{
+        const p=Number(it.precioUnit)||0;
+        const bi=buckets.findIndex(b=>p>=b[0]&&p<b[1]);
+        if(bi>=0) cnt[bi]+=it.cantidad;
+      }));
+      const tot=cnt.reduce((a,b)=>a+b,0), max=Math.max(...cnt), bi=cnt.indexOf(max);
+      if(tot>0&&max/tot>=0.45){
+        const b=buckets[bi];
+        const label=b[1]===Infinity?`Bs ${b[0]}+`:`Bs ${b[0]}–${b[1]}`;
+        out.push({score:max/tot*90, badge:"DATO",
+          t:`Tu punto dulce de precio: ${label}`,
+          s:`${max} de ${tot} unidades vendidas están en ese rango`});
+      }
+    }
+
+    // 3. Categoría en alza / en baja (mes visto vs anterior)
+    {
+      const mkPrev=mkKey(mes===0?11:mes-1, mes===0?anio-1:anio);
+      const cat=c=>{ const p=invMarca.find(x=>x.codigo===c); return p?(p.categoria||"General"):null; };
+      const sum=(vs)=>{ const m={}; vs.forEach(v=>itemsDe(v).forEach(it=>{
+        const k=cat(it.codigo); if(k) m[k]=(m[k]||0)+it.cantidad; })); return m; };
+      const cur=sum(vMes), prev=sum(todasMarca.filter(v=>v.mk===mkPrev));
+      Object.keys(cur).forEach(k=>{
+        const c=cur[k], p=prev[k]||0;
+        if(c>=3&&p>0&&c/p>=1.5) out.push({score:60+c, badge:"EN ALZA",
+          t:`${k}: en alza este mes`, s:`${c} uds vs ${p} el mes pasado`});
+        if(p>=3&&c<p*0.5) out.push({score:40+p, badge:"EN BAJA",
+          t:`${k}: bajó este mes`, s:`${c} uds vs ${p} el mes pasado · un descuento puede ayudar`});
+      });
+    }
+
+    // 4. Talla más pedida (últimos 60 días)
+    if(uds60>=8){
+      const tl={};
+      v60.forEach(v=>itemsDe(v).forEach(it=>{
+        const p=invMarca.find(x=>x.codigo===it.codigo);
+        const t=extraerTalla(p?.descripcion)||"";
+        if(t) tl[t]=(tl[t]||0)+it.cantidad;
+      }));
+      const es=Object.entries(tl).sort((a,b)=>b[1]-a[1]);
+      const tot=es.reduce((s,e)=>s+e[1],0);
+      if(es.length>=2&&tot>=6&&es[0][1]/tot>=0.4) out.push({score:es[0][1]/tot*80, badge:"DATO",
+        t:`El talle ${es[0][0]} es tu más pedido`,
+        s:`${es[0][1]} de ${tot} unidades · cuidá su reposición`});
+    }
+
+    // 5. Qué traer: demanda de toda la tienda (30 días, anónima) vs tu stock
+    {
+      const catGlobal={};
+      ventas.filter(v=>!v.anulada&&(v.fecha||"")>=lim30).forEach(v=>v.items.forEach(it=>{
+        const p=inv.find(x=>x.codigo===it.codigo);
+        const k=p?(p.categoria||"General"):null;
+        if(k) catGlobal[k]=(catGlobal[k]||0)+it.cantidad;
+      }));
+      const top=Object.entries(catGlobal).sort((a,b)=>b[1]-a[1]).slice(0,2);
+      top.forEach(([k,n])=>{
+        const miStock=invMarca.filter(p=>(p.categoria||"General")===k)
+          .reduce((s,p)=>s+(Number(p.stock)||0),0);
+        if(n>=10&&miStock<=3) out.push({score:55+n/2, badge:"QUÉ TRAER",
+          t:`En la tienda vuelan los ${k.toLowerCase()}`,
+          s:`${n} uds vendidas este mes en toda la tienda y tenés ${miStock} en stock`});
+      });
+    }
+
+    return out.sort((a,b)=>b.score-a.score).slice(0,3);
+  },[todasMarca,vMes,invMarca,inv,ventas,mid,mes,anio]);
+
+  // ── Tu mes en Toscana ──────────────────────────────────────────────────────
+  const [tuMesOpen,setTuMesOpen]=useState(false);
+  const mejorDia = useMemo(()=>{
+    const by={};
+    vMes.forEach(v=>{
+      const sub=v.items.filter(i=>i.marcaId===mid).reduce((s,i)=>s+i.subtotal,0);
+      if(sub>0) by[v.fecha]=(by[v.fecha]||0)+sub;
+    });
+    let best=null;
+    Object.entries(by).forEach(([f,t])=>{ if(!best||t>best.t) best={f,t}; });
+    return best;
+  },[vMes,mid]);
+  // esRecordMes se calcula más abajo (después de declarar mejorMes)
+
+  async function descargarTuMes(){
+    try{ await document.fonts.ready; }catch(e){}
+    const W=1080,H=1350;
+    const cv=document.createElement("canvas"); cv.width=W; cv.height=H;
+    const x=cv.getContext("2d");
+    const rr=(x0,y0,w,h,r)=>{x.beginPath();x.moveTo(x0+r,y0);x.arcTo(x0+w,y0,x0+w,y0+h,r);
+      x.arcTo(x0+w,y0+h,x0,y0+h,r);x.arcTo(x0,y0+h,x0,y0,r);x.arcTo(x0,y0,x0+w,y0,r);x.closePath();};
+    x.fillStyle="#F5F2EE"; x.fillRect(0,0,W,H);
+    x.textAlign="center";
+    x.fillStyle="#1A1714"; x.font="500 52px 'Cormorant Garamond', Georgia, serif";
+    x.fillText("T   H",W/2,104);
+    x.fillStyle="#A8A29E"; x.font="500 21px 'DM Mono', monospace";
+    x.fillText("T O S C A N A   H O U S E   ·   C A S A   D E   M O D A",W/2,146);
+    const g=x.createLinearGradient(60,200,1020,840);
+    g.addColorStop(0,"#7C7468"); g.addColorStop(.45,"#5C5449"); g.addColorStop(1,"#938A7E");
+    x.fillStyle=g; rr(60,200,960,600,46); x.fill();
+    x.fillStyle="#D9C48C"; x.font="500 25px 'DM Mono', monospace";
+    x.fillText("TU MES EN TOSCANA · "+MESES[mes].toUpperCase()+" "+anio,W/2,286);
+    x.fillStyle="#F5F2EE"; x.font="800 84px 'Plus Jakarta Sans', sans-serif";
+    x.fillText(marca.nombre,W/2,396);
+    x.font="800 118px 'Plus Jakarta Sans', sans-serif";
+    x.fillText($(brutoMes),W/2,556);
+    x.fillStyle="#E7E1D5"; x.font="500 29px 'DM Mono', monospace";
+    x.fillText(vMes.length+" VENTAS · "+udsMes+" UNIDADES",W/2,632);
+    if(esRecordMes){ x.fillStyle="#D9C48C"; x.font="500 27px 'DM Mono', monospace";
+      x.fillText("TU MEJOR MES HISTÓRICO",W/2,716); }
+    const rows=[];
+    if(ticketEstrella) rows.push(["PRENDA ESTRELLA",
+      (ticketEstrella.venta.items.find(i=>i.marcaId===mid)?.nombre||"").slice(0,30),$(ticketEstrella.sub)]);
+    if(mejorDia) rows.push(["MEJOR DÍA",
+      mejorDia.f.split("-").reverse().slice(0,2).join("/"),$(mejorDia.t)]);
+    rows.push(["TICKET PROMEDIO","",$(tktProm)]);
+    if(brutoPrev>0) rows.push(["VS MES ANTERIOR","",(varBruto>0?"+":"")+varBruto.toFixed(0)+"%"]);
+    let ry=880;
+    rows.forEach(r=>{
+      x.fillStyle="#FFFFFF"; rr(60,ry,960,92,26); x.fill();
+      x.strokeStyle="rgba(20,19,24,.07)"; x.lineWidth=2; rr(60,ry,960,92,26); x.stroke();
+      x.textAlign="left"; x.fillStyle="#A8A29E"; x.font="500 20px 'DM Mono', monospace";
+      x.fillText(r[0],104,ry+56);
+      x.textAlign="right"; x.fillStyle="#1A1714"; x.font="800 34px 'Plus Jakarta Sans', sans-serif";
+      x.fillText(r[2],976,ry+59);
+      if(r[1]){ x.textAlign="center"; x.fillStyle="#57534E"; x.font="600 24px 'Plus Jakarta Sans', sans-serif";
+        x.fillText(r[1],W/2,ry+58); }
+      x.textAlign="center"; ry+=112;
+    });
+    x.fillStyle="#A8A29E"; x.font="500 19px 'DM Mono', monospace";
+    x.fillText("POWERED BY FORGE.",W/2,H-52);
+    const a=document.createElement("a");
+    a.download=`TuMes_${(marca.nombre||"marca").replace(/\s+/g,"_")}_${MESES[mes]}_${anio}.png`;
+    a.href=cv.toDataURL("image/png"); a.click();
+  }
+
   // Mejor mes histórico (excluye el mes visto) → meta implícita "tu récord"
   const mejorMes = useMemo(()=>{
     const by={};
@@ -10731,6 +10890,7 @@ function BrandPortal({user, ventas, inv, cargas, retiros=[], logout, descuentos=
     return best;
   },[todasMarca,MK,mid]);
   const metaPct = mejorMes&&mejorMes.tot>0 ? Math.min(100,Math.round(brutoMes/mejorMes.tot*100)) : 0;
+  const esRecordMes = mejorMes ? brutoMes>mejorMes.tot : vMes.length>0;
 
   // Alertas automáticas de la marca (computadas de los datos, sin backend nuevo)
   const alertasMarca = useMemo(()=>{
@@ -11039,6 +11199,117 @@ function BrandPortal({user, ventas, inv, cargas, retiros=[], logout, descuentos=
               </div>
             </div>
 
+            {/* ── Tu mes en Toscana (resumen compartible) ── */}
+            {vMes.length>0&&(
+              <button onClick={()=>setTuMesOpen(true)} className="fos-bub fos-in"
+                style={{width:"100%",padding:"15px 20px",marginBottom:16,border:"1px solid rgba(20,19,24,.055)",
+                  cursor:"pointer",display:"flex",alignItems:"center",gap:13,textAlign:"left",
+                  fontFamily:FOS.sans,WebkitTapHighlightColor:"transparent",animationDelay:".05s"}}>
+                <div style={{width:38,height:38,borderRadius:12,flexShrink:0,display:"flex",
+                  alignItems:"center",justifyContent:"center",
+                  background:"linear-gradient(135deg,#7C7468,#5C5449)"}}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#D9C48C"
+                    strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 3l1.9 5.6 5.9.2-4.7 3.6 1.7 5.7L12 14.7l-4.8 3.4 1.7-5.7-4.7-3.6 5.9-.2z"/>
+                  </svg>
+                </div>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontWeight:700,fontSize:14.5,color:FOS.void}}>Tu mes en Toscana</div>
+                  <div style={{fontSize:12,color:FOS.mut,marginTop:1}}>
+                    Tu resumen de {MESES[mes]}, listo para compartir en Instagram
+                  </div>
+                </div>
+                <span style={{fontFamily:FOS.mono,fontSize:10,letterSpacing:".14em",padding:"5px 11px",
+                  borderRadius:999,background:FOS.lavBg,color:FOS.lavDeep,flexShrink:0}}>VER →</span>
+              </button>
+            )}
+
+            {/* ── Overlay: Tu mes en Toscana ── */}
+            {tuMesOpen&&(
+              <div style={{position:"fixed",inset:0,zIndex:600,overflowY:"auto",
+                background:"linear-gradient(160deg,#7C7468 0%,#5C5449 45%,#8A8478 100%)"}}
+                onClick={e=>{ if(e.target===e.currentTarget) setTuMesOpen(false); }}>
+                <div style={{maxWidth:430,margin:"0 auto",padding:"46px 22px 60px",textAlign:"center"}}>
+                  <div className="fos-in" style={{fontFamily:FONT_DISPLAY,fontSize:30,color:FOS.bone,
+                    letterSpacing:".16em"}}>T H</div>
+                  <div className="fos-in" style={{...fosMono({color:"#D9C48C"}),marginTop:14,
+                    animationDelay:".1s"}}>Tu mes en Toscana · {MESES[mes]} {anio}</div>
+                  <div className="fos-in" style={{fontFamily:FOS.sans,fontWeight:800,fontSize:40,
+                    color:FOS.bone,letterSpacing:"-0.03em",marginTop:18,animationDelay:".2s"}}>
+                    {marca.nombre}
+                  </div>
+                  <div className="fos-in" style={{fontFamily:FOS.sans,fontWeight:800,fontSize:54,
+                    color:FOS.bone,letterSpacing:"-0.03em",marginTop:22,fontVariantNumeric:"tabular-nums",
+                    animationDelay:".32s"}}>
+                    <FosCount value={brutoMes} prefix="Bs " dur={1200}/>
+                  </div>
+                  <div className="fos-in" style={{...fosMono({color:"#E7E1D5"}),marginTop:10,
+                    animationDelay:".42s"}}>
+                    {vMes.length} ventas · {udsMes} unidades
+                  </div>
+                  {esRecordMes&&(
+                    <div className="fos-in" style={{...fosMono({color:"#D9C48C"}),marginTop:16,
+                      animationDelay:".52s"}}>★ Tu mejor mes histórico</div>
+                  )}
+                  <div style={{marginTop:30,display:"flex",flexDirection:"column",gap:10,textAlign:"left"}}>
+                    {ticketEstrella&&(
+                      <div className="fos-in" style={{background:"rgba(255,255,255,.96)",borderRadius:18,
+                        padding:"14px 18px",animationDelay:".6s"}}>
+                        <div style={fosMono({fontSize:9.5})}>Prenda estrella</div>
+                        <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",gap:10,marginTop:4}}>
+                          <span style={{fontFamily:FOS.sans,fontWeight:600,fontSize:13.5,color:FOS.void,
+                            overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                            {ticketEstrella.venta.items.find(i=>i.marcaId===mid)?.nombre||"—"}
+                          </span>
+                          <span style={{fontFamily:FOS.sans,fontWeight:800,fontSize:17,color:FOS.void,flexShrink:0}}>
+                            {$(ticketEstrella.sub)}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                    {mejorDia&&(
+                      <div className="fos-in" style={{background:"rgba(255,255,255,.96)",borderRadius:18,
+                        padding:"14px 18px",animationDelay:".7s"}}>
+                        <div style={fosMono({fontSize:9.5})}>Tu mejor día</div>
+                        <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginTop:4}}>
+                          <span style={{fontFamily:FOS.sans,fontWeight:600,fontSize:13.5,color:FOS.void}}>
+                            {mejorDia.f.split("-").reverse().slice(0,2).join("/")}
+                          </span>
+                          <span style={{fontFamily:FOS.sans,fontWeight:800,fontSize:17,color:FOS.void}}>
+                            {$(mejorDia.t)}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                    {brutoPrev>0&&(
+                      <div className="fos-in" style={{background:"rgba(255,255,255,.96)",borderRadius:18,
+                        padding:"14px 18px",animationDelay:".8s"}}>
+                        <div style={fosMono({fontSize:9.5})}>Vs mes anterior</div>
+                        <div style={{fontFamily:FOS.sans,fontWeight:800,fontSize:17,marginTop:4,
+                          color:varBruto>=0?FOS.ok:C.red}}>
+                          {varBruto>0?"▲ +":"▼ "}{Math.abs(varBruto).toFixed(0)}%
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  <div className="fos-in" style={{display:"flex",flexDirection:"column",gap:10,marginTop:28,
+                    animationDelay:".9s"}}>
+                    <button onClick={descargarTuMes} style={{padding:"15px 0",borderRadius:14,border:"none",
+                      background:FOS.bone,color:FOS.void,fontFamily:FOS.sans,fontSize:14.5,fontWeight:800,
+                      cursor:"pointer",WebkitTapHighlightColor:"transparent",
+                      boxShadow:"0 12px 26px -10px rgba(0,0,0,.4)"}}>
+                      Descargar para Instagram
+                    </button>
+                    <button onClick={()=>setTuMesOpen(false)} style={{padding:"13px 0",borderRadius:14,
+                      border:"1px solid rgba(255,255,255,.25)",background:"transparent",color:FOS.bone,
+                      fontFamily:FOS.sans,fontSize:13.5,fontWeight:600,cursor:"pointer",
+                      WebkitTapHighlightColor:"transparent"}}>Cerrar</button>
+                  </div>
+                  <div style={{...fosMono({color:"#CFC8BA",fontSize:8.5}),marginTop:26}}>Powered by FORGE.</div>
+                </div>
+              </div>
+            )}
+
             {/* ── KPI burbujas ── */}
             <div style={{display:"grid",gridTemplateColumns:isDesktop?"repeat(4,1fr)":"1fr 1fr",
               gap:12,marginBottom:16}}>
@@ -11106,6 +11377,31 @@ function BrandPortal({user, ventas, inv, cargas, retiros=[], logout, descuentos=
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{fontFamily:FOS.sans,fontWeight:600,fontSize:13.5,color:FOS.void}}>{a.t}</div>
                       <div style={{fontSize:12,color:FOS.mut,fontFamily:FOS.sans,marginTop:1}}>{a.s}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* ── Tu asesor: hallazgos de tus datos ── */}
+            {hallazgos.length>0&&(
+              <div className="fos-bub fos-in" style={{padding:"20px 22px",marginBottom:16,animationDelay:".38s"}}>
+                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:6}}>
+                  <div style={{fontFamily:FOS.sans,fontWeight:700,fontSize:15,color:FOS.void}}>Tu asesor</div>
+                  <span style={{fontFamily:FOS.mono,fontSize:10,letterSpacing:".14em",padding:"5px 11px",
+                    borderRadius:999,background:FOS.lavBg,color:FOS.lavDeep}}>DE TUS DATOS</span>
+                </div>
+                {hallazgos.map((h,i)=>(
+                  <div key={i} style={{display:"flex",alignItems:"flex-start",gap:13,padding:"12px 0",
+                    borderBottom:i<hallazgos.length-1?"1px solid rgba(20,19,24,.06)":"none"}}>
+                    <span style={{fontFamily:FOS.mono,fontSize:9,letterSpacing:".1em",padding:"4px 9px",
+                      borderRadius:999,flexShrink:0,marginTop:2,
+                      background:h.badge==="EN ALZA"?FOS.okBg:h.badge==="EN BAJA"?FOS.warnBg:FOS.lavBg,
+                      color:h.badge==="EN ALZA"?FOS.ok:h.badge==="EN BAJA"?FOS.warn:FOS.lavDeep,
+                    }}>{h.badge}</span>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontFamily:FOS.sans,fontWeight:600,fontSize:13.5,color:FOS.void}}>{h.t}</div>
+                      <div style={{fontSize:12,color:FOS.mut,fontFamily:FOS.sans,marginTop:1}}>{h.s}</div>
                     </div>
                   </div>
                 ))}
