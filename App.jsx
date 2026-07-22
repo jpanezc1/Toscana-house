@@ -11473,10 +11473,10 @@ function BrandPortal({user, ventas, inv, cargas, retiros=[], logout, descuentos=
                           {$(espacio.cargaVenta)}
                         </div>
                         <div style={{fontSize:12,color:"#E7E1D5",marginTop:4,lineHeight:1.5,fontFamily:FOS.sans}}>
-                          de alquiler cargó <b>cada venta</b> este mes
+                          de alquiler cargó <b>cada prenda que vendiste</b> este mes
                         </div>
                         <div style={fosMono({fontSize:8,color:"#D5CEC0",marginTop:4})}>
-                          vender más lo diluye
+                          tu alquiler {$(espacio.alquiler)} ÷ {udsMes} vendidas · vender más lo diluye
                         </div>
                       </div>
                     )}
