@@ -10916,57 +10916,6 @@ function BrandPortal({user, ventas, inv, cargas, retiros=[], logout, descuentos=
   },[vMes,mid]);
   // esRecordMes se calcula más abajo (después de declarar mejorMes)
 
-  async function descargarTuMes(){
-    try{ await document.fonts.ready; }catch(e){}
-    const W=1080,H=1350;
-    const cv=document.createElement("canvas"); cv.width=W; cv.height=H;
-    const x=cv.getContext("2d");
-    const rr=(x0,y0,w,h,r)=>{x.beginPath();x.moveTo(x0+r,y0);x.arcTo(x0+w,y0,x0+w,y0+h,r);
-      x.arcTo(x0+w,y0+h,x0,y0+h,r);x.arcTo(x0,y0+h,x0,y0,r);x.arcTo(x0,y0,x0+w,y0,r);x.closePath();};
-    x.fillStyle="#F5F2EE"; x.fillRect(0,0,W,H);
-    x.textAlign="center";
-    x.fillStyle="#1A1714"; x.font="500 52px 'Cormorant Garamond', Georgia, serif";
-    x.fillText("T   H",W/2,104);
-    x.fillStyle="#A8A29E"; x.font="500 21px 'DM Mono', monospace";
-    x.fillText("T O S C A N A   H O U S E   ·   C A S A   D E   M O D A",W/2,146);
-    const g=x.createLinearGradient(60,200,1020,840);
-    g.addColorStop(0,"#7C7468"); g.addColorStop(.45,"#5C5449"); g.addColorStop(1,"#938A7E");
-    x.fillStyle=g; rr(60,200,960,600,46); x.fill();
-    x.fillStyle="#D9C48C"; x.font="500 25px 'DM Mono', monospace";
-    x.fillText("TU MES EN TOSCANA · "+MESES[mes].toUpperCase()+" "+anio,W/2,286);
-    x.fillStyle="#F5F2EE"; x.font="800 84px 'Plus Jakarta Sans', sans-serif";
-    x.fillText(marca.nombre,W/2,396);
-    x.font="800 118px 'Plus Jakarta Sans', sans-serif";
-    x.fillText($(brutoMes),W/2,556);
-    x.fillStyle="#E7E1D5"; x.font="500 29px 'DM Mono', monospace";
-    x.fillText(vMes.length+" VENTAS · "+udsMes+" UNIDADES",W/2,632);
-    if(esRecordMes){ x.fillStyle="#D9C48C"; x.font="500 27px 'DM Mono', monospace";
-      x.fillText("TU MEJOR MES HISTÓRICO",W/2,716); }
-    const rows=[];
-    if(ticketEstrella) rows.push(["PRENDA ESTRELLA",
-      (ticketEstrella.venta.items.find(i=>i.marcaId===mid)?.nombre||"").slice(0,30),$(ticketEstrella.sub)]);
-    if(mejorDia) rows.push(["MEJOR DÍA",
-      mejorDia.f.split("-").reverse().slice(0,2).join("/"),$(mejorDia.t)]);
-    rows.push(["TICKET PROMEDIO","",$(tktProm)]);
-    if(brutoPrev>0) rows.push(["VS MES ANTERIOR","",(varBruto>0?"+":"")+varBruto.toFixed(0)+"%"]);
-    let ry=880;
-    rows.forEach(r=>{
-      x.fillStyle="#FFFFFF"; rr(60,ry,960,92,26); x.fill();
-      x.strokeStyle="rgba(20,19,24,.07)"; x.lineWidth=2; rr(60,ry,960,92,26); x.stroke();
-      x.textAlign="left"; x.fillStyle="#A8A29E"; x.font="500 20px 'DM Mono', monospace";
-      x.fillText(r[0],104,ry+56);
-      x.textAlign="right"; x.fillStyle="#1A1714"; x.font="800 34px 'Plus Jakarta Sans', sans-serif";
-      x.fillText(r[2],976,ry+59);
-      if(r[1]){ x.textAlign="center"; x.fillStyle="#57534E"; x.font="600 24px 'Plus Jakarta Sans', sans-serif";
-        x.fillText(r[1],W/2,ry+58); }
-      x.textAlign="center"; ry+=112;
-    });
-    x.fillStyle="#A8A29E"; x.font="500 19px 'DM Mono', monospace";
-    x.fillText("POWERED BY FORGE.",W/2,H-52);
-    const a=document.createElement("a");
-    a.download=`TuMes_${(marca.nombre||"marca").replace(/\s+/g,"_")}_${MESES[mes]}_${anio}.png`;
-    a.href=cv.toDataURL("image/png"); a.click();
-  }
 
   // Mejor mes histórico (excluye el mes visto) → meta implícita "tu récord"
   const mejorMes = useMemo(()=>{
@@ -11307,7 +11256,7 @@ function BrandPortal({user, ventas, inv, cargas, retiros=[], logout, descuentos=
                 <div style={{flex:1,minWidth:0}}>
                   <div style={{fontWeight:700,fontSize:14.5,color:FOS.void}}>Tu mes en Toscana</div>
                   <div style={{fontSize:12,color:FOS.mut,marginTop:1}}>
-                    Tu resumen de {MESES[mes]}, listo para compartir en Instagram
+                    Tu resumen de {MESES[mes]}, de un vistazo
                   </div>
                 </div>
                 <span style={{fontFamily:FOS.mono,fontSize:10,letterSpacing:".14em",padding:"5px 11px",
@@ -11385,16 +11334,10 @@ function BrandPortal({user, ventas, inv, cargas, retiros=[], logout, descuentos=
                   </div>
                   <div className="fos-in" style={{display:"flex",flexDirection:"column",gap:10,marginTop:28,
                     animationDelay:".9s"}}>
-                    <button onClick={descargarTuMes} style={{padding:"15px 0",borderRadius:14,border:"none",
+                    <button onClick={()=>setTuMesOpen(false)} style={{padding:"15px 0",borderRadius:14,border:"none",
                       background:FOS.bone,color:FOS.void,fontFamily:FOS.sans,fontSize:14.5,fontWeight:800,
                       cursor:"pointer",WebkitTapHighlightColor:"transparent",
-                      boxShadow:"0 12px 26px -10px rgba(0,0,0,.4)"}}>
-                      Descargar para Instagram
-                    </button>
-                    <button onClick={()=>setTuMesOpen(false)} style={{padding:"13px 0",borderRadius:14,
-                      border:"1px solid rgba(255,255,255,.25)",background:"transparent",color:FOS.bone,
-                      fontFamily:FOS.sans,fontSize:13.5,fontWeight:600,cursor:"pointer",
-                      WebkitTapHighlightColor:"transparent"}}>Cerrar</button>
+                      boxShadow:"0 12px 26px -10px rgba(0,0,0,.4)"}}>Cerrar</button>
                   </div>
                   <div style={{...fosMono({color:"#CFC8BA",fontSize:8.5}),marginTop:26}}>Powered by FORGE.</div>
                 </div>
