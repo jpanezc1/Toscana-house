@@ -2640,17 +2640,39 @@ async function generarExcelMensual(ventas, inventario, mes, anio, setGenerando, 
       [`TOSCANA HOUSE — REPORTE MENSUAL ${mesNom.toUpperCase()} ${anio}`],
       [`Generado: ${new Date().toLocaleString("es-BO")}`],
       [],
-      ["Marca","Ventas brutas (Bs)","Desc. Tarjeta","Subtotal","Comisión %","Comisión (Bs)","Alquiler","Neto a pagar (Bs)","N° Ventas","Uds. vendidas","Estado"],
+      ["Marca","Ventas brutas (Bs)","Desc. Tarjeta","Subtotal","Comisión %","Comisión (Bs)","Alquiler","Neto a pagar (Bs)","Cobertura alquiler","Sacar de lo ingresado (Bs)","Pendiente por cobrar (Bs)","N° Ventas","Uds. vendidas","Estado"],
     ];
 
-    let totalBruto = 0, totalNeto = 0, totalVentas = 0;
+    let totalBruto = 0, totalNeto = 0, totalVentas = 0, totalPendiente = 0;
+    const filaSemaforo = {}; // fila del sheet → color de relleno (semáforo)
     const ventasMes = ventas.filter(v => v.mk === MK && !v.anulada);
 
     MARCAS.forEach(m => {
       const vM  = ventasMes.filter(v => v.items.some(i => i.marcaId === m.id));
       const uds = vM.reduce((s,v) => s + v.items.filter(i=>i.marcaId===m.id).reduce((ss,i)=>ss+i.cantidad,0), 0);
       const liq = calcLiqMarca(vM, m.id, MK);
-      totalBruto += liq.bruto; totalNeto += liq.neto; totalVentas += vM.length;
+      totalBruto += liq.bruto; totalNeto += Math.max(0, liq.neto); totalVentas += vM.length;
+      // Cobertura de alquiler: comisión y tarjeta primero, alquiler con lo que
+      // queda; neto negativo = pendiente por cobrar a la marca.
+      const alq = Number(liq.alquiler) || 0;
+      const disponible = liq.subBanco - liq.comision - liq.totalGastos;
+      const cubre = liq.neto >= 0;
+      const pendiente = cubre ? 0 : -liq.neto;
+      totalPendiente += pendiente;
+      const cobPct = alq > 0
+        ? `${Math.max(0, Math.min(100, Math.round(disponible / alq * 100)))}%`
+        : "—";
+      const sacar = cubre ? (liq.bruto - liq.neto) : liq.bruto;
+      const estado = alq <= 0
+        ? (liq.bruto > 0 ? "Con ventas" : "Sin ventas")
+        : cubre ? "Cubre alquiler"
+        : liq.bruto > 0 ? "PARCIAL: sacar todo lo ingresado"
+        : "SIN VENTAS: debe alquiler completo";
+      // Semáforo: verde = cubre, ámbar = parcial, rojo = sin ventas/no cubre
+      filaSemaforo[resumenRows.length] = alq <= 0 ? null
+        : cubre ? "E8F6EE"
+        : liq.bruto > 0 ? "FBF3E2"
+        : "F9ECEA";
       resumenRows.push([
         m.nombre,
         +liq.bruto.toFixed(2),
@@ -2660,19 +2682,62 @@ async function generarExcelMensual(ventas, inventario, mes, anio, setGenerando, 
         +liq.comision.toFixed(2),
         +liq.alquiler.toFixed(2),
         +liq.neto.toFixed(2),
+        cobPct,
+        +sacar.toFixed(2),
+        +pendiente.toFixed(2),
         vM.length,
         uds,
-        liq.bruto > 0 ? "Con ventas" : "Sin ventas",
+        estado,
       ]);
     });
 
     resumenRows.push(
       [],
-      ["TOTAL GENERAL", +totalBruto.toFixed(2), "","","","","","", +totalNeto.toFixed(2), totalVentas, "", ""]
+      ["TOTAL GENERAL", +totalBruto.toFixed(2), "","","","","", +totalNeto.toFixed(2), "", "", +totalPendiente.toFixed(2), totalVentas, "", ""],
+      ["", "", "","","","","", "Neto a pagar (solo positivos)", "", "", "Pendiente por cobrar a marcas", "", "", ""]
     );
 
     const wsResumen = XLSX.utils.aoa_to_sheet(resumenRows);
-    wsResumen["!cols"] = [{wch:22},{wch:18},{wch:12},{wch:14},{wch:14},{wch:12},{wch:14},{wch:12},{wch:18},{wch:10},{wch:13},{wch:14}];
+    wsResumen["!cols"] = [{wch:22},{wch:18},{wch:12},{wch:14},{wch:12},{wch:12},{wch:12},{wch:16},{wch:16},{wch:22},{wch:22},{wch:10},{wch:12},{wch:30}];
+
+    // ── Estilos: bordes en TODA la cuadrícula + semáforo por marca ──────────
+    // (xlsx-js-style: celda.s = {border, fill, font, alignment})
+    {
+      const bd = { style:"thin", color:{ rgb:"D8D2C8" } };
+      const B  = { top:bd, bottom:bd, left:bd, right:bd };
+      const HEADER_ROW = 3;                       // fila de cabecera (0-index)
+      const TOTAL_ROW  = resumenRows.length - 2;  // fila TOTAL GENERAL
+      const lastCol = 13;
+      // Título
+      if(wsResumen["A1"]) wsResumen["A1"].s = { font:{ name:"Arial", sz:14, bold:true, color:{ rgb:"1A1714" } } };
+      if(wsResumen["A2"]) wsResumen["A2"].s = { font:{ name:"Arial", sz:9, color:{ rgb:"8B8791" } } };
+      for(let R = HEADER_ROW; R < resumenRows.length; R++){
+        const esVacia = !resumenRows[R] || resumenRows[R].length === 0;
+        if(esVacia) continue;                     // fila separadora, sin bordes
+        for(let C = 0; C <= lastCol; C++){
+          const addr = XLSX.utils.encode_cell({ r:R, c:C });
+          if(!wsResumen[addr]) wsResumen[addr] = { t:"s", v:"" };
+          const cell = wsResumen[addr];
+          if(R === HEADER_ROW){
+            cell.s = { border:B, fill:{ fgColor:{ rgb:"5C5449" } },
+              font:{ name:"Arial", sz:9, bold:true, color:{ rgb:"F5F2EE" } },
+              alignment:{ vertical:"center", horizontal:"center", wrapText:true } };
+          } else if(R === TOTAL_ROW){
+            cell.s = { border:B, fill:{ fgColor:{ rgb:"F3EEE1" } },
+              font:{ name:"Arial", sz:10, bold:true, color:{ rgb:"1A1714" } },
+              alignment:{ vertical:"center" } };
+          } else if(R === TOTAL_ROW + 1){
+            cell.s = { border:B, font:{ name:"Arial", sz:8, italic:true, color:{ rgb:"8B8791" } } };
+          } else {
+            cell.s = { border:B, font:{ name:"Arial", sz:10, color:{ rgb:"1A1714" } },
+              alignment:{ vertical:"center" } };
+            const sem = filaSemaforo[R];
+            if(sem) cell.s.fill = { fgColor:{ rgb:sem } };
+          }
+        }
+      }
+      wsResumen["!rows"] = resumenRows.map((r,i)=> i===HEADER_ROW ? { hpt:30 } : { hpt:18 });
+    }
     XLSX.utils.book_append_sheet(wb, wsResumen, "📊 Resumen");
 
     // ── Una pestaña por cada marca ───────────────────────────
@@ -15472,14 +15537,28 @@ function App(){
                       {(()=>{
                         const cb=cob.por[m.id]||{estado:"sin_alquiler"};
                         if(cb.estado==="parcial") return (
-                          <div style={{fontSize: isDesktop ? 11.5 : 12.5, color:FOS.warn,fontFamily:FONT,fontWeight:600}}>
-                            Sacar todo lo ingresado ({$(cb.sacar)}) · debe {$(cb.pendiente)}
-                          </div>
+                          <>
+                            <div style={{fontSize: isDesktop ? 11.5 : 12.5, color:"#A3372F",fontFamily:FONT,fontWeight:700}}>
+                              Sacar todo lo ingresado ({$(cb.sacar)})
+                            </div>
+                            <span style={{display:"inline-block",marginTop:4,padding:"3px 10px",
+                              borderRadius:999,background:"#F9ECEA",color:"#A3372F",
+                              fontSize:10.5,fontWeight:700,fontFamily:FONT}}>
+                              Debe {$(cb.pendiente)}
+                            </span>
+                          </>
                         );
                         if(cb.estado==="cero") return (
-                          <div style={{fontSize: isDesktop ? 11.5 : 12.5, color:"#A3372F",fontFamily:FONT,fontWeight:600}}>
-                            Sin ventas · debe el alquiler completo ({$(cb.pendiente)})
-                          </div>
+                          <>
+                            <div style={{fontSize: isDesktop ? 11.5 : 12.5, color:"#A3372F",fontFamily:FONT,fontWeight:700}}>
+                              Sin ventas este mes
+                            </div>
+                            <span style={{display:"inline-block",marginTop:4,padding:"3px 10px",
+                              borderRadius:999,background:"#F9ECEA",color:"#A3372F",
+                              fontSize:10.5,fontWeight:700,fontFamily:FONT}}>
+                              Debe {$(cb.pendiente)} (alquiler completo)
+                            </span>
+                          </>
                         );
                         return (
                           <div style={{fontSize: isDesktop ? 12 : 13, color:liq.bruto>0?C.gold:C.label3,fontFamily:FONT}}>
