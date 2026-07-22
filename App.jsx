@@ -10811,6 +10811,32 @@ function BrandPortal({user, ventas, inv, cargas, retiros=[], logout, descuentos=
     return out.sort((a,b)=>b.score-a.score).slice(0,3);
   },[todasMarca,vMes,invMarca,inv,ventas,mid,mes,anio]);
 
+  // ── El costo de tu espacio (alquiler por prenda) ───────────────────────────
+  const espacio = useMemo(()=>{
+    const alquiler = Number(leerCfgLiq(marcaId)?.alquiler)||0;
+    const stockA = invMarca.reduce((s,p)=>s+(Number(p.stock)||0),0);
+    if(alquiler<=0 || stockA<=0) return null;
+    const tarifa = alquiler/stockA;                        // Bs por prenda en tienda, por mes
+    const cargaVenta = udsMes>0 ? alquiler/udsMes : null;  // Bs de alquiler por venta del mes
+    const lastSale={};
+    todasMarca.forEach(v=>v.items.filter(i=>i.marcaId===mid).forEach(it=>{
+      if(!lastSale[it.codigo]||v.fecha>lastSale[it.codigo]) lastSale[it.codigo]=v.fecha;
+    }));
+    const lim60=new Date(Date.now()-60*864e5).toISOString().slice(0,10);
+    const ahora=new Date();
+    let udsMuertas=0;
+    const items=invMarca.filter(p=>(Number(p.stock)||0)>0).map(p=>{
+      const f=p.fecha?new Date(p.fecha+"T12:00:00"):null;
+      const meses=f?Math.max(0,(ahora-f)/(30.44*864e5)):0;
+      const consumido=meses*tarifa;
+      const sinRot=(!lastSale[p.codigo]||lastSale[p.codigo]<lim60)&&(!p.fecha||p.fecha<lim60);
+      if(sinRot) udsMuertas+=(Number(p.stock)||0);
+      return {p,meses,consumido,sinRot};
+    }).sort((a,b)=>b.consumido-a.consumido);
+    return {alquiler,stockA,tarifa,cargaVenta,udsMuertas,
+      costoMuertas:udsMuertas*tarifa,top:items.slice(0,3)};
+  },[invMarca,todasMarca,mid,udsMes,marcaId]);
+
   // ── Tu mes en Toscana ──────────────────────────────────────────────────────
   const [tuMesOpen,setTuMesOpen]=useState(false);
   const mejorDia = useMemo(()=>{
@@ -11405,6 +11431,110 @@ function BrandPortal({user, ventas, inv, cargas, retiros=[], logout, descuentos=
                     </div>
                   </div>
                 ))}
+              </div>
+            )}
+
+            {/* ── El costo de tu espacio ── */}
+            {espacio&&(
+              <div className="fos-in" style={{marginBottom:16,animationDelay:".42s"}}>
+                <div style={{
+                  background:"linear-gradient(135deg,#7C7468 0%,#5C5449 45%,#938A7E 100%)",
+                  borderRadius:22,padding:"20px 24px",color:FOS.bone,
+                  boxShadow:"0 18px 36px -16px rgba(92,84,73,.45)",
+                }}>
+                  <div style={fosMono({color:"#D9C48C",marginBottom:14})}>
+                    El costo de tu espacio · {MESES[mes]} {anio}
+                  </div>
+                  <div style={{display:"grid",gridTemplateColumns:isDesktop?"1fr 1fr 1fr":"1fr",gap:isDesktop?20:14}}>
+                    <div>
+                      <div style={{fontFamily:FOS.sans,fontWeight:800,fontSize:26,letterSpacing:"-0.03em",
+                        fontVariantNumeric:"tabular-nums"}}>
+                        Bs {espacio.tarifa.toLocaleString("es-BO",{minimumFractionDigits:2,maximumFractionDigits:2})}
+                      </div>
+                      <div style={{fontSize:12,color:"#E7E1D5",marginTop:4,lineHeight:1.5,fontFamily:FOS.sans}}>
+                        te cuesta <b>cada prenda en tienda</b>, por mes
+                      </div>
+                      <div style={fosMono({fontSize:8,color:"#D5CEC0",marginTop:4})}>
+                        alquiler {$(espacio.alquiler)} ÷ {espacio.stockA} unidades
+                      </div>
+                    </div>
+                    {espacio.cargaVenta!=null&&(
+                      <div>
+                        <div style={{fontFamily:FOS.sans,fontWeight:800,fontSize:26,letterSpacing:"-0.03em",
+                          color:"#D9C48C",fontVariantNumeric:"tabular-nums"}}>
+                          {$(espacio.cargaVenta)}
+                        </div>
+                        <div style={{fontSize:12,color:"#E7E1D5",marginTop:4,lineHeight:1.5,fontFamily:FOS.sans}}>
+                          de alquiler cargó <b>cada venta</b> este mes
+                        </div>
+                        <div style={fosMono({fontSize:8,color:"#D5CEC0",marginTop:4})}>
+                          vender más lo diluye
+                        </div>
+                      </div>
+                    )}
+                    {espacio.udsMuertas>0&&(
+                      <div>
+                        <div style={{fontFamily:FOS.sans,fontWeight:800,fontSize:26,letterSpacing:"-0.03em",
+                          fontVariantNumeric:"tabular-nums"}}>
+                          {$(espacio.costoMuertas)}
+                        </div>
+                        <div style={{fontSize:12,color:"#E7E1D5",marginTop:4,lineHeight:1.5,fontFamily:FOS.sans}}>
+                          consumen al mes tus <b>{espacio.udsMuertas} prendas sin rotación</b>
+                        </div>
+                        <div style={fosMono({fontSize:8,color:"#D5CEC0",marginTop:4})}>
+                          paradas hace más de 60 días
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {espacio.top.length>0&&(
+                  <div className="fos-bub" style={{padding:"18px 22px",marginTop:12}}>
+                    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:4}}>
+                      <div style={{fontFamily:FOS.sans,fontWeight:700,fontSize:15,color:FOS.void}}>
+                        Tus prendas más caras de tener
+                      </div>
+                      <span style={{fontFamily:FOS.mono,fontSize:10,letterSpacing:".14em",padding:"5px 11px",
+                        borderRadius:999,background:FOS.lavBg,color:FOS.lavDeep}}>DECIDÍ CON NÚMEROS</span>
+                    </div>
+                    {espacio.top.map((t,i)=>{
+                      const precio=Number(t.p.precio)||0;
+                      const masQueVale=t.consumido>precio&&precio>0;
+                      const desc25=Math.round(precio*0.25);
+                      const dosMeses=Math.round(2*espacio.tarifa);
+                      const tag=masQueVale
+                        ?{t:"YA COSTÓ MÁS DE LO QUE VALE",bg:"#F9ECEA",c:"#A3372F"}
+                        :desc25<=dosMeses
+                        ?{t:`-25% (BS ${desc25}) SALE MÁS BARATO`,bg:FOS.warnBg,c:FOS.warn}
+                        :{t:"UN -15% LA MUEVE A TIEMPO",bg:FOS.lavBg,c:FOS.lavDeep};
+                      return (
+                        <div key={t.p.codigo} style={{display:"flex",alignItems:"center",gap:12,padding:"12px 0",
+                          flexWrap:"wrap",
+                          borderBottom:i<espacio.top.length-1?"1px solid rgba(20,19,24,.06)":"none"}}>
+                          <div style={{flex:1,minWidth:150}}>
+                            <div style={{fontFamily:FOS.sans,fontWeight:600,fontSize:13,color:FOS.void,
+                              overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:isDesktop?340:"100%"}}>
+                              {t.p.nombre}
+                            </div>
+                            <div style={{fontSize:11.5,color:FOS.mut,fontFamily:FOS.sans,marginTop:1}}>
+                              Precio {$(precio)} · en tienda hace {Math.max(1,Math.round(t.meses))} mes{Math.round(t.meses)>1?"es":""}
+                            </div>
+                          </div>
+                          <div style={{textAlign:"right",flexShrink:0}}>
+                            <div style={{fontFamily:FOS.sans,fontWeight:800,fontSize:15,
+                              color:masQueVale?"#A3372F":FOS.warn,fontVariantNumeric:"tabular-nums"}}>
+                              {$(t.consumido)}
+                            </div>
+                            <div style={fosMono({fontSize:7.5})}>alquiler consumido</div>
+                          </div>
+                          <span style={{fontFamily:FOS.mono,fontSize:8.5,letterSpacing:".1em",padding:"5px 10px",
+                            borderRadius:999,background:tag.bg,color:tag.c,flexShrink:0}}>{tag.t}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             )}
 
@@ -15129,7 +15259,27 @@ function App(){
         )}
 
         {/* LIQUIDACIONES */}
-        {tab==="liquidaciones" && (
+        {tab==="liquidaciones" && (()=>{
+          // ── Cobertura de alquiler por marca (comisión y tarjeta primero,
+          //    alquiler con lo que queda; neto negativo = pendiente) ──
+          const cob={cubren:0,parciales:0,cero:0,pendTotal:0,por:{}};
+          MARCAS.forEach(m=>{
+            const l=getLiq(m.id);
+            const alq=Number(l.alquiler)||0;
+            if(alq<=0){ cob.por[m.id]={estado:"sin_alquiler"}; return; }
+            const disponible=l.subBanco-l.comision-l.totalGastos;
+            const pct=Math.max(0,Math.min(100,Math.round(disponible/alq*100)));
+            if(l.neto>=0){
+              cob.cubren++;
+              cob.por[m.id]={estado:"cubre",pct:100,pendiente:0};
+            }else{
+              const pend=-l.neto;
+              if(l.bruto>0) cob.parciales++; else cob.cero++;
+              cob.pendTotal+=pend;
+              cob.por[m.id]={estado:l.bruto>0?"parcial":"cero",pct,sacar:l.bruto,pendiente:pend};
+            }
+          });
+          return (
           <div>
             <div style={{marginBottom:16}}>
               <div style={{fontSize:13,fontWeight:700,color:C.label3,textTransform:"uppercase",
@@ -15220,6 +15370,40 @@ function App(){
                 </div>
               </div>
 
+              {/* ── Cobertura de alquiler del mes ── */}
+              <div style={{
+                background:"linear-gradient(135deg,#7C7468 0%,#5C5449 45%,#938A7E 100%)",
+                borderRadius:20,padding:"16px 20px",marginBottom:12,color:FOS.bone,
+                boxShadow:"0 16px 32px -14px rgba(92,84,73,.45)",
+              }}>
+                <div style={fosMono({color:"#D9C48C",marginBottom:12})}>
+                  Cobertura de alquiler · {MESES[mes]} {anio}
+                </div>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:14}}>
+                  <div>
+                    <div style={{fontFamily:FOS.sans,fontWeight:800,fontSize:22,
+                      fontVariantNumeric:"tabular-nums"}}>{cob.cubren}</div>
+                    <div style={{fontSize:11.5,color:"#E7E1D5",marginTop:2,fontFamily:FOS.sans}}>
+                      marcas cubren su alquiler
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{fontFamily:FOS.sans,fontWeight:800,fontSize:22,color:"#EFC9A6",
+                      fontVariantNumeric:"tabular-nums"}}>{cob.parciales+cob.cero}</div>
+                    <div style={{fontSize:11.5,color:"#E7E1D5",marginTop:2,fontFamily:FOS.sans}}>
+                      no llegan ({cob.parciales} parciales, {cob.cero} sin ventas)
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{fontFamily:FOS.sans,fontWeight:800,fontSize:22,color:"#F0B9B0",
+                      fontVariantNumeric:"tabular-nums"}}>{$(cob.pendTotal)}</div>
+                    <div style={{fontSize:11.5,color:"#E7E1D5",marginTop:2,fontFamily:FOS.sans}}>
+                      pendiente por cobrar a marcas
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               {/* ── PANEL CONFIGURAR PORCENTAJES POR MARCA ── */}
               <PctMarcasPanel onCfgChange={bumpCfgLiq}/>
 
@@ -15283,11 +15467,41 @@ function App(){
                         ? <img src={getMarcaImg(m)} alt={m.nombre} style={{width: isDesktop ? 32 : 38, height: isDesktop ? 32 : 38, objectFit:"cover"}}/>
                         : m.emoji}
                     </div>
-                    <div style={{flex:1}}>
+                    <div style={{flex:1,minWidth:0}}>
                       <div style={{fontSize: isDesktop ? 14 : 16, fontWeight:600, color:C.label, fontFamily:FONT, letterSpacing:"0.02em"}}>{m.nombre}</div>
-                      <div style={{fontSize: isDesktop ? 12 : 13, color:liq.bruto>0?C.gold:C.label3,fontFamily:FONT}}>
-                        {liq.bruto>0 ? `${$(liq.neto)} neto` : "Sin ventas"}
-                      </div>
+                      {(()=>{
+                        const cb=cob.por[m.id]||{estado:"sin_alquiler"};
+                        if(cb.estado==="parcial") return (
+                          <div style={{fontSize: isDesktop ? 11.5 : 12.5, color:FOS.warn,fontFamily:FONT,fontWeight:600}}>
+                            Sacar todo lo ingresado ({$(cb.sacar)}) · debe {$(cb.pendiente)}
+                          </div>
+                        );
+                        if(cb.estado==="cero") return (
+                          <div style={{fontSize: isDesktop ? 11.5 : 12.5, color:"#A3372F",fontFamily:FONT,fontWeight:600}}>
+                            Sin ventas · debe el alquiler completo ({$(cb.pendiente)})
+                          </div>
+                        );
+                        return (
+                          <div style={{fontSize: isDesktop ? 12 : 13, color:liq.bruto>0?C.gold:C.label3,fontFamily:FONT}}>
+                            {liq.bruto>0 ? `${$(liq.neto)} neto` : "Sin ventas"}
+                          </div>
+                        );
+                      })()}
+                      {(cob.por[m.id]&&cob.por[m.id].estado!=="sin_alquiler")&&(
+                        <div style={{display:"flex",alignItems:"center",gap:7,marginTop:5}}>
+                          <div style={{flex:1,height:5,borderRadius:3,background:C.bg3,overflow:"hidden",
+                            boxShadow:"inset 0 1px 1px rgba(20,19,24,.07)"}}>
+                            <div style={{height:"100%",width:`${cob.por[m.id].pct}%`,borderRadius:3,
+                              background:cob.por[m.id].estado==="cubre"?FOS.ok
+                                :cob.por[m.id].estado==="parcial"?FOS.warn:"#A3372F"}}/>
+                          </div>
+                          <span style={{fontFamily:FOS.mono,fontSize:8.5,letterSpacing:".06em",flexShrink:0,
+                            color:cob.por[m.id].estado==="cubre"?FOS.ok
+                              :cob.por[m.id].estado==="parcial"?FOS.warn:"#A3372F"}}>
+                            {cob.por[m.id].pct}%
+                          </span>
+                        </div>
+                      )}
                     </div>
                     <div style={{display:"flex",alignItems:"center",gap:8}}>
                       {cerrado
@@ -15301,7 +15515,7 @@ function App(){
               })}
             </div>
           </div>
-        )}
+          );})()}
 
         {/* GIFT CARDS */}
         {tab==="giftcards" && <GiftCardsTab/>}
