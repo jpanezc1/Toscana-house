@@ -10899,8 +10899,23 @@ function BrandPortal({user, ventas, inv, cargas, retiros=[], logout, descuentos=
       return {p,meses,consumido,sinRot};
     }).sort((a,b)=>b.consumido-a.consumido);
     return {alquiler,stockA,tarifa,cargaVenta,udsMuertas,
-      costoMuertas:udsMuertas*tarifa,top:items.slice(0,3)};
-  },[invMarca,todasMarca,mid,udsMes,marcaId]);
+      costoMuertas:udsMuertas*tarifa,top:items.slice(0,3),
+      // Punto de equilibrio: cuántas prendas (a precio promedio de su stock,
+      // descontando su comisión) cubren el alquiler; progreso con plata real.
+      equilibrio:(()=>{
+        const pctCom=Number(leerCfgLiq(marcaId)?.pctComision)||0;
+        const valorStock=invMarca.reduce((s,p)=>s+(Number(p.stock)||0)*(Number(p.precio)||0),0);
+        const precioProm=stockA>0?valorStock/stockA:0;
+        const aporteProm=precioProm*(1-pctCom/100);
+        if(aporteProm<=0) return null;
+        const prendas=Math.ceil(alquiler/aporteProm);
+        const disponible=Math.max(0,liq.subBanco-liq.comision-liq.totalGastos);
+        const pct=Math.max(0,Math.min(100,Math.round(disponible/alquiler*100)));
+        const faltaBs=Math.max(0,alquiler-disponible);
+        const faltanPrendas=faltaBs>0?Math.ceil(faltaBs/aporteProm):0;
+        return {precioProm,prendas,pct,faltaBs,faltanPrendas,cubierto:faltaBs<=0};
+      })()};
+  },[invMarca,todasMarca,mid,udsMes,marcaId,liq]);
 
   // ── Tu mes en Toscana ──────────────────────────────────────────────────────
   const [tuMesOpen,setTuMesOpen]=useState(false);
@@ -11495,6 +11510,32 @@ function BrandPortal({user, ventas, inv, cargas, retiros=[], logout, descuentos=
                       </div>
                     )}
                   </div>
+
+                  {/* ── Punto de equilibrio del alquiler ── */}
+                  {espacio.equilibrio&&(
+                    <div style={{marginTop:16,paddingTop:14,borderTop:"1px solid rgba(255,255,255,.14)"}}>
+                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",
+                        flexWrap:"wrap",gap:8,marginBottom:9}}>
+                        <div style={{fontSize:12.5,color:"#E7E1D5",fontFamily:FOS.sans,lineHeight:1.5}}>
+                          <b style={{color:FOS.bone,fontSize:15}}>~{espacio.equilibrio.prendas} prendas al mes</b> cubren
+                          tu alquiler (tu precio promedio: {$(espacio.equilibrio.precioProm)})
+                        </div>
+                        <div style={fosMono({fontSize:8.5,color:"#D9C48C"})}>
+                          {espacio.equilibrio.cubierto
+                            ? "este mes ya lo cubriste"
+                            : `te faltan ~${espacio.equilibrio.faltanPrendas} prendas (${$(espacio.equilibrio.faltaBs)})`}
+                        </div>
+                      </div>
+                      <div style={{height:7,borderRadius:4,background:"rgba(255,255,255,.16)",overflow:"hidden"}}>
+                        <div style={{height:"100%",width:`${espacio.equilibrio.pct}%`,borderRadius:4,
+                          background:espacio.equilibrio.cubierto?"#7FBF9B":"#D9C48C",
+                          transition:"width 1s cubic-bezier(.16,1,.3,1)"}}/>
+                      </div>
+                      <div style={fosMono({fontSize:8,color:"#D5CEC0",marginTop:6})}>
+                        alquiler cubierto este mes: {espacio.equilibrio.pct}%
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {espacio.top.length>0&&(
