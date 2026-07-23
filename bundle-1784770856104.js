@@ -55628,7 +55628,19 @@
   };
   var hora = () => (/* @__PURE__ */ new Date()).toLocaleTimeString("es-BO", { hour: "2-digit", minute: "2-digit" });
   var tsVenta = (v) => {
-    const [Y = 0, M = 1, D = 1] = String(v.fecha || "").split("-").map(Number);
+    const f = String(v.fecha || "").trim();
+    let Y = 0, M = 1, D = 1;
+    if (f.includes("/")) {
+      const [d, m, y] = f.split("/").map(Number);
+      Y = y || 0;
+      M = m || 1;
+      D = d || 1;
+    } else {
+      const [y, m, d] = f.split("-").map(Number);
+      Y = y || 0;
+      M = m || 1;
+      D = d || 1;
+    }
     const s = String(v.hora || "").toLowerCase();
     const hm = s.match(/(\d{1,2}):(\d{2})/);
     let h = 0, min = 0;
@@ -55642,7 +55654,8 @@
       else if (s.includes("tarde")) h = 15;
       else if (s.includes("noche")) h = 20;
     }
-    return (((Y * 12 + M) * 31 + D) * 24 + h) * 60 + min;
+    const t = (((Y * 12 + M) * 31 + D) * 24 + h) * 60 + min;
+    return Number.isFinite(t) ? t : 0;
   };
   var mkKey = (m, a) => `${a}-${String(m + 1).padStart(2, "0")}`;
   var genCod = (mid, nombre, idx) => {
@@ -63251,7 +63264,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
     }, [vMes]);
     const maxMarca = Math.max(...topMarcas.map((m) => m.total), 1);
     const ultVentas = (0, import_react.useMemo)(
-      () => [...ventas].sort((a, b) => {
+      () => [...ventas].filter((v) => !/^TEST/i.test(String(v.id || ""))).sort((a, b) => {
         const ta = tsVenta(a), tb = tsVenta(b);
         if (tb !== ta) return tb - ta;
         return String(b.id || "").localeCompare(String(a.id || ""));
@@ -63422,10 +63435,17 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       background: `linear-gradient(90deg, ${C.gold}99, ${C.gold})`,
       transition: "width .4s ease"
     } })), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", marginTop: 5 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: C.label3, fontFamily: FONT_UI } }, "1 ", MESES[mes].slice(0, 3)), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: C.label3, fontFamily: FONT_UI } }, diasEnMes, " ", MESES[mes].slice(0, 3)))), (() => {
+      const horaCompacta = (h) => {
+        let s = String(h || "").trim();
+        if (!s) return "\u2014";
+        s = s.replace(/\s*([ap])\.?\s*m\.?/i, (m, x) => ` ${x.toLowerCase()}.m.`);
+        s = s.replace(/^0(\d)/, "$1");
+        return s.trim();
+      };
       const feed = [
         ...ultVentas.slice(0, 6).map((v) => ({
           id: v.id,
-          hora: v.hora || "\u2014",
+          hora: horaCompacta(v.hora),
           fecha: v.fecha || "\u2014",
           tipo: v.anulada ? "Anulada" : "Venta",
           producto: v.items?.[0]?.nombre || "\u2014",
@@ -63460,12 +63480,12 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
         textTransform: "uppercase"
       } }, "En vivo"))), /* @__PURE__ */ import_react.default.createElement("style", null, `@keyframes pulse-live{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(1.3)}}`), feed.map((a, i) => /* @__PURE__ */ import_react.default.createElement("div", { key: a.id, style: {
         display: "grid",
-        gridTemplateColumns: "64px 52px 1fr 80px",
+        gridTemplateColumns: "78px 52px 1fr 80px",
         alignItems: "center",
         gap: 8,
         padding: "9px 0",
         borderTop: i > 0 ? `1px solid ${C.sep}` : ""
-      } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label, fontFamily: FONT_MONO, fontWeight: 600, lineHeight: 1.4 } }, a.hora), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 9, color: C.label2, fontFamily: FONT_MONO, fontWeight: 500, lineHeight: 1.3 } }, a.fecha)), /* @__PURE__ */ import_react.default.createElement("span", { style: {
+      } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label, fontFamily: FONT_MONO, fontWeight: 600, lineHeight: 1.4, whiteSpace: "nowrap" } }, a.hora), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 9, color: C.label2, fontFamily: FONT_MONO, fontWeight: 500, lineHeight: 1.3 } }, a.fecha)), /* @__PURE__ */ import_react.default.createElement("span", { style: {
         fontSize: 10,
         fontWeight: 700,
         color: a.color,

@@ -2083,7 +2083,16 @@ const hora = () => new Date().toLocaleTimeString("es-BO",{hour:"2-digit",minute:
 // número ordenable. La hora se guarda en formato 12h con a.m./p.m., por lo que
 // compararla como texto ordena mal ("12:26 p.m." > "06:18 p.m.").
 const tsVenta = v => {
-  const [Y=0,M=1,D=1] = String(v.fecha||"").split("-").map(Number);
+  // Acepta "YYYY-MM-DD" (formato normal) y "DD/MM/YYYY" (filas migradas/prueba).
+  const f = String(v.fecha||"").trim();
+  let Y=0,M=1,D=1;
+  if(f.includes("/")){                       // DD/MM/YYYY
+    const [d,m,y] = f.split("/").map(Number);
+    Y=y||0; M=m||1; D=d||1;
+  } else {                                    // YYYY-MM-DD
+    const [y,m,d] = f.split("-").map(Number);
+    Y=y||0; M=m||1; D=d||1;
+  }
   const s  = String(v.hora||"").toLowerCase();
   const hm = s.match(/(\d{1,2}):(\d{2})/);
   let h = 0, min = 0;
@@ -2097,7 +2106,10 @@ const tsVenta = v => {
     else if(s.includes("tarde"))                   h = 15;  // bloque tarde
     else if(s.includes("noche"))                   h = 20;  // bloque noche
   }
-  return (((Y*12+M)*31+D)*24+h)*60 + min;
+  const t = (((Y*12+M)*31+D)*24+h)*60 + min;
+  // Nunca devolver NaN: un comparador que devuelve NaN corrompe todo el orden
+  // (por eso una sola fila con fecha rota tiraba las ventas de hoy hacia abajo).
+  return Number.isFinite(t) ? t : 0;
 };
 const mkKey= (m,a) => `${a}-${String(m+1).padStart(2,"0")}`;
 const genCod=(mid,nombre,idx)=>{
@@ -9630,6 +9642,8 @@ function HomeDashboard({ventas, inv, vMes, mes, anio, onGoTab}){
   // ── Últimas 6 ventas ────────────────────────────────────
   const ultVentas = useMemo(() =>
     [...ventas]
+      // Fuera filas de prueba (Canario Codex y otras basura del período codex)
+      .filter(v => !/^TEST/i.test(String(v.id || "")))
       .sort((a, b) => {
         // fecha+hora parseadas a número (la hora es 12h con a.m./p.m. — como
         // texto ordena mal)
@@ -9772,9 +9786,17 @@ function HomeDashboard({ventas, inv, vMes, mes, anio, onGoTab}){
       {/* ── Actividad showroom ── */}
       {(() => {
         // combine last 6 ventas into a live activity feed
+        // Hora compacta para el feed: "06:00 p. m." → "6:00 p.m." (una sola línea)
+        const horaCompacta = h => {
+          let s = String(h||"").trim();
+          if(!s) return "—";
+          s = s.replace(/\s*([ap])\.?\s*m\.?/i, (m,x)=>` ${x.toLowerCase()}.m.`);
+          s = s.replace(/^0(\d)/, "$1");
+          return s.trim();
+        };
         const feed = [
           ...ultVentas.slice(0,6).map(v=>({
-            id:v.id, hora:v.hora||"—", fecha:v.fecha||"—", tipo:v.anulada?"Anulada":"Venta",
+            id:v.id, hora:horaCompacta(v.hora), fecha:v.fecha||"—", tipo:v.anulada?"Anulada":"Venta",
             producto:v.items?.[0]?.nombre||"—",
             marca:v.items?.[0]?.marcaNombre||"—",
             marcaObj:MARCAS.find(m=>m.id===v.items?.[0]?.marcaId)||null,
@@ -9801,13 +9823,13 @@ function HomeDashboard({ventas, inv, vMes, mes, anio, onGoTab}){
             <style>{`@keyframes pulse-live{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(1.3)}}`}</style>
             {feed.map((a,i)=>(
               <div key={a.id} style={{
-                display:"grid",gridTemplateColumns:"64px 52px 1fr 80px",
+                display:"grid",gridTemplateColumns:"78px 52px 1fr 80px",
                 alignItems:"center",gap:8,
                 padding:"9px 0",
                 borderTop:i>0?`1px solid ${C.sep}`:"",
               }}>
                 <div>
-                  <div style={{fontSize:11,color:C.label,fontFamily:FONT_MONO,fontWeight:600,lineHeight:1.4}}>
+                  <div style={{fontSize:11,color:C.label,fontFamily:FONT_MONO,fontWeight:600,lineHeight:1.4,whiteSpace:"nowrap"}}>
                     {a.hora}
                   </div>
                   <div style={{fontSize:9,color:C.label2,fontFamily:FONT_MONO,fontWeight:500,lineHeight:1.3}}>
