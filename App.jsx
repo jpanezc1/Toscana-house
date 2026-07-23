@@ -744,6 +744,76 @@ function aplicarEstadoMarcas(lista){
   });
 }
 
+// ── KV Sync: datos compartidos entre computadoras (tabla kv_sync) ───
+// Motor genérico clave→valor con espejo en localStorage. Cubre todo lo que
+// antes vivía SOLO en cada equipo: planilla de alquileres pagados, gastos de
+// liquidación, gift cards, cajas, QR del banco y facturas emitidas. Cualquier
+// dato nuevo se suma mapeando su clave acá, sin crear más tablas.
+const KV_LS_MAP = k =>
+  k==="alq"       ? "th_alq" :
+  k==="giftcards" ? "th_gc_v1" :
+  k==="cajas"     ? "th_cajas_v1" :
+  k==="qr_banco"  ? "th_qr_banco" :
+  k.startsWith("gastos_") ? "th_liq_gastos_"+k.slice(7) :
+  k.startsWith("fac_")    ? "th_fac_"+k.slice(4) : null;
+let KV_CACHE = {};          // { key: data } último valor conocido de la nube
+const _kvTimers = {};
+async function sbKVCargarTodo(){
+  try{
+    const db = await getSupabase();
+    const {data, error} = await db.from("kv_sync").select("key,data");
+    if(error) throw error;
+    return data||[];
+  }catch(e){ console.warn("kv_sync load:", e.message); return null; }
+}
+function sbKVGuardar(key, data){
+  // Escribe local al toque; sube a la nube con debounce y sin ecos idénticos
+  const identico = JSON.stringify(KV_CACHE[key] ?? null) === JSON.stringify(data ?? null);
+  KV_CACHE[key] = data;
+  const ls = KV_LS_MAP(key);
+  if(ls){ try{
+    if(data==null) localStorage.removeItem(ls);
+    else localStorage.setItem(ls, typeof data==="string" ? data : JSON.stringify(data));
+  }catch{} }
+  if(identico) return; // mismo valor que ya conoce la nube → no re-subir (evita bucles)
+  clearTimeout(_kvTimers[key]);
+  _kvTimers[key] = setTimeout(async ()=>{
+    try{
+      const db = await getSupabase();
+      const {error} = await db.from("kv_sync")
+        .upsert({key, data, updated_at:new Date().toISOString()}, {onConflict:"key"});
+      if(error) throw error;
+    }catch(e){ console.warn("kv_sync save:", e.message); }
+  }, 500);
+}
+// Aplica un valor recibido de la nube al espejo local (localStorage) y avisa
+// a los componentes montados (CajasTab, GiftTab) por evento de ventana.
+function kvAplicarLocal(key, data){
+  const prevJson = JSON.stringify(KV_CACHE[key] ?? null);
+  const nextJson = JSON.stringify(data ?? null);
+  KV_CACHE[key] = data;
+  const ls = KV_LS_MAP(key);
+  if(ls){ try{
+    if(data==null) localStorage.removeItem(ls);
+    else localStorage.setItem(ls, typeof data==="string" ? data : JSON.stringify(data));
+  }catch{} }
+  if(prevJson!==nextJson){
+    try{ window.dispatchEvent(new CustomEvent("th-kv", {detail:{key, data}})); }catch{}
+  }
+  return prevJson!==nextJson;
+}
+// Unión sin pérdida para la siembra inicial: la nube manda en conflictos,
+// lo local que la nube no tiene se conserva (evita perder gift cards o pagos
+// registrados en un equipo que sembró después).
+function kvMergeListas(cloud, local, keyFn){
+  if(!Array.isArray(cloud)) return local;
+  if(!Array.isArray(local)) return cloud;
+  const map = new Map();
+  local.forEach(x=>{ try{ map.set(keyFn(x), x); }catch{} });
+  cloud.forEach(x=>{ try{ map.set(keyFn(x), x); }catch{} });
+  return [...map.values()];
+}
+
 // ── Descuentos por código (tabla descuentos_codigo) ─────────────────
 async function sbCargarDescuentosCodigo(){
   try{
@@ -2248,7 +2318,7 @@ function loadQR() {
 
 // QR estático del banco de la tienda (imagen subida una vez por admin)
 const cargarQRBanco  = () => { try { return localStorage.getItem("th_qr_banco") || null; } catch { return null; } };
-const guardarQRBanco = (dataUrl) => { try { dataUrl ? localStorage.setItem("th_qr_banco", dataUrl) : localStorage.removeItem("th_qr_banco"); } catch {} };
+const guardarQRBanco = (dataUrl) => { sbKVGuardar("qr_banco", dataUrl || null); }; // nube + espejo local
 
 // Sonido de pago verificado — campanilla de dos tonos (Web Audio, sin assets)
 function playPagoSound(){
@@ -2569,8 +2639,7 @@ function leerGastosLiq(marcaId, MK) {
   catch { return []; }
 }
 function guardarGastosLiq(marcaId, MK, gastos) {
-  const key = `th_liq_gastos_${marcaId}_${MK}`;
-  try { localStorage.setItem(key, JSON.stringify(gastos)); } catch {}
+  sbKVGuardar(`gastos_${marcaId}_${MK}`, gastos); // nube + espejo local
 }
 function parseMixtoXls(metodoPago, total) {
   if (metodoPago?.startsWith("mixto|")) {
@@ -2629,7 +2698,7 @@ function leerCfgCUCU(){
   catch{ return CUCU_DEF; }
 }
 function guardarFacturaLocal(ventaId, data){
-  try{ localStorage.setItem(`th_fac_${ventaId}`, JSON.stringify(data)); }catch{}
+  sbKVGuardar(`fac_${ventaId}`, data); // nube + espejo local
 }
 function leerFacturaLocal(ventaId){
   try{ return JSON.parse(localStorage.getItem(`th_fac_${ventaId}`)||"null"); }catch{return null;}
@@ -7142,9 +7211,16 @@ function CajasTab(){
   const [balInput, setBalInput] = useState({});
   const [showBal, setShowBal] = useState(null);
 
+  // Cambios de cajas hechos en OTRA computadora llegan en vivo por kv_sync
+  useEffect(()=>{
+    const h = e => { if(e.detail?.key==="cajas" && Array.isArray(e.detail.data)) setCajas(e.detail.data); };
+    window.addEventListener("th-kv", h);
+    return ()=>window.removeEventListener("th-kv", h);
+  },[]);
+
   function saveCajas(updated){
     setCajas(updated);
-    try{localStorage.setItem(CAJAS_KEY,JSON.stringify(updated));}catch{}
+    sbKVGuardar("cajas", updated); // nube + espejo local
   }
   function abrirCaja(id){
     saveCajas(cajas.map(c=>c.id===id?{...c,isOpen:true}:c));
@@ -13117,7 +13193,7 @@ function cargarGC() {
   catch { return []; }
 }
 function guardarGC(lista) {
-  try { localStorage.setItem(GC_KEY, JSON.stringify(lista)); } catch {}
+  sbKVGuardar("giftcards", lista); // nube + espejo local
 }
 function gcEstado(gc) {
   if ((gc.saldo||0) <= 0) return "agotada";
@@ -13596,6 +13672,13 @@ function GiftCardsTab() {
   const [exportando,  setExportando] = useState(false);
 
   function reload(lista){ setGiftCards(lista||cargarGC()); }
+
+  // Gift cards creadas/usadas en OTRA computadora llegan en vivo por kv_sync
+  useEffect(()=>{
+    const h = e => { if(e.detail?.key==="giftcards" && Array.isArray(e.detail.data)) setGiftCards(e.detail.data); };
+    window.addEventListener("th-kv", h);
+    return ()=>window.removeEventListener("th-kv", h);
+  },[]);
 
   function aplicarRango(tipo){
     setRangoActivo(tipo);
@@ -14096,7 +14179,7 @@ function App(){
   // ── Sync localStorage ← siempre que cambie inv, ventas, alq o cierres ──
   useEffect(()=>{ try{localStorage.setItem("th_inv",JSON.stringify(inv));}catch{} },[inv]);
   useEffect(()=>{ try{localStorage.setItem("th_ventas",JSON.stringify(ventas));}catch{} },[ventas]);
-  useEffect(()=>{ try{localStorage.setItem("th_alq",JSON.stringify(alq));}catch{} },[alq]);
+  useEffect(()=>{ sbKVGuardar("alq", alq); },[alq]); // nube + espejo local (planilla alquileres)
   useEffect(()=>{ try{localStorage.setItem("th_cierres",JSON.stringify(cierres));}catch{} },[cierres]);
   useEffect(()=>{ try{localStorage.setItem("th_retiros_v1",JSON.stringify(retiros));}catch{} },[retiros]);
   useEffect(()=>{ try{localStorage.setItem("th_auditorias",JSON.stringify(auditorias));}catch{} },[auditorias]);
@@ -14272,6 +14355,71 @@ function App(){
       ch = db.channel("config-marca-rt")
         .on("postgres_changes", {event:"*", schema:"public", table:"config_marca"}, ()=>{
           sbCargarConfigMarca().then(()=>refrescar());
+        })
+        .subscribe();
+    }).catch(()=>{});
+    return ()=>{ mounted=false; if(ch) getSupabase().then(db=>db.removeChannel(ch)).catch(()=>{}); };
+  },[]);// eslint-disable-line
+
+  // ── KV Sync (alquileres pagados, gastos liq, gift cards, cajas, QR, facturas) ──
+  // Carga inicial: la nube manda; lo local que la nube no tiene se SIEMBRA (unión
+  // sin pérdida, así el primer equipo que abre no pisa lo del resto). Realtime:
+  // cualquier cambio en otra computadora llega al instante.
+  useEffect(()=>{
+    let ch=null, mounted=true;
+    const KEYFN = {
+      alq:       x=>`${x.marcaId}-${x.mes}-${x.anio}`,
+      giftcards: x=>x.id,
+    };
+    const leerLS = k => { try{
+      const raw = localStorage.getItem(k); if(raw==null) return null;
+      if(k==="th_qr_banco") return raw;                    // dataUrl plano
+      return JSON.parse(raw);
+    }catch{ return null; } };
+    sbKVCargarTodo().then(rows=>{
+      if(!mounted || !Array.isArray(rows)) return;
+      const nube = new Map(rows.map(r=>[r.key, r.data]));
+      // 1. aplicar lo de la nube (con unión para listas mergeables)
+      nube.forEach((data, key)=>{
+        let final = data;
+        const kfn = KEYFN[key] || (key.startsWith("gastos_") ? (x=>x.id ?? JSON.stringify(x)) : null);
+        if(kfn){
+          const local = leerLS(KV_LS_MAP(key));
+          const union = kvMergeListas(data, local, kfn);
+          kvAplicarLocal(key, union);
+          if(JSON.stringify(union)!==JSON.stringify(data)) sbKVGuardar(key, union); // subir lo local que faltaba
+        } else {
+          kvAplicarLocal(key, final);
+        }
+      });
+      // 2. sembrar claves locales que la nube no tiene todavía
+      const candidatas = ["th_alq","th_gc_v1","th_cajas_v1","th_qr_banco"];
+      try{ Object.keys(localStorage).forEach(k=>{
+        if(k.startsWith("th_liq_gastos_")||k.startsWith("th_fac_")) candidatas.push(k);
+      }); }catch{}
+      candidatas.forEach(lsKey=>{
+        const key = lsKey==="th_alq" ? "alq" : lsKey==="th_gc_v1" ? "giftcards"
+          : lsKey==="th_cajas_v1" ? "cajas" : lsKey==="th_qr_banco" ? "qr_banco"
+          : lsKey.startsWith("th_liq_gastos_") ? "gastos_"+lsKey.slice(14)
+          : "fac_"+lsKey.slice(7);
+        if(nube.has(key)) return;
+        const local = leerLS(lsKey);
+        if(local!=null && !(Array.isArray(local)&&local.length===0)) sbKVGuardar(key, local);
+      });
+      const a = leerLS("th_alq"); if(Array.isArray(a)) setAlq(a);
+      setCfgTick(t=>t+1);
+    });
+    getSupabase().then(db=>{
+      if(!mounted) return;
+      ch = db.channel("kv-sync-rt")
+        .on("postgres_changes", {event:"*", schema:"public", table:"kv_sync"}, payload=>{
+          if(!mounted) return;
+          const row = payload.new || payload.old; if(!row?.key) return;
+          const data = payload.eventType==="DELETE" ? null : payload.new.data;
+          if(kvAplicarLocal(row.key, data)){
+            if(row.key==="alq" && Array.isArray(data)) setAlq(data);
+            setCfgTick(t=>t+1); // fuerza recálculo (liquidaciones usan gastos)
+          }
         })
         .subscribe();
     }).catch(()=>{});
