@@ -53624,6 +53624,7 @@
         subtotal: it.subtotal,
         desc_pct: it.descPct != null ? it.descPct : null
       }));
+      await db.from("venta_items").delete().eq("venta_id", venta.id);
       let { error: errItems } = await db.from("venta_items").insert(items);
       if (errItems && /desc_pct/.test(errItems.message || "")) {
         ({ error: errItems } = await db.from("venta_items").insert(items.map(({ desc_pct, ...r }) => r)));

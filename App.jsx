@@ -226,6 +226,10 @@ async function sbGuardarVenta(venta) {
       cantidad: it.cantidad, precio_unit: it.precioUnit, subtotal: it.subtotal,
       desc_pct: it.descPct != null ? it.descPct : null
     }));
+    // Reintento seguro: si esta venta ya subió items (retry del outbox tras un
+    // fallo parcial), limpiarlos antes de insertar. Evita items DUPLICADOS en la
+    // nube, que duplicaban lo liquidado a la marca y el conteo de vendidas.
+    await db.from("venta_items").delete().eq("venta_id", venta.id);
     let { error: errItems } = await db.from("venta_items").insert(items);
     if (errItems && /desc_pct/.test(errItems.message || "")) {
       // Columna desc_pct aún no creada (SQL manual pendiente): subir sin ese
