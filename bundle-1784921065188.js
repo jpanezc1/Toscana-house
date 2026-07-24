@@ -73796,9 +73796,12 @@ ${c.diferencia > 0.01 ? `Cliente paga diferencia: Bs ${fmt2(c.diferencia)} (${c.
     const [descPct, setDescPct] = import_react.default.useState("");
     const [montosMixtos, setMontosMixtos] = import_react.default.useState({ efectivo: "", qr: "", tarjeta: "" });
     const inputRef = import_react.default.useRef(null);
-    const total = carrito.reduce((s, it) => s + it.subtotal, 0);
+    const descOf = (it) => Math.min(100, Math.max(0, Number(it.descPct) || 0));
+    const netOf = (it) => +(it.precioUnit * it.cantidad * (1 - descOf(it) / 100)).toFixed(2);
+    const total = carrito.reduce((s, it) => s + it.precioUnit * it.cantidad, 0);
+    const totalFinal = +carrito.reduce((s, it) => s + netOf(it), 0).toFixed(2);
     const desc = Math.min(100, Math.max(0, parseFloat(descPct) || 0));
-    const totalFinal = +(total * (1 - desc / 100)).toFixed(2);
+    const hayDesc = carrito.some((it) => descOf(it) > 0);
     const sumaMixto = (parseFloat(montosMixtos.efectivo) || 0) + (parseFloat(montosMixtos.qr) || 0) + (parseFloat(montosMixtos.tarjeta) || 0);
     const mixtoCuadra = Math.abs(sumaMixto - totalFinal) < 0.01;
     function getConflictoItem(it) {
@@ -73852,12 +73855,23 @@ ${c.diferencia > 0.01 ? `Cliente paga diferencia: Bs ${fmt2(c.diferencia)} (${c.
           marcaNombre: prod.marcaNombre || prod.marca || "",
           cantidad: 1,
           precioUnit: prod.precio || 0,
-          subtotal: prod.precio || 0
+          subtotal: prod.precio || 0,
+          descPct: Math.min(100, Math.max(0, parseFloat(descPct) || 0))
+          // hereda el atajo global
         }];
       });
       setBusqueda([]);
       setCodInput("");
       setTimeout(() => inputRef.current?.focus(), 50);
+    }
+    function setItemDesc(prodId, val) {
+      const d = Math.min(100, Math.max(0, parseFloat(val) || 0));
+      setCarrito((prev) => prev.map((it) => it.prodId === prodId ? { ...it, descPct: d } : it));
+    }
+    function aplicarDescGlobal(val) {
+      setDescPct(val);
+      const d = Math.min(100, Math.max(0, parseFloat(val) || 0));
+      setCarrito((prev) => prev.map((it) => ({ ...it, descPct: d })));
     }
     function quitarItem(prodId) {
       setCarrito((prev) => prev.filter((it) => it.prodId !== prodId));
@@ -73889,8 +73903,12 @@ ${c.diferencia > 0.01 ? `Cliente paga diferencia: Bs ${fmt2(c.diferencia)} (${c.
       if (!puedeConfirmar) return;
       setGuardando(true);
       const itemsVerif = carrito.filter((it) => verificados.has(it.prodId)).map((it) => it.codigo);
-      const factor = 1 - desc / 100;
-      const itemsFinal = desc > 0 ? carrito.map((it) => ({ ...it, subtotal: +(it.subtotal * factor).toFixed(2) })) : carrito;
+      const itemsFinal = carrito.map((it) => {
+        const d = descOf(it);
+        return { ...it, descPct: +d.toFixed(2), subtotal: +(it.precioUnit * it.cantidad * (1 - d / 100)).toFixed(2) };
+      });
+      const totalLleno = carrito.reduce((s, it) => s + it.precioUnit * it.cantidad, 0);
+      const descEfectivo = totalLleno > 0 ? +((1 - totalFinal / totalLleno) * 100).toFixed(2) : 0;
       let metodoPagoFinal = metodo;
       if (metodo === "mixto") {
         const partes = [];
@@ -73904,8 +73922,8 @@ ${c.diferencia > 0.01 ? `Cliente paga diferencia: Bs ${fmt2(c.diferencia)} (${c.
         turno,
         metodoPago: metodoPagoFinal,
         total: totalFinal,
-        subtotal: total,
-        descPct: desc,
+        subtotal: totalLleno,
+        descPct: descEfectivo,
         items: itemsFinal,
         ...verificados.size > 0 ? { advertencia: "ITEMS_VERIFICADOS_MANUALMENTE", itemsVerificados: itemsVerif, verificadoPor: user?.nombre || "Admin" } : {}
       };
@@ -74094,7 +74112,7 @@ ${c.diferencia > 0.01 ? `Cliente paga diferencia: Bs ${fmt2(c.diferencia)} (${c.
         }
       },
       m.label
-    )))), /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, fontWeight: 500, color: C.label2, marginBottom: 6 } }, /* @__PURE__ */ import_react.default.createElement("i", { className: "ti ti-discount", style: { fontSize: 11 }, "aria-hidden": "true" }), " Descuento %"), /* @__PURE__ */ import_react.default.createElement(
+    )))), /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, fontWeight: 500, color: C.label2, marginBottom: 6 } }, /* @__PURE__ */ import_react.default.createElement("i", { className: "ti ti-discount", style: { fontSize: 11 }, "aria-hidden": "true" }), " Descuento % (a todos)"), /* @__PURE__ */ import_react.default.createElement(
       "input",
       {
         type: "number",
@@ -74103,7 +74121,7 @@ ${c.diferencia > 0.01 ? `Cliente paga diferencia: Bs ${fmt2(c.diferencia)} (${c.
         step: "0.5",
         inputMode: "decimal",
         value: descPct,
-        onChange: (e) => setDescPct(e.target.value),
+        onChange: (e) => aplicarDescGlobal(e.target.value),
         placeholder: "0",
         style: {
           width: "100%",
@@ -74341,7 +74359,33 @@ ${c.diferencia > 0.01 ? `Cliente paga diferencia: Bs ${fmt2(c.diferencia)} (${c.
           }
         },
         /* @__PURE__ */ import_react.default.createElement("i", { className: "ti ti-plus", style: { fontSize: 11 }, "aria-hidden": "true" })
-      )), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, fontWeight: 500, color: C.label, minWidth: 52, textAlign: "right" } }, "Bs ", it.subtotal), /* @__PURE__ */ import_react.default.createElement(
+      )), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 2 } }, /* @__PURE__ */ import_react.default.createElement(
+        "input",
+        {
+          type: "number",
+          min: "0",
+          max: "100",
+          step: "0.5",
+          inputMode: "decimal",
+          value: it.descPct || "",
+          placeholder: "0",
+          onChange: (e) => setItemDesc(it.prodId, e.target.value),
+          title: "Descuento de esta prenda",
+          style: {
+            width: 42,
+            padding: "5px 4px",
+            borderRadius: 7,
+            boxSizing: "border-box",
+            textAlign: "center",
+            fontSize: 12,
+            fontFamily: FONT_UI,
+            border: descOf(it) > 0 ? `1.5px solid ${C.green}` : `1px solid ${C.sep}`,
+            background: descOf(it) > 0 ? `${C.green}0d` : C.bg0,
+            color: descOf(it) > 0 ? C.green : C.label,
+            fontWeight: descOf(it) > 0 ? 700 : 400
+          }
+        }
+      ), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 11, color: descOf(it) > 0 ? C.green : C.label3, fontWeight: 600 } }, "%")), /* @__PURE__ */ import_react.default.createElement("div", { style: { minWidth: 58, textAlign: "right" } }, descOf(it) > 0 ? /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: C.label3, textDecoration: "line-through", lineHeight: 1.2 } }, "Bs ", +(it.precioUnit * it.cantidad).toFixed(2)), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, fontWeight: 700, color: C.green, fontFamily: FONT } }, "Bs ", netOf(it))) : /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, fontWeight: 500, color: C.label, fontFamily: FONT } }, "Bs ", +(it.precioUnit * it.cantidad).toFixed(2))), /* @__PURE__ */ import_react.default.createElement(
         "button",
         {
           onClick: () => quitarItem(it.prodId),
@@ -74368,12 +74412,12 @@ ${c.diferencia > 0.01 ? `Cliente paga diferencia: Bs ${fmt2(c.diferencia)} (${c.
           }
         }
       ), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 11, color: estaVerif ? "#F57F17" : "#C62828", lineHeight: 1.5 } }, "Verifiqu\xE9 que ", /* @__PURE__ */ import_react.default.createElement("b", null, it.nombre), " (", it.marcaNombre, ") con fecha ", /* @__PURE__ */ import_react.default.createElement("b", null, fecha), " no est\xE1 registrado en el sistema"))));
-    }), /* @__PURE__ */ import_react.default.createElement("div", { style: { padding: "10px 14px", background: C.bg2, borderTop: `1px solid ${C.sep}` } }, desc > 0 && /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, null, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 3 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 11, color: C.label3 } }, "Subtotal"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 12, color: C.label2, fontFamily: FONT } }, "Bs ", total)), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 5 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 11, color: C.green, fontWeight: 600 } }, "Descuento (", desc, "%)"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 12, color: C.green, fontWeight: 600, fontFamily: FONT } }, "\u2212Bs ", +(total - totalFinal).toFixed(2)))), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+    }), /* @__PURE__ */ import_react.default.createElement("div", { style: { padding: "10px 14px", background: C.bg2, borderTop: `1px solid ${C.sep}` } }, hayDesc && /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, null, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 3 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 11, color: C.label3 } }, "Subtotal"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 12, color: C.label2, fontFamily: FONT } }, "Bs ", +total.toFixed(2))), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 5 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 11, color: C.green, fontWeight: 600 } }, "Descuentos por prenda"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 12, color: C.green, fontWeight: 600, fontFamily: FONT } }, "\u2212Bs ", +(total - totalFinal).toFixed(2)))), /* @__PURE__ */ import_react.default.createElement("div", { style: {
       display: "flex",
       justifyContent: "space-between",
       alignItems: "center",
-      borderTop: desc > 0 ? `1px solid ${C.sep}` : "none",
-      paddingTop: desc > 0 ? 6 : 0
+      borderTop: hayDesc ? `1px solid ${C.sep}` : "none",
+      paddingTop: hayDesc ? 6 : 0
     } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 12, color: C.label2 } }, "Total"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 16, fontWeight: 600, color: C.label, fontFamily: FONT } }, "Bs ", totalFinal)))), hayConflictos && /* @__PURE__ */ import_react.default.createElement(
       "button",
       {
