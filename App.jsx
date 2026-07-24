@@ -4183,23 +4183,35 @@ async function notaVentaPDF(venta){
   y += 1;
   doc.setDrawColor(210,205,195); doc.line(M, y, W-M, y); y += 7;
 
-  // Tabla de ítems
+  // Tabla de ítems — muestra precio sin descuento, % y en cuánto queda
   doc.setFont("helvetica","bold"); doc.setFontSize(7.5); doc.setTextColor(130,130,130);
   doc.text("CODIGO", M, y); doc.text("DESCRIPCION", M+26, y);
-  doc.text("CANT", W-M-52, y, {align:"right"}); doc.text("P.UNIT", W-M-30, y, {align:"right"});
+  doc.text("CANT", W-M-64, y, {align:"right"}); doc.text("P.UNIT", W-M-42, y, {align:"right"});
+  doc.text("DESC", W-M-24, y, {align:"right"});
   doc.text("SUBTOTAL", W-M, y, {align:"right"});
   y += 2; doc.setDrawColor(230,226,218); doc.line(M, y, W-M, y); y += 5;
   doc.setFont("helvetica","normal"); doc.setFontSize(9); doc.setTextColor(24,20,16);
   items.forEach(it=>{
-    const linea = (it.precioUnit||0)*(it.cantidad||1);
+    const full = (it.precioUnit||0)*(it.cantidad||1);
+    const d = it.descPct!=null ? Number(it.descPct)||0 : 0;
+    const queda = +(full*(1-d/100)).toFixed(2);
     doc.setFont("courier","normal"); doc.setFontSize(8); doc.setTextColor(120,120,120);
     doc.text(String(it.codigo||""), M, y);
     doc.setFont("helvetica","normal"); doc.setFontSize(9); doc.setTextColor(24,20,16);
-    const nom = doc.splitTextToSize(String(it.nombre||"") + (it.marcaNombre?" - "+it.marcaNombre:""), W-M-26-58);
+    const nom = doc.splitTextToSize(String(it.nombre||"") + (it.marcaNombre?" - "+it.marcaNombre:""), W-M-26-70);
     doc.text(nom[0]||"", M+26, y);
-    doc.text(String(it.cantidad||1), W-M-52, y, {align:"right"});
-    doc.text(fmt2(it.precioUnit), W-M-30, y, {align:"right"});
-    doc.text(fmt2(linea), W-M, y, {align:"right"});
+    doc.text(String(it.cantidad||1), W-M-64, y, {align:"right"});
+    doc.text(fmt2(it.precioUnit), W-M-42, y, {align:"right"});
+    if(d>0){
+      doc.setTextColor(150,60,60);
+      doc.text("-"+d+"%", W-M-24, y, {align:"right"});
+      doc.setTextColor(24,20,16);
+    } else {
+      doc.setTextColor(170,170,170);
+      doc.text("-", W-M-24, y, {align:"right"});
+      doc.setTextColor(24,20,16);
+    }
+    doc.text(fmt2(queda), W-M, y, {align:"right"});
     y += 6.5;
     if(y > 250){ doc.addPage(); y = 24; }
   });
@@ -4209,9 +4221,8 @@ async function notaVentaPDF(venta){
   const tx = W-M-55, vx = W-M;
   doc.setFontSize(9); doc.setTextColor(90,90,90);
   doc.text("Subtotal", tx, y); doc.setTextColor(24,20,16); doc.text("Bs " + fmt2(subtotalBruto), vx, y, {align:"right"}); y += 6;
-  const pctPond = subtotalBruto>0 ? Math.round(descBs/subtotalBruto*100) : 0;
   if(descBs > 0.005){
-    doc.setTextColor(150,60,60); doc.text("Descuento " + pctPond + "%", tx, y);
+    doc.setTextColor(150,60,60); doc.text("Descuento", tx, y);
     doc.text("- Bs " + fmt2(descBs), vx, y, {align:"right"}); y += 6;
   }
   doc.setDrawColor(24,20,16); doc.setLineWidth(0.5); doc.line(tx, y-2, vx, y-2);
@@ -4406,17 +4417,23 @@ function abrirNotaVenta(venta, numSecuencial, autoPrint=false){
   const descAdicional=subtotalBruto-displayTotal;
   // Descuento por ítem: propio del ítem (nuevo modelo) o el global (ventas viejas)
   const itemDesc = it => it.descPct!=null ? Number(it.descPct)||0 : getManualDescPct(venta);
-  // Filas a precio LLENO en columna Subtotal: la cuenta visible cuadra
-  const rows=venta.items.map(it=>`
+  // Cada fila muestra el precio SIN descuento (tachado) y en cuánto queda
+  const rows=venta.items.map(it=>{
+    const d=itemDesc(it);
+    const full=it.precioUnit*it.cantidad;
+    const queda=+(full*(1-d/100)).toFixed(2);
+    return `
     <tr>
       <td>${it.codigo}</td>
       <td>${it.nombre}${it.marcaNombre?" — "+it.marcaNombre:""}</td>
       <td style="text-align:center">UNIDAD (BIENES)</td>
       <td style="text-align:center">${it.cantidad}</td>
       <td style="text-align:right">${fmt2(it.precioUnit)}</td>
-      <td style="text-align:right">${itemDesc(it)?itemDesc(it)+"%":"—"}</td>
-      <td style="text-align:right">${fmt2(it.precioUnit*it.cantidad)}</td>
-    </tr>`).join("");
+      <td style="text-align:right">${d?d+"%":"—"}</td>
+      <td style="text-align:right">${d
+        ? `<span style="text-decoration:line-through;color:#999;font-size:9px">${fmt2(full)}</span><br/><strong>${fmt2(queda)}</strong>`
+        : fmt2(full)}</td>
+    </tr>`;}).join("");
   win.document.write(`<!DOCTYPE html>
 <html lang="es"><head>
 <meta charset="UTF-8">
@@ -4482,7 +4499,7 @@ function abrirNotaVenta(venta, numSecuencial, autoPrint=false){
 <div style="display:flex;justify-content:flex-end;margin-bottom:12px">
   <table class="tots">
     <tr><td>Subtotal:</td><td>${fmt2(subtotalBruto)}</td></tr>
-    ${descAdicional>0.01?`<tr><td>Descuento adicional:</td><td>- ${fmt2(descAdicional)}</td></tr>`:""}
+    ${descAdicional>0.01?`<tr><td>Descuento:</td><td>- ${fmt2(descAdicional)}</td></tr>`:""}
     <tr><td>Total Valor:</td><td>${fmt2(displayTotal)}</td></tr>
     <tr class="tf"><td>Monto a pagar Bs</td><td>${fmt2(displayTotal)}</td></tr>
   </table>
