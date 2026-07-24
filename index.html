@@ -180,7 +180,7 @@
   <!-- Auto-updater: detecta nueva versión y recarga sin intervención del usuario -->
   <script>
     (function(){
-      var CURRENT = "1784818445241";
+      var CURRENT = "1784901266824";
       function check(){
         fetch("/version.json?_="+Date.now(),{cache:"no-store"})
           .then(function(r){return r.json();})
@@ -197,7 +197,7 @@
   </script>
   <!-- jsPDF: generación de notas de venta en PDF nativo (ligero, nítido) -->
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
-  <script src="bundle-1784818445241.js"></script>
+  <script src="bundle-1784901266824.js"></script>
   <!-- Service worker: permite instalar la app y seguir usándola sin internet -->
   <script>
     if("serviceWorker" in navigator){

@@ -223,9 +223,16 @@ async function sbGuardarVenta(venta) {
     const items = venta.items.map(it => ({
       venta_id: venta.id, prod_id: it.prodId, codigo: it.codigo,
       nombre: it.nombre, marca_id: it.marcaId, marca_nombre: it.marcaNombre,
-      cantidad: it.cantidad, precio_unit: it.precioUnit, subtotal: it.subtotal
+      cantidad: it.cantidad, precio_unit: it.precioUnit, subtotal: it.subtotal,
+      desc_pct: it.descPct != null ? it.descPct : null
     }));
-    const { error: errItems } = await db.from("venta_items").insert(items);
+    let { error: errItems } = await db.from("venta_items").insert(items);
+    if (errItems && /desc_pct/.test(errItems.message || "")) {
+      // Columna desc_pct aún no creada (SQL manual pendiente): subir sin ese
+      // detalle para que la venta NUNCA deje de llegar a la nube.
+      ({ error: errItems } = await db.from("venta_items")
+        .insert(items.map(({ desc_pct, ...r }) => r)));
+    }
     if (errItems) throw errItems;
     return true;
   } catch(e) { console.warn("Supabase save venta:", e.message); return false; }
@@ -576,7 +583,8 @@ async function sbCargarTodo() {
       items: (items||[]).filter(i=>i.venta_id===v.id).map(i=>({
         prodId: i.prod_id, codigo: i.codigo, nombre: i.nombre,
         marcaId: i.marca_id, marcaNombre: i.marca_nombre,
-        cantidad: i.cantidad, precioUnit: i.precio_unit, subtotal: i.subtotal
+        cantidad: i.cantidad, precioUnit: i.precio_unit, subtotal: i.subtotal,
+        descPct: i.desc_pct != null ? Number(i.desc_pct) : undefined
       }))
     }));
 
@@ -1058,7 +1066,8 @@ function useRealtimeSync(setVentas, setInv, setRetiros, setFactoryResetRecibido,
               items: (rawItems || []).map(i => ({
                 prodId: i.prod_id, codigo: i.codigo, nombre: i.nombre,
                 marcaId: i.marca_id, marcaNombre: i.marca_nombre,
-                cantidad: i.cantidad, precioUnit: i.precio_unit, subtotal: i.subtotal
+                cantidad: i.cantidad, precioUnit: i.precio_unit, subtotal: i.subtotal,
+                descPct: i.desc_pct != null ? Number(i.desc_pct) : undefined
               }))
             };
             if (mounted) setVentas(prev =>

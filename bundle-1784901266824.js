@@ -53621,9 +53621,13 @@
         marca_nombre: it.marcaNombre,
         cantidad: it.cantidad,
         precio_unit: it.precioUnit,
-        subtotal: it.subtotal
+        subtotal: it.subtotal,
+        desc_pct: it.descPct != null ? it.descPct : null
       }));
-      const { error: errItems } = await db.from("venta_items").insert(items);
+      let { error: errItems } = await db.from("venta_items").insert(items);
+      if (errItems && /desc_pct/.test(errItems.message || "")) {
+        ({ error: errItems } = await db.from("venta_items").insert(items.map(({ desc_pct, ...r }) => r)));
+      }
       if (errItems) throw errItems;
       return true;
     } catch (e) {
@@ -54068,7 +54072,8 @@
           marcaNombre: i.marca_nombre,
           cantidad: i.cantidad,
           precioUnit: i.precio_unit,
-          subtotal: i.subtotal
+          subtotal: i.subtotal,
+          descPct: i.desc_pct != null ? Number(i.desc_pct) : void 0
         }))
       }));
       const invCompleto = (inv || []).map((p) => ({
@@ -54616,7 +54621,8 @@
                 marcaNombre: i.marca_nombre,
                 cantidad: i.cantidad,
                 precioUnit: i.precio_unit,
-                subtotal: i.subtotal
+                subtotal: i.subtotal,
+                descPct: i.desc_pct != null ? Number(i.desc_pct) : void 0
               }))
             };
             if (mounted) setVentas(
