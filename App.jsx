@@ -9707,7 +9707,133 @@ function ImportarVentasLibresModal({open, onImportar, onClose}){
   );
 }
 
-function HomeDashboard({ventas, inv, vMes, mes, anio, onGoTab}){
+// ── Burbuja "Descuentos activos" para Inicio (admin y staff) ──────────
+// Estilo Toscana oscuro (editorial) + semáforo por urgencia. Lee lo que ya
+// existe: descuentos de marca (config_descuentos) y por código.
+function BurbujaDescuentos({descuentos, descCodigos, isDesktop}){
+  const H = hoy();
+  const fechaCorta = s => {
+    const p = String(s||"").split("-"); if(p.length!==3) return s;
+    return `${+p[2]} ${(MESES[(+p[1])-1]||"").slice(0,3).toLowerCase()}`;
+  };
+  const marcasConDesc = MARCAS
+    .map(m=>({m, pct:descMarcaVigente(descuentos, m.id), hasta:descuentos?.[m.id]?.hasta||""}))
+    .filter(x=>x.pct>0)
+    .sort((a,b)=> ((b.hasta===H)-(a.hasta===H)) || (b.pct-a.pct));
+  const porCod = {};
+  Object.values(descCodigos||{})
+    .filter(d=> d && d.activo && (!d.hasta || H<=d.hasta) && (Number(d.pct)||0)>0)
+    .forEach(d=>{
+      const k = d.marcaId||d.marcaNombre;
+      if(!porCod[k]) porCod[k]={marcaId:d.marcaId, marca:d.marcaNombre||"", n:0, min:Infinity, max:0};
+      const p=Number(d.pct)||0; porCod[k].n++; porCod[k].min=Math.min(porCod[k].min,p); porCod[k].max=Math.max(porCod[k].max,p);
+    });
+  const codCards = Object.values(porCod);
+  const idsBrand = new Set(marcasConDesc.map(x=>x.m.id));
+  const totalMarcas = new Set([...idsBrand, ...codCards.map(c=>c.marcaId)]).size;
+  const vencenHoy = marcasConDesc.filter(x=>x.hasta===H).length;
+
+  const wrap = {position:"relative", borderRadius:24, overflow:"hidden", marginBottom:isDesktop?10:14,
+    background:"linear-gradient(135deg,#2A251F 0%,#1A1714 55%,#332C24 100%)", color:FOS.bone,
+    boxShadow:"0 24px 50px -22px rgba(26,23,20,.5), inset 0 1px 0 rgba(255,255,255,.06)"};
+  const mono = (extra={}) => ({fontFamily:FONT_MONO, fontSize:9.5, letterSpacing:"0.15em",
+    textTransform:"uppercase", fontWeight:500, ...extra});
+
+  if(totalMarcas===0){
+    return (
+      <div style={{...wrap, padding:"15px 20px", display:"flex", alignItems:"center", justifyContent:"space-between"}}>
+        <div>
+          <div style={mono({color:FOS.lavL})}>Descuentos habilitados</div>
+          <div style={{fontFamily:FONT_DISPLAY, fontSize:19, marginTop:3}}>Ninguno activo hoy</div>
+        </div>
+        <div style={{width:8,height:8,borderRadius:"50%",background:"#6B6558"}}/>
+      </div>
+    );
+  }
+
+  const estado = hasta => !hasta ? {t:"permanente", c:"#CFBA82", urge:false}
+    : hasta===H ? {t:"● vence hoy", c:"#E9B872", urge:true}
+    : {t:"hasta "+fechaCorta(hasta), c:"#9FE3B6", urge:false};
+
+  const Avatar = ({m}) => (
+    <div style={{width:32,height:32,borderRadius:10,background:m.color||"#CFBA82",
+      display:"flex",alignItems:"center",justifyContent:"center",
+      fontFamily:FONT_DISPLAY,fontWeight:600,fontSize:15,color:"#1A1714",marginBottom:11}}>
+      {(m.nombre||"?").trim()[0].toUpperCase()}
+    </div>
+  );
+  const cardBase = urge => ({flex:"0 0 auto", width:126, padding:13, borderRadius:16,
+    background:"rgba(255,255,255,.06)", border:`1px solid ${urge?"rgba(216,151,59,.55)":"rgba(255,255,255,.10)"}`,
+    boxShadow: urge?"0 0 0 1px rgba(216,151,59,.28)":"none"});
+
+  return (
+    <div style={wrap}>
+      <style>{`@keyframes descPulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.45;transform:scale(1.35)}}
+        .desc-rail{scrollbar-width:none}.desc-rail::-webkit-scrollbar{display:none}`}</style>
+      <div style={{position:"absolute",top:"-40%",right:"-8%",width:300,height:300,pointerEvents:"none",
+        background:"radial-gradient(circle,rgba(207,186,130,.15),transparent 62%)"}}/>
+      <div style={{position:"relative",padding:isDesktop?"18px 20px 16px":"20px 18px 16px"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:14}}>
+          <div style={mono({color:FOS.lavL})}>Descuentos habilitados · hoy</div>
+          <div style={{display:"flex",alignItems:"center",gap:6}}>
+            <div style={{width:6,height:6,borderRadius:"50%",background:FOS.live,
+              boxShadow:`0 0 0 3px ${FOS.live}40`,animation:"descPulse 2s infinite"}}/>
+            <span style={mono({color:FOS.live})}>En vivo</span>
+          </div>
+        </div>
+
+        <div style={{display:"flex",alignItems:"baseline",gap:11,marginBottom:2}}>
+          <span style={{fontWeight:800,letterSpacing:"-.03em",fontVariantNumeric:"tabular-nums",
+            fontSize:isDesktop?40:44,lineHeight:.9,color:FOS.bone}}>{totalMarcas}</span>
+          <span style={{fontFamily:FONT_DISPLAY,fontSize:isDesktop?22:24,fontWeight:600}}>
+            marca{totalMarcas!==1?"s":""} con descuento
+          </span>
+        </div>
+        <div style={{fontSize:12,color:"#C9C2B4",marginBottom:16}}>
+          {vencenHoy>0 ? `${vencenHoy} vence${vencenHoy!==1?"n":""} hoy · ` : ""}se enciende solo en la caja
+        </div>
+
+        <div className="desc-rail" style={{display:"flex",gap:10,overflowX:"auto",paddingBottom:2}}>
+          {marcasConDesc.map(({m,pct,hasta})=>{
+            const e = estado(hasta);
+            return (
+              <div key={"m"+m.id} style={cardBase(e.urge)}>
+                <Avatar m={m}/>
+                <div style={{fontSize:12.5,fontWeight:600,color:FOS.bone,whiteSpace:"nowrap",
+                  overflow:"hidden",textOverflow:"ellipsis",marginBottom:7}}>{m.nombre}</div>
+                <div style={{fontWeight:800,letterSpacing:"-.03em",fontVariantNumeric:"tabular-nums",
+                  fontSize:32,lineHeight:.85,color:FOS.lavL}}>{pct}<span style={{fontSize:14,fontWeight:700}}>%</span></div>
+                <div style={mono({color:e.c,fontSize:8.5,letterSpacing:"0.05em",marginTop:8})}>{e.t}</div>
+              </div>
+            );
+          })}
+          {codCards.map((c,i)=>{
+            const m = MARCAS.find(x=>x.id===c.marcaId) || {nombre:c.marca, color:"#C4C4C4"};
+            const rango = c.min===c.max ? `${c.max}%` : `${c.min}–${c.max}%`;
+            return (
+              <div key={"c"+i} style={cardBase(false)}>
+                <Avatar m={m}/>
+                <div style={{fontSize:12.5,fontWeight:600,color:FOS.bone,whiteSpace:"nowrap",
+                  overflow:"hidden",textOverflow:"ellipsis",marginBottom:7}}>{m.nombre}</div>
+                <div style={{fontWeight:800,letterSpacing:"-.02em",fontSize:19,lineHeight:1,color:FOS.lavL,paddingTop:6}}>{rango}</div>
+                <div style={mono({color:"#C9C2B4",fontSize:8.5,letterSpacing:"0.05em",marginTop:8})}>
+                  {c.n} prenda{c.n!==1?"s":""}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:15}}>
+          <span style={mono({color:"#8E877A"})}>Descuento de marca y por prenda</span>
+          <span style={mono({color:FOS.lavL})}>Powered by FORGE.</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function HomeDashboard({ventas, inv, vMes, mes, anio, onGoTab, descuentos, descCodigos}){
   const isDesktop = useIsDesktop();
 
   const hoyStr = hoy();
@@ -9892,6 +10018,9 @@ function HomeDashboard({ventas, inv, vMes, mes, anio, onGoTab}){
           <div style={{fontSize:10, color:C.label3, fontFamily:FONT_UI}}>{diasEnMes} {MESES[mes].slice(0,3)}</div>
         </div>
       </div>
+
+      {/* ── Descuentos activos (marca + por código) — admin y staff ── */}
+      <BurbujaDescuentos descuentos={descuentos} descCodigos={descCodigos} isDesktop={isDesktop}/>
 
       {/* ── Actividad showroom ── */}
       {(() => {
@@ -15444,6 +15573,7 @@ function App(){
             ventas={ventas} inv={inv} vMes={vMes}
             mes={mes} anio={anio}
             onGoTab={setTab}
+            descuentos={descuentos} descCodigos={descCodigos}
           />
         )}
 
