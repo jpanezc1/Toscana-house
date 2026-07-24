@@ -209,6 +209,10 @@ async function sbEliminarCarga(cargaId) {
 }
 
 async function sbGuardarVenta(venta) {
+  // Guardián: ventas de prueba (id TEST*) jamás suben a la nube. Un equipo con
+  // la cola de reintentos vieja del período codex las re-insertaba en cada
+  // arranque; devolver true las marca como "hechas" y las saca de la cola.
+  if (/^TEST/i.test(String(venta?.id || ""))) return true;
   try {
     const db = await getSupabase();
     const { error: errVenta } = await db.from("ventas").upsert({

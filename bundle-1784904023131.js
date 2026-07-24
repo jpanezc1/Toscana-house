@@ -53593,6 +53593,7 @@
     }
   }
   async function sbGuardarVenta(venta) {
+    if (/^TEST/i.test(String(venta?.id || ""))) return true;
     try {
       const db = await getSupabase();
       const { error: errVenta } = await db.from("ventas").upsert({
