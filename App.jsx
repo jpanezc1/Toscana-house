@@ -14298,6 +14298,16 @@ function App(){
   const[marcasState,setMarcasState]       =useState(()=>cargarMarcas());
   const drive = useDriveSync();
 
+  // ── Permiso: staff puede cambiar precios (lo prende/apaga el admin) ──
+  // Guardado en la nube (kv_sync) → aplica en todas las computadoras al toque.
+  const[permPrecioStaff,setPermPrecioStaff]=useState(()=>!!KV_CACHE["perm_precio_staff"]);
+  useEffect(()=>{
+    const h = e => { if(e.detail?.key==="perm_precio_staff") setPermPrecioStaff(!!e.detail.data); };
+    window.addEventListener("th-kv", h);
+    return ()=>window.removeEventListener("th-kv", h);
+  },[]);
+  function togglePermPrecio(v){ sbKVGuardar("perm_precio_staff", !!v); setPermPrecioStaff(!!v); }
+
   // Guarda marca nueva o editada → actualiza React state + global + localStorage + Supabase
   function onMarcaGuardada(marca, isNew, nuevoUsuario){
     const prev = marcasState;
@@ -14974,6 +14984,18 @@ function App(){
         motivo:_motivo||"", usuario:user?.nombre,
       }, user);
     }
+    // Auditoría: cambio de precio (sube o baja) — queda con quién y por qué
+    if(prev && typeof rest.precio==="number" && rest.precio !== (Number(prev.precio)||0)){
+      const antes = Number(prev.precio)||0, desp = rest.precio;
+      const dir = desp>antes ? "subió" : "bajó";
+      const pct = antes>0 ? Math.round((desp-antes)/antes*1000)/10 : 0;
+      logAudit("PRECIO", {
+        resumen:`Cambio de precio: ${prev.nombre} (${prev.codigo}) Bs ${antes} → Bs ${desp} (${dir}${pct?` ${pct>0?"+":""}${pct}%`:""})${_motivo?` · ${_motivo}`:""}`,
+        codigo:prev.codigo, nombre:prev.nombre, marca:prev.marcaNombre||"—",
+        precioAntes:antes, precioDespues:desp, delta:+(desp-antes).toFixed(2), pct,
+        motivo:_motivo||"",
+      }, user);
+    }
   }
 
   async function handleEliminarProducto(prodId){
@@ -15578,7 +15600,7 @@ function App(){
         )}
 
         {/* POS */}
-        {tab==="pos" && <POSContainer inv={inv} onVenta={handleVenta} retiros={retiros} onRetiro={registrarRetiro} onVerNota={v=>setVentaDetalle(v)} user={user} descuentos={descuentos} descCodigos={descCodigos}/>}
+        {tab==="pos" && <POSContainer inv={inv} onVenta={handleVenta} retiros={retiros} onRetiro={registrarRetiro} onVerNota={v=>setVentaDetalle(v)} user={user} descuentos={descuentos} descCodigos={descCodigos} onCambioPrecio={handleEditarProducto} permPrecio={permPrecioStaff}/>}
 
         {/* INVENTARIO — por marca */}
         {tab==="inventario" && (
@@ -16046,7 +16068,7 @@ function App(){
 
         {/* CONFIG */}
         {tab==="config" && (
-          <ConfigTab user={user} logout={logout} onRecargarDesdeSupabase={recargarDesdeSupabase} onSyncCompleto={forzarSyncInventario}/>
+          <ConfigTab user={user} logout={logout} onRecargarDesdeSupabase={recargarDesdeSupabase} onSyncCompleto={forzarSyncInventario} permPrecioStaff={permPrecioStaff} onTogglePermPrecio={togglePermPrecio}/>
         )}
       </div>
 
@@ -16295,9 +16317,171 @@ function App(){
 // ══════════════════════════════════════════════════════════
 // POSContainer — Caja con sub-tabs Venta | Retiros
 // ══════════════════════════════════════════════════════════
-function POSContainer({inv,onVenta,retiros,onRetiro,onVerNota,user,descuentos,descCodigos}){
+// ── Cambio de precio (staff y admin) — sube o baja, con motivo y auditoría ──
+function CambioPrecioTab({inv, onGuardar, user}){
+  const [cod, setCod]           = useState("");
+  const [prod, setProd]         = useState(null);
+  const [busq, setBusq]         = useState([]);
+  const [nuevo, setNuevo]       = useState("");
+  const [motivo, setMotivo]     = useState("");
+  const [guardando, setGuard]   = useState(false);
+  const [okMsg, setOkMsg]       = useState(null);
+  const [confirmGrande, setCG]  = useState(false);
+  const inputRef = useRef();
+
+  function elegir(p){ setProd(p); setBusq([]); setCod(p.codigo||""); setNuevo(""); setMotivo(""); setCG(false); setOkMsg(null); }
+  function buscar(q){
+    const s=(q||"").trim().toUpperCase(); if(!s) return;
+    const m = inv.filter(p=>(p.codigo||"").toUpperCase()===s || (p.nombre||"").toUpperCase().includes(s));
+    if(m.length===1) elegir(m[0]);
+    else if(m.length>1){ setBusq(m.slice(0,8)); setProd(null); }
+    else { setBusq([{_no:true, codigo:s}]); setProd(null); }
+  }
+
+  const precioActual = Number(prod?.precio)||0;
+  const nuevoNum = parseFloat(nuevo)||0;
+  const delta = +(nuevoNum-precioActual).toFixed(2);
+  const pct   = precioActual>0 ? Math.round(delta/precioActual*1000)/10 : 0;
+  const sube  = delta>0;
+  const grande= Math.abs(pct)>=30;
+  const valido= prod && nuevoNum>0 && nuevoNum!==precioActual && motivo.trim().length>=3;
+  const col   = sube ? C.green : C.gold;
+
+  async function guardar(){
+    if(!valido || guardando) return;
+    if(grande && !confirmGrande){ setCG(true); return; }
+    setGuard(true);
+    await onGuardar(prod.id, {precio:+nuevoNum.toFixed(2), _motivo:motivo.trim()});
+    setGuard(false);
+    setOkMsg(`${prod.codigo}: Bs ${precioActual} → Bs ${nuevoNum} · guardado y registrado`);
+    setProd(null); setCod(""); setNuevo(""); setMotivo(""); setCG(false);
+    setTimeout(()=>inputRef.current?.focus(),60);
+  }
+
+  const lbl = {fontSize:11,fontWeight:700,color:C.label3,textTransform:"uppercase",letterSpacing:.7,marginBottom:6,fontFamily:FONT};
+  const field = {width:"100%",padding:"12px 14px",borderRadius:12,border:`1.5px solid ${C.sep}`,
+    background:C.bg0,fontSize:15,color:C.label,fontFamily:FONT,outline:"none",boxSizing:"border-box"};
+
+  return (
+    <div style={{maxWidth:520,margin:"0 auto"}}>
+      <div style={{background:C.bg1,border:`1px solid ${C.sep}`,borderRadius:16,padding:"18px 18px",
+        boxShadow:"0 1px 3px rgba(0,0,0,0.04)"}}>
+        <div style={{display:"flex",alignItems:"center",gap:9,marginBottom:16}}>
+          <span style={{fontSize:15,fontWeight:700,color:C.label,fontFamily:FONT}}>Cambiar precio</span>
+          <span style={{marginLeft:"auto",fontSize:9,fontFamily:FONT_MONO,letterSpacing:.6,
+            background:`${C.gold}14`,color:C.gold,padding:"3px 9px",borderRadius:99,textTransform:"uppercase"}}>
+            queda registrado
+          </span>
+        </div>
+
+        {okMsg&&(
+          <div style={{background:`${C.green}12`,border:`1px solid ${C.green}40`,borderRadius:12,
+            padding:"10px 13px",marginBottom:14,fontSize:12.5,color:C.green,fontWeight:600,fontFamily:FONT}}>
+            ✓ {okMsg}
+          </div>
+        )}
+
+        <div style={lbl}>Escaneá o escribí el código</div>
+        <input ref={inputRef} value={cod} placeholder="Código de la prenda…"
+          onChange={e=>{ setCod(e.target.value); setProd(null); setBusq([]); }}
+          onKeyDown={e=>{ if(e.key==="Enter") buscar(cod); }}
+          style={{...field,fontFamily:FONT_MONO,letterSpacing:".04em"}}/>
+
+        {busq.length>0&&(
+          <div style={{marginTop:8,border:`1px solid ${C.sep}`,borderRadius:12,overflow:"hidden"}}>
+            {busq[0]?._no ? (
+              <div style={{padding:"12px 14px",fontSize:13,color:C.red,fontFamily:FONT}}>No se encontró "{busq[0].codigo}"</div>
+            ) : busq.map((p,i)=>(
+              <div key={p.id} onClick={()=>elegir(p)}
+                style={{padding:"10px 14px",cursor:"pointer",borderBottom:i<busq.length-1?`1px solid ${C.sep}`:"none",
+                  display:"flex",justifyContent:"space-between",alignItems:"center"}}
+                onMouseEnter={e=>e.currentTarget.style.background=C.bg2}
+                onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+                <div style={{minWidth:0}}>
+                  <div style={{fontSize:13,fontWeight:600,color:C.label,fontFamily:FONT,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{p.nombre}</div>
+                  <div style={{fontSize:11,color:C.label3,fontFamily:FONT_MONO}}>{p.codigo} · {p.marcaNombre}</div>
+                </div>
+                <span style={{fontSize:13,fontWeight:700,color:C.label,fontFamily:FONT}}>Bs {p.precio}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {prod&&(
+          <>
+            <div style={{background:C.bg2,borderRadius:14,padding:"13px 15px",margin:"14px 0",
+              display:"flex",alignItems:"center",gap:12}}>
+              <div style={{width:40,height:40,borderRadius:12,flexShrink:0,
+                background:`${(MARCAS.find(m=>m.id===prod.marcaId)?.color)||C.gold}22`,
+                display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,
+                fontFamily:FONT_DISPLAY,fontWeight:600,color:C.label}}>
+                {(prod.marcaNombre||"?").trim()[0]?.toUpperCase()}
+              </div>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:14,fontWeight:600,color:C.label,fontFamily:FONT,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{prod.nombre}</div>
+                <div style={{fontSize:12,color:C.label3,fontFamily:FONT}}>{prod.marcaNombre} · {prod.codigo}</div>
+              </div>
+              <div style={{textAlign:"right"}}>
+                <div style={{fontSize:8.5,fontFamily:FONT_MONO,color:C.label3,textTransform:"uppercase"}}>Precio actual</div>
+                <div style={{fontSize:18,fontWeight:800,color:C.label,fontFamily:FONT}}>Bs {precioActual}</div>
+              </div>
+            </div>
+
+            <div style={lbl}>Precio nuevo</div>
+            <input type="number" min="0" step="1" inputMode="decimal" value={nuevo} placeholder="0"
+              onChange={e=>{ setNuevo(e.target.value); setCG(false); }}
+              style={{...field,fontSize:20,fontWeight:800,borderColor:nuevoNum>0?col:C.sep,
+                background:nuevoNum>0?`${col}0d`:C.bg0,color:nuevoNum>0?col:C.label}}/>
+
+            <div style={{...lbl,marginTop:14}}>Motivo <span style={{color:C.red}}>obligatorio</span></div>
+            <input value={motivo} placeholder="Ej: Gattara pidió subir el precio"
+              onChange={e=>setMotivo(e.target.value)}
+              style={{...field,borderColor:motivo.trim().length>=3?C.gold:C.sep,
+                background:motivo.trim().length>=3?`${C.gold}0d`:C.bg0}}/>
+
+            {nuevoNum>0&&nuevoNum!==precioActual&&(
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",
+                background:`${col}12`,borderRadius:12,padding:"10px 13px",marginTop:14}}>
+                <span style={{fontSize:12.5,color:C.label2,fontFamily:FONT}}>
+                  <span style={{textDecoration:"line-through",color:C.label3}}>Bs {precioActual}</span> → <b style={{color:col}}>Bs {nuevoNum}</b>
+                </span>
+                <span style={{fontSize:9,fontFamily:FONT_MONO,color:col,letterSpacing:.4}}>
+                  {sube?"+":""}Bs {delta} · {pct>0?"+":""}{pct}%
+                </span>
+              </div>
+            )}
+
+            {grande&&confirmGrande&&(
+              <div style={{background:`${C.red}10`,border:`1px solid ${C.red}40`,borderRadius:12,
+                padding:"10px 13px",marginTop:10,fontSize:12,color:C.red,fontFamily:FONT,lineHeight:1.5}}>
+                Es un cambio grande ({pct>0?"+":""}{pct}%). Tocá de nuevo "Guardar" para confirmar.
+              </div>
+            )}
+
+            <button onClick={guardar} disabled={!valido||guardando}
+              style={{width:"100%",padding:"13px",borderRadius:13,border:"none",marginTop:14,
+                background: valido&&!guardando ? C.label : C.sep,
+                color:"#fff",fontSize:14,fontWeight:600,fontFamily:FONT,
+                cursor: valido&&!guardando?"pointer":"not-allowed",opacity:valido&&!guardando?1:.6}}>
+              {guardando ? "Guardando…" : grande&&confirmGrande ? "Confirmar cambio grande" : "Guardar cambio de precio"}
+            </button>
+            <div style={{fontSize:11,color:C.label3,fontFamily:FONT,marginTop:10,textAlign:"center"}}>
+              Se guarda con tu nombre en el reporte y no se puede borrar.
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function POSContainer({inv,onVenta,retiros,onRetiro,onVerNota,user,descuentos,descCodigos,onCambioPrecio,permPrecio}){
   const [subTab, setSubTab] = useState("venta");
-  const tabs=[{id:"venta",label:"💳 Venta"},{id:"retiros",label:"📤 Retiros"}];
+  // El cambio de precio lo ve el admin siempre; el staff solo si el admin lo habilitó.
+  const puedePrecio = user?.rol==="admin" || !!permPrecio;
+  const tabs=[{id:"venta",label:"💳 Venta"},{id:"retiros",label:"📤 Retiros"},
+    ...(puedePrecio?[{id:"precio",label:"Cambiar precio"}]:[])];
+  const activa = subTab==="precio" && !puedePrecio ? "venta" : subTab;
   return (
     <div>
       {/* Sub-tab bar */}
@@ -16316,9 +16500,11 @@ function POSContainer({inv,onVenta,retiros,onRetiro,onVerNota,user,descuentos,de
           </button>
         ))}
       </div>
-      {subTab==="venta"
+      {activa==="venta"
         ? <POS inv={inv} onVenta={onVenta} onVerNota={onVerNota} user={user} descuentos={descuentos} descCodigos={descCodigos}/>
-        : <RetirosTab inv={inv} retiros={retiros} onRetiro={onRetiro}/>
+        : activa==="retiros"
+        ? <RetirosTab inv={inv} retiros={retiros} onRetiro={onRetiro}/>
+        : <CambioPrecioTab inv={inv} onGuardar={onCambioPrecio} user={user}/>
       }
     </div>
   );
@@ -22106,6 +22292,8 @@ const AUDIT_TIPOS = {
   CIERRE:     { label:"Cierre",       icono:"📊",  color:"#8A6418" },
   DESCUENTO_MARCA: { label:"Descuento marca", icono:"🏷️", color:"#2E7D32" },
   DESCUENTO_CODIGO:{ label:"Descuento producto", icono:"🏷️", color:"#2E7D32" },
+  PRECIO:     { label:"Cambio de precio", icono:"⇅", color:"#8A6418" },
+  STOCK_AJUSTE:{ label:"Corrección stock", icono:"⇅", color:"#C94C4C" },
 };
 
 // ── Registro de carga (trazabilidad de inventario) ────────────────────────
@@ -23439,7 +23627,7 @@ function SistemaTab({user, logout, onRecargarDesdeSupabase, onSyncCompleto}){
 }
 
 // ── Panel configuración principal ─────────────────────────────────────────────
-function ConfigTab({user, logout, onRecargarDesdeSupabase, onSyncCompleto}){
+function ConfigTab({user, logout, onRecargarDesdeSupabase, onSyncCompleto, permPrecioStaff, onTogglePermPrecio}){
   const [subTab, setSubTab] = useState("perfil");
   const [usuarios, setUsuarios] = useState(()=>{
     try{return JSON.parse(localStorage.getItem("th_usuarios")||"null")||USUARIOS;}
@@ -23766,6 +23954,26 @@ create policy "allow all usuarios" on usuarios
                   textTransform:"uppercase",letterSpacing:.3}}>{s.l}</div>
               </div>
             ))}
+          </div>
+
+          {/* Permiso: cambio de precio por staff (lo prende el admin, sincronizado) */}
+          <div style={{background:C.bg1,border:`1px solid ${permPrecioStaff?C.gold+"55":C.sep}`,borderRadius:14,
+            padding:"14px 16px",marginBottom:16,display:"flex",alignItems:"center",gap:14}}>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontSize:14,fontWeight:700,color:C.label,fontFamily:FONT}}>Cambio de precio por el staff</div>
+              <div style={{fontSize:12,color:C.label3,fontFamily:FONT,marginTop:3,lineHeight:1.5}}>
+                {permPrecioStaff
+                  ? "Habilitado. Las vendedoras pueden subir o bajar precios desde la Caja. Todo queda en el reporte de Auditoría con su nombre."
+                  : "Apagado. Solo vos (admin) podés cambiar precios. Prendelo para que el staff también pueda; se aplica en todas las computadoras."}
+              </div>
+            </div>
+            <button onClick={()=>onTogglePermPrecio(!permPrecioStaff)}
+              aria-label="Permitir cambio de precio al staff"
+              style={{flexShrink:0,width:52,height:30,borderRadius:99,border:"none",cursor:"pointer",
+                background:permPrecioStaff?C.green:C.sep,position:"relative",transition:"background .2s"}}>
+              <span style={{position:"absolute",top:3,left:permPrecioStaff?25:3,width:24,height:24,borderRadius:"50%",
+                background:"#fff",boxShadow:"0 1px 3px rgba(0,0,0,.25)",transition:"left .2s"}}/>
+            </button>
           </div>
 
           {/* Botón agregar */}

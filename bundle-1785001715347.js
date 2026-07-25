@@ -68655,6 +68655,18 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
     const [editMarca, setEditMarca] = (0, import_react.useState)(null);
     const [marcasState, setMarcasState] = (0, import_react.useState)(() => cargarMarcas());
     const drive = useDriveSync();
+    const [permPrecioStaff, setPermPrecioStaff] = (0, import_react.useState)(() => !!KV_CACHE["perm_precio_staff"]);
+    (0, import_react.useEffect)(() => {
+      const h = (e) => {
+        if (e.detail?.key === "perm_precio_staff") setPermPrecioStaff(!!e.detail.data);
+      };
+      window.addEventListener("th-kv", h);
+      return () => window.removeEventListener("th-kv", h);
+    }, []);
+    function togglePermPrecio(v) {
+      sbKVGuardar("perm_precio_staff", !!v);
+      setPermPrecioStaff(!!v);
+    }
     function onMarcaGuardada(marca, isNew, nuevoUsuario) {
       const prev = marcasState;
       const lista = isNew ? [...prev, marca] : prev.map((m) => m.id === marca.id ? { ...m, ...marca } : m);
@@ -69447,6 +69459,22 @@ Motivo: ${motivo}` : ""}`)) {
           usuario: user?.nombre
         }, user);
       }
+      if (prev && typeof rest.precio === "number" && rest.precio !== (Number(prev.precio) || 0)) {
+        const antes = Number(prev.precio) || 0, desp = rest.precio;
+        const dir = desp > antes ? "subi\xF3" : "baj\xF3";
+        const pct = antes > 0 ? Math.round((desp - antes) / antes * 1e3) / 10 : 0;
+        logAudit("PRECIO", {
+          resumen: `Cambio de precio: ${prev.nombre} (${prev.codigo}) Bs ${antes} \u2192 Bs ${desp} (${dir}${pct ? ` ${pct > 0 ? "+" : ""}${pct}%` : ""})${_motivo ? ` \xB7 ${_motivo}` : ""}`,
+          codigo: prev.codigo,
+          nombre: prev.nombre,
+          marca: prev.marcaNombre || "\u2014",
+          precioAntes: antes,
+          precioDespues: desp,
+          delta: +(desp - antes).toFixed(2),
+          pct,
+          motivo: _motivo || ""
+        }, user);
+      }
     }
     async function handleEliminarProducto(prodId) {
       const prod = inv.find((p) => p.id === prodId);
@@ -70043,7 +70071,7 @@ Esta acci\xF3n no se puede deshacer.` : "\xBFEliminar esta carga? Esta acci\xF3n
         descuentos,
         descCodigos
       }
-    ), tab === "pos" && /* @__PURE__ */ import_react.default.createElement(POSContainer, { inv, onVenta: handleVenta, retiros, onRetiro: registrarRetiro, onVerNota: (v) => setVentaDetalle(v), user, descuentos, descCodigos }), tab === "inventario" && /* @__PURE__ */ import_react.default.createElement(InventarioPorMarca, { inv, ventas, retiros, bajas: bajasLog, onRecibir: () => setShInv(true), onBaja: () => {
+    ), tab === "pos" && /* @__PURE__ */ import_react.default.createElement(POSContainer, { inv, onVenta: handleVenta, retiros, onRetiro: registrarRetiro, onVerNota: (v) => setVentaDetalle(v), user, descuentos, descCodigos, onCambioPrecio: handleEditarProducto, permPrecio: permPrecioStaff }), tab === "inventario" && /* @__PURE__ */ import_react.default.createElement(InventarioPorMarca, { inv, ventas, retiros, bajas: bajasLog, onRecibir: () => setShInv(true), onBaja: () => {
       setShBaja(true);
       setBajaMsg(null);
       setBajaCod("");
@@ -70521,7 +70549,7 @@ Esta acci\xF3n no se puede deshacer.` : "\xBFEliminar esta carga? Esta acci\xF3n
         cierres,
         onVentaClick: (v) => setVentaDetalle(v)
       }
-    ), tab === "config" && /* @__PURE__ */ import_react.default.createElement(ConfigTab, { user, logout, onRecargarDesdeSupabase: recargarDesdeSupabase, onSyncCompleto: forzarSyncInventario }))), !isDesktop && /* @__PURE__ */ import_react.default.createElement(TabBar, { tabs: TABS, active: tab, onChange: (t) => {
+    ), tab === "config" && /* @__PURE__ */ import_react.default.createElement(ConfigTab, { user, logout, onRecargarDesdeSupabase: recargarDesdeSupabase, onSyncCompleto: forzarSyncInventario, permPrecioStaff, onTogglePermPrecio: togglePermPrecio }))), !isDesktop && /* @__PURE__ */ import_react.default.createElement(TabBar, { tabs: TABS, active: tab, onChange: (t) => {
       setTab(t);
       setMD(null);
     } }), /* @__PURE__ */ import_react.default.createElement(
@@ -70809,9 +70837,241 @@ Esta acci\xF3n no se puede deshacer.` : "\xBFEliminar esta carga? Esta acci\xF3n
       }
     ));
   }
-  function POSContainer({ inv, onVenta, retiros, onRetiro, onVerNota, user, descuentos, descCodigos }) {
+  function CambioPrecioTab({ inv, onGuardar, user }) {
+    const [cod, setCod] = (0, import_react.useState)("");
+    const [prod, setProd] = (0, import_react.useState)(null);
+    const [busq, setBusq] = (0, import_react.useState)([]);
+    const [nuevo, setNuevo] = (0, import_react.useState)("");
+    const [motivo, setMotivo] = (0, import_react.useState)("");
+    const [guardando, setGuard] = (0, import_react.useState)(false);
+    const [okMsg, setOkMsg] = (0, import_react.useState)(null);
+    const [confirmGrande, setCG] = (0, import_react.useState)(false);
+    const inputRef = (0, import_react.useRef)();
+    function elegir(p) {
+      setProd(p);
+      setBusq([]);
+      setCod(p.codigo || "");
+      setNuevo("");
+      setMotivo("");
+      setCG(false);
+      setOkMsg(null);
+    }
+    function buscar(q) {
+      const s = (q || "").trim().toUpperCase();
+      if (!s) return;
+      const m = inv.filter((p) => (p.codigo || "").toUpperCase() === s || (p.nombre || "").toUpperCase().includes(s));
+      if (m.length === 1) elegir(m[0]);
+      else if (m.length > 1) {
+        setBusq(m.slice(0, 8));
+        setProd(null);
+      } else {
+        setBusq([{ _no: true, codigo: s }]);
+        setProd(null);
+      }
+    }
+    const precioActual = Number(prod?.precio) || 0;
+    const nuevoNum = parseFloat(nuevo) || 0;
+    const delta = +(nuevoNum - precioActual).toFixed(2);
+    const pct = precioActual > 0 ? Math.round(delta / precioActual * 1e3) / 10 : 0;
+    const sube = delta > 0;
+    const grande = Math.abs(pct) >= 30;
+    const valido = prod && nuevoNum > 0 && nuevoNum !== precioActual && motivo.trim().length >= 3;
+    const col = sube ? C.green : C.gold;
+    async function guardar() {
+      if (!valido || guardando) return;
+      if (grande && !confirmGrande) {
+        setCG(true);
+        return;
+      }
+      setGuard(true);
+      await onGuardar(prod.id, { precio: +nuevoNum.toFixed(2), _motivo: motivo.trim() });
+      setGuard(false);
+      setOkMsg(`${prod.codigo}: Bs ${precioActual} \u2192 Bs ${nuevoNum} \xB7 guardado y registrado`);
+      setProd(null);
+      setCod("");
+      setNuevo("");
+      setMotivo("");
+      setCG(false);
+      setTimeout(() => inputRef.current?.focus(), 60);
+    }
+    const lbl = { fontSize: 11, fontWeight: 700, color: C.label3, textTransform: "uppercase", letterSpacing: 0.7, marginBottom: 6, fontFamily: FONT };
+    const field = {
+      width: "100%",
+      padding: "12px 14px",
+      borderRadius: 12,
+      border: `1.5px solid ${C.sep}`,
+      background: C.bg0,
+      fontSize: 15,
+      color: C.label,
+      fontFamily: FONT,
+      outline: "none",
+      boxSizing: "border-box"
+    };
+    return /* @__PURE__ */ import_react.default.createElement("div", { style: { maxWidth: 520, margin: "0 auto" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      background: C.bg1,
+      border: `1px solid ${C.sep}`,
+      borderRadius: 16,
+      padding: "18px 18px",
+      boxShadow: "0 1px 3px rgba(0,0,0,0.04)"
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 9, marginBottom: 16 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 15, fontWeight: 700, color: C.label, fontFamily: FONT } }, "Cambiar precio"), /* @__PURE__ */ import_react.default.createElement("span", { style: {
+      marginLeft: "auto",
+      fontSize: 9,
+      fontFamily: FONT_MONO,
+      letterSpacing: 0.6,
+      background: `${C.gold}14`,
+      color: C.gold,
+      padding: "3px 9px",
+      borderRadius: 99,
+      textTransform: "uppercase"
+    } }, "queda registrado")), okMsg && /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      background: `${C.green}12`,
+      border: `1px solid ${C.green}40`,
+      borderRadius: 12,
+      padding: "10px 13px",
+      marginBottom: 14,
+      fontSize: 12.5,
+      color: C.green,
+      fontWeight: 600,
+      fontFamily: FONT
+    } }, "\u2713 ", okMsg), /* @__PURE__ */ import_react.default.createElement("div", { style: lbl }, "Escane\xE1 o escrib\xED el c\xF3digo"), /* @__PURE__ */ import_react.default.createElement(
+      "input",
+      {
+        ref: inputRef,
+        value: cod,
+        placeholder: "C\xF3digo de la prenda\u2026",
+        onChange: (e) => {
+          setCod(e.target.value);
+          setProd(null);
+          setBusq([]);
+        },
+        onKeyDown: (e) => {
+          if (e.key === "Enter") buscar(cod);
+        },
+        style: { ...field, fontFamily: FONT_MONO, letterSpacing: ".04em" }
+      }
+    ), busq.length > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: { marginTop: 8, border: `1px solid ${C.sep}`, borderRadius: 12, overflow: "hidden" } }, busq[0]?._no ? /* @__PURE__ */ import_react.default.createElement("div", { style: { padding: "12px 14px", fontSize: 13, color: C.red, fontFamily: FONT } }, 'No se encontr\xF3 "', busq[0].codigo, '"') : busq.map((p, i) => /* @__PURE__ */ import_react.default.createElement(
+      "div",
+      {
+        key: p.id,
+        onClick: () => elegir(p),
+        style: {
+          padding: "10px 14px",
+          cursor: "pointer",
+          borderBottom: i < busq.length - 1 ? `1px solid ${C.sep}` : "none",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center"
+        },
+        onMouseEnter: (e) => e.currentTarget.style.background = C.bg2,
+        onMouseLeave: (e) => e.currentTarget.style.background = "transparent"
+      },
+      /* @__PURE__ */ import_react.default.createElement("div", { style: { minWidth: 0 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, fontWeight: 600, color: C.label, fontFamily: FONT, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" } }, p.nombre), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT_MONO } }, p.codigo, " \xB7 ", p.marcaNombre)),
+      /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, fontWeight: 700, color: C.label, fontFamily: FONT } }, "Bs ", p.precio)
+    ))), prod && /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, null, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      background: C.bg2,
+      borderRadius: 14,
+      padding: "13px 15px",
+      margin: "14px 0",
+      display: "flex",
+      alignItems: "center",
+      gap: 12
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      width: 40,
+      height: 40,
+      borderRadius: 12,
+      flexShrink: 0,
+      background: `${MARCAS.find((m) => m.id === prod.marcaId)?.color || C.gold}22`,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      fontSize: 18,
+      fontFamily: FONT_DISPLAY,
+      fontWeight: 600,
+      color: C.label
+    } }, (prod.marcaNombre || "?").trim()[0]?.toUpperCase()), /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 14, fontWeight: 600, color: C.label, fontFamily: FONT, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" } }, prod.nombre), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT } }, prod.marcaNombre, " \xB7 ", prod.codigo)), /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "right" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 8.5, fontFamily: FONT_MONO, color: C.label3, textTransform: "uppercase" } }, "Precio actual"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 18, fontWeight: 800, color: C.label, fontFamily: FONT } }, "Bs ", precioActual))), /* @__PURE__ */ import_react.default.createElement("div", { style: lbl }, "Precio nuevo"), /* @__PURE__ */ import_react.default.createElement(
+      "input",
+      {
+        type: "number",
+        min: "0",
+        step: "1",
+        inputMode: "decimal",
+        value: nuevo,
+        placeholder: "0",
+        onChange: (e) => {
+          setNuevo(e.target.value);
+          setCG(false);
+        },
+        style: {
+          ...field,
+          fontSize: 20,
+          fontWeight: 800,
+          borderColor: nuevoNum > 0 ? col : C.sep,
+          background: nuevoNum > 0 ? `${col}0d` : C.bg0,
+          color: nuevoNum > 0 ? col : C.label
+        }
+      }
+    ), /* @__PURE__ */ import_react.default.createElement("div", { style: { ...lbl, marginTop: 14 } }, "Motivo ", /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.red } }, "obligatorio")), /* @__PURE__ */ import_react.default.createElement(
+      "input",
+      {
+        value: motivo,
+        placeholder: "Ej: Gattara pidi\xF3 subir el precio",
+        onChange: (e) => setMotivo(e.target.value),
+        style: {
+          ...field,
+          borderColor: motivo.trim().length >= 3 ? C.gold : C.sep,
+          background: motivo.trim().length >= 3 ? `${C.gold}0d` : C.bg0
+        }
+      }
+    ), nuevoNum > 0 && nuevoNum !== precioActual && /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      background: `${col}12`,
+      borderRadius: 12,
+      padding: "10px 13px",
+      marginTop: 14
+    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 12.5, color: C.label2, fontFamily: FONT } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { textDecoration: "line-through", color: C.label3 } }, "Bs ", precioActual), " \u2192 ", /* @__PURE__ */ import_react.default.createElement("b", { style: { color: col } }, "Bs ", nuevoNum)), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 9, fontFamily: FONT_MONO, color: col, letterSpacing: 0.4 } }, sube ? "+" : "", "Bs ", delta, " \xB7 ", pct > 0 ? "+" : "", pct, "%")), grande && confirmGrande && /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      background: `${C.red}10`,
+      border: `1px solid ${C.red}40`,
+      borderRadius: 12,
+      padding: "10px 13px",
+      marginTop: 10,
+      fontSize: 12,
+      color: C.red,
+      fontFamily: FONT,
+      lineHeight: 1.5
+    } }, "Es un cambio grande (", pct > 0 ? "+" : "", pct, '%). Toc\xE1 de nuevo "Guardar" para confirmar.'), /* @__PURE__ */ import_react.default.createElement(
+      "button",
+      {
+        onClick: guardar,
+        disabled: !valido || guardando,
+        style: {
+          width: "100%",
+          padding: "13px",
+          borderRadius: 13,
+          border: "none",
+          marginTop: 14,
+          background: valido && !guardando ? C.label : C.sep,
+          color: "#fff",
+          fontSize: 14,
+          fontWeight: 600,
+          fontFamily: FONT,
+          cursor: valido && !guardando ? "pointer" : "not-allowed",
+          opacity: valido && !guardando ? 1 : 0.6
+        }
+      },
+      guardando ? "Guardando\u2026" : grande && confirmGrande ? "Confirmar cambio grande" : "Guardar cambio de precio"
+    ), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT, marginTop: 10, textAlign: "center" } }, "Se guarda con tu nombre en el reporte y no se puede borrar."))));
+  }
+  function POSContainer({ inv, onVenta, retiros, onRetiro, onVerNota, user, descuentos, descCodigos, onCambioPrecio, permPrecio }) {
     const [subTab, setSubTab] = (0, import_react.useState)("venta");
-    const tabs = [{ id: "venta", label: "\u{1F4B3} Venta" }, { id: "retiros", label: "\u{1F4E4} Retiros" }];
+    const puedePrecio = user?.rol === "admin" || !!permPrecio;
+    const tabs = [
+      { id: "venta", label: "\u{1F4B3} Venta" },
+      { id: "retiros", label: "\u{1F4E4} Retiros" },
+      ...puedePrecio ? [{ id: "precio", label: "Cambiar precio" }] : []
+    ];
+    const activa = subTab === "precio" && !puedePrecio ? "venta" : subTab;
     return /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: {
       display: "flex",
       gap: 4,
@@ -70834,7 +71094,7 @@ Esta acci\xF3n no se puede deshacer.` : "\xBFEliminar esta carga? Esta acci\xF3n
       boxShadow: subTab === t.id ? "0 1px 4px rgba(0,0,0,0.10)" : "none",
       transition: "all .15s",
       WebkitTapHighlightColor: "transparent"
-    } }, t.label))), subTab === "venta" ? /* @__PURE__ */ import_react.default.createElement(POS, { inv, onVenta, onVerNota, user, descuentos, descCodigos }) : /* @__PURE__ */ import_react.default.createElement(RetirosTab, { inv, retiros, onRetiro }));
+    } }, t.label))), activa === "venta" ? /* @__PURE__ */ import_react.default.createElement(POS, { inv, onVenta, onVerNota, user, descuentos, descCodigos }) : activa === "retiros" ? /* @__PURE__ */ import_react.default.createElement(RetirosTab, { inv, retiros, onRetiro }) : /* @__PURE__ */ import_react.default.createElement(CambioPrecioTab, { inv, onGuardar: onCambioPrecio, user }));
   }
   function QRPagoPanel({ total, refVenta }) {
     const [qrBanco, setQrBanco] = (0, import_react.useState)(cargarQRBanco);
@@ -77515,7 +77775,9 @@ ${c.resumen || c.id}`)) onEliminarCarga(c.id);
     LOGIN: { label: "Acceso", icono: "\u{1F510}", color: "#546E7A" },
     CIERRE: { label: "Cierre", icono: "\u{1F4CA}", color: "#8A6418" },
     DESCUENTO_MARCA: { label: "Descuento marca", icono: "\u{1F3F7}\uFE0F", color: "#2E7D32" },
-    DESCUENTO_CODIGO: { label: "Descuento producto", icono: "\u{1F3F7}\uFE0F", color: "#2E7D32" }
+    DESCUENTO_CODIGO: { label: "Descuento producto", icono: "\u{1F3F7}\uFE0F", color: "#2E7D32" },
+    PRECIO: { label: "Cambio de precio", icono: "\u21C5", color: "#8A6418" },
+    STOCK_AJUSTE: { label: "Correcci\xF3n stock", icono: "\u21C5", color: "#C94C4C" }
   };
   function crearCarga(tipo, usuario, extra) {
     const now = /* @__PURE__ */ new Date();
@@ -78993,7 +79255,7 @@ ${c.resumen || c.id}`)) onEliminarCarga(c.id);
     } }, "Volver"));
     return /* @__PURE__ */ import_react.default.createElement("div", null, resetState === "idle" && renderIdle(), resetState === "confirm1" && renderConfirm1(), resetState === "confirm2" && renderConfirm2(), resetState === "running" && renderRunning(), resetState === "done" && renderDone(), resetState === "error" && renderError());
   }
-  function ConfigTab({ user, logout, onRecargarDesdeSupabase, onSyncCompleto }) {
+  function ConfigTab({ user, logout, onRecargarDesdeSupabase, onSyncCompleto, permPrecioStaff, onTogglePermPrecio }) {
     const [subTab, setSubTab] = (0, import_react.useState)("perfil");
     const [usuarios, setUsuarios] = (0, import_react.useState)(() => {
       try {
@@ -79392,7 +79654,44 @@ create policy "allow all usuarios" on usuarios
       marginTop: 2,
       textTransform: "uppercase",
       letterSpacing: 0.3
-    } }, s.l)))), /* @__PURE__ */ import_react.default.createElement("button", { onClick: () => setModalAdd(true), style: {
+    } }, s.l)))), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      background: C.bg1,
+      border: `1px solid ${permPrecioStaff ? C.gold + "55" : C.sep}`,
+      borderRadius: 14,
+      padding: "14px 16px",
+      marginBottom: 16,
+      display: "flex",
+      alignItems: "center",
+      gap: 14
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 14, fontWeight: 700, color: C.label, fontFamily: FONT } }, "Cambio de precio por el staff"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT, marginTop: 3, lineHeight: 1.5 } }, permPrecioStaff ? "Habilitado. Las vendedoras pueden subir o bajar precios desde la Caja. Todo queda en el reporte de Auditor\xEDa con su nombre." : "Apagado. Solo vos (admin) pod\xE9s cambiar precios. Prendelo para que el staff tambi\xE9n pueda; se aplica en todas las computadoras.")), /* @__PURE__ */ import_react.default.createElement(
+      "button",
+      {
+        onClick: () => onTogglePermPrecio(!permPrecioStaff),
+        "aria-label": "Permitir cambio de precio al staff",
+        style: {
+          flexShrink: 0,
+          width: 52,
+          height: 30,
+          borderRadius: 99,
+          border: "none",
+          cursor: "pointer",
+          background: permPrecioStaff ? C.green : C.sep,
+          position: "relative",
+          transition: "background .2s"
+        }
+      },
+      /* @__PURE__ */ import_react.default.createElement("span", { style: {
+        position: "absolute",
+        top: 3,
+        left: permPrecioStaff ? 25 : 3,
+        width: 24,
+        height: 24,
+        borderRadius: "50%",
+        background: "#fff",
+        boxShadow: "0 1px 3px rgba(0,0,0,.25)",
+        transition: "left .2s"
+      } })
+    )), /* @__PURE__ */ import_react.default.createElement("button", { onClick: () => setModalAdd(true), style: {
       width: "100%",
       padding: "13px",
       borderRadius: 14,
