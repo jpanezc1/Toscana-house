@@ -63344,6 +63344,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
   function ClientesTab({ ventas, user }) {
     const [busq, setBusq] = (0, import_react.useState)("");
     const [soloTel, setSoloTel] = (0, import_react.useState)(false);
+    const [sel, setSel] = (0, import_react.useState)(null);
     const titleCase = (s) => String(s || "").trim().toLowerCase().replace(/\b([a-záéíóúñ])/g, (m) => m.toUpperCase());
     const soloDigitos = (t) => String(t || "").replace(/[^\d]/g, "");
     const clientes = (0, import_react.useMemo)(() => {
@@ -63354,7 +63355,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
         if (!nom) return;
         const key = nom.toLowerCase().replace(/\s+/g, " ");
         const tel = soloDigitos(v.clienteTelefono);
-        if (!map.has(key)) map.set(key, { nombre: titleCase(nom), tel: "", compras: 0, total: 0, ultima: "", primera: "" });
+        if (!map.has(key)) map.set(key, { key, nombre: titleCase(nom), tel: "", compras: 0, total: 0, ultima: "", primera: "" });
         const c = map.get(key);
         c.compras++;
         c.total += Number(v.total) || 0;
@@ -63418,6 +63419,71 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       cursor: "pointer",
       WebkitTapHighlightColor: "transparent"
     } }, txt);
+    if (sel) {
+      const vts = (ventas || []).filter((v) => !v.anulada && (v.clienteNombre || "").trim().toLowerCase().replace(/\s+/g, " ") === sel.key).sort((a, b) => (b.fecha || "").localeCompare(a.fecha || "") || String(b.id || "").localeCompare(String(a.id || "")));
+      const fechaLarga = (s) => {
+        const p = String(s || "").split("-");
+        return p.length === 3 ? `${+p[2]} ${MESES[+p[1] - 1] || ""} ${p[0]}` : s;
+      };
+      const stat = (v, l, col) => /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1, textAlign: "center" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 19, fontWeight: 800, color: col || C.label, fontFamily: FONT, letterSpacing: "-0.02em" } }, v), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: C.label3, fontFamily: FONT_MONO, textTransform: "uppercase", letterSpacing: 0.4, marginTop: 2 } }, l));
+      return /* @__PURE__ */ import_react.default.createElement("div", { style: { maxWidth: 560, margin: "0 auto" } }, /* @__PURE__ */ import_react.default.createElement("button", { onClick: () => setSel(null), style: {
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 6,
+        background: "none",
+        border: "none",
+        cursor: "pointer",
+        color: C.label3,
+        fontSize: 13,
+        fontFamily: FONT,
+        padding: "4px 0",
+        marginBottom: 12
+      } }, /* @__PURE__ */ import_react.default.createElement("i", { className: "ti ti-arrow-left", style: { fontSize: 16 }, "aria-hidden": "true" }), " Volver a clientes"), /* @__PURE__ */ import_react.default.createElement("div", { style: { background: C.bg1, border: `1px solid ${C.sep}`, borderRadius: 18, padding: "18px 18px", marginBottom: 14 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 14, marginBottom: 14 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+        width: 54,
+        height: 54,
+        borderRadius: 16,
+        flexShrink: 0,
+        background: `${C.gold}18`,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        fontSize: 24,
+        fontFamily: FONT_DISPLAY,
+        fontWeight: 600,
+        color: C.gold
+      } }, (sel.nombre || "?").trim()[0]?.toUpperCase()), /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 19, fontWeight: 700, color: C.label, fontFamily: FONT_DISPLAY, letterSpacing: "-0.01em" } }, sel.nombre), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT, marginTop: 2 } }, "Clienta desde ", fechaCorta(sel.primera), " \xB7 \xFAltima visita ", fechaCorta(sel.ultima))), sel.tel && /* @__PURE__ */ import_react.default.createElement("button", { onClick: () => chatCliente(sel), style: {
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 6,
+        flexShrink: 0,
+        padding: "9px 13px",
+        borderRadius: 11,
+        border: `1px solid ${C.green}33`,
+        background: `${C.green}10`,
+        color: C.green,
+        fontSize: 12.5,
+        fontWeight: 700,
+        fontFamily: FONT_MONO,
+        cursor: "pointer"
+      } }, /* @__PURE__ */ import_react.default.createElement("i", { className: "ti ti-brand-whatsapp", style: { fontSize: 16 }, "aria-hidden": "true" }), " ", sel.tel)), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 8, background: C.bg2, borderRadius: 13, padding: "12px 10px" } }, stat(sel.compras, sel.compras === 1 ? "compra" : "compras"), /* @__PURE__ */ import_react.default.createElement("div", { style: { width: 1, background: C.sep } }), stat($2(sel.total), "total gastado", C.gold), /* @__PURE__ */ import_react.default.createElement("div", { style: { width: 1, background: C.sep } }), stat($2(sel.compras > 0 ? sel.total / sel.compras : 0), "ticket promedio")), !sel.tel && /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11.5, color: C.label3, fontFamily: FONT, marginTop: 12, textAlign: "center", fontStyle: "italic" } }, "Sin tel\xE9fono guardado. Se completa al cobrarle una venta con su n\xFAmero.")), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+        fontSize: 11,
+        fontWeight: 700,
+        color: C.label3,
+        fontFamily: FONT_MONO,
+        textTransform: "uppercase",
+        letterSpacing: 0.6,
+        margin: "4px 4px 10px"
+      } }, "Compras (", vts.length, ")"), vts.map((v) => {
+        const items = v.items || [];
+        return /* @__PURE__ */ import_react.default.createElement("div", { key: v.id, style: { background: C.bg1, border: `1px solid ${C.sep}`, borderRadius: 15, padding: "13px 15px", marginBottom: 10 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: items.length ? 9 : 0 } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13.5, fontWeight: 600, color: C.label, fontFamily: FONT } }, fechaLarga(v.fecha)), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT, marginTop: 1 } }, v.hora || "", " \xB7 ", labelPago(v.metodoPago), " \xB7 ", items.length, " prenda", items.length !== 1 ? "s" : "")), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 16, fontWeight: 800, color: C.gold, fontFamily: FONT } }, $2(getDisplayTotal(v)))), items.map((it, i) => /* @__PURE__ */ import_react.default.createElement("div", { key: i, style: {
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          padding: "6px 0",
+          borderTop: `1px solid ${C.sep}`
+        } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { minWidth: 0, flex: 1 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12.5, color: C.label, fontFamily: FONT, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" } }, it.nombre), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10.5, color: C.label3, fontFamily: FONT_MONO } }, it.marcaNombre, " \xB7 ", it.codigo, it.cantidad > 1 ? ` \xB7 x${it.cantidad}` : "")), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12.5, fontWeight: 600, color: C.label2, fontFamily: FONT, flexShrink: 0 } }, $2(netItemSub(v, it))))));
+      }), vts.length === 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center", padding: "30px", color: C.label3, fontFamily: FONT, fontSize: 13 } }, "Sin compras registradas."));
+    }
     return /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "flex-end", justifyContent: "space-between", flexWrap: "wrap", gap: 12, marginBottom: 16 } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 20, fontWeight: 700, color: C.label, fontFamily: FONT_DISPLAY, letterSpacing: "-0.01em" } }, "Clientes"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12.5, color: C.label3, fontFamily: FONT, marginTop: 2 } }, /* @__PURE__ */ import_react.default.createElement("b", { style: { color: C.label } }, clientes.length), " clienta", clientes.length !== 1 ? "s" : "", " registrada", clientes.length !== 1 ? "s" : "", " \xB7 ", /* @__PURE__ */ import_react.default.createElement("b", { style: { color: C.green } }, conTel.length), " con tel\xE9fono")), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 8, flexWrap: "wrap" } }, btn(compartirLista, /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, null, " ", /* @__PURE__ */ import_react.default.createElement("i", { className: "ti ti-brand-whatsapp", style: { fontSize: 15 }, "aria-hidden": "true" }), " Compartir por WhatsApp"), C.green, `${C.green}12`), btn(exportarExcel, /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, null, " ", /* @__PURE__ */ import_react.default.createElement("i", { className: "ti ti-file-spreadsheet", style: { fontSize: 15 }, "aria-hidden": "true" }), " Excel"), C.gold, `${C.gold}12`))), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 8, marginBottom: 14 } }, /* @__PURE__ */ import_react.default.createElement(
       "input",
       {
@@ -63448,51 +63514,70 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       fontWeight: 600,
       fontFamily: FONT,
       whiteSpace: "nowrap"
-    } }, "Con tel\xE9fono")), lista.length === 0 ? /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center", padding: "48px 20px", color: C.label3, fontFamily: FONT, fontSize: 13.5 } }, clientes.length === 0 ? "Todav\xEDa no hay clientas registradas. Se agregan solas al cobrar una venta con el nombre de la clienta." : "Sin resultados para la b\xFAsqueda.") : /* @__PURE__ */ import_react.default.createElement("div", { style: { background: C.bg1, border: `1px solid ${C.sep}`, borderRadius: 16, overflow: "hidden" } }, lista.map((c, i) => /* @__PURE__ */ import_react.default.createElement("div", { key: c.nombre + i, style: {
-      display: "flex",
-      alignItems: "center",
-      gap: 13,
-      padding: "12px 15px",
-      borderBottom: i < lista.length - 1 ? `1px solid ${C.sep}` : "none"
-    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      width: 40,
-      height: 40,
-      borderRadius: 13,
-      flexShrink: 0,
-      background: `${C.gold}18`,
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      fontSize: 16,
-      fontFamily: FONT_DISPLAY,
-      fontWeight: 600,
-      color: C.gold
-    } }, (c.nombre || "?").trim()[0]?.toUpperCase()), /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 14.5, fontWeight: 600, color: C.label, fontFamily: FONT, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" } }, c.nombre), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT, marginTop: 2 } }, c.compras, " compra", c.compras !== 1 ? "s" : "", " \xB7 ", $2(c.total), " \xB7 \xFAltima ", fechaCorta(c.ultima))), c.tel ? /* @__PURE__ */ import_react.default.createElement(
-      "button",
+    } }, "Con tel\xE9fono")), lista.length === 0 ? /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center", padding: "48px 20px", color: C.label3, fontFamily: FONT, fontSize: 13.5 } }, clientes.length === 0 ? "Todav\xEDa no hay clientas registradas. Se agregan solas al cobrar una venta con el nombre de la clienta." : "Sin resultados para la b\xFAsqueda.") : /* @__PURE__ */ import_react.default.createElement("div", { style: { background: C.bg1, border: `1px solid ${C.sep}`, borderRadius: 16, overflow: "hidden" } }, lista.map((c, i) => /* @__PURE__ */ import_react.default.createElement(
+      "div",
       {
-        onClick: () => chatCliente(c),
-        title: "Escribir por WhatsApp",
+        key: c.nombre + i,
+        onClick: () => setSel(c),
         style: {
-          display: "inline-flex",
+          display: "flex",
           alignItems: "center",
-          gap: 6,
-          flexShrink: 0,
-          padding: "7px 11px",
-          borderRadius: 10,
-          border: `1px solid ${C.green}33`,
-          background: `${C.green}10`,
-          color: C.green,
-          fontSize: 12.5,
-          fontWeight: 700,
-          fontFamily: FONT_MONO,
+          gap: 13,
+          padding: "12px 15px",
           cursor: "pointer",
+          borderBottom: i < lista.length - 1 ? `1px solid ${C.sep}` : "none",
+          transition: "background .12s",
           WebkitTapHighlightColor: "transparent"
-        }
+        },
+        onMouseEnter: (e) => e.currentTarget.style.background = `${C.gold}08`,
+        onMouseLeave: (e) => e.currentTarget.style.background = "transparent"
       },
-      /* @__PURE__ */ import_react.default.createElement("i", { className: "ti ti-brand-whatsapp", style: { fontSize: 15 }, "aria-hidden": "true" }),
-      " ",
-      c.tel
-    ) : /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 11, color: C.label4, fontFamily: FONT, flexShrink: 0, fontStyle: "italic" } }, "sin tel\xE9fono")))), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT, marginTop: 12, textAlign: "center", lineHeight: 1.5 } }, 'Las clientas se registran solas al cobrar una venta con su nombre y tel\xE9fono. "Compartir por WhatsApp" abre WhatsApp con la lista de las que tienen tel\xE9fono, para que la mandes a quien quieras.'));
+      /* @__PURE__ */ import_react.default.createElement("div", { style: {
+        width: 40,
+        height: 40,
+        borderRadius: 13,
+        flexShrink: 0,
+        background: `${C.gold}18`,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        fontSize: 16,
+        fontFamily: FONT_DISPLAY,
+        fontWeight: 600,
+        color: C.gold
+      } }, (c.nombre || "?").trim()[0]?.toUpperCase()),
+      /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 14.5, fontWeight: 600, color: C.label, fontFamily: FONT, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" } }, c.nombre), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT, marginTop: 2 } }, c.compras, " compra", c.compras !== 1 ? "s" : "", " \xB7 ", $2(c.total), " \xB7 \xFAltima ", fechaCorta(c.ultima))),
+      c.tel ? /* @__PURE__ */ import_react.default.createElement(
+        "button",
+        {
+          onClick: (e) => {
+            e.stopPropagation();
+            chatCliente(c);
+          },
+          title: "Escribir por WhatsApp",
+          style: {
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 6,
+            flexShrink: 0,
+            padding: "7px 11px",
+            borderRadius: 10,
+            border: `1px solid ${C.green}33`,
+            background: `${C.green}10`,
+            color: C.green,
+            fontSize: 12.5,
+            fontWeight: 700,
+            fontFamily: FONT_MONO,
+            cursor: "pointer",
+            WebkitTapHighlightColor: "transparent"
+          }
+        },
+        /* @__PURE__ */ import_react.default.createElement("i", { className: "ti ti-brand-whatsapp", style: { fontSize: 15 }, "aria-hidden": "true" }),
+        " ",
+        c.tel
+      ) : /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 11, color: C.label4, fontFamily: FONT, flexShrink: 0, fontStyle: "italic" } }, "sin tel\xE9fono"),
+      /* @__PURE__ */ import_react.default.createElement("i", { className: "ti ti-chevron-right", style: { fontSize: 16, color: C.label4, flexShrink: 0 }, "aria-hidden": "true" })
+    ))), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT, marginTop: 12, textAlign: "center", lineHeight: 1.5 } }, 'Las clientas se registran solas al cobrar una venta con su nombre y tel\xE9fono. "Compartir por WhatsApp" abre WhatsApp con la lista de las que tienen tel\xE9fono, para que la mandes a quien quieras.'));
   }
   function BurbujaDescuentos({ descuentos, descCodigos, isDesktop }) {
     const H = hoy();

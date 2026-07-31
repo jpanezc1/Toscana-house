@@ -9731,6 +9731,7 @@ function ImportarVentasLibresModal({open, onImportar, onClose}){
 function ClientesTab({ventas, user}){
   const [busq, setBusq] = useState("");
   const [soloTel, setSoloTel] = useState(false);
+  const [sel, setSel] = useState(null); // clienta seleccionada → ficha + compras
 
   const titleCase = s => String(s||"").trim().toLowerCase()
     .replace(/\b([a-záéíóúñ])/g, m=>m.toUpperCase());
@@ -9744,7 +9745,7 @@ function ClientesTab({ventas, user}){
       if(!nom) return;
       const key = nom.toLowerCase().replace(/\s+/g," ");
       const tel = soloDigitos(v.clienteTelefono);
-      if(!map.has(key)) map.set(key,{nombre:titleCase(nom), tel:"", compras:0, total:0, ultima:"", primera:""});
+      if(!map.has(key)) map.set(key,{key, nombre:titleCase(nom), tel:"", compras:0, total:0, ultima:"", primera:""});
       const c = map.get(key);
       c.compras++; c.total += Number(v.total)||0;
       if(tel && tel.length>=7 && !c.tel) c.tel = tel;
@@ -9792,6 +9793,96 @@ function ClientesTab({ventas, user}){
       fontFamily:FONT,cursor:"pointer",WebkitTapHighlightColor:"transparent"}}>{txt}</button>
   );
 
+  // ── Ficha de la clienta + su historial de compras ──
+  if(sel){
+    const vts = (ventas||[])
+      .filter(v=>!v.anulada && (v.clienteNombre||"").trim().toLowerCase().replace(/\s+/g," ")===sel.key)
+      .sort((a,b)=> (b.fecha||"").localeCompare(a.fecha||"") || String(b.id||"").localeCompare(String(a.id||"")));
+    const fechaLarga = s => { const p=String(s||"").split("-"); return p.length===3?`${+p[2]} ${(MESES[+p[1]-1]||"")} ${p[0]}`:s; };
+    const stat = (v,l,col) => (
+      <div style={{flex:1,textAlign:"center"}}>
+        <div style={{fontSize:19,fontWeight:800,color:col||C.label,fontFamily:FONT,letterSpacing:"-0.02em"}}>{v}</div>
+        <div style={{fontSize:10,color:C.label3,fontFamily:FONT_MONO,textTransform:"uppercase",letterSpacing:.4,marginTop:2}}>{l}</div>
+      </div>
+    );
+    return (
+      <div style={{maxWidth:560,margin:"0 auto"}}>
+        <button onClick={()=>setSel(null)} style={{display:"inline-flex",alignItems:"center",gap:6,
+          background:"none",border:"none",cursor:"pointer",color:C.label3,fontSize:13,fontFamily:FONT,
+          padding:"4px 0",marginBottom:12}}>
+          <i className="ti ti-arrow-left" style={{fontSize:16}} aria-hidden="true"/> Volver a clientes
+        </button>
+
+        {/* Encabezado de la ficha */}
+        <div style={{background:C.bg1,border:`1px solid ${C.sep}`,borderRadius:18,padding:"18px 18px",marginBottom:14}}>
+          <div style={{display:"flex",alignItems:"center",gap:14,marginBottom:14}}>
+            <div style={{width:54,height:54,borderRadius:16,flexShrink:0,background:`${C.gold}18`,
+              display:"flex",alignItems:"center",justifyContent:"center",fontSize:24,
+              fontFamily:FONT_DISPLAY,fontWeight:600,color:C.gold}}>{(sel.nombre||"?").trim()[0]?.toUpperCase()}</div>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontSize:19,fontWeight:700,color:C.label,fontFamily:FONT_DISPLAY,letterSpacing:"-0.01em"}}>{sel.nombre}</div>
+              <div style={{fontSize:12,color:C.label3,fontFamily:FONT,marginTop:2}}>
+                Clienta desde {fechaCorta(sel.primera)} · última visita {fechaCorta(sel.ultima)}
+              </div>
+            </div>
+            {sel.tel && (
+              <button onClick={()=>chatCliente(sel)} style={{display:"inline-flex",alignItems:"center",gap:6,flexShrink:0,
+                padding:"9px 13px",borderRadius:11,border:`1px solid ${C.green}33`,background:`${C.green}10`,color:C.green,
+                fontSize:12.5,fontWeight:700,fontFamily:FONT_MONO,cursor:"pointer"}}>
+                <i className="ti ti-brand-whatsapp" style={{fontSize:16}} aria-hidden="true"/> {sel.tel}
+              </button>
+            )}
+          </div>
+          <div style={{display:"flex",gap:8,background:C.bg2,borderRadius:13,padding:"12px 10px"}}>
+            {stat(sel.compras, sel.compras===1?"compra":"compras")}
+            <div style={{width:1,background:C.sep}}/>
+            {stat($(sel.total), "total gastado", C.gold)}
+            <div style={{width:1,background:C.sep}}/>
+            {stat($(sel.compras>0?sel.total/sel.compras:0), "ticket promedio")}
+          </div>
+          {!sel.tel && (
+            <div style={{fontSize:11.5,color:C.label3,fontFamily:FONT,marginTop:12,textAlign:"center",fontStyle:"italic"}}>
+              Sin teléfono guardado. Se completa al cobrarle una venta con su número.
+            </div>
+          )}
+        </div>
+
+        {/* Historial de compras */}
+        <div style={{fontSize:11,fontWeight:700,color:C.label3,fontFamily:FONT_MONO,textTransform:"uppercase",
+          letterSpacing:.6,margin:"4px 4px 10px"}}>Compras ({vts.length})</div>
+        {vts.map(v=>{
+          const items = v.items||[];
+          return (
+            <div key={v.id} style={{background:C.bg1,border:`1px solid ${C.sep}`,borderRadius:15,padding:"13px 15px",marginBottom:10}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:items.length?9:0}}>
+                <div>
+                  <div style={{fontSize:13.5,fontWeight:600,color:C.label,fontFamily:FONT}}>{fechaLarga(v.fecha)}</div>
+                  <div style={{fontSize:11,color:C.label3,fontFamily:FONT,marginTop:1}}>
+                    {v.hora||""} · {labelPago(v.metodoPago)} · {items.length} prenda{items.length!==1?"s":""}
+                  </div>
+                </div>
+                <div style={{fontSize:16,fontWeight:800,color:C.gold,fontFamily:FONT}}>{$(getDisplayTotal(v))}</div>
+              </div>
+              {items.map((it,i)=>(
+                <div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",
+                  padding:"6px 0",borderTop:`1px solid ${C.sep}`}}>
+                  <div style={{minWidth:0,flex:1}}>
+                    <div style={{fontSize:12.5,color:C.label,fontFamily:FONT,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{it.nombre}</div>
+                    <div style={{fontSize:10.5,color:C.label3,fontFamily:FONT_MONO}}>{it.marcaNombre} · {it.codigo}{it.cantidad>1?` · x${it.cantidad}`:""}</div>
+                  </div>
+                  <div style={{fontSize:12.5,fontWeight:600,color:C.label2,fontFamily:FONT,flexShrink:0}}>{$(netItemSub(v,it))}</div>
+                </div>
+              ))}
+            </div>
+          );
+        })}
+        {vts.length===0 && (
+          <div style={{textAlign:"center",padding:"30px",color:C.label3,fontFamily:FONT,fontSize:13}}>Sin compras registradas.</div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div>
       {/* Cabecera */}
@@ -9829,8 +9920,11 @@ function ClientesTab({ventas, user}){
       ) : (
         <div style={{background:C.bg1,border:`1px solid ${C.sep}`,borderRadius:16,overflow:"hidden"}}>
           {lista.map((c,i)=>(
-            <div key={c.nombre+i} style={{display:"flex",alignItems:"center",gap:13,padding:"12px 15px",
-              borderBottom:i<lista.length-1?`1px solid ${C.sep}`:"none"}}>
+            <div key={c.nombre+i} onClick={()=>setSel(c)}
+              style={{display:"flex",alignItems:"center",gap:13,padding:"12px 15px",cursor:"pointer",
+              borderBottom:i<lista.length-1?`1px solid ${C.sep}`:"none",transition:"background .12s",WebkitTapHighlightColor:"transparent"}}
+              onMouseEnter={e=>e.currentTarget.style.background=`${C.gold}08`}
+              onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
               <div style={{width:40,height:40,borderRadius:13,flexShrink:0,background:`${C.gold}18`,
                 display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,
                 fontFamily:FONT_DISPLAY,fontWeight:600,color:C.gold}}>
@@ -9843,7 +9937,7 @@ function ClientesTab({ventas, user}){
                 </div>
               </div>
               {c.tel ? (
-                <button onClick={()=>chatCliente(c)} title="Escribir por WhatsApp"
+                <button onClick={e=>{e.stopPropagation();chatCliente(c);}} title="Escribir por WhatsApp"
                   style={{display:"inline-flex",alignItems:"center",gap:6,flexShrink:0,padding:"7px 11px",
                     borderRadius:10,border:`1px solid ${C.green}33`,background:`${C.green}10`,color:C.green,
                     fontSize:12.5,fontWeight:700,fontFamily:FONT_MONO,cursor:"pointer",WebkitTapHighlightColor:"transparent"}}>
@@ -9852,6 +9946,7 @@ function ClientesTab({ventas, user}){
               ) : (
                 <span style={{fontSize:11,color:C.label4,fontFamily:FONT,flexShrink:0,fontStyle:"italic"}}>sin teléfono</span>
               )}
+              <i className="ti ti-chevron-right" style={{fontSize:16,color:C.label4,flexShrink:0}} aria-hidden="true"/>
             </div>
           ))}
         </div>
