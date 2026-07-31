@@ -1194,6 +1194,23 @@ function useRealtimeSync(setVentas, setInv, setRetiros, setFactoryResetRecibido,
           setFactoryResetRecibido(true);
           setTimeout(()=>window.location.reload(), 3000);
         })
+        // Recarga forzada (para empujar una versión nueva a TODAS las sesiones al
+        // instante). Limpia el service worker y los caches para no servir el
+        // bundle viejo, y recarga. NO borra datos.
+        .on("broadcast", {event:"recargar"}, async () => {
+          if(!mounted) return;
+          try{
+            if("serviceWorker" in navigator){
+              const regs = await navigator.serviceWorker.getRegistrations();
+              await Promise.all(regs.map(r=>r.unregister()));
+            }
+            if(window.caches){
+              const keys = await caches.keys();
+              await Promise.all(keys.map(k=>caches.delete(k)));
+            }
+          }catch{}
+          window.location.reload();
+        })
         .subscribe(status => {
           if (status === "SUBSCRIBED"){
             console.log("[Toscana Realtime] ✓ conectado");
@@ -5122,6 +5139,7 @@ const FOS_NAV_PATHS = {
   ventas_ant:"M12 21a9 9 0 100-18 9 9 0 000 18z M12 7v5l3 3",
   config:    "M4 21v-7 M4 10V3 M12 21v-9 M12 8V3 M20 21v-5 M20 12V3 M1 14h6 M9 8h6 M17 16h6",
   retiros:   "M9 14l-4-4 4-4 M5 10h9a6 6 0 016 6v2",
+  clientes:  "M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2 M9 11a4 4 0 100-8 4 4 0 000 8 M23 21v-2a4 4 0 00-3-3.87 M16 3.13a4 4 0 010 7.75",
 };
 function FosNavIcon({id}){
   const d = FOS_NAV_PATHS[id];
@@ -5136,7 +5154,7 @@ function FosNavIcon({id}){
 
 function DesktopSidebar({tabs, active, onChange, user, logout, groups: customGroups, dotColors: customDot}){
   const GROUPS = customGroups || [
-    {label:"Principal", ids:["inicio","pos","ventas","cambios"]},
+    {label:"Principal", ids:["inicio","pos","ventas","clientes","cambios"]},
     {label:"Gestión",   ids:["inventario","marcas","liquidaciones","giftcards"]},
     {label:"Sistema",   ids:["auditoria","cargas","ventas_ant","config"]},
   ];
@@ -9704,6 +9722,145 @@ function ImportarVentasLibresModal({open, onImportar, onClose}){
         )}
       </div>
     </Sheet>
+  );
+}
+
+// ── CLIENTES — directorio de clientas (admin y staff) ─────────────────
+// Deriva las clientas de las ventas (nombre + teléfono), con compras, total
+// gastado y última visita. Exporta la lista por WhatsApp y a Excel.
+function ClientesTab({ventas, user}){
+  const [busq, setBusq] = useState("");
+  const [soloTel, setSoloTel] = useState(false);
+
+  const titleCase = s => String(s||"").trim().toLowerCase()
+    .replace(/\b([a-záéíóúñ])/g, m=>m.toUpperCase());
+  const soloDigitos = t => String(t||"").replace(/[^\d]/g,"");
+
+  const clientes = useMemo(()=>{
+    const map = new Map();
+    (ventas||[]).forEach(v=>{
+      if(v.anulada) return;
+      const nom = (v.clienteNombre||"").trim();
+      if(!nom) return;
+      const key = nom.toLowerCase().replace(/\s+/g," ");
+      const tel = soloDigitos(v.clienteTelefono);
+      if(!map.has(key)) map.set(key,{nombre:titleCase(nom), tel:"", compras:0, total:0, ultima:"", primera:""});
+      const c = map.get(key);
+      c.compras++; c.total += Number(v.total)||0;
+      if(tel && tel.length>=7 && !c.tel) c.tel = tel;
+      const f = v.fecha||"";
+      if(f>c.ultima) c.ultima = f;
+      if(!c.primera || (f && f<c.primera)) c.primera = f;
+    });
+    return [...map.values()].sort((a,b)=>(b.ultima||"").localeCompare(a.ultima||"")||b.total-a.total);
+  },[ventas]);
+
+  const conTel = clientes.filter(c=>c.tel);
+  const q = busq.trim().toLowerCase();
+  const lista = clientes
+    .filter(c=> !soloTel || c.tel)
+    .filter(c=> !q || c.nombre.toLowerCase().includes(q) || c.tel.includes(q.replace(/\D/g,"")));
+
+  const fechaCorta = s => { const p=String(s||"").split("-"); return p.length===3?`${+p[2]} ${(MESES[+p[1]-1]||"").slice(0,3).toLowerCase()}`:"—"; };
+  const waNum = t => { const d=soloDigitos(t); return d.length===8 ? "591"+d : d; };
+
+  function chatCliente(c){
+    if(!c.tel) return;
+    window.open(`https://wa.me/${waNum(c.tel)}`, "_blank");
+  }
+  function compartirLista(){
+    if(conTel.length===0){ alert("Todavía no hay clientas con teléfono guardado. Se guardan al cobrar una venta con el dato de la clienta."); return; }
+    const txt = `Clientas Toscana House (${conTel.length})\n\n` +
+      conTel.map((c,i)=>`${i+1}. ${c.nombre} · ${c.tel}`).join("\n");
+    window.open("https://wa.me/?text="+encodeURIComponent(txt), "_blank");
+  }
+  async function exportarExcel(){
+    const XLSX = await loadXLSX();
+    const wb = XLSX.utils.book_new();
+    const rows = [["Cliente","Teléfono","Compras","Total gastado (Bs)","Primera visita","Última visita"],
+      ...clientes.map(c=>[c.nombre, c.tel||"", c.compras, +c.total.toFixed(2), c.primera||"", c.ultima||""])];
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    ws["!cols"]=[{wch:26},{wch:14},{wch:9},{wch:16},{wch:13},{wch:13}];
+    XLSX.utils.book_append_sheet(wb, ws, "Clientas");
+    const buf = XLSX.write(wb,{bookType:"xlsx",type:"array"});
+    descargarArchivo(new Blob([buf],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}), "Toscana_Clientas_"+HOY+".xlsx");
+  }
+
+  const btn = (onClick,txt,col,bg) => (
+    <button onClick={onClick} style={{display:"inline-flex",alignItems:"center",gap:6,padding:"9px 14px",
+      borderRadius:11,border:`1px solid ${col}33`,background:bg,color:col,fontSize:12.5,fontWeight:700,
+      fontFamily:FONT,cursor:"pointer",WebkitTapHighlightColor:"transparent"}}>{txt}</button>
+  );
+
+  return (
+    <div>
+      {/* Cabecera */}
+      <div style={{display:"flex",alignItems:"flex-end",justifyContent:"space-between",flexWrap:"wrap",gap:12,marginBottom:16}}>
+        <div>
+          <div style={{fontSize:20,fontWeight:700,color:C.label,fontFamily:FONT_DISPLAY,letterSpacing:"-0.01em"}}>Clientes</div>
+          <div style={{fontSize:12.5,color:C.label3,fontFamily:FONT,marginTop:2}}>
+            <b style={{color:C.label}}>{clientes.length}</b> clienta{clientes.length!==1?"s":""} registrada{clientes.length!==1?"s":""}
+            {" · "}<b style={{color:C.green}}>{conTel.length}</b> con teléfono
+          </div>
+        </div>
+        <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+          {btn(compartirLista, <> <i className="ti ti-brand-whatsapp" style={{fontSize:15}} aria-hidden="true"/> Compartir por WhatsApp</>, C.green, `${C.green}12`)}
+          {btn(exportarExcel, <> <i className="ti ti-file-spreadsheet" style={{fontSize:15}} aria-hidden="true"/> Excel</>, C.gold, `${C.gold}12`)}
+        </div>
+      </div>
+
+      {/* Buscador + filtro */}
+      <div style={{display:"flex",gap:8,marginBottom:14}}>
+        <input value={busq} onChange={e=>setBusq(e.target.value)} placeholder="Buscar por nombre o teléfono…"
+          style={{flex:1,padding:"11px 14px",borderRadius:12,border:`1px solid ${C.sep}`,background:C.bg0,
+            fontSize:14,color:C.label,fontFamily:FONT,outline:"none",boxSizing:"border-box"}}/>
+        <button onClick={()=>setSoloTel(s=>!s)} style={{padding:"0 14px",borderRadius:12,cursor:"pointer",
+          border:`1px solid ${soloTel?C.green:C.sep}`,background:soloTel?`${C.green}12`:C.bg0,
+          color:soloTel?C.green:C.label3,fontSize:12.5,fontWeight:600,fontFamily:FONT,whiteSpace:"nowrap"}}>
+          Con teléfono
+        </button>
+      </div>
+
+      {/* Lista */}
+      {lista.length===0 ? (
+        <div style={{textAlign:"center",padding:"48px 20px",color:C.label3,fontFamily:FONT,fontSize:13.5}}>
+          {clientes.length===0 ? "Todavía no hay clientas registradas. Se agregan solas al cobrar una venta con el nombre de la clienta." : "Sin resultados para la búsqueda."}
+        </div>
+      ) : (
+        <div style={{background:C.bg1,border:`1px solid ${C.sep}`,borderRadius:16,overflow:"hidden"}}>
+          {lista.map((c,i)=>(
+            <div key={c.nombre+i} style={{display:"flex",alignItems:"center",gap:13,padding:"12px 15px",
+              borderBottom:i<lista.length-1?`1px solid ${C.sep}`:"none"}}>
+              <div style={{width:40,height:40,borderRadius:13,flexShrink:0,background:`${C.gold}18`,
+                display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,
+                fontFamily:FONT_DISPLAY,fontWeight:600,color:C.gold}}>
+                {(c.nombre||"?").trim()[0]?.toUpperCase()}
+              </div>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:14.5,fontWeight:600,color:C.label,fontFamily:FONT,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{c.nombre}</div>
+                <div style={{fontSize:12,color:C.label3,fontFamily:FONT,marginTop:2}}>
+                  {c.compras} compra{c.compras!==1?"s":""} · {$(c.total)} · última {fechaCorta(c.ultima)}
+                </div>
+              </div>
+              {c.tel ? (
+                <button onClick={()=>chatCliente(c)} title="Escribir por WhatsApp"
+                  style={{display:"inline-flex",alignItems:"center",gap:6,flexShrink:0,padding:"7px 11px",
+                    borderRadius:10,border:`1px solid ${C.green}33`,background:`${C.green}10`,color:C.green,
+                    fontSize:12.5,fontWeight:700,fontFamily:FONT_MONO,cursor:"pointer",WebkitTapHighlightColor:"transparent"}}>
+                  <i className="ti ti-brand-whatsapp" style={{fontSize:15}} aria-hidden="true"/> {c.tel}
+                </button>
+              ) : (
+                <span style={{fontSize:11,color:C.label4,fontFamily:FONT,flexShrink:0,fontStyle:"italic"}}>sin teléfono</span>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div style={{fontSize:11,color:C.label3,fontFamily:FONT,marginTop:12,textAlign:"center",lineHeight:1.5}}>
+        Las clientas se registran solas al cobrar una venta con su nombre y teléfono. "Compartir por WhatsApp" abre WhatsApp con la lista de las que tienen teléfono, para que la mandes a quien quieras.
+      </div>
+    </div>
   );
 }
 
@@ -15401,6 +15558,7 @@ function App(){
     {id:"inicio",        icon:"⊞", label:"Inicio"},
     {id:"pos",           icon:"⊕", label:"Caja"},
     {id:"ventas",        icon:"◈", label:"Ventas"},
+    {id:"clientes",      icon:"◐", label:"Clientes"},
     {id:"inventario",    icon:"◫", label:"Inventario"},
     {id:"auditoria",     icon:"⌖", label:"Verificación"},
     {id:"cargas",        icon:"🧾", label:"Cargas"},
@@ -15413,7 +15571,7 @@ function App(){
   ];
   // Caja: solo inicio + POS + ventas + cambios (no acceso a admin, marcas, config)
   const TABS = user?.rol==="caja"
-    ? TABS_ALL.filter(t=>["inicio","pos","ventas","cambios","inventario"].includes(t.id))
+    ? TABS_ALL.filter(t=>["inicio","pos","ventas","clientes","cambios","inventario"].includes(t.id))
     : user?.rol==="admin" ? TABS_ALL
     : TABS_ALL.filter(t=>t.id!=="auditoria"&&t.id!=="cargas"&&t.id!=="ventas_ant");
 
@@ -15625,6 +15783,11 @@ function App(){
         {/* CAMBIOS — cambio de prendas */}
         {tab==="cambios" && (
           <CambiosTab inv={inv} ventas={ventas} onCambio={handleCambio}/>
+        )}
+
+        {/* CLIENTES — directorio de clientas (admin y staff) */}
+        {tab==="clientes" && (
+          <ClientesTab ventas={ventas} user={user}/>
         )}
 
         {/* VENTAS ANTIGUAS — solo admin */}

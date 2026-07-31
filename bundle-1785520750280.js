@@ -17695,15 +17695,15 @@
         function getHydratableHoistableCache(type, keyAttribute, ownerDocument) {
           if (null === tagCaches) {
             var cache = /* @__PURE__ */ new Map();
-            var caches = tagCaches = /* @__PURE__ */ new Map();
-            caches.set(ownerDocument, cache);
+            var caches2 = tagCaches = /* @__PURE__ */ new Map();
+            caches2.set(ownerDocument, cache);
           } else
-            caches = tagCaches, cache = caches.get(ownerDocument), cache || (cache = /* @__PURE__ */ new Map(), caches.set(ownerDocument, cache));
+            caches2 = tagCaches, cache = caches2.get(ownerDocument), cache || (cache = /* @__PURE__ */ new Map(), caches2.set(ownerDocument, cache));
           if (cache.has(type)) return cache;
           cache.set(type, null);
           ownerDocument = ownerDocument.getElementsByTagName(type);
-          for (caches = 0; caches < ownerDocument.length; caches++) {
-            var node = ownerDocument[caches];
+          for (caches2 = 0; caches2 < ownerDocument.length; caches2++) {
+            var node = ownerDocument[caches2];
             if (!(node[internalHoistableMarker] || node[internalInstanceKey] || "link" === type && "stylesheet" === node.getAttribute("rel")) && node.namespaceURI !== SVG_NAMESPACE) {
               var nodeKey = node.getAttribute(keyAttribute) || "";
               nodeKey = type + nodeKey;
@@ -54757,6 +54757,20 @@
           });
           setFactoryResetRecibido(true);
           setTimeout(() => window.location.reload(), 3e3);
+        }).on("broadcast", { event: "recargar" }, async () => {
+          if (!mounted) return;
+          try {
+            if ("serviceWorker" in navigator) {
+              const regs = await navigator.serviceWorker.getRegistrations();
+              await Promise.all(regs.map((r) => r.unregister()));
+            }
+            if (window.caches) {
+              const keys2 = await caches.keys();
+              await Promise.all(keys2.map((k) => caches.delete(k)));
+            }
+          } catch {
+          }
+          window.location.reload();
         }).subscribe((status) => {
           if (status === "SUBSCRIBED") {
             console.log("[Toscana Realtime] \u2713 conectado");
@@ -55899,7 +55913,7 @@
   async function generarPlantillaXLSX() {
     const XLSX2 = await loadXLSX();
     const wb = XLSX2.utils.book_new();
-    const HOY = hoy();
+    const HOY2 = hoy();
     const D = "1A1714";
     const G = "9A7B4F";
     const GL = "C4A57B";
@@ -56027,7 +56041,7 @@
     const rows1 = [
       ["TOSCANA HOUSE", ...Array(NC - 1).fill("")],
       ["PLANTILLA OFICIAL DE INVENTARIO", ...Array(NC - 1).fill("")],
-      ["Version: " + HOY + "  \xB7  Completar columnas \u2605 y enviar a Toscana House", ...Array(NC - 1).fill("")],
+      ["Version: " + HOY2 + "  \xB7  Completar columnas \u2605 y enviar a Toscana House", ...Array(NC - 1).fill("")],
       ["\u26A0   Escribir en MAYUSCULAS. No modificar ni eliminar la fila de encabezados (fila 5).", ...Array(NC - 1).fill("")],
       HCOLS.map((h) => h.l),
       ["NOMBRE DE TU MARCA", "Bralette microfibra esponja removible", 100, 3, "S/M", "Lenceria", "Negro", ""],
@@ -56133,7 +56147,7 @@
     XLSX2.utils.book_append_sheet(wb, ws3, "Instrucciones");
     const buf = XLSX2.write(wb, { bookType: "xlsx", type: "array" });
     const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
-    descargarArchivo(blob, "ToscanaHouse_Inventario_" + HOY + ".xlsx");
+    descargarArchivo(blob, "ToscanaHouse_Inventario_" + HOY2 + ".xlsx");
   }
   function leerCfgLiq(marcaId) {
     const id = Number(marcaId);
@@ -58673,7 +58687,8 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
     cargas: "M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4 M7 8l5-5 5 5 M12 3v12",
     ventas_ant: "M12 21a9 9 0 100-18 9 9 0 000 18z M12 7v5l3 3",
     config: "M4 21v-7 M4 10V3 M12 21v-9 M12 8V3 M20 21v-5 M20 12V3 M1 14h6 M9 8h6 M17 16h6",
-    retiros: "M9 14l-4-4 4-4 M5 10h9a6 6 0 016 6v2"
+    retiros: "M9 14l-4-4 4-4 M5 10h9a6 6 0 016 6v2",
+    clientes: "M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2 M9 11a4 4 0 100-8 4 4 0 000 8 M23 21v-2a4 4 0 00-3-3.87 M16 3.13a4 4 0 010 7.75"
   };
   function FosNavIcon({ id }) {
     const d = FOS_NAV_PATHS[id];
@@ -58696,7 +58711,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
   }
   function DesktopSidebar({ tabs, active, onChange, user, logout, groups: customGroups, dotColors: customDot }) {
     const GROUPS = customGroups || [
-      { label: "Principal", ids: ["inicio", "pos", "ventas", "cambios"] },
+      { label: "Principal", ids: ["inicio", "pos", "ventas", "clientes", "cambios"] },
       { label: "Gesti\xF3n", ids: ["inventario", "marcas", "liquidaciones", "giftcards"] },
       { label: "Sistema", ids: ["auditoria", "cargas", "ventas_ant", "config"] }
     ];
@@ -63325,6 +63340,159 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       },
       "Descargar plantilla"
     ))), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label2, lineHeight: 1.7, padding: "0 4px" } }, "\u2022 Una fila = una venta registrada (sin afectar stock).", /* @__PURE__ */ import_react.default.createElement("br", null), "\u2022 Fecha: DD/MM/AAAA. Turno: Ma\xF1ana/Tarde/Noche. M\xE9todo: efectivo/qr/tarjeta.", /* @__PURE__ */ import_react.default.createElement("br", null), "\u2022 Se agrupan por marca+fecha+turno+m\xE9todo para las liquidaciones.", /* @__PURE__ */ import_react.default.createElement("br", null), "\u2022 Las marcas y turnos se reconocen en may\xFAsculas o min\xFAsculas.", /* @__PURE__ */ import_react.default.createElement("br", null), "\u2022 Cada venta queda en el mes real de su fecha (abril, mayo, junio...)."))));
+  }
+  function ClientesTab({ ventas, user }) {
+    const [busq, setBusq] = (0, import_react.useState)("");
+    const [soloTel, setSoloTel] = (0, import_react.useState)(false);
+    const titleCase = (s) => String(s || "").trim().toLowerCase().replace(/\b([a-záéíóúñ])/g, (m) => m.toUpperCase());
+    const soloDigitos = (t) => String(t || "").replace(/[^\d]/g, "");
+    const clientes = (0, import_react.useMemo)(() => {
+      const map = /* @__PURE__ */ new Map();
+      (ventas || []).forEach((v) => {
+        if (v.anulada) return;
+        const nom = (v.clienteNombre || "").trim();
+        if (!nom) return;
+        const key = nom.toLowerCase().replace(/\s+/g, " ");
+        const tel = soloDigitos(v.clienteTelefono);
+        if (!map.has(key)) map.set(key, { nombre: titleCase(nom), tel: "", compras: 0, total: 0, ultima: "", primera: "" });
+        const c = map.get(key);
+        c.compras++;
+        c.total += Number(v.total) || 0;
+        if (tel && tel.length >= 7 && !c.tel) c.tel = tel;
+        const f = v.fecha || "";
+        if (f > c.ultima) c.ultima = f;
+        if (!c.primera || f && f < c.primera) c.primera = f;
+      });
+      return [...map.values()].sort((a, b) => (b.ultima || "").localeCompare(a.ultima || "") || b.total - a.total);
+    }, [ventas]);
+    const conTel = clientes.filter((c) => c.tel);
+    const q = busq.trim().toLowerCase();
+    const lista = clientes.filter((c) => !soloTel || c.tel).filter((c) => !q || c.nombre.toLowerCase().includes(q) || c.tel.includes(q.replace(/\D/g, "")));
+    const fechaCorta = (s) => {
+      const p = String(s || "").split("-");
+      return p.length === 3 ? `${+p[2]} ${(MESES[+p[1] - 1] || "").slice(0, 3).toLowerCase()}` : "\u2014";
+    };
+    const waNum = (t) => {
+      const d = soloDigitos(t);
+      return d.length === 8 ? "591" + d : d;
+    };
+    function chatCliente(c) {
+      if (!c.tel) return;
+      window.open(`https://wa.me/${waNum(c.tel)}`, "_blank");
+    }
+    function compartirLista() {
+      if (conTel.length === 0) {
+        alert("Todav\xEDa no hay clientas con tel\xE9fono guardado. Se guardan al cobrar una venta con el dato de la clienta.");
+        return;
+      }
+      const txt = `Clientas Toscana House (${conTel.length})
+
+` + conTel.map((c, i) => `${i + 1}. ${c.nombre} \xB7 ${c.tel}`).join("\n");
+      window.open("https://wa.me/?text=" + encodeURIComponent(txt), "_blank");
+    }
+    async function exportarExcel() {
+      const XLSX2 = await loadXLSX();
+      const wb = XLSX2.utils.book_new();
+      const rows = [
+        ["Cliente", "Tel\xE9fono", "Compras", "Total gastado (Bs)", "Primera visita", "\xDAltima visita"],
+        ...clientes.map((c) => [c.nombre, c.tel || "", c.compras, +c.total.toFixed(2), c.primera || "", c.ultima || ""])
+      ];
+      const ws = XLSX2.utils.aoa_to_sheet(rows);
+      ws["!cols"] = [{ wch: 26 }, { wch: 14 }, { wch: 9 }, { wch: 16 }, { wch: 13 }, { wch: 13 }];
+      XLSX2.utils.book_append_sheet(wb, ws, "Clientas");
+      const buf = XLSX2.write(wb, { bookType: "xlsx", type: "array" });
+      descargarArchivo(new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), "Toscana_Clientas_" + HOY + ".xlsx");
+    }
+    const btn = (onClick, txt, col, bg) => /* @__PURE__ */ import_react.default.createElement("button", { onClick, style: {
+      display: "inline-flex",
+      alignItems: "center",
+      gap: 6,
+      padding: "9px 14px",
+      borderRadius: 11,
+      border: `1px solid ${col}33`,
+      background: bg,
+      color: col,
+      fontSize: 12.5,
+      fontWeight: 700,
+      fontFamily: FONT,
+      cursor: "pointer",
+      WebkitTapHighlightColor: "transparent"
+    } }, txt);
+    return /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "flex-end", justifyContent: "space-between", flexWrap: "wrap", gap: 12, marginBottom: 16 } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 20, fontWeight: 700, color: C.label, fontFamily: FONT_DISPLAY, letterSpacing: "-0.01em" } }, "Clientes"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12.5, color: C.label3, fontFamily: FONT, marginTop: 2 } }, /* @__PURE__ */ import_react.default.createElement("b", { style: { color: C.label } }, clientes.length), " clienta", clientes.length !== 1 ? "s" : "", " registrada", clientes.length !== 1 ? "s" : "", " \xB7 ", /* @__PURE__ */ import_react.default.createElement("b", { style: { color: C.green } }, conTel.length), " con tel\xE9fono")), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 8, flexWrap: "wrap" } }, btn(compartirLista, /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, null, " ", /* @__PURE__ */ import_react.default.createElement("i", { className: "ti ti-brand-whatsapp", style: { fontSize: 15 }, "aria-hidden": "true" }), " Compartir por WhatsApp"), C.green, `${C.green}12`), btn(exportarExcel, /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, null, " ", /* @__PURE__ */ import_react.default.createElement("i", { className: "ti ti-file-spreadsheet", style: { fontSize: 15 }, "aria-hidden": "true" }), " Excel"), C.gold, `${C.gold}12`))), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 8, marginBottom: 14 } }, /* @__PURE__ */ import_react.default.createElement(
+      "input",
+      {
+        value: busq,
+        onChange: (e) => setBusq(e.target.value),
+        placeholder: "Buscar por nombre o tel\xE9fono\u2026",
+        style: {
+          flex: 1,
+          padding: "11px 14px",
+          borderRadius: 12,
+          border: `1px solid ${C.sep}`,
+          background: C.bg0,
+          fontSize: 14,
+          color: C.label,
+          fontFamily: FONT,
+          outline: "none",
+          boxSizing: "border-box"
+        }
+      }
+    ), /* @__PURE__ */ import_react.default.createElement("button", { onClick: () => setSoloTel((s) => !s), style: {
+      padding: "0 14px",
+      borderRadius: 12,
+      cursor: "pointer",
+      border: `1px solid ${soloTel ? C.green : C.sep}`,
+      background: soloTel ? `${C.green}12` : C.bg0,
+      color: soloTel ? C.green : C.label3,
+      fontSize: 12.5,
+      fontWeight: 600,
+      fontFamily: FONT,
+      whiteSpace: "nowrap"
+    } }, "Con tel\xE9fono")), lista.length === 0 ? /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center", padding: "48px 20px", color: C.label3, fontFamily: FONT, fontSize: 13.5 } }, clientes.length === 0 ? "Todav\xEDa no hay clientas registradas. Se agregan solas al cobrar una venta con el nombre de la clienta." : "Sin resultados para la b\xFAsqueda.") : /* @__PURE__ */ import_react.default.createElement("div", { style: { background: C.bg1, border: `1px solid ${C.sep}`, borderRadius: 16, overflow: "hidden" } }, lista.map((c, i) => /* @__PURE__ */ import_react.default.createElement("div", { key: c.nombre + i, style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 13,
+      padding: "12px 15px",
+      borderBottom: i < lista.length - 1 ? `1px solid ${C.sep}` : "none"
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      width: 40,
+      height: 40,
+      borderRadius: 13,
+      flexShrink: 0,
+      background: `${C.gold}18`,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      fontSize: 16,
+      fontFamily: FONT_DISPLAY,
+      fontWeight: 600,
+      color: C.gold
+    } }, (c.nombre || "?").trim()[0]?.toUpperCase()), /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 14.5, fontWeight: 600, color: C.label, fontFamily: FONT, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" } }, c.nombre), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT, marginTop: 2 } }, c.compras, " compra", c.compras !== 1 ? "s" : "", " \xB7 ", $2(c.total), " \xB7 \xFAltima ", fechaCorta(c.ultima))), c.tel ? /* @__PURE__ */ import_react.default.createElement(
+      "button",
+      {
+        onClick: () => chatCliente(c),
+        title: "Escribir por WhatsApp",
+        style: {
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 6,
+          flexShrink: 0,
+          padding: "7px 11px",
+          borderRadius: 10,
+          border: `1px solid ${C.green}33`,
+          background: `${C.green}10`,
+          color: C.green,
+          fontSize: 12.5,
+          fontWeight: 700,
+          fontFamily: FONT_MONO,
+          cursor: "pointer",
+          WebkitTapHighlightColor: "transparent"
+        }
+      },
+      /* @__PURE__ */ import_react.default.createElement("i", { className: "ti ti-brand-whatsapp", style: { fontSize: 15 }, "aria-hidden": "true" }),
+      " ",
+      c.tel
+    ) : /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 11, color: C.label4, fontFamily: FONT, flexShrink: 0, fontStyle: "italic" } }, "sin tel\xE9fono")))), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT, marginTop: 12, textAlign: "center", lineHeight: 1.5 } }, 'Las clientas se registran solas al cobrar una venta con su nombre y tel\xE9fono. "Compartir por WhatsApp" abre WhatsApp con la lista de las que tienen tel\xE9fono, para que la mandes a quien quieras.'));
   }
   function BurbujaDescuentos({ descuentos, descCodigos, isDesktop }) {
     const H = hoy();
@@ -69867,6 +70035,7 @@ Esta acci\xF3n no se puede deshacer.` : "\xBFEliminar esta carga? Esta acci\xF3n
       { id: "inicio", icon: "\u229E", label: "Inicio" },
       { id: "pos", icon: "\u2295", label: "Caja" },
       { id: "ventas", icon: "\u25C8", label: "Ventas" },
+      { id: "clientes", icon: "\u25D0", label: "Clientes" },
       { id: "inventario", icon: "\u25EB", label: "Inventario" },
       { id: "auditoria", icon: "\u2316", label: "Verificaci\xF3n" },
       { id: "cargas", icon: "\u{1F9FE}", label: "Cargas" },
@@ -69877,7 +70046,7 @@ Esta acci\xF3n no se puede deshacer.` : "\xBFEliminar esta carga? Esta acci\xF3n
       { id: "ventas_ant", icon: "\u23F1", label: "V.Antiguas" },
       { id: "config", icon: "\u2699", label: "Config" }
     ];
-    const TABS = user?.rol === "caja" ? TABS_ALL.filter((t) => ["inicio", "pos", "ventas", "cambios", "inventario"].includes(t.id)) : user?.rol === "admin" ? TABS_ALL : TABS_ALL.filter((t) => t.id !== "auditoria" && t.id !== "cargas" && t.id !== "ventas_ant");
+    const TABS = user?.rol === "caja" ? TABS_ALL.filter((t) => ["inicio", "pos", "ventas", "clientes", "cambios", "inventario"].includes(t.id)) : user?.rol === "admin" ? TABS_ALL : TABS_ALL.filter((t) => t.id !== "auditoria" && t.id !== "cargas" && t.id !== "ventas_ant");
     const showingDetail = tab === "marcas" && marcaDetalle;
     if (!authReady) return /* @__PURE__ */ import_react.default.createElement("div", { style: {
       minHeight: "100vh",
@@ -70101,7 +70270,7 @@ Esta acci\xF3n no se puede deshacer.` : "\xBFEliminar esta carga? Esta acci\xF3n
         onGoVerif: () => setTab("auditoria"),
         tabActual: tab
       }
-    )), tab === "cargas" && /* @__PURE__ */ import_react.default.createElement(RegistroCargas, { cargas: cargasCompletas, marcas: MARCAS, onVerificar: handleVerificarCarga, user, onEliminarCarga: handleEliminarCarga, inv }), tab === "cambios" && /* @__PURE__ */ import_react.default.createElement(CambiosTab, { inv, ventas, onCambio: handleCambio }), tab === "ventas_ant" && user?.rol === "admin" && /* @__PURE__ */ import_react.default.createElement(VentasAntiguas, { inv, ventas, cargas: cargasCompletas, onVentaHistorica: handleVentaHistorica, onImportarVentasLibres: handleImportarVentasLibres, user }), tab === "marcas" && !marcaDetalle && /* @__PURE__ */ import_react.default.createElement("div", null, user?.rol === "admin" && /* @__PURE__ */ import_react.default.createElement(
+    )), tab === "cargas" && /* @__PURE__ */ import_react.default.createElement(RegistroCargas, { cargas: cargasCompletas, marcas: MARCAS, onVerificar: handleVerificarCarga, user, onEliminarCarga: handleEliminarCarga, inv }), tab === "cambios" && /* @__PURE__ */ import_react.default.createElement(CambiosTab, { inv, ventas, onCambio: handleCambio }), tab === "clientes" && /* @__PURE__ */ import_react.default.createElement(ClientesTab, { ventas, user }), tab === "ventas_ant" && user?.rol === "admin" && /* @__PURE__ */ import_react.default.createElement(VentasAntiguas, { inv, ventas, cargas: cargasCompletas, onVentaHistorica: handleVentaHistorica, onImportarVentasLibres: handleImportarVentasLibres, user }), tab === "marcas" && !marcaDetalle && /* @__PURE__ */ import_react.default.createElement("div", null, user?.rol === "admin" && /* @__PURE__ */ import_react.default.createElement(
       PanelDescuentosAdmin,
       {
         marcas: marcasState,
