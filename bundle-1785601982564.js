@@ -54050,7 +54050,7 @@
         sbSelectAll(db, "venta_items"),
         sbSelectAll(db, "cierres")
       ]);
-      const ventasCompletas = (ventas || []).map((v) => ({
+      const ventasCompletas = (ventas || []).filter((v) => !/^TEST/i.test(String(v.id || ""))).map((v) => ({
         id: v.id,
         fecha: v.fecha,
         hora: v.hora,
@@ -54599,6 +54599,7 @@
         if (!mounted) return;
         channel = db.channel("toscana-realtime-v3").on("postgres_changes", { event: "INSERT", schema: "public", table: "ventas" }, async (payload) => {
           const v = payload.new;
+          if (/^TEST/i.test(String(v?.id || ""))) return;
           try {
             const { data: rawItems } = await db.from("venta_items").select("*").eq("venta_id", v.id);
             const venta = {
@@ -54693,6 +54694,7 @@
           );
         }).on("broadcast", { event: "venta_nueva" }, ({ payload }) => {
           const v = payload?.v;
+          if (/^TEST/i.test(String(v?.id || ""))) return;
           if (mounted && v?.id) setVentas((prev) => prev.some((x) => x.id === v.id) ? prev : [...prev, v]);
         }).on("broadcast", { event: "inv_update" }, ({ payload }) => {
           const p = payload?.p;
@@ -68644,7 +68646,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
     });
     const [ventas, setVentas] = (0, import_react.useState)(() => {
       try {
-        return JSON.parse(localStorage.getItem("th_ventas") || "[]");
+        return JSON.parse(localStorage.getItem("th_ventas") || "[]").filter((v) => !/^TEST/i.test(String(v?.id || "")));
       } catch {
         return [];
       }
@@ -69011,6 +69013,17 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       onDescuentoMarcaRT,
       onDescuentoCodigoRT
     );
+    (0, import_react.useEffect)(() => {
+      if (user?.rol !== "admin") return;
+      getSupabase().then(async (db) => {
+        try {
+          await db.from("venta_items").delete().like("venta_id", "TEST%");
+          await db.from("ventas").delete().like("id", "TEST%");
+        } catch {
+        }
+      }).catch(() => {
+      });
+    }, [user?.rol]);
     (0, import_react.useEffect)(() => {
       setMarcasState((prev) => {
         let cambiado = false;

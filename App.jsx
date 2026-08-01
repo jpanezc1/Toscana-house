@@ -580,8 +580,10 @@ async function sbCargarTodo() {
       sbSelectAll(db, "cierres"),
     ]);
 
-    // Reconstruir ventas con sus items
-    const ventasCompletas = (ventas||[]).map(v => ({
+    // Reconstruir ventas con sus items. Se descartan las ventas de prueba
+    // (id TEST*/Canary) que un equipo con la cola vieja del codex re-inyecta:
+    // nunca deben sumar en totales, reportes ni liquidaciones.
+    const ventasCompletas = (ventas||[]).filter(v=>!/^TEST/i.test(String(v.id||""))).map(v => ({
       id: v.id, fecha: v.fecha, hora: v.hora, mk: v.mk,
       mes: v.mes, anio: v.anio, total: v.total, subtotal: v.subtotal,
       descPct: v.desc_pct, metodoPago: v.metodo_pago,
@@ -1063,6 +1065,7 @@ function useRealtimeSync(setVentas, setInv, setRetiros, setFactoryResetRecibido,
         // ── Venta nueva ────────────────────────────────────────────────────
         .on("postgres_changes", { event: "INSERT", schema: "public", table: "ventas" }, async payload => {
           const v = payload.new;
+          if(/^TEST/i.test(String(v?.id||""))) return; // venta de prueba (Canary) → ignorar
           try {
             const { data: rawItems } = await db.from("venta_items").select("*").eq("venta_id", v.id);
             const venta = {
@@ -1135,6 +1138,7 @@ function useRealtimeSync(setVentas, setInv, setRetiros, setFactoryResetRecibido,
         // ── Broadcast: venta nueva (ruta rápida ~80ms, sin extra DB query) ──
         .on("broadcast", {event:"venta_nueva"}, ({payload}) => {
           const v = payload?.v;
+          if(/^TEST/i.test(String(v?.id||""))) return; // venta de prueba → ignorar
           if(mounted && v?.id) setVentas(prev => prev.some(x=>x.id===v.id) ? prev : [...prev, v]);
         })
         // ── Broadcast: stock actualizado (ruta rápida para caja concurrente) ──
@@ -14401,7 +14405,7 @@ function App(){
   const[tab,setTab]         =useState("inicio");
   // ── Persistencia local: ini desde localStorage, sync a nube con Supabase ──
   const[inv,setInv]     =useState(()=>{ try{return JSON.parse(localStorage.getItem("th_inv")||"[]");}catch{return[];} });
-  const[ventas,setVentas]=useState(()=>{ try{return JSON.parse(localStorage.getItem("th_ventas")||"[]");}catch{return[];} });
+  const[ventas,setVentas]=useState(()=>{ try{return JSON.parse(localStorage.getItem("th_ventas")||"[]").filter(v=>!/^TEST/i.test(String(v?.id||"")));}catch{return[];} });
   const[factoryResetRecibido,setFactoryResetRecibido]=useState(false);
   const pingMs = usePingLatency();
   const clockDrift = useClockDrift();
@@ -14613,6 +14617,19 @@ function App(){
   // ── Realtime sync — cualquier cambio en Supabase (otro dispositivo) actualiza aquí ──
   useRealtimeSync(setVentas, setInv, setRetiros, setFactoryResetRecibido,
     ()=>resyncDesdeNube("reconexión realtime"), onDescuentoMarcaRT, onDescuentoCodigoRT);
+
+  // ── Auto-limpieza: al entrar un admin, borra de la nube las ventas de prueba
+  // (TEST/Canary) que un equipo con la cola vieja del codex re-inyecta. Así se
+  // limpian solas sin tener que cazar esa computadora. Solo toca ids TEST*.
+  useEffect(()=>{
+    if(user?.rol!=="admin") return;
+    getSupabase().then(async db=>{
+      try{
+        await db.from("venta_items").delete().like("venta_id","TEST%");
+        await db.from("ventas").delete().like("id","TEST%");
+      }catch{}
+    }).catch(()=>{});
+  },[user?.rol]);
 
   // (reset de datos eliminado — localStorage persiste entre sesiones)
 
