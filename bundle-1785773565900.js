@@ -57853,6 +57853,283 @@
       }
     }
   }
+  async function liquidacionPDF(marca, mes, anio, liq) {
+    const { jsPDF } = window.jspdf || {};
+    if (!jsPDF) throw new Error("jsPDF no carg\xF3");
+    const doc = new jsPDF({ unit: "mm", format: "a4" });
+    const W = 210, H = 297, M = 16;
+    const f2 = (n) => "Bs " + Number(n || 0).toLocaleString("es-BO", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const n0 = (n) => Number(n || 0).toLocaleString("es-BO", { maximumFractionDigits: 0 });
+    const marcaId = marca?.id;
+    const rows = [];
+    (liq.vMarca || []).forEach((v) => (v.items || []).filter((it) => it.marcaId === marcaId).forEach((it) => {
+      const full = (it.precioUnit || 0) * (it.cantidad || 1);
+      const d = it.descPct != null ? Number(it.descPct) || 0 : getManualDescPct(v);
+      rows.push({ fecha: v.fecha, hora: v.hora, codigo: it.codigo, nombre: it.nombre, cant: it.cantidad || 1, lleno: full, desc: d, neto: netItemSub(v, it), metodo: v.metodoPago });
+    }));
+    rows.sort((a, b) => tsVenta({ fecha: a.fecha, hora: a.hora }) - tsVenta({ fecha: b.fecha, hora: b.hora }));
+    const fullTot = rows.reduce((s, r) => s + r.lleno, 0);
+    const descTot = +(fullTot - liq.bruto).toFixed(2);
+    const pago = (mp) => !mp ? "\u2014" : String(mp).startsWith("mixto|") ? "Mixto" : { efectivo: "Efectivo", qr: "QR", tarjeta: "Tarjeta", giftcard: "Gift" }[mp] || mp;
+    const fcorta = (s) => {
+      const p = String(s || "").split("-");
+      return p.length === 3 ? +p[2] + " " + (MESES[+p[1] - 1] || "").slice(0, 3).toLowerCase() : String(s || "");
+    };
+    const trunc = (t, fnt, sz, mw) => {
+      doc.setFont(...fnt);
+      doc.setFontSize(sz);
+      if (doc.getTextWidth(t) <= mw) return t;
+      while (t && doc.getTextWidth(t + "\u2026") > mw) t = t.slice(0, -1);
+      return t + "\u2026";
+    };
+    const CH = [207, 186, 130], BONE = [245, 242, 238], MUT = [139, 135, 145], GOLD = [138, 100, 24], RED = [163, 55, 47], V2 = [87, 83, 78], V = [26, 23, 20];
+    doc.setFillColor(38, 37, 31);
+    doc.roundedRect(M, 14, W - 2 * M, 26, 4, 4, "F");
+    doc.setFont("courier", "normal");
+    doc.setFontSize(7);
+    doc.setTextColor(...CH);
+    doc.text(("Liquidaci\xF3n \xB7 " + MESES[mes] + " " + anio).toUpperCase(), M + 8, 22, { charSpace: 0.6 });
+    doc.setFont("times", "normal");
+    doc.setFontSize(21);
+    doc.setTextColor(...BONE);
+    doc.text(marca?.nombre || "", M + 8, 33);
+    doc.setFont("times", "normal");
+    doc.setFontSize(13);
+    doc.setTextColor(...CH);
+    doc.text("T  H", W - M - 8, 23, { align: "right" });
+    doc.setFont("courier", "normal");
+    doc.setFontSize(6.5);
+    doc.setTextColor(175, 166, 150);
+    doc.text((rows.length + " prendas vendidas").toUpperCase(), W - M - 8, 33, { align: "right", charSpace: 0.4 });
+    const cx = M, cw = W - 2 * M;
+    let cy = 46;
+    const cuenta = [
+      ["Ingres\xF3 por ventas (precio lleno)", f2(fullTot), false, MUT],
+      ["Descuentos aplicados a las prendas", descTot > 0.01 ? "- " + f2(descTot) : f2(0), false, [200, 150, 110]],
+      ["__hr__"],
+      ["Ingreso neto (entr\xF3 a caja)", f2(liq.bruto), true, BONE],
+      ["__ef__"],
+      [`Comisi\xF3n tarjeta ${liq.cfg?.pctTarjeta ?? 0}% (solo lo de tarjeta)`, "- " + f2(liq.descTJ), false, [230, 150, 150]]
+    ];
+    if ((liq.cfg?.pctComision ?? 0) > 0) cuenta.push([`Comisi\xF3n Toscana ${liq.cfg?.pctComision}%`, "- " + f2(liq.comision), false, [230, 150, 150]]);
+    if (liq.alquiler > 0) cuenta.push(["Alquiler del espacio", "- " + f2(liq.alquiler), false, [230, 150, 150]]);
+    (liq.gastos || []).filter((g) => g.desc || Number(g.monto) > 0).forEach((g) => cuenta.push([g.desc || "Gasto", "- " + f2(Number(g.monto) || 0), false, [230, 150, 150]]));
+    const nLin = cuenta.length + 1;
+    const cardH = 16 + nLin * 6.6 + 12;
+    doc.setFillColor(38, 37, 31);
+    doc.roundedRect(cx, cy, cw, cardH, 4, 4, "F");
+    doc.setFont("courier", "normal");
+    doc.setFontSize(6.8);
+    doc.setTextColor(...CH);
+    doc.text("LA CUENTA DEL MES", cx + 8, cy + 9, { charSpace: 0.6 });
+    let ly = cy + 18;
+    for (const row of cuenta) {
+      if (row[0] === "__hr__") {
+        doc.setDrawColor(74, 68, 56);
+        doc.setLineWidth(0.2);
+        doc.line(cx + 8, ly - 2.5, cx + cw - 8, ly - 2.5);
+        continue;
+      }
+      if (row[0] === "__ef__") {
+        doc.setFont("courier", "normal");
+        doc.setFontSize(6.3);
+        doc.setTextColor(142, 135, 122);
+        doc.text(`EFECTIVO ${n0(liq.brutoEf)}     QR ${n0(liq.brutoQR)}     TARJETA ${n0(liq.brutoTJ)}`, cx + 10, ly - 1, { charSpace: 0.3 });
+        ly += 4.5;
+        continue;
+      }
+      const [lbl, val, bold, vcol] = row;
+      doc.setFont("helvetica", bold ? "bold" : "normal");
+      doc.setFontSize(bold ? 9.5 : 8.6);
+      doc.setTextColor(bold ? BONE[0] : 200, bold ? BONE[1] : 194, bold ? BONE[2] : 182);
+      doc.text(trunc(lbl, ["helvetica", bold ? "bold" : "normal"], bold ? 9.5 : 8.6, cw - 70), cx + 8, ly);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(bold ? 10 : 8.8);
+      doc.setTextColor(...vcol || BONE);
+      doc.text(val, cx + cw - 8, ly, { align: "right" });
+      ly += 6.6;
+    }
+    doc.setDrawColor(...CH);
+    doc.setLineWidth(0.4);
+    doc.line(cx + 8, ly - 2, cx + cw - 8, ly - 2);
+    ly += 4;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(11);
+    doc.setTextColor(...CH);
+    doc.text("NETO A PAGAR A " + String(marca?.nombre || "").toUpperCase(), cx + 8, ly);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(16);
+    doc.setTextColor(...BONE);
+    doc.text(f2(liq.neto), cx + cw - 8, ly + 0.5, { align: "right" });
+    let y = cy + cardH + 12;
+    const headTabla = (yy) => {
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(6.6);
+      doc.setTextColor(...MUT);
+      doc.text("FECHA", M, yy);
+      doc.text("C\xD3DIGO", M + 18, yy);
+      doc.text("PRENDA", M + 44, yy);
+      doc.text("PRECIO", W - M - 46, yy, { align: "right" });
+      doc.text("DESC", W - M - 30, yy, { align: "right" });
+      doc.text("NETO", W - M - 14, yy, { align: "right" });
+      doc.text("PAGO", W - M - 13, yy);
+      doc.setDrawColor(226, 222, 216);
+      doc.setLineWidth(0.3);
+      doc.line(M, yy + 1.5, W - M, yy + 1.5);
+    };
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(11);
+    doc.setTextColor(...V);
+    doc.text("Desglose de lo vendido", M, y);
+    doc.setFont("courier", "normal");
+    doc.setFontSize(6.6);
+    doc.setTextColor(...MUT);
+    doc.text((rows.length + " ventas").toUpperCase(), W - M, y, { align: "right" });
+    y += 6;
+    headTabla(y);
+    y += 6;
+    for (const r of rows) {
+      if (y > H - 24) {
+        doc.setFont("courier", "normal");
+        doc.setFontSize(6.3);
+        doc.setTextColor(...MUT);
+        doc.text("Powered by FORGE.", W - M, H - 12, { align: "right" });
+        doc.addPage();
+        y = 22;
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(11);
+        doc.setTextColor(...V);
+        doc.text("Desglose de lo vendido (cont.)", M, y);
+        y += 6;
+        headTabla(y);
+        y += 6;
+      }
+      doc.setFont("courier", "normal");
+      doc.setFontSize(6.6);
+      doc.setTextColor(...V2);
+      doc.text(fcorta(r.fecha), M, y);
+      doc.setFont("courier", "normal");
+      doc.setFontSize(6.6);
+      doc.setTextColor(...GOLD);
+      doc.text(trunc(String(r.codigo || ""), ["courier", "normal"], 6.6, 24), M + 18, y);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(7.6);
+      doc.setTextColor(...V);
+      doc.text(trunc(String(r.nombre || "") + (r.cant > 1 ? "  x" + r.cant : ""), ["helvetica", "normal"], 7.6, W - M - 46 - (M + 44) - 2), M + 44, y);
+      doc.setTextColor(...MUT);
+      doc.text(n0(r.lleno), W - M - 46, y, { align: "right" });
+      if (r.desc > 0) {
+        doc.setTextColor(...RED);
+        doc.text("-" + Math.round(r.desc) + "%", W - M - 30, y, { align: "right" });
+      } else {
+        doc.setTextColor(200, 196, 188);
+        doc.text("\u2014", W - M - 30, y, { align: "right" });
+      }
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(7.6);
+      doc.setTextColor(...V);
+      doc.text(Number(r.neto).toLocaleString("es-BO", { minimumFractionDigits: 2, maximumFractionDigits: 2 }), W - M - 14, y, { align: "right" });
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(6.6);
+      doc.setTextColor(...V2);
+      doc.text(pago(r.metodo), W - M - 13, y);
+      y += 5.6;
+      doc.setDrawColor(239, 236, 230);
+      doc.setLineWidth(0.15);
+      doc.line(M, y - 2, W - M, y - 2);
+    }
+    y += 1;
+    doc.setDrawColor(...V);
+    doc.setLineWidth(0.3);
+    doc.line(W - M - 60, y, W - M, y);
+    y += 5;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(8.5);
+    doc.setTextColor(...V);
+    doc.text("Total vendido (neto)", W - M - 60, y);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10.5);
+    doc.setTextColor(...GOLD);
+    doc.text(f2(liq.bruto), W - M, y, { align: "right" });
+    const np = doc.getNumberOfPages();
+    for (let p = 1; p <= np; p++) {
+      doc.setPage(p);
+      doc.setDrawColor(226, 222, 216);
+      doc.setLineWidth(0.3);
+      doc.line(M, H - 16, W - M, H - 16);
+      doc.setFont("courier", "normal");
+      doc.setFontSize(6);
+      doc.setTextColor(...MUT);
+      doc.text(("Toscana House \xB7 liquidaci\xF3n " + (marca?.nombre || "")).toUpperCase(), M, H - 11, { charSpace: 0.3 });
+      doc.text(`POWERED BY FORGE.   \xB7   ${p}/${np}`, W - M, H - 11, { align: "right", charSpace: 0.3 });
+    }
+    return doc;
+  }
+  async function subirLiqPDF(doc, marca, mes, anio) {
+    try {
+      const sb = await getSupabase();
+      if (!sb) return null;
+      const blob = doc.output("blob");
+      const slug = String(marca?.nombre || "marca").replace(/[^a-zA-Z0-9]/g, "_");
+      const path = `liquidaciones/${slug}_${MESES[mes]}_${anio}_${Date.now()}.pdf`;
+      const { error } = await sb.storage.from("notas").upload(path, blob, { contentType: "application/pdf", upsert: true });
+      if (error) {
+        console.warn("subir liq:", error.message);
+        return null;
+      }
+      return sb.storage.from("notas").getPublicUrl(path).data.publicUrl;
+    } catch (e) {
+      console.warn("subir liq:", e.message);
+      return null;
+    }
+  }
+  async function verLiquidacionPDF(marca, mes, anio, liq) {
+    try {
+      const doc = await liquidacionPDF(marca, mes, anio, liq);
+      const w = window.open(doc.output("bloburl"), "_blank");
+      if (!w) doc.save(`Liquidacion ${marca?.nombre || "marca"} ${MESES[mes]} ${anio}.pdf`);
+    } catch (e) {
+      try {
+        alert("No se pudo generar el PDF");
+      } catch {
+      }
+    }
+  }
+  async function enviarLiquidacionWhatsApp(marca, mes, anio, liq, notify) {
+    const say = notify || ((m) => {
+      try {
+        alert(m);
+      } catch {
+      }
+    });
+    try {
+      const doc = await liquidacionPDF(marca, mes, anio, liq);
+      const file = new File([doc.output("blob")], `Liquidacion ${marca?.nombre || "marca"} ${MESES[mes]}.pdf`, { type: "application/pdf" });
+      const esMovil = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1;
+      if (esMovil && navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], title: `Liquidaci\xF3n ${marca?.nombre} ${MESES[mes]}` });
+        return;
+      }
+      const url = await subirLiqPDF(doc, marca, mes, anio);
+      const texto = `*TOSCANA HOUSE \u2014 Liquidaci\xF3n*
+${marca?.nombre || ""} \xB7 ${MESES[mes]} ${anio}
+
+Neto a pagar: ${"Bs " + Number(liq.neto || 0).toLocaleString("es-BO", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` + (url ? `
+
+Detalle completo en PDF: ${url}` : "");
+      const tel = String(marca?.telefono || "").replace(/\D/g, "");
+      const destino = tel.length >= 7 ? "https://wa.me/591" + tel + "?text=" : "https://wa.me/?text=";
+      window.open(destino + encodeURIComponent(texto), "_blank");
+      if (url) say("Listo \u2014 el mensaje lleva el neto + el enlace al PDF completo");
+      else {
+        doc.save(`Liquidacion ${marca?.nombre || "marca"} ${MESES[mes]}.pdf`);
+        say("PDF descargado \u2014 adjuntalo con el clip en WhatsApp");
+      }
+    } catch (e) {
+      if (e && e.name === "AbortError") return;
+      say("No pude preparar el env\xEDo, prob\xE1 de nuevo.");
+    }
+  }
   function NotaImgPreviewModal({ data, onClose }) {
     if (!data) return null;
     function compartir() {
@@ -59606,7 +59883,23 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
         icon: "\u{1F4E4}"
       },
       "Compartir liquidaci\xF3n"
-    ), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => exportExcelLiquidacion(marca, ventas, mes, anio), variant: "fill", icon: "\u2B07" }, "Exportar Excel"), !cerrado ? /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => {
+    ), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => exportExcelLiquidacion(marca, ventas, mes, anio), variant: "fill", icon: "\u2B07" }, "Exportar Excel"), /* @__PURE__ */ (() => {
+      const liqPDF = {
+        bruto,
+        brutoEf: brutoEfect,
+        brutoQR,
+        brutoTJ: brutoTarjeta,
+        descTJ: descTarjeta,
+        subBanco: subtotalBanco,
+        comision,
+        alquiler,
+        gastos,
+        neto,
+        vMarca,
+        cfg: { pctTarjeta, pctComision }
+      };
+      return /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 } }, /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => verLiquidacionPDF(marca, mes, anio, liqPDF), variant: "fill" }, "PDF completo"), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => enviarLiquidacionWhatsApp(marca, mes, anio, liqPDF), variant: "success" }, "Enviar PDF"));
+    })(), !cerrado ? /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => {
       const key = `${MK}-${marcaId}`, data = { cerrado: true, fecha: hoy(), mk: MK, marca_id: marcaId };
       setCierres((p) => ({ ...p, [key]: { cerrado: true, fecha: hoy(), mk: MK } }));
       syncConRespaldo("cierre", { key, data }, () => sbGuardarCierre(key, data));
@@ -77231,7 +77524,7 @@ ${c.resumen || c.id}`)) onEliminarCarga(c.id);
       neto: liq.neto,
       vMarca: liq.vMarca,
       marcaId
-    }, setImgPreview), variant: "fill", full: true, icon: "\u{1F4E4}" }, "Compartir"), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => imprimirLiquidacion(marca, mes, anio, liq), variant: "fill", full: true, icon: "\u{1F5A8}" }, "Imprimir")), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 16 } }, /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => generarImagenLiquidacion(marca, mes, anio, liq), variant: "fill", full: true, icon: "\u{1F4F7}" }, "Imagen"), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => exportExcelLiquidacion(MARCAS.find((m) => m.id === marcaId), ventas, mes, anio), variant: "fill", full: true, icon: "\u2B07" }, "Excel")), !cerrado ? /* @__PURE__ */ import_react.default.createElement(
+    }, setImgPreview), variant: "fill", full: true, icon: "\u{1F4E4}" }, "Compartir"), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => imprimirLiquidacion(marca, mes, anio, liq), variant: "fill", full: true, icon: "\u{1F5A8}" }, "Imprimir")), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 } }, /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => verLiquidacionPDF(marca, mes, anio, liq), variant: "fill", full: true }, "PDF completo"), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => enviarLiquidacionWhatsApp(marca, mes, anio, liq), variant: "success", full: true }, "Enviar PDF por WhatsApp")), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 16 } }, /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => generarImagenLiquidacion(marca, mes, anio, liq), variant: "fill", full: true, icon: "\u{1F4F7}" }, "Imagen"), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => exportExcelLiquidacion(MARCAS.find((m) => m.id === marcaId), ventas, mes, anio), variant: "fill", full: true, icon: "\u2B07" }, "Excel")), !cerrado ? /* @__PURE__ */ import_react.default.createElement(
       IOSBtn,
       {
         variant: "success",
