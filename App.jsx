@@ -11488,6 +11488,42 @@ function BrandPortal({user, ventas, inv, cargas, retiros=[], logout, descuentos=
   // Actualizar lastUpdate cuando cambien ventas o inv (cualquier fuente)
   useEffect(()=>{ setLastUpdate(Date.now()); },[ventas, inv]);
 
+  // ── Vínculo permanente con la nube: gastos + config de la marca ───────────
+  // El portal de marca ya escuchaba ventas/inventario, pero NO los gastos ni la
+  // config (alquiler/comisión/estado). Por eso un equipo mostraba gastos viejos
+  // ya borrados (p. ej. "dia de la madre") en la liquidación. Ahora la nube es
+  // la única fuente: al montar y ante cualquier cambio en kv_sync/config_marca,
+  // refresca el espejo local (sobreescribe, borra lo eliminado) y recalcula.
+  useEffect(()=>{
+    let mounted=true, ch=null;
+    const refrescar = ()=> Promise.all([sbKVCargarTodo(), sbCargarConfigMarca()])
+      .then(([rows])=>{
+        if(!mounted) return;
+        (rows||[]).forEach(r=> kvAplicarLocal(r.key, r.data)); // la nube manda
+        setLastUpdate(Date.now());
+      }).catch(()=>{});
+    refrescar();
+    getSupabase().then(db=>{
+      if(!mounted) return;
+      ch = db.channel(`brand-sync-${marcaId}`)
+        .on("postgres_changes",{event:"*",schema:"public",table:"kv_sync"},()=>refrescar())
+        .on("postgres_changes",{event:"*",schema:"public",table:"config_marca"},()=>refrescar())
+        .subscribe();
+    }).catch(()=>{});
+    return ()=>{ mounted=false; if(ch) getSupabase().then(db=>db.removeChannel(ch)).catch(()=>{}); };
+  },[marcaId]); // eslint-disable-line
+
+  // También refresca al volver a la pestaña (equipo que estuvo en segundo plano)
+  useEffect(()=>{
+    const onVis = ()=>{ if(document.visibilityState==="visible"){
+      Promise.all([sbKVCargarTodo(), sbCargarConfigMarca()]).then(([rows])=>{
+        (rows||[]).forEach(r=> kvAplicarLocal(r.key, r.data)); setLastUpdate(Date.now());
+      }).catch(()=>{});
+    }};
+    document.addEventListener("visibilitychange", onVis);
+    return ()=> document.removeEventListener("visibilitychange", onVis);
+  },[]); // eslint-disable-line
+
   // Ventas filtradas por marca (excluir anuladas) — seguro si marca es null
   const todasMarca = useMemo(()=>
     marca ? ventas.filter(v=>!v.anulada&&v.items.some(i=>i.marcaId===marca.id)) : []
@@ -11526,7 +11562,7 @@ function BrandPortal({user, ventas, inv, cargas, retiros=[], logout, descuentos=
   },[vMes, mid]);
 
   // Liquidación con config real (incluye gastos extra del período)
-  const liq = useMemo(()=>calcLiqMarca(vMes, mid, MK),[vMes, mid, MK]);
+  const liq = useMemo(()=>calcLiqMarca(vMes, mid, MK),[vMes, mid, MK, lastUpdate]);
   const gastos = liq.gastos;
 
   // GC usadas en ventas de esta marca este mes

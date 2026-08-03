@@ -65437,6 +65437,39 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
     (0, import_react.useEffect)(() => {
       setLastUpdate(Date.now());
     }, [ventas, inv]);
+    (0, import_react.useEffect)(() => {
+      let mounted = true, ch = null;
+      const refrescar = () => Promise.all([sbKVCargarTodo(), sbCargarConfigMarca()]).then(([rows]) => {
+        if (!mounted) return;
+        (rows || []).forEach((r) => kvAplicarLocal(r.key, r.data));
+        setLastUpdate(Date.now());
+      }).catch(() => {
+      });
+      refrescar();
+      getSupabase().then((db) => {
+        if (!mounted) return;
+        ch = db.channel(`brand-sync-${marcaId}`).on("postgres_changes", { event: "*", schema: "public", table: "kv_sync" }, () => refrescar()).on("postgres_changes", { event: "*", schema: "public", table: "config_marca" }, () => refrescar()).subscribe();
+      }).catch(() => {
+      });
+      return () => {
+        mounted = false;
+        if (ch) getSupabase().then((db) => db.removeChannel(ch)).catch(() => {
+        });
+      };
+    }, [marcaId]);
+    (0, import_react.useEffect)(() => {
+      const onVis = () => {
+        if (document.visibilityState === "visible") {
+          Promise.all([sbKVCargarTodo(), sbCargarConfigMarca()]).then(([rows]) => {
+            (rows || []).forEach((r) => kvAplicarLocal(r.key, r.data));
+            setLastUpdate(Date.now());
+          }).catch(() => {
+          });
+        }
+      };
+      document.addEventListener("visibilitychange", onVis);
+      return () => document.removeEventListener("visibilitychange", onVis);
+    }, []);
     const todasMarca = (0, import_react.useMemo)(
       () => marca ? ventas.filter((v) => !v.anulada && v.items.some((i) => i.marcaId === marca.id)) : [],
       [ventas, marca]
@@ -65469,7 +65502,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       }));
       return map;
     }, [vMes, mid]);
-    const liq = (0, import_react.useMemo)(() => calcLiqMarca(vMes, mid, MK), [vMes, mid, MK]);
+    const liq = (0, import_react.useMemo)(() => calcLiqMarca(vMes, mid, MK), [vMes, mid, MK, lastUpdate]);
     const gastos = liq.gastos;
     const gcMarca = (0, import_react.useMemo)(() => vMes.reduce((s, v) => {
       const a = v.gcAllocations?.find((x) => x.marcaId === mid);
