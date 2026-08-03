@@ -11696,21 +11696,26 @@ function BrandPortal({user, ventas, inv, cargas, retiros=[], logout, descuentos=
         s:`${es[0][1]} de ${tot} unidades · cuidá su reposición`});
     }
 
-    // 5. Qué traer: demanda de toda la tienda (30 días, anónima) vs tu stock
+    // 5. Qué traer: demanda de toda la tienda (30 días, anónima) vs tu stock.
+    //    SOLO categorías que la marca realmente maneja (las tiene en su
+    //    inventario, aunque estén agotadas). Nunca sugerir algo que la marca
+    //    no vende (p. ej. aretes a una marca que no hace aretes).
     {
+      const misCats=new Set(invMarca.map(p=>p.categoria||"General"));
       const catGlobal={};
       ventas.filter(v=>!v.anulada&&(v.fecha||"")>=lim30).forEach(v=>v.items.forEach(it=>{
         const p=inv.find(x=>x.codigo===it.codigo);
         const k=p?(p.categoria||"General"):null;
-        if(k) catGlobal[k]=(catGlobal[k]||0)+it.cantidad;
+        if(k&&misCats.has(k)) catGlobal[k]=(catGlobal[k]||0)+it.cantidad;
       }));
       const top=Object.entries(catGlobal).sort((a,b)=>b[1]-a[1]).slice(0,2);
       top.forEach(([k,n])=>{
-        const miStock=invMarca.filter(p=>(p.categoria||"General")===k)
-          .reduce((s,p)=>s+(Number(p.stock)||0),0);
-        if(n>=10&&miStock<=3) out.push({score:55+n/2, badge:"QUÉ TRAER",
-          t:`En la tienda vuelan los ${k.toLowerCase()}`,
-          s:`${n} uds vendidas este mes en toda la tienda y tenés ${miStock} en stock`});
+        const items=invMarca.filter(p=>(p.categoria||"General")===k);
+        const miStock=items.reduce((s,p)=>s+(Number(p.stock)||0),0);
+        // Debe ser una categoría que la marca tiene registrada y hoy escasea
+        if(items.length>0&&n>=10&&miStock<=3) out.push({score:55+n/2, badge:"QUÉ TRAER",
+          t:`Se te están agotando los ${k.toLowerCase()}`,
+          s:`${n} uds vendidas este mes en la tienda y te quedan ${miStock} en stock`});
       });
     }
 

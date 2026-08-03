@@ -65638,20 +65638,22 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
         });
       }
       {
+        const misCats = new Set(invMarca.map((p) => p.categoria || "General"));
         const catGlobal = {};
         ventas.filter((v) => !v.anulada && (v.fecha || "") >= lim30).forEach((v) => v.items.forEach((it) => {
           const p = inv.find((x) => x.codigo === it.codigo);
           const k = p ? p.categoria || "General" : null;
-          if (k) catGlobal[k] = (catGlobal[k] || 0) + it.cantidad;
+          if (k && misCats.has(k)) catGlobal[k] = (catGlobal[k] || 0) + it.cantidad;
         }));
         const top = Object.entries(catGlobal).sort((a, b) => b[1] - a[1]).slice(0, 2);
         top.forEach(([k, n]) => {
-          const miStock = invMarca.filter((p) => (p.categoria || "General") === k).reduce((s, p) => s + (Number(p.stock) || 0), 0);
-          if (n >= 10 && miStock <= 3) out.push({
+          const items = invMarca.filter((p) => (p.categoria || "General") === k);
+          const miStock = items.reduce((s, p) => s + (Number(p.stock) || 0), 0);
+          if (items.length > 0 && n >= 10 && miStock <= 3) out.push({
             score: 55 + n / 2,
             badge: "QU\xC9 TRAER",
-            t: `En la tienda vuelan los ${k.toLowerCase()}`,
-            s: `${n} uds vendidas este mes en toda la tienda y ten\xE9s ${miStock} en stock`
+            t: `Se te est\xE1n agotando los ${k.toLowerCase()}`,
+            s: `${n} uds vendidas este mes en la tienda y te quedan ${miStock} en stock`
           });
         });
       }
