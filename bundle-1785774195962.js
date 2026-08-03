@@ -57853,10 +57853,11 @@
       }
     }
   }
-  async function liquidacionPDF(marca, mes, anio, liq) {
+  async function liquidacionPDF(marca, mes, anio, liq, opts = {}) {
     const { jsPDF } = window.jspdf || {};
     if (!jsPDF) throw new Error("jsPDF no carg\xF3");
-    const doc = new jsPDF({ unit: "mm", format: "a4" });
+    const doc = opts.doc || new jsPDF({ unit: "mm", format: "a4" });
+    if (opts.doc) doc.addPage();
     const W = 210, H = 297, M = 16;
     const f2 = (n) => "Bs " + Number(n || 0).toLocaleString("es-BO", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     const n0 = (n) => Number(n || 0).toLocaleString("es-BO", { maximumFractionDigits: 0 });
@@ -58051,7 +58052,11 @@
     doc.setFontSize(10.5);
     doc.setTextColor(...GOLD);
     doc.text(f2(liq.bruto), W - M, y, { align: "right" });
-    const np = doc.getNumberOfPages();
+    if (!opts.doc) _pieLiq(doc, "Toscana House \xB7 liquidaci\xF3n " + (marca?.nombre || ""));
+    return doc;
+  }
+  function _pieLiq(doc, textoIzq) {
+    const W = 210, H = 297, M = 16, np = doc.getNumberOfPages();
     for (let p = 1; p <= np; p++) {
       doc.setPage(p);
       doc.setDrawColor(226, 222, 216);
@@ -58059,11 +58064,108 @@
       doc.line(M, H - 16, W - M, H - 16);
       doc.setFont("courier", "normal");
       doc.setFontSize(6);
-      doc.setTextColor(...MUT);
-      doc.text(("Toscana House \xB7 liquidaci\xF3n " + (marca?.nombre || "")).toUpperCase(), M, H - 11, { charSpace: 0.3 });
+      doc.setTextColor(139, 135, 145);
+      doc.text(String(textoIzq || "Toscana House").toUpperCase(), M, H - 11, { charSpace: 0.3 });
       doc.text(`POWERED BY FORGE.   \xB7   ${p}/${np}`, W - M, H - 11, { align: "right", charSpace: 0.3 });
     }
+  }
+  async function liquidacionTodasPDF(mes, anio, lista) {
+    const { jsPDF } = window.jspdf || {};
+    if (!jsPDF) throw new Error("jsPDF no carg\xF3");
+    const doc = new jsPDF({ unit: "mm", format: "a4" });
+    const W = 210, H = 297, M = 16;
+    const f2 = (n) => "Bs " + Number(n || 0).toLocaleString("es-BO", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const CH = [207, 186, 130], BONE = [245, 242, 238], MUT = [139, 135, 145], GOLD = [138, 100, 24], OK = [31, 138, 76], RED = [163, 55, 47], V = [26, 23, 20], V2 = [87, 83, 78];
+    doc.setFillColor(38, 37, 31);
+    doc.roundedRect(M, 14, W - 2 * M, 30, 4, 4, "F");
+    doc.setFont("courier", "normal");
+    doc.setFontSize(7);
+    doc.setTextColor(...CH);
+    doc.text("CIERRE DE MES \xB7 TOSCANA HOUSE", M + 8, 23, { charSpace: 0.6 });
+    doc.setFont("times", "normal");
+    doc.setFontSize(23);
+    doc.setTextColor(...BONE);
+    doc.text("Liquidaci\xF3n " + MESES[mes] + " " + anio, M + 8, 35);
+    doc.setFont("times", "normal");
+    doc.setFontSize(13);
+    doc.setTextColor(...CH);
+    doc.text("T  H", W - M - 8, 25, { align: "right" });
+    const aCobrar = lista.filter((x) => x.liq.neto > 0).reduce((s, x) => s + x.liq.neto, 0);
+    const pend = lista.filter((x) => x.liq.neto < 0).reduce((s, x) => s - x.liq.neto, 0);
+    let y = 58;
+    const kpi = (x, val, lbl, col) => {
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(15);
+      doc.setTextColor(...col);
+      doc.text(val, x, y);
+      doc.setFont("courier", "normal");
+      doc.setFontSize(6.5);
+      doc.setTextColor(...MUT);
+      doc.text(String(lbl).toUpperCase(), x, y + 6, { charSpace: 0.3 });
+    };
+    kpi(M, String(lista.length), "marcas con ventas", V);
+    kpi(M + 62, f2(aCobrar), "total a pagar a marcas", GOLD);
+    kpi(M + 130, f2(pend), "pendiente por cobrar", RED);
+    y += 20;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(11);
+    doc.setTextColor(...V);
+    doc.text("Resumen por marca", M, y);
+    y += 6;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(6.6);
+    doc.setTextColor(...MUT);
+    doc.text("MARCA", M, y);
+    doc.text("VENDIDO", W - M - 95, y, { align: "right" });
+    doc.text("COMIS.+TARJ.", W - M - 62, y, { align: "right" });
+    doc.text("ALQ.+GASTOS", W - M - 28, y, { align: "right" });
+    doc.text("NETO", W - M, y, { align: "right" });
+    doc.setDrawColor(226, 222, 216);
+    doc.setLineWidth(0.3);
+    doc.line(M, y + 1.5, W - M, y + 1.5);
+    y += 6;
+    for (const { marca, liq } of lista) {
+      if (y > H - 24) {
+        doc.addPage();
+        y = 22;
+      }
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(8.5);
+      doc.setTextColor(...V);
+      doc.text(String(marca?.nombre || ""), M, y);
+      doc.setTextColor(...V2);
+      doc.text(f2(liq.bruto).replace("Bs ", ""), W - M - 95, y, { align: "right" });
+      doc.text("-" + f2((liq.descTJ || 0) + (liq.comision || 0)).replace("Bs ", ""), W - M - 62, y, { align: "right" });
+      doc.text("-" + f2((liq.alquiler || 0) + (liq.totalGastos || 0)).replace("Bs ", ""), W - M - 28, y, { align: "right" });
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(...liq.neto >= 0 ? OK : RED);
+      doc.text(f2(liq.neto).replace("Bs ", ""), W - M, y, { align: "right" });
+      y += 5.6;
+      doc.setDrawColor(239, 236, 230);
+      doc.setLineWidth(0.15);
+      doc.line(M, y - 2, W - M, y - 2);
+    }
+    for (const { marca, liq } of lista) {
+      await liquidacionPDF(marca, mes, anio, liq, { doc });
+    }
+    _pieLiq(doc, "Toscana House \xB7 cierre " + MESES[mes] + " " + anio);
     return doc;
+  }
+  async function verLiquidacionTodasPDF(mes, anio, lista) {
+    try {
+      if (!lista.length) {
+        alert("No hay marcas con ventas este mes.");
+        return;
+      }
+      const doc = await liquidacionTodasPDF(mes, anio, lista);
+      const w = window.open(doc.output("bloburl"), "_blank");
+      if (!w) doc.save(`Cierre ${MESES[mes]} ${anio} Toscana.pdf`);
+    } catch (e) {
+      try {
+        alert("No se pudo generar el PDF");
+      } catch {
+      }
+    }
   }
   async function subirLiqPDF(doc, marca, mes, anio) {
     try {
@@ -71007,7 +71109,34 @@ Esta acci\xF3n no se puede deshacer.` : "\xBFEliminar esta carga? Esta acci\xF3n
           }
         },
         generando ? "\u23F3" : "\u{1F4E6} Stock .xlsx"
-      ))), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      )), /* @__PURE__ */ import_react.default.createElement(
+        "button",
+        {
+          onClick: () => {
+            const lista = MARCAS.map((m) => ({ marca: m, liq: getLiq(m.id) })).filter((x) => x.liq.bruto > 0).sort((a, b) => b.liq.neto - a.liq.neto);
+            verLiquidacionTodasPDF(mes, anio, lista);
+          },
+          style: {
+            width: "100%",
+            background: `${C.gold}18`,
+            border: `1px solid ${C.gold}40`,
+            borderRadius: 12,
+            padding: "12px 10px",
+            color: C.gold,
+            fontSize: 13,
+            fontFamily: FONT,
+            fontWeight: 700,
+            cursor: "pointer",
+            WebkitTapHighlightColor: "transparent",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 6,
+            marginBottom: 16
+          }
+        },
+        "PDF de todas las marcas"
+      )), /* @__PURE__ */ import_react.default.createElement("div", { style: {
         display: isDesktop ? "grid" : "flex",
         gridTemplateColumns: isDesktop ? "1fr 1fr" : void 0,
         flexDirection: isDesktop ? void 0 : "column",
