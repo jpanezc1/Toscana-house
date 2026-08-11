@@ -53592,8 +53592,19 @@
       return false;
     }
   }
+  var VENTAS_TUMBA = /* @__PURE__ */ new Set([
+    "VH1786478366378",
+    "VH1786478227549",
+    "VH1786478208916",
+    "VH1786478171127",
+    "VH1786477401886"
+  ]);
+  function ventaBloqueada(id) {
+    const s = String(id || "");
+    return /^TEST/i.test(s) || VENTAS_TUMBA.has(s);
+  }
   async function sbGuardarVenta(venta) {
-    if (/^TEST/i.test(String(venta?.id || ""))) return true;
+    if (ventaBloqueada(venta?.id)) return true;
     try {
       const db = await getSupabase();
       const { error: errVenta } = await db.from("ventas").upsert({
@@ -54050,7 +54061,7 @@
         sbSelectAll(db, "venta_items"),
         sbSelectAll(db, "cierres")
       ]);
-      const ventasCompletas = (ventas || []).filter((v) => !/^TEST/i.test(String(v.id || ""))).map((v) => ({
+      const ventasCompletas = (ventas || []).filter((v) => !ventaBloqueada(v.id)).map((v) => ({
         id: v.id,
         fecha: v.fecha,
         hora: v.hora,
@@ -54599,7 +54610,7 @@
         if (!mounted) return;
         channel = db.channel("toscana-realtime-v3").on("postgres_changes", { event: "INSERT", schema: "public", table: "ventas" }, async (payload) => {
           const v = payload.new;
-          if (/^TEST/i.test(String(v?.id || ""))) return;
+          if (ventaBloqueada(v?.id)) return;
           try {
             const { data: rawItems } = await db.from("venta_items").select("*").eq("venta_id", v.id);
             const venta = {
@@ -54694,7 +54705,7 @@
           );
         }).on("broadcast", { event: "venta_nueva" }, ({ payload }) => {
           const v = payload?.v;
-          if (/^TEST/i.test(String(v?.id || ""))) return;
+          if (ventaBloqueada(v?.id)) return;
           if (mounted && v?.id) setVentas((prev) => prev.some((x) => x.id === v.id) ? prev : [...prev, v]);
         }).on("broadcast", { event: "inv_update" }, ({ payload }) => {
           const p = payload?.p;
@@ -64127,7 +64138,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
     }, [vMes]);
     const maxMarca = Math.max(...topMarcas.map((m) => m.total), 1);
     const ultVentas = (0, import_react.useMemo)(
-      () => [...ventas].filter((v) => !/^TEST/i.test(String(v.id || ""))).sort((a, b) => {
+      () => [...ventas].filter((v) => !ventaBloqueada(v.id)).sort((a, b) => {
         const ta = tsVenta(a), tb = tsVenta(b);
         if (tb !== ta) return tb - ta;
         return String(b.id || "").localeCompare(String(a.id || ""));
@@ -69076,7 +69087,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
     });
     const [ventas, setVentas] = (0, import_react.useState)(() => {
       try {
-        return JSON.parse(localStorage.getItem("th_ventas") || "[]").filter((v) => !/^TEST/i.test(String(v?.id || "")));
+        return JSON.parse(localStorage.getItem("th_ventas") || "[]").filter((v) => !ventaBloqueada(v?.id));
       } catch {
         return [];
       }
@@ -69449,6 +69460,11 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
         try {
           await db.from("venta_items").delete().like("venta_id", "TEST%");
           await db.from("ventas").delete().like("id", "TEST%");
+          const tumba = Array.from(VENTAS_TUMBA);
+          if (tumba.length) {
+            await db.from("venta_items").delete().in("venta_id", tumba);
+            await db.from("ventas").delete().in("id", tumba);
+          }
         } catch {
         }
       }).catch(() => {

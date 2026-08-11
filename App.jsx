@@ -208,11 +208,25 @@ async function sbEliminarCarga(cargaId) {
   } catch(e) { console.warn("Supabase eliminar carga:", e.message); return false; }
 }
 
+// ── Tumba de ventas ────────────────────────────────────────────────────────
+// Ids borrados a propósito que un equipo fantasma con la cola vieja del período
+// codex vuelve a re-insertar (a veces SIN la marca de anulada, como si fueran
+// ventas activas). Se ignoran al leer y al escribir en TODAS las sesiones, y el
+// admin las purga de la nube al entrar. Mismo mecanismo que las ventas TEST*.
+const VENTAS_TUMBA = new Set([
+  "VH1786478366378","VH1786478227549","VH1786478208916","VH1786478171127","VH1786477401886",
+]);
+function ventaBloqueada(id){
+  const s = String(id || "");
+  return /^TEST/i.test(s) || VENTAS_TUMBA.has(s);
+}
+
 async function sbGuardarVenta(venta) {
-  // Guardián: ventas de prueba (id TEST*) jamás suben a la nube. Un equipo con
-  // la cola de reintentos vieja del período codex las re-insertaba en cada
-  // arranque; devolver true las marca como "hechas" y las saca de la cola.
-  if (/^TEST/i.test(String(venta?.id || ""))) return true;
+  // Guardián: ventas de prueba (id TEST*) y las de la tumba jamás suben a la
+  // nube. Un equipo con la cola de reintentos vieja del período codex las
+  // re-insertaba en cada arranque; devolver true las marca como "hechas" y las
+  // saca de la cola.
+  if (ventaBloqueada(venta?.id)) return true;
   try {
     const db = await getSupabase();
     const { error: errVenta } = await db.from("ventas").upsert({
@@ -583,7 +597,7 @@ async function sbCargarTodo() {
     // Reconstruir ventas con sus items. Se descartan las ventas de prueba
     // (id TEST*/Canary) que un equipo con la cola vieja del codex re-inyecta:
     // nunca deben sumar en totales, reportes ni liquidaciones.
-    const ventasCompletas = (ventas||[]).filter(v=>!/^TEST/i.test(String(v.id||""))).map(v => ({
+    const ventasCompletas = (ventas||[]).filter(v=>!ventaBloqueada(v.id)).map(v => ({
       id: v.id, fecha: v.fecha, hora: v.hora, mk: v.mk,
       mes: v.mes, anio: v.anio, total: v.total, subtotal: v.subtotal,
       descPct: v.desc_pct, metodoPago: v.metodo_pago,
@@ -1065,7 +1079,7 @@ function useRealtimeSync(setVentas, setInv, setRetiros, setFactoryResetRecibido,
         // ── Venta nueva ────────────────────────────────────────────────────
         .on("postgres_changes", { event: "INSERT", schema: "public", table: "ventas" }, async payload => {
           const v = payload.new;
-          if(/^TEST/i.test(String(v?.id||""))) return; // venta de prueba (Canary) → ignorar
+          if(ventaBloqueada(v?.id)) return; // venta de prueba (Canary) o tumba → ignorar
           try {
             const { data: rawItems } = await db.from("venta_items").select("*").eq("venta_id", v.id);
             const venta = {
@@ -1138,7 +1152,7 @@ function useRealtimeSync(setVentas, setInv, setRetiros, setFactoryResetRecibido,
         // ── Broadcast: venta nueva (ruta rápida ~80ms, sin extra DB query) ──
         .on("broadcast", {event:"venta_nueva"}, ({payload}) => {
           const v = payload?.v;
-          if(/^TEST/i.test(String(v?.id||""))) return; // venta de prueba → ignorar
+          if(ventaBloqueada(v?.id)) return; // venta de prueba o tumba → ignorar
           if(mounted && v?.id) setVentas(prev => prev.some(x=>x.id===v.id) ? prev : [...prev, v]);
         })
         // ── Broadcast: stock actualizado (ruta rápida para caja concurrente) ──
@@ -10360,8 +10374,8 @@ function HomeDashboard({ventas, inv, vMes, mes, anio, onGoTab, descuentos, descC
   // ── Últimas 6 ventas ────────────────────────────────────
   const ultVentas = useMemo(() =>
     [...ventas]
-      // Fuera filas de prueba (Canario Codex y otras basura del período codex)
-      .filter(v => !/^TEST/i.test(String(v.id || "")))
+      // Fuera filas de prueba (Canario Codex) y las de la tumba (borradas)
+      .filter(v => !ventaBloqueada(v.id))
       .sort((a, b) => {
         // fecha+hora parseadas a número (la hora es 12h con a.m./p.m. — como
         // texto ordena mal)
@@ -14672,7 +14686,7 @@ function App(){
   const[tab,setTab]         =useState("inicio");
   // ── Persistencia local: ini desde localStorage, sync a nube con Supabase ──
   const[inv,setInv]     =useState(()=>{ try{return JSON.parse(localStorage.getItem("th_inv")||"[]");}catch{return[];} });
-  const[ventas,setVentas]=useState(()=>{ try{return JSON.parse(localStorage.getItem("th_ventas")||"[]").filter(v=>!/^TEST/i.test(String(v?.id||"")));}catch{return[];} });
+  const[ventas,setVentas]=useState(()=>{ try{return JSON.parse(localStorage.getItem("th_ventas")||"[]").filter(v=>!ventaBloqueada(v?.id));}catch{return[];} });
   const[factoryResetRecibido,setFactoryResetRecibido]=useState(false);
   const pingMs = usePingLatency();
   const clockDrift = useClockDrift();
@@ -14894,6 +14908,11 @@ function App(){
       try{
         await db.from("venta_items").delete().like("venta_id","TEST%");
         await db.from("ventas").delete().like("id","TEST%");
+        const tumba = Array.from(VENTAS_TUMBA);
+        if(tumba.length){
+          await db.from("venta_items").delete().in("venta_id", tumba);
+          await db.from("ventas").delete().in("id", tumba);
+        }
       }catch{}
     }).catch(()=>{});
   },[user?.rol]);
