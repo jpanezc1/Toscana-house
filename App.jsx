@@ -20916,6 +20916,14 @@ function InventarioPorMarca({inv, ventas, retiros=[], bajas=[], onRecibir, onBaj
   const totalVendidas = productos.reduce((s,p)=>s+(vendidosPorProd[p.id]||0),0);
   const agotados = productos.filter(p=>p.stock===0).length;
 
+  // ── Render por ventana: dibuja solo un bloque de filas a la vez. Con ~2.100
+  //    productos, pintarlos todos de golpe trababa la vista. Los totales de
+  //    arriba y la búsqueda siguen sobre TODO el inventario; solo se limita
+  //    cuántas filas se dibujan. Botón "Ver más" para cargar el resto.
+  const INV_BLOQUE = 80;
+  const [invVisible, setInvVisible] = useState(INV_BLOQUE);
+  useEffect(()=>{ setInvVisible(INV_BLOQUE); }, [marcaSelec, invBusq, invFechaDesde, invFechaHasta]);
+
   const hayFiltro = invBusq.trim() || invFechaDesde || invFechaHasta;
 
   return (
@@ -21097,7 +21105,7 @@ function InventarioPorMarca({inv, ventas, retiros=[], bajas=[], onRecibir, onBaj
               <div style={{fontSize:9,fontWeight:700,color:C.label3,textTransform:"uppercase",letterSpacing:.8,textAlign:"right"}}>Etiq.</div>
             </div>
 
-            {productos.map((prod,i)=>{
+            {productos.slice(0, invVisible).map((prod,i)=>{
               const vendidas=vendidosPorProd[prod.id]||0;
               const marcaProd=MARCAS.find(m=>m.id===prod.marcaId);
               const stockColor=prod.stock===0?C.red:prod.stock<3?C.amber:C.green;
@@ -21214,6 +21222,16 @@ function InventarioPorMarca({inv, ventas, retiros=[], bajas=[], onRecibir, onBaj
                 </React.Fragment>
               );
             })}
+            {productos.length > invVisible && (
+              <div style={{padding:"14px",textAlign:"center",borderTop:`1px solid ${C.sep}`,background:C.bg2}}>
+                <button onClick={()=>setInvVisible(v=>v+120)}
+                  style={{background:C.bg0,border:`1px solid ${C.sep}`,borderRadius:10,padding:"9px 20px",
+                    fontSize:13,fontWeight:600,color:C.label,fontFamily:FONT,cursor:"pointer",
+                    WebkitTapHighlightColor:"transparent"}}>
+                  Ver más · mostrando {invVisible} de {productos.length}
+                </button>
+              </div>
+            )}
           </div>
       }
 

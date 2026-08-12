@@ -76330,6 +76330,11 @@ ${c.resumen || c.id}`)) onEliminarCarga(c.id);
     const totalStock = productos.reduce((s, p) => s + p.stock, 0);
     const totalVendidas = productos.reduce((s, p) => s + (vendidosPorProd[p.id] || 0), 0);
     const agotados = productos.filter((p) => p.stock === 0).length;
+    const INV_BLOQUE = 80;
+    const [invVisible, setInvVisible] = (0, import_react.useState)(INV_BLOQUE);
+    (0, import_react.useEffect)(() => {
+      setInvVisible(INV_BLOQUE);
+    }, [marcaSelec, invBusq, invFechaDesde, invFechaHasta]);
     const hayFiltro = invBusq.trim() || invFechaDesde || invFechaHasta;
     return /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 14 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
       fontSize: 10,
@@ -76589,7 +76594,7 @@ ${c.resumen || c.id}`)) onEliminarCarga(c.id);
       padding: "8px 14px",
       background: C.bg2,
       borderBottom: `1px solid ${C.sep}`
-    } }, (hayFiltro || !marcaSelec) && /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 9, fontWeight: 700, color: C.label3, textTransform: "uppercase", letterSpacing: 0.8 } }, "Marca"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 9, fontWeight: 700, color: C.label3, textTransform: "uppercase", letterSpacing: 0.8 } }, "Producto \xB7 C\xF3digo"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 9, fontWeight: 700, color: C.label3, textTransform: "uppercase", letterSpacing: 0.8, textAlign: "right" } }, "Precio"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 9, fontWeight: 700, color: C.label3, textTransform: "uppercase", letterSpacing: 0.8, textAlign: "center" } }, "Stock"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 9, fontWeight: 700, color: C.label3, textTransform: "uppercase", letterSpacing: 0.8, textAlign: "right" } }, "Etiq.")), productos.map((prod, i) => {
+    } }, (hayFiltro || !marcaSelec) && /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 9, fontWeight: 700, color: C.label3, textTransform: "uppercase", letterSpacing: 0.8 } }, "Marca"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 9, fontWeight: 700, color: C.label3, textTransform: "uppercase", letterSpacing: 0.8 } }, "Producto \xB7 C\xF3digo"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 9, fontWeight: 700, color: C.label3, textTransform: "uppercase", letterSpacing: 0.8, textAlign: "right" } }, "Precio"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 9, fontWeight: 700, color: C.label3, textTransform: "uppercase", letterSpacing: 0.8, textAlign: "center" } }, "Stock"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 9, fontWeight: 700, color: C.label3, textTransform: "uppercase", letterSpacing: 0.8, textAlign: "right" } }, "Etiq.")), productos.slice(0, invVisible).map((prod, i) => {
       const vendidas = vendidosPorProd[prod.id] || 0;
       const marcaProd = MARCAS.find((m) => m.id === prod.marcaId);
       const stockColor = prod.stock === 0 ? C.red : prod.stock < 3 ? C.amber : C.green;
@@ -76757,7 +76762,28 @@ ${c.resumen || c.id}`)) onEliminarCarga(c.id);
         /* @__PURE__ */ import_react.default.createElement("i", { className: "ti ti-trash", style: { fontSize: 12 }, "aria-hidden": "true" }),
         "Eliminar"
       )));
-    })), editProd && /* @__PURE__ */ import_react.default.createElement("div", { onClick: () => setEditProd(null), style: { position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center" } }, /* @__PURE__ */ import_react.default.createElement("div", { onClick: (e) => e.stopPropagation(), style: { background: C.bg0, borderRadius: 18, width: 340, maxWidth: "92vw", overflow: "hidden", border: `1px solid ${C.sep}` } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { padding: "14px 18px", borderBottom: `1px solid ${C.sep}`, display: "flex", alignItems: "center", justifyContent: "space-between" } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 14, fontWeight: 700, color: C.label, fontFamily: FONT } }, "Editar producto"), /* @__PURE__ */ import_react.default.createElement("button", { onClick: () => setEditProd(null), style: { background: "none", border: "none", fontSize: 18, cursor: "pointer", color: C.label3 } }, "\u2715")), /* @__PURE__ */ import_react.default.createElement("div", { style: { padding: 16, display: "flex", flexDirection: "column", gap: 12 } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT, marginBottom: 4, fontWeight: 600 } }, "Nombre"), /* @__PURE__ */ import_react.default.createElement(
+    }), productos.length > invVisible && /* @__PURE__ */ import_react.default.createElement("div", { style: { padding: "14px", textAlign: "center", borderTop: `1px solid ${C.sep}`, background: C.bg2 } }, /* @__PURE__ */ import_react.default.createElement(
+      "button",
+      {
+        onClick: () => setInvVisible((v) => v + 120),
+        style: {
+          background: C.bg0,
+          border: `1px solid ${C.sep}`,
+          borderRadius: 10,
+          padding: "9px 20px",
+          fontSize: 13,
+          fontWeight: 600,
+          color: C.label,
+          fontFamily: FONT,
+          cursor: "pointer",
+          WebkitTapHighlightColor: "transparent"
+        }
+      },
+      "Ver m\xE1s \xB7 mostrando ",
+      invVisible,
+      " de ",
+      productos.length
+    ))), editProd && /* @__PURE__ */ import_react.default.createElement("div", { onClick: () => setEditProd(null), style: { position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center" } }, /* @__PURE__ */ import_react.default.createElement("div", { onClick: (e) => e.stopPropagation(), style: { background: C.bg0, borderRadius: 18, width: 340, maxWidth: "92vw", overflow: "hidden", border: `1px solid ${C.sep}` } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { padding: "14px 18px", borderBottom: `1px solid ${C.sep}`, display: "flex", alignItems: "center", justifyContent: "space-between" } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 14, fontWeight: 700, color: C.label, fontFamily: FONT } }, "Editar producto"), /* @__PURE__ */ import_react.default.createElement("button", { onClick: () => setEditProd(null), style: { background: "none", border: "none", fontSize: 18, cursor: "pointer", color: C.label3 } }, "\u2715")), /* @__PURE__ */ import_react.default.createElement("div", { style: { padding: 16, display: "flex", flexDirection: "column", gap: 12 } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT, marginBottom: 4, fontWeight: 600 } }, "Nombre"), /* @__PURE__ */ import_react.default.createElement(
       "input",
       {
         value: editNombre,
