@@ -6505,8 +6505,9 @@ function LoginScreen({ onLogin }) {
 // ══════════════════════════════════════════════════════════
 // RETIROS — Items retirados de tienda (no ventas)
 // ══════════════════════════════════════════════════════════
-function RetirosTab({inv, retiros, onRetiro, onAnular}){
+function RetirosTab({inv, retiros, onRetiro, onRetiroBatch, onAnular}){
   const [confAnular, setConfAnular] = useState(null); // retiro pendiente de confirmar
+  const [carrito, setCarrito] = useState([]); // prendas agregadas al retiro en curso
   const [codBusq, setCodBusq] = useState("");
   const [prodEncontrado, setProdEncontrado] = useState(null);
   const [cantidad, setCantidad] = useState("1");
@@ -6570,6 +6571,49 @@ function RetirosTab({inv, retiros, onRetiro, onAnular}){
     onRetiro(r);
     setMsg({ok:true,txt:`✓ "${prodEncontrado.nombre}" retirado para ${destinatario.trim()}`});
     setProdEncontrado(null); setCodBusq(""); setDestinatario(""); setMotivo(""); setCantidad("1");
+  }
+
+  // ── Carrito de retiro: agregar varias prendas y confirmar todo junto ──
+  function agregarAlCarrito(){
+    if(!prodEncontrado) return;
+    const cant = Math.max(1, parseInt(cantidad)||1);
+    const ex = carrito.find(x=>x.codigo===prodEncontrado.codigo);
+    const yaEn = ex ? ex.cantidad : 0;
+    if(yaEn + cant > prodEncontrado.stock){
+      setMsg({ok:false,txt:`Stock insuficiente para ${prodEncontrado.codigo} (disponible: ${prodEncontrado.stock}${yaEn?`, ya en el carrito: ${yaEn}`:""})`});
+      return;
+    }
+    setCarrito(prev=>{
+      if(ex) return prev.map(x=>x.codigo===prodEncontrado.codigo?{...x,cantidad:x.cantidad+cant}:x);
+      return [...prev, {prodId:prodEncontrado.id, codigo:prodEncontrado.codigo, nombre:prodEncontrado.nombre,
+        marcaId:prodEncontrado.marcaId, marcaNombre:prodEncontrado.marcaNombre, precio:prodEncontrado.precio,
+        cantidad:cant, stock:prodEncontrado.stock}];
+    });
+    setMsg({ok:true,txt:`✓ "${prodEncontrado.nombre}" agregado al retiro`});
+    setProdEncontrado(null); setCodBusq(""); setCantidad("1");
+  }
+  function setCantCarrito(codigo, nueva){
+    setCarrito(prev=>prev.map(x=> x.codigo===codigo ? {...x, cantidad:Math.max(1,Math.min(x.stock, nueva))} : x));
+  }
+  function quitarDeCarrito(codigo){ setCarrito(prev=>prev.filter(x=>x.codigo!==codigo)); }
+
+  const totalCarrito = carrito.reduce((s,x)=>s+x.cantidad,0);
+
+  function confirmarRetiroCarrito(){
+    if(carrito.length===0){ setMsg({ok:false,txt:"Agregá al menos una prenda al retiro"}); return; }
+    if(!destinatario.trim()){ setMsg({ok:false,txt:"Ingresa el nombre del destinatario"}); return; }
+    // Revalidar stock actual (pudo cambiar desde que se agregó)
+    for(const it of carrito){
+      const p = inv.find(i=>i.id===it.prodId) || inv.find(i=>i.codigo===it.codigo);
+      if(!p || it.cantidad > (p.stock||0)){ setMsg({ok:false,txt:`Stock insuficiente para ${it.codigo} (disponible: ${p?.stock||0})`}); return; }
+    }
+    onRetiroBatch(
+      carrito.map(it=>({prodId:it.prodId, codigo:it.codigo, nombre:it.nombre,
+        marcaId:it.marcaId, marcaNombre:it.marcaNombre, cantidad:it.cantidad})),
+      destinatario.trim(), motivo.trim()
+    );
+    setMsg({ok:true,txt:`✓ Retiro de ${totalCarrito} prenda${totalCarrito!==1?"s":""} para ${destinatario.trim()}`});
+    setCarrito([]); setDestinatario(""); setMotivo(""); setProdEncontrado(null); setCodBusq(""); setCantidad("1");
   }
 
   // Filtrado + agrupación por marca
@@ -6709,18 +6753,12 @@ function RetirosTab({inv, retiros, onRetiro, onAnular}){
               </div>
             </div>
 
-            <IOSInput
-              label="Para quién (destinatario)"
-              value={destinatario}
-              onChange={e=>setDestinatario(e.target.value)}
-              placeholder="Nombre del destinatario"
-            />
-            <IOSInput
-              label="Motivo (opcional)"
-              value={motivo}
-              onChange={e=>setMotivo(e.target.value)}
-              placeholder="Muestra, préstamo, evento…"
-            />
+            <button onClick={agregarAlCarrito}
+              style={{width:"100%",background:C.blue,border:"none",borderRadius:10,padding:"12px",
+                fontSize:14,fontWeight:700,color:"#fff",cursor:"pointer",fontFamily:FONT,
+                WebkitTapHighlightColor:"transparent"}}>
+              + Agregar al retiro
+            </button>
           </div>
         )}
 
@@ -6734,16 +6772,57 @@ function RetirosTab({inv, retiros, onRetiro, onAnular}){
           </div>
         )}
 
+        {/* ── Carrito del retiro en curso ── */}
+        {carrito.length>0 && (
+          <div style={{marginBottom:14,background:C.bg2,borderRadius:12,padding:"12px 14px",border:`1px solid ${C.sep}`}}>
+            <div style={{fontSize:11,fontWeight:700,color:C.label3,textTransform:"uppercase",letterSpacing:.6,marginBottom:6,fontFamily:FONT}}>
+              En este retiro · {totalCarrito} prenda{totalCarrito!==1?"s":""}
+            </div>
+            {carrito.map(it=>(
+              <div key={it.codigo} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 0",
+                borderBottom:`1px solid ${C.sep}`}}>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:13,fontWeight:600,color:C.label,fontFamily:FONT,
+                    whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{it.nombre}</div>
+                  <div style={{fontSize:11,color:C.label3,fontFamily:FONT}}>{it.marcaNombre} · {it.codigo}</div>
+                </div>
+                <div style={{display:"flex",alignItems:"center",gap:6}}>
+                  <button onClick={()=>setCantCarrito(it.codigo,it.cantidad-1)}
+                    style={{width:28,height:28,borderRadius:7,border:`1px solid ${C.sep}`,background:C.bg1,
+                      fontSize:16,cursor:"pointer",color:C.label,display:"flex",alignItems:"center",justifyContent:"center"}}>−</button>
+                  <span style={{minWidth:22,textAlign:"center",fontSize:14,fontWeight:700,color:C.label,fontFamily:FONT}}>{it.cantidad}</span>
+                  <button onClick={()=>setCantCarrito(it.codigo,it.cantidad+1)}
+                    style={{width:28,height:28,borderRadius:7,border:`1px solid ${C.sep}`,background:C.bg1,
+                      fontSize:16,cursor:"pointer",color:C.label,display:"flex",alignItems:"center",justifyContent:"center"}}>+</button>
+                </div>
+                <button onClick={()=>quitarDeCarrito(it.codigo)}
+                  style={{background:"none",border:"none",color:C.red,fontSize:18,cursor:"pointer",
+                    padding:"2px 4px",WebkitTapHighlightColor:"transparent"}}>×</button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Destinatario + motivo (una sola vez para todo el retiro) */}
+        {carrito.length>0 && (
+          <>
+            <IOSInput label="Para quién (destinatario)" value={destinatario}
+              onChange={e=>setDestinatario(e.target.value)} placeholder="Nombre del destinatario"/>
+            <IOSInput label="Motivo (opcional)" value={motivo}
+              onChange={e=>setMotivo(e.target.value)} placeholder="Muestra, préstamo, evento…"/>
+          </>
+        )}
+
         <button
-          onClick={confirmarRetiro}
-          disabled={!prodEncontrado||!destinatario.trim()}
+          onClick={confirmarRetiroCarrito}
+          disabled={carrito.length===0||!destinatario.trim()}
           style={{
-            width:"100%",background:!prodEncontrado||!destinatario.trim()?"#E0E0E0":C.amber,
-            border:"none",borderRadius:12,padding:"14px",fontSize:15,fontWeight:700,
-            color:!prodEncontrado||!destinatario.trim()?"#9E9E9E":"#fff",
-            cursor:!prodEncontrado||!destinatario.trim()?"not-allowed":"pointer",
+            width:"100%",background:carrito.length===0||!destinatario.trim()?"#E0E0E0":C.amber,
+            border:"none",borderRadius:12,padding:"14px",fontSize:15,fontWeight:700,marginTop:10,
+            color:carrito.length===0||!destinatario.trim()?"#9E9E9E":"#fff",
+            cursor:carrito.length===0||!destinatario.trim()?"not-allowed":"pointer",
             fontFamily:FONT,WebkitTapHighlightColor:"transparent"}}>
-          📤 Confirmar Retiro
+          📤 Confirmar retiro{totalCarrito>0?` · ${totalCarrito} prenda${totalCarrito!==1?"s":""}`:""}
         </button>
       </div>
 
@@ -15322,6 +15401,41 @@ function App(){
     }, user);
   }
 
+  // ── Retiro en lote (carrito): varias prendas con un solo destinatario ──
+  function registrarRetiroBatch(items, destinatario, motivo){
+    if(!items?.length) return;
+    const ts = Date.now();
+    const nuevos = items.map((it,idx)=>({
+      id:`RET-${ts}-${idx}`, fecha:hoy(), hora:hora(),
+      prodId:it.prodId, codigo:it.codigo, nombre:it.nombre,
+      marcaId:it.marcaId, marcaNombre:it.marcaNombre,
+      cantidad:it.cantidad, destinatario, motivo:motivo||"", anulada:false
+    }));
+    setRetiros(prev=>{
+      const updated=[...prev, ...nuevos];
+      try{localStorage.setItem("th_retiros_v1",JSON.stringify(updated));}catch{}
+      return updated;
+    });
+    nuevos.forEach(r=>{
+      const prod = inv.find(i=>i.id===r.prodId) || inv.find(i=>i.codigo===r.codigo);
+      const stockAntes = prod?.stock||0;
+      const stockDespues = Math.max(0, stockAntes - r.cantidad);
+      const pid = prod?.id ?? r.prodId;
+      if(pid!=null){
+        setInv(p=>p.map(i=>i.id===pid?{...i,stock:stockDespues}:i));
+        syncConRespaldo("stock", {prodId:pid, stock:stockDespues}, ()=>sbActualizarStock(pid, stockDespues));
+      }
+      syncConRespaldo("retiro", r, ()=>sbGuardarRetiro(r));
+      logAudit("RETIRO", {
+        resumen: `Retiro: ${prod?.nombre||r.codigo} × ${r.cantidad} u.`,
+        codigo: r.codigo, nombre: prod?.nombre||r.codigo,
+        marca: prod?.marcaNombre||"—", cantidad: r.cantidad,
+        destinatario: r.destinatario||"—", motivo: r.motivo||"—",
+        stockAntes, stockDespues,
+      }, user);
+    });
+  }
+
   // ── Anular un retiro (solo admin): devuelve el stock y lo marca anulado ──
   //    No se borra (para que no reviva por sync); queda de historial tachado.
   function anularRetiro(r){
@@ -16243,7 +16357,7 @@ function App(){
         )}
 
         {/* POS */}
-        {tab==="pos" && <POSContainer inv={inv} onVenta={handleVenta} retiros={retiros} onRetiro={registrarRetiro} onAnularRetiro={anularRetiro} onVerNota={v=>setVentaDetalle(v)} user={user} descuentos={descuentos} descCodigos={descCodigos} onCambioPrecio={handleEditarProducto} permPrecio={permPrecioStaff}/>}
+        {tab==="pos" && <POSContainer inv={inv} onVenta={handleVenta} retiros={retiros} onRetiro={registrarRetiro} onRetiroBatch={registrarRetiroBatch} onAnularRetiro={anularRetiro} onVerNota={v=>setVentaDetalle(v)} user={user} descuentos={descuentos} descCodigos={descCodigos} onCambioPrecio={handleEditarProducto} permPrecio={permPrecioStaff}/>}
 
         {/* INVENTARIO — por marca */}
         {tab==="inventario" && (
@@ -17135,7 +17249,7 @@ function CambioPrecioTab({inv, onGuardar, user}){
   );
 }
 
-function POSContainer({inv,onVenta,retiros,onRetiro,onAnularRetiro,onVerNota,user,descuentos,descCodigos,onCambioPrecio,permPrecio}){
+function POSContainer({inv,onVenta,retiros,onRetiro,onRetiroBatch,onAnularRetiro,onVerNota,user,descuentos,descCodigos,onCambioPrecio,permPrecio}){
   const [subTab, setSubTab] = useState("venta");
   // El cambio de precio lo ve el admin siempre; el staff solo si el admin lo habilitó.
   const puedePrecio = user?.rol==="admin" || !!permPrecio;
@@ -17163,7 +17277,7 @@ function POSContainer({inv,onVenta,retiros,onRetiro,onAnularRetiro,onVerNota,use
       {activa==="venta"
         ? <POS inv={inv} onVenta={onVenta} onVerNota={onVerNota} user={user} descuentos={descuentos} descCodigos={descCodigos}/>
         : activa==="retiros"
-        ? <RetirosTab inv={inv} retiros={retiros} onRetiro={onRetiro} onAnular={user?.rol==="admin"?onAnularRetiro:undefined}/>
+        ? <RetirosTab inv={inv} retiros={retiros} onRetiro={onRetiro} onRetiroBatch={onRetiroBatch} onAnular={user?.rol==="admin"?onAnularRetiro:undefined}/>
         : <CambioPrecioTab inv={inv} onGuardar={onCambioPrecio} user={user}/>
       }
     </div>

@@ -60438,8 +60438,9 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       lineHeight: 1
     } }, "FORGE", /* @__PURE__ */ import_react.default.createElement("span", { style: { color: "#9b8fa0" } }, "."))));
   }
-  function RetirosTab({ inv, retiros, onRetiro, onAnular }) {
+  function RetirosTab({ inv, retiros, onRetiro, onRetiroBatch, onAnular }) {
     const [confAnular, setConfAnular] = (0, import_react.useState)(null);
+    const [carrito, setCarrito] = (0, import_react.useState)([]);
     const [codBusq, setCodBusq] = (0, import_react.useState)("");
     const [prodEncontrado, setProdEncontrado] = (0, import_react.useState)(null);
     const [cantidad, setCantidad] = (0, import_react.useState)("1");
@@ -60531,6 +60532,76 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       setCodBusq("");
       setDestinatario("");
       setMotivo("");
+      setCantidad("1");
+    }
+    function agregarAlCarrito() {
+      if (!prodEncontrado) return;
+      const cant = Math.max(1, parseInt(cantidad) || 1);
+      const ex = carrito.find((x) => x.codigo === prodEncontrado.codigo);
+      const yaEn = ex ? ex.cantidad : 0;
+      if (yaEn + cant > prodEncontrado.stock) {
+        setMsg({ ok: false, txt: `Stock insuficiente para ${prodEncontrado.codigo} (disponible: ${prodEncontrado.stock}${yaEn ? `, ya en el carrito: ${yaEn}` : ""})` });
+        return;
+      }
+      setCarrito((prev) => {
+        if (ex) return prev.map((x) => x.codigo === prodEncontrado.codigo ? { ...x, cantidad: x.cantidad + cant } : x);
+        return [...prev, {
+          prodId: prodEncontrado.id,
+          codigo: prodEncontrado.codigo,
+          nombre: prodEncontrado.nombre,
+          marcaId: prodEncontrado.marcaId,
+          marcaNombre: prodEncontrado.marcaNombre,
+          precio: prodEncontrado.precio,
+          cantidad: cant,
+          stock: prodEncontrado.stock
+        }];
+      });
+      setMsg({ ok: true, txt: `\u2713 "${prodEncontrado.nombre}" agregado al retiro` });
+      setProdEncontrado(null);
+      setCodBusq("");
+      setCantidad("1");
+    }
+    function setCantCarrito(codigo, nueva) {
+      setCarrito((prev) => prev.map((x) => x.codigo === codigo ? { ...x, cantidad: Math.max(1, Math.min(x.stock, nueva)) } : x));
+    }
+    function quitarDeCarrito(codigo) {
+      setCarrito((prev) => prev.filter((x) => x.codigo !== codigo));
+    }
+    const totalCarrito = carrito.reduce((s, x) => s + x.cantidad, 0);
+    function confirmarRetiroCarrito() {
+      if (carrito.length === 0) {
+        setMsg({ ok: false, txt: "Agreg\xE1 al menos una prenda al retiro" });
+        return;
+      }
+      if (!destinatario.trim()) {
+        setMsg({ ok: false, txt: "Ingresa el nombre del destinatario" });
+        return;
+      }
+      for (const it of carrito) {
+        const p = inv.find((i) => i.id === it.prodId) || inv.find((i) => i.codigo === it.codigo);
+        if (!p || it.cantidad > (p.stock || 0)) {
+          setMsg({ ok: false, txt: `Stock insuficiente para ${it.codigo} (disponible: ${p?.stock || 0})` });
+          return;
+        }
+      }
+      onRetiroBatch(
+        carrito.map((it) => ({
+          prodId: it.prodId,
+          codigo: it.codigo,
+          nombre: it.nombre,
+          marcaId: it.marcaId,
+          marcaNombre: it.marcaNombre,
+          cantidad: it.cantidad
+        })),
+        destinatario.trim(),
+        motivo.trim()
+      );
+      setMsg({ ok: true, txt: `\u2713 Retiro de ${totalCarrito} prenda${totalCarrito !== 1 ? "s" : ""} para ${destinatario.trim()}` });
+      setCarrito([]);
+      setDestinatario("");
+      setMotivo("");
+      setProdEncontrado(null);
+      setCodBusq("");
       setCantidad("1");
     }
     const retirosFiltrados = (0, import_react.useMemo)(() => {
@@ -60702,6 +60773,101 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       },
       "+"
     ), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 12, color: C.label3, fontFamily: FONT } }, "de ", prodEncontrado.stock, " en stock"))), /* @__PURE__ */ import_react.default.createElement(
+      "button",
+      {
+        onClick: agregarAlCarrito,
+        style: {
+          width: "100%",
+          background: C.blue,
+          border: "none",
+          borderRadius: 10,
+          padding: "12px",
+          fontSize: 14,
+          fontWeight: 700,
+          color: "#fff",
+          cursor: "pointer",
+          fontFamily: FONT,
+          WebkitTapHighlightColor: "transparent"
+        }
+      },
+      "+ Agregar al retiro"
+    )), msg && /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      padding: "10px 14px",
+      borderRadius: 10,
+      marginBottom: 12,
+      background: msg.ok ? `${C.green}12` : `${C.red}12`,
+      border: `1px solid ${msg.ok ? C.green : C.red}30`,
+      color: msg.ok ? C.green : C.red,
+      fontSize: 13,
+      fontFamily: FONT
+    } }, msg.txt), carrito.length > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 14, background: C.bg2, borderRadius: 12, padding: "12px 14px", border: `1px solid ${C.sep}` } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: C.label3, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 6, fontFamily: FONT } }, "En este retiro \xB7 ", totalCarrito, " prenda", totalCarrito !== 1 ? "s" : ""), carrito.map((it) => /* @__PURE__ */ import_react.default.createElement("div", { key: it.codigo, style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+      padding: "8px 0",
+      borderBottom: `1px solid ${C.sep}`
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      fontSize: 13,
+      fontWeight: 600,
+      color: C.label,
+      fontFamily: FONT,
+      whiteSpace: "nowrap",
+      overflow: "hidden",
+      textOverflow: "ellipsis"
+    } }, it.nombre), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT } }, it.marcaNombre, " \xB7 ", it.codigo)), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6 } }, /* @__PURE__ */ import_react.default.createElement(
+      "button",
+      {
+        onClick: () => setCantCarrito(it.codigo, it.cantidad - 1),
+        style: {
+          width: 28,
+          height: 28,
+          borderRadius: 7,
+          border: `1px solid ${C.sep}`,
+          background: C.bg1,
+          fontSize: 16,
+          cursor: "pointer",
+          color: C.label,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center"
+        }
+      },
+      "\u2212"
+    ), /* @__PURE__ */ import_react.default.createElement("span", { style: { minWidth: 22, textAlign: "center", fontSize: 14, fontWeight: 700, color: C.label, fontFamily: FONT } }, it.cantidad), /* @__PURE__ */ import_react.default.createElement(
+      "button",
+      {
+        onClick: () => setCantCarrito(it.codigo, it.cantidad + 1),
+        style: {
+          width: 28,
+          height: 28,
+          borderRadius: 7,
+          border: `1px solid ${C.sep}`,
+          background: C.bg1,
+          fontSize: 16,
+          cursor: "pointer",
+          color: C.label,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center"
+        }
+      },
+      "+"
+    )), /* @__PURE__ */ import_react.default.createElement(
+      "button",
+      {
+        onClick: () => quitarDeCarrito(it.codigo),
+        style: {
+          background: "none",
+          border: "none",
+          color: C.red,
+          fontSize: 18,
+          cursor: "pointer",
+          padding: "2px 4px",
+          WebkitTapHighlightColor: "transparent"
+        }
+      },
+      "\xD7"
+    )))), carrito.length > 0 && /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, null, /* @__PURE__ */ import_react.default.createElement(
       IOSInput,
       {
         label: "Para qui\xE9n (destinatario)",
@@ -60717,35 +60883,28 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
         onChange: (e) => setMotivo(e.target.value),
         placeholder: "Muestra, pr\xE9stamo, evento\u2026"
       }
-    )), msg && /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      padding: "10px 14px",
-      borderRadius: 10,
-      marginBottom: 12,
-      background: msg.ok ? `${C.green}12` : `${C.red}12`,
-      border: `1px solid ${msg.ok ? C.green : C.red}30`,
-      color: msg.ok ? C.green : C.red,
-      fontSize: 13,
-      fontFamily: FONT
-    } }, msg.txt), /* @__PURE__ */ import_react.default.createElement(
+    )), /* @__PURE__ */ import_react.default.createElement(
       "button",
       {
-        onClick: confirmarRetiro,
-        disabled: !prodEncontrado || !destinatario.trim(),
+        onClick: confirmarRetiroCarrito,
+        disabled: carrito.length === 0 || !destinatario.trim(),
         style: {
           width: "100%",
-          background: !prodEncontrado || !destinatario.trim() ? "#E0E0E0" : C.amber,
+          background: carrito.length === 0 || !destinatario.trim() ? "#E0E0E0" : C.amber,
           border: "none",
           borderRadius: 12,
           padding: "14px",
           fontSize: 15,
           fontWeight: 700,
-          color: !prodEncontrado || !destinatario.trim() ? "#9E9E9E" : "#fff",
-          cursor: !prodEncontrado || !destinatario.trim() ? "not-allowed" : "pointer",
+          marginTop: 10,
+          color: carrito.length === 0 || !destinatario.trim() ? "#9E9E9E" : "#fff",
+          cursor: carrito.length === 0 || !destinatario.trim() ? "not-allowed" : "pointer",
           fontFamily: FONT,
           WebkitTapHighlightColor: "transparent"
         }
       },
-      "\u{1F4E4} Confirmar Retiro"
+      "\u{1F4E4} Confirmar retiro",
+      totalCarrito > 0 ? ` \xB7 ${totalCarrito} prenda${totalCarrito !== 1 ? "s" : ""}` : ""
     )), /* @__PURE__ */ import_react.default.createElement("div", { style: {
       background: "linear-gradient(180deg,#FFFFFF,#FCFBF9)",
       boxShadow: "0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1px 0 rgba(255,255,255,.45)",
@@ -69952,6 +70111,54 @@ Esta acci\xF3n no se puede deshacer.`)) return;
         stockDespues
       }, user);
     }
+    function registrarRetiroBatch(items, destinatario, motivo) {
+      if (!items?.length) return;
+      const ts = Date.now();
+      const nuevos = items.map((it, idx) => ({
+        id: `RET-${ts}-${idx}`,
+        fecha: hoy(),
+        hora: hora(),
+        prodId: it.prodId,
+        codigo: it.codigo,
+        nombre: it.nombre,
+        marcaId: it.marcaId,
+        marcaNombre: it.marcaNombre,
+        cantidad: it.cantidad,
+        destinatario,
+        motivo: motivo || "",
+        anulada: false
+      }));
+      setRetiros((prev) => {
+        const updated = [...prev, ...nuevos];
+        try {
+          localStorage.setItem("th_retiros_v1", JSON.stringify(updated));
+        } catch {
+        }
+        return updated;
+      });
+      nuevos.forEach((r) => {
+        const prod = inv.find((i) => i.id === r.prodId) || inv.find((i) => i.codigo === r.codigo);
+        const stockAntes = prod?.stock || 0;
+        const stockDespues = Math.max(0, stockAntes - r.cantidad);
+        const pid = prod?.id ?? r.prodId;
+        if (pid != null) {
+          setInv((p) => p.map((i) => i.id === pid ? { ...i, stock: stockDespues } : i));
+          syncConRespaldo("stock", { prodId: pid, stock: stockDespues }, () => sbActualizarStock(pid, stockDespues));
+        }
+        syncConRespaldo("retiro", r, () => sbGuardarRetiro(r));
+        logAudit("RETIRO", {
+          resumen: `Retiro: ${prod?.nombre || r.codigo} \xD7 ${r.cantidad} u.`,
+          codigo: r.codigo,
+          nombre: prod?.nombre || r.codigo,
+          marca: prod?.marcaNombre || "\u2014",
+          cantidad: r.cantidad,
+          destinatario: r.destinatario || "\u2014",
+          motivo: r.motivo || "\u2014",
+          stockAntes,
+          stockDespues
+        }, user);
+      });
+    }
     function anularRetiro(r) {
       if (!r || r.anulada) return;
       const prod = inv.find((i) => i.id === r.prodId) || inv.find((i) => i.codigo === r.codigo);
@@ -70917,7 +71124,7 @@ Esta acci\xF3n no se puede deshacer.` : "\xBFEliminar esta carga? Esta acci\xF3n
         descuentos,
         descCodigos
       }
-    ), tab === "pos" && /* @__PURE__ */ import_react.default.createElement(POSContainer, { inv, onVenta: handleVenta, retiros, onRetiro: registrarRetiro, onAnularRetiro: anularRetiro, onVerNota: (v) => setVentaDetalle(v), user, descuentos, descCodigos, onCambioPrecio: handleEditarProducto, permPrecio: permPrecioStaff }), tab === "inventario" && /* @__PURE__ */ import_react.default.createElement(InventarioPorMarca, { inv, ventas, retiros, bajas: bajasLog, onRecibir: () => setShInv(true), onBaja: () => {
+    ), tab === "pos" && /* @__PURE__ */ import_react.default.createElement(POSContainer, { inv, onVenta: handleVenta, retiros, onRetiro: registrarRetiro, onRetiroBatch: registrarRetiroBatch, onAnularRetiro: anularRetiro, onVerNota: (v) => setVentaDetalle(v), user, descuentos, descCodigos, onCambioPrecio: handleEditarProducto, permPrecio: permPrecioStaff }), tab === "inventario" && /* @__PURE__ */ import_react.default.createElement(InventarioPorMarca, { inv, ventas, retiros, bajas: bajasLog, onRecibir: () => setShInv(true), onBaja: () => {
       setShBaja(true);
       setBajaMsg(null);
       setBajaCod("");
@@ -71936,7 +72143,7 @@ Esta acci\xF3n no se puede deshacer.` : "\xBFEliminar esta carga? Esta acci\xF3n
       guardando ? "Guardando\u2026" : grande && confirmGrande ? "Confirmar cambio grande" : "Guardar cambio de precio"
     ), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT, marginTop: 10, textAlign: "center" } }, "Se guarda con tu nombre en el reporte y no se puede borrar."))));
   }
-  function POSContainer({ inv, onVenta, retiros, onRetiro, onAnularRetiro, onVerNota, user, descuentos, descCodigos, onCambioPrecio, permPrecio }) {
+  function POSContainer({ inv, onVenta, retiros, onRetiro, onRetiroBatch, onAnularRetiro, onVerNota, user, descuentos, descCodigos, onCambioPrecio, permPrecio }) {
     const [subTab, setSubTab] = (0, import_react.useState)("venta");
     const puedePrecio = user?.rol === "admin" || !!permPrecio;
     const tabs = [
@@ -71967,7 +72174,7 @@ Esta acci\xF3n no se puede deshacer.` : "\xBFEliminar esta carga? Esta acci\xF3n
       boxShadow: subTab === t.id ? "0 1px 4px rgba(0,0,0,0.10)" : "none",
       transition: "all .15s",
       WebkitTapHighlightColor: "transparent"
-    } }, t.label))), activa === "venta" ? /* @__PURE__ */ import_react.default.createElement(POS, { inv, onVenta, onVerNota, user, descuentos, descCodigos }) : activa === "retiros" ? /* @__PURE__ */ import_react.default.createElement(RetirosTab, { inv, retiros, onRetiro, onAnular: user?.rol === "admin" ? onAnularRetiro : void 0 }) : /* @__PURE__ */ import_react.default.createElement(CambioPrecioTab, { inv, onGuardar: onCambioPrecio, user }));
+    } }, t.label))), activa === "venta" ? /* @__PURE__ */ import_react.default.createElement(POS, { inv, onVenta, onVerNota, user, descuentos, descCodigos }) : activa === "retiros" ? /* @__PURE__ */ import_react.default.createElement(RetirosTab, { inv, retiros, onRetiro, onRetiroBatch, onAnular: user?.rol === "admin" ? onAnularRetiro : void 0 }) : /* @__PURE__ */ import_react.default.createElement(CambioPrecioTab, { inv, onGuardar: onCambioPrecio, user }));
   }
   function QRPagoPanel({ total, refVenta }) {
     const [qrBanco, setQrBanco] = (0, import_react.useState)(cargarQRBanco);
