@@ -315,18 +315,33 @@ async function sbResetSesionVerif(id) {
 }
 
 async function sbGuardarRetiro(retiro) {
+  const base = {
+    id: retiro.id, fecha: retiro.fecha, hora: retiro.hora,
+    prod_id: retiro.prodId, codigo: retiro.codigo,
+    nombre: retiro.nombre, marca_id: retiro.marcaId,
+    marca_nombre: retiro.marcaNombre, cantidad: retiro.cantidad,
+    destinatario: retiro.destinatario, motivo: retiro.motivo||""
+  };
   try {
     const db = await getSupabase();
-    const { error } = await db.from("retiros").upsert({
-      id: retiro.id, fecha: retiro.fecha, hora: retiro.hora,
-      prod_id: retiro.prodId, codigo: retiro.codigo,
-      nombre: retiro.nombre, marca_id: retiro.marcaId,
-      marca_nombre: retiro.marcaNombre, cantidad: retiro.cantidad,
-      destinatario: retiro.destinatario, motivo: retiro.motivo||""
-    });
+    // Incluye anulada; si la columna aún no existe, reintenta sin ella.
+    let { error } = await db.from("retiros").upsert({...base, anulada: retiro.anulada||false});
+    if (error && /anulada|column/i.test(error.message||"")) {
+      ({ error } = await db.from("retiros").upsert(base));
+    }
     if (error) throw error;
     return true;
   } catch(e) { console.warn("Supabase retiro (tabla puede no existir):", e.message); return false; }
+}
+
+// Marca un retiro como anulado (o lo reactiva). El stock se ajusta aparte.
+async function sbAnularRetiro(id, anulada=true) {
+  try {
+    const db = await getSupabase();
+    const { error } = await db.from("retiros").update({ anulada }).eq("id", id);
+    if (error) throw error;
+    return true;
+  } catch(e) { console.warn("Supabase anular retiro:", e.message); return false; }
 }
 
 async function sbCargarRetiros() {
@@ -337,7 +352,8 @@ async function sbCargarRetiros() {
       id:r.id, fecha:r.fecha, hora:r.hora,
       prodId:r.prod_id, codigo:r.codigo, nombre:r.nombre,
       marcaId:r.marca_id, marcaNombre:r.marca_nombre,
-      cantidad:r.cantidad, destinatario:r.destinatario, motivo:r.motivo
+      cantidad:r.cantidad, destinatario:r.destinatario, motivo:r.motivo,
+      anulada: r.anulada||false
     }));
   } catch(e) { console.warn("Supabase load retiros:", e.message); return []; }
 }
@@ -963,6 +979,7 @@ async function ejecutarOpOutbox(op){
     case "anularVenta": return await sbAnularVenta(op.payload.id);
     case "cierre":      return await sbGuardarCierre(op.payload.key, op.payload.data);
     case "retiro":      return await sbGuardarRetiro(op.payload);
+    case "anularRetiro": return await sbAnularRetiro(op.payload.id, op.payload.anulada);
     case "carga":       return await sbGuardarCarga(op.payload);
     case "auditoria":   return await sbGuardarAuditoria(op.payload);
     case "auditLog":    return await sbGuardarAuditLog(op.payload);
@@ -1143,10 +1160,18 @@ function useRealtimeSync(setVentas, setInv, setRetiros, setFactoryResetRecibido,
             id: r.id, fecha: r.fecha, hora: r.hora,
             prodId: r.prod_id, codigo: r.codigo, nombre: r.nombre,
             marcaId: r.marca_id, marcaNombre: r.marca_nombre,
-            cantidad: r.cantidad, destinatario: r.destinatario, motivo: r.motivo||""
+            cantidad: r.cantidad, destinatario: r.destinatario, motivo: r.motivo||"",
+            anulada: r.anulada||false
           };
           if (mounted && setRetiros) setRetiros(prev =>
             prev.some(x => x.id === retiro.id) ? prev : [...prev, retiro]
+          );
+        })
+        // ── Retiro anulado/actualizado en otro dispositivo ──────────────
+        .on("postgres_changes", { event: "UPDATE", schema: "public", table: "retiros" }, payload => {
+          const r = payload.new;
+          if (mounted && setRetiros) setRetiros(prev =>
+            prev.map(x => x.id === r.id ? {...x, anulada: r.anulada||false} : x)
           );
         })
         // ── Broadcast: venta nueva (ruta rápida ~80ms, sin extra DB query) ──
@@ -6480,7 +6505,8 @@ function LoginScreen({ onLogin }) {
 // ══════════════════════════════════════════════════════════
 // RETIROS — Items retirados de tienda (no ventas)
 // ══════════════════════════════════════════════════════════
-function RetirosTab({inv, retiros, onRetiro}){
+function RetirosTab({inv, retiros, onRetiro, onAnular}){
+  const [confAnular, setConfAnular] = useState(null); // retiro pendiente de confirmar
   const [codBusq, setCodBusq] = useState("");
   const [prodEncontrado, setProdEncontrado] = useState(null);
   const [cantidad, setCantidad] = useState("1");
@@ -6781,9 +6807,11 @@ function RetirosTab({inv, retiros, onRetiro}){
               {/* Items de la marca */}
               {grupo.items.map((r,ri)=>(
                 <div key={r.id} style={{borderBottom:ri<grupo.items.length-1?`1px solid ${C.sep}`:"none",
-                  padding:"10px 0",display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:12}}>
+                  padding:"10px 0",display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:12,
+                  opacity:r.anulada?0.6:1}}>
                   <div style={{flex:1}}>
-                    <div style={{fontSize:14,fontWeight:600,color:C.label,fontFamily:FONT}}>
+                    <div style={{fontSize:14,fontWeight:600,color:C.label,fontFamily:FONT,
+                      textDecoration:r.anulada?"line-through":"none"}}>
                       {r.nombre}
                     </div>
                     <div style={{fontSize:12,color:C.label3,fontFamily:FONT,marginTop:2}}>
@@ -6802,11 +6830,24 @@ function RetirosTab({inv, retiros, onRetiro}){
                     </div>
                     <div style={{fontSize:11,color:C.label3,fontFamily:FONT}}>{r.hora}</div>
                     <div style={{marginTop:4}}>
-                      <span style={{background:`${C.amber}18`,color:C.amber,
-                        fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:20,fontFamily:FONT}}>
-                        RETIRADO
-                      </span>
+                      {r.anulada
+                        ? <span style={{background:`${C.red}18`,color:C.red,
+                            fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:20,fontFamily:FONT}}>
+                            ANULADO
+                          </span>
+                        : <span style={{background:`${C.amber}18`,color:C.amber,
+                            fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:20,fontFamily:FONT}}>
+                            RETIRADO
+                          </span>}
                     </div>
+                    {onAnular && !r.anulada && (
+                      <button onClick={()=>setConfAnular(r)}
+                        style={{marginTop:8,background:"none",border:`1px solid ${C.red}55`,color:C.red,
+                          fontSize:11,fontWeight:600,padding:"4px 10px",borderRadius:8,cursor:"pointer",
+                          fontFamily:FONT,WebkitTapHighlightColor:"transparent"}}>
+                        Anular
+                      </button>
+                    )}
                   </div>
                 </div>
               ))}
@@ -6814,6 +6855,26 @@ function RetirosTab({inv, retiros, onRetiro}){
           ))
         }
       </div>
+
+      {/* Confirmación de anulación (solo admin) */}
+      {confAnular && (
+        <div onClick={()=>setConfAnular(null)} style={{position:"fixed",inset:0,zIndex:9000,
+          background:"rgba(20,19,24,.45)",display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
+          <div onClick={e=>e.stopPropagation()} style={{background:"#FFFFFF",borderRadius:18,padding:22,maxWidth:380,width:"100%",
+            boxShadow:"0 20px 60px -20px rgba(0,0,0,.4)",fontFamily:FONT}}>
+            <div style={{fontSize:17,fontWeight:700,color:C.label,marginBottom:6}}>¿Anular este retiro?</div>
+            <div style={{fontSize:13,color:C.label3,lineHeight:1.5,marginBottom:16}}>
+              Se devuelven <strong>{confAnular.cantidad} u.</strong> de <strong>{confAnular.nombre}</strong> ({confAnular.codigo}) al stock. Queda registrado quién lo anuló y cuándo.
+            </div>
+            <div style={{display:"flex",gap:10}}>
+              <button onClick={()=>setConfAnular(null)} style={{flex:1,padding:"11px",borderRadius:10,border:`1px solid ${C.sep}`,
+                background:C.bg2,color:C.label,fontWeight:600,fontSize:14,cursor:"pointer",fontFamily:FONT,WebkitTapHighlightColor:"transparent"}}>Cancelar</button>
+              <button onClick={()=>{ onAnular&&onAnular(confAnular); setConfAnular(null); }} style={{flex:1,padding:"11px",borderRadius:10,border:"none",
+                background:C.red,color:"#fff",fontWeight:700,fontSize:14,cursor:"pointer",fontFamily:FONT,WebkitTapHighlightColor:"transparent"}}>Sí, anular</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -12868,6 +12929,7 @@ function BrandPortal({user, ventas, inv, cargas, retiros=[], logout, descuentos=
         {/* ══ RETIROS ══ */}
         {tab==="retiros"&&(()=>{
           const retirosMarca = retiros.filter(r=>{
+            if(r.anulada) return false; // anulado: se devolvió el stock, no se muestra
             if(Number(r.marcaId)===mid) return true;
             if(r.marcaNombre && marca && r.marcaNombre.toLowerCase()===marca.nombre.toLowerCase()) return true;
             const prod = inv.find(p=>p.codigo===r.codigo);
@@ -15260,6 +15322,31 @@ function App(){
     }, user);
   }
 
+  // ── Anular un retiro (solo admin): devuelve el stock y lo marca anulado ──
+  //    No se borra (para que no reviva por sync); queda de historial tachado.
+  function anularRetiro(r){
+    if(!r || r.anulada) return;
+    const prod = inv.find(i=>i.id===r.prodId) || inv.find(i=>i.codigo===r.codigo);
+    const pid = prod?.id ?? r.prodId;
+    const stockAntes = prod?.stock||0;
+    const stockDespues = stockAntes + (Number(r.cantidad)||0);
+    if(pid!=null){
+      setInv(p=>p.map(i=>i.id===pid?{...i,stock:stockDespues}:i));
+      syncConRespaldo("stock", {prodId:pid, stock:stockDespues}, ()=>sbActualizarStock(pid, stockDespues));
+    }
+    const updated = retiros.map(x=>x.id===r.id?{...x,anulada:true}:x);
+    setRetiros(updated);
+    try{localStorage.setItem("th_retiros_v1",JSON.stringify(updated));}catch{}
+    syncConRespaldo("anularRetiro", {id:r.id, anulada:true}, ()=>sbAnularRetiro(r.id, true));
+    logAudit("RETIRO_ANULADO", {
+      resumen: `Retiro anulado: ${prod?.nombre||r.nombre||r.codigo} × ${r.cantidad} u. (stock devuelto)`,
+      codigo: r.codigo, nombre: prod?.nombre||r.nombre||r.codigo,
+      marca: prod?.marcaNombre||r.marcaNombre||"—",
+      cantidad: r.cantidad, destinatario: r.destinatario||"—",
+      motivo: r.motivo||"—", stockAntes, stockDespues,
+    }, user);
+  }
+
   // ── Carga completa desde Supabase — merge inteligente con localStorage ──
   // Usada al inicio, al reconectar realtime tras una caída, al volver la app
   // a foreground y al recuperar la red. Los eventos realtime perdidos durante
@@ -16156,7 +16243,7 @@ function App(){
         )}
 
         {/* POS */}
-        {tab==="pos" && <POSContainer inv={inv} onVenta={handleVenta} retiros={retiros} onRetiro={registrarRetiro} onVerNota={v=>setVentaDetalle(v)} user={user} descuentos={descuentos} descCodigos={descCodigos} onCambioPrecio={handleEditarProducto} permPrecio={permPrecioStaff}/>}
+        {tab==="pos" && <POSContainer inv={inv} onVenta={handleVenta} retiros={retiros} onRetiro={registrarRetiro} onAnularRetiro={anularRetiro} onVerNota={v=>setVentaDetalle(v)} user={user} descuentos={descuentos} descCodigos={descCodigos} onCambioPrecio={handleEditarProducto} permPrecio={permPrecioStaff}/>}
 
         {/* INVENTARIO — por marca */}
         {tab==="inventario" && (
@@ -17048,7 +17135,7 @@ function CambioPrecioTab({inv, onGuardar, user}){
   );
 }
 
-function POSContainer({inv,onVenta,retiros,onRetiro,onVerNota,user,descuentos,descCodigos,onCambioPrecio,permPrecio}){
+function POSContainer({inv,onVenta,retiros,onRetiro,onAnularRetiro,onVerNota,user,descuentos,descCodigos,onCambioPrecio,permPrecio}){
   const [subTab, setSubTab] = useState("venta");
   // El cambio de precio lo ve el admin siempre; el staff solo si el admin lo habilitó.
   const puedePrecio = user?.rol==="admin" || !!permPrecio;
@@ -17076,7 +17163,7 @@ function POSContainer({inv,onVenta,retiros,onRetiro,onVerNota,user,descuentos,de
       {activa==="venta"
         ? <POS inv={inv} onVenta={onVenta} onVerNota={onVerNota} user={user} descuentos={descuentos} descCodigos={descCodigos}/>
         : activa==="retiros"
-        ? <RetirosTab inv={inv} retiros={retiros} onRetiro={onRetiro}/>
+        ? <RetirosTab inv={inv} retiros={retiros} onRetiro={onRetiro} onAnular={user?.rol==="admin"?onAnularRetiro:undefined}/>
         : <CambioPrecioTab inv={inv} onGuardar={onCambioPrecio} user={user}/>
       }
     </div>
@@ -20706,6 +20793,7 @@ function InventarioPorMarca({inv, ventas, retiros=[], bajas=[], onRecibir, onBaj
   const retirosPorCodigo = useMemo(()=>{
     const map = {};
     retiros.forEach(r=>{
+      if(r.anulada) return; // los anulados devolvieron el stock: no cuentan
       if(r.codigo) map[r.codigo] = (map[r.codigo]||[]).concat(r);
     });
     return map;
@@ -21648,6 +21736,7 @@ function MarcaDetalle({marcaId,inv,ventas,vMes,mes,anio,MK,cierres,setCierres,ge
   const vendMapMD = mapVendidasPorCodigo(ventas);
   // Retiros de esta marca — comparación con coerción numérica para evitar string/int mismatch
   const retirosMarca = retiros.filter(r=>{
+    if(r.anulada) return false; // anulado: se devolvió el stock, no cuenta
     if(Number(r.marcaId)===Number(marcaId)) return true;
     if(r.marcaNombre && marca &&
       r.marcaNombre.toLowerCase()===marca.nombre.toLowerCase()) return true;
@@ -22861,6 +22950,7 @@ const AUDIT_TIPOS = {
   VENTA:      { label:"Venta",        icono:"🛍️",  color:"#1A7A45" },
   ANULACION:  { label:"Anulación",    icono:"↩️",  color:"#C94C4C" },
   RETIRO:     { label:"Retiro",       icono:"📤",  color:"#8A6418" },
+  RETIRO_ANULADO: { label:"Retiro anulado", icono:"↩", color:"#8A6418" },
   BAJA:       { label:"Baja",         icono:"🚫",  color:"#C94C4C" },
   IMPORT:     { label:"Importación",  icono:"📥",  color:"#1565C0" },
   STOCK_ADD:  { label:"Entrada stock",icono:"📦",  color:"#2E7D32" },

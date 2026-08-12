@@ -53712,25 +53712,40 @@
     }
   }
   async function sbGuardarRetiro(retiro) {
+    const base = {
+      id: retiro.id,
+      fecha: retiro.fecha,
+      hora: retiro.hora,
+      prod_id: retiro.prodId,
+      codigo: retiro.codigo,
+      nombre: retiro.nombre,
+      marca_id: retiro.marcaId,
+      marca_nombre: retiro.marcaNombre,
+      cantidad: retiro.cantidad,
+      destinatario: retiro.destinatario,
+      motivo: retiro.motivo || ""
+    };
     try {
       const db = await getSupabase();
-      const { error } = await db.from("retiros").upsert({
-        id: retiro.id,
-        fecha: retiro.fecha,
-        hora: retiro.hora,
-        prod_id: retiro.prodId,
-        codigo: retiro.codigo,
-        nombre: retiro.nombre,
-        marca_id: retiro.marcaId,
-        marca_nombre: retiro.marcaNombre,
-        cantidad: retiro.cantidad,
-        destinatario: retiro.destinatario,
-        motivo: retiro.motivo || ""
-      });
+      let { error } = await db.from("retiros").upsert({ ...base, anulada: retiro.anulada || false });
+      if (error && /anulada|column/i.test(error.message || "")) {
+        ({ error } = await db.from("retiros").upsert(base));
+      }
       if (error) throw error;
       return true;
     } catch (e) {
       console.warn("Supabase retiro (tabla puede no existir):", e.message);
+      return false;
+    }
+  }
+  async function sbAnularRetiro(id, anulada = true) {
+    try {
+      const db = await getSupabase();
+      const { error } = await db.from("retiros").update({ anulada }).eq("id", id);
+      if (error) throw error;
+      return true;
+    } catch (e) {
+      console.warn("Supabase anular retiro:", e.message);
       return false;
     }
   }
@@ -53749,7 +53764,8 @@
         marcaNombre: r.marca_nombre,
         cantidad: r.cantidad,
         destinatario: r.destinatario,
-        motivo: r.motivo
+        motivo: r.motivo,
+        anulada: r.anulada || false
       }));
     } catch (e) {
       console.warn("Supabase load retiros:", e.message);
@@ -54489,6 +54505,8 @@
         return await sbGuardarCierre(op.payload.key, op.payload.data);
       case "retiro":
         return await sbGuardarRetiro(op.payload);
+      case "anularRetiro":
+        return await sbAnularRetiro(op.payload.id, op.payload.anulada);
       case "carga":
         return await sbGuardarCarga(op.payload);
       case "auditoria":
@@ -54698,10 +54716,16 @@
             marcaNombre: r.marca_nombre,
             cantidad: r.cantidad,
             destinatario: r.destinatario,
-            motivo: r.motivo || ""
+            motivo: r.motivo || "",
+            anulada: r.anulada || false
           };
           if (mounted && setRetiros) setRetiros(
             (prev) => prev.some((x) => x.id === retiro.id) ? prev : [...prev, retiro]
+          );
+        }).on("postgres_changes", { event: "UPDATE", schema: "public", table: "retiros" }, (payload) => {
+          const r = payload.new;
+          if (mounted && setRetiros) setRetiros(
+            (prev) => prev.map((x) => x.id === r.id ? { ...x, anulada: r.anulada || false } : x)
           );
         }).on("broadcast", { event: "venta_nueva" }, ({ payload }) => {
           const v = payload?.v;
@@ -60414,7 +60438,8 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       lineHeight: 1
     } }, "FORGE", /* @__PURE__ */ import_react.default.createElement("span", { style: { color: "#9b8fa0" } }, "."))));
   }
-  function RetirosTab({ inv, retiros, onRetiro }) {
+  function RetirosTab({ inv, retiros, onRetiro, onAnular }) {
+    const [confAnular, setConfAnular] = (0, import_react.useState)(null);
     const [codBusq, setCodBusq] = (0, import_react.useState)("");
     const [prodEncontrado, setProdEncontrado] = (0, import_react.useState)(null);
     const [cantidad, setCantidad] = (0, import_react.useState)("1");
@@ -60837,8 +60862,23 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       display: "flex",
       justifyContent: "space-between",
       alignItems: "flex-start",
-      gap: 12
-    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 14, fontWeight: 600, color: C.label, fontFamily: FONT } }, r.nombre), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT, marginTop: 2 } }, r.codigo, " \xB7 x", r.cantidad), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.blue, fontFamily: FONT, marginTop: 3, fontWeight: 500 } }, "Para: ", r.destinatario), r.motivo && /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT, marginTop: 2, fontStyle: "italic" } }, r.motivo)), /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "right", flexShrink: 0 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, fontFamily: "monospace", color: C.amber, fontWeight: 600 } }, r.fecha), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT } }, r.hora), /* @__PURE__ */ import_react.default.createElement("div", { style: { marginTop: 4 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: {
+      gap: 12,
+      opacity: r.anulada ? 0.6 : 1
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      fontSize: 14,
+      fontWeight: 600,
+      color: C.label,
+      fontFamily: FONT,
+      textDecoration: r.anulada ? "line-through" : "none"
+    } }, r.nombre), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT, marginTop: 2 } }, r.codigo, " \xB7 x", r.cantidad), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.blue, fontFamily: FONT, marginTop: 3, fontWeight: 500 } }, "Para: ", r.destinatario), r.motivo && /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT, marginTop: 2, fontStyle: "italic" } }, r.motivo)), /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "right", flexShrink: 0 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, fontFamily: "monospace", color: C.amber, fontWeight: 600 } }, r.fecha), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT } }, r.hora), /* @__PURE__ */ import_react.default.createElement("div", { style: { marginTop: 4 } }, r.anulada ? /* @__PURE__ */ import_react.default.createElement("span", { style: {
+      background: `${C.red}18`,
+      color: C.red,
+      fontSize: 10,
+      fontWeight: 700,
+      padding: "2px 8px",
+      borderRadius: 20,
+      fontFamily: FONT
+    } }, "ANULADO") : /* @__PURE__ */ import_react.default.createElement("span", { style: {
       background: `${C.amber}18`,
       color: C.amber,
       fontSize: 10,
@@ -60846,7 +60886,70 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       padding: "2px 8px",
       borderRadius: 20,
       fontFamily: FONT
-    } }, "RETIRADO")))))))));
+    } }, "RETIRADO")), onAnular && !r.anulada && /* @__PURE__ */ import_react.default.createElement(
+      "button",
+      {
+        onClick: () => setConfAnular(r),
+        style: {
+          marginTop: 8,
+          background: "none",
+          border: `1px solid ${C.red}55`,
+          color: C.red,
+          fontSize: 11,
+          fontWeight: 600,
+          padding: "4px 10px",
+          borderRadius: 8,
+          cursor: "pointer",
+          fontFamily: FONT,
+          WebkitTapHighlightColor: "transparent"
+        }
+      },
+      "Anular"
+    ))))))), confAnular && /* @__PURE__ */ import_react.default.createElement("div", { onClick: () => setConfAnular(null), style: {
+      position: "fixed",
+      inset: 0,
+      zIndex: 9e3,
+      background: "rgba(20,19,24,.45)",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      padding: 20
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { onClick: (e) => e.stopPropagation(), style: {
+      background: "#FFFFFF",
+      borderRadius: 18,
+      padding: 22,
+      maxWidth: 380,
+      width: "100%",
+      boxShadow: "0 20px 60px -20px rgba(0,0,0,.4)",
+      fontFamily: FONT
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 17, fontWeight: 700, color: C.label, marginBottom: 6 } }, "\xBFAnular este retiro?"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.label3, lineHeight: 1.5, marginBottom: 16 } }, "Se devuelven ", /* @__PURE__ */ import_react.default.createElement("strong", null, confAnular.cantidad, " u."), " de ", /* @__PURE__ */ import_react.default.createElement("strong", null, confAnular.nombre), " (", confAnular.codigo, ") al stock. Queda registrado qui\xE9n lo anul\xF3 y cu\xE1ndo."), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 10 } }, /* @__PURE__ */ import_react.default.createElement("button", { onClick: () => setConfAnular(null), style: {
+      flex: 1,
+      padding: "11px",
+      borderRadius: 10,
+      border: `1px solid ${C.sep}`,
+      background: C.bg2,
+      color: C.label,
+      fontWeight: 600,
+      fontSize: 14,
+      cursor: "pointer",
+      fontFamily: FONT,
+      WebkitTapHighlightColor: "transparent"
+    } }, "Cancelar"), /* @__PURE__ */ import_react.default.createElement("button", { onClick: () => {
+      onAnular && onAnular(confAnular);
+      setConfAnular(null);
+    }, style: {
+      flex: 1,
+      padding: "11px",
+      borderRadius: 10,
+      border: "none",
+      background: C.red,
+      color: "#fff",
+      fontWeight: 700,
+      fontSize: 14,
+      cursor: "pointer",
+      fontFamily: FONT,
+      WebkitTapHighlightColor: "transparent"
+    } }, "S\xED, anular")))));
   }
   function FacturaModal({ venta, open, onClose, onFacturada }) {
     const [nit, setNit] = (0, import_react.useState)("0");
@@ -66924,6 +67027,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       } }, p.stockInicial || stockReal + vendTot || "\u2014"))));
     })))), tab === "retiros" && (() => {
       const retirosMarca = retiros.filter((r) => {
+        if (r.anulada) return false;
         if (Number(r.marcaId) === mid) return true;
         if (r.marcaNombre && marca && r.marcaNombre.toLowerCase() === marca.nombre.toLowerCase()) return true;
         const prod = inv.find((p) => p.codigo === r.codigo);
@@ -69848,6 +69952,35 @@ Esta acci\xF3n no se puede deshacer.`)) return;
         stockDespues
       }, user);
     }
+    function anularRetiro(r) {
+      if (!r || r.anulada) return;
+      const prod = inv.find((i) => i.id === r.prodId) || inv.find((i) => i.codigo === r.codigo);
+      const pid = prod?.id ?? r.prodId;
+      const stockAntes = prod?.stock || 0;
+      const stockDespues = stockAntes + (Number(r.cantidad) || 0);
+      if (pid != null) {
+        setInv((p) => p.map((i) => i.id === pid ? { ...i, stock: stockDespues } : i));
+        syncConRespaldo("stock", { prodId: pid, stock: stockDespues }, () => sbActualizarStock(pid, stockDespues));
+      }
+      const updated = retiros.map((x) => x.id === r.id ? { ...x, anulada: true } : x);
+      setRetiros(updated);
+      try {
+        localStorage.setItem("th_retiros_v1", JSON.stringify(updated));
+      } catch {
+      }
+      syncConRespaldo("anularRetiro", { id: r.id, anulada: true }, () => sbAnularRetiro(r.id, true));
+      logAudit("RETIRO_ANULADO", {
+        resumen: `Retiro anulado: ${prod?.nombre || r.nombre || r.codigo} \xD7 ${r.cantidad} u. (stock devuelto)`,
+        codigo: r.codigo,
+        nombre: prod?.nombre || r.nombre || r.codigo,
+        marca: prod?.marcaNombre || r.marcaNombre || "\u2014",
+        cantidad: r.cantidad,
+        destinatario: r.destinatario || "\u2014",
+        motivo: r.motivo || "\u2014",
+        stockAntes,
+        stockDespues
+      }, user);
+    }
     const _lastResync = (0, import_react.useRef)(0);
     async function cargarDesdeNube() {
       _lastResync.current = Date.now();
@@ -70784,7 +70917,7 @@ Esta acci\xF3n no se puede deshacer.` : "\xBFEliminar esta carga? Esta acci\xF3n
         descuentos,
         descCodigos
       }
-    ), tab === "pos" && /* @__PURE__ */ import_react.default.createElement(POSContainer, { inv, onVenta: handleVenta, retiros, onRetiro: registrarRetiro, onVerNota: (v) => setVentaDetalle(v), user, descuentos, descCodigos, onCambioPrecio: handleEditarProducto, permPrecio: permPrecioStaff }), tab === "inventario" && /* @__PURE__ */ import_react.default.createElement(InventarioPorMarca, { inv, ventas, retiros, bajas: bajasLog, onRecibir: () => setShInv(true), onBaja: () => {
+    ), tab === "pos" && /* @__PURE__ */ import_react.default.createElement(POSContainer, { inv, onVenta: handleVenta, retiros, onRetiro: registrarRetiro, onAnularRetiro: anularRetiro, onVerNota: (v) => setVentaDetalle(v), user, descuentos, descCodigos, onCambioPrecio: handleEditarProducto, permPrecio: permPrecioStaff }), tab === "inventario" && /* @__PURE__ */ import_react.default.createElement(InventarioPorMarca, { inv, ventas, retiros, bajas: bajasLog, onRecibir: () => setShInv(true), onBaja: () => {
       setShBaja(true);
       setBajaMsg(null);
       setBajaCod("");
@@ -71803,7 +71936,7 @@ Esta acci\xF3n no se puede deshacer.` : "\xBFEliminar esta carga? Esta acci\xF3n
       guardando ? "Guardando\u2026" : grande && confirmGrande ? "Confirmar cambio grande" : "Guardar cambio de precio"
     ), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT, marginTop: 10, textAlign: "center" } }, "Se guarda con tu nombre en el reporte y no se puede borrar."))));
   }
-  function POSContainer({ inv, onVenta, retiros, onRetiro, onVerNota, user, descuentos, descCodigos, onCambioPrecio, permPrecio }) {
+  function POSContainer({ inv, onVenta, retiros, onRetiro, onAnularRetiro, onVerNota, user, descuentos, descCodigos, onCambioPrecio, permPrecio }) {
     const [subTab, setSubTab] = (0, import_react.useState)("venta");
     const puedePrecio = user?.rol === "admin" || !!permPrecio;
     const tabs = [
@@ -71834,7 +71967,7 @@ Esta acci\xF3n no se puede deshacer.` : "\xBFEliminar esta carga? Esta acci\xF3n
       boxShadow: subTab === t.id ? "0 1px 4px rgba(0,0,0,0.10)" : "none",
       transition: "all .15s",
       WebkitTapHighlightColor: "transparent"
-    } }, t.label))), activa === "venta" ? /* @__PURE__ */ import_react.default.createElement(POS, { inv, onVenta, onVerNota, user, descuentos, descCodigos }) : activa === "retiros" ? /* @__PURE__ */ import_react.default.createElement(RetirosTab, { inv, retiros, onRetiro }) : /* @__PURE__ */ import_react.default.createElement(CambioPrecioTab, { inv, onGuardar: onCambioPrecio, user }));
+    } }, t.label))), activa === "venta" ? /* @__PURE__ */ import_react.default.createElement(POS, { inv, onVenta, onVerNota, user, descuentos, descCodigos }) : activa === "retiros" ? /* @__PURE__ */ import_react.default.createElement(RetirosTab, { inv, retiros, onRetiro, onAnular: user?.rol === "admin" ? onAnularRetiro : void 0 }) : /* @__PURE__ */ import_react.default.createElement(CambioPrecioTab, { inv, onGuardar: onCambioPrecio, user }));
   }
   function QRPagoPanel({ total, refVenta }) {
     const [qrBanco, setQrBanco] = (0, import_react.useState)(cargarQRBanco);
@@ -76053,6 +76186,7 @@ ${c.resumen || c.id}`)) onEliminarCarga(c.id);
     const retirosPorCodigo = (0, import_react.useMemo)(() => {
       const map = {};
       retiros.forEach((r) => {
+        if (r.anulada) return;
         if (r.codigo) map[r.codigo] = (map[r.codigo] || []).concat(r);
       });
       return map;
@@ -77373,6 +77507,7 @@ ${c.resumen || c.id}`)) onEliminarCarga(c.id);
     const prods = inv.filter((i) => i.marcaId === marcaId);
     const vendMapMD = mapVendidasPorCodigo(ventas);
     const retirosMarca = retiros.filter((r) => {
+      if (r.anulada) return false;
       if (Number(r.marcaId) === Number(marcaId)) return true;
       if (r.marcaNombre && marca && r.marcaNombre.toLowerCase() === marca.nombre.toLowerCase()) return true;
       const prod = inv.find((p) => p.codigo === r.codigo || r.codigo && p.codigo && limpiarCod(p.codigo) === limpiarCod(r.codigo));
@@ -78507,6 +78642,7 @@ ${c.resumen || c.id}`)) onEliminarCarga(c.id);
     VENTA: { label: "Venta", icono: "\u{1F6CD}\uFE0F", color: "#1A7A45" },
     ANULACION: { label: "Anulaci\xF3n", icono: "\u21A9\uFE0F", color: "#C94C4C" },
     RETIRO: { label: "Retiro", icono: "\u{1F4E4}", color: "#8A6418" },
+    RETIRO_ANULADO: { label: "Retiro anulado", icono: "\u21A9", color: "#8A6418" },
     BAJA: { label: "Baja", icono: "\u{1F6AB}", color: "#C94C4C" },
     IMPORT: { label: "Importaci\xF3n", icono: "\u{1F4E5}", color: "#1565C0" },
     STOCK_ADD: { label: "Entrada stock", icono: "\u{1F4E6}", color: "#2E7D32" },
