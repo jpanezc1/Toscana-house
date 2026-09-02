@@ -55599,7 +55599,7 @@
     },
     {
       id: 19,
-      nombre: "Gatarra",
+      nombre: "Gattara",
       color: "#C4A8B4",
       emoji: "\u25C8",
       imagen: "data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PSIwIDAgMjAwIDIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgcng9IjEyIiBmaWxsPSIjRkFGQUY4Ii8+CiAgPGNpcmNsZSBjeD0iMTAwIiBjeT0iNzMiIHI9IjEuOCIgZmlsbD0iIzFBMTcxNCIgb3BhY2l0eT0iLjQ1Ii8+CiAgPHRleHQgeD0iMTAwIiB5PSI5NSIgZm9udC1mYW1pbHk9IidDb3Jtb3JhbnQgR2FyYW1vbmQnLEdlb3JnaWEsc2VyaWYiIGZvbnQtc2l6ZT0iMzIiIGZvbnQtd2VpZ2h0PSI0MDAiIGZvbnQtc3R5bGU9Im5vcm1hbCIgZmlsbD0iIzFBMTcxNCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZG9taW5hbnQtYmFzZWxpbmU9Im1pZGRsZSIgbGV0dGVyLXNwYWNpbmc9IjQiPkdBVEFSUkE8L3RleHQ+CiAgPHRleHQgeD0iMTAwIiB5PSIxNzYiIGZvbnQtZmFtaWx5PSInQ29ybW9yYW50IEdhcmFtb25kJyxHZW9yZ2lhLHNlcmlmIiBmb250LXNpemU9IjExIiBmb250LXdlaWdodD0iNDAwIiBmaWxsPSIjMUExNzE0IiBvcGFjaXR5PSIuMzUiIHRleHQtYW5jaG9yPSJtaWRkbGUiPjE5LjwvdGV4dD4KPC9zdmc+"
