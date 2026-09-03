@@ -56275,22 +56275,38 @@
     const neto = subBanco - comision - alquiler - totalGastos;
     return { bruto, brutoEf, brutoQR, brutoTJ, descTJ, subBanco, comision, alquiler, gastos, totalGastos, neto, cfg };
   }
-  var CUCU_CFG_KEY = "th_cucu_cfg";
-  var CUCU_DEF = {
-    apiKey: "",
-    endpoint: "https://app.cucu.bo/api/v1/invoices",
-    codigoActividad: "470000",
-    codigoProductoSin: "58311",
-    modoApi: true
-  };
-  var CUCU_MP = { efectivo: 1, qr: 5, tarjeta: 2, transferencia: 4 };
-  function leerCfgCUCU() {
+  var FACT_CFG_KEY = "toscana_fact_cfg";
+  var FACT_DEF = { url: "https://forge-facturacion.vercel.app", llave: "", empresa: "toscana" };
+  var FACT_DOCS = [
+    { id: 1, sigla: "CI", label: "Carnet de identidad" },
+    { id: 2, sigla: "CEX", label: "Documento de extranjero" },
+    { id: 3, sigla: "PAS", label: "Pasaporte" },
+    { id: 4, sigla: "OD", label: "Otro documento" },
+    { id: 5, sigla: "NIT", label: "NIT" }
+  ];
+  var FACT_MOTIVOS = [
+    { id: 1, label: "Factura mal emitida" },
+    { id: 3, label: "Datos del cliente incorrectos" },
+    { id: 4, label: "Devoluci\xF3n de la venta" }
+  ];
+  try {
+    localStorage.removeItem("th_cucu_cfg");
+  } catch {
+  }
+  function leerCfgFact() {
     try {
-      return { ...CUCU_DEF, ...JSON.parse(localStorage.getItem(CUCU_CFG_KEY) || "{}") };
+      return { ...FACT_DEF, ...JSON.parse(localStorage.getItem(FACT_CFG_KEY) || "{}") };
     } catch {
-      return CUCU_DEF;
+      return FACT_DEF;
     }
   }
+  function guardarCfgFact(cfg) {
+    try {
+      localStorage.setItem(FACT_CFG_KEY, JSON.stringify(cfg));
+    } catch {
+    }
+  }
+  var factBs = (n) => "Bs " + Number(n || 0).toLocaleString("es-BO", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   function guardarFacturaLocal(ventaId, data) {
     sbKVGuardar(`fac_${ventaId}`, data);
   }
@@ -56301,83 +56317,174 @@
       return null;
     }
   }
-  async function emitirFacturaCUCU(venta, nitComprador, nombreComprador) {
-    const cfg = leerCfgCUCU();
-    if (!cfg.apiKey) throw new Error("API Key de CUCU no configurada. Ir a Config \u2192 Sistema \u2192 Facturaci\xF3n.");
-    const mp = venta.metodoPago;
-    let codPago = 1;
-    if (mp?.startsWith("mixto|")) {
-      const obj = { efectivo: 0, qr: 0, tarjeta: 0 };
-      mp.split("|").slice(1).forEach((p) => {
-        const [k, v] = p.split(":");
-        obj[k] = parseFloat(v) || 0;
-      });
-      const dom = Object.keys(obj).reduce((a, b) => obj[a] >= obj[b] ? a : b, "efectivo");
-      codPago = CUCU_MP[dom] || 1;
-    } else {
-      codPago = CUCU_MP[mp] || 1;
-    }
-    const payload = {
-      actividadEconomica: cfg.codigoActividad,
-      metodoPago: codPago,
-      cliente: { nit: Number(nitComprador) || 0, razonSocial: (nombreComprador || "Sin Nombre").trim() },
-      items: venta.items.map((it) => ({
-        codigoProducto: Number(cfg.codigoProductoSin) || 58311,
-        descripcion: (it.nombre || "Producto").slice(0, 100),
-        cantidad: it.cantidad || 1,
-        precioUnitario: it.precioUnit || 0,
-        descuento: 0,
-        subtotal: it.subtotal || 0
-      })),
-      total: venta.total || 0
-    };
-    const r = await fetch(cfg.endpoint, {
-      method: "POST",
-      headers: { "Authorization": `Bearer ${cfg.apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
+  function facturaDeVenta(venta) {
+    return venta ? leerFacturaLocal(venta.id) : null;
+  }
+  var _FACT_KEYS = ["facturaId", "facturaNumero", "facturaCuf", "facturaQr", "facturaPdf", "facturaEstado", "facturaFecha", "facturaAmbiente", "total", "literal", "numero", "cuf", "qrUrl", "pdf", "nombreComprador", "nitComprador", "factTipoDoc", "factDocumento", "factComplemento", "factNombre", "factEmail", "factExcepcion", "anulada", "fechaAnulacion", "telefono"];
+  function sbGuardarFactura(ventaId, campos) {
+    const prev = leerFacturaLocal(ventaId) || {};
+    const merge = {};
+    _FACT_KEYS.forEach((k) => {
+      if (campos && campos[k] !== void 0) merge[k] = campos[k];
     });
-    if (!r.ok) {
-      let msg = "";
-      try {
-        const j = await r.json();
-        msg = j.message || j.error || JSON.stringify(j);
-      } catch {
-        msg = await r.text();
-      }
-      throw new Error(`CUCU ${r.status}: ${msg.slice(0, 200)}`);
+    if (merge.facturaEstado === "anulada") merge.anulada = true;
+    if (merge.facturaEstado === "emitida") merge.anulada = false;
+    guardarFacturaLocal(ventaId, { ...prev, ...merge });
+    return Promise.resolve(true);
+  }
+  function avisarFacturaCambiada(ventaId, cambios) {
+    try {
+      window.dispatchEvent(new CustomEvent("toscana-factura", { detail: { ventaId, cambios } }));
+    } catch {
     }
-    const body = await r.json();
-    const d = body.data || body;
+  }
+  async function llamarAdaptador(ruta, body, ms = 45e3) {
+    const cfg = leerCfgFact();
+    if (!cfg.llave) throw new Error("Falta la llave de facturaci\xF3n. Ir a Config \u2192 Sistema \u2192 Facturaci\xF3n.");
+    const base = (cfg.url || "").replace(/\/+$/, "");
+    let r;
+    try {
+      r = await fetch(`${base}${ruta}`, {
+        method: body ? "POST" : "GET",
+        headers: { "Content-Type": "application/json", "X-Forge-Key": cfg.llave },
+        body: body ? JSON.stringify(body) : void 0,
+        signal: AbortSignal.timeout(ms)
+      });
+    } catch (e) {
+      throw new Error(e.name === "TimeoutError" ? "El servicio de facturaci\xF3n no respondi\xF3 a tiempo. Revis\xE1 en el panel si la factura sali\xF3 antes de volver a emitir." : "Sin conexi\xF3n con el servicio de facturaci\xF3n.");
+    }
+    let j = null;
+    try {
+      j = await r.json();
+    } catch {
+    }
+    if (!r.ok || !j || j.ok === false) {
+      const detalle = j && (j.error || j.detalle) || `Error ${r.status}`;
+      throw new Error(String(detalle));
+    }
+    return j;
+  }
+  async function factEstado() {
+    return llamarAdaptador("/api/estado", null, 12e3);
+  }
+  async function verificarNit(nit) {
+    const cfg = leerCfgFact();
+    return llamarAdaptador("/api/verificar-nit", { empresa_slug: cfg.empresa || "toscana", nit: String(nit).replace(/[.\s-]/g, "") }, 15e3);
+  }
+  function categoriaDeCodigo(codigo) {
+    try {
+      const inv = JSON.parse(localStorage.getItem("th_inv") || "[]");
+      const c = String(codigo || "").toUpperCase();
+      const p = inv.find((x) => String(x.codigo || "").toUpperCase() === c);
+      return p ? String(p.categoria || p.subcat || "").toUpperCase() : "";
+    } catch {
+      return "";
+    }
+  }
+  function refSinDeItem(it) {
+    return String(it.categoria || categoriaDeCodigo(it.codigo) || it.nombre || "").trim().toUpperCase();
+  }
+  function ventaParaFactura(venta, cliente) {
+    const items = (venta.items || []).map((it) => {
+      const bruto = (Number(it.precioUnit) || 0) * (Number(it.cantidad) || 1);
+      const neto = Number(it.subtotal);
+      const descuento = Number.isFinite(neto) ? +(bruto - neto).toFixed(2) : 0;
+      return {
+        producto_ref: refSinDeItem(it),
+        descripcion: String(it.nombre || "").slice(0, 200),
+        cantidad: Number(it.cantidad) || 1,
+        precio_unitario: Number(it.precioUnit) || 0,
+        ...descuento > 9e-3 ? { descuento } : {}
+      };
+    });
     return {
-      cuf: d.cuf || d.CUF || d.codigoCuf || "",
-      numero: d.numero || d.nroFactura || d.numeroFactura || d.number || "",
-      qrUrl: d.qr || d.qrUrl || d.urlQr || "",
-      pdf: d.pdf || d.pdfUrl || d.urlPdf || "",
-      nitComprador: Number(nitComprador) || 0,
-      nombreComprador: (nombreComprador || "Sin Nombre").trim()
+      venta_ref: venta.id,
+      cliente: {
+        tipo_doc: cliente.tipoDoc,
+        documento: String(cliente.documento || "").trim(),
+        complemento: (cliente.complemento || "").trim(),
+        razon_social: (cliente.nombre || "").trim(),
+        email: (cliente.email || "").trim(),
+        ...cliente.tipoDoc === 5 ? { exception_code: cliente.excepcion ?? 1 } : {}
+      },
+      metodo_pago: venta.metodoPago,
+      ...cliente.tarjeta ? { card_number: String(cliente.tarjeta).replace(/\s/g, "") } : {},
+      items
     };
   }
-  async function anularFacturaCUCU(cuf) {
-    const cfg = leerCfgCUCU();
-    if (!cfg.apiKey) throw new Error("Sin API Key de CUCU \u2014 ir a Config \u2192 Facturaci\xF3n.");
-    const base = cfg.endpoint.replace(/\/invoices\/?$/, "");
-    const url = `${base}/invoices/${encodeURIComponent(cuf)}`;
-    const r = await fetch(url, {
-      method: "DELETE",
-      headers: { "Authorization": `Bearer ${cfg.apiKey}`, "Content-Type": "application/json" },
-      signal: AbortSignal.timeout(1e4)
+  async function emitirFactura(venta, cliente) {
+    const cfg = leerCfgFact();
+    const r = await llamarAdaptador("/api/facturar", {
+      empresa_slug: cfg.empresa || "toscana",
+      venta: ventaParaFactura(venta, cliente)
     });
-    if (!r.ok && r.status !== 404) {
-      let msg = "";
-      try {
-        const j = await r.json();
-        msg = j.message || j.error || JSON.stringify(j);
-      } catch {
-        msg = await r.text();
+    const num = r.invoiceNumber ?? null, cuf = r.cuf || "", qr = r.qrCode || "", pdf = r.pdfUrl || "";
+    return {
+      facturaId: r.invoiceId || "",
+      facturaNumero: num,
+      facturaCuf: cuf,
+      facturaQr: qr,
+      facturaPdf: pdf,
+      facturaEstado: "emitida",
+      facturaFecha: (/* @__PURE__ */ new Date()).toISOString(),
+      total: r.total,
+      literal: r.literal || "",
+      // compat con la nota vieja de Toscana:
+      numero: num,
+      cuf,
+      qrUrl: qr,
+      pdf,
+      nombreComprador: (cliente.nombre || "").trim(),
+      nitComprador: (cliente.documento || "").trim()
+    };
+  }
+  async function anularFactura(facturaId, motivo = 1) {
+    if (!facturaId) throw new Error("Esta factura no tiene identificador guardado, no se puede anular desde ac\xE1.");
+    const cfg = leerCfgFact();
+    return llamarAdaptador("/api/anular", { empresa_slug: cfg.empresa || "toscana", invoiceId: facturaId, motivo });
+  }
+  async function revertirAnulacion(facturaId) {
+    if (!facturaId) throw new Error("Esta factura no tiene identificador guardado.");
+    const cfg = leerCfgFact();
+    return llamarAdaptador("/api/revertir-anulacion", { empresa_slug: cfg.empresa || "toscana", invoiceId: facturaId });
+  }
+  function AvisoAmbiente({ ambiente }) {
+    if (ambiente !== "sandbox") return null;
+    return /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      background: `${C.gold}14`,
+      border: `1px solid ${C.gold}45`,
+      borderRadius: 12,
+      padding: "10px 12px",
+      marginBottom: 14,
+      display: "flex",
+      gap: 9,
+      alignItems: "flex-start"
+    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.gold, fontSize: 15, lineHeight: 1.2, flexShrink: 0 } }, "!"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label2, fontFamily: FONT, lineHeight: 1.55 } }, /* @__PURE__ */ import_react.default.createElement("strong", { style: { color: C.gold } }, "Ambiente de prueba."), " Esta factura NO tiene validez fiscal y no se declara ante Impuestos. Sirve para probar el sistema."));
+  }
+  function useChequeoNit() {
+    const [estado, setEstado] = (0, import_react.useState)(null);
+    const limpiar = () => setEstado(null);
+    async function chequear(nit, alResolver) {
+      const limpio = String(nit || "").replace(/[.\s-]/g, "").trim();
+      if (limpio.length < 5) {
+        setEstado(null);
+        return;
       }
-      throw new Error(`CUCU ${r.status}: ${msg.slice(0, 200)}`);
+      setEstado({ cargando: true });
+      try {
+        const r = await verificarNit(limpio);
+        setEstado({ valido: r.valido, motivo: r.motivo });
+        alResolver && alResolver(r);
+      } catch (e) {
+        setEstado({ error: e.message });
+      }
     }
-    return r.status === 204 ? {} : await r.json().catch(() => ({}));
+    return { estado, chequear, limpiar };
+  }
+  function ChipNit({ estado }) {
+    if (!estado) return null;
+    const { color, texto } = estado.cargando ? { color: C.label3, texto: "Consultando a Impuestos\u2026" } : estado.error ? { color: C.label3, texto: "No se pudo consultar. Se emite igual." } : estado.valido ? { color: C.green, texto: `${estado.motivo}. Factura normal.` } : { color: C.gold, texto: `${estado.motivo}. Se emite amparada en la excepci\xF3n.` };
+    return /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11.5, color, fontFamily: FONT, marginTop: -8, marginBottom: 12, paddingLeft: 2, lineHeight: 1.5 } }, texto);
   }
   async function generarExcelMensual(ventas, inventario, mes, anio, setGenerando, retiros) {
     setGenerando(true);
@@ -61110,266 +61217,449 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       WebkitTapHighlightColor: "transparent"
     } }, "S\xED, anular")))));
   }
-  function FacturaModal({ venta, open, onClose, onFacturada }) {
-    const [nit, setNit] = (0, import_react.useState)("0");
-    const [nombre, setNombre] = (0, import_react.useState)("Sin Nombre");
+  function FacturaModal({ venta, open, onClose, onFacturada, esAdmin }) {
+    const [tipoDoc, setTipoDoc] = (0, import_react.useState)(5);
+    const [documento, setDocumento] = (0, import_react.useState)("");
+    const [complemento, setComplemento] = (0, import_react.useState)("");
+    const [nombre, setNombre] = (0, import_react.useState)("");
+    const [email, setEmail] = (0, import_react.useState)("");
+    const [excepcion, setExcepcion] = (0, import_react.useState)(0);
+    const [motivoAnul, setMotivoAnul] = (0, import_react.useState)(1);
+    const [revirtiendo, setRevirtiendo] = (0, import_react.useState)(false);
+    const nitChk = useChequeoNit();
+    const [tarjeta, setTarjeta] = (0, import_react.useState)("");
     const [telefono, setTelefono] = (0, import_react.useState)("");
-    const [modo, setModo] = (0, import_react.useState)("api");
     const [estado, setEstado] = (0, import_react.useState)("idle");
     const [resultado, setResultado] = (0, import_react.useState)(null);
     const [errMsg, setErrMsg] = (0, import_react.useState)("");
-    const [manNro, setManNro] = (0, import_react.useState)("");
-    const [manCuf, setManCuf] = (0, import_react.useState)("");
-    const cfg = leerCfgCUCU();
+    const [ambiente, setAmbiente] = (0, import_react.useState)("");
+    const [listo, setListo] = (0, import_react.useState)(null);
+    const [anulando, setAnulando] = (0, import_react.useState)(false);
+    const [confirmAnul, setConfirmAnul] = (0, import_react.useState)(false);
+    const cfg = leerCfgFact();
+    const facturaPrevia = facturaDeVenta(venta);
+    const pagoConTarjeta = /tarjeta/.test(String(venta?.metodoPago || ""));
     (0, import_react.useEffect)(() => {
-      if (open) {
-        setNit("0");
-        setNombre("Sin Nombre");
-        setTelefono("");
-        setModo(cfg.modoApi !== false ? "api" : "manual");
-        setEstado("idle");
-        setResultado(null);
-        setErrMsg("");
-        setManNro("");
-        setManCuf("");
+      if (!open) return;
+      setTipoDoc(venta?.factTipoDoc ?? 5);
+      setDocumento(venta?.factDocumento || "");
+      setComplemento(venta?.factComplemento || "");
+      setNombre(venta?.factNombre || "");
+      setEmail(venta?.factEmail || "");
+      setExcepcion(venta?.factExcepcion ?? 0);
+      setMotivoAnul(1);
+      nitChk.limpiar();
+      setTelefono(venta?.clienteTelefono || "");
+      setTarjeta("");
+      setEstado("idle");
+      setResultado(null);
+      setErrMsg("");
+      setConfirmAnul(false);
+      if (cfg.llave) {
+        factEstado().then((r) => {
+          const emp = (r.empresas || []).find((e) => e.slug === (cfg.empresa || "toscana"));
+          setAmbiente(emp?.ambiente || r.ambiente || "");
+          setListo(emp ? !!emp.listo : null);
+        }).catch(() => {
+          setAmbiente("");
+          setListo(null);
+        });
       }
     }, [open]);
-    const factExist = venta ? leerFacturaLocal(venta.id) : null;
+    const docSel = FACT_DOCS.find((d) => d.id === tipoDoc) || FACT_DOCS[4];
+    function validar() {
+      if (!documento.trim()) return `Falta el ${docSel.label.toLowerCase()} del cliente.`;
+      if (!nombre.trim()) return "Falta el nombre o raz\xF3n social del cliente.";
+      if (pagoConTarjeta && !tarjeta.trim())
+        return "El cobro incluye tarjeta: Impuestos exige el n\xFAmero de la tarjeta en la factura.";
+      if (email.trim() && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email.trim()))
+        return "El correo no parece v\xE1lido. Revisalo o dejalo vac\xEDo.";
+      return "";
+    }
     async function emitir() {
+      const problema = validar();
+      if (problema) {
+        setErrMsg(problema);
+        setEstado("error");
+        return;
+      }
       setEstado("enviando");
       setErrMsg("");
       try {
-        const r = await emitirFacturaCUCU(venta, nit, nombre);
-        guardarFacturaLocal(venta.id, { ...r, telefono: telefono.trim() });
-        setResultado({ ...r, telefono: telefono.trim() });
+        const datos = {
+          tipoDoc,
+          documento,
+          complemento,
+          nombre,
+          email,
+          excepcion: tipoDoc === 5 ? excepcion : null,
+          tarjeta: pagoConTarjeta ? tarjeta : ""
+        };
+        const r = await emitirFactura(venta, datos);
+        const guardado = {
+          ...r,
+          factTipoDoc: tipoDoc,
+          factDocumento: documento.trim(),
+          factComplemento: complemento.trim(),
+          factNombre: nombre.trim(),
+          factEmail: email.trim(),
+          factExcepcion: tipoDoc === 5 ? excepcion : null,
+          facturaAmbiente: ambiente || "",
+          telefono: telefono.trim()
+        };
+        await sbGuardarFactura(venta.id, guardado);
+        setResultado({ ...guardado, telefono: telefono.trim() });
         setEstado("ok");
-        onFacturada && onFacturada(r);
+        avisarFacturaCambiada(venta.id, guardado);
+        onFacturada && onFacturada(venta.id, guardado);
       } catch (e) {
         setErrMsg(e.message);
         setEstado("error");
       }
     }
-    function guardarManual() {
-      if (!manNro && !manCuf) {
-        setErrMsg("Ingres\xE1 el n\xFAmero de factura o CUF.");
-        return;
+    async function ejecutarAnular() {
+      const fac = resultado || facturaPrevia;
+      setAnulando(true);
+      setErrMsg("");
+      setConfirmAnul(false);
+      try {
+        await anularFactura(fac.facturaId || fac.id, motivoAnul);
+        const cambios = { facturaEstado: "anulada" };
+        await sbGuardarFactura(venta.id, cambios);
+        avisarFacturaCambiada(venta.id, cambios);
+        onFacturada && onFacturada(venta.id, cambios);
+        setResultado({ ...fac, ...cambios });
+        setEstado("ok");
+      } catch (e) {
+        setErrMsg(e.message);
+        setEstado("error");
       }
-      const r = {
-        cuf: manCuf,
-        numero: manNro,
-        qrUrl: "",
-        pdf: "",
-        nitComprador: Number(nit) || 0,
-        nombreComprador: nombre.trim(),
-        telefono: telefono.trim()
-      };
-      guardarFacturaLocal(venta.id, r);
-      setResultado(r);
-      setEstado("ok");
-      onFacturada && onFacturada(r);
+      setAnulando(false);
     }
-    const FacturaOK = ({ r }) => /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center", marginBottom: 20 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      width: 60,
-      height: 60,
-      borderRadius: "50%",
-      background: `${C.green}15`,
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      margin: "0 auto 12px",
-      fontSize: 28
-    } }, "\u2713"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 20, fontWeight: 500, color: C.green, fontFamily: FONT_DISPLAY, letterSpacing: 0.5 } }, "Factura Emitida"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT, marginTop: 4 } }, "SIAT Bolivia")), /* @__PURE__ */ import_react.default.createElement("div", { style: { background: C.bg2, borderRadius: 14, overflow: "hidden", marginBottom: 16, border: `1px solid ${C.sep}` } }, [
-      ["N\xB0 Factura", r.numero],
-      ["Cliente", r.nombreComprador],
-      ["NIT", r.nitComprador === 0 ? "Sin NIT (CF)" : r.nitComprador],
-      r.telefono ? ["Tel\xE9fono", r.telefono] : null
-    ].filter((x) => x && x[1] !== void 0 && x[1] !== "").map(([k, v], i, a) => /* @__PURE__ */ import_react.default.createElement("div", { key: k, style: {
+    async function ejecutarRevertir() {
+      const fac = resultado || facturaPrevia;
+      setRevirtiendo(true);
+      setErrMsg("");
+      try {
+        await revertirAnulacion(fac.facturaId || fac.id);
+        const cambios = { facturaEstado: "emitida" };
+        await sbGuardarFactura(venta.id, cambios);
+        avisarFacturaCambiada(venta.id, cambios);
+        onFacturada && onFacturada(venta.id, cambios);
+        setResultado({ ...fac, ...cambios });
+        setEstado("ok");
+      } catch (e) {
+        setErrMsg(e.message);
+        setEstado("error");
+      }
+      setRevirtiendo(false);
+    }
+    const filaDato = (k, v, i, total) => /* @__PURE__ */ import_react.default.createElement("div", { key: k, style: {
       display: "flex",
       justifyContent: "space-between",
+      gap: 12,
       padding: "12px 16px",
-      borderBottom: i < a.length - 1 ? `1px solid ${C.sep}` : ""
-    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, color: C.label3, fontFamily: FONT } }, k), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, fontWeight: 600, color: C.label, fontFamily: FONT } }, String(v))))), r.cuf && /* @__PURE__ */ import_react.default.createElement("div", { style: { background: C.bg2, borderRadius: 12, padding: 12, marginBottom: 16, border: `1px solid ${C.sep}` } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      fontSize: 10,
-      fontWeight: 700,
-      color: C.label3,
+      borderBottom: i < total - 1 ? `1px solid ${C.sep}` : ""
+    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, color: C.label3, fontFamily: FONT, flexShrink: 0 } }, k), /* @__PURE__ */ import_react.default.createElement("span", { style: {
+      fontSize: 13,
+      fontWeight: 600,
+      color: C.label,
       fontFamily: FONT,
-      textTransform: "uppercase",
-      letterSpacing: 0.5,
-      marginBottom: 4
-    } }, "CUF"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, fontFamily: "monospace", color: C.label, lineHeight: 1.6, wordBreak: "break-all" } }, r.cuf)), r.qrUrl && /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center", marginBottom: 16 } }, /* @__PURE__ */ import_react.default.createElement("img", { src: r.qrUrl, style: { width: 140, height: 140, borderRadius: 8 }, alt: "QR Factura" })), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 10 } }, /* @__PURE__ */ import_react.default.createElement("button", { onClick: () => sendFacturaWA(r, venta, r.telefono), style: {
-      width: "100%",
-      padding: "14px",
-      borderRadius: 14,
-      border: "none",
-      cursor: "pointer",
-      background: "linear-gradient(135deg,#25D366,#128C7E)",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      gap: 10,
-      WebkitTapHighlightColor: "transparent"
-    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 20 } }, "\u{1F4F2}"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 14, fontWeight: 700, color: "#fff", fontFamily: FONT_UI } }, r.telefono ? `Enviar a ${r.telefono}` : "Enviar por WhatsApp")), r.pdf && /* @__PURE__ */ import_react.default.createElement("a", { href: r.pdf, target: "_blank", rel: "noopener noreferrer", style: { textDecoration: "none" } }, /* @__PURE__ */ import_react.default.createElement(IOSBtn, { variant: "fill", full: true, icon: "\u{1F4C4}" }, "Ver PDF Factura")), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: onClose, variant: "primary", full: true }, "Cerrar")));
-    return /* @__PURE__ */ import_react.default.createElement(Sheet, { open, onClose, title: "\u{1F9FE} Factura SIAT Bolivia", tall: true }, factExist && estado === "idle" ? /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      background: `${C.green}12`,
-      border: `1px solid ${C.green}30`,
-      borderRadius: 14,
-      padding: 16,
-      marginBottom: 16
-    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 15, fontWeight: 700, color: C.green, fontFamily: FONT, marginBottom: 6 } }, "\u2713 Factura ya emitida"), factExist.numero && /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.label, fontFamily: FONT } }, "N\xB0 ", /* @__PURE__ */ import_react.default.createElement("strong", null, factExist.numero)), factExist.cuf && /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      fontSize: 11,
-      color: C.label3,
-      fontFamily: "monospace",
-      marginTop: 4,
-      wordBreak: "break-all"
-    } }, "CUF: ", factExist.cuf.slice(0, 32), factExist.cuf.length > 32 ? "\u2026" : "")), factExist.qrUrl && /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center", marginBottom: 16 } }, /* @__PURE__ */ import_react.default.createElement("img", { src: factExist.qrUrl, style: { width: 140, height: 140, borderRadius: 8 }, alt: "QR" })), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 8, marginTop: 4 } }, /* @__PURE__ */ import_react.default.createElement("button", { onClick: () => sendFacturaWA(factExist, venta, factExist.telefono), style: {
-      width: "100%",
-      padding: "13px",
-      borderRadius: 14,
-      border: "none",
-      cursor: "pointer",
-      background: "linear-gradient(135deg,#25D366,#128C7E)",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      gap: 10,
-      WebkitTapHighlightColor: "transparent"
-    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 20 } }, "\u{1F4F2}"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 14, fontWeight: 700, color: "#fff", fontFamily: FONT_UI } }, factExist.telefono ? `Enviar a ${factExist.telefono}` : "Enviar por WhatsApp")), factExist.pdf && /* @__PURE__ */ import_react.default.createElement("a", { href: factExist.pdf, target: "_blank", rel: "noopener noreferrer", style: { textDecoration: "none" } }, /* @__PURE__ */ import_react.default.createElement(IOSBtn, { variant: "fill", full: true, icon: "\u{1F4C4}" }, "Ver PDF Factura")), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => setEstado("form"), variant: "fill", full: true }, "Emitir nueva factura"))) : estado === "ok" && resultado ? /* @__PURE__ */ import_react.default.createElement(FacturaOK, { r: resultado }) : (
-      /* ── Formulario ── */
-      /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, null, /* @__PURE__ */ import_react.default.createElement("div", { style: { background: C.bg2, borderRadius: 14, padding: 14, marginBottom: 16, border: `1px solid ${C.sep}` } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
-        fontSize: 11,
+      textAlign: "right",
+      wordBreak: "break-word"
+    } }, String(v)));
+    const FacturaEmitida = ({ fac, reciente }) => {
+      const anulada = fac.facturaEstado === "anulada" || fac.estado === "anulada" || fac.anulada;
+      const numero = fac.facturaNumero ?? fac.numero;
+      const cufTxt = fac.facturaCuf || fac.cuf || "";
+      const pdf = fac.facturaPdf || fac.pdf || "";
+      const qr = fac.facturaQr || fac.qrUrl || "";
+      const datos = [
+        ["N\xB0 de factura", numero ?? "\u2014"],
+        ["Cliente", fac.factNombre || fac.nombreComprador || "\u2014"],
+        [docSel.sigla === "NIT" ? "NIT" : docSel.sigla, fac.factDocumento || fac.nitComprador || "\u2014"],
+        fac.factEmail ? ["Correo", fac.factEmail] : null,
+        fac.total != null ? ["Total", factBs(fac.total)] : null
+      ].filter(Boolean);
+      return /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center", marginBottom: 18 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+        width: 56,
+        height: 56,
+        borderRadius: "50%",
+        background: anulada ? `${C.red}15` : `${C.green}15`,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        margin: "0 auto 12px",
+        fontSize: 26,
+        color: anulada ? C.red : C.green
+      } }, anulada ? "\xD7" : "\u2713"), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+        fontSize: 19,
+        fontWeight: 500,
+        color: anulada ? C.red : C.green,
+        fontFamily: FONT_DISPLAY,
+        letterSpacing: 0.5
+      } }, anulada ? "Factura anulada" : reciente ? "Factura emitida" : "Ya facturada"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT, marginTop: 4 } }, "SIAT Bolivia", fac.facturaAmbiente === "sandbox" ? " \xB7 prueba" : "")), fac.facturaAmbiente === "sandbox" && /* @__PURE__ */ import_react.default.createElement(AvisoAmbiente, { ambiente: "sandbox" }), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+        background: C.bg2,
+        borderRadius: 14,
+        overflow: "hidden",
+        marginBottom: 14,
+        border: `1px solid ${C.sep}`
+      } }, datos.map(([k, v], i) => filaDato(k, v, i, datos.length))), cufTxt && /* @__PURE__ */ import_react.default.createElement("div", { style: {
+        background: C.bg2,
+        borderRadius: 12,
+        padding: 12,
+        marginBottom: 14,
+        border: `1px solid ${C.sep}`
+      } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+        fontSize: 10,
         fontWeight: 700,
         color: C.label3,
         fontFamily: FONT,
         textTransform: "uppercase",
         letterSpacing: 0.5,
-        marginBottom: 8
-      } }, "Venta a facturar"), venta?.items?.slice(0, 3).map((it, i) => /* @__PURE__ */ import_react.default.createElement("div", { key: i, style: { display: "flex", justifyContent: "space-between", marginBottom: 4 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, color: C.label2, fontFamily: FONT } }, it.nombre, " \xD7", it.cantidad), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, fontWeight: 700, color: C.label, fontFamily: FONT } }, $2(it.subtotal)))), (venta?.items?.length || 0) > 3 && /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT } }, "+", venta.items.length - 3, " m\xE1s\u2026"), /* @__PURE__ */ import_react.default.createElement("div", { style: {
-        display: "flex",
-        justifyContent: "space-between",
-        marginTop: 8,
-        paddingTop: 8,
-        borderTop: `1px solid ${C.sep}`
-      } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 15, fontWeight: 700, color: C.label, fontFamily: FONT } }, "Total"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 17, fontWeight: 700, color: C.label, fontFamily: FONT } }, $2(venta?.total)))), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 8, marginBottom: 16 } }, [["api", "\u{1F310} API CUCU"], ["manual", "Manual"]].map(([m, l]) => /* @__PURE__ */ import_react.default.createElement("button", { key: m, onClick: () => {
-        setModo(m);
-        setErrMsg("");
-      }, style: {
-        flex: 1,
-        padding: "10px",
+        marginBottom: 4
+      } }, "CUF"), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+        fontSize: 11,
+        fontFamily: "monospace",
+        color: C.label,
+        lineHeight: 1.6,
+        wordBreak: "break-all"
+      } }, cufTxt)), errMsg && /* @__PURE__ */ import_react.default.createElement("div", { style: {
+        background: `${C.red}12`,
+        border: `1px solid ${C.red}30`,
         borderRadius: 12,
+        padding: 12,
+        marginBottom: 14
+      } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.red, fontFamily: FONT, whiteSpace: "pre-line" } }, errMsg)), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 9 } }, !anulada && /* @__PURE__ */ import_react.default.createElement("button", { onClick: () => sendFacturaWA(
+        {
+          numero,
+          cuf: cufTxt,
+          pdf,
+          qrUrl: qr,
+          nombreComprador: fac.factNombre || fac.nombreComprador,
+          nitComprador: fac.factDocumento || fac.nitComprador
+        },
+        venta,
+        telefono || fac.telefono
+      ), style: {
+        width: "100%",
+        padding: "14px",
+        borderRadius: 14,
+        border: "none",
         cursor: "pointer",
-        fontFamily: FONT,
-        fontSize: 13,
-        border: `2px solid ${modo === m ? C.blue : C.sep}`,
-        background: modo === m ? `${C.blue}15` : C.bg2,
-        color: modo === m ? C.blue : C.label2,
-        fontWeight: modo === m ? 700 : 400,
+        background: "linear-gradient(135deg,#25D366,#128C7E)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 10,
         WebkitTapHighlightColor: "transparent"
-      } }, l))), /* @__PURE__ */ import_react.default.createElement(
-        IOSInput,
-        {
-          label: "NIT Comprador (0 = Sin NIT / CF)",
-          type: "number",
-          value: nit,
-          onChange: (e) => setNit(e.target.value),
-          placeholder: "0"
-        }
-      ), /* @__PURE__ */ import_react.default.createElement(
-        IOSInput,
-        {
-          label: "Raz\xF3n Social / Nombre",
-          value: nombre,
-          onChange: (e) => setNombre(e.target.value),
-          placeholder: "Sin Nombre"
-        }
-      ), /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 16 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
-        fontSize: 12,
+      } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 20 } }, "\u{1F4F2}"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 14, fontWeight: 700, color: "#fff", fontFamily: FONT_UI } }, telefono || fac.telefono ? `Enviar a ${telefono || fac.telefono}` : "Enviar por WhatsApp")), pdf && /* @__PURE__ */ import_react.default.createElement("a", { href: pdf, target: "_blank", rel: "noopener noreferrer", style: { textDecoration: "none" } }, /* @__PURE__ */ import_react.default.createElement(IOSBtn, { variant: "fill", full: true, icon: "\u{1F4C4}" }, "Ver PDF de la factura")), qr && /* @__PURE__ */ import_react.default.createElement("a", { href: qr, target: "_blank", rel: "noopener noreferrer", style: { textDecoration: "none" } }, /* @__PURE__ */ import_react.default.createElement(IOSBtn, { variant: "fill", full: true }, "Verificar en Impuestos")), !anulada && esAdmin && (fac.facturaId || fac.id) && (confirmAnul ? /* @__PURE__ */ import_react.default.createElement("div", { style: {
+        background: `${C.red}10`,
+        border: `1px solid ${C.red}30`,
+        borderRadius: 12,
+        padding: 12
+      } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.label, fontFamily: FONT, marginBottom: 10, lineHeight: 1.5 } }, "\xBFAnular esta factura ante Impuestos? La venta no se toca, solo la factura."), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+        fontSize: 11,
         fontWeight: 600,
         color: C.label3,
         fontFamily: FONT,
         marginBottom: 6,
-        display: "flex",
-        alignItems: "center",
-        gap: 6
-      } }, "\u{1F4F2} Tel\xE9fono WhatsApp", /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 11, fontWeight: 400, color: C.label3 } }, "(opcional)")), /* @__PURE__ */ import_react.default.createElement("div", { style: { position: "relative" } }, /* @__PURE__ */ import_react.default.createElement("span", { style: {
-        position: "absolute",
-        left: 12,
-        top: "50%",
-        transform: "translateY(-50%)",
-        fontSize: 13,
-        color: C.label3,
+        textTransform: "uppercase",
+        letterSpacing: "0.07em"
+      } }, "Motivo (queda declarado ante Impuestos)"), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6, marginBottom: 12 } }, FACT_MOTIVOS.map((m) => {
+        const activo = motivoAnul === m.id;
+        return /* @__PURE__ */ import_react.default.createElement("button", { key: m.id, onClick: () => setMotivoAnul(m.id), style: {
+          padding: "10px 12px",
+          borderRadius: 10,
+          cursor: "pointer",
+          fontFamily: FONT,
+          fontSize: 12.5,
+          textAlign: "left",
+          border: `2px solid ${activo ? C.red : C.sep}`,
+          background: activo ? `${C.red}12` : C.bg2,
+          color: activo ? C.red : C.label2,
+          fontWeight: activo ? 700 : 500,
+          WebkitTapHighlightColor: "transparent"
+        } }, m.label);
+      })), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 8 } }, /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => setConfirmAnul(false), variant: "fill", full: true }, "No"), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: ejecutarAnular, variant: "danger", full: true, disabled: anulando }, anulando ? "Anulando\u2026" : "S\xED, anular"))) : /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => setConfirmAnul(true), variant: "fill", full: true }, "Anular factura")), anulada && esAdmin && (fac.facturaId || fac.id) && /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, null, /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: ejecutarRevertir, variant: "fill", full: true, disabled: revirtiendo }, revirtiendo ? "Revirtiendo\u2026" : "Deshacer la anulaci\xF3n"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11.5, color: C.label3, fontFamily: FONT, lineHeight: 1.5, padding: "0 2px" } }, "Si anulaste la factura equivocada, deshac\xE9 la anulaci\xF3n. No emitas otra: duplicar\xEDas la venta ante Impuestos.")), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: onClose, variant: "primary", full: true }, "Cerrar")));
+    };
+    const mostrarEmitida = estado !== "form" && (resultado || facturaPrevia);
+    return /* @__PURE__ */ import_react.default.createElement(Sheet, { open, onClose, title: "Factura SIAT Bolivia", tall: true }, mostrarEmitida ? /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, null, /* @__PURE__ */ import_react.default.createElement(FacturaEmitida, { fac: resultado || facturaPrevia, reciente: estado === "ok" }), estado !== "ok" && /* @__PURE__ */ import_react.default.createElement("div", { style: { marginTop: 10 } }, /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => {
+      setEstado("form");
+      setErrMsg("");
+    }, variant: "fill", full: true }, "Emitir otra factura de esta venta"))) : /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, null, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      background: C.bg2,
+      borderRadius: 14,
+      padding: 14,
+      marginBottom: 14,
+      border: `1px solid ${C.sep}`
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      fontSize: 11,
+      fontWeight: 700,
+      color: C.label3,
+      fontFamily: FONT,
+      textTransform: "uppercase",
+      letterSpacing: 0.5,
+      marginBottom: 8
+    } }, "Venta a facturar"), venta?.items?.slice(0, 3).map((it, i) => /* @__PURE__ */ import_react.default.createElement("div", { key: i, style: { display: "flex", justifyContent: "space-between", marginBottom: 4, gap: 10 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, color: C.label2, fontFamily: FONT } }, it.nombre, " \xD7", it.cantidad), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13, fontWeight: 700, color: C.label, fontFamily: FONT } }, factBs(it.subtotal)))), (venta?.items?.length || 0) > 3 && /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT } }, "+", venta.items.length - 3, " m\xE1s\u2026"), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      display: "flex",
+      justifyContent: "space-between",
+      marginTop: 8,
+      paddingTop: 8,
+      borderTop: `1px solid ${C.sep}`
+    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 15, fontWeight: 700, color: C.label, fontFamily: FONT } }, "Total"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 17, fontWeight: 700, color: C.label, fontFamily: FONT } }, factBs(venta?.total)))), /* @__PURE__ */ import_react.default.createElement(AvisoAmbiente, { ambiente }), !cfg.llave && /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      background: `${C.red}12`,
+      border: `1px solid ${C.red}30`,
+      borderRadius: 12,
+      padding: 12,
+      marginBottom: 14
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.red, fontFamily: FONT, lineHeight: 1.55 } }, "Este equipo todav\xEDa no tiene la llave de facturaci\xF3n. Un administrador la carga en ", /* @__PURE__ */ import_react.default.createElement("strong", null, "Config \u2192 Sistema \u2192 Facturaci\xF3n"), ".")), listo === false && /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      background: `${C.red}12`,
+      border: `1px solid ${C.red}30`,
+      borderRadius: 12,
+      padding: 12,
+      marginBottom: 14
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.red, fontFamily: FONT, lineHeight: 1.55 } }, "El servicio de facturaci\xF3n est\xE1 conectado pero le falta configuraci\xF3n para este negocio. Avisale a FORGE antes de seguir.")), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      fontSize: 11,
+      fontWeight: 600,
+      color: C.label3,
+      fontFamily: FONT,
+      marginBottom: 6,
+      paddingLeft: 2,
+      textTransform: "uppercase",
+      letterSpacing: "0.07em"
+    } }, "Tipo de documento"), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 6, marginBottom: 12, flexWrap: "wrap" } }, FACT_DOCS.map((d) => {
+      const activo = tipoDoc === d.id;
+      return /* @__PURE__ */ import_react.default.createElement("button", { key: d.id, onClick: () => setTipoDoc(d.id), title: d.label, style: {
+        flex: "1 1 60px",
+        padding: "10px 6px",
+        borderRadius: 11,
+        cursor: "pointer",
         fontFamily: FONT,
-        pointerEvents: "none",
-        display: "flex",
-        alignItems: "center",
-        gap: 4
-      } }, "\u{1F1E7}\u{1F1F4} +591"), /* @__PURE__ */ import_react.default.createElement(
-        "input",
-        {
-          type: "tel",
-          value: telefono,
-          onChange: (e) => setTelefono(e.target.value),
-          placeholder: "70000000",
-          style: {
-            width: "100%",
-            padding: "11px 14px 11px 80px",
-            borderRadius: 12,
-            border: `1.5px solid ${C.sep}`,
-            background: C.bg3,
-            fontSize: 16,
-            color: C.label,
-            outline: "none",
-            fontFamily: FONT,
-            boxSizing: "border-box",
-            WebkitAppearance: "none"
-          }
-        }
-      )), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT, marginTop: 4 } }, "La factura se enviar\xE1 por WhatsApp despu\xE9s de emitirse.")), modo === "api" && /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, null, /* @__PURE__ */ import_react.default.createElement("div", { style: {
-        background: `${C.blue}10`,
-        borderRadius: 12,
-        padding: 12,
-        marginBottom: 16,
-        border: `1px solid ${C.blue}20`
-      } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.blue, fontFamily: FONT, lineHeight: 1.7 } }, "\u{1F3E2} ", /* @__PURE__ */ import_react.default.createElement("strong", null, "SYLVIA CAROLINA GRANIER ZALLES"), /* @__PURE__ */ import_react.default.createElement("br", null), "NIT Emisor: ", /* @__PURE__ */ import_react.default.createElement("strong", null, NIT_EMPRESA), !cfg.apiKey && /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, null, /* @__PURE__ */ import_react.default.createElement("br", null), /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.red } }, "\u26A0 Sin API Key \u2014 ir a Config \u2192 Sistema \u2192 Facturaci\xF3n")))), errMsg && /* @__PURE__ */ import_react.default.createElement("div", { style: {
-        background: `${C.red}12`,
-        border: `1px solid ${C.red}30`,
-        borderRadius: 12,
-        padding: 12,
-        marginBottom: 16
-      } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.red, fontFamily: FONT } }, "\u26A0 ", errMsg)), /* @__PURE__ */ import_react.default.createElement(
-        IOSBtn,
-        {
-          onPress: emitir,
-          variant: "primary",
-          full: true,
-          disabled: estado === "enviando",
-          icon: estado === "enviando" ? "\u23F3" : "\u{1F9FE}"
+        fontSize: 12.5,
+        border: `2px solid ${activo ? C.blue : C.sep}`,
+        background: activo ? `${C.blue}15` : C.bg2,
+        color: activo ? C.blue : C.label2,
+        fontWeight: activo ? 700 : 500,
+        WebkitTapHighlightColor: "transparent"
+      } }, d.sigla);
+    })), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11.5, color: C.label3, fontFamily: FONT, marginBottom: 12, paddingLeft: 2 } }, docSel.label), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 10 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 2 } }, /* @__PURE__ */ import_react.default.createElement(
+      IOSInput,
+      {
+        label: `N\xB0 de ${docSel.sigla}`,
+        value: documento,
+        inputMode: tipoDoc === 3 ? "text" : "numeric",
+        onChange: (e) => {
+          setDocumento(e.target.value);
+          nitChk.limpiar();
         },
-        estado === "enviando" ? "Emitiendo\u2026" : "Emitir Factura SIAT"
-      )), modo === "manual" && /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, null, /* @__PURE__ */ import_react.default.createElement(
-        IOSInput,
-        {
-          label: "N\xB0 de Factura",
-          type: "number",
-          value: manNro,
-          onChange: (e) => setManNro(e.target.value),
-          placeholder: "00042"
-        }
-      ), /* @__PURE__ */ import_react.default.createElement(
-        IOSInput,
-        {
-          label: "CUF (C\xF3digo \xDAnico de Factura)",
-          value: manCuf,
-          onChange: (e) => setManCuf(e.target.value),
-          placeholder: "C\xF3digo CUF de CUCU / SIAT"
-        }
-      ), errMsg && /* @__PURE__ */ import_react.default.createElement("div", { style: {
-        background: `${C.red}12`,
-        border: `1px solid ${C.red}30`,
-        borderRadius: 12,
-        padding: 12,
-        marginBottom: 16
-      } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.red, fontFamily: FONT } }, "\u26A0 ", errMsg)), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: guardarManual, variant: "primary", full: true, icon: "\u{1F4BE}" }, "Guardar Factura")))
-    ));
+        onBlur: () => {
+          if (tipoDoc === 5) nitChk.chequear(documento, (r) => {
+            setExcepcion(r.exception_code);
+            if (r.razon_social && !nombre.trim()) setNombre(r.razon_social);
+          });
+        },
+        placeholder: "Sin puntos ni guiones"
+      }
+    )), tipoDoc === 1 && /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ import_react.default.createElement(
+      IOSInput,
+      {
+        label: "Compl.",
+        value: complemento,
+        onChange: (e) => setComplemento(e.target.value.toUpperCase()),
+        maxLength: 2,
+        placeholder: "1K"
+      }
+    ))), tipoDoc === 5 && /* @__PURE__ */ import_react.default.createElement(ChipNit, { estado: nitChk.estado }), /* @__PURE__ */ import_react.default.createElement(
+      IOSInput,
+      {
+        label: "Nombre o raz\xF3n social",
+        value: nombre,
+        onChange: (e) => setNombre(e.target.value),
+        placeholder: "Como figura en su documento"
+      }
+    ), /* @__PURE__ */ import_react.default.createElement(
+      IOSInput,
+      {
+        label: "Correo (le llega la factura)",
+        type: "email",
+        value: email,
+        onChange: (e) => setEmail(e.target.value),
+        placeholder: "cliente@correo.com"
+      }
+    ), tipoDoc === 5 && /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 14 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      fontSize: 11,
+      fontWeight: 600,
+      color: C.label3,
+      fontFamily: FONT,
+      marginBottom: 6,
+      paddingLeft: 2,
+      textTransform: "uppercase",
+      letterSpacing: "0.07em"
+    } }, "Validaci\xF3n del NIT"), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 8 } }, [{ v: 0, l: "NIT verificado" }, { v: 1, l: "No figura en el padr\xF3n" }].map((o) => {
+      const activo = excepcion === o.v;
+      const col = o.v === 0 ? C.green : C.gold;
+      return /* @__PURE__ */ import_react.default.createElement("button", { key: o.v, onClick: () => setExcepcion(o.v), style: {
+        flex: 1,
+        padding: "11px 8px",
+        borderRadius: 11,
+        cursor: "pointer",
+        fontFamily: FONT,
+        fontSize: 12.5,
+        border: `2px solid ${activo ? col : C.sep}`,
+        background: activo ? `${col}15` : C.bg2,
+        color: activo ? col : C.label2,
+        fontWeight: activo ? 700 : 500,
+        WebkitTapHighlightColor: "transparent"
+      } }, o.l);
+    })), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11.5, color: C.label3, fontFamily: FONT, marginTop: 6, lineHeight: 1.5 } }, "Esto se marca solo al consultar el NIT. Solo cambialo a mano si sab\xE9s algo que la consulta no vio.")), pagoConTarjeta && /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, null, /* @__PURE__ */ import_react.default.createElement(
+      IOSInput,
+      {
+        label: "N\xB0 de tarjeta (lo pide Impuestos)",
+        value: tarjeta,
+        inputMode: "numeric",
+        onChange: (e) => setTarjeta(e.target.value),
+        placeholder: "Como figura en el voucher"
+      }
+    ), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      fontSize: 11.5,
+      color: C.label3,
+      fontFamily: FONT,
+      marginTop: -8,
+      marginBottom: 14,
+      paddingLeft: 2,
+      lineHeight: 1.5
+    } }, "El cobro incluye tarjeta. El n\xFAmero viaja a Impuestos ofuscado y no queda guardado en el sistema.")), /* @__PURE__ */ import_react.default.createElement(
+      IOSInput,
+      {
+        label: "WhatsApp (opcional, +591)",
+        type: "tel",
+        value: telefono,
+        onChange: (e) => setTelefono(e.target.value),
+        placeholder: "70000000"
+      }
+    ), errMsg && /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      background: `${C.red}12`,
+      border: `1px solid ${C.red}30`,
+      borderRadius: 12,
+      padding: 12,
+      marginBottom: 14
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      fontSize: 13,
+      color: C.red,
+      fontFamily: FONT,
+      whiteSpace: "pre-line",
+      lineHeight: 1.55
+    } }, errMsg)), /* @__PURE__ */ import_react.default.createElement(
+      IOSBtn,
+      {
+        onPress: emitir,
+        variant: "primary",
+        full: true,
+        disabled: estado === "enviando" || !cfg.llave
+      },
+      estado === "enviando" ? "Emitiendo\u2026" : "Emitir factura"
+    )));
   }
   function NotaBajaModal({ baja, onClose }) {
     if (!baja) return null;
@@ -61401,7 +61691,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       marginBottom: 16
     } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT_UI, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 } }, "Antes"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 22, fontWeight: 700, color: C.label, fontFamily: FONT } }, stockAntes)), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 20, color: "#C94C4C", fontWeight: 700 } }, "\u2192"), /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT_UI, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 } }, "Despu\xE9s"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 22, fontWeight: 700, color: "#C94C4C", fontFamily: FONT } }, stockDespues)), /* @__PURE__ */ import_react.default.createElement("div", { style: { marginLeft: 8, textAlign: "center" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT_UI, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 } }, "Baja"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 18, fontWeight: 700, color: "#C94C4C", fontFamily: FONT } }, "-", cant))), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: onClose, variant: "fill", full: true }, "Cerrar"));
   }
-  function NotaVentaModal({ venta, onClose, numVenta, onAnularVenta }) {
+  function NotaVentaModal({ venta, onClose, numVenta, onAnularVenta, esAdmin }) {
     if (!venta) return null;
     const [menuOpen, setMenuOpen] = (0, import_react.useState)(false);
     const [showFactura, setShowFactura] = (0, import_react.useState)(false);
@@ -61413,18 +61703,20 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
     const num = numVenta || venta.id.replace(/\D/g, "").slice(-4).padStart(4, "0");
     const facturaGuardada = leerFacturaLocal(venta.id);
     async function ejecutarAnularFactura() {
-      const fac = leerFacturaLocal(venta.id);
-      if (!fac?.cuf) {
-        setAnulFacMsg({ ok: false, txt: "No hay CUF registrado para esta factura." });
+      const fac = facturaDeVenta(venta);
+      const fid = fac && (fac.facturaId || fac.id);
+      if (!fid) {
+        setAnulFacMsg({ ok: false, txt: "Esta factura no tiene identificador para anular. Anulala desde el panel de CUCU." });
         return;
       }
       setAnulandoFac(true);
       setAnulFacMsg(null);
       setConfirmAnulF(false);
       try {
-        await anularFacturaCUCU(fac.cuf);
-        guardarFacturaLocal(venta.id, { ...fac, anulada: true, fechaAnulacion: (/* @__PURE__ */ new Date()).toLocaleDateString("es-BO") });
-        setAnulFacMsg({ ok: true, txt: "\u2713 Factura anulada en SIAT / CUCU" });
+        await anularFactura(fid, 1);
+        await sbGuardarFactura(venta.id, { facturaEstado: "anulada" });
+        avisarFacturaCambiada(venta.id, { facturaEstado: "anulada" });
+        setAnulFacMsg({ ok: true, txt: "Factura anulada ante Impuestos." });
       } catch (e) {
         setAnulFacMsg({ ok: false, txt: e.message });
       }
@@ -61731,6 +62023,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       {
         venta,
         open: showFactura,
+        esAdmin,
         onClose: () => setShowFactura(false),
         onFacturada: () => setShowFactura(false)
       }
@@ -71637,6 +71930,7 @@ Esta acci\xF3n no se puede deshacer.` : "\xBFEliminar esta carga? Esta acci\xF3n
       {
         venta: ventaDetalle,
         numVenta: ventaDetalle ? ventaDetalle.id.replace(/\D/g, "").slice(-4).padStart(4, "0") : null,
+        esAdmin: user?.rol === "admin",
         onClose: () => setVentaDetalle(null),
         onAnularVenta: handleAnularVenta
       }
@@ -72905,6 +73199,7 @@ ${sinStock.map((it) => {
       {
         venta: ultima,
         open: showFacPOS,
+        esAdmin: user?.rol === "admin",
         onClose: () => setShowFacPOS(false),
         onFacturada: () => setShowFacPOS(false)
       }
@@ -78772,41 +79067,36 @@ ${c.resumen || c.id}`)) onEliminarCarga(c.id);
     })));
   }
   function FacturacionConfig() {
-    const [cfg, setCfg] = (0, import_react.useState)(leerCfgCUCU);
+    const [cfg, setCfg] = (0, import_react.useState)(leerCfgFact);
     const [saved, setSaved] = (0, import_react.useState)(false);
     const [testing, setTesting] = (0, import_react.useState)(false);
-    const [testMsg, setTestMsg] = (0, import_react.useState)(null);
-    function save(newCfg) {
-      setCfg(newCfg);
-      localStorage.setItem(CUCU_CFG_KEY, JSON.stringify(newCfg));
+    const [estado, setEstado] = (0, import_react.useState)(null);
+    const [verLlave, setVerLlave] = (0, import_react.useState)(false);
+    function guardar() {
+      guardarCfgFact(cfg);
       setSaved(true);
-      setTimeout(() => setSaved(false), 2e3);
+      setTimeout(() => setSaved(false), 2200);
     }
-    async function testConexion() {
-      if (!cfg.apiKey) {
-        setTestMsg({ ok: false, txt: "Ingres\xE1 el API Key primero." });
-        return;
-      }
+    async function probar() {
+      guardarCfgFact(cfg);
       setTesting(true);
-      setTestMsg(null);
+      setEstado(null);
       try {
-        const r = await fetch(cfg.endpoint.replace("/invoices", "/health") || cfg.endpoint, {
-          headers: { "Authorization": `Bearer ${cfg.apiKey}` },
-          signal: AbortSignal.timeout(6e3)
-        });
-        setTestMsg(r.ok ? { ok: true, txt: `\u2713 Conexi\xF3n OK (${r.status})` } : { ok: false, txt: `Error ${r.status}` });
+        const r = await factEstado();
+        const emp = (r.empresas || []).find((e) => e.slug === (cfg.empresa || "toscana"));
+        setEstado({ ok: true, ambiente: emp?.ambiente || r.ambiente, empresa: emp });
       } catch (e) {
-        setTestMsg({ ok: false, txt: `Error: ${e.message.slice(0, 80)}` });
+        setEstado({ ok: false, txt: e.message });
       }
       setTesting(false);
     }
-    const fld = (label, key, placeholder, type = "text") => /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 12 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, fontWeight: 600, color: C.label3, fontFamily: FONT, marginBottom: 4 } }, label), /* @__PURE__ */ import_react.default.createElement(
+    const campo = (label, key, placeholder, extra = {}) => /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 12 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, fontWeight: 600, color: C.label3, fontFamily: FONT, marginBottom: 4 } }, label), /* @__PURE__ */ import_react.default.createElement(
       "input",
       {
         value: cfg[key] || "",
-        type,
         placeholder,
-        onChange: (e) => setCfg((p) => ({ ...p, [key]: e.target.value })),
+        ...extra,
+        onChange: (e) => setCfg((p) => ({ ...p, [key]: e.target.value.trim() })),
         style: {
           width: "100%",
           padding: "10px 12px",
@@ -78827,35 +79117,62 @@ ${c.resumen || c.id}`)) onEliminarCarga(c.id);
       fontWeight: 700,
       color: C.label2,
       fontFamily: FONT,
-      marginBottom: 14,
+      marginBottom: 6,
       display: "flex",
       alignItems: "center",
       gap: 8
-    } }, "\u{1F9FE} Facturaci\xF3n SIAT Bolivia", /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 11, fontWeight: 400, color: C.label3 } }, "(CUCU API)")), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 8, marginBottom: 16 } }, [["true", "\u{1F310} API Autom\xE1tica"], ["false", "Modo Manual"]].map(([v, l]) => {
-      const active = v === "true" === (cfg.modoApi !== false);
-      return /* @__PURE__ */ import_react.default.createElement("button", { key: v, onClick: () => save({ ...cfg, modoApi: v === "true" }), style: {
-        flex: 1,
-        padding: "9px 6px",
-        borderRadius: 11,
-        cursor: "pointer",
-        fontFamily: FONT,
-        fontSize: 12,
-        border: `2px solid ${active ? C.gold : C.sep}`,
-        background: active ? `${C.gold}15` : C.bg3,
-        color: active ? C.gold : C.label2,
-        fontWeight: active ? 700 : 400,
-        WebkitTapHighlightColor: "transparent"
-      } }, l);
-    })), cfg.modoApi !== false && /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, null, fld("API Key CUCU", "apiKey", "Bearer token de tu cuenta CUCU"), fld("Endpoint", "endpoint", "https://app.cucu.bo/api/v1/invoices"), fld("C\xF3digo Actividad Econ\xF3mica", "codigoActividad", "470000"), fld("C\xF3digo Producto SIN", "codigoProductoSin", "58311"), testMsg && /* @__PURE__ */ import_react.default.createElement("div", { style: {
-      background: testMsg.ok ? `${C.green}12` : `${C.red}12`,
-      border: `1px solid ${testMsg.ok ? C.green : C.red}30`,
-      borderRadius: 10,
-      padding: 10,
-      marginBottom: 12,
-      fontSize: 13,
-      color: testMsg.ok ? C.green : C.red,
-      fontFamily: FONT
-    } }, testMsg.txt), /* @__PURE__ */ import_react.default.createElement("button", { onClick: testConexion, disabled: testing, style: {
+    } }, "Facturaci\xF3n SIAT Bolivia"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11.5, color: C.label3, fontFamily: FONT, lineHeight: 1.6, marginBottom: 14 } }, "La app no habla directo con Impuestos: pasa por el servicio de facturaci\xF3n de FORGE, que es el \xFAnico que guarda las claves. Ac\xE1 solo va la llave de acceso a ese servicio, y queda en este equipo."), campo("Servicio de facturaci\xF3n", "url", "https://forge-facturacion.vercel.app"), /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 12 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      fontSize: 12,
+      fontWeight: 600,
+      color: C.label3,
+      fontFamily: FONT,
+      marginBottom: 4,
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center"
+    } }, /* @__PURE__ */ import_react.default.createElement("span", null, "Llave de acceso"), /* @__PURE__ */ import_react.default.createElement("button", { onClick: () => setVerLlave((v) => !v), style: {
+      background: "none",
+      border: "none",
+      color: C.blue,
+      fontSize: 11.5,
+      fontFamily: FONT,
+      cursor: "pointer",
+      padding: 0
+    } }, verLlave ? "Ocultar" : "Ver")), /* @__PURE__ */ import_react.default.createElement(
+      "input",
+      {
+        value: cfg.llave || "",
+        type: verLlave ? "text" : "password",
+        placeholder: "La entrega FORGE",
+        autoComplete: "off",
+        onChange: (e) => setCfg((p) => ({ ...p, llave: e.target.value.trim() })),
+        style: {
+          width: "100%",
+          padding: "10px 12px",
+          borderRadius: 11,
+          border: `1.5px solid ${C.sep}`,
+          background: C.bg3,
+          fontSize: 14,
+          color: C.label,
+          fontFamily: "monospace",
+          outline: "none",
+          boxSizing: "border-box",
+          WebkitAppearance: "none"
+        }
+      }
+    )), estado && estado.ok && /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      background: C.bg3,
+      borderRadius: 11,
+      border: `1px solid ${C.sep}`,
+      padding: 12,
+      marginBottom: 12
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.green, fontFamily: FONT, fontWeight: 600, marginBottom: 8 } }, "Conectado"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12.5, color: C.label2, fontFamily: FONT, lineHeight: 1.8 } }, "Ambiente: ", /* @__PURE__ */ import_react.default.createElement("strong", { style: { color: estado.ambiente === "sandbox" ? C.gold : C.green } }, estado.ambiente === "sandbox" ? "pruebas (sin validez fiscal)" : "producci\xF3n"), /* @__PURE__ */ import_react.default.createElement("br", null), estado.empresa ? /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, null, "Negocio: ", /* @__PURE__ */ import_react.default.createElement("strong", null, estado.empresa.marca), " \xB7 NIT ", estado.empresa.nit, /* @__PURE__ */ import_react.default.createElement("br", null), "Listo para facturar: ", /* @__PURE__ */ import_react.default.createElement("strong", { style: { color: estado.empresa.listo ? C.green : C.red } }, estado.empresa.listo ? "s\xED" : "no")) : /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.red } }, "El servicio no tiene configurado este negocio."))), estado && !estado.ok && /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      background: `${C.red}12`,
+      border: `1px solid ${C.red}30`,
+      borderRadius: 11,
+      padding: 12,
+      marginBottom: 12
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.red, fontFamily: FONT, whiteSpace: "pre-line" } }, estado.txt)), /* @__PURE__ */ import_react.default.createElement("button", { onClick: probar, disabled: testing, style: {
       width: "100%",
       padding: "10px",
       borderRadius: 11,
@@ -78866,9 +79183,9 @@ ${c.resumen || c.id}`)) onEliminarCarga(c.id);
       border: `1.5px solid ${C.blue}`,
       color: C.blue,
       fontWeight: 600,
-      marginBottom: 10,
+      marginBottom: 12,
       WebkitTapHighlightColor: "transparent"
-    } }, testing ? "Probando\u2026" : "Probar conexi\xF3n")), /* @__PURE__ */ import_react.default.createElement("div", { style: { padding: 10, background: C.bg3, borderRadius: 10, border: `1px solid ${C.sep}`, marginBottom: 12 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT, lineHeight: 1.7 } }, "\u{1F4CB} Obtener API Key \u2192 ", /* @__PURE__ */ import_react.default.createElement("strong", null, "cucu.bo"), /* @__PURE__ */ import_react.default.createElement("br", null), "Docs \u2192 ", /* @__PURE__ */ import_react.default.createElement("strong", null, "docs.cucu.bo"), /* @__PURE__ */ import_react.default.createElement("br", null), "Actividad ", /* @__PURE__ */ import_react.default.createElement("strong", null, "470000"), " = Comercio al por menor", /* @__PURE__ */ import_react.default.createElement("br", null), "C\xF3digo SIN ", /* @__PURE__ */ import_react.default.createElement("strong", null, "58311"), " = Prendas de vestir")), saved && /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.green, fontFamily: FONT, textAlign: "center", marginBottom: 8 } }, "\u2713 Guardado"), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => save(cfg), variant: "primary", full: true, icon: "\u{1F4BE}" }, "Guardar Configuraci\xF3n"));
+    } }, testing ? "Probando\u2026" : "Probar conexi\xF3n"), saved && /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.green, fontFamily: FONT, textAlign: "center", marginBottom: 8 } }, "Guardado"), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: guardar, variant: "primary", full: true, icon: "\u{1F4BE}" }, "Guardar"));
   }
   var AUDIT_KEY = "th_audit_v2";
   var AUDIT_TIPOS = {
@@ -81489,6 +81806,22 @@ Esta acci\xF3n no se puede deshacer.`,
       if (!marcaFiltro) return [...vMes].reverse();
       return [...vMes].filter((v) => v.items.some((i) => i.marcaId === marcaFiltro)).reverse();
     }, [vMes, marcaFiltro]);
+    const facInfo = (0, import_react.useMemo)(() => {
+      let facN = 0, facBs = 0, sinN = 0, sinBs = 0;
+      vMesActivas.forEach((v) => {
+        const f = leerFacturaLocal(v.id);
+        const facturada = f && f.facturaEstado !== "anulada" && (f.facturaCuf || f.cuf || f.facturaNumero || f.numero);
+        const t = getDisplayTotal(v);
+        if (facturada) {
+          facN++;
+          facBs += t;
+        } else {
+          sinN++;
+          sinBs += t;
+        }
+      });
+      return { facN, facBs, sinN, sinBs };
+    }, [vMesActivas]);
     return /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, null, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { className: "fos-in", style: {
       background: "linear-gradient(135deg,#7C7468 0%,#5C5449 45%,#938A7E 100%)",
       borderRadius: 24,
@@ -81522,7 +81855,25 @@ Esta acci\xF3n no se puede deshacer.`,
         color: s.color,
         compact: isDesktop
       }
-    ))), /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 16 } }, /* @__PURE__ */ import_react.default.createElement(
+    ))), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 16 } }, /* @__PURE__ */ import_react.default.createElement(
+      StatCard,
+      {
+        label: `Con factura \xB7 ${facInfo.facN}`,
+        value: $2(facInfo.facBs),
+        sub: `${Math.round(totalVtas > 0 ? facInfo.facBs / totalVtas * 100 : 0)}% del total`,
+        color: "#5B8DB8",
+        compact: isDesktop
+      }
+    ), /* @__PURE__ */ import_react.default.createElement(
+      StatCard,
+      {
+        label: `Sin factura \xB7 ${facInfo.sinN}`,
+        value: $2(facInfo.sinBs),
+        sub: `${Math.round(totalVtas > 0 ? facInfo.sinBs / totalVtas * 100 : 0)}% del total`,
+        color: C.gold,
+        compact: isDesktop
+      }
+    )), /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 16 } }, /* @__PURE__ */ import_react.default.createElement(
       SegControl,
       {
         options: [{ value: "marcas", label: "Por Marca" }, { value: "historial", label: "Historial" }, { value: "dia", label: "Por d\xEDa" }, { value: "movimientos", label: "Movimientos" }],

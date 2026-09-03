@@ -2759,91 +2759,205 @@ function calcLiqMarca(vMarca, marcaId, MK) {
   return { bruto, brutoEf, brutoQR, brutoTJ, descTJ, subBanco, comision, alquiler, gastos, totalGastos, neto, cfg };
 }
 
-// ── FACTURACIÓN SIAT BOLIVIA — CUCU API ────────────────────────
-const CUCU_CFG_KEY = "th_cucu_cfg";
-const CUCU_DEF = {
-  apiKey: "",
-  endpoint: "https://app.cucu.bo/api/v1/invoices",
-  codigoActividad: "470000",
-  codigoProductoSin: "58311",
-  modoApi: true,
-};
-const CUCU_MP = { efectivo:1, qr:5, tarjeta:2, transferencia:4 };
+// ── FACTURACIÓN SIAT BOLIVIA — vía adaptador FORGE ────────────────────────────
+// La app NO habla directo con Impuestos ni con CUCU: pasa por el servicio de
+// facturación de FORGE (forge-facturacion), el único que guarda la API key de
+// CUCU. Acá solo vive la llave de acceso a ese servicio, cargada por equipo.
+const FACT_CFG_KEY = "toscana_fact_cfg";
+const FACT_DEF = { url: "https://forge-facturacion.vercel.app", llave: "", empresa: "toscana" };
 
-function leerCfgCUCU(){
-  try{ return {...CUCU_DEF,...JSON.parse(localStorage.getItem(CUCU_CFG_KEY)||"{}")}; }
-  catch{ return CUCU_DEF; }
+// Los 5 tipos de documento del catálogo del SIN.
+const FACT_DOCS = [
+  { id: 1, sigla: "CI",  label: "Carnet de identidad" },
+  { id: 2, sigla: "CEX", label: "Documento de extranjero" },
+  { id: 3, sigla: "PAS", label: "Pasaporte" },
+  { id: 4, sigla: "OD",  label: "Otro documento" },
+  { id: 5, sigla: "NIT", label: "NIT" },
+];
+// Motivos de anulación del catálogo de Impuestos. El 2 es solo para notas de crédito.
+const FACT_MOTIVOS = [
+  { id: 1, label: "Factura mal emitida" },
+  { id: 3, label: "Datos del cliente incorrectos" },
+  { id: 4, label: "Devolución de la venta" },
+];
+
+// La versión anterior guardaba la API key de CUCU en el navegador (th_cucu_cfg).
+// Se borra al abrir: esa clave permite emitir con el NIT de Toscana y no tiene
+// por qué seguir dando vueltas en los equipos de la tienda.
+try{ localStorage.removeItem("th_cucu_cfg"); }catch{}
+
+function leerCfgFact(){
+  try{ return {...FACT_DEF, ...JSON.parse(localStorage.getItem(FACT_CFG_KEY)||"{}")}; }
+  catch{ return FACT_DEF; }
 }
+function guardarCfgFact(cfg){
+  try{ localStorage.setItem(FACT_CFG_KEY, JSON.stringify(cfg)); }catch{}
+}
+const factBs = n => "Bs " + Number(n||0).toLocaleString("es-BO",{minimumFractionDigits:2,maximumFractionDigits:2});
+
+// La factura de una venta se guarda en kv_sync bajo `fac_<id>` (se ve en todos
+// los equipos). Mismo almacenamiento de siempre.
 function guardarFacturaLocal(ventaId, data){
   sbKVGuardar(`fac_${ventaId}`, data); // nube + espejo local
 }
 function leerFacturaLocal(ventaId){
   try{ return JSON.parse(localStorage.getItem(`th_fac_${ventaId}`)||"null"); }catch{return null;}
 }
-async function emitirFacturaCUCU(venta, nitComprador, nombreComprador){
-  const cfg = leerCfgCUCU();
-  if(!cfg.apiKey) throw new Error("API Key de CUCU no configurada. Ir a Config → Sistema → Facturación.");
-  const mp = venta.metodoPago;
-  let codPago = 1;
-  if(mp?.startsWith("mixto|")){
-    const obj={efectivo:0,qr:0,tarjeta:0};
-    mp.split("|").slice(1).forEach(p=>{const[k,v]=p.split(":");obj[k]=parseFloat(v)||0;});
-    const dom=Object.keys(obj).reduce((a,b)=>obj[a]>=obj[b]?a:b,"efectivo");
-    codPago=CUCU_MP[dom]||1;
-  } else { codPago=CUCU_MP[mp]||1; }
-  const payload = {
-    actividadEconomica: cfg.codigoActividad,
-    metodoPago: codPago,
-    cliente: { nit: Number(nitComprador)||0, razonSocial:(nombreComprador||"Sin Nombre").trim() },
-    items: venta.items.map(it=>({
-      codigoProducto: Number(cfg.codigoProductoSin)||58311,
-      descripcion: (it.nombre||"Producto").slice(0,100),
-      cantidad: it.cantidad||1,
-      precioUnitario: it.precioUnit||0,
-      descuento: 0,
-      subtotal: it.subtotal||0,
-    })),
-    total: venta.total||0,
-  };
-  const r = await fetch(cfg.endpoint, {
-    method:"POST",
-    headers:{"Authorization":`Bearer ${cfg.apiKey}`,"Content-Type":"application/json"},
-    body:JSON.stringify(payload),
-  });
-  if(!r.ok){
-    let msg="";
-    try{const j=await r.json();msg=j.message||j.error||JSON.stringify(j);}catch{msg=await r.text();}
-    throw new Error(`CUCU ${r.status}: ${msg.slice(0,200)}`);
-  }
-  const body=await r.json();
-  const d=body.data||body;
-  return {
-    cuf: d.cuf||d.CUF||d.codigoCuf||"",
-    numero: d.numero||d.nroFactura||d.numeroFactura||d.number||"",
-    qrUrl: d.qr||d.qrUrl||d.urlQr||"",
-    pdf: d.pdf||d.pdfUrl||d.urlPdf||"",
-    nitComprador: Number(nitComprador)||0,
-    nombreComprador: (nombreComprador||"Sin Nombre").trim(),
-  };
+function facturaDeVenta(venta){ return venta ? leerFacturaLocal(venta.id) : null; }
+
+// Merge SOLO de los campos de factura sobre lo ya guardado (emitir guarda el
+// objeto entero; anular/revertir solo tocan facturaEstado sin pisarlo con la venta).
+const _FACT_KEYS = ["facturaId","facturaNumero","facturaCuf","facturaQr","facturaPdf","facturaEstado","facturaFecha","facturaAmbiente","total","literal","numero","cuf","qrUrl","pdf","nombreComprador","nitComprador","factTipoDoc","factDocumento","factComplemento","factNombre","factEmail","factExcepcion","anulada","fechaAnulacion","telefono"];
+function sbGuardarFactura(ventaId, campos){
+  const prev = leerFacturaLocal(ventaId) || {};
+  const merge = {};
+  _FACT_KEYS.forEach(k=>{ if(campos && campos[k]!==undefined) merge[k]=campos[k]; });
+  if(merge.facturaEstado==="anulada") merge.anulada = true;
+  if(merge.facturaEstado==="emitida") merge.anulada = false;
+  guardarFacturaLocal(ventaId, {...prev, ...merge});
+  return Promise.resolve(true);
+}
+function avisarFacturaCambiada(ventaId, cambios){
+  try{ window.dispatchEvent(new CustomEvent("toscana-factura",{detail:{ventaId,cambios}})); }catch{}
 }
 
-async function anularFacturaCUCU(cuf) {
-  const cfg = leerCfgCUCU();
-  if(!cfg.apiKey) throw new Error("Sin API Key de CUCU — ir a Config → Facturación.");
-  // Try DELETE /{cuf} first, common CUCU pattern
-  const base = cfg.endpoint.replace(/\/invoices\/?$/, "");
-  const url  = `${base}/invoices/${encodeURIComponent(cuf)}`;
-  const r = await fetch(url, {
-    method: "DELETE",
-    headers: {"Authorization":`Bearer ${cfg.apiKey}`,"Content-Type":"application/json"},
-    signal: AbortSignal.timeout(10000),
-  });
-  if(!r.ok && r.status !== 404){
-    let msg="";
-    try{const j=await r.json();msg=j.message||j.error||JSON.stringify(j);}catch{msg=await r.text();}
-    throw new Error(`CUCU ${r.status}: ${msg.slice(0,200)}`);
+async function llamarAdaptador(ruta, body, ms = 45000){
+  const cfg = leerCfgFact();
+  if(!cfg.llave) throw new Error("Falta la llave de facturación. Ir a Config → Sistema → Facturación.");
+  const base = (cfg.url||"").replace(/\/+$/,"");
+  let r;
+  try{
+    r = await fetch(`${base}${ruta}`, {
+      method: body ? "POST" : "GET",
+      headers: {"Content-Type":"application/json","X-Forge-Key":cfg.llave},
+      body: body ? JSON.stringify(body) : undefined,
+      signal: AbortSignal.timeout(ms),
+    });
+  }catch(e){
+    throw new Error(e.name==="TimeoutError"
+      ? "El servicio de facturación no respondió a tiempo. Revisá en el panel si la factura salió antes de volver a emitir."
+      : "Sin conexión con el servicio de facturación.");
   }
-  return r.status===204?{}:(await r.json().catch(()=>({})));
+  let j = null;
+  try{ j = await r.json(); }catch{}
+  if(!r.ok || !j || j.ok===false){
+    const detalle = (j && (j.error || j.detalle)) || `Error ${r.status}`;
+    throw new Error(String(detalle));
+  }
+  return j;
+}
+async function factEstado(){ return llamarAdaptador("/api/estado", null, 12000); }
+async function verificarNit(nit){
+  const cfg = leerCfgFact();
+  return llamarAdaptador("/api/verificar-nit", { empresa_slug: cfg.empresa||"toscana", nit: String(nit).replace(/[.\s-]/g,"") }, 15000);
+}
+
+// SIN mapea el producto por CATEGORÍA. Los items de venta de Toscana no llevan
+// categoria, así que se resuelve por código contra el inventario espejado.
+function categoriaDeCodigo(codigo){
+  try{
+    const inv = JSON.parse(localStorage.getItem("th_inv")||"[]");
+    const c = String(codigo||"").toUpperCase();
+    const p = inv.find(x=>String(x.codigo||"").toUpperCase()===c);
+    return p ? String(p.categoria||p.subcat||"").toUpperCase() : "";
+  }catch{ return ""; }
+}
+function refSinDeItem(it){
+  return String(it.categoria || categoriaDeCodigo(it.codigo) || it.nombre || "").trim().toUpperCase();
+}
+function ventaParaFactura(venta, cliente){
+  const items = (venta.items||[]).map(it=>{
+    const bruto = (Number(it.precioUnit)||0) * (Number(it.cantidad)||1);
+    const neto  = Number(it.subtotal);
+    const descuento = Number.isFinite(neto) ? +(bruto - neto).toFixed(2) : 0;
+    return {
+      producto_ref: refSinDeItem(it),
+      descripcion: String(it.nombre||"").slice(0,200),
+      cantidad: Number(it.cantidad)||1,
+      precio_unitario: Number(it.precioUnit)||0,
+      ...(descuento > 0.009 ? {descuento} : {}),
+    };
+  });
+  return {
+    venta_ref: venta.id,
+    cliente: {
+      tipo_doc: cliente.tipoDoc,
+      documento: String(cliente.documento||"").trim(),
+      complemento: (cliente.complemento||"").trim(),
+      razon_social: (cliente.nombre||"").trim(),
+      email: (cliente.email||"").trim(),
+      ...(cliente.tipoDoc===5 ? {exception_code: cliente.excepcion ?? 1} : {}),
+    },
+    metodo_pago: venta.metodoPago,
+    ...(cliente.tarjeta ? {card_number: String(cliente.tarjeta).replace(/\s/g,"")} : {}),
+    items,
+  };
+}
+async function emitirFactura(venta, cliente){
+  const cfg = leerCfgFact();
+  const r = await llamarAdaptador("/api/facturar", {
+    empresa_slug: cfg.empresa||"toscana",
+    venta: ventaParaFactura(venta, cliente),
+  });
+  const num = r.invoiceNumber ?? null, cuf = r.cuf||"", qr = r.qrCode||"", pdf = r.pdfUrl||"";
+  return {
+    facturaId: r.invoiceId||"", facturaNumero: num, facturaCuf: cuf, facturaQr: qr, facturaPdf: pdf,
+    facturaEstado: "emitida", facturaFecha: new Date().toISOString(), total: r.total, literal: r.literal||"",
+    // compat con la nota vieja de Toscana:
+    numero: num, cuf, qrUrl: qr, pdf,
+    nombreComprador: (cliente.nombre||"").trim(),
+    nitComprador: (cliente.documento||"").trim(),
+  };
+}
+async function anularFactura(facturaId, motivo = 1){
+  if(!facturaId) throw new Error("Esta factura no tiene identificador guardado, no se puede anular desde acá.");
+  const cfg = leerCfgFact();
+  return llamarAdaptador("/api/anular", { empresa_slug: cfg.empresa||"toscana", invoiceId: facturaId, motivo });
+}
+async function revertirAnulacion(facturaId){
+  if(!facturaId) throw new Error("Esta factura no tiene identificador guardado.");
+  const cfg = leerCfgFact();
+  return llamarAdaptador("/api/revertir-anulacion", { empresa_slug: cfg.empresa||"toscana", invoiceId: facturaId });
+}
+
+function AvisoAmbiente({ambiente}){
+  if(ambiente!=="sandbox") return null;
+  return (
+    <div style={{background:`${C.gold}14`,border:`1px solid ${C.gold}45`,borderRadius:12,
+      padding:"10px 12px",marginBottom:14,display:"flex",gap:9,alignItems:"flex-start"}}>
+      <span style={{color:C.gold,fontSize:15,lineHeight:1.2,flexShrink:0}}>!</span>
+      <div style={{fontSize:12,color:C.label2,fontFamily:FONT,lineHeight:1.55}}>
+        <strong style={{color:C.gold}}>Ambiente de prueba.</strong> Esta factura NO tiene
+        validez fiscal y no se declara ante Impuestos. Sirve para probar el sistema.
+      </div>
+    </div>
+  );
+}
+function useChequeoNit(){
+  const [estado,setEstado] = useState(null);
+  const limpiar = () => setEstado(null);
+  async function chequear(nit, alResolver){
+    const limpio = String(nit||"").replace(/[.\s-]/g,"").trim();
+    if(limpio.length < 5){ setEstado(null); return; }
+    setEstado({cargando:true});
+    try{
+      const r = await verificarNit(limpio);
+      setEstado({valido:r.valido, motivo:r.motivo});
+      alResolver && alResolver(r);
+    }catch(e){ setEstado({error:e.message}); }
+  }
+  return {estado, chequear, limpiar};
+}
+function ChipNit({estado}){
+  if(!estado) return null;
+  const {color,texto} =
+    estado.cargando ? {color:C.label3, texto:"Consultando a Impuestos…"} :
+    estado.error    ? {color:C.label3, texto:"No se pudo consultar. Se emite igual."} :
+    estado.valido   ? {color:C.green,  texto:`${estado.motivo}. Factura normal.`} :
+                      {color:C.gold,   texto:`${estado.motivo}. Se emite amparada en la excepción.`};
+  return (
+    <div style={{fontSize:11.5,color,fontFamily:FONT,marginTop:-8,marginBottom:12,paddingLeft:2,lineHeight:1.5}}>{texto}</div>
+  );
 }
 
 // ── REPORTE MENSUAL COMPLETO (todas las marcas, una pestaña c/u) ──
@@ -6961,156 +7075,293 @@ function RetirosTab({inv, retiros, onRetiro, onRetiroBatch, onAnular}){
 // ══════════════════════════════════════════════════════════
 // FACTURA MODAL — SIAT Bolivia (CUCU API)
 // ══════════════════════════════════════════════════════════
-function FacturaModal({venta, open, onClose, onFacturada}){
-  const [nit,setNit]         = useState("0");
-  const [nombre,setNombre]   = useState("Sin Nombre");
+function FacturaModal({venta, open, onClose, onFacturada, esAdmin}){
+  const [tipoDoc,setTipoDoc]   = useState(5);
+  const [documento,setDocumento] = useState("");
+  const [complemento,setComplemento] = useState("");
+  const [nombre,setNombre]     = useState("");
+  const [email,setEmail]       = useState("");
+  const [excepcion,setExcepcion] = useState(0);
+  const [motivoAnul,setMotivoAnul] = useState(1);
+  const [revirtiendo,setRevirtiendo] = useState(false);
+  const nitChk = useChequeoNit();
+  const [tarjeta,setTarjeta]   = useState("");
   const [telefono,setTelefono] = useState("");
-  const [modo,setModo]       = useState("api");
-  const [estado,setEstado]   = useState("idle");
+  const [estado,setEstado]     = useState("idle");
   const [resultado,setResultado] = useState(null);
-  const [errMsg,setErrMsg]   = useState("");
-  const [manNro,setManNro]   = useState("");
-  const [manCuf,setManCuf]   = useState("");
+  const [errMsg,setErrMsg]     = useState("");
+  const [ambiente,setAmbiente] = useState("");
+  const [listo,setListo]       = useState(null);
+  const [anulando,setAnulando] = useState(false);
+  const [confirmAnul,setConfirmAnul] = useState(false);
 
-  const cfg = leerCfgCUCU();
+  const cfg = leerCfgFact();
+  const facturaPrevia = facturaDeVenta(venta);
+  const pagoConTarjeta = /tarjeta/.test(String(venta?.metodoPago||""));
 
   useEffect(()=>{
-    if(open){
-      setNit("0"); setNombre("Sin Nombre"); setTelefono("");
-      setModo(cfg.modoApi!==false?"api":"manual");
-      setEstado("idle"); setResultado(null); setErrMsg("");
-      setManNro(""); setManCuf("");
+    if(!open) return;
+    setTipoDoc(venta?.factTipoDoc ?? 5);
+    setDocumento(venta?.factDocumento || "");
+    setComplemento(venta?.factComplemento || "");
+    setNombre(venta?.factNombre || "");
+    setEmail(venta?.factEmail || "");
+    setExcepcion(venta?.factExcepcion ?? 0);
+    setMotivoAnul(1); nitChk.limpiar();
+    setTelefono(venta?.clienteTelefono || "");
+    setTarjeta(""); setEstado("idle"); setResultado(null); setErrMsg("");
+    setConfirmAnul(false);
+    if(cfg.llave){
+      factEstado()
+        .then(r=>{
+          const emp = (r.empresas||[]).find(e=>e.slug===(cfg.empresa||"toscana"));
+          setAmbiente(emp?.ambiente || r.ambiente || "");
+          setListo(emp ? !!emp.listo : null);
+        })
+        .catch(()=>{ setAmbiente(""); setListo(null); });
     }
   },[open]);
 
-  const factExist = venta ? leerFacturaLocal(venta.id) : null;
+  const docSel = FACT_DOCS.find(d=>d.id===tipoDoc) || FACT_DOCS[4];
+
+  function validar(){
+    if(!documento.trim()) return `Falta el ${docSel.label.toLowerCase()} del cliente.`;
+    if(!nombre.trim())    return "Falta el nombre o razón social del cliente.";
+    if(pagoConTarjeta && !tarjeta.trim())
+      return "El cobro incluye tarjeta: Impuestos exige el número de la tarjeta en la factura.";
+    if(email.trim() && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email.trim()))
+      return "El correo no parece válido. Revisalo o dejalo vacío.";
+    return "";
+  }
 
   async function emitir(){
+    const problema = validar();
+    if(problema){ setErrMsg(problema); setEstado("error"); return; }
     setEstado("enviando"); setErrMsg("");
     try{
-      const r = await emitirFacturaCUCU(venta,nit,nombre);
-      guardarFacturaLocal(venta.id,{...r, telefono:telefono.trim()});
-      setResultado({...r, telefono:telefono.trim()}); setEstado("ok");
-      onFacturada&&onFacturada(r);
+      const datos = {
+        tipoDoc, documento, complemento, nombre, email,
+        excepcion: tipoDoc===5 ? excepcion : null,
+        tarjeta: pagoConTarjeta ? tarjeta : "",
+      };
+      const r = await emitirFactura(venta, datos);
+      const guardado = {
+        ...r,
+        factTipoDoc: tipoDoc,
+        factDocumento: documento.trim(),
+        factComplemento: complemento.trim(),
+        factNombre: nombre.trim(),
+        factEmail: email.trim(),
+        factExcepcion: tipoDoc===5 ? excepcion : null,
+        facturaAmbiente: ambiente || "",
+        telefono: telefono.trim(),
+      };
+      await sbGuardarFactura(venta.id, guardado);
+      setResultado({...guardado, telefono:telefono.trim()});
+      setEstado("ok");
+      avisarFacturaCambiada(venta.id, guardado);
+      onFacturada && onFacturada(venta.id, guardado);
     }catch(e){ setErrMsg(e.message); setEstado("error"); }
   }
 
-  function guardarManual(){
-    if(!manNro&&!manCuf){ setErrMsg("Ingresá el número de factura o CUF."); return; }
-    const r={cuf:manCuf,numero:manNro,qrUrl:"",pdf:"",
-      nitComprador:Number(nit)||0,nombreComprador:nombre.trim(),telefono:telefono.trim()};
-    guardarFacturaLocal(venta.id,r);
-    setResultado(r); setEstado("ok");
-    onFacturada&&onFacturada(r);
+  async function ejecutarAnular(){
+    const fac = resultado || facturaPrevia;
+    setAnulando(true); setErrMsg(""); setConfirmAnul(false);
+    try{
+      await anularFactura(fac.facturaId || fac.id, motivoAnul);
+      const cambios = {facturaEstado:"anulada"};
+      await sbGuardarFactura(venta.id, cambios);
+      avisarFacturaCambiada(venta.id, cambios);
+      onFacturada && onFacturada(venta.id, cambios);
+      setResultado({...fac, ...cambios});
+      setEstado("ok");
+    }catch(e){ setErrMsg(e.message); setEstado("error"); }
+    setAnulando(false);
   }
 
-  const FacturaOK = ({r})=>(
-    <div>
-      <div style={{textAlign:"center",marginBottom:20}}>
-        <div style={{width:60,height:60,borderRadius:"50%",background:`${C.green}15`,
-          display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 12px",fontSize:28}}>✓</div>
-        <div style={{fontSize:20,fontWeight:500,color:C.green,fontFamily:FONT_DISPLAY,letterSpacing:.5}}>
-          Factura Emitida
-        </div>
-        <div style={{fontSize:12,color:C.label3,fontFamily:FONT,marginTop:4}}>SIAT Bolivia</div>
-      </div>
-      <div style={{background:C.bg2,borderRadius:14,overflow:"hidden",marginBottom:16,border:`1px solid ${C.sep}`}}>
-        {[["N° Factura",r.numero],["Cliente",r.nombreComprador],
-          ["NIT",r.nitComprador===0?"Sin NIT (CF)":r.nitComprador],
-          r.telefono?["Teléfono",r.telefono]:null,
-        ].filter(x=>x&&x[1]!==undefined&&x[1]!=="").map(([k,v],i,a)=>(
-          <div key={k} style={{display:"flex",justifyContent:"space-between",
-            padding:"12px 16px",borderBottom:i<a.length-1?`1px solid ${C.sep}`:""}}>
-            <span style={{fontSize:13,color:C.label3,fontFamily:FONT}}>{k}</span>
-            <span style={{fontSize:13,fontWeight:600,color:C.label,fontFamily:FONT}}>{String(v)}</span>
-          </div>
-        ))}
-      </div>
-      {r.cuf&&(
-        <div style={{background:C.bg2,borderRadius:12,padding:12,marginBottom:16,border:`1px solid ${C.sep}`}}>
-          <div style={{fontSize:10,fontWeight:700,color:C.label3,fontFamily:FONT,
-            textTransform:"uppercase",letterSpacing:.5,marginBottom:4}}>CUF</div>
-          <div style={{fontSize:11,fontFamily:"monospace",color:C.label,lineHeight:1.6,wordBreak:"break-all"}}>{r.cuf}</div>
-        </div>
-      )}
-      {r.qrUrl&&<div style={{textAlign:"center",marginBottom:16}}>
-        <img src={r.qrUrl} style={{width:140,height:140,borderRadius:8}} alt="QR Factura"/>
-      </div>}
-      {/* Botones de acción */}
-      <div style={{display:"flex",flexDirection:"column",gap:10}}>
-        <button onClick={()=>sendFacturaWA(r,venta,r.telefono)} style={{
-          width:"100%",padding:"14px",borderRadius:14,border:"none",cursor:"pointer",
-          background:"linear-gradient(135deg,#25D366,#128C7E)",
-          display:"flex",alignItems:"center",justifyContent:"center",gap:10,
-          WebkitTapHighlightColor:"transparent",
-        }}>
-          <span style={{fontSize:20}}>📲</span>
-          <span style={{fontSize:14,fontWeight:700,color:"#fff",fontFamily:FONT_UI}}>
-            {r.telefono ? `Enviar a ${r.telefono}` : "Enviar por WhatsApp"}
-          </span>
-        </button>
-        {r.pdf&&<a href={r.pdf} target="_blank" rel="noopener noreferrer" style={{textDecoration:"none"}}>
-          <IOSBtn variant="fill" full icon="📄">Ver PDF Factura</IOSBtn>
-        </a>}
-        <IOSBtn onPress={onClose} variant="primary" full>Cerrar</IOSBtn>
-      </div>
+  async function ejecutarRevertir(){
+    const fac = resultado || facturaPrevia;
+    setRevirtiendo(true); setErrMsg("");
+    try{
+      await revertirAnulacion(fac.facturaId || fac.id);
+      const cambios = {facturaEstado:"emitida"};
+      await sbGuardarFactura(venta.id, cambios);
+      avisarFacturaCambiada(venta.id, cambios);
+      onFacturada && onFacturada(venta.id, cambios);
+      setResultado({...fac, ...cambios});
+      setEstado("ok");
+    }catch(e){ setErrMsg(e.message); setEstado("error"); }
+    setRevirtiendo(false);
+  }
+
+  const filaDato = (k,v,i,total) => (
+    <div key={k} style={{display:"flex",justifyContent:"space-between",gap:12,
+      padding:"12px 16px",borderBottom:i<total-1?`1px solid ${C.sep}`:""}}>
+      <span style={{fontSize:13,color:C.label3,fontFamily:FONT,flexShrink:0}}>{k}</span>
+      <span style={{fontSize:13,fontWeight:600,color:C.label,fontFamily:FONT,
+        textAlign:"right",wordBreak:"break-word"}}>{String(v)}</span>
     </div>
   );
 
-  return (
-    <Sheet open={open} onClose={onClose} title="🧾 Factura SIAT Bolivia" tall>
-      {/* Ya facturada */}
-      {factExist&&estado==="idle"?(
-        <div>
-          <div style={{background:`${C.green}12`,border:`1px solid ${C.green}30`,
-            borderRadius:14,padding:16,marginBottom:16}}>
-            <div style={{fontSize:15,fontWeight:700,color:C.green,fontFamily:FONT,marginBottom:6}}>
-              ✓ Factura ya emitida
-            </div>
-            {factExist.numero&&<div style={{fontSize:13,color:C.label,fontFamily:FONT}}>
-              N° <strong>{factExist.numero}</strong>
-            </div>}
-            {factExist.cuf&&<div style={{fontSize:11,color:C.label3,fontFamily:"monospace",marginTop:4,
-              wordBreak:"break-all"}}>
-              CUF: {factExist.cuf.slice(0,32)}{factExist.cuf.length>32?"…":""}
-            </div>}
+  const FacturaEmitida = ({fac, reciente}) => {
+    const anulada = fac.facturaEstado==="anulada" || fac.estado==="anulada" || fac.anulada;
+    const numero  = fac.facturaNumero ?? fac.numero;
+    const cufTxt  = fac.facturaCuf || fac.cuf || "";
+    const pdf     = fac.facturaPdf || fac.pdf || "";
+    const qr      = fac.facturaQr || fac.qrUrl || "";
+    const datos = [
+      ["N° de factura", numero ?? "—"],
+      ["Cliente", fac.factNombre || fac.nombreComprador || "—"],
+      [docSel.sigla==="NIT"?"NIT":docSel.sigla, fac.factDocumento || fac.nitComprador || "—"],
+      fac.factEmail ? ["Correo", fac.factEmail] : null,
+      fac.total!=null ? ["Total", factBs(fac.total)] : null,
+    ].filter(Boolean);
+
+    return (
+      <div>
+        <div style={{textAlign:"center",marginBottom:18}}>
+          <div style={{width:56,height:56,borderRadius:"50%",
+            background:anulada?`${C.red}15`:`${C.green}15`,
+            display:"flex",alignItems:"center",justifyContent:"center",
+            margin:"0 auto 12px",fontSize:26,color:anulada?C.red:C.green}}>
+            {anulada?"×":"✓"}
           </div>
-          {factExist.qrUrl&&<div style={{textAlign:"center",marginBottom:16}}>
-            <img src={factExist.qrUrl} style={{width:140,height:140,borderRadius:8}} alt="QR"/>
-          </div>}
-          <div style={{display:"flex",flexDirection:"column",gap:8,marginTop:4}}>
-            <button onClick={()=>sendFacturaWA(factExist,venta,factExist.telefono)} style={{
-              width:"100%",padding:"13px",borderRadius:14,border:"none",cursor:"pointer",
+          <div style={{fontSize:19,fontWeight:500,color:anulada?C.red:C.green,
+            fontFamily:FONT_DISPLAY,letterSpacing:.5}}>
+            {anulada?"Factura anulada":(reciente?"Factura emitida":"Ya facturada")}
+          </div>
+          <div style={{fontSize:12,color:C.label3,fontFamily:FONT,marginTop:4}}>
+            SIAT Bolivia{fac.facturaAmbiente==="sandbox"?" · prueba":""}
+          </div>
+        </div>
+
+        {fac.facturaAmbiente==="sandbox" && <AvisoAmbiente ambiente="sandbox"/>}
+
+        <div style={{background:C.bg2,borderRadius:14,overflow:"hidden",marginBottom:14,
+          border:`1px solid ${C.sep}`}}>
+          {datos.map(([k,v],i)=>filaDato(k,v,i,datos.length))}
+        </div>
+
+        {cufTxt&&(
+          <div style={{background:C.bg2,borderRadius:12,padding:12,marginBottom:14,
+            border:`1px solid ${C.sep}`}}>
+            <div style={{fontSize:10,fontWeight:700,color:C.label3,fontFamily:FONT,
+              textTransform:"uppercase",letterSpacing:.5,marginBottom:4}}>CUF</div>
+            <div style={{fontSize:11,fontFamily:"monospace",color:C.label,
+              lineHeight:1.6,wordBreak:"break-all"}}>{cufTxt}</div>
+          </div>
+        )}
+
+        {errMsg&&(
+          <div style={{background:`${C.red}12`,border:`1px solid ${C.red}30`,
+            borderRadius:12,padding:12,marginBottom:14}}>
+            <div style={{fontSize:13,color:C.red,fontFamily:FONT,whiteSpace:"pre-line"}}>{errMsg}</div>
+          </div>
+        )}
+
+        <div style={{display:"flex",flexDirection:"column",gap:9}}>
+          {!anulada&&(
+            <button onClick={()=>sendFacturaWA(
+              {numero, cuf:cufTxt, pdf, qrUrl:qr, nombreComprador:fac.factNombre||fac.nombreComprador,
+               nitComprador:fac.factDocumento||fac.nitComprador},
+              venta, telefono||fac.telefono)} style={{
+              width:"100%",padding:"14px",borderRadius:14,border:"none",cursor:"pointer",
               background:"linear-gradient(135deg,#25D366,#128C7E)",
               display:"flex",alignItems:"center",justifyContent:"center",gap:10,
               WebkitTapHighlightColor:"transparent",
             }}>
               <span style={{fontSize:20}}>📲</span>
               <span style={{fontSize:14,fontWeight:700,color:"#fff",fontFamily:FONT_UI}}>
-                {factExist.telefono ? `Enviar a ${factExist.telefono}` : "Enviar por WhatsApp"}
+                {(telefono||fac.telefono) ? `Enviar a ${telefono||fac.telefono}` : "Enviar por WhatsApp"}
               </span>
             </button>
-            {factExist.pdf&&<a href={factExist.pdf} target="_blank" rel="noopener noreferrer" style={{textDecoration:"none"}}>
-              <IOSBtn variant="fill" full icon="📄">Ver PDF Factura</IOSBtn>
-            </a>}
-            <IOSBtn onPress={()=>setEstado("form")} variant="fill" full>
-              Emitir nueva factura
-            </IOSBtn>
-          </div>
+          )}
+          {pdf&&<a href={pdf} target="_blank" rel="noopener noreferrer" style={{textDecoration:"none"}}>
+            <IOSBtn variant="fill" full icon="📄">Ver PDF de la factura</IOSBtn>
+          </a>}
+          {qr&&<a href={qr} target="_blank" rel="noopener noreferrer" style={{textDecoration:"none"}}>
+            <IOSBtn variant="fill" full>Verificar en Impuestos</IOSBtn>
+          </a>}
+
+          {!anulada&&esAdmin&&(fac.facturaId||fac.id)&&(
+            confirmAnul ? (
+              <div style={{background:`${C.red}10`,border:`1px solid ${C.red}30`,
+                borderRadius:12,padding:12}}>
+                <div style={{fontSize:13,color:C.label,fontFamily:FONT,marginBottom:10,lineHeight:1.5}}>
+                  ¿Anular esta factura ante Impuestos? La venta no se toca, solo la factura.
+                </div>
+                <div style={{fontSize:11,fontWeight:600,color:C.label3,fontFamily:FONT,
+                  marginBottom:6,textTransform:"uppercase",letterSpacing:"0.07em"}}>
+                  Motivo (queda declarado ante Impuestos)
+                </div>
+                <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:12}}>
+                  {FACT_MOTIVOS.map(m=>{
+                    const activo = motivoAnul===m.id;
+                    return (
+                      <button key={m.id} onClick={()=>setMotivoAnul(m.id)} style={{
+                        padding:"10px 12px",borderRadius:10,cursor:"pointer",fontFamily:FONT,
+                        fontSize:12.5,textAlign:"left",
+                        border:`2px solid ${activo?C.red:C.sep}`,
+                        background:activo?`${C.red}12`:C.bg2,
+                        color:activo?C.red:C.label2,fontWeight:activo?700:500,
+                        WebkitTapHighlightColor:"transparent",
+                      }}>{m.label}</button>
+                    );
+                  })}
+                </div>
+                <div style={{display:"flex",gap:8}}>
+                  <IOSBtn onPress={()=>setConfirmAnul(false)} variant="fill" full>No</IOSBtn>
+                  <IOSBtn onPress={ejecutarAnular} variant="danger" full disabled={anulando}>
+                    {anulando?"Anulando…":"Sí, anular"}
+                  </IOSBtn>
+                </div>
+              </div>
+            ) : (
+              <IOSBtn onPress={()=>setConfirmAnul(true)} variant="fill" full>Anular factura</IOSBtn>
+            )
+          )}
+          {anulada&&esAdmin&&(fac.facturaId||fac.id)&&(
+            <>
+              <IOSBtn onPress={ejecutarRevertir} variant="fill" full disabled={revirtiendo}>
+                {revirtiendo?"Revirtiendo…":"Deshacer la anulación"}
+              </IOSBtn>
+              <div style={{fontSize:11.5,color:C.label3,fontFamily:FONT,lineHeight:1.5,padding:"0 2px"}}>
+                Si anulaste la factura equivocada, deshacé la anulación. No emitas
+                otra: duplicarías la venta ante Impuestos.
+              </div>
+            </>
+          )}
+          <IOSBtn onPress={onClose} variant="primary" full>Cerrar</IOSBtn>
         </div>
-      ) : estado==="ok"&&resultado?(
-        <FacturaOK r={resultado}/>
-      ):(
-        /* ── Formulario ── */
+      </div>
+    );
+  };
+
+  const mostrarEmitida = (estado!=="form") && (resultado || facturaPrevia);
+
+  return (
+    <Sheet open={open} onClose={onClose} title="Factura SIAT Bolivia" tall>
+      {mostrarEmitida ? (
         <>
-          {/* Resumen venta */}
-          <div style={{background:C.bg2,borderRadius:14,padding:14,marginBottom:16,border:`1px solid ${C.sep}`}}>
+          <FacturaEmitida fac={resultado || facturaPrevia} reciente={estado==="ok"}/>
+          {estado!=="ok"&&(
+            <div style={{marginTop:10}}>
+              <IOSBtn onPress={()=>{setEstado("form");setErrMsg("");}} variant="fill" full>
+                Emitir otra factura de esta venta
+              </IOSBtn>
+            </div>
+          )}
+        </>
+      ) : (
+        <>
+          <div style={{background:C.bg2,borderRadius:14,padding:14,marginBottom:14,
+            border:`1px solid ${C.sep}`}}>
             <div style={{fontSize:11,fontWeight:700,color:C.label3,fontFamily:FONT,
               textTransform:"uppercase",letterSpacing:.5,marginBottom:8}}>Venta a facturar</div>
             {venta?.items?.slice(0,3).map((it,i)=>(
-              <div key={i} style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
+              <div key={i} style={{display:"flex",justifyContent:"space-between",marginBottom:4,gap:10}}>
                 <span style={{fontSize:13,color:C.label2,fontFamily:FONT}}>{it.nombre} ×{it.cantidad}</span>
-                <span style={{fontSize:13,fontWeight:700,color:C.label,fontFamily:FONT}}>{$(it.subtotal)}</span>
+                <span style={{fontSize:13,fontWeight:700,color:C.label,fontFamily:FONT}}>{factBs(it.subtotal)}</span>
               </div>
             ))}
             {(venta?.items?.length||0)>3&&<div style={{fontSize:12,color:C.label3,fontFamily:FONT}}>
@@ -7118,101 +7369,137 @@ function FacturaModal({venta, open, onClose, onFacturada}){
             <div style={{display:"flex",justifyContent:"space-between",marginTop:8,
               paddingTop:8,borderTop:`1px solid ${C.sep}`}}>
               <span style={{fontSize:15,fontWeight:700,color:C.label,fontFamily:FONT}}>Total</span>
-              <span style={{fontSize:17,fontWeight:700,color:C.label,fontFamily:FONT}}>{$(venta?.total)}</span>
+              <span style={{fontSize:17,fontWeight:700,color:C.label,fontFamily:FONT}}>{factBs(venta?.total)}</span>
             </div>
           </div>
 
-          {/* Modo toggle */}
-          <div style={{display:"flex",gap:8,marginBottom:16}}>
-            {[["api","🌐 API CUCU"],["manual","Manual"]].map(([m,l])=>(
-              <button key={m} onClick={()=>{setModo(m);setErrMsg("");}} style={{
-                flex:1,padding:"10px",borderRadius:12,cursor:"pointer",fontFamily:FONT,fontSize:13,
-                border:`2px solid ${modo===m?C.blue:C.sep}`,
-                background:modo===m?`${C.blue}15`:C.bg2,
-                color:modo===m?C.blue:C.label2,fontWeight:modo===m?700:400,
-                WebkitTapHighlightColor:"transparent",
-              }}>{l}</button>
-            ))}
-          </div>
+          <AvisoAmbiente ambiente={ambiente}/>
 
-          {/* Datos comprador */}
-          <IOSInput label="NIT Comprador (0 = Sin NIT / CF)" type="number"
-            value={nit} onChange={e=>setNit(e.target.value)} placeholder="0"/>
-          <IOSInput label="Razón Social / Nombre"
-            value={nombre} onChange={e=>setNombre(e.target.value)} placeholder="Sin Nombre"/>
-
-          {/* Teléfono WhatsApp */}
-          <div style={{marginBottom:16}}>
-            <div style={{fontSize:12,fontWeight:600,color:C.label3,fontFamily:FONT,
-              marginBottom:6,display:"flex",alignItems:"center",gap:6}}>
-              📲 Teléfono WhatsApp
-              <span style={{fontSize:11,fontWeight:400,color:C.label3}}>(opcional)</span>
-            </div>
-            <div style={{position:"relative"}}>
-              <span style={{
-                position:"absolute",left:12,top:"50%",transform:"translateY(-50%)",
-                fontSize:13,color:C.label3,fontFamily:FONT,pointerEvents:"none",
-                display:"flex",alignItems:"center",gap:4,
-              }}>🇧🇴 +591</span>
-              <input
-                type="tel" value={telefono}
-                onChange={e=>setTelefono(e.target.value)}
-                placeholder="70000000"
-                style={{
-                  width:"100%",padding:"11px 14px 11px 80px",borderRadius:12,
-                  border:`1.5px solid ${C.sep}`,background:C.bg3,
-                  fontSize:16,color:C.label,outline:"none",
-                  fontFamily:FONT,boxSizing:"border-box",
-                  WebkitAppearance:"none",
-                }}
-              />
-            </div>
-            <div style={{fontSize:11,color:C.label3,fontFamily:FONT,marginTop:4}}>
-              La factura se enviará por WhatsApp después de emitirse.
-            </div>
-          </div>
-
-          {/* API CUCU */}
-          {modo==="api"&&(
-            <>
-              <div style={{background:`${C.blue}10`,borderRadius:12,padding:12,
-                marginBottom:16,border:`1px solid ${C.blue}20`}}>
-                <div style={{fontSize:12,color:C.blue,fontFamily:FONT,lineHeight:1.7}}>
-                  🏢 <strong>SYLVIA CAROLINA GRANIER ZALLES</strong><br/>
-                  NIT Emisor: <strong>{NIT_EMPRESA}</strong>
-                  {!cfg.apiKey&&<><br/><span style={{color:C.red}}>
-                    ⚠ Sin API Key — ir a Config → Sistema → Facturación
-                  </span></>}
-                </div>
+          {!cfg.llave&&(
+            <div style={{background:`${C.red}12`,border:`1px solid ${C.red}30`,
+              borderRadius:12,padding:12,marginBottom:14}}>
+              <div style={{fontSize:13,color:C.red,fontFamily:FONT,lineHeight:1.55}}>
+                Este equipo todavía no tiene la llave de facturación.
+                Un administrador la carga en <strong>Config → Sistema → Facturación</strong>.
               </div>
-              {errMsg&&<div style={{background:`${C.red}12`,border:`1px solid ${C.red}30`,
-                borderRadius:12,padding:12,marginBottom:16}}>
-                <div style={{fontSize:13,color:C.red,fontFamily:FONT}}>⚠ {errMsg}</div>
-              </div>}
-              <IOSBtn onPress={emitir} variant="primary" full
-                disabled={estado==="enviando"} icon={estado==="enviando"?"⏳":"🧾"}>
-                {estado==="enviando"?"Emitiendo…":"Emitir Factura SIAT"}
-              </IOSBtn>
+            </div>
+          )}
+          {listo===false&&(
+            <div style={{background:`${C.red}12`,border:`1px solid ${C.red}30`,
+              borderRadius:12,padding:12,marginBottom:14}}>
+              <div style={{fontSize:13,color:C.red,fontFamily:FONT,lineHeight:1.55}}>
+                El servicio de facturación está conectado pero le falta configuración
+                para este negocio. Avisale a FORGE antes de seguir.
+              </div>
+            </div>
+          )}
+
+          <div style={{fontSize:11,fontWeight:600,color:C.label3,fontFamily:FONT,
+            marginBottom:6,paddingLeft:2,textTransform:"uppercase",letterSpacing:"0.07em"}}>
+            Tipo de documento
+          </div>
+          <div style={{display:"flex",gap:6,marginBottom:12,flexWrap:"wrap"}}>
+            {FACT_DOCS.map(d=>{
+              const activo = tipoDoc===d.id;
+              return (
+                <button key={d.id} onClick={()=>setTipoDoc(d.id)} title={d.label} style={{
+                  flex:"1 1 60px",padding:"10px 6px",borderRadius:11,cursor:"pointer",
+                  fontFamily:FONT,fontSize:12.5,
+                  border:`2px solid ${activo?C.blue:C.sep}`,
+                  background:activo?`${C.blue}15`:C.bg2,
+                  color:activo?C.blue:C.label2,fontWeight:activo?700:500,
+                  WebkitTapHighlightColor:"transparent",
+                }}>{d.sigla}</button>
+              );
+            })}
+          </div>
+          <div style={{fontSize:11.5,color:C.label3,fontFamily:FONT,marginBottom:12,paddingLeft:2}}>
+            {docSel.label}
+          </div>
+
+          <div style={{display:"flex",gap:10}}>
+            <div style={{flex:2}}>
+              <IOSInput label={`N° de ${docSel.sigla}`} value={documento}
+                inputMode={tipoDoc===3?"text":"numeric"}
+                onChange={e=>{setDocumento(e.target.value); nitChk.limpiar();}}
+                onBlur={()=>{ if(tipoDoc===5) nitChk.chequear(documento, r=>{
+                  setExcepcion(r.exception_code);
+                  if(r.razon_social && !nombre.trim()) setNombre(r.razon_social);
+                }); }}
+                placeholder="Sin puntos ni guiones"/>
+            </div>
+            {tipoDoc===1&&(
+              <div style={{flex:1}}>
+                <IOSInput label="Compl." value={complemento}
+                  onChange={e=>setComplemento(e.target.value.toUpperCase())}
+                  maxLength={2} placeholder="1K"/>
+              </div>
+            )}
+          </div>
+
+          {tipoDoc===5&&<ChipNit estado={nitChk.estado}/>}
+
+          <IOSInput label="Nombre o razón social" value={nombre}
+            onChange={e=>setNombre(e.target.value)} placeholder="Como figura en su documento"/>
+
+          <IOSInput label="Correo (le llega la factura)" type="email" value={email}
+            onChange={e=>setEmail(e.target.value)} placeholder="cliente@correo.com"/>
+
+          {tipoDoc===5&&(
+            <div style={{marginBottom:14}}>
+              <div style={{fontSize:11,fontWeight:600,color:C.label3,fontFamily:FONT,
+                marginBottom:6,paddingLeft:2,textTransform:"uppercase",letterSpacing:"0.07em"}}>
+                Validación del NIT
+              </div>
+              <div style={{display:"flex",gap:8}}>
+                {[{v:0,l:"NIT verificado"},{v:1,l:"No figura en el padrón"}].map(o=>{
+                  const activo = excepcion===o.v;
+                  const col = o.v===0?C.green:C.gold;
+                  return (
+                    <button key={o.v} onClick={()=>setExcepcion(o.v)} style={{
+                      flex:1,padding:"11px 8px",borderRadius:11,cursor:"pointer",fontFamily:FONT,
+                      fontSize:12.5,border:`2px solid ${activo?col:C.sep}`,
+                      background:activo?`${col}15`:C.bg2,
+                      color:activo?col:C.label2,fontWeight:activo?700:500,
+                      WebkitTapHighlightColor:"transparent",
+                    }}>{o.l}</button>
+                  );
+                })}
+              </div>
+              <div style={{fontSize:11.5,color:C.label3,fontFamily:FONT,marginTop:6,lineHeight:1.5}}>
+                Esto se marca solo al consultar el NIT. Solo cambialo a mano si sabés
+                algo que la consulta no vio.
+              </div>
+            </div>
+          )}
+
+          {pagoConTarjeta&&(
+            <>
+              <IOSInput label="N° de tarjeta (lo pide Impuestos)" value={tarjeta}
+                inputMode="numeric"
+                onChange={e=>setTarjeta(e.target.value)} placeholder="Como figura en el voucher"/>
+              <div style={{fontSize:11.5,color:C.label3,fontFamily:FONT,
+                marginTop:-8,marginBottom:14,paddingLeft:2,lineHeight:1.5}}>
+                El cobro incluye tarjeta. El número viaja a Impuestos ofuscado y no queda guardado en el sistema.
+              </div>
             </>
           )}
 
-          {/* Modo manual */}
-          {modo==="manual"&&(
-            <>
-              <IOSInput label="N° de Factura" type="number"
-                value={manNro} onChange={e=>setManNro(e.target.value)} placeholder="00042"/>
-              <IOSInput label="CUF (Código Único de Factura)"
-                value={manCuf} onChange={e=>setManCuf(e.target.value)}
-                placeholder="Código CUF de CUCU / SIAT"/>
-              {errMsg&&<div style={{background:`${C.red}12`,border:`1px solid ${C.red}30`,
-                borderRadius:12,padding:12,marginBottom:16}}>
-                <div style={{fontSize:13,color:C.red,fontFamily:FONT}}>⚠ {errMsg}</div>
-              </div>}
-              <IOSBtn onPress={guardarManual} variant="primary" full icon="💾">
-                Guardar Factura
-              </IOSBtn>
-            </>
+          <IOSInput label="WhatsApp (opcional, +591)" type="tel" value={telefono}
+            onChange={e=>setTelefono(e.target.value)} placeholder="70000000"/>
+
+          {errMsg&&(
+            <div style={{background:`${C.red}12`,border:`1px solid ${C.red}30`,
+              borderRadius:12,padding:12,marginBottom:14}}>
+              <div style={{fontSize:13,color:C.red,fontFamily:FONT,
+                whiteSpace:"pre-line",lineHeight:1.55}}>{errMsg}</div>
+            </div>
           )}
+
+          <IOSBtn onPress={emitir} variant="primary" full
+            disabled={estado==="enviando"||!cfg.llave}>
+            {estado==="enviando"?"Emitiendo…":"Emitir factura"}
+          </IOSBtn>
         </>
       )}
     </Sheet>
@@ -7292,7 +7579,7 @@ function NotaBajaModal({baja, onClose}){
 // ══════════════════════════════════════════════════════════
 // NOTA DE VENTA — Modal detalle
 // ══════════════════════════════════════════════════════════
-function NotaVentaModal({venta, onClose, numVenta, onAnularVenta}){
+function NotaVentaModal({venta, onClose, numVenta, onAnularVenta, esAdmin}){
   if(!venta) return null;
   const [menuOpen,       setMenuOpen]       = useState(false);
   const [showFactura,    setShowFactura]     = useState(false);
@@ -7305,13 +7592,15 @@ function NotaVentaModal({venta, onClose, numVenta, onAnularVenta}){
   const facturaGuardada = leerFacturaLocal(venta.id);
 
   async function ejecutarAnularFactura(){
-    const fac = leerFacturaLocal(venta.id);
-    if(!fac?.cuf){ setAnulFacMsg({ok:false,txt:"No hay CUF registrado para esta factura."}); return; }
+    const fac = facturaDeVenta(venta);
+    const fid = fac && (fac.facturaId || fac.id);
+    if(!fid){ setAnulFacMsg({ok:false,txt:"Esta factura no tiene identificador para anular. Anulala desde el panel de CUCU."}); return; }
     setAnulandoFac(true); setAnulFacMsg(null); setConfirmAnulF(false);
     try{
-      await anularFacturaCUCU(fac.cuf);
-      guardarFacturaLocal(venta.id, {...fac, anulada:true, fechaAnulacion:new Date().toLocaleDateString("es-BO")});
-      setAnulFacMsg({ok:true, txt:"✓ Factura anulada en SIAT / CUCU"});
+      await anularFactura(fid, 1);
+      await sbGuardarFactura(venta.id, {facturaEstado:"anulada"});
+      avisarFacturaCambiada(venta.id, {facturaEstado:"anulada"});
+      setAnulFacMsg({ok:true, txt:"Factura anulada ante Impuestos."});
     }catch(e){ setAnulFacMsg({ok:false, txt:e.message}); }
     setAnulandoFac(false);
   }
@@ -7622,6 +7911,7 @@ function NotaVentaModal({venta, onClose, numVenta, onAnularVenta}){
       <FacturaModal
         venta={venta}
         open={showFactura}
+        esAdmin={esAdmin}
         onClose={()=>setShowFactura(false)}
         onFacturada={()=>setShowFactura(false)}
       />
@@ -16856,6 +17146,7 @@ function App(){
       <NotaVentaModal
         venta={ventaDetalle}
         numVenta={ventaDetalle?ventaDetalle.id.replace(/\D/g,"").slice(-4).padStart(4,"0"):null}
+        esAdmin={user?.rol==="admin"}
         onClose={()=>setVentaDetalle(null)}
         onAnularVenta={handleAnularVenta}
       />
@@ -17862,6 +18153,7 @@ function POS({inv,onVenta,onVerNota,user,descuentos={},descCodigos={}}){
       <FacturaModal
         venta={ultima}
         open={showFacPOS}
+        esAdmin={user?.rol==="admin"}
         onClose={()=>setShowFacPOS(false)}
         onFacturada={()=>setShowFacPOS(false)}
       />
@@ -22981,95 +23273,103 @@ function HistorialTab({ventas, inv, cierres, onVentaClick}){
 // ══════════════════════════════════════════════════════════
 // ── Facturación CUCU Config ────────────────────────────────
 function FacturacionConfig(){
-  const [cfg,setCfg]   = useState(leerCfgCUCU);
+  const [cfg,setCfg]     = useState(leerCfgFact);
   const [saved,setSaved] = useState(false);
   const [testing,setTesting] = useState(false);
-  const [testMsg,setTestMsg] = useState(null);
+  const [estado,setEstado]   = useState(null);
+  const [verLlave,setVerLlave] = useState(false);
 
-  function save(newCfg){
-    setCfg(newCfg);
-    localStorage.setItem(CUCU_CFG_KEY,JSON.stringify(newCfg));
-    setSaved(true); setTimeout(()=>setSaved(false),2000);
+  function guardar(){
+    guardarCfgFact(cfg);
+    setSaved(true); setTimeout(()=>setSaved(false),2200);
   }
-  async function testConexion(){
-    if(!cfg.apiKey){setTestMsg({ok:false,txt:"Ingresá el API Key primero."});return;}
-    setTesting(true); setTestMsg(null);
+  async function probar(){
+    guardarCfgFact(cfg);
+    setTesting(true); setEstado(null);
     try{
-      const r=await fetch(cfg.endpoint.replace("/invoices","/health")||cfg.endpoint,{
-        headers:{"Authorization":`Bearer ${cfg.apiKey}`},
-        signal:AbortSignal.timeout(6000),
-      });
-      setTestMsg(r.ok?{ok:true,txt:`✓ Conexión OK (${r.status})`}:{ok:false,txt:`Error ${r.status}`});
-    }catch(e){ setTestMsg({ok:false,txt:`Error: ${e.message.slice(0,80)}`}); }
+      const r = await factEstado();
+      const emp = (r.empresas||[]).find(e=>e.slug===(cfg.empresa||"toscana"));
+      setEstado({ok:true, ambiente:emp?.ambiente || r.ambiente, empresa:emp});
+    }catch(e){ setEstado({ok:false, txt:e.message}); }
     setTesting(false);
   }
-  const fld=(label,key,placeholder,type="text")=>(
+  const campo = (label, key, placeholder, extra={}) => (
     <div style={{marginBottom:12}}>
       <div style={{fontSize:12,fontWeight:600,color:C.label3,fontFamily:FONT,marginBottom:4}}>{label}</div>
-      <input value={cfg[key]||""} type={type} placeholder={placeholder}
-        onChange={e=>setCfg(p=>({...p,[key]:e.target.value}))}
+      <input value={cfg[key]||""} placeholder={placeholder} {...extra}
+        onChange={e=>setCfg(p=>({...p,[key]:e.target.value.trim()}))}
         style={{width:"100%",padding:"10px 12px",borderRadius:11,border:`1.5px solid ${C.sep}`,
           background:C.bg3,fontSize:14,color:C.label,fontFamily:FONT,outline:"none",
           boxSizing:"border-box",WebkitAppearance:"none"}}/>
     </div>
   );
+
   return (
     <div style={{background:C.bg2,borderRadius:16,padding:16,border:`1px solid ${C.sep}`,marginBottom:16}}>
       <div style={{fontSize:13,fontWeight:700,color:C.label2,fontFamily:FONT,
-        marginBottom:14,display:"flex",alignItems:"center",gap:8}}>
-        🧾 Facturación SIAT Bolivia
-        <span style={{fontSize:11,fontWeight:400,color:C.label3}}>(CUCU API)</span>
+        marginBottom:6,display:"flex",alignItems:"center",gap:8}}>
+        Facturación SIAT Bolivia
+      </div>
+      <div style={{fontSize:11.5,color:C.label3,fontFamily:FONT,lineHeight:1.6,marginBottom:14}}>
+        La app no habla directo con Impuestos: pasa por el servicio de facturación
+        de FORGE, que es el único que guarda las claves. Acá solo va la llave de
+        acceso a ese servicio, y queda en este equipo.
       </div>
 
-      {/* Modo */}
-      <div style={{display:"flex",gap:8,marginBottom:16}}>
-        {[["true","🌐 API Automática"],["false","Modo Manual"]].map(([v,l])=>{
-          const active=(v==="true")===(cfg.modoApi!==false);
-          return(
-            <button key={v} onClick={()=>save({...cfg,modoApi:v==="true"})} style={{
-              flex:1,padding:"9px 6px",borderRadius:11,cursor:"pointer",fontFamily:FONT,fontSize:12,
-              border:`2px solid ${active?C.gold:C.sep}`,
-              background:active?`${C.gold}15`:C.bg3,
-              color:active?C.gold:C.label2,fontWeight:active?700:400,
-              WebkitTapHighlightColor:"transparent",
-            }}>{l}</button>
-          );
-        })}
+      {campo("Servicio de facturación","url","https://forge-facturacion.vercel.app")}
+
+      <div style={{marginBottom:12}}>
+        <div style={{fontSize:12,fontWeight:600,color:C.label3,fontFamily:FONT,marginBottom:4,
+          display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <span>Llave de acceso</span>
+          <button onClick={()=>setVerLlave(v=>!v)} style={{background:"none",border:"none",
+            color:C.blue,fontSize:11.5,fontFamily:FONT,cursor:"pointer",padding:0}}>
+            {verLlave?"Ocultar":"Ver"}
+          </button>
+        </div>
+        <input value={cfg.llave||""} type={verLlave?"text":"password"}
+          placeholder="La entrega FORGE" autoComplete="off"
+          onChange={e=>setCfg(p=>({...p,llave:e.target.value.trim()}))}
+          style={{width:"100%",padding:"10px 12px",borderRadius:11,border:`1.5px solid ${C.sep}`,
+            background:C.bg3,fontSize:14,color:C.label,fontFamily:"monospace",outline:"none",
+            boxSizing:"border-box",WebkitAppearance:"none"}}/>
       </div>
 
-      {cfg.modoApi!==false&&(
-        <>
-          {fld("API Key CUCU","apiKey","Bearer token de tu cuenta CUCU")}
-          {fld("Endpoint","endpoint","https://app.cucu.bo/api/v1/invoices")}
-          {fld("Código Actividad Económica","codigoActividad","470000")}
-          {fld("Código Producto SIN","codigoProductoSin","58311")}
-
-          {testMsg&&<div style={{background:testMsg.ok?`${C.green}12`:`${C.red}12`,
-            border:`1px solid ${testMsg.ok?C.green:C.red}30`,borderRadius:10,
-            padding:10,marginBottom:12,fontSize:13,color:testMsg.ok?C.green:C.red,fontFamily:FONT}}>
-            {testMsg.txt}
-          </div>}
-
-          <button onClick={testConexion} disabled={testing} style={{
-            width:"100%",padding:"10px",borderRadius:11,cursor:"pointer",fontFamily:FONT,
-            fontSize:13,background:"none",border:`1.5px solid ${C.blue}`,
-            color:C.blue,fontWeight:600,marginBottom:10,
-            WebkitTapHighlightColor:"transparent",
-          }}>{testing?"Probando…":"Probar conexión"}</button>
-        </>
+      {estado&&estado.ok&&(
+        <div style={{background:C.bg3,borderRadius:11,border:`1px solid ${C.sep}`,
+          padding:12,marginBottom:12}}>
+          <div style={{fontSize:13,color:C.green,fontFamily:FONT,fontWeight:600,marginBottom:8}}>
+            Conectado
+          </div>
+          <div style={{fontSize:12.5,color:C.label2,fontFamily:FONT,lineHeight:1.8}}>
+            Ambiente: <strong style={{color:estado.ambiente==="sandbox"?C.gold:C.green}}>
+              {estado.ambiente==="sandbox"?"pruebas (sin validez fiscal)":"producción"}
+            </strong><br/>
+            {estado.empresa
+              ? <>Negocio: <strong>{estado.empresa.marca}</strong> · NIT {estado.empresa.nit}<br/>
+                  Listo para facturar: <strong style={{color:estado.empresa.listo?C.green:C.red}}>
+                    {estado.empresa.listo?"sí":"no"}
+                  </strong></>
+              : <span style={{color:C.red}}>El servicio no tiene configurado este negocio.</span>}
+          </div>
+        </div>
+      )}
+      {estado&&!estado.ok&&(
+        <div style={{background:`${C.red}12`,border:`1px solid ${C.red}30`,borderRadius:11,
+          padding:12,marginBottom:12}}>
+          <div style={{fontSize:13,color:C.red,fontFamily:FONT,whiteSpace:"pre-line"}}>{estado.txt}</div>
+        </div>
       )}
 
-      <div style={{padding:10,background:C.bg3,borderRadius:10,border:`1px solid ${C.sep}`,marginBottom:12}}>
-        <div style={{fontSize:11,color:C.label3,fontFamily:FONT,lineHeight:1.7}}>
-          📋 Obtener API Key → <strong>cucu.bo</strong><br/>
-          Docs → <strong>docs.cucu.bo</strong><br/>
-          Actividad <strong>470000</strong> = Comercio al por menor<br/>
-          Código SIN <strong>58311</strong> = Prendas de vestir
-        </div>
-      </div>
+      <button onClick={probar} disabled={testing} style={{
+        width:"100%",padding:"10px",borderRadius:11,cursor:"pointer",fontFamily:FONT,
+        fontSize:13,background:"none",border:`1.5px solid ${C.blue}`,
+        color:C.blue,fontWeight:600,marginBottom:12,
+        WebkitTapHighlightColor:"transparent",
+      }}>{testing?"Probando…":"Probar conexión"}</button>
 
-      {saved&&<div style={{fontSize:13,color:C.green,fontFamily:FONT,textAlign:"center",marginBottom:8}}>✓ Guardado</div>}
-      <IOSBtn onPress={()=>save(cfg)} variant="primary" full icon="💾">Guardar Configuración</IOSBtn>
+      {saved&&<div style={{fontSize:13,color:C.green,fontFamily:FONT,textAlign:"center",marginBottom:8}}>Guardado</div>}
+      <IOSBtn onPress={guardar} variant="primary" full icon="💾">Guardar</IOSBtn>
     </div>
   );
 }
@@ -25447,6 +25747,19 @@ function VentasTab({vMes, totalVtas, mes, anio, onVentaClick, retiros=[], bajas=
     return [...vMes].filter(v=>v.items.some(i=>i.marcaId===marcaFiltro)).reverse();
   },[vMes, marcaFiltro]);
 
+  // Con factura / Sin factura del mes: una venta está facturada si tiene una
+  // factura guardada que no esté anulada.
+  const facInfo = useMemo(()=>{
+    let facN=0, facBs=0, sinN=0, sinBs=0;
+    vMesActivas.forEach(v=>{
+      const f = leerFacturaLocal(v.id);
+      const facturada = f && f.facturaEstado!=="anulada" && (f.facturaCuf||f.cuf||f.facturaNumero||f.numero);
+      const t = getDisplayTotal(v);
+      if(facturada){ facN++; facBs+=t; } else { sinN++; sinBs+=t; }
+    });
+    return {facN,facBs,sinN,sinBs};
+  },[vMesActivas]);
+
   return (
     <>
     <div>
@@ -25477,6 +25790,14 @@ function VentasTab({vMes, totalVtas, mes, anio, onVentaClick, retiros=[], bajas=
           <StatCard key={s.label} label={s.label} value={$(s.value)}
             sub={`${Math.round(totalVtas>0?(s.value/totalVtas)*100:0)}% del total`} color={s.color} compact={isDesktop}/>
         ))}
+      </div>
+
+      {/* ── Con factura / Sin factura ── */}
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:16}}>
+        <StatCard label={`Con factura · ${facInfo.facN}`} value={$(facInfo.facBs)}
+          sub={`${Math.round(totalVtas>0?(facInfo.facBs/totalVtas)*100:0)}% del total`} color="#5B8DB8" compact={isDesktop}/>
+        <StatCard label={`Sin factura · ${facInfo.sinN}`} value={$(facInfo.sinBs)}
+          sub={`${Math.round(totalVtas>0?(facInfo.sinBs/totalVtas)*100:0)}% del total`} color={C.gold} compact={isDesktop}/>
       </div>
 
       {/* Selector vista */}
