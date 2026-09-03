@@ -56276,7 +56276,7 @@
     return { bruto, brutoEf, brutoQR, brutoTJ, descTJ, subBanco, comision, alquiler, gastos, totalGastos, neto, cfg };
   }
   var FACT_CFG_KEY = "toscana_fact_cfg";
-  var FACT_DEF = { url: "https://forge-facturacion.vercel.app", llave: "", empresa: "toscana" };
+  var FACT_DEF = { url: "https://toscana-facturacion.vercel.app", llave: "", empresa: "toscana" };
   var FACT_DOCS = [
     { id: 1, sigla: "CI", label: "Carnet de identidad" },
     { id: 2, sigla: "CEX", label: "Documento de extranjero" },
@@ -79121,7 +79121,7 @@ ${c.resumen || c.id}`)) onEliminarCarga(c.id);
       display: "flex",
       alignItems: "center",
       gap: 8
-    } }, "Facturaci\xF3n SIAT Bolivia"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11.5, color: C.label3, fontFamily: FONT, lineHeight: 1.6, marginBottom: 14 } }, "La app no habla directo con Impuestos: pasa por el servicio de facturaci\xF3n de FORGE, que es el \xFAnico que guarda las claves. Ac\xE1 solo va la llave de acceso a ese servicio, y queda en este equipo."), campo("Servicio de facturaci\xF3n", "url", "https://forge-facturacion.vercel.app"), /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 12 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+    } }, "Facturaci\xF3n SIAT Bolivia"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11.5, color: C.label3, fontFamily: FONT, lineHeight: 1.6, marginBottom: 14 } }, "La app no habla directo con Impuestos: pasa por el servicio de facturaci\xF3n de FORGE, que es el \xFAnico que guarda las claves. Ac\xE1 solo va la llave de acceso a ese servicio, y queda en este equipo."), campo("Servicio de facturaci\xF3n", "url", "https://toscana-facturacion.vercel.app"), /* @__PURE__ */ import_react.default.createElement("div", { style: { marginBottom: 12 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
       fontSize: 12,
       fontWeight: 600,
       color: C.label3,

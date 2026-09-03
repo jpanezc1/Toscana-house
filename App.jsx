@@ -2764,7 +2764,7 @@ function calcLiqMarca(vMarca, marcaId, MK) {
 // facturación de FORGE (forge-facturacion), el único que guarda la API key de
 // CUCU. Acá solo vive la llave de acceso a ese servicio, cargada por equipo.
 const FACT_CFG_KEY = "toscana_fact_cfg";
-const FACT_DEF = { url: "https://forge-facturacion.vercel.app", llave: "", empresa: "toscana" };
+const FACT_DEF = { url: "https://toscana-facturacion.vercel.app", llave: "", empresa: "toscana" };
 
 // Los 5 tipos de documento del catálogo del SIN.
 const FACT_DOCS = [
@@ -23316,7 +23316,7 @@ function FacturacionConfig(){
         acceso a ese servicio, y queda en este equipo.
       </div>
 
-      {campo("Servicio de facturación","url","https://forge-facturacion.vercel.app")}
+      {campo("Servicio de facturación","url","https://toscana-facturacion.vercel.app")}
 
       <div style={{marginBottom:12}}>
         <div style={{fontSize:12,fontWeight:600,color:C.label3,fontFamily:FONT,marginBottom:4,
