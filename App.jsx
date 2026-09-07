@@ -16458,9 +16458,9 @@ function App(){
     {id:"ventas_ant",    icon:"⏱", label:"V.Antiguas"},
     {id:"config",        icon:"⚙", label:"Config"},
   ];
-  // Caja: solo inicio + POS + ventas + cambios (no acceso a admin, marcas, config)
+  // Caja: inicio + POS + ventas + clientes + cambios + inventario + verificación (auditoria)
   const TABS = user?.rol==="caja"
-    ? TABS_ALL.filter(t=>["inicio","pos","ventas","clientes","cambios","inventario"].includes(t.id))
+    ? TABS_ALL.filter(t=>["inicio","pos","ventas","clientes","cambios","inventario","auditoria"].includes(t.id))
     : user?.rol==="admin" ? TABS_ALL
     : TABS_ALL.filter(t=>t.id!=="auditoria"&&t.id!=="cargas"&&t.id!=="ventas_ant");
 
