@@ -65407,7 +65407,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
   }
   function PanelDescuentosAdmin({ marcas, descuentos, onGuardar }) {
     const [abierto, setAbierto] = (0, import_react.useState)(false);
-    const OPCIONES = [5, 10, 15, 20, 25, 30];
+    const OPCIONES = [5, 10, 15, 20, 25, 30, 35];
     const lista = (marcas || []).filter((m) => m.estado !== "inactiva");
     const activos = lista.filter((m) => descMarcaVigente(descuentos, m.id) > 0);
     return /* @__PURE__ */ import_react.default.createElement("div", { style: {
@@ -65495,7 +65495,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
     })));
   }
   function DescuentoMarcaCard({ actual, onGuardar }) {
-    const OPCIONES = [5, 10, 15, 20, 25, 30];
+    const OPCIONES = [5, 10, 15, 20, 25, 30, 35];
     const activo = !!actual?.activo;
     const pct = Number(actual?.pct) || 0;
     const hasta = actual?.hasta || "";
@@ -65608,7 +65608,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
     )), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT_UI, marginTop: 10, lineHeight: 1.5 } }, "\u2139\uFE0F El ", pct, "% se descuenta de tu liquidaci\xF3n, no de Toscana. Al activarlo se avisa a la tienda al instante.")));
   }
   function DescuentosPorCodigoCard({ marca, inv, descCodigos = {}, onGuardar, onQuitar }) {
-    const OPCIONES = [10, 20, 30, 40, 50];
+    const OPCIONES = [10, 20, 30, 35, 40, 50];
     const [abierto, setAbierto] = (0, import_react.useState)(false);
     const [busq, setBusq] = (0, import_react.useState)("");
     const [sel, setSel] = (0, import_react.useState)(null);
