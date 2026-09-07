@@ -11468,7 +11468,7 @@ function BrandVentaModal({venta, marca, onClose}){
 // Panel admin: ver/activar/apagar el descuento de cada marca (pestaña Marcas)
 function PanelDescuentosAdmin({marcas, descuentos, onGuardar}){
   const [abierto, setAbierto] = useState(false);
-  const OPCIONES = [5,10,15,20,25,30,35];
+  const OPCIONES = [5,10,15,20,25,30,35,40,45,50];
   const lista = (marcas||[]).filter(m=>m.estado!=="inactiva");
   const activos = lista.filter(m=>descMarcaVigente(descuentos, m.id)>0);
   return (
@@ -11545,7 +11545,7 @@ function PanelDescuentosAdmin({marcas, descuentos, onGuardar}){
 
 // Tarjeta de autogestión de descuento — portal de marca
 function DescuentoMarcaCard({actual, onGuardar}){
-  const OPCIONES = [5,10,15,20,25,30,35];
+  const OPCIONES = [5,10,15,20,25,30,35,40,45,50];
   const activo = !!actual?.activo;
   const pct    = Number(actual?.pct)||0;
   const hasta  = actual?.hasta||"";

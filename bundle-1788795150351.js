@@ -65407,7 +65407,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
   }
   function PanelDescuentosAdmin({ marcas, descuentos, onGuardar }) {
     const [abierto, setAbierto] = (0, import_react.useState)(false);
-    const OPCIONES = [5, 10, 15, 20, 25, 30, 35];
+    const OPCIONES = [5, 10, 15, 20, 25, 30, 35, 40, 45, 50];
     const lista = (marcas || []).filter((m) => m.estado !== "inactiva");
     const activos = lista.filter((m) => descMarcaVigente(descuentos, m.id) > 0);
     return /* @__PURE__ */ import_react.default.createElement("div", { style: {
@@ -65495,7 +65495,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
     })));
   }
   function DescuentoMarcaCard({ actual, onGuardar }) {
-    const OPCIONES = [5, 10, 15, 20, 25, 30, 35];
+    const OPCIONES = [5, 10, 15, 20, 25, 30, 35, 40, 45, 50];
     const activo = !!actual?.activo;
     const pct = Number(actual?.pct) || 0;
     const hasta = actual?.hasta || "";
