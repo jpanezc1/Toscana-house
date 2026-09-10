@@ -57995,6 +57995,216 @@
       }
     }
   }
+  async function facturaSiatPDF(venta) {
+    const { jsPDF } = window.jspdf || {};
+    if (!jsPDF) throw new Error("jsPDF no carg\xF3");
+    const fac = leerFacturaLocal(venta.id);
+    if (!fac) throw new Error("Esta venta no tiene factura emitida.");
+    const numero = fac.facturaNumero ?? fac.numero ?? "";
+    const cuf = fac.facturaCuf || fac.cuf || "";
+    const qrUrl = fac.facturaQr || fac.qrUrl || "";
+    const anulada = fac.facturaEstado === "anulada" || fac.anulada;
+    const nombreC = fac.factNombre || fac.nombreComprador || "";
+    const nitC = fac.factDocumento || fac.nitComprador || "";
+    const fmt2 = (n) => Number(n || 0).toLocaleString("es-BO", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    let fechaFac = venta.fecha ? String(venta.fecha) + " " + String(venta.hora || "") : "";
+    if (fac.facturaFecha) {
+      try {
+        const d = new Date(fac.facturaFecha);
+        if (!isNaN(d)) fechaFac = d.toLocaleString("es-BO");
+      } catch {
+      }
+    }
+    const items = venta.items || [];
+    const total = Number(fac.total ?? getDisplayTotal(venta)) || 0;
+    const literal = fac.literal || (typeof numeroALetras === "function" ? numeroALetras(total) : "");
+    const doc = new jsPDF({ unit: "mm", format: "a4" });
+    const W = 210, M = 16;
+    let y = 20;
+    let qrImg = null;
+    if (qrUrl) {
+      try {
+        const qrcode = await loadQR();
+        const q = qrcode(0, "M");
+        q.addData(qrUrl);
+        q.make();
+        qrImg = q.createDataURL(6, 4);
+      } catch {
+      }
+    }
+    if (anulada) {
+      doc.saveGraphicsState();
+      doc.setGState(new doc.GState({ opacity: 0.1 }));
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(80);
+      doc.setTextColor(220, 60, 90);
+      doc.text("ANULADA", 105, 165, { align: "center", angle: 25 });
+      doc.restoreGraphicsState();
+      doc.setTextColor(20, 20, 20);
+    }
+    const emp = typeof RAZON_SOCIAL !== "undefined" ? RAZON_SOCIAL : "TOSCANA HOUSE";
+    doc.setTextColor(24, 20, 16);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(13);
+    doc.text(String(emp), M, y);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.setTextColor(90, 90, 90);
+    let yi = y + 5;
+    if (typeof PROPIETARIA !== "undefined") {
+      doc.text(String(PROPIETARIA), M, yi);
+      yi += 4;
+    }
+    const dir = typeof DIRECCION_EMP !== "undefined" ? DIRECCION_EMP : "";
+    const ciu = typeof CIUDAD_EMP !== "undefined" ? CIUDAD_EMP : "";
+    if (dir || ciu) {
+      doc.text([dir, ciu].filter(Boolean).join(", "), M, yi);
+      yi += 4;
+    }
+    if (typeof TELEFONO_EMP !== "undefined") {
+      doc.text("Tel. " + TELEFONO_EMP, M, yi);
+      yi += 4;
+    }
+    const bx = W - M - 64, bw = 64, bh = 30;
+    doc.setDrawColor(24, 20, 16);
+    doc.setLineWidth(0.5);
+    doc.rect(bx, y - 6, bw, bh);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9);
+    doc.setTextColor(24, 20, 16);
+    doc.text("FACTURA", bx + bw / 2, y - 1, { align: "center" });
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(7.5);
+    doc.setTextColor(60, 60, 60);
+    if (typeof NIT_EMPRESA !== "undefined") doc.text("NIT: " + NIT_EMPRESA, bx + bw / 2, y + 4, { align: "center" });
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(8);
+    doc.setTextColor(24, 20, 16);
+    doc.text("FACTURA N\xB0 " + numero, bx + bw / 2, y + 9, { align: "center" });
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(6.5);
+    doc.setTextColor(60, 60, 60);
+    doc.text("C\xF3d. Autorizaci\xF3n:", bx + 2, y + 15);
+    doc.setFontSize(5.5);
+    doc.text(doc.splitTextToSize(String(cuf), bw - 4), bx + 2, y + 18);
+    y = Math.max(yi, y + 26) + 4;
+    doc.setDrawColor(210, 205, 195);
+    doc.setLineWidth(0.4);
+    doc.line(M, y, W - M, y);
+    y += 6;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(7);
+    doc.setTextColor(140, 140, 140);
+    doc.text("NOMBRE / RAZ\xD3N SOCIAL", M, y);
+    doc.text("NIT / CI", M + 110, y);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.setTextColor(24, 20, 16);
+    doc.text(String(nombreC || "S/N"), M, y + 5);
+    doc.text(String(nitC && nitC !== 0 ? nitC : "0 (Sin NIT / CF)"), M + 110, y + 5);
+    y += 10;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(7);
+    doc.setTextColor(140, 140, 140);
+    doc.text("FECHA DE EMISI\xD3N", M, y);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.setTextColor(24, 20, 16);
+    doc.text(String(fechaFac), M + 45, y);
+    y += 5;
+    doc.setDrawColor(210, 205, 195);
+    doc.line(M, y, W - M, y);
+    y += 6;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(7.5);
+    doc.setTextColor(130, 130, 130);
+    doc.text("C\xD3DIGO", M, y);
+    doc.text("DESCRIPCI\xD3N", M + 26, y);
+    doc.text("CANT", W - M - 58, y, { align: "right" });
+    doc.text("P.UNIT", W - M - 36, y, { align: "right" });
+    doc.text("SUBTOTAL", W - M, y, { align: "right" });
+    y += 2;
+    doc.setDrawColor(230, 226, 218);
+    doc.line(M, y, W - M, y);
+    y += 5;
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.setTextColor(24, 20, 16);
+    items.forEach((it) => {
+      const sub = typeof netItemSub === "function" ? netItemSub(venta, it) : (it.precioUnit || 0) * (it.cantidad || 1);
+      doc.setFont("courier", "normal");
+      doc.setFontSize(8);
+      doc.setTextColor(120, 120, 120);
+      doc.text(String(it.codigo || ""), M, y);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9);
+      doc.setTextColor(24, 20, 16);
+      const nom = doc.splitTextToSize(String(it.nombre || "") + (it.marcaNombre ? " - " + it.marcaNombre : ""), W - M - 26 - 64);
+      doc.text(nom[0] || "", M + 26, y);
+      doc.text(String(it.cantidad || 1), W - M - 58, y, { align: "right" });
+      doc.text(fmt2(it.precioUnit), W - M - 36, y, { align: "right" });
+      doc.text(fmt2(sub), W - M, y, { align: "right" });
+      y += 6.5;
+      if (y > 235) {
+        doc.addPage();
+        y = 24;
+      }
+    });
+    doc.setDrawColor(210, 205, 195);
+    doc.line(M, y, W - M, y);
+    y += 8;
+    const tx = W - M - 55, vx = W - M;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(13);
+    doc.setTextColor(24, 20, 16);
+    doc.text("TOTAL Bs", tx, y);
+    doc.text(fmt2(total), vx, y, { align: "right" });
+    y += 8;
+    if (literal) {
+      doc.setFont("helvetica", "italic");
+      doc.setFontSize(8);
+      doc.setTextColor(90, 90, 90);
+      const son = doc.splitTextToSize("Son: " + literal, W - 2 * M);
+      doc.text(son, M, y);
+      y += son.length * 4 + 4;
+    }
+    const qy = y + 2;
+    if (qrImg) doc.addImage(qrImg, "PNG", M, qy, 30, 30);
+    const lx = qrImg ? M + 36 : M;
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(6.8);
+    doc.setTextColor(90, 90, 90);
+    const leyendas = [
+      "Este documento es la Representaci\xF3n Gr\xE1fica de un Documento Fiscal Digital emitido en una modalidad de facturaci\xF3n en l\xEDnea.",
+      "Ley N\xB0 453: Tienes derecho a reclamar y a recibir un trato equitativo y digno de todo proveedor de bienes y servicios.",
+      qrUrl ? "Verific\xE1 esta factura en: " + qrUrl : ""
+    ].filter(Boolean);
+    let ly = qy + 3;
+    leyendas.forEach((t) => {
+      const ls = doc.splitTextToSize(t, W - M - lx);
+      doc.text(ls, lx, ly);
+      ly += ls.length * 3.2 + 2;
+    });
+    doc.setFontSize(7);
+    doc.setTextColor(150, 150, 150);
+    doc.setDrawColor(230, 226, 218);
+    doc.line(M, 285, W - M, 285);
+    doc.text("Gracias por tu compra \xB7 " + String(emp), 105, 290, { align: "center" });
+    return doc;
+  }
+  async function descargarFacturaSiatPDF(venta) {
+    try {
+      const doc = await facturaSiatPDF(venta);
+      const fac = leerFacturaLocal(venta.id) || {};
+      const num = String(fac.facturaNumero ?? fac.numero ?? venta.id).toString().replace(/\D/g, "").slice(-8) || "factura";
+      doc.save("Factura_" + num + ".pdf");
+    } catch (e) {
+      try {
+        alert(e.message || "No se pudo generar la factura en PDF");
+      } catch {
+      }
+    }
+  }
   async function liquidacionPDF(marca, mes, anio, liq, opts = {}) {
     const { jsPDF } = window.jspdf || {};
     if (!jsPDF) throw new Error("jsPDF no carg\xF3");
@@ -61453,7 +61663,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
         justifyContent: "center",
         gap: 10,
         WebkitTapHighlightColor: "transparent"
-      } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 20 } }, "\u{1F4F2}"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 14, fontWeight: 700, color: "#fff", fontFamily: FONT_UI } }, telefono || fac.telefono ? `Enviar a ${telefono || fac.telefono}` : "Enviar por WhatsApp")), pdf && /* @__PURE__ */ import_react.default.createElement("a", { href: pdf, target: "_blank", rel: "noopener noreferrer", style: { textDecoration: "none" } }, /* @__PURE__ */ import_react.default.createElement(IOSBtn, { variant: "fill", full: true, icon: "\u{1F4C4}" }, "Ver PDF de la factura")), qr && /* @__PURE__ */ import_react.default.createElement("a", { href: qr, target: "_blank", rel: "noopener noreferrer", style: { textDecoration: "none" } }, /* @__PURE__ */ import_react.default.createElement(IOSBtn, { variant: "fill", full: true }, "Verificar en Impuestos")), !anulada && esAdmin && (fac.facturaId || fac.id) && (confirmAnul ? /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 20 } }, "\u{1F4F2}"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 14, fontWeight: 700, color: "#fff", fontFamily: FONT_UI } }, telefono || fac.telefono ? `Enviar a ${telefono || fac.telefono}` : "Enviar por WhatsApp")), !anulada && (numero != null || cufTxt) && /* @__PURE__ */ import_react.default.createElement("div", { onClick: () => descargarFacturaSiatPDF(venta) }, /* @__PURE__ */ import_react.default.createElement(IOSBtn, { variant: "fill", full: true, icon: "\u{1F4C4}" }, "Descargar factura PDF")), pdf && /* @__PURE__ */ import_react.default.createElement("a", { href: pdf, target: "_blank", rel: "noopener noreferrer", style: { textDecoration: "none" } }, /* @__PURE__ */ import_react.default.createElement(IOSBtn, { variant: "fill", full: true, icon: "\u{1F4C4}" }, "Ver PDF de la factura")), qr && /* @__PURE__ */ import_react.default.createElement("a", { href: qr, target: "_blank", rel: "noopener noreferrer", style: { textDecoration: "none" } }, /* @__PURE__ */ import_react.default.createElement(IOSBtn, { variant: "fill", full: true }, "Verificar en Impuestos")), !anulada && esAdmin && (fac.facturaId || fac.id) && (confirmAnul ? /* @__PURE__ */ import_react.default.createElement("div", { style: {
         background: `${C.red}10`,
         border: `1px solid ${C.red}30`,
         borderRadius: 12,
@@ -61991,7 +62201,49 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       },
       /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 20 } }, facturaGuardada ? "\u2705" : "\u{1F9FE}"),
       /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 14, fontWeight: 700, color: "#fff", fontFamily: FONT_UI } }, facturaGuardada ? `Factura N\xB0 ${facturaGuardada.numero || "emitida"}` : "Emitir Factura SIAT")
-    ), /* @__PURE__ */ import_react.default.createElement("button", { onClick: onClose, style: {
+    ), facturaGuardada && !facturaGuardada.anulada && (facturaGuardada.facturaCuf || facturaGuardada.cuf || facturaGuardada.facturaNumero || facturaGuardada.numero) && /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, null, /* @__PURE__ */ import_react.default.createElement(
+      "button",
+      {
+        onClick: () => descargarFacturaSiatPDF(venta),
+        style: {
+          width: "100%",
+          marginBottom: 10,
+          background: "linear-gradient(135deg,#1A237E,#3949AB)",
+          border: "none",
+          borderRadius: 14,
+          padding: "14px 10px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 10,
+          cursor: "pointer",
+          WebkitTapHighlightColor: "transparent"
+        }
+      },
+      /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 20 } }, "\u{1F4C4}"),
+      /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 14, fontWeight: 700, color: "#fff", fontFamily: FONT_UI } }, "Descargar factura PDF")
+    ), (facturaGuardada.facturaQr || facturaGuardada.qrUrl) && /* @__PURE__ */ import_react.default.createElement(
+      "button",
+      {
+        onClick: () => window.open(facturaGuardada.facturaQr || facturaGuardada.qrUrl, "_blank", "noopener"),
+        style: {
+          width: "100%",
+          marginBottom: 10,
+          background: "transparent",
+          border: "1.5px solid #1A237E40",
+          borderRadius: 14,
+          padding: "11px 10px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 8,
+          cursor: "pointer",
+          WebkitTapHighlightColor: "transparent"
+        }
+      },
+      /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 15 } }, "\u{1F50E}"),
+      /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 12.5, fontWeight: 600, color: "#1A237E", fontFamily: FONT_UI } }, "Verificar en Impuestos (SIAT)")
+    )), /* @__PURE__ */ import_react.default.createElement("button", { onClick: onClose, style: {
       width: "100%",
       background: C.bg2,
       border: `1px solid ${C.sep}`,
