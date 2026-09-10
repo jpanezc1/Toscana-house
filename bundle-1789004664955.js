@@ -2172,9 +2172,9 @@
                   if ("string" === typeof entry.name) {
                     var JSCompiler_temp_const = info;
                     a: {
-                      var name = entry.name, env = entry.env, location = entry.debugLocation;
-                      if (null != location) {
-                        var childStack = formatOwnerStack(location), idx = childStack.lastIndexOf("\n"), lastLine = -1 === idx ? childStack : childStack.slice(idx + 1);
+                      var name = entry.name, env = entry.env, location2 = entry.debugLocation;
+                      if (null != location2) {
+                        var childStack = formatOwnerStack(location2), idx = childStack.lastIndexOf("\n"), lastLine = -1 === idx ? childStack : childStack.slice(idx + 1);
                         if (-1 !== lastLine.indexOf(name)) {
                           var JSCompiler_inline_result = "\n" + lastLine;
                           break a;
@@ -53427,6 +53427,33 @@
   var SUCURSAL_EMP = "Casa Matriz";
   var _supabase = null;
   var SUPA_OPTS = { realtime: { heartbeatIntervalMs: 1e4 } };
+  var HOSTS_PROD = ["toscana-house.vercel.app"];
+  function _hostEsProduccion() {
+    try {
+      if (typeof location === "undefined") return true;
+      if (location.protocol === "file:") return false;
+      const h = (location.hostname || "").toLowerCase();
+      if (!h) return false;
+      if (HOSTS_PROD.includes(h)) return true;
+      if (h === "localhost" || h.endsWith(".localhost") || h.endsWith(".local")) return false;
+      if (/^127\.|^0\.0\.0\.0$|^10\.|^192\.168\.|^172\.(1[6-9]|2\d|3[01])\./.test(h)) return false;
+      if (/^\d{1,3}(\.\d{1,3}){3}$/.test(h)) return false;
+      return true;
+    } catch {
+      return true;
+    }
+  }
+  function puedeEscribirNube() {
+    try {
+      if (localStorage.getItem("th_nube_escritura") === "1") return true;
+    } catch {
+    }
+    return _hostEsProduccion();
+  }
+  var ESCRITURA_NUBE_OK = puedeEscribirNube();
+  if (!ESCRITURA_NUBE_OK && typeof console !== "undefined") {
+    console.warn("[BARRERA] Copia NO productiva: las escrituras a la nube est\xE1n DESACTIVADAS. Nada de lo que hagas ac\xE1 toca la base real de Toscana.");
+  }
   async function getSupabase() {
     if (_supabase) return _supabase;
     if (window.supabase) {
@@ -53445,10 +53472,12 @@
   }
   var _rtChannel = null;
   function rtBroadcast(event, payload) {
+    if (!ESCRITURA_NUBE_OK) return;
     if (_rtChannel) _rtChannel.send({ type: "broadcast", event, payload }).catch(() => {
     });
   }
   async function sbGuardarProducto(prod) {
+    if (!ESCRITURA_NUBE_OK) return prod?.id ?? null;
     try {
       const db = await getSupabase();
       const numId = Number(prod.id);
@@ -53477,6 +53506,7 @@
   }
   async function sbGuardarProductosBatch(prods) {
     if (!prods.length) return true;
+    if (!ESCRITURA_NUBE_OK) return true;
     try {
       const db = await getSupabase();
       const payload = prods.map((prod) => ({
@@ -53523,6 +53553,7 @@
     }
   }
   async function sbActualizarStock(prodId, nuevoStock) {
+    if (!ESCRITURA_NUBE_OK) return true;
     try {
       const db = await getSupabase();
       const { error } = await db.from("inventario").update({ stock: Math.max(0, nuevoStock) }).eq("id", prodId);
@@ -53534,6 +53565,7 @@
     }
   }
   async function sbActualizarProductoPatch(prodId, campos) {
+    if (!ESCRITURA_NUBE_OK) return true;
     try {
       const db = await getSupabase();
       const { error } = await db.from("inventario").update(campos).eq("id", prodId);
@@ -53611,6 +53643,7 @@
   }
   async function sbGuardarVenta(venta) {
     if (ventaBloqueada(venta?.id)) return true;
+    if (!ESCRITURA_NUBE_OK) return true;
     try {
       const db = await getSupabase();
       const { error: errVenta } = await db.from("ventas").upsert({
@@ -53655,6 +53688,7 @@
     }
   }
   async function sbAnularVenta(ventaId) {
+    if (!ESCRITURA_NUBE_OK) return true;
     try {
       const db = await getSupabase();
       const { error } = await db.from("ventas").update({ anulada: true }).eq("id", ventaId);
@@ -53718,6 +53752,7 @@
     }
   }
   async function sbGuardarRetiro(retiro) {
+    if (!ESCRITURA_NUBE_OK) return true;
     const base = {
       id: retiro.id,
       fecha: retiro.fecha,
@@ -53745,6 +53780,7 @@
     }
   }
   async function sbAnularRetiro(id, anulada = true) {
+    if (!ESCRITURA_NUBE_OK) return true;
     try {
       const db = await getSupabase();
       const { error } = await db.from("retiros").update({ anulada }).eq("id", id);
@@ -53794,6 +53830,7 @@
     }
   }
   async function sbGuardarCarga(c) {
+    if (!ESCRITURA_NUBE_OK) return true;
     try {
       const db = await getSupabase();
       const { error } = await db.from("cargas_inventario").insert({
@@ -54309,6 +54346,7 @@
       }
     }
     if (identico) return;
+    if (!ESCRITURA_NUBE_OK) return;
     clearTimeout(_kvTimers[key]);
     _kvTimers[key] = setTimeout(async () => {
       try {
@@ -54496,6 +54534,7 @@
     setOutbox(getOutbox().filter((o) => o.id !== id));
   }
   async function ejecutarOpOutbox(op) {
+    if (!ESCRITURA_NUBE_OK) return true;
     switch (op.tipo) {
       case "producto":
         return !!await sbGuardarProducto(op.payload);
@@ -54609,6 +54648,7 @@
     }
   }
   async function syncConRespaldo(tipo, payload, fnDirecto) {
+    if (!ESCRITURA_NUBE_OK) return true;
     rtBroadcastForOp(tipo, payload);
     try {
       if (typeof navigator !== "undefined" && navigator.onLine === false) {
@@ -56345,6 +56385,8 @@
     }
   }
   async function llamarAdaptador(ruta, body, ms = 45e3) {
+    if (!ESCRITURA_NUBE_OK && /\/api\/(facturar|anular|revertir)/.test(ruta))
+      throw new Error("Facturaci\xF3n deshabilitada: esta no es la instalaci\xF3n de producci\xF3n.");
     const cfg = leerCfgFact();
     if (!cfg.llave) throw new Error("Falta la llave de facturaci\xF3n. Ir a Config \u2192 Sistema \u2192 Facturaci\xF3n.");
     const base = (cfg.url || "").replace(/\/+$/, "");

@@ -41,6 +41,42 @@ const SUCURSAL_EMP  = "Casa Matriz";
 let _supabase = null;
 // heartbeat corto: detecta conexiones muertas en ~10s (default 30s) → reconecta antes
 const SUPA_OPTS = { realtime: { heartbeatIntervalMs: 10000 } };
+
+// ── BARRERA DE PRODUCCIÓN (a prueba de fuego) ───────────────────────────────
+// La anon key va compilada en el bundle, así que CUALQUIER copia del sistema
+// (una demo servida en localhost, un archivo abierto con file://, un clon en la
+// LAN) puede escribir en la base REAL. Eso fue lo que metió el trío fantasma de
+// Donaire (2026-09-09): una copia demo en localhost:8790 cobró ventas ficticias
+// contra producción. Regla dura: SOLO el dominio real de producción puede
+// ESCRIBIR en la nube. Las lecturas quedan libres (leer no ensucia nada).
+//   • Producción real  → escribe.
+//   • localhost / 127.* / IP privada / file:// / *.local / host vacío → NO escribe.
+// Escape para desarrollo consciente: localStorage["th_nube_escritura"]="1".
+const HOSTS_PROD = ["toscana-house.vercel.app"]; // si algún día hay dominio propio, agregarlo acá
+function _hostEsProduccion(){
+  try{
+    if(typeof location==="undefined") return true; // SSR/entorno raro: no bloquear
+    if(location.protocol==="file:") return false;
+    const h = (location.hostname||"").toLowerCase();
+    if(!h) return false;
+    if(HOSTS_PROD.includes(h)) return true;
+    if(h==="localhost"||h.endsWith(".localhost")||h.endsWith(".local")) return false;
+    if(/^127\.|^0\.0\.0\.0$|^10\.|^192\.168\.|^172\.(1[6-9]|2\d|3[01])\./.test(h)) return false;
+    if(/^\d{1,3}(\.\d{1,3}){3}$/.test(h)) return false; // IP cruda
+    // Cualquier otro host público (dominio propio nuevo, etc.): permitido. Para
+    // blindar del todo a solo-allowlist, quitar este return y dejar false.
+    return true;
+  }catch{ return true; }
+}
+function puedeEscribirNube(){
+  try{ if(localStorage.getItem("th_nube_escritura")==="1") return true; }catch{}
+  return _hostEsProduccion();
+}
+const ESCRITURA_NUBE_OK = puedeEscribirNube();
+if(!ESCRITURA_NUBE_OK && typeof console!=="undefined"){
+  console.warn("[BARRERA] Copia NO productiva: las escrituras a la nube están DESACTIVADAS. Nada de lo que hagas acá toca la base real de Toscana.");
+}
+
 async function getSupabase() {
   if (_supabase) return _supabase;
   if (window.supabase) {
@@ -60,11 +96,13 @@ async function getSupabase() {
 // ── Broadcast channel global ──────────────────────────────
 let _rtChannel = null; // referencia al canal de realtime, para enviar broadcasts
 function rtBroadcast(event, payload){
+  if(!ESCRITURA_NUBE_OK) return; // copia no productiva: no emite nada a la nube
   if(_rtChannel) _rtChannel.send({type:"broadcast", event, payload}).catch(()=>{});
 }
 
 // ── Funciones de sincronización ──────────────────────────
 async function sbGuardarProducto(prod) {
+  if (!ESCRITURA_NUBE_OK) return prod?.id ?? null;
   try {
     const db = await getSupabase();
     // La tabla inventario usa bigint para id.
@@ -99,6 +137,7 @@ async function sbGuardarProducto(prod) {
 
 async function sbGuardarProductosBatch(prods) {
   if(!prods.length) return true;
+  if(!ESCRITURA_NUBE_OK) return true;
   try {
     const db = await getSupabase();
     const payload = prods.map(prod => ({
@@ -145,6 +184,7 @@ async function sbExistenCodigos(codigos){
 }
 
 async function sbActualizarStock(prodId, nuevoStock) {
+  if (!ESCRITURA_NUBE_OK) return true;
   try {
     const db = await getSupabase();
     const { error } = await db.from("inventario").update({ stock: Math.max(0, nuevoStock) }).eq("id", prodId);
@@ -154,6 +194,7 @@ async function sbActualizarStock(prodId, nuevoStock) {
 }
 
 async function sbActualizarProductoPatch(prodId, campos) {
+  if (!ESCRITURA_NUBE_OK) return true;
   try {
     const db = await getSupabase();
     const { error } = await db.from("inventario").update(campos).eq("id", prodId);
@@ -231,6 +272,7 @@ async function sbGuardarVenta(venta) {
   // re-insertaba en cada arranque; devolver true las marca como "hechas" y las
   // saca de la cola.
   if (ventaBloqueada(venta?.id)) return true;
+  if (!ESCRITURA_NUBE_OK) return true; // barrera: copia no productiva no sube ventas
   try {
     const db = await getSupabase();
     const { error: errVenta } = await db.from("ventas").upsert({
@@ -265,6 +307,7 @@ async function sbGuardarVenta(venta) {
 }
 
 async function sbAnularVenta(ventaId) {
+  if (!ESCRITURA_NUBE_OK) return true;
   try {
     const db = await getSupabase();
     const { error } = await db.from("ventas").update({ anulada: true }).eq("id", ventaId);
@@ -319,6 +362,7 @@ async function sbResetSesionVerif(id) {
 }
 
 async function sbGuardarRetiro(retiro) {
+  if (!ESCRITURA_NUBE_OK) return true;
   const base = {
     id: retiro.id, fecha: retiro.fecha, hora: retiro.hora,
     prod_id: retiro.prodId, codigo: retiro.codigo,
@@ -340,6 +384,7 @@ async function sbGuardarRetiro(retiro) {
 
 // Marca un retiro como anulado (o lo reactiva). El stock se ajusta aparte.
 async function sbAnularRetiro(id, anulada=true) {
+  if (!ESCRITURA_NUBE_OK) return true;
   try {
     const db = await getSupabase();
     const { error } = await db.from("retiros").update({ anulada }).eq("id", id);
@@ -377,6 +422,7 @@ async function sbMarcarCargaVerificada(cargaId, verificado, nombre) {
 }
 
 async function sbGuardarCarga(c) {
+  if (!ESCRITURA_NUBE_OK) return true;
   try {
     const db = await getSupabase();
     const { error } = await db.from("cargas_inventario").insert({
@@ -828,6 +874,7 @@ function sbKVGuardar(key, data){
     else localStorage.setItem(ls, typeof data==="string" ? data : JSON.stringify(data));
   }catch{} }
   if(identico) return; // mismo valor que ya conoce la nube → no re-subir (evita bucles)
+  if(!ESCRITURA_NUBE_OK) return; // barrera: copia no productiva guarda local pero no sube
   clearTimeout(_kvTimers[key]);
   _kvTimers[key] = setTimeout(async ()=>{
     try{
@@ -973,6 +1020,8 @@ function removeFromOutbox(id){
 // Ejecuta la operación sb* correspondiente a un ítem de la cola.
 // Devuelve true si Supabase confirmó la escritura (sale de la cola).
 async function ejecutarOpOutbox(op){
+  // Barrera: una copia no productiva jamás drena la cola a la base real.
+  if(!ESCRITURA_NUBE_OK) return true;
   switch(op.tipo){
     case "producto":    return !!(await sbGuardarProducto(op.payload));
     case "stock":         return op.payload.stock_inicial!=null
@@ -1070,6 +1119,10 @@ function rtBroadcastForOp(tipo, payload){
 // encola la operación para reintento automático. Los datos ya están
 // seguros en localStorage (estado React) independientemente del resultado.
 async function syncConRespaldo(tipo, payload, fnDirecto){
+  // Barrera: en una copia no productiva NO se escribe a la nube ni se encola
+  // (encolar sería peligroso: el outbox podría drenar a producción después).
+  // El estado local del que llama igual se actualiza, así la demo funciona.
+  if(!ESCRITURA_NUBE_OK) return true;
   rtBroadcastForOp(tipo, payload);
   try{
     if(typeof navigator!=="undefined" && navigator.onLine===false){
@@ -2826,6 +2879,10 @@ function avisarFacturaCambiada(ventaId, cambios){
 }
 
 async function llamarAdaptador(ruta, body, ms = 45000){
+  // Barrera: una copia no productiva NO puede emitir/anular facturas fiscales
+  // reales. Los endpoints de solo lectura (estado, verificar-nit) sí se permiten.
+  if(!ESCRITURA_NUBE_OK && /\/api\/(facturar|anular|revertir)/.test(ruta))
+    throw new Error("Facturación deshabilitada: esta no es la instalación de producción.");
   const cfg = leerCfgFact();
   if(!cfg.llave) throw new Error("Falta la llave de facturación. Ir a Config → Sistema → Facturación.");
   const base = (cfg.url||"").replace(/\/+$/,"");
