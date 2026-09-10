@@ -16696,8 +16696,10 @@ function App(){
     {id:"config",        icon:"⚙", label:"Config"},
   ];
   // Caja: inicio + POS + ventas + clientes + cambios + inventario + verificación (auditoria)
+  // + config (para cargar la llave de facturación de su equipo; adentro solo ve
+  //   Perfil, Seguridad y Facturación — "Sistema" queda solo para admin).
   const TABS = user?.rol==="caja"
-    ? TABS_ALL.filter(t=>["inicio","pos","ventas","clientes","cambios","inventario","auditoria"].includes(t.id))
+    ? TABS_ALL.filter(t=>["inicio","pos","ventas","clientes","cambios","inventario","auditoria","config"].includes(t.id))
     : user?.rol==="admin" ? TABS_ALL
     : TABS_ALL.filter(t=>t.id!=="auditoria"&&t.id!=="cargas"&&t.id!=="ventas_ant");
 
@@ -25075,7 +25077,7 @@ function ConfigTab({user, logout, onRecargarDesdeSupabase, onSyncCompleto, permP
       {id:"auditoria", icon:"📋", label:"Auditoría"},
     ] : []),
     {id:"seguridad", icon:"🔒", label:"Seguridad"},
-    {id:"sistema",   icon:"⚙",  label:"Sistema"},
+    ...(isAdmin ? [{id:"sistema", icon:"⚙",  label:"Sistema"}] : []), // Factory Reset / sync: solo admin
     {id:"factura",   icon:"🧾", label:"Facturación"},
   ];
 
@@ -25432,8 +25434,8 @@ create policy "allow all usuarios" on usuarios
         </div>
       )}
 
-      {/* ════ SISTEMA ════ */}
-      {subTab==="sistema"&&(
+      {/* ════ SISTEMA (solo admin: incluye Factory Reset) ════ */}
+      {subTab==="sistema"&&isAdmin&&(
         <SistemaTab user={user} logout={logout} onRecargarDesdeSupabase={onRecargarDesdeSupabase} onSyncCompleto={onSyncCompleto}/>
       )}
 

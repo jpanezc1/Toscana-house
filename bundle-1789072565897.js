@@ -71523,7 +71523,7 @@ Esta acci\xF3n no se puede deshacer.` : "\xBFEliminar esta carga? Esta acci\xF3n
       { id: "ventas_ant", icon: "\u23F1", label: "V.Antiguas" },
       { id: "config", icon: "\u2699", label: "Config" }
     ];
-    const TABS = user?.rol === "caja" ? TABS_ALL.filter((t) => ["inicio", "pos", "ventas", "clientes", "cambios", "inventario", "auditoria"].includes(t.id)) : user?.rol === "admin" ? TABS_ALL : TABS_ALL.filter((t) => t.id !== "auditoria" && t.id !== "cargas" && t.id !== "ventas_ant");
+    const TABS = user?.rol === "caja" ? TABS_ALL.filter((t) => ["inicio", "pos", "ventas", "clientes", "cambios", "inventario", "auditoria", "config"].includes(t.id)) : user?.rol === "admin" ? TABS_ALL : TABS_ALL.filter((t) => t.id !== "auditoria" && t.id !== "cargas" && t.id !== "ventas_ant");
     const showingDetail = tab === "marcas" && marcaDetalle;
     if (!authReady) return /* @__PURE__ */ import_react.default.createElement("div", { style: {
       minHeight: "100vh",
@@ -81109,7 +81109,8 @@ ${c.resumen || c.id}`)) onEliminarCarga(c.id);
         { id: "auditoria", icon: "\u{1F4CB}", label: "Auditor\xEDa" }
       ] : [],
       { id: "seguridad", icon: "\u{1F512}", label: "Seguridad" },
-      { id: "sistema", icon: "\u2699", label: "Sistema" },
+      ...isAdmin ? [{ id: "sistema", icon: "\u2699", label: "Sistema" }] : [],
+      // Factory Reset / sync: solo admin
       { id: "factura", icon: "\u{1F9FE}", label: "Facturaci\xF3n" }
     ];
     function rolBadge(u) {
@@ -81549,7 +81550,7 @@ Esta acci\xF3n no se puede deshacer.`,
         usuarios,
         onGuardar: (u) => guardarUsuarios(u, "Cambi\xF3 su contrase\xF1a", user.usuario, "\u2713 Contrase\xF1a actualizada")
       }
-    )), subTab === "sistema" && /* @__PURE__ */ import_react.default.createElement(SistemaTab, { user, logout, onRecargarDesdeSupabase, onSyncCompleto }), subTab === "factura" && /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement(FacturacionConfig, null), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+    )), subTab === "sistema" && isAdmin && /* @__PURE__ */ import_react.default.createElement(SistemaTab, { user, logout, onRecargarDesdeSupabase, onSyncCompleto }), subTab === "factura" && /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement(FacturacionConfig, null), /* @__PURE__ */ import_react.default.createElement("div", { style: {
       padding: 14,
       background: `${C.blue}08`,
       borderRadius: 14,
