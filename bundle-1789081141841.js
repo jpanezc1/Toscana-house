@@ -80981,6 +80981,103 @@ ${c.resumen || c.id}`)) onEliminarCarga(c.id);
     } }, "Volver"));
     return /* @__PURE__ */ import_react.default.createElement("div", null, resetState === "idle" && renderIdle(), resetState === "confirm1" && renderConfirm1(), resetState === "confirm2" && renderConfirm2(), resetState === "running" && renderRunning(), resetState === "done" && renderDone(), resetState === "error" && renderError());
   }
+  function FacturasEmitidas() {
+    const [q, setQ] = (0, import_react.useState)("");
+    const ventas = (0, import_react.useMemo)(() => {
+      try {
+        return JSON.parse(localStorage.getItem("th_ventas") || "[]");
+      } catch {
+        return [];
+      }
+    }, []);
+    const rows = (0, import_react.useMemo)(() => {
+      const out = [];
+      for (const v of ventas) {
+        const f = leerFacturaLocal(v.id);
+        if (!f) continue;
+        const num = f.facturaNumero ?? f.numero;
+        const cuf = f.facturaCuf || f.cuf;
+        if (num == null && !cuf) continue;
+        out.push({
+          v,
+          f,
+          num,
+          anulada: f.facturaEstado === "anulada" || f.anulada,
+          cliente: f.factNombre || f.nombreComprador || "",
+          nit: f.factDocumento || f.nitComprador || "",
+          total: f.total != null ? f.total : getDisplayTotal(v),
+          fecha: v.fecha || "",
+          hora: v.hora || "",
+          clave: String(v.fecha || "") + " " + String(v.hora || "")
+        });
+      }
+      out.sort((a, b) => b.clave.localeCompare(a.clave));
+      return out;
+    }, [ventas]);
+    const nq = q.trim().toLowerCase();
+    const filt = nq ? rows.filter((r) => `${r.num || ""} ${r.cliente} ${r.nit} ${r.fecha}`.toLowerCase().includes(nq)) : rows;
+    return /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 15, fontWeight: 700, color: C.label, fontFamily: FONT } }, "Facturas emitidas"), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      fontSize: 12,
+      fontWeight: 700,
+      color: C.blue,
+      fontFamily: FONT,
+      background: `${C.blue}12`,
+      padding: "3px 10px",
+      borderRadius: 20
+    } }, rows.length)), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT, marginBottom: 12, lineHeight: 1.5 } }, "Descarg\xE1 el PDF de cualquier factura (representaci\xF3n gr\xE1fica del SIAT: n\xFAmero, CUF, QR y detalle)."), rows.length > 8 && /* @__PURE__ */ import_react.default.createElement(
+      "input",
+      {
+        value: q,
+        onChange: (e) => setQ(e.target.value),
+        placeholder: "Buscar por N\xB0, cliente, NIT o fecha\u2026",
+        style: {
+          width: "100%",
+          boxSizing: "border-box",
+          padding: "12px 14px",
+          marginBottom: 14,
+          borderRadius: 12,
+          border: `1px solid ${C.sep}`,
+          background: C.bg2,
+          fontSize: 14,
+          fontFamily: FONT,
+          color: C.label,
+          outline: "none"
+        }
+      }
+    ), filt.length === 0 ? /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center", padding: "36px 16px", color: C.label3, fontFamily: FONT, fontSize: 14 } }, rows.length === 0 ? "Todav\xEDa no hay facturas emitidas en este equipo." : "No hay resultados para esa b\xFAsqueda.") : /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 10 } }, filt.map((r, i) => /* @__PURE__ */ import_react.default.createElement("div", { key: r.v.id || i, style: {
+      background: C.bg2,
+      borderRadius: 14,
+      padding: 14,
+      border: `1px solid ${C.sep}`
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10, marginBottom: 10 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { minWidth: 0 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 3 } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 15, fontWeight: 700, color: C.label, fontFamily: FONT } }, "Factura N\xB0 ", r.num ?? "\u2014"), r.anulada && /* @__PURE__ */ import_react.default.createElement("span", { style: {
+      fontSize: 10,
+      fontWeight: 700,
+      color: C.red,
+      background: `${C.red}15`,
+      padding: "2px 8px",
+      borderRadius: 20,
+      fontFamily: FONT
+    } }, "ANULADA")), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      fontSize: 12.5,
+      color: C.label2,
+      fontFamily: FONT,
+      whiteSpace: "nowrap",
+      overflow: "hidden",
+      textOverflow: "ellipsis"
+    } }, r.cliente || "Sin nombre", r.nit && r.nit !== 0 ? ` \xB7 ${r.nit}` : ""), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11.5, color: C.label3, fontFamily: FONT, marginTop: 2 } }, r.fecha, r.hora ? ` \xB7 ${r.hora}` : "")), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 15, fontWeight: 700, color: C.label, fontFamily: FONT, whiteSpace: "nowrap" } }, factBs(r.total))), /* @__PURE__ */ import_react.default.createElement("button", { onClick: () => descargarFacturaSiatPDF(r.v), style: {
+      width: "100%",
+      padding: "11px",
+      borderRadius: 12,
+      border: "none",
+      cursor: "pointer",
+      background: "linear-gradient(135deg,#1A237E,#3949AB)",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 8,
+      WebkitTapHighlightColor: "transparent"
+    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 17 } }, "\u{1F4C4}"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13.5, fontWeight: 700, color: "#fff", fontFamily: FONT_UI } }, "Descargar PDF"))))));
+  }
   function ConfigTab({ user, logout, onRecargarDesdeSupabase, onSyncCompleto, permPrecioStaff, onTogglePermPrecio }) {
     const [subTab, setSubTab] = (0, import_react.useState)("perfil");
     const [usuarios, setUsuarios] = (0, import_react.useState)(() => {
@@ -81111,7 +81208,9 @@ ${c.resumen || c.id}`)) onEliminarCarga(c.id);
       { id: "seguridad", icon: "\u{1F512}", label: "Seguridad" },
       ...isAdmin ? [{ id: "sistema", icon: "\u2699", label: "Sistema" }] : [],
       // Factory Reset / sync: solo admin
-      { id: "factura", icon: "\u{1F9FE}", label: "Facturaci\xF3n" }
+      { id: "factura", icon: "\u{1F9FE}", label: "Facturaci\xF3n" },
+      { id: "facturas", icon: "\u{1F4C4}", label: "Facturas" }
+      // lista de facturas emitidas con PDF
     ];
     function rolBadge(u) {
       const rc = ROL_CFG[u.rol] || ROL_CFG.caja;
@@ -81577,7 +81676,7 @@ Esta acci\xF3n no se puede deshacer.`,
       fontWeight: 600,
       color: C.label,
       fontFamily: FONT
-    } }, v))))), (modalAdd || editando) && /* @__PURE__ */ import_react.default.createElement(
+    } }, v))))), subTab === "facturas" && /* @__PURE__ */ import_react.default.createElement(FacturasEmitidas, null), (modalAdd || editando) && /* @__PURE__ */ import_react.default.createElement(
       UserFormModal,
       {
         editUser: editando,

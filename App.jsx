@@ -24965,6 +24965,103 @@ function SistemaTab({user, logout, onRecargarDesdeSupabase, onSyncCompleto}){
   );
 }
 
+// ── Facturas emitidas: lista con descarga del PDF (representación gráfica) ─────
+// Cruza las ventas (th_ventas) con las facturas guardadas (th_fac_<id>) y arma
+// una lista buscable. Cada fila descarga el PDF con descargarFacturaSiatPDF.
+function FacturasEmitidas(){
+  const [q, setQ] = useState("");
+  const ventas = useMemo(()=>{ try{ return JSON.parse(localStorage.getItem("th_ventas")||"[]"); }catch{ return []; } },[]);
+  const rows = useMemo(()=>{
+    const out = [];
+    for(const v of ventas){
+      const f = leerFacturaLocal(v.id);
+      if(!f) continue;
+      const num = f.facturaNumero ?? f.numero;
+      const cuf = f.facturaCuf || f.cuf;
+      if(num==null && !cuf) continue; // sin factura real
+      out.push({
+        v, f, num,
+        anulada: f.facturaEstado==="anulada" || f.anulada,
+        cliente: f.factNombre || f.nombreComprador || "",
+        nit: f.factDocumento || f.nitComprador || "",
+        total: f.total!=null ? f.total : getDisplayTotal(v),
+        fecha: v.fecha || "", hora: v.hora || "",
+        clave: String(v.fecha||"") + " " + String(v.hora||""),
+      });
+    }
+    out.sort((a,b)=> b.clave.localeCompare(a.clave)); // más nuevas primero
+    return out;
+  },[ventas]);
+  const nq = q.trim().toLowerCase();
+  const filt = nq
+    ? rows.filter(r => (`${r.num||""} ${r.cliente} ${r.nit} ${r.fecha}`).toLowerCase().includes(nq))
+    : rows;
+
+  return (
+    <div>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
+        <div style={{fontSize:15,fontWeight:700,color:C.label,fontFamily:FONT}}>Facturas emitidas</div>
+        <div style={{fontSize:12,fontWeight:700,color:C.blue,fontFamily:FONT,
+          background:`${C.blue}12`,padding:"3px 10px",borderRadius:20}}>{rows.length}</div>
+      </div>
+      <div style={{fontSize:12,color:C.label3,fontFamily:FONT,marginBottom:12,lineHeight:1.5}}>
+        Descargá el PDF de cualquier factura (representación gráfica del SIAT: número, CUF, QR y detalle).
+      </div>
+
+      {rows.length>8 && (
+        <input value={q} onChange={e=>setQ(e.target.value)}
+          placeholder="Buscar por N°, cliente, NIT o fecha…"
+          style={{width:"100%",boxSizing:"border-box",padding:"12px 14px",marginBottom:14,
+            borderRadius:12,border:`1px solid ${C.sep}`,background:C.bg2,
+            fontSize:14,fontFamily:FONT,color:C.label,outline:"none"}}/>
+      )}
+
+      {filt.length===0 ? (
+        <div style={{textAlign:"center",padding:"36px 16px",color:C.label3,fontFamily:FONT,fontSize:14}}>
+          {rows.length===0 ? "Todavía no hay facturas emitidas en este equipo." : "No hay resultados para esa búsqueda."}
+        </div>
+      ) : (
+        <div style={{display:"flex",flexDirection:"column",gap:10}}>
+          {filt.map((r,i)=>(
+            <div key={r.v.id||i} style={{background:C.bg2,borderRadius:14,padding:14,
+              border:`1px solid ${C.sep}`}}>
+              <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:10,marginBottom:10}}>
+                <div style={{minWidth:0}}>
+                  <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:3}}>
+                    <span style={{fontSize:15,fontWeight:700,color:C.label,fontFamily:FONT}}>
+                      Factura N° {r.num ?? "—"}
+                    </span>
+                    {r.anulada && <span style={{fontSize:10,fontWeight:700,color:C.red,
+                      background:`${C.red}15`,padding:"2px 8px",borderRadius:20,fontFamily:FONT}}>ANULADA</span>}
+                  </div>
+                  <div style={{fontSize:12.5,color:C.label2,fontFamily:FONT,
+                    whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>
+                    {r.cliente || "Sin nombre"}{r.nit && r.nit!==0 ? ` · ${r.nit}` : ""}
+                  </div>
+                  <div style={{fontSize:11.5,color:C.label3,fontFamily:FONT,marginTop:2}}>
+                    {r.fecha}{r.hora ? ` · ${r.hora}` : ""}
+                  </div>
+                </div>
+                <div style={{fontSize:15,fontWeight:700,color:C.label,fontFamily:FONT,whiteSpace:"nowrap"}}>
+                  {factBs(r.total)}
+                </div>
+              </div>
+              <button onClick={()=>descargarFacturaSiatPDF(r.v)} style={{
+                width:"100%",padding:"11px",borderRadius:12,border:"none",cursor:"pointer",
+                background:"linear-gradient(135deg,#1A237E,#3949AB)",
+                display:"flex",alignItems:"center",justifyContent:"center",gap:8,
+                WebkitTapHighlightColor:"transparent"}}>
+                <span style={{fontSize:17}}>📄</span>
+                <span style={{fontSize:13.5,fontWeight:700,color:"#fff",fontFamily:FONT_UI}}>Descargar PDF</span>
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Panel configuración principal ─────────────────────────────────────────────
 function ConfigTab({user, logout, onRecargarDesdeSupabase, onSyncCompleto, permPrecioStaff, onTogglePermPrecio}){
   const [subTab, setSubTab] = useState("perfil");
@@ -25079,6 +25176,7 @@ function ConfigTab({user, logout, onRecargarDesdeSupabase, onSyncCompleto, permP
     {id:"seguridad", icon:"🔒", label:"Seguridad"},
     ...(isAdmin ? [{id:"sistema", icon:"⚙",  label:"Sistema"}] : []), // Factory Reset / sync: solo admin
     {id:"factura",   icon:"🧾", label:"Facturación"},
+    {id:"facturas",  icon:"📄", label:"Facturas"}, // lista de facturas emitidas con PDF
   ];
 
   // helpers de badge
@@ -25462,6 +25560,11 @@ create policy "allow all usuarios" on usuarios
             ))}
           </div>
         </div>
+      )}
+
+      {/* ════ FACTURAS EMITIDAS (lista + PDF) ════ */}
+      {subTab==="facturas"&&(
+        <FacturasEmitidas/>
       )}
 
       {/* ════ MODALES ════ */}
