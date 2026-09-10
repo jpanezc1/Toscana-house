@@ -215,6 +215,10 @@ async function sbEliminarCarga(cargaId) {
 // admin las purga de la nube al entrar. Mismo mecanismo que las ventas TEST*.
 const VENTAS_TUMBA = new Set([
   "VH1786478366378","VH1786478227549","VH1786478208916","VH1786478171127","VH1786477401886",
+  // 2026-09-09: trío fantasma de Donaire drenado de un outbox envenenado en un
+  // solo burst (created_at 17:09:05.12-.14 UTC). Códigos inexistentes 121/103/124,
+  // vendedor "Administración", cliente "Ana Ríos". Nadie las hizo.
+  "V1788972062481","V1788972369641","V1788972562370",
 ]);
 function ventaBloqueada(id){
   const s = String(id || "");
