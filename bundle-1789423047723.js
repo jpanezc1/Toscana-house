@@ -55998,14 +55998,17 @@
   var PADRON_UNICO_HEADERS = ["PRODUCTO", "MATERIAL", "DETALLES", "COLOR", "MARCA", "TALLA", "CANTIDAD", "TOTAL MODELO", "COSTO", "PRECIO VENTA"];
   function validarPadronUnico(XLSX2, wb) {
     try {
-      const firmaNombre = (wb.SheetNames || []).find((n) => String(n).trim().toUpperCase() === HOJA_HUELLA_CARGA);
-      if (!firmaNombre) return false;
-      const firma = wb.Sheets[firmaNombre]?.A1?.v;
+      const hojas = wb.SheetNames || [];
+      if (hojas.length !== 3 || hojas[0] !== "CARGA" || hojas[1] !== "COMO USARLO" || hojas[2] !== HOJA_HUELLA_CARGA) return false;
+      const huellaMeta = (wb.Workbook?.Sheets || []).find((s) => s.name === HOJA_HUELLA_CARGA);
+      if (!huellaMeta || Number(huellaMeta.Hidden) !== 1) return false;
+      const firma = wb.Sheets[HOJA_HUELLA_CARGA]?.A1?.v;
       if (String(firma || "").trim().toUpperCase() !== PADRON_UNICO_TOKEN) return false;
       const carga = wb.Sheets.CARGA;
       if (!carga) return false;
       const fila = (XLSX2.utils.sheet_to_json(carga, { header: 1, defval: "" })[0] || []).map((x) => String(x || "").trim().toUpperCase());
-      return !PADRON_UNICO_HEADERS.some((h, i) => fila[i] !== h) && !fila.slice(PADRON_UNICO_HEADERS.length).some(Boolean);
+      if (PADRON_UNICO_HEADERS.some((h, i) => fila[i] !== h) || fila.slice(PADRON_UNICO_HEADERS.length).some(Boolean)) return false;
+      return carga["!ref"] === "A1:J401";
     } catch {
       return false;
     }
@@ -63054,6 +63057,11 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
     }
     async function parsearArchivo(file) {
       setEstado("leyendo");
+      if (!/\.xlsx$/i.test(file?.name || "")) {
+        setEstado("idle");
+        alert("Solo se acepta el archivo oficial PADRON_UNICO_CARGA_MASIVA_FORGE.xlsx.");
+        return;
+      }
       try {
         let matchMarca = function(nomRaw) {
           if (!nomRaw || !nomRaw.trim()) return null;
