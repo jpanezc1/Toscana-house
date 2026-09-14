@@ -2514,7 +2514,7 @@ async function generarPlantillaXLSX(){
   const guia=XLSX.utils.aoa_to_sheet([
     ["PADRÓN ÚNICO DE CARGA MASIVA"],
     ["Copien y peguen debajo de los títulos de CARGA. No agreguen, borren, muevan ni renombren columnas."],
-    ["Sirve para Working Style y Toscana House, incluidas Monas y las demás marcas."],
+    ["Sirve para Working Style, Toscana House y Monas, incluidas todas sus marcas."],
     ["CANTIDAD es el stock. TOTAL MODELO se calcula solo y no se carga."],
     ["Guarden y envíen este mismo archivo .xlsx; no copien la hoja a otro libro."],
   ]);
@@ -9895,14 +9895,14 @@ function ImportarExcelModal({inv, onImportar, onClose, onArchivoCapturado}){
               Arrastra el padrón oficial completado o haz clic para seleccionar
             </div>
             <div style={{display:"flex",gap:8,justifyContent:"center",flexWrap:"wrap"}}>
-              {[".xlsx",".xls",".csv"].map(ext=>(
+              {[".xlsx"].map(ext=>(
                 <span key={ext} style={{fontSize:11,fontWeight:700,color:C.gold,
                   background:`${C.gold}15`,padding:"4px 10px",borderRadius:12,
                   border:`1px solid ${C.gold}30`,fontFamily:FONT_UI}}>{ext}</span>
               ))}
             </div>
           </div>
-          <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv"
+          <input ref={fileRef} type="file" accept=".xlsx"
             onChange={e=>{const f=e.target.files?.[0];if(f)parsearArchivo(f);}}
             style={{display:"none"}}/>
 
@@ -22111,7 +22111,7 @@ function InventarioPorMarca({inv, ventas, retiros=[], bajas=[], onRecibir, onBaj
         <div style={{display:"flex",gap:8}}>
           <IOSBtn onPress={onImportarExcel} variant="fill" full small icon="📥">Importar Excel</IOSBtn>
           <IOSBtn onPress={async()=>{ try{await generarPlantillaXLSX();}catch(e){alert("Error: "+e.message);} }}
-            full small icon="📋">Plantilla</IOSBtn>
+            full small icon="📋">Plantilla oficial</IOSBtn>
         </div>
         <div style={{display:"flex",gap:8,marginTop:8}}>
           <IOSBtn onPress={()=>{

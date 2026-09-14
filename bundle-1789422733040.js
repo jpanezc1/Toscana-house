@@ -56030,7 +56030,7 @@
     const guia = XLSX2.utils.aoa_to_sheet([
       ["PADR\xD3N \xDANICO DE CARGA MASIVA"],
       ["Copien y peguen debajo de los t\xEDtulos de CARGA. No agreguen, borren, muevan ni renombren columnas."],
-      ["Sirve para Working Style y Toscana House, incluidas Monas y las dem\xE1s marcas."],
+      ["Sirve para Working Style, Toscana House y Monas, incluidas todas sus marcas."],
       ["CANTIDAD es el stock. TOTAL MODELO se calcula solo y no se carga."],
       ["Guarden y env\xEDen este mismo archivo .xlsx; no copien la hoja a otro libro."]
     ]);
@@ -63629,7 +63629,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
         marginBottom: 6
       } }, isDragging ? "Suelta el archivo aqu\xED" : "Importar inventario rellenado"),
       /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.label3, fontFamily: FONT_UI, marginBottom: 16 } }, "Arrastra el padr\xF3n oficial completado o haz clic para seleccionar"),
-      /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap" } }, [".xlsx", ".xls", ".csv"].map((ext) => /* @__PURE__ */ import_react.default.createElement("span", { key: ext, style: {
+      /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap" } }, [".xlsx"].map((ext) => /* @__PURE__ */ import_react.default.createElement("span", { key: ext, style: {
         fontSize: 11,
         fontWeight: 700,
         color: C.gold,
@@ -63644,7 +63644,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       {
         ref: fileRef,
         type: "file",
-        accept: ".xlsx,.xls,.csv",
+        accept: ".xlsx",
         onChange: (e) => {
           const f = e.target.files?.[0];
           if (f) parsearArchivo(f);
@@ -77651,7 +77651,7 @@ ${c.resumen || c.id}`)) onEliminarCarga(c.id);
         small: true,
         icon: "\u{1F4CB}"
       },
-      "Plantilla"
+      "Plantilla oficial"
     )), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 8, marginTop: 8 } }, /* @__PURE__ */ import_react.default.createElement(
       IOSBtn,
       {
