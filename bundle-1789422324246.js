@@ -55993,244 +55993,58 @@
     } catch {
     }
   }
+  var HOJA_HUELLA_CARGA = "WS_HUELLA";
+  var PADRON_UNICO_TOKEN = "FORGE-PADRON-UNICO-2026-V1";
+  var PADRON_UNICO_HEADERS = ["PRODUCTO", "MATERIAL", "DETALLES", "COLOR", "MARCA", "TALLA", "CANTIDAD", "TOTAL MODELO", "COSTO", "PRECIO VENTA"];
+  function validarPadronUnico(XLSX2, wb) {
+    try {
+      const firmaNombre = (wb.SheetNames || []).find((n) => String(n).trim().toUpperCase() === HOJA_HUELLA_CARGA);
+      if (!firmaNombre) return false;
+      const firma = wb.Sheets[firmaNombre]?.A1?.v;
+      if (String(firma || "").trim().toUpperCase() !== PADRON_UNICO_TOKEN) return false;
+      const carga = wb.Sheets.CARGA;
+      if (!carga) return false;
+      const fila = (XLSX2.utils.sheet_to_json(carga, { header: 1, defval: "" })[0] || []).map((x) => String(x || "").trim().toUpperCase());
+      return !PADRON_UNICO_HEADERS.some((h, i) => fila[i] !== h) && !fila.slice(PADRON_UNICO_HEADERS.length).some(Boolean);
+    } catch {
+      return false;
+    }
+  }
   async function generarPlantillaXLSX() {
     const XLSX2 = await loadXLSX();
+    const headers = PADRON_UNICO_HEADERS;
+    const rows = [headers, ...Array.from({ length: 400 }, () => Array(10).fill(""))];
+    const ws = XLSX2.utils.aoa_to_sheet(rows);
+    for (let r = 2; r <= 401; r++) {
+      ws[`H${r}`] = { t: "n", f: `IF($A${r}="","",SUMIFS($G$2:$G$401,$A$2:$A$401,$A${r},$B$2:$B$401,$B${r},$C$2:$C$401,$C${r},$D$2:$D$401,$D${r}))` };
+      [1, 2, 3, 4, 5, 6, 7, 9, 10].forEach((c) => {
+        const a = XLSX2.utils.encode_cell({ r: r - 1, c: c - 1 });
+        if (!ws[a]) ws[a] = { t: "s", v: "" };
+        ws[a].s = { ...ws[a].s || {}, protection: { locked: false } };
+      });
+    }
+    ws["!ref"] = "A1:J401";
+    ws["!cols"] = [{ wch: 28 }, { wch: 20 }, { wch: 34 }, { wch: 18 }, { wch: 22 }, { wch: 12 }, { wch: 12 }, { wch: 15 }, { wch: 14 }, { wch: 16 }];
+    ws["!autofilter"] = { ref: "A1:J401" };
+    ws["!protect"] = { password: "FORGE2026", formatCells: true, formatColumns: true, formatRows: true, insertColumns: true, deleteColumns: true, insertRows: true, deleteRows: true };
+    const guia = XLSX2.utils.aoa_to_sheet([
+      ["PADR\xD3N \xDANICO DE CARGA MASIVA"],
+      ["Copien y peguen debajo de los t\xEDtulos de CARGA. No agreguen, borren, muevan ni renombren columnas."],
+      ["Sirve para Working Style y Toscana House, incluidas Monas y las dem\xE1s marcas."],
+      ["CANTIDAD es el stock. TOTAL MODELO se calcula solo y no se carga."],
+      ["Guarden y env\xEDen este mismo archivo .xlsx; no copien la hoja a otro libro."]
+    ]);
+    guia["!cols"] = [{ wch: 110 }];
+    guia["!protect"] = { password: "FORGE2026" };
+    const firma = XLSX2.utils.aoa_to_sheet([[PADRON_UNICO_TOKEN], ["No borres ni renombres esta hoja."]]);
+    firma["!protect"] = { password: "FORGE2026" };
     const wb = XLSX2.utils.book_new();
-    const HOY2 = hoy();
-    const D = "1A1714";
-    const G = "9A7B4F";
-    const GL = "C4A57B";
-    const GD = "6B4A28";
-    const CR = "F5F0E8";
-    const CL = "FAF7F3";
-    const WH = "FFFFFF";
-    const AM = "FDF3DC";
-    const AB = "E8C97A";
-    const BD = "D4C5A9";
-    const MT = "8B7355";
-    const bAll = (c = BD) => ({
-      top: { style: "thin", color: { rgb: c } },
-      bottom: { style: "thin", color: { rgb: c } },
-      left: { style: "thin", color: { rgb: c } },
-      right: { style: "thin", color: { rgb: c } }
-    });
-    const bMedBot = (bot = G, side = BD) => ({
-      top: { style: "thin", color: { rgb: side } },
-      bottom: { style: "medium", color: { rgb: bot } },
-      left: { style: "thin", color: { rgb: side } },
-      right: { style: "thin", color: { rgb: side } }
-    });
-    function S(ws, r, c, st) {
-      const a = XLSX2.utils.encode_cell({ r, c });
-      if (!ws[a]) ws[a] = { t: "z", v: "" };
-      ws[a].s = st;
-    }
-    const Srow = (ws, r, nc, st) => {
-      for (let c = 0; c < nc; c++) S(ws, r, c, st);
-    };
-    const sTitulo = {
-      font: { name: "Arial", sz: 24, bold: true, color: { rgb: WH } },
-      fill: { patternType: "solid", fgColor: { rgb: D } },
-      alignment: { horizontal: "center", vertical: "center" },
-      border: bAll("2A2420")
-    };
-    const sSubtit = {
-      font: { name: "Arial", sz: 13, bold: true, color: { rgb: WH } },
-      fill: { patternType: "solid", fgColor: { rgb: G } },
-      alignment: { horizontal: "center", vertical: "center" },
-      border: bAll(GL)
-    };
-    const sMeta = {
-      font: { name: "Arial", sz: 9, color: { rgb: MT } },
-      fill: { patternType: "solid", fgColor: { rgb: CR } },
-      alignment: { horizontal: "center", vertical: "center" },
-      border: bAll(BD)
-    };
-    const sAviso = {
-      font: { name: "Arial", sz: 9, italic: true, color: { rgb: GD } },
-      fill: { patternType: "solid", fgColor: { rgb: AM } },
-      alignment: { horizontal: "center", vertical: "center", wrapText: true },
-      border: {
-        top: { style: "thin", color: { rgb: AB } },
-        bottom: { style: "medium", color: { rgb: "C8993A" } },
-        left: { style: "thin", color: { rgb: AB } },
-        right: { style: "thin", color: { rgb: AB } }
-      }
-    };
-    const sHdrReq = {
-      // encabezado columna OBLIGATORIA ★
-      font: { name: "Arial", sz: 11, bold: true, color: { rgb: WH } },
-      fill: { patternType: "solid", fgColor: { rgb: G } },
-      alignment: { horizontal: "center", vertical: "center", wrapText: true },
-      border: bAll(GL)
-    };
-    const sHdrOpt = {
-      // encabezado columna opcional
-      font: { name: "Arial", sz: 11, bold: true, color: { rgb: WH } },
-      fill: { patternType: "solid", fgColor: { rgb: D } },
-      alignment: { horizontal: "center", vertical: "center", wrapText: true },
-      border: bAll("2A2420")
-    };
-    const sDataL = (alt) => ({
-      // dato — texto izquierda
-      font: { name: "Arial", sz: 10, color: { rgb: D } },
-      fill: { patternType: "solid", fgColor: { rgb: alt ? CL : WH } },
-      alignment: { horizontal: "left", vertical: "center", wrapText: true },
-      border: bAll(BD)
-    });
-    const sDataC = (alt) => ({
-      // dato — centrado
-      font: { name: "Arial", sz: 10, color: { rgb: D } },
-      fill: { patternType: "solid", fgColor: { rgb: alt ? CL : WH } },
-      alignment: { horizontal: "center", vertical: "center", wrapText: true },
-      border: bAll(BD)
-    });
-    const sBlank = {
-      fill: { patternType: "solid", fgColor: { rgb: WH } },
-      border: bAll(BD)
-    };
-    const sSeccion = {
-      // titulo de sección (instrucciones)
-      font: { name: "Arial", sz: 10, bold: true, color: { rgb: D } },
-      fill: { patternType: "solid", fgColor: { rgb: CR } },
-      alignment: { horizontal: "left", vertical: "center" },
-      border: bMedBot(G, BD)
-    };
-    const sClave = {
-      // clave izquierda (instrucciones)
-      font: { name: "Arial", sz: 10, bold: true, color: { rgb: G } },
-      fill: { patternType: "solid", fgColor: { rgb: WH } },
-      alignment: { horizontal: "left", vertical: "center", wrapText: true },
-      border: bAll(BD)
-    };
-    const sValor = {
-      // valor derecha (instrucciones)
-      font: { name: "Arial", sz: 10, color: { rgb: D } },
-      fill: { patternType: "solid", fgColor: { rgb: WH } },
-      alignment: { horizontal: "left", vertical: "center", wrapText: true },
-      border: bAll(BD)
-    };
-    const HCOLS = [
-      { l: "\u2605  MARCA", req: true, ctr: true, wch: 22 },
-      { l: "\u2605  DESCRIPCION\nDEL PRODUCTO", req: true, ctr: false, wch: 46 },
-      { l: "\u2605  PRECIO\n(Bs.)", req: true, ctr: true, wch: 14 },
-      { l: "STOCK\n(unidades)", req: false, ctr: true, wch: 13 },
-      { l: "TALLA", req: false, ctr: true, wch: 11 },
-      { l: "CATEGORIA", req: false, ctr: false, wch: 18 },
-      { l: "COLOR", req: false, ctr: true, wch: 13 },
-      { l: "SKU / CODIGO\n(vacio = auto)", req: false, ctr: true, wch: 22 }
-    ];
-    const NC = HCOLS.length;
-    const rows1 = [
-      ["TOSCANA HOUSE", ...Array(NC - 1).fill("")],
-      ["PLANTILLA OFICIAL DE INVENTARIO", ...Array(NC - 1).fill("")],
-      ["Version: " + HOY2 + "  \xB7  Completar columnas \u2605 y enviar a Toscana House", ...Array(NC - 1).fill("")],
-      ["\u26A0   Escribir en MAYUSCULAS. No modificar ni eliminar la fila de encabezados (fila 5).", ...Array(NC - 1).fill("")],
-      HCOLS.map((h) => h.l),
-      ["NOMBRE DE TU MARCA", "Bralette microfibra esponja removible", 100, 3, "S/M", "Lenceria", "Negro", ""],
-      ["NOMBRE DE TU MARCA", "Kit 3 piezas tangon alto especial", 150, 2, "S/M", "Lenceria", "Nude", ""],
-      ["NOMBRE DE TU MARCA", "Vestido lino manga larga bordado a mano", 280, 1, "M", "Vestidos", "Blanco", ""]
-    ];
-    const ws1 = XLSX2.utils.aoa_to_sheet(rows1);
-    ws1["!cols"] = HCOLS.map((h) => ({ wch: h.wch }));
-    ws1["!rows"] = [{ hpt: 65 }, { hpt: 32 }, { hpt: 20 }, { hpt: 30 }, { hpt: 80 }, { hpt: 50 }, { hpt: 50 }, { hpt: 50 }];
-    ws1["!merges"] = [
-      { s: { r: 0, c: 0 }, e: { r: 0, c: NC - 1 } },
-      { s: { r: 1, c: 0 }, e: { r: 1, c: NC - 1 } },
-      { s: { r: 2, c: 0 }, e: { r: 2, c: NC - 1 } },
-      { s: { r: 3, c: 0 }, e: { r: 3, c: NC - 1 } }
-    ];
-    Srow(ws1, 0, NC, sTitulo);
-    Srow(ws1, 1, NC, sSubtit);
-    Srow(ws1, 2, NC, sMeta);
-    Srow(ws1, 3, NC, sAviso);
-    HCOLS.forEach((h, c) => S(ws1, 4, c, h.req ? sHdrReq : sHdrOpt));
-    for (let ri = 0; ri < 3; ri++) {
-      const alt = ri % 2 === 1;
-      HCOLS.forEach((h, c) => S(ws1, 5 + ri, c, h.ctr ? sDataC(alt) : sDataL(alt)));
-    }
-    XLSX2.utils.book_append_sheet(wb, ws1, "Inventario");
-    const mList = MARCAS.filter((m) => m.estado !== "inactiva");
-    const rows2 = [
-      ["TOSCANA HOUSE \u2014 MARCAS REGISTRADAS", ""],
-      ["Usa el nombre exactamente como aparece en esta lista", ""],
-      ["", ""],
-      ["#", "NOMBRE DE MARCA"],
-      ...mList.map((m, i) => [i + 1, m.nombre])
-    ];
-    const ws2 = XLSX2.utils.aoa_to_sheet(rows2);
-    ws2["!cols"] = [{ wch: 6 }, { wch: 34 }];
-    ws2["!rows"] = [{ hpt: 55 }, { hpt: 24 }, { hpt: 8 }, { hpt: 36 }];
-    ws2["!merges"] = [
-      { s: { r: 0, c: 0 }, e: { r: 0, c: 1 } },
-      { s: { r: 1, c: 0 }, e: { r: 1, c: 1 } },
-      { s: { r: 2, c: 0 }, e: { r: 2, c: 1 } }
-    ];
-    Srow(ws2, 0, 2, sTitulo);
-    Srow(ws2, 1, 2, sMeta);
-    Srow(ws2, 2, 2, sBlank);
-    Srow(ws2, 3, 2, sHdrOpt);
-    for (let r = 4; r < rows2.length; r++) {
-      const alt = (r - 4) % 2 === 1;
-      S(ws2, r, 0, sDataC(alt));
-      S(ws2, r, 1, sDataL(alt));
-    }
-    XLSX2.utils.book_append_sheet(wb, ws2, "Marcas");
-    const INSTR = [
-      { t: "title", a: "INSTRUCCIONES \u2014 Plantilla de Inventario Toscana House" },
-      { t: "blank" },
-      { t: "section", a: "COLUMNAS OBLIGATORIAS \u2605" },
-      { t: "row", k: "Marca \u2605", v: "Nombre de tu marca tal como aparece en la pestana Marcas" },
-      { t: "row", k: "Descripcion \u2605", v: "Nombre completo del producto. Incluye material, tipo de prenda, largo, etc." },
-      { t: "row", k: "Precio Bs. \u2605", v: "Precio de venta en bolivianos. Solo numero (ej: 250). Sin el simbolo Bs." },
-      { t: "blank" },
-      { t: "section", a: "COLUMNAS OPCIONALES" },
-      { t: "row", k: "Stock", v: "Cantidad disponible. Si se omite, se asume 1 unidad." },
-      { t: "row", k: "Talla", v: "XS / S / M / L / XL / TU / Unica / numero" },
-      { t: "row", k: "Categoria", v: "Tipo de prenda: Lenceria, Vestidos, Camisas, Pantalones, Accesorios, etc." },
-      { t: "row", k: "Color", v: "Color principal del articulo" },
-      { t: "row", k: "SKU / Codigo", v: "Codigo propio del producto. Si lo dejas vacio, Toscana lo genera automaticamente." },
-      { t: "blank" },
-      { t: "section", a: "PASOS PARA COMPLETAR" },
-      { t: "row", k: "1.", v: "Ve a la pestana Inventario y llena una fila por producto" },
-      { t: "row", k: "2.", v: "Verifica que el nombre de tu marca coincida exactamente con la pestana Marcas" },
-      { t: "row", k: "3.", v: "Guarda el archivo como .xlsx (formato Excel)" },
-      { t: "row", k: "4.", v: "Envia el archivo completo a Toscana House" },
-      { t: "blank" },
-      { t: "section", a: "NOTAS IMPORTANTES" },
-      { t: "row", k: "\u2022", v: "No modifiques ni elimines la fila de encabezados (fila 5 de la pestana Inventario)" },
-      { t: "row", k: "\u2022", v: "Puedes borrar las filas de ejemplo antes de ingresar tu informacion" },
-      { t: "row", k: "\u2022", v: "No combines celdas en la zona de datos" },
-      { t: "row", k: "\u2022", v: "Si un producto tiene varias tallas, agrega una fila separada por cada talla" },
-      { t: "row", k: "\u2022", v: "Formato SKU automatico: MARCA-INICIALES-TALLA-001" }
-    ];
-    const rows3 = INSTR.map((x) => {
-      if (x.t === "title" || x.t === "blank" || x.t === "section") return [x.a || "", ""];
-      return [x.k, x.v];
-    });
-    const ws3 = XLSX2.utils.aoa_to_sheet(rows3);
-    ws3["!cols"] = [{ wch: 22 }, { wch: 60 }];
-    ws3["!merges"] = INSTR.reduce((acc, x, r) => {
-      if (x.t === "title" || x.t === "blank" || x.t === "section") acc.push({ s: { r, c: 0 }, e: { r, c: 1 } });
-      return acc;
-    }, []);
-    INSTR.forEach((x, r) => {
-      if (x.t === "title") {
-        Srow(ws3, r, 2, sTitulo);
-      } else if (x.t === "blank") {
-        Srow(ws3, r, 2, sBlank);
-      } else if (x.t === "section") {
-        S(ws3, r, 0, sSeccion);
-        S(ws3, r, 1, sSeccion);
-      } else {
-        S(ws3, r, 0, sClave);
-        S(ws3, r, 1, sValor);
-      }
-    });
-    XLSX2.utils.book_append_sheet(wb, ws3, "Instrucciones");
-    const buf = XLSX2.write(wb, { bookType: "xlsx", type: "array" });
-    const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
-    descargarArchivo(blob, "ToscanaHouse_Inventario_" + HOY2 + ".xlsx");
+    XLSX2.utils.book_append_sheet(wb, ws, "CARGA");
+    XLSX2.utils.book_append_sheet(wb, guia, "COMO USARLO");
+    XLSX2.utils.book_append_sheet(wb, firma, HOJA_HUELLA_CARGA);
+    wb.Workbook = { Sheets: [{ Hidden: 0 }, { Hidden: 0 }, { Hidden: 1 }], WBProps: {}, Views: [] };
+    const buf = XLSX2.write(wb, { bookType: "xlsx", type: "array", cellStyles: true });
+    descargarArchivo(new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), "PADRON_UNICO_CARGA_MASIVA_FORGE.xlsx");
   }
   function leerCfgLiq(marcaId) {
     const id = Number(marcaId);
@@ -63239,7 +63053,6 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       return cod;
     }
     async function parsearArchivo(file) {
-      if (onArchivoCapturado) onArchivoCapturado(file);
       setEstado("leyendo");
       try {
         let matchMarca = function(nomRaw) {
@@ -63263,15 +63076,13 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
         const XLSX2 = await loadXLSX();
         const buf = await file.arrayBuffer();
         const wb = XLSX2.read(buf, { type: "array" });
-        const HOJAS_IGNORADAS = ["marcas", "instrucciones"];
-        let rawAll = [];
-        for (const shName of wb.SheetNames) {
-          if (HOJAS_IGNORADAS.includes(norm(shName).toLowerCase().trim())) continue;
-          const ws = wb.Sheets[shName];
-          const rows = XLSX2.utils.sheet_to_json(ws, { header: 1, defval: "" });
-          if (rows.length > 1) rawAll = rawAll.concat(rows);
+        if (!validarPadronUnico(XLSX2, wb)) {
+          setEstado("idle");
+          alert("Esta planilla no se puede cargar. Usa PADRON_UNICO_CARGA_MASIVA_FORGE.xlsx y copia tus datos dentro de la hoja CARGA sin modificar los t\xEDtulos.");
+          return;
         }
-        const raw = rawAll;
+        if (onArchivoCapturado) onArchivoCapturado(file);
+        const raw = XLSX2.utils.sheet_to_json(wb.Sheets.CARGA, { header: 1, defval: "" });
         if (raw.length < 2) {
           setEstado("idle");
           alert("El archivo est\xE1 vac\xEDo o no tiene datos");
@@ -63315,12 +63126,23 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
           }
           return -1;
         };
-        const hJoined = headers.join("|");
+        const isPadronUnico = true;
         const isTH = headers.some((h) => h.includes("\u2605") || h.includes("descripciondelproducto") || h.includes("descripcion del producto") || h.includes("descripcion") && headers.some((hh) => hh.includes("sku") || hh.includes("codigo")));
         const isNumerico = !isTH && headers.some((h) => /^\d+\.\s/.test(h) || h.includes("item/art") || h.includes("unidad de medida") || h.includes("cant. de ingreso"));
         const isIZi = !isNumerico && !isTH && headers.some((h) => h.includes("subgategoria"));
-        let cSKU, cMarca, cDesc, cPrecio, cCat, cTalla, cColor, cStock;
-        if (isTH) {
+        let cSKU, cMarca, cDesc, cPrecio, cCat, cTalla, cColor, cStock, cMaterial = -1, cDetalles = -1;
+        if (isPadronUnico) {
+          cDesc = 0;
+          cMaterial = 1;
+          cDetalles = 2;
+          cColor = 3;
+          cMarca = 4;
+          cTalla = 5;
+          cStock = 6;
+          cCat = -1;
+          cSKU = -1;
+          cPrecio = 9;
+        } else if (isTH) {
           cMarca = col("marca");
           if (cMarca < 0) cMarca = 0;
           cDesc = col("descripcion del producto", "descripcion", "nombre", "producto");
@@ -63411,8 +63233,25 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
           if (!row || row.every((c) => String(c).trim() === "")) continue;
           const marcaRaw = cMarca >= 0 ? String(row[cMarca] || "").trim() : "";
           const descRaw = cDesc >= 0 ? String(row[cDesc] || "").trim() : "";
+          const materialRaw = cMaterial >= 0 ? String(row[cMaterial] || "").trim() : "";
+          const detallesRaw = cDetalles >= 0 ? String(row[cDetalles] || "").trim() : "";
           const skuRaw = cSKU >= 0 ? String(row[cSKU] || "").trim().toUpperCase() : "";
-          const catRaw = cCat >= 0 ? String(row[cCat] || "").trim() : "General";
+          const categoriaPorProducto = ((v) => {
+            const t = norm(v).toUpperCase();
+            if (/VESTIDO|DRESS/.test(t)) return "Vestidos";
+            if (/FALDA/.test(t)) return "Faldas";
+            if (/PANTAL|JEAN|JOGGER/.test(t)) return "Pantalones";
+            if (/SHORT|BERMUDA/.test(t)) return "Shorts";
+            if (/CAMISA|BLUSA|POLERA|POLO|REMERA/.test(t)) return "Camisas y blusas";
+            if (/TOP|BODY|BRALETTE/.test(t)) return "Tops";
+            if (/CHAQUETA|CHAMARRA|SACO|BLAZER/.test(t)) return "Abrigos";
+            if (/ZAPAT|MOCAS|SANDALIA|BOTA|MULE/.test(t)) return "Calzados";
+            if (/CINTUR|GORRA|BILLETERA|COLLAR|ARETE|ACCESORIO/.test(t)) return "Accesorios";
+            if (/CONJUNTO|SET/.test(t)) return "Conjuntos";
+            if (/CAPA/.test(t)) return "Capas";
+            return "General";
+          })(descRaw);
+          const catRaw = cCat >= 0 ? String(row[cCat] || "").trim() : categoriaPorProducto;
           const tallaRaw = cTalla >= 0 ? String(row[cTalla] || "").trim() : "";
           const colorRaw = cColor >= 0 ? String(row[cColor] || "").trim() : "";
           const skips = [
@@ -63437,7 +63276,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
           const precio = parsePrecio(precioRaw);
           const stockRaw = cStock >= 0 ? row[cStock] : "";
           const stock = parseStock(stockRaw);
-          let desc = descRaw;
+          let desc = isPadronUnico ? [descRaw, materialRaw, detallesRaw].filter(Boolean).join(" \xB7 ") : descRaw;
           if (!desc && skuRaw) {
             const partes = [catRaw, tallaRaw, colorRaw].filter(Boolean).join(" ").trim();
             desc = partes ? partes === catRaw && precio > 0 ? `${catRaw} BS. ${precio}` : partes : skuRaw;
@@ -63459,6 +63298,8 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
             marcaId: marcaEnc?.id || null,
             marcaNombre: marcaEnc?.nombre || marcaRaw || "",
             desc: desc || "",
+            material: materialRaw,
+            detalles: detallesRaw,
             precio,
             cat: catRaw || "General",
             talla: tallaRaw,
@@ -63740,7 +63581,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       fontFamily: FONT,
       marginBottom: 3,
       letterSpacing: "0.01em"
-    } }, "Plantilla oficial para marcas"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT_UI, lineHeight: 1.45 } }, "Descarga el Excel modelo, comp\xE1rtelo con la marca para que llene su inventario y te lo devuelva listo para importar.")), /* @__PURE__ */ import_react.default.createElement(
+    } }, "Padr\xF3n \xFAnico oficial de carga"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT_UI, lineHeight: 1.45 } }, "Usa siempre este mismo archivo. Las marcas solo copian y pegan sus datos en CARGA; otros formatos ser\xE1n rechazados.")), /* @__PURE__ */ import_react.default.createElement(
       "button",
       {
         onClick: generarPlantilla,
@@ -63787,7 +63628,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
         letterSpacing: "0.01em",
         marginBottom: 6
       } }, isDragging ? "Suelta el archivo aqu\xED" : "Importar inventario rellenado"),
-      /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.label3, fontFamily: FONT_UI, marginBottom: 16 } }, "Arrastra el Excel completado por la marca o haz clic para seleccionar"),
+      /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.label3, fontFamily: FONT_UI, marginBottom: 16 } }, "Arrastra el padr\xF3n oficial completado o haz clic para seleccionar"),
       /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap" } }, [".xlsx", ".xls", ".csv"].map((ext) => /* @__PURE__ */ import_react.default.createElement("span", { key: ext, style: {
         fontSize: 11,
         fontWeight: 700,

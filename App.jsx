@@ -2478,7 +2478,57 @@ function playPagoSound(){
 // Usa xlsx-js-style: fork de SheetJS con soporte REAL de estilos
 // (colores de fondo, fuentes, bordes — sin licencia Pro)
 // ══════════════════════════════════════════════════════════════
+const HOJA_HUELLA_CARGA = "WS_HUELLA"; // nombre legado, oculto; compartido con Working Style
+const PADRON_UNICO_TOKEN = "FORGE-PADRON-UNICO-2026-V1";
+const PADRON_UNICO_HEADERS = ["PRODUCTO","MATERIAL","DETALLES","COLOR","MARCA","TALLA","CANTIDAD","TOTAL MODELO","COSTO","PRECIO VENTA"];
+function validarPadronUnico(XLSX,wb){
+  try{
+    const firmaNombre=(wb.SheetNames||[]).find(n=>String(n).trim().toUpperCase()===HOJA_HUELLA_CARGA);
+    if(!firmaNombre) return false;
+    const firma=wb.Sheets[firmaNombre]?.A1?.v;
+    if(String(firma||"").trim().toUpperCase()!==PADRON_UNICO_TOKEN) return false;
+    const carga=wb.Sheets.CARGA;
+    if(!carga) return false;
+    const fila=(XLSX.utils.sheet_to_json(carga,{header:1,defval:""})[0]||[]).map(x=>String(x||"").trim().toUpperCase());
+    return !PADRON_UNICO_HEADERS.some((h,i)=>fila[i]!==h) && !fila.slice(PADRON_UNICO_HEADERS.length).some(Boolean);
+  }catch{return false;}
+}
+
 async function generarPlantillaXLSX(){
+  const XLSX=await loadXLSX();
+  const headers=PADRON_UNICO_HEADERS;
+  const rows=[headers,...Array.from({length:400},()=>Array(10).fill(""))];
+  const ws=XLSX.utils.aoa_to_sheet(rows);
+  for(let r=2;r<=401;r++){
+    ws[`H${r}`]={t:"n",f:`IF($A${r}="","",SUMIFS($G$2:$G$401,$A$2:$A$401,$A${r},$B$2:$B$401,$B${r},$C$2:$C$401,$C${r},$D$2:$D$401,$D${r}))`};
+    [1,2,3,4,5,6,7,9,10].forEach(c=>{
+      const a=XLSX.utils.encode_cell({r:r-1,c:c-1});
+      if(!ws[a]) ws[a]={t:"s",v:""};
+      ws[a].s={...(ws[a].s||{}),protection:{locked:false}};
+    });
+  }
+  ws["!ref"]="A1:J401";
+  ws["!cols"]=[{wch:28},{wch:20},{wch:34},{wch:18},{wch:22},{wch:12},{wch:12},{wch:15},{wch:14},{wch:16}];
+  ws["!autofilter"]={ref:"A1:J401"};
+  ws["!protect"]={password:"FORGE2026",formatCells:true,formatColumns:true,formatRows:true,insertColumns:true,deleteColumns:true,insertRows:true,deleteRows:true};
+  const guia=XLSX.utils.aoa_to_sheet([
+    ["PADRÓN ÚNICO DE CARGA MASIVA"],
+    ["Copien y peguen debajo de los títulos de CARGA. No agreguen, borren, muevan ni renombren columnas."],
+    ["Sirve para Working Style y Toscana House, incluidas Monas y las demás marcas."],
+    ["CANTIDAD es el stock. TOTAL MODELO se calcula solo y no se carga."],
+    ["Guarden y envíen este mismo archivo .xlsx; no copien la hoja a otro libro."],
+  ]);
+  guia["!cols"]=[{wch:110}]; guia["!protect"]={password:"FORGE2026"};
+  const firma=XLSX.utils.aoa_to_sheet([[PADRON_UNICO_TOKEN],["No borres ni renombres esta hoja."]]);
+  firma["!protect"]={password:"FORGE2026"};
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,"CARGA"); XLSX.utils.book_append_sheet(wb,guia,"COMO USARLO"); XLSX.utils.book_append_sheet(wb,firma,HOJA_HUELLA_CARGA);
+  wb.Workbook={Sheets:[{Hidden:0},{Hidden:0},{Hidden:1}],WBProps:{},Views:[]};
+  const buf=XLSX.write(wb,{bookType:"xlsx",type:"array",cellStyles:true});
+  descargarArchivo(new Blob([buf],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}),"PADRON_UNICO_CARGA_MASIVA_FORGE.xlsx");
+}
+
+async function generarPlantillaXLSXAnterior(){
   const XLSX = await loadXLSX();
   const wb   = XLSX.utils.book_new();
   const HOY  = hoy();
@@ -9186,25 +9236,23 @@ function ImportarExcelModal({inv, onImportar, onClose, onArchivoCapturado}){
 
   // ── Parsear archivo ───────────────────────────────────────────────
   async function parsearArchivo(file){
-    if(onArchivoCapturado) onArchivoCapturado(file);
     setEstado("leyendo");
     try{
       const XLSX = await loadXLSX();
       const buf  = await file.arrayBuffer();
       const wb   = XLSX.read(buf,{type:"array"});
 
-      // ── Leer todas las hojas de datos y unir filas ───────────────────
-      // Se ignoran hojas auxiliares de la plantilla oficial (Marcas,
-      // Instrucciones) que no contienen productos.
-      const HOJAS_IGNORADAS = ["marcas","instrucciones"];
-      let rawAll = [];
-      for(const shName of wb.SheetNames){
-        if(HOJAS_IGNORADAS.includes(norm(shName).toLowerCase().trim())) continue;
-        const ws  = wb.Sheets[shName];
-        const rows = XLSX.utils.sheet_to_json(ws,{header:1,defval:""});
-        if(rows.length>1) rawAll = rawAll.concat(rows);
+      // Candado de formato: no se captura ni procesa ningún archivo que no sea
+      // el padrón único oficial con huella y encabezados exactos.
+      if(!validarPadronUnico(XLSX,wb)){
+        setEstado("idle");
+        alert("Esta planilla no se puede cargar. Usa PADRON_UNICO_CARGA_MASIVA_FORGE.xlsx y copia tus datos dentro de la hoja CARGA sin modificar los títulos.");
+        return;
       }
-      const raw = rawAll;
+      if(onArchivoCapturado) onArchivoCapturado(file);
+
+      // El padrón tiene una única fuente de datos autorizada.
+      const raw = XLSX.utils.sheet_to_json(wb.Sheets.CARGA,{header:1,defval:""});
 
       if(raw.length<2){ setEstado("idle"); alert("El archivo está vacío o no tiene datos"); return; }
 
@@ -9239,8 +9287,8 @@ function ImportarExcelModal({inv, onImportar, onClose, onArchivoCapturado}){
         return -1;
       };
 
-      // ── Detectar formato por fingerprint de headers ───────────────────
-      const hJoined = headers.join("|");
+      // ── Formato único autorizado ───────────────────────────────────────
+      const isPadronUnico = true;
 
       // ─────────────────────────────────────────────────────────────────
       // FORMATO A — Plantilla Oficial Toscana House
@@ -9268,9 +9316,12 @@ function ImportarExcelModal({inv, onImportar, onClose, onArchivoCapturado}){
       // Formato D: Estándar genérico (cualquier otro Excel reconocible)
       // — se maneja con col() flexible abajo
 
-      let cSKU, cMarca, cDesc, cPrecio, cCat, cTalla, cColor, cStock;
+      let cSKU, cMarca, cDesc, cPrecio, cCat, cTalla, cColor, cStock, cMaterial=-1, cDetalles=-1;
 
-      if(isTH){
+      if(isPadronUnico){
+        cDesc=0; cMaterial=1; cDetalles=2; cColor=3; cMarca=4;
+        cTalla=5; cStock=6; cCat=-1; cSKU=-1; cPrecio=9;
+      } else if(isTH){
         // ── Plantilla Oficial TH — mapeo por nombre + fallback posición ──
         // Nombre compuesto (col B) = CATEGORIA DESCRIPCION COLOR TALLA → va a `nombre`
         // Talla (col E) + Color (col G) → van a `descripcion` para el label
@@ -9417,8 +9468,25 @@ function ImportarExcelModal({inv, onImportar, onClose, onArchivoCapturado}){
         // ── Extraer valores crudos ──────────────────────────────────
         const marcaRaw = cMarca>=0 ? String(row[cMarca]||"").trim() : "";
         const descRaw  = cDesc>=0  ? String(row[cDesc]||"").trim()  : "";
+        const materialRaw = cMaterial>=0 ? String(row[cMaterial]||"").trim() : "";
+        const detallesRaw = cDetalles>=0 ? String(row[cDetalles]||"").trim() : "";
         const skuRaw   = cSKU>=0   ? String(row[cSKU]||"").trim().toUpperCase() : "";
-        const catRaw   = cCat>=0   ? String(row[cCat]||"").trim()   : "General";
+        const categoriaPorProducto = (v=>{
+          const t=norm(v).toUpperCase();
+          if(/VESTIDO|DRESS/.test(t)) return "Vestidos";
+          if(/FALDA/.test(t)) return "Faldas";
+          if(/PANTAL|JEAN|JOGGER/.test(t)) return "Pantalones";
+          if(/SHORT|BERMUDA/.test(t)) return "Shorts";
+          if(/CAMISA|BLUSA|POLERA|POLO|REMERA/.test(t)) return "Camisas y blusas";
+          if(/TOP|BODY|BRALETTE/.test(t)) return "Tops";
+          if(/CHAQUETA|CHAMARRA|SACO|BLAZER/.test(t)) return "Abrigos";
+          if(/ZAPAT|MOCAS|SANDALIA|BOTA|MULE/.test(t)) return "Calzados";
+          if(/CINTUR|GORRA|BILLETERA|COLLAR|ARETE|ACCESORIO/.test(t)) return "Accesorios";
+          if(/CONJUNTO|SET/.test(t)) return "Conjuntos";
+          if(/CAPA/.test(t)) return "Capas";
+          return "General";
+        })(descRaw);
+        const catRaw   = cCat>=0 ? String(row[cCat]||"").trim() : categoriaPorProducto;
         const tallaRaw = cTalla>=0 ? String(row[cTalla]||"").trim() : "";
         const colorRaw = cColor>=0 ? String(row[cColor]||"").trim() : "";
 
@@ -9445,7 +9513,9 @@ function ImportarExcelModal({inv, onImportar, onClose, onArchivoCapturado}){
 
         // ── Descripción final ────────────────────────────────────────
         // Si la descripción está vacía, construirla desde otras columnas
-        let desc = descRaw;
+        let desc = isPadronUnico
+          ? [descRaw,materialRaw,detallesRaw].filter(Boolean).join(" · ")
+          : descRaw;
         if(!desc && skuRaw){
           // Reconstruir desde columnas disponibles
           const partes = [catRaw, tallaRaw, colorRaw].filter(Boolean).join(" ").trim();
@@ -9478,7 +9548,7 @@ function ImportarExcelModal({inv, onImportar, onClose, onArchivoCapturado}){
           marcaNom: marcaRaw||marcaEnc?.nombre||"",
           marcaId: marcaEnc?.id||null,
           marcaNombre: marcaEnc?.nombre||marcaRaw||"",
-          desc: desc||"",
+          desc: desc||"", material:materialRaw, detalles:detallesRaw,
           precio, cat: catRaw||"General",
           talla: tallaRaw, color: colorRaw,
           stock, subcat:"",
@@ -9791,10 +9861,10 @@ function ImportarExcelModal({inv, onImportar, onClose, onArchivoCapturado}){
             <div style={{flex:1,minWidth:0}}>
               <div style={{fontSize:13,fontWeight:700,color:C.label,fontFamily:FONT,
                 marginBottom:3,letterSpacing:"0.01em"}}>
-                Plantilla oficial para marcas
+                Padrón único oficial de carga
               </div>
               <div style={{fontSize:11,color:C.label3,fontFamily:FONT_UI,lineHeight:1.45}}>
-                Descarga el Excel modelo, compártelo con la marca para que llene su inventario y te lo devuelva listo para importar.
+                Usa siempre este mismo archivo. Las marcas solo copian y pegan sus datos en CARGA; otros formatos serán rechazados.
               </div>
             </div>
             <button onClick={generarPlantilla}
@@ -9822,7 +9892,7 @@ function ImportarExcelModal({inv, onImportar, onClose, onArchivoCapturado}){
               {isDragging?"Suelta el archivo aquí":"Importar inventario rellenado"}
             </div>
             <div style={{fontSize:13,color:C.label3,fontFamily:FONT_UI,marginBottom:16}}>
-              Arrastra el Excel completado por la marca o haz clic para seleccionar
+              Arrastra el padrón oficial completado o haz clic para seleccionar
             </div>
             <div style={{display:"flex",gap:8,justifyContent:"center",flexWrap:"wrap"}}>
               {[".xlsx",".xls",".csv"].map(ext=>(
