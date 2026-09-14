@@ -55122,6 +55122,20 @@
     const m = (desc || "").match(/TALLA:\s*([^·\n]+)/i);
     return m ? m[1].trim() : "";
   }
+  var TALLAS_CODIGO = /* @__PURE__ */ new Set(["XXL", "XL", "XS", "S", "M", "L", "SM", "S/M", "ML", "M/L", "LXL", "L/XL", "TU", "T/U", "U", "UNICA", "\xDANICA"]);
+  function extraerTallaCodigo(codigo) {
+    const partes = String(codigo || "").toUpperCase().split("-").slice(1);
+    const antesDelCorrelativo = [];
+    for (const parte of partes) {
+      if (/^\d+$/.test(parte.trim())) break;
+      antesDelCorrelativo.push(parte.trim());
+    }
+    return antesDelCorrelativo.find((p) => TALLAS_CODIGO.has(p)) || "";
+  }
+  function tallaComparable(talla) {
+    const t = String(talla || "").trim().toUpperCase().replace(/Ú/g, "U").replace(/\s+/g, "");
+    return { SM: "S/M", ML: "M/L", LXL: "L/XL", TU: "T/U", U: "T/U", UNICA: "T/U" }[t] || t;
+  }
   var TARJETA_DESC_CLIENTE_HASTA = "2026-06-23";
   function getManualDescPct(v) {
     const legacy = v.metodoPago === "tarjeta" && (v.fecha || "") < TARJETA_DESC_CLIENTE_HASTA;
@@ -63224,13 +63238,11 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
         const codigosExistentes = new Set(inv.map((p) => p.codigo.toUpperCase().trim()));
         const descExistente = /* @__PURE__ */ new Map();
         const descExistenteSinColor = /* @__PURE__ */ new Map();
-        const descExistenteSinTallaColor = /* @__PURE__ */ new Map();
         for (const p of inv) {
-          const talla = (p.descripcion || "").match(/TALLA:\s*([^·\n]+)/i)?.[1]?.trim() || p.subcat || "";
+          const talla = extraerTalla(p.descripcion) || p.subcat || extraerTallaCodigo(p.codigo) || "";
           const color = (p.descripcion || "").match(/COLOR:\s*([^·\n]+)/i)?.[1]?.trim() || "";
           descExistente.set(descKey(p.marcaNombre, p.nombre, talla, color), p);
           if (!color) descExistenteSinColor.set(descKey(p.marcaNombre, p.nombre, talla, ""), p);
-          if (!talla && !color) descExistenteSinTallaColor.set(descKey(p.marcaNombre, p.nombre, "", ""), p);
         }
         const usadosSet = /* @__PURE__ */ new Set();
         const filas = [];
@@ -63322,8 +63334,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
           if (!marcaEnc) fila._errs.push(`Marca "${marcaRaw || "\u2014"}" no encontrada`);
           const dk = descKey(fila.marcaNombre, fila.desc, fila.talla, fila.color);
           const dkSinColor = descKey(fila.marcaNombre, fila.desc, fila.talla, "");
-          const dkSoloNombre = descKey(fila.marcaNombre, fila.desc, "", "");
-          const prodExistente = codigosExistentes.has(sku) ? inv.find((p) => p.codigo.toUpperCase() === sku) : autoSKU ? descExistente.get(dk) || descExistenteSinColor.get(dkSinColor) || descExistenteSinTallaColor.get(dkSoloNombre) || null : null;
+          const prodExistente = codigosExistentes.has(sku) ? inv.find((p) => p.codigo.toUpperCase() === sku) : autoSKU ? descExistente.get(dk) || descExistenteSinColor.get(dkSinColor) || null : null;
           if (prodExistente) {
             const colorExistente = ((prodExistente.descripcion || "").match(/COLOR:\s*([^·\n]+)/i)?.[1] || "").trim().toUpperCase();
             const colorNuevo = (fila.color || "").trim().toUpperCase();
@@ -63353,6 +63364,11 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
               fila._prodExistente = prodExistente;
               if (!codigosExistentes.has(sku)) fila.sku = prodExistente.codigo.toUpperCase();
             }
+          }
+          const tallaEnCodigo = extraerTallaCodigo(fila.sku);
+          if (tallaEnCodigo && fila.talla && tallaComparable(tallaEnCodigo) !== tallaComparable(fila.talla)) {
+            fila._bloqueado = true;
+            fila._errs.push(`Talla del c\xF3digo (${tallaEnCodigo}) no coincide con la fila (${fila.talla})`);
           }
           filas.push(fila);
         }
@@ -76659,9 +76675,7 @@ ${c.diferencia > 0.01 ? `Cliente paga diferencia: Bs ${fmt2(c.diferencia)} (${c.
         const paraImprimir = items.filter((it) => it.codigo && it.nombre).map((it) => {
           const prodInv = inv.find((p) => (p.codigo || "").toLowerCase() === (it.codigo || "").toLowerCase());
           const _palabras = (it.nombre || "").toUpperCase().split(/\s+/);
-          const _segs = (it.codigo || "").toUpperCase().split("-");
-          const _midSeg = _segs.length >= 3 ? _segs[_segs.length - 2] : "";
-          const _tallaFromSku = /^[A-Za-z]{1,5}$/.test(_midSeg) ? _midSeg : "";
+          const _tallaFromSku = extraerTallaCodigo(it.codigo);
           const _tallasList = ["UNICA", "\xDANICA", "XXL", "XL", "XS", "S", "M", "L"];
           const _tallaFromNombre = _palabras.slice().reverse().find((p) => _tallasList.includes(p) || /^\d{2,3}$/.test(p) && Number(p) >= 30 && Number(p) <= 60) || "";
           const _talla = it.talla || prodInv?.subcat || _tallaFromSku || _tallaFromNombre || "";

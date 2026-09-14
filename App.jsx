@@ -1603,6 +1603,20 @@ function BarcodeDisplay({ codigo, small }) {
 // Extrae el color del campo descripcion ("TALLA: X · COLOR: Y")
 function extraerColor(desc){ const m=(desc||"").match(/COLOR:\s*([^·\n]+)/i); return m?m[1].trim():""; }
 function extraerTalla(desc){ const m=(desc||"").match(/TALLA:\s*([^·\n]+)/i); return m?m[1].trim():""; }
+const TALLAS_CODIGO = new Set(["XXL","XL","XS","S","M","L","SM","S/M","ML","M/L","LXL","L/XL","TU","T/U","U","UNICA","ÚNICA"]);
+function extraerTallaCodigo(codigo){
+  const partes=String(codigo||"").toUpperCase().split("-").slice(1);
+  const antesDelCorrelativo=[];
+  for(const parte of partes){
+    if(/^\d+$/.test(parte.trim())) break;
+    antesDelCorrelativo.push(parte.trim());
+  }
+  return antesDelCorrelativo.find(p=>TALLAS_CODIGO.has(p))||"";
+}
+function tallaComparable(talla){
+  const t=String(talla||"").trim().toUpperCase().replace(/Ú/g,"U").replace(/\s+/g,"");
+  return ({SM:"S/M",ML:"M/L",LXL:"L/XL",TU:"T/U",U:"T/U",UNICA:"T/U"})[t]||t;
+}
 
 // Construye la línea completa para etiqueta e inventario: NOMBRE TALLA X COLOR Y
 // Igual en ambos lados — si el nombre ya incluye talla/color no los duplica
@@ -9450,14 +9464,11 @@ function ImportarExcelModal({inv, onImportar, onClose, onArchivoCapturado}){
       }
       const descExistente = new Map();
       const descExistenteSinColor = new Map(); // fallback: match sin color
-      const descExistenteSinTallaColor = new Map(); // fallback: match solo marca+nombre (sin talla ni color)
       for(const p of inv){
-        const talla = (p.descripcion||"").match(/TALLA:\s*([^·\n]+)/i)?.[1]?.trim()||p.subcat||"";
+        const talla = extraerTalla(p.descripcion)||p.subcat||extraerTallaCodigo(p.codigo)||"";
         const color = (p.descripcion||"").match(/COLOR:\s*([^·\n]+)/i)?.[1]?.trim()||"";
         descExistente.set(descKey(p.marcaNombre,p.nombre,talla,color), p);
         if(!color) descExistenteSinColor.set(descKey(p.marcaNombre,p.nombre,talla,""), p);
-        // Tercer fallback: para productos sin ningún dato de talla ni color
-        if(!talla && !color) descExistenteSinTallaColor.set(descKey(p.marcaNombre,p.nombre,"",""), p);
       }
 
       // ── Iterar filas de datos ─────────────────────────────────────────
@@ -9575,11 +9586,10 @@ function ImportarExcelModal({inv, onImportar, onClose, onArchivoCapturado}){
         // el código de otro item del inventario.
         const dk = descKey(fila.marcaNombre, fila.desc, fila.talla, fila.color);
         const dkSinColor = descKey(fila.marcaNombre, fila.desc, fila.talla, "");
-        const dkSoloNombre = descKey(fila.marcaNombre, fila.desc, "", "");
         const prodExistente = codigosExistentes.has(sku)
           ? inv.find(p=>p.codigo.toUpperCase()===sku)
           : (autoSKU
-              ? descExistente.get(dk) || descExistenteSinColor.get(dkSinColor) || descExistenteSinTallaColor.get(dkSoloNombre) || null
+              ? descExistente.get(dk) || descExistenteSinColor.get(dkSinColor) || null
               : null);
 
         if(prodExistente){
@@ -9619,6 +9629,14 @@ function ImportarExcelModal({inv, onImportar, onClose, onArchivoCapturado}){
             fila._prodExistente = prodExistente;
             if(!codigosExistentes.has(sku)) fila.sku = prodExistente.codigo.toUpperCase();
           }
+        }
+
+        // Invariante de seguridad: una talla escrita en el código nunca puede
+        // contradecir la talla de la fila. Si ocurre, la carga queda bloqueada.
+        const tallaEnCodigo=extraerTallaCodigo(fila.sku);
+        if(tallaEnCodigo && fila.talla && tallaComparable(tallaEnCodigo)!==tallaComparable(fila.talla)){
+          fila._bloqueado=true;
+          fila._errs.push(`Talla del código (${tallaEnCodigo}) no coincide con la fila (${fila.talla})`);
         }
 
         filas.push(fila);
@@ -21393,9 +21411,7 @@ function RegistroCargas({cargas, marcas, marcaId=null, onVerificar=null, user=nu
                             const prodInv = inv.find(p=>(p.codigo||"").toLowerCase()===(it.codigo||"").toLowerCase());
                             const _palabras = (it.nombre||"").toUpperCase().split(/\s+/);
                             // Talla: item carga → inv.subcat → segmento medio SKU → del nombre
-                            const _segs = (it.codigo||"").toUpperCase().split("-");
-                            const _midSeg = _segs.length >= 3 ? _segs[_segs.length-2] : "";
-                            const _tallaFromSku = /^[A-Za-z]{1,5}$/.test(_midSeg) ? _midSeg : "";
+                            const _tallaFromSku = extraerTallaCodigo(it.codigo);
                             const _tallasList = ["UNICA","ÚNICA","XXL","XL","XS","S","M","L"];
                             const _tallaFromNombre = _palabras.slice().reverse().find(p=>_tallasList.includes(p)||(/^\d{2,3}$/.test(p)&&Number(p)>=30&&Number(p)<=60))||"";
                             const _talla = it.talla||prodInv?.subcat||_tallaFromSku||_tallaFromNombre||"";
