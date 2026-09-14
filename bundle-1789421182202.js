@@ -63037,11 +63037,11 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       return () => clearTimeout(t);
     }, [feedback?.ts]);
     const lista = (rows || []).slice().sort((a, b) => (a.codigo || "").localeCompare(b.codigo || ""));
-    const completos = lista.filter((r) => r.sistema > 0 && r.contado >= r.sistema).length;
+    const completos = lista.filter((r) => r.sistema > 0 && r.contado === r.sistema).length;
     const pendientes = lista.filter((r) => r.contado < r.sistema).length;
     const unidadesPendientes = lista.reduce((s, r) => s + Math.max(0, r.sistema - r.contado), 0);
     function estadoFila(r) {
-      if (r.contado > r.sistema) return { lbl: "Sobrante", col: "#3B82F6", bg: "rgba(59,130,246,0.14)" };
+      if (r.contado > r.sistema) return { lbl: `Sobrante +${r.contado - r.sistema}`, col: "#3B82F6", bg: "rgba(59,130,246,0.14)" };
       if (r.sistema > 0 && r.contado >= r.sistema) return { lbl: "Completo", col: "#22C55E", bg: "rgba(34,197,94,0.14)" };
       if (r.contado > 0) return { lbl: `Parcial ${r.contado}/${r.sistema}`, col: "#F59E0B", bg: "rgba(245,158,11,0.14)" };
       return { lbl: "Pendiente", col: "rgba(255,255,255,0.45)", bg: "rgba(255,255,255,0.05)" };
@@ -74132,7 +74132,8 @@ ${sinStock.map((it) => {
     const [msgAgregar, setMsgAgregar] = (0, import_react.useState)(null);
     const [cruceVerTodo, setCruceVerTodo] = (0, import_react.useState)(false);
     const [baseInv, setBaseInv] = (0, import_react.useState)(() => inv.map((p) => ({ ...p })));
-    const [baseTs] = (0, import_react.useState)(() => /* @__PURE__ */ new Date());
+    const [baseTs, setBaseTs] = (0, import_react.useState)(() => /* @__PURE__ */ new Date());
+    const [iniciandoVerif, setIniciandoVerif] = (0, import_react.useState)(false);
     (0, import_react.useEffect)(() => {
       setBaseInv((prev) => {
         const ids = new Set(prev.map((p) => p.id));
@@ -74409,7 +74410,7 @@ ${sinStock.map((it) => {
           ajuste,
           contado,
           diferencia,
-          estado: diferencia <= 0 ? diferencia === 0 ? "OK" : "FALTANTE" : "OK"
+          estado: diferencia === 0 ? "OK" : diferencia > 0 ? "SOBRANTE" : "FALTANTE"
         };
       }).filter((r) => r.sistema > 0 || r.contado > 0).sort((a, b) => Math.abs(b.diferencia) - Math.abs(a.diferencia) || (a.nombre || "").localeCompare(b.nombre || ""));
     }, [productos, conteo, ventasAjuste, cargasAjuste]);
@@ -74423,6 +74424,33 @@ ${sinStock.map((it) => {
     );
     const itemsContados = Object.keys(conteo).length;
     const unidadesContadas = Object.values(conteo).reduce((s, v) => s + v, 0);
+    async function iniciarVerificacionRapida() {
+      if (itemsContados > 0) {
+        setModoCierre(true);
+        return;
+      }
+      if (iniciandoVerif) return;
+      setIniciandoVerif(true);
+      try {
+        await procesarOutbox();
+        const pendientesSync = getOutbox().length;
+        if (pendientesSync > 0) {
+          const continuar = window.confirm(
+            `Todav\xEDa hay ${pendientesSync} cambio(s) pendiente(s) de subir a la nube.
+
+Para una comparaci\xF3n exacta conviene esperar a que se sincronicen. \xBFDeseas continuar temporalmente con la copia local?`
+          );
+          if (!continuar) return;
+        }
+        const nube = pendientesSync === 0 ? await sbCargarInventario() : null;
+        const fuente = Array.isArray(nube) && nube.length > 0 ? nube : inv;
+        setBaseInv(fuente.map((p) => ({ ...p })));
+        setBaseTs(/* @__PURE__ */ new Date());
+        setModoCierre(true);
+      } finally {
+        setIniciandoVerif(false);
+      }
+    }
     const faltantesFinal = cruce.filter((r) => r.estado === "FALTANTE");
     const sobrantesFinal = cruce.filter((r) => r.estado === "SOBRANTE");
     const okFinal = cruce.filter((r) => r.estado === "OK").length;
@@ -74707,13 +74735,13 @@ Base de inventario tomada: ${baseTs.toLocaleString("es-BO")}`)) return;
         color: activa ? m.color : C.label2,
         whiteSpace: "nowrap"
       } }, m.nombre));
-    })), marcaSelec && /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT, marginTop: 8, lineHeight: 1.4, paddingLeft: 2 } }, "Solo se contar\xE1n y cruzar\xE1n productos de ", /* @__PURE__ */ import_react.default.createElement("b", { style: { color: C.label2 } }, marcaSelNombre), ". Los c\xF3digos de otras marcas se rechazan durante el escaneo.")), /* @__PURE__ */ import_react.default.createElement("button", { onClick: () => setModoCierre(true), style: {
+    })), marcaSelec && /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT, marginTop: 8, lineHeight: 1.4, paddingLeft: 2 } }, "Solo se contar\xE1n y cruzar\xE1n productos de ", /* @__PURE__ */ import_react.default.createElement("b", { style: { color: C.label2 } }, marcaSelNombre), ". Los c\xF3digos de otras marcas se rechazan durante el escaneo.")), /* @__PURE__ */ import_react.default.createElement("button", { onClick: iniciarVerificacionRapida, disabled: iniciandoVerif, style: {
       width: "100%",
       border: "none",
       borderRadius: 16,
       marginBottom: 14,
       padding: "18px 20px",
-      cursor: "pointer",
+      cursor: iniciandoVerif ? "wait" : "pointer",
       WebkitTapHighlightColor: "transparent",
       display: "flex",
       alignItems: "center",
@@ -74732,7 +74760,7 @@ Base de inventario tomada: ${baseTs.toLocaleString("es-BO")}`)) return;
       alignItems: "center",
       justifyContent: "center",
       fontSize: 22
-    } }, "\u26A1"), /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 14.5, fontWeight: 800, color: "#fff", fontFamily: FONT, letterSpacing: ".01em" } }, "Iniciar Verificaci\xF3n R\xE1pida"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11.5, color: "rgba(255,255,255,0.65)", fontFamily: FONT, marginTop: 2 } }, "Con lector de c\xF3digo de barras USB \u2014 escanea cada prenda en continuo")), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: "#C4A57B", fontWeight: 700, fontFamily: FONT, flexShrink: 0 } }, "\u2192")), modoCierre && /* @__PURE__ */ import_react.default.createElement(
+    } }, "\u26A1"), /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 14.5, fontWeight: 800, color: "#fff", fontFamily: FONT, letterSpacing: ".01em" } }, iniciandoVerif ? "Sincronizando inventario\u2026" : "Iniciar Verificaci\xF3n R\xE1pida"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11.5, color: "rgba(255,255,255,0.65)", fontFamily: FONT, marginTop: 2 } }, "Con lector de c\xF3digo de barras USB \u2014 escanea cada prenda en continuo")), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: "#C4A57B", fontWeight: 700, fontFamily: FONT, flexShrink: 0 } }, "\u2192")), modoCierre && /* @__PURE__ */ import_react.default.createElement(
       LectorHID,
       {
         onDetect: onDetectCierreRapido,
@@ -74984,7 +75012,7 @@ Base de inventario tomada: ${baseTs.toLocaleString("es-BO")}`)) return;
       marginBottom: 14,
       background: C.redBg,
       border: `1px solid ${C.red}33`
-    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 18 } }, "\u26A0"), /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1, fontSize: 12, color: C.red, fontFamily: FONT, lineHeight: 1.4 } }, /* @__PURE__ */ import_react.default.createElement("b", null, discrepancias.length - verificadosCount, " discrepancia(s) sin verificar."), " Opcional: toca para hacer una segunda revisi\xF3n (doble conteo) antes de guardar.")), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 10 } }, /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => setModoCierre(true), variant: "fill", full: true, icon: "\u{1F4F7}" }, "Escanear \xEDtem rezagado"), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => exportAuditoriaExcel({
+    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 18 } }, "\u26A0"), /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1, fontSize: 12, color: C.red, fontFamily: FONT, lineHeight: 1.4 } }, /* @__PURE__ */ import_react.default.createElement("b", null, discrepancias.length - verificadosCount, " discrepancia(s) sin verificar."), " Opcional: toca para hacer una segunda revisi\xF3n (doble conteo) antes de guardar.")), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 10 } }, /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: iniciarVerificacionRapida, variant: "fill", full: true, icon: "\u{1F4F7}", disabled: iniciandoVerif }, "Escanear \xEDtem rezagado"), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => exportAuditoriaExcel({
       id: `AUD-${MK}-preview`,
       mk: MK,
       mes,

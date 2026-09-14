@@ -9011,11 +9011,11 @@ function LectorHID({onDetect, onClose, onReiniciar, feedback, stats, rows, marca
 
   // Orden estable por código + estado de avance por fila
   const lista = (rows||[]).slice().sort((a,b)=>(a.codigo||"").localeCompare(b.codigo||""));
-  const completos = lista.filter(r=>r.sistema>0 && r.contado>=r.sistema).length;
+  const completos = lista.filter(r=>r.sistema>0 && r.contado===r.sistema).length;
   const pendientes = lista.filter(r=>r.contado<r.sistema).length;
   const unidadesPendientes = lista.reduce((s,r)=> s + Math.max(0,r.sistema-r.contado), 0);
   function estadoFila(r){
-    if(r.contado>r.sistema) return {lbl:"Sobrante", col:"#3B82F6", bg:"rgba(59,130,246,0.14)"};
+    if(r.contado>r.sistema) return {lbl:`Sobrante +${r.contado-r.sistema}`, col:"#3B82F6", bg:"rgba(59,130,246,0.14)"};
     if(r.sistema>0 && r.contado>=r.sistema) return {lbl:"Completo", col:"#22C55E", bg:"rgba(34,197,94,0.14)"};
     if(r.contado>0) return {lbl:`Parcial ${r.contado}/${r.sistema}`, col:"#F59E0B", bg:"rgba(245,158,11,0.14)"};
     return {lbl:"Pendiente", col:"rgba(255,255,255,0.45)", bg:"rgba(255,255,255,0.05)"};
@@ -18970,7 +18970,8 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
   // Ventas no modifican "sistema" a mitad del conteo.
   // Importaciones nuevas sí aparecen de inmediato (useEffect abajo).
   const[baseInv,setBaseInv]=useState(()=> inv.map(p=>({...p})));
-  const[baseTs] =useState(()=> new Date());
+  const[baseTs,setBaseTs] =useState(()=> new Date());
+  const[iniciandoVerif,setIniciandoVerif]=useState(false);
 
   useEffect(()=>{
     setBaseInv(prev=>{
@@ -19245,7 +19246,7 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
       const contado = conteo[p.id]||0;
       const diferencia = contado - sistema;
       return {...p, sistema, sistemaBase:p.stock, ajuste, contado, diferencia,
-        estado: diferencia<=0 ? (diferencia===0 ? "OK" : "FALTANTE") : "OK"};
+        estado: diferencia===0 ? "OK" : diferencia>0 ? "SOBRANTE" : "FALTANTE"};
     })
     .filter(r=>r.sistema>0 || r.contado>0)
     .sort((a,b)=> Math.abs(b.diferencia)-Math.abs(a.diferencia) || (a.nombre||"").localeCompare(b.nombre||""));
@@ -19261,6 +19262,36 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
 
   const itemsContados   = Object.keys(conteo).length;
   const unidadesContadas= Object.values(conteo).reduce((s,v)=>s+v,0);
+
+  // Antes de una verificación NUEVA, drena los cambios pendientes y vuelve a
+  // leer el inventario desde Supabase. Esto evita congelar el valor viejo del
+  // localStorage mientras la carga inicial de la nube todavía está en curso.
+  // Si ya existe un conteo, conserva su base para no cambiar las reglas a mitad
+  // de una auditoría en progreso.
+  async function iniciarVerificacionRapida(){
+    if(itemsContados>0){ setModoCierre(true); return; }
+    if(iniciandoVerif) return;
+    setIniciandoVerif(true);
+    try{
+      await procesarOutbox();
+      const pendientesSync=getOutbox().length;
+      if(pendientesSync>0){
+        const continuar=window.confirm(
+          `Todavía hay ${pendientesSync} cambio(s) pendiente(s) de subir a la nube.\n\n`+
+          "Para una comparación exacta conviene esperar a que se sincronicen. "+
+          "¿Deseas continuar temporalmente con la copia local?"
+        );
+        if(!continuar) return;
+      }
+      const nube=pendientesSync===0 ? await sbCargarInventario() : null;
+      const fuente=Array.isArray(nube) && nube.length>0 ? nube : inv;
+      setBaseInv(fuente.map(p=>({...p})));
+      setBaseTs(new Date());
+      setModoCierre(true);
+    }finally{
+      setIniciandoVerif(false);
+    }
+  }
 
   // ── Resultado FINAL del cierre: incluye TODO el inventario, tratando los
   // productos aún no escaneados como "Faltante" (se asume que al confirmar
@@ -19503,9 +19534,9 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
       </div>
 
       {/* ── Cierre Rápido — escaneo continuo de pasada ── */}
-      <button onClick={()=>setModoCierre(true)} style={{
+      <button onClick={iniciarVerificacionRapida} disabled={iniciandoVerif} style={{
         width:"100%",border:"none",borderRadius:16,marginBottom:14,
-        padding:"18px 20px",cursor:"pointer",WebkitTapHighlightColor:"transparent",
+        padding:"18px 20px",cursor:iniciandoVerif?"wait":"pointer",WebkitTapHighlightColor:"transparent",
         display:"flex",alignItems:"center",gap:14,textAlign:"left",
         background:"linear-gradient(135deg, #1A1714, #2E2620)",
         boxShadow:"0 6px 22px rgba(26,23,20,0.28)",
@@ -19515,7 +19546,7 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
           display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>⚡</div>
         <div style={{flex:1,minWidth:0}}>
           <div style={{fontSize:14.5,fontWeight:800,color:"#fff",fontFamily:FONT,letterSpacing:".01em"}}>
-            Iniciar Verificación Rápida
+            {iniciandoVerif?"Sincronizando inventario…":"Iniciar Verificación Rápida"}
           </div>
           <div style={{fontSize:11.5,color:"rgba(255,255,255,0.65)",fontFamily:FONT,marginTop:2}}>
             Con lector de código de barras USB — escanea cada prenda en continuo
@@ -19750,7 +19781,7 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
           )}
 
           <div style={{display:"flex",flexDirection:"column",gap:10}}>
-            <IOSBtn onPress={()=>setModoCierre(true)} variant="fill" full icon="📷">
+            <IOSBtn onPress={iniciarVerificacionRapida} variant="fill" full icon="📷" disabled={iniciandoVerif}>
               Escanear ítem rezagado
             </IOSBtn>
             <IOSBtn onPress={()=>exportAuditoriaExcel({
