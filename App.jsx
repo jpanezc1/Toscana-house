@@ -18972,6 +18972,7 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
   const[baseInv,setBaseInv]=useState(()=> inv.map(p=>({...p})));
   const[baseTs,setBaseTs] =useState(()=> new Date());
   const[iniciandoVerif,setIniciandoVerif]=useState(false);
+  const[baseNubeConfirmada,setBaseNubeConfirmada]=useState(false);
 
   useEffect(()=>{
     setBaseInv(prev=>{
@@ -19175,6 +19176,7 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
     if(Object.keys(conteo).length===0) return;
     if(window.confirm("¿Reiniciar el conteo físico? Se perderán los ítems escaneados hasta ahora.")) {
       setConteo({}); setVerifConteo({}); setManualVerif({});
+      setBaseNubeConfirmada(false);
       try{
         localStorage.removeItem(`th_verif_conteo_${MK}_${marcaSelec||"ALL"}`);
         localStorage.removeItem(`th_verif_doble_${MK}`);
@@ -19192,6 +19194,7 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
       "Se borrará el conteo actual (no quedará guardado en el historial)."
     )) return;
     setConteo({}); setVerifConteo({}); setManualVerif({});
+    setBaseNubeConfirmada(false);
     try{
       localStorage.removeItem(`th_verif_conteo_${MK}_${marcaSelec||"ALL"}`);
       localStorage.removeItem(`th_verif_doble_${MK}`);
@@ -19263,13 +19266,13 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
   const itemsContados   = Object.keys(conteo).length;
   const unidadesContadas= Object.values(conteo).reduce((s,v)=>s+v,0);
 
-  // Antes de una verificación NUEVA, drena los cambios pendientes y vuelve a
-  // leer el inventario desde Supabase. Esto evita congelar el valor viejo del
-  // localStorage mientras la carga inicial de la nube todavía está en curso.
-  // Si ya existe un conteo, conserva su base para no cambiar las reglas a mitad
-  // de una auditoría en progreso.
+  // Antes de abrir (o retomar) una verificación, confirma UNA VEZ su base contra
+  // Supabase. Los escaneos ya realizados se conservan: solo se reemplaza la
+  // columna "Sistema" por la existencia vigente y se recalculan diferencias.
+  // Después de confirmarla, la base vuelve a quedar congelada para que no cambie
+  // silenciosamente a mitad del conteo.
   async function iniciarVerificacionRapida(){
-    if(itemsContados>0){ setModoCierre(true); return; }
+    if(baseNubeConfirmada){ setModoCierre(true); return; }
     if(iniciandoVerif) return;
     setIniciandoVerif(true);
     try{
@@ -19284,9 +19287,17 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
         if(!continuar) return;
       }
       const nube=pendientesSync===0 ? await sbCargarInventario() : null;
+      if(pendientesSync===0 && !Array.isArray(nube)){
+        const continuar=window.confirm(
+          "No se pudo consultar el inventario de la nube.\n\n"+
+          "¿Deseas continuar temporalmente con la copia local sin borrar el conteo realizado?"
+        );
+        if(!continuar) return;
+      }
       const fuente=Array.isArray(nube) && nube.length>0 ? nube : inv;
       setBaseInv(fuente.map(p=>({...p})));
       setBaseTs(new Date());
+      setBaseNubeConfirmada(Array.isArray(nube));
       setModoCierre(true);
     }finally{
       setIniciandoVerif(false);
@@ -19382,6 +19393,7 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
     // sistema vs escaneado, con faltantes/sobrantes marcados)
     try{ exportAuditoriaExcel(aud); }catch(e){ console.error("Export cierre:",e); }
     setConteo({}); setVerifConteo({}); setManualVerif({});
+    setBaseNubeConfirmada(false);
     try{
       localStorage.removeItem(`th_verif_conteo_${MK}_${marcaSelec||"ALL"}`);
       localStorage.removeItem(`th_verif_doble_${MK}`);

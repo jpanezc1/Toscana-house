@@ -74134,6 +74134,7 @@ ${sinStock.map((it) => {
     const [baseInv, setBaseInv] = (0, import_react.useState)(() => inv.map((p) => ({ ...p })));
     const [baseTs, setBaseTs] = (0, import_react.useState)(() => /* @__PURE__ */ new Date());
     const [iniciandoVerif, setIniciandoVerif] = (0, import_react.useState)(false);
+    const [baseNubeConfirmada, setBaseNubeConfirmada] = (0, import_react.useState)(false);
     (0, import_react.useEffect)(() => {
       setBaseInv((prev) => {
         const ids = new Set(prev.map((p) => p.id));
@@ -74342,6 +74343,7 @@ ${sinStock.map((it) => {
         setConteo({});
         setVerifConteo({});
         setManualVerif({});
+        setBaseNubeConfirmada(false);
         try {
           localStorage.removeItem(`th_verif_conteo_${MK}_${marcaSelec || "ALL"}`);
           localStorage.removeItem(`th_verif_doble_${MK}`);
@@ -74358,6 +74360,7 @@ ${sinStock.map((it) => {
       setConteo({});
       setVerifConteo({});
       setManualVerif({});
+      setBaseNubeConfirmada(false);
       try {
         localStorage.removeItem(`th_verif_conteo_${MK}_${marcaSelec || "ALL"}`);
         localStorage.removeItem(`th_verif_doble_${MK}`);
@@ -74425,7 +74428,7 @@ ${sinStock.map((it) => {
     const itemsContados = Object.keys(conteo).length;
     const unidadesContadas = Object.values(conteo).reduce((s, v) => s + v, 0);
     async function iniciarVerificacionRapida() {
-      if (itemsContados > 0) {
+      if (baseNubeConfirmada) {
         setModoCierre(true);
         return;
       }
@@ -74443,9 +74446,16 @@ Para una comparaci\xF3n exacta conviene esperar a que se sincronicen. \xBFDeseas
           if (!continuar) return;
         }
         const nube = pendientesSync === 0 ? await sbCargarInventario() : null;
+        if (pendientesSync === 0 && !Array.isArray(nube)) {
+          const continuar = window.confirm(
+            "No se pudo consultar el inventario de la nube.\n\n\xBFDeseas continuar temporalmente con la copia local sin borrar el conteo realizado?"
+          );
+          if (!continuar) return;
+        }
         const fuente = Array.isArray(nube) && nube.length > 0 ? nube : inv;
         setBaseInv(fuente.map((p) => ({ ...p })));
         setBaseTs(/* @__PURE__ */ new Date());
+        setBaseNubeConfirmada(Array.isArray(nube));
         setModoCierre(true);
       } finally {
         setIniciandoVerif(false);
@@ -74573,6 +74583,7 @@ Base de inventario tomada: ${baseTs.toLocaleString("es-BO")}`)) return;
       setConteo({});
       setVerifConteo({});
       setManualVerif({});
+      setBaseNubeConfirmada(false);
       try {
         localStorage.removeItem(`th_verif_conteo_${MK}_${marcaSelec || "ALL"}`);
         localStorage.removeItem(`th_verif_doble_${MK}`);
