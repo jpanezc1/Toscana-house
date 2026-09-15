@@ -56017,20 +56017,29 @@
   }
   var HOJA_HUELLA_CARGA = "WS_HUELLA";
   var PADRON_UNICO_TOKEN = "FORGE-PADRON-UNICO-2026-V2";
+  var PADRON_UNICO_AVISO = "No borres ni renombres esta hoja.";
   var PADRON_UNICO_HEADERS = ["MARCA", "PRODUCTO", "DESCRIPCI\xD3N", "COLOR", "TALLA", "CANTIDAD", "PRECIO VENTA"];
   function validarPadronUnico(XLSX2, wb) {
     try {
       const hojas = wb.SheetNames || [];
       if (hojas.length !== 3 || hojas[0] !== "CARGA" || hojas[1] !== "COMO USARLO" || hojas[2] !== HOJA_HUELLA_CARGA) return false;
-      const huellaMeta = (wb.Workbook?.Sheets || []).find((s) => s.name === HOJA_HUELLA_CARGA);
-      if (!huellaMeta || Number(huellaMeta.Hidden) !== 1) return false;
-      const firma = wb.Sheets[HOJA_HUELLA_CARGA]?.A1?.v;
+      const metas = wb.Workbook?.Sheets || [];
+      if (metas.length !== 3 || Number(metas[0]?.Hidden || 0) !== 0 || Number(metas[1]?.Hidden || 0) !== 0 || Number(metas[2]?.Hidden) !== 1) return false;
+      const huella = wb.Sheets[HOJA_HUELLA_CARGA];
+      if (!huella || huella["!ref"] !== "A1:A2") return false;
+      const firma = huella.A1?.v;
       if (String(firma || "").trim().toUpperCase() !== PADRON_UNICO_TOKEN) return false;
+      if (String(huella.A2?.v || "").trim() !== PADRON_UNICO_AVISO) return false;
+      if (wb.vbaraw) return false;
       const carga = wb.Sheets.CARGA;
-      if (!carga) return false;
+      if (!carga || carga["!ref"] !== "A1:G401" || (carga["!merges"] || []).length > 0) return false;
       const fila = (XLSX2.utils.sheet_to_json(carga, { header: 1, defval: "" })[0] || []).map((x) => String(x || "").trim().toUpperCase());
       if (PADRON_UNICO_HEADERS.some((h, i) => fila[i] !== h) || fila.slice(PADRON_UNICO_HEADERS.length).some(Boolean)) return false;
-      return carga["!ref"] === "A1:G401";
+      for (let r = 1; r <= 400; r++) for (let c = 0; c < 7; c++) {
+        const celda = carga[XLSX2.utils.encode_cell({ r, c })];
+        if (celda && (celda.f || celda.l || celda.t === "e")) return false;
+      }
+      return true;
     } catch {
       return false;
     }
@@ -56061,7 +56070,7 @@
     ]);
     guia["!cols"] = [{ wch: 110 }];
     guia["!protect"] = { password: "FORGE2026" };
-    const firma = XLSX2.utils.aoa_to_sheet([[PADRON_UNICO_TOKEN], ["No borres ni renombres esta hoja."]]);
+    const firma = XLSX2.utils.aoa_to_sheet([[PADRON_UNICO_TOKEN], [PADRON_UNICO_AVISO]]);
     firma["!protect"] = { password: "FORGE2026" };
     const wb = XLSX2.utils.book_new();
     XLSX2.utils.book_append_sheet(wb, ws, "CARGA");
@@ -63084,6 +63093,11 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
         alert("Solo se acepta el archivo oficial PADRON_UNICO_CARGA_MASIVA_FORGE.xlsx.");
         return;
       }
+      if (Number(file?.size || 0) > 5 * 1024 * 1024) {
+        setEstado("idle");
+        alert("El archivo supera el tama\xF1o permitido. Usa el padr\xF3n oficial sin agregar im\xE1genes ni otras hojas.");
+        return;
+      }
       try {
         let matchMarca = function(nomRaw) {
           if (!nomRaw || !nomRaw.trim()) return null;
@@ -63105,7 +63119,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
         };
         const XLSX2 = await loadXLSX();
         const buf = await file.arrayBuffer();
-        const wb = XLSX2.read(buf, { type: "array" });
+        const wb = XLSX2.read(buf, { type: "array", bookVBA: true, cellStyles: true });
         if (!validarPadronUnico(XLSX2, wb)) {
           setEstado("idle");
           alert("Esta planilla no se puede cargar. Usa PADRON_UNICO_CARGA_MASIVA_FORGE.xlsx y copia tus datos dentro de la hoja CARGA sin modificar los t\xEDtulos.");

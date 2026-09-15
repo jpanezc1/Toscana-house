@@ -2503,20 +2503,31 @@ function playPagoSound(){
 // ══════════════════════════════════════════════════════════════
 const HOJA_HUELLA_CARGA = "WS_HUELLA"; // nombre legado, oculto; compartido con Working Style
 const PADRON_UNICO_TOKEN = "FORGE-PADRON-UNICO-2026-V2";
+const PADRON_UNICO_AVISO = "No borres ni renombres esta hoja.";
 const PADRON_UNICO_HEADERS = ["MARCA","PRODUCTO","DESCRIPCIÓN","COLOR","TALLA","CANTIDAD","PRECIO VENTA"];
 function validarPadronUnico(XLSX,wb){
   try{
     const hojas=wb.SheetNames||[];
     if(hojas.length!==3 || hojas[0]!=="CARGA" || hojas[1]!=="COMO USARLO" || hojas[2]!==HOJA_HUELLA_CARGA) return false;
-    const huellaMeta=(wb.Workbook?.Sheets||[]).find(s=>s.name===HOJA_HUELLA_CARGA);
-    if(!huellaMeta || Number(huellaMeta.Hidden)!==1) return false;
-    const firma=wb.Sheets[HOJA_HUELLA_CARGA]?.A1?.v;
+    const metas=wb.Workbook?.Sheets||[];
+    if(metas.length!==3 || Number(metas[0]?.Hidden||0)!==0 || Number(metas[1]?.Hidden||0)!==0 || Number(metas[2]?.Hidden)!==1) return false;
+    const huella=wb.Sheets[HOJA_HUELLA_CARGA];
+    if(!huella || huella["!ref"]!=="A1:A2") return false;
+    const firma=huella.A1?.v;
     if(String(firma||"").trim().toUpperCase()!==PADRON_UNICO_TOKEN) return false;
+    if(String(huella.A2?.v||"").trim()!==PADRON_UNICO_AVISO) return false;
+    if(wb.vbaraw) return false;
     const carga=wb.Sheets.CARGA;
-    if(!carga) return false;
+    if(!carga || carga["!ref"]!=="A1:G401" || (carga["!merges"]||[]).length>0) return false;
     const fila=(XLSX.utils.sheet_to_json(carga,{header:1,defval:""})[0]||[]).map(x=>String(x||"").trim().toUpperCase());
     if(PADRON_UNICO_HEADERS.some((h,i)=>fila[i]!==h) || fila.slice(PADRON_UNICO_HEADERS.length).some(Boolean)) return false;
-    return carga["!ref"]==="A1:G401";
+    // Solo se permiten valores pegados. Las fórmulas, hipervínculos y errores
+    // quedan fuera para evitar archivos adulterados o contenido ejecutable.
+    for(let r=1;r<=400;r++) for(let c=0;c<7;c++){
+      const celda=carga[XLSX.utils.encode_cell({r,c})];
+      if(celda && (celda.f || celda.l || celda.t==="e")) return false;
+    }
+    return true;
   }catch{return false;}
 }
 
@@ -2545,7 +2556,7 @@ async function generarPlantillaXLSX(){
     ["Guarden y envíen este mismo archivo .xlsx; no copien la hoja a otro libro."],
   ]);
   guia["!cols"]=[{wch:110}]; guia["!protect"]={password:"FORGE2026"};
-  const firma=XLSX.utils.aoa_to_sheet([[PADRON_UNICO_TOKEN],["No borres ni renombres esta hoja."]]);
+  const firma=XLSX.utils.aoa_to_sheet([[PADRON_UNICO_TOKEN],[PADRON_UNICO_AVISO]]);
   firma["!protect"]={password:"FORGE2026"};
   const wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb,ws,"CARGA"); XLSX.utils.book_append_sheet(wb,guia,"COMO USARLO"); XLSX.utils.book_append_sheet(wb,firma,HOJA_HUELLA_CARGA);
@@ -9268,10 +9279,15 @@ function ImportarExcelModal({inv, onImportar, onClose, onArchivoCapturado}){
       alert("Solo se acepta el archivo oficial PADRON_UNICO_CARGA_MASIVA_FORGE.xlsx.");
       return;
     }
+    if(Number(file?.size||0)>5*1024*1024){
+      setEstado("idle");
+      alert("El archivo supera el tamaño permitido. Usa el padrón oficial sin agregar imágenes ni otras hojas.");
+      return;
+    }
     try{
       const XLSX = await loadXLSX();
       const buf  = await file.arrayBuffer();
-      const wb   = XLSX.read(buf,{type:"array"});
+      const wb   = XLSX.read(buf,{type:"array",bookVBA:true,cellStyles:true});
 
       // Candado de formato: no se captura ni procesa ningún archivo que no sea
       // el padrón único oficial con huella y encabezados exactos.
