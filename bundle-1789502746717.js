@@ -56040,26 +56040,9 @@
     }
   }
   async function generarPlantillaXLSX() {
-    const XLSX2 = await loadXLSX();
-    const headers = PADRON_UNICO_HEADERS;
-    const rows = [headers, ...Array.from({ length: 400 }, () => Array(7).fill(""))];
-    const ws = XLSX2.utils.aoa_to_sheet(rows);
-    for (let r = 2; r <= 401; r++) {
-      [1, 2, 3, 4, 5, 6, 7].forEach((c) => {
-        const a = XLSX2.utils.encode_cell({ r: r - 1, c: c - 1 });
-        if (!ws[a]) ws[a] = { t: "s", v: "" };
-        ws[a].s = { ...ws[a].s || {}, protection: { locked: false } };
-      });
-    }
-    ws["!ref"] = "A1:G401";
-    ws["!cols"] = [{ wch: 22 }, { wch: 28 }, { wch: 38 }, { wch: 18 }, { wch: 12 }, { wch: 12 }, { wch: 16 }];
-    ws["!autofilter"] = { ref: "A1:G401" };
-    ws["!protect"] = { password: "FORGE2026", formatCells: true, formatColumns: true, formatRows: true, insertColumns: true, deleteColumns: true, insertRows: true, deleteRows: true };
-    const wb = XLSX2.utils.book_new();
-    XLSX2.utils.book_append_sheet(wb, ws, "CARGA");
-    wb.Custprops = { ...wb.Custprops || {}, [PADRON_UNICO_PROP]: PADRON_UNICO_TOKEN };
-    const buf = XLSX2.write(wb, { bookType: "xlsx", type: "array", cellStyles: true });
-    descargarArchivo(new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), "PADRON_UNICO_CARGA_MASIVA_FORGE.xlsx");
+    const resp = await fetch("./public/PADRON_UNICO_CARGA_MASIVA_FORGE.xlsx", { cache: "no-store" });
+    if (!resp.ok) throw new Error("No se pudo obtener el padr\xF3n oficial");
+    descargarArchivo(await resp.blob(), "PADRON_UNICO_CARGA_MASIVA_FORGE.xlsx");
   }
   function leerCfgLiq(marcaId) {
     const id = Number(marcaId);

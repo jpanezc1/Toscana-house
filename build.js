@@ -65,6 +65,7 @@ const CORE_ASSETS = [
   "./public/favicon.ico",
   "./public/logo192.png",
   "./public/logo512.png",
+  "./public/PADRON_UNICO_CARGA_MASIVA_FORGE.xlsx",
 ];
 
 self.addEventListener("install", (event) => {

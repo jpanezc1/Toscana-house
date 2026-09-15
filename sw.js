@@ -1,13 +1,14 @@
 // Generado automáticamente por build.js — no editar a mano
-const CACHE_NAME = "th-cache-1789502630991";
+const CACHE_NAME = "th-cache-1789502746717";
 const CORE_ASSETS = [
   "./",
   "./index.html",
   "./manifest.json",
-  "./bundle-1789502630991.js",
+  "./bundle-1789502746717.js",
   "./public/favicon.ico",
   "./public/logo192.png",
   "./public/logo512.png",
+  "./public/PADRON_UNICO_CARGA_MASIVA_FORGE.xlsx",
 ];
 
 self.addEventListener("install", (event) => {
