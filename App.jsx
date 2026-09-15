@@ -2507,19 +2507,38 @@ const PADRON_UNICO_HEADERS = ["MARCA","PRODUCTO","DESCRIPCIÓN","COLOR","CANTIDA
 function validarPadronUnico(XLSX,wb){
   try{
     const hojas=wb.SheetNames||[];
-    if(hojas.length!==1 || hojas[0]!=="CARGA") return false;
+    if(hojas.length!==1) return false;
     const metas=wb.Workbook?.Sheets||[];
     if(metas.length!==1 || Number(metas[0]?.Hidden||0)!==0) return false;
-    // La huella vive en una propiedad interna del libro: no agrega hojas visibles.
-    if(String(wb.Custprops?.[PADRON_UNICO_PROP]||"").trim().toUpperCase()!==PADRON_UNICO_TOKEN) return false;
     if(wb.vbaraw) return false;
-    const carga=wb.Sheets.CARGA;
-    if(!carga || carga["!ref"]!=="A1:G401" || (carga["!merges"]||[]).length>0) return false;
-    const fila=(XLSX.utils.sheet_to_json(carga,{header:1,defval:""})[0]||[]).map(x=>String(x||"").trim().toUpperCase());
+    const carga=wb.Sheets[hojas[0]];
+    if(!carga?.["!ref"]) return false;
+    const rango=XLSX.utils.decode_range(carga["!ref"]);
+    if(rango.s.r!==0 || rango.s.c!==0 || rango.e.c!==6 || rango.e.r>401) return false;
+    const raw=XLSX.utils.sheet_to_json(carga,{header:1,defval:""});
+    const normalizarFila=f=>(f||[]).map(x=>String(x||"").trim().toUpperCase());
+    let hRow=normalizarFila(raw[0]).every((x,i)=>x===(PADRON_UNICO_HEADERS[i]||"")) ? 0 : -1;
+    // Numbers agrega una fila "Table 1" al exportar. Se admite solo esa
+    // envoltura y siempre con los siete encabezados oficiales intactos.
+    if(hRow<0 && String(raw[0]?.[0]||"").trim().toUpperCase()==="TABLE 1" && raw[0].slice(1).every(x=>!String(x||"").trim())){
+      hRow=normalizarFila(raw[1]).every((x,i)=>x===(PADRON_UNICO_HEADERS[i]||"")) ? 1 : -1;
+    }
+    if(hRow<0) return false;
+    const fila=normalizarFila(raw[hRow]);
     if(PADRON_UNICO_HEADERS.some((h,i)=>fila[i]!==h) || fila.slice(PADRON_UNICO_HEADERS.length).some(Boolean)) return false;
+    const huella=String(wb.Custprops?.[PADRON_UNICO_PROP]||"").trim().toUpperCase();
+    // Si existe una huella debe ser la vigente. Si Numbers la eliminó, la
+    // estructura exacta anterior funciona como modo de compatibilidad.
+    if(huella && huella!==PADRON_UNICO_TOKEN) return false;
+    if(huella && (hojas[0]!=="CARGA" || hRow!==0 || carga["!ref"]!=="A1:G401" || (carga["!merges"]||[]).length>0)) return false;
+    if(!huella){
+      const merges=carga["!merges"]||[];
+      const mergeNumbers=hRow===1 && merges.length===1 && merges[0].s.r===0 && merges[0].s.c===0 && merges[0].e.r===0 && merges[0].e.c===6;
+      if(merges.length && !mergeNumbers) return false;
+    }
     // Solo se permiten valores pegados. Las fórmulas, hipervínculos y errores
     // quedan fuera para evitar archivos adulterados o contenido ejecutable.
-    for(let r=1;r<=400;r++) for(let c=0;c<7;c++){
+    for(let r=hRow+1;r<=rango.e.r;r++) for(let c=0;c<7;c++){
       const celda=carga[XLSX.utils.encode_cell({r,c})];
       if(celda && (celda.f || celda.l || celda.t==="e")) return false;
     }
@@ -9926,7 +9945,7 @@ function ImportarExcelModal({inv, onImportar, onClose, onArchivoCapturado}){
             </div>
             <div style={{display:"flex",flexDirection:"column",gap:8}}>
               {[
-                ["🔒 Valida el padrón","Exige una sola hoja CARGA, la huella interna y las siete columnas oficiales",C.label],
+                ["🔒 Valida el padrón","Exige una sola hoja y las siete columnas oficiales; compatible con Excel y Numbers",C.label],
                 ["🏷️ Auto-código","Genera un código único con marca, talla y correlativo",C.gold],
                 ["👕 Conserva el detalle","Guarda Producto, Descripción, Color y Talla para inventario y etiquetas",C.blue],
                 ["✅ Verifica precio","Detecta precio inválido o 0 y lo marca como error antes de importar",C.green],

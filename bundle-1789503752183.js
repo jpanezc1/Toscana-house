@@ -56021,16 +56021,32 @@
   function validarPadronUnico(XLSX2, wb) {
     try {
       const hojas = wb.SheetNames || [];
-      if (hojas.length !== 1 || hojas[0] !== "CARGA") return false;
+      if (hojas.length !== 1) return false;
       const metas = wb.Workbook?.Sheets || [];
       if (metas.length !== 1 || Number(metas[0]?.Hidden || 0) !== 0) return false;
-      if (String(wb.Custprops?.[PADRON_UNICO_PROP] || "").trim().toUpperCase() !== PADRON_UNICO_TOKEN) return false;
       if (wb.vbaraw) return false;
-      const carga = wb.Sheets.CARGA;
-      if (!carga || carga["!ref"] !== "A1:G401" || (carga["!merges"] || []).length > 0) return false;
-      const fila = (XLSX2.utils.sheet_to_json(carga, { header: 1, defval: "" })[0] || []).map((x) => String(x || "").trim().toUpperCase());
+      const carga = wb.Sheets[hojas[0]];
+      if (!carga?.["!ref"]) return false;
+      const rango = XLSX2.utils.decode_range(carga["!ref"]);
+      if (rango.s.r !== 0 || rango.s.c !== 0 || rango.e.c !== 6 || rango.e.r > 401) return false;
+      const raw = XLSX2.utils.sheet_to_json(carga, { header: 1, defval: "" });
+      const normalizarFila = (f) => (f || []).map((x) => String(x || "").trim().toUpperCase());
+      let hRow = normalizarFila(raw[0]).every((x, i) => x === (PADRON_UNICO_HEADERS[i] || "")) ? 0 : -1;
+      if (hRow < 0 && String(raw[0]?.[0] || "").trim().toUpperCase() === "TABLE 1" && raw[0].slice(1).every((x) => !String(x || "").trim())) {
+        hRow = normalizarFila(raw[1]).every((x, i) => x === (PADRON_UNICO_HEADERS[i] || "")) ? 1 : -1;
+      }
+      if (hRow < 0) return false;
+      const fila = normalizarFila(raw[hRow]);
       if (PADRON_UNICO_HEADERS.some((h, i) => fila[i] !== h) || fila.slice(PADRON_UNICO_HEADERS.length).some(Boolean)) return false;
-      for (let r = 1; r <= 400; r++) for (let c = 0; c < 7; c++) {
+      const huella = String(wb.Custprops?.[PADRON_UNICO_PROP] || "").trim().toUpperCase();
+      if (huella && huella !== PADRON_UNICO_TOKEN) return false;
+      if (huella && (hojas[0] !== "CARGA" || hRow !== 0 || carga["!ref"] !== "A1:G401" || (carga["!merges"] || []).length > 0)) return false;
+      if (!huella) {
+        const merges = carga["!merges"] || [];
+        const mergeNumbers = hRow === 1 && merges.length === 1 && merges[0].s.r === 0 && merges[0].s.c === 0 && merges[0].e.r === 0 && merges[0].e.c === 6;
+        if (merges.length && !mergeNumbers) return false;
+      }
+      for (let r = hRow + 1; r <= rango.e.r; r++) for (let c = 0; c < 7; c++) {
         const celda = carga[XLSX2.utils.encode_cell({ r, c })];
         if (celda && (celda.f || celda.l || celda.t === "e")) return false;
       }
@@ -63668,7 +63684,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       letterSpacing: 0.7,
       marginBottom: 12
     } }, "Qu\xE9 analiza el sistema al importar"), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 8 } }, [
-      ["\u{1F512} Valida el padr\xF3n", "Exige una sola hoja CARGA, la huella interna y las siete columnas oficiales", C.label],
+      ["\u{1F512} Valida el padr\xF3n", "Exige una sola hoja y las siete columnas oficiales; compatible con Excel y Numbers", C.label],
       ["\u{1F3F7}\uFE0F Auto-c\xF3digo", "Genera un c\xF3digo \xFAnico con marca, talla y correlativo", C.gold],
       ["\u{1F455} Conserva el detalle", "Guarda Producto, Descripci\xF3n, Color y Talla para inventario y etiquetas", C.blue],
       ["\u2705 Verifica precio", "Detecta precio inv\xE1lido o 0 y lo marca como error antes de importar", C.green],
