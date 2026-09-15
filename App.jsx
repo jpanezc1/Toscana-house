@@ -973,7 +973,14 @@ async function sbGuardarAuditLog(evento) {
   try {
     const db = await getSupabase();
     const {id, ts, fecha, hora, tipo, usuario, nombre, rol, ...detalle} = evento;
-    const { error } = await db.from("audit_log").upsert({id, ts, fecha, hora, tipo, usuario, nombre, rol, detalle});
+    // La auditoría es append-only: nunca actualizamos un evento existente.
+    // Si una respuesta se perdió y el outbox reintenta el mismo ID, Supabase
+    // hace DO NOTHING y lo considera sincronizado en vez de disparar el
+    // bloqueo de inmutabilidad de la tabla.
+    const { error } = await db.from("audit_log").upsert(
+      {id, ts, fecha, hora, tipo, usuario, nombre, rol, detalle},
+      {onConflict:"id", ignoreDuplicates:true}
+    );
     if (error) throw error;
     return true;
   } catch(e) { console.warn("Supabase save audit_log:", e.message); return false; }

@@ -54478,7 +54478,10 @@
     try {
       const db = await getSupabase();
       const { id, ts, fecha, hora: hora2, tipo, usuario, nombre, rol, ...detalle } = evento;
-      const { error } = await db.from("audit_log").upsert({ id, ts, fecha, hora: hora2, tipo, usuario, nombre, rol, detalle });
+      const { error } = await db.from("audit_log").upsert(
+        { id, ts, fecha, hora: hora2, tipo, usuario, nombre, rol, detalle },
+        { onConflict: "id", ignoreDuplicates: true }
+      );
       if (error) throw error;
       return true;
     } catch (e) {
