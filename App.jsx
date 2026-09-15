@@ -2501,50 +2501,7 @@ function playPagoSound(){
 // Usa xlsx-js-style: fork de SheetJS con soporte REAL de estilos
 // (colores de fondo, fuentes, bordes — sin licencia Pro)
 // ══════════════════════════════════════════════════════════════
-const PADRON_UNICO_PROP = "FORGE_TEMPLATE_ID";
-const PADRON_UNICO_TOKEN = "FORGE-PADRON-UNICO-2026-V4";
 const PADRON_UNICO_HEADERS = ["MARCA","PRODUCTO","DESCRIPCIÓN","COLOR","CANTIDAD","TALLA","PRECIO VENTA"];
-function validarPadronUnico(XLSX,wb){
-  try{
-    const hojas=wb.SheetNames||[];
-    if(hojas.length!==1) return false;
-    const metas=wb.Workbook?.Sheets||[];
-    if(metas.length!==1 || Number(metas[0]?.Hidden||0)!==0) return false;
-    if(wb.vbaraw) return false;
-    const carga=wb.Sheets[hojas[0]];
-    if(!carga?.["!ref"]) return false;
-    const rango=XLSX.utils.decode_range(carga["!ref"]);
-    if(rango.s.r!==0 || rango.s.c!==0 || rango.e.c!==6 || rango.e.r>401) return false;
-    const raw=XLSX.utils.sheet_to_json(carga,{header:1,defval:""});
-    const normalizarFila=f=>(f||[]).map(x=>String(x||"").trim().toUpperCase());
-    let hRow=normalizarFila(raw[0]).every((x,i)=>x===(PADRON_UNICO_HEADERS[i]||"")) ? 0 : -1;
-    // Numbers agrega una fila "Table 1" al exportar. Se admite solo esa
-    // envoltura y siempre con los siete encabezados oficiales intactos.
-    if(hRow<0 && String(raw[0]?.[0]||"").trim().toUpperCase()==="TABLE 1" && raw[0].slice(1).every(x=>!String(x||"").trim())){
-      hRow=normalizarFila(raw[1]).every((x,i)=>x===(PADRON_UNICO_HEADERS[i]||"")) ? 1 : -1;
-    }
-    if(hRow<0) return false;
-    const fila=normalizarFila(raw[hRow]);
-    if(PADRON_UNICO_HEADERS.some((h,i)=>fila[i]!==h) || fila.slice(PADRON_UNICO_HEADERS.length).some(Boolean)) return false;
-    const huella=String(wb.Custprops?.[PADRON_UNICO_PROP]||"").trim().toUpperCase();
-    // Si existe una huella debe ser la vigente. Si Numbers la eliminó, la
-    // estructura exacta anterior funciona como modo de compatibilidad.
-    if(huella && huella!==PADRON_UNICO_TOKEN) return false;
-    if(huella && (hojas[0]!=="CARGA" || hRow!==0 || carga["!ref"]!=="A1:G401" || (carga["!merges"]||[]).length>0)) return false;
-    if(!huella){
-      const merges=carga["!merges"]||[];
-      const mergeNumbers=hRow===1 && merges.length===1 && merges[0].s.r===0 && merges[0].s.c===0 && merges[0].e.r===0 && merges[0].e.c===6;
-      if(merges.length && !mergeNumbers) return false;
-    }
-    // Solo se permiten valores pegados. Las fórmulas, hipervínculos y errores
-    // quedan fuera para evitar archivos adulterados o contenido ejecutable.
-    for(let r=hRow+1;r<=rango.e.r;r++) for(let c=0;c<7;c++){
-      const celda=carga[XLSX.utils.encode_cell({r,c})];
-      if(celda && (celda.f || celda.l || celda.t==="e")) return false;
-    }
-    return true;
-  }catch{return false;}
-}
 
 async function generarPlantillaXLSX(){
   const resp=await fetch("./public/PADRON_UNICO_CARGA_MASIVA_FORGE.xlsx",{cache:"no-store"});
@@ -9261,32 +9218,25 @@ function ImportarExcelModal({inv, onImportar, onClose, onArchivoCapturado}){
   // ── Parsear archivo ───────────────────────────────────────────────
   async function parsearArchivo(file){
     setEstado("leyendo");
-    if(!/\.xlsx$/i.test(file?.name||"")){
-      setEstado("idle");
-      alert("Solo se acepta el archivo oficial PADRON_UNICO_CARGA_MASIVA_FORGE.xlsx.");
-      return;
-    }
     if(Number(file?.size||0)>5*1024*1024){
       setEstado("idle");
-      alert("El archivo supera el tamaño permitido. Usa el padrón oficial sin agregar imágenes ni otras hojas.");
+      alert("El archivo supera el tamaño permitido de 5 MB.");
       return;
     }
     try{
       const XLSX = await loadXLSX();
       const buf  = await file.arrayBuffer();
-      const wb   = XLSX.read(buf,{type:"array",bookVBA:true,cellStyles:true});
-
-      // Candado de formato: no se captura ni procesa ningún archivo que no sea
-      // el padrón único oficial con huella y encabezados exactos.
-      if(!validarPadronUnico(XLSX,wb)){
-        setEstado("idle");
-        alert("Esta planilla no se puede cargar. Usa PADRON_UNICO_CARGA_MASIVA_FORGE.xlsx y copia tus datos dentro de la hoja CARGA sin modificar los títulos.");
-        return;
-      }
+      const wb   = XLSX.read(buf,{type:"array"});
       if(onArchivoCapturado) onArchivoCapturado(file);
 
-      // El padrón tiene una única fuente de datos autorizada.
-      const raw = XLSX.utils.sheet_to_json(wb.Sheets.CARGA,{header:1,defval:""});
+      // Lector flexible: detecta encabezados y procesa las hojas con datos.
+      const HOJAS_IGNORADAS=["marcas","instrucciones","como usarlo","ws_huella"];
+      let raw=[];
+      for(const shName of wb.SheetNames||[]){
+        if(HOJAS_IGNORADAS.includes(norm(shName).toLowerCase().trim())) continue;
+        const rows=XLSX.utils.sheet_to_json(wb.Sheets[shName],{header:1,defval:""});
+        if(rows.length>1) raw=raw.concat(rows);
+      }
 
       if(raw.length<2){ setEstado("idle"); alert("El archivo está vacío o no tiene datos"); return; }
 
@@ -9321,8 +9271,8 @@ function ImportarExcelModal({inv, onImportar, onClose, onArchivoCapturado}){
         return -1;
       };
 
-      // ── Formato único autorizado ───────────────────────────────────────
-      const isPadronUnico = true;
+      // ── El padrón se reconoce por columnas, no por huellas internas ────
+      const isPadronUnico=PADRON_UNICO_HEADERS.map(h=>n(h)).every(h=>headers.includes(h));
 
       // ─────────────────────────────────────────────────────────────────
       // FORMATO A — Plantilla Oficial Toscana House
@@ -9353,8 +9303,8 @@ function ImportarExcelModal({inv, onImportar, onClose, onArchivoCapturado}){
       let cSKU, cMarca, cDesc, cPrecio, cCat, cTalla, cColor, cStock, cMaterial=-1, cDetalles=-1;
 
       if(isPadronUnico){
-        cMarca=0; cDesc=1; cDetalles=2; cColor=3;
-        cStock=4; cTalla=5; cPrecio=6; cCat=-1; cSKU=-1; cMaterial=-1;
+        cMarca=col("marca"); cDesc=col("producto"); cDetalles=col("descripcion"); cColor=col("color");
+        cStock=col("cantidad"); cTalla=col("talla"); cPrecio=col("precio venta","precio"); cCat=-1; cSKU=-1; cMaterial=-1;
       } else if(isTH){
         // ── Plantilla Oficial TH — mapeo por nombre + fallback posición ──
         // Nombre compuesto (col B) = CATEGORIA DESCRIPCION COLOR TALLA → va a `nombre`
@@ -9892,10 +9842,10 @@ function ImportarExcelModal({inv, onImportar, onClose, onArchivoCapturado}){
             <div style={{flex:1,minWidth:0}}>
               <div style={{fontSize:13,fontWeight:700,color:C.label,fontFamily:FONT,
                 marginBottom:3,letterSpacing:"0.01em"}}>
-                Padrón único oficial de carga
+                Plantilla recomendada de carga
               </div>
               <div style={{fontSize:11,color:C.label3,fontFamily:FONT_UI,lineHeight:1.45}}>
-                Usa siempre este mismo archivo. Las marcas solo copian y pegan sus datos en CARGA; otros formatos serán rechazados.
+                Puedes usar la plantilla o un Excel anterior; el sistema detectará las columnas disponibles.
               </div>
             </div>
             <button onClick={generarPlantilla}
@@ -9923,17 +9873,17 @@ function ImportarExcelModal({inv, onImportar, onClose, onArchivoCapturado}){
               {isDragging?"Suelta el archivo aquí":"Importar inventario rellenado"}
             </div>
             <div style={{fontSize:13,color:C.label3,fontFamily:FONT_UI,marginBottom:16}}>
-              Arrastra el padrón oficial completado o haz clic para seleccionar
+              Arrastra tu archivo o haz clic para seleccionar
             </div>
             <div style={{display:"flex",gap:8,justifyContent:"center",flexWrap:"wrap"}}>
-              {[".xlsx"].map(ext=>(
+              {[".xlsx",".xls",".csv"].map(ext=>(
                 <span key={ext} style={{fontSize:11,fontWeight:700,color:C.gold,
                   background:`${C.gold}15`,padding:"4px 10px",borderRadius:12,
                   border:`1px solid ${C.gold}30`,fontFamily:FONT_UI}}>{ext}</span>
               ))}
             </div>
           </div>
-          <input ref={fileRef} type="file" accept=".xlsx"
+          <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv"
             onChange={e=>{const f=e.target.files?.[0];if(f)parsearArchivo(f);}}
             style={{display:"none"}}/>
 
@@ -9945,7 +9895,7 @@ function ImportarExcelModal({inv, onImportar, onClose, onArchivoCapturado}){
             </div>
             <div style={{display:"flex",flexDirection:"column",gap:8}}>
               {[
-                ["🔒 Valida el padrón","Exige una sola hoja y las siete columnas oficiales; compatible con Excel y Numbers",C.label],
+                ["📄 Detecta columnas","Reconoce la plantilla y formatos anteriores de Excel, Numbers y CSV",C.label],
                 ["🏷️ Auto-código","Genera un código único con marca, talla y correlativo",C.gold],
                 ["👕 Conserva el detalle","Guarda Producto, Descripción, Color y Talla para inventario y etiquetas",C.blue],
                 ["✅ Verifica precio","Detecta precio inválido o 0 y lo marca como error antes de importar",C.green],

@@ -56015,46 +56015,7 @@
     } catch {
     }
   }
-  var PADRON_UNICO_PROP = "FORGE_TEMPLATE_ID";
-  var PADRON_UNICO_TOKEN = "FORGE-PADRON-UNICO-2026-V4";
   var PADRON_UNICO_HEADERS = ["MARCA", "PRODUCTO", "DESCRIPCI\xD3N", "COLOR", "CANTIDAD", "TALLA", "PRECIO VENTA"];
-  function validarPadronUnico(XLSX2, wb) {
-    try {
-      const hojas = wb.SheetNames || [];
-      if (hojas.length !== 1) return false;
-      const metas = wb.Workbook?.Sheets || [];
-      if (metas.length !== 1 || Number(metas[0]?.Hidden || 0) !== 0) return false;
-      if (wb.vbaraw) return false;
-      const carga = wb.Sheets[hojas[0]];
-      if (!carga?.["!ref"]) return false;
-      const rango = XLSX2.utils.decode_range(carga["!ref"]);
-      if (rango.s.r !== 0 || rango.s.c !== 0 || rango.e.c !== 6 || rango.e.r > 401) return false;
-      const raw = XLSX2.utils.sheet_to_json(carga, { header: 1, defval: "" });
-      const normalizarFila = (f) => (f || []).map((x) => String(x || "").trim().toUpperCase());
-      let hRow = normalizarFila(raw[0]).every((x, i) => x === (PADRON_UNICO_HEADERS[i] || "")) ? 0 : -1;
-      if (hRow < 0 && String(raw[0]?.[0] || "").trim().toUpperCase() === "TABLE 1" && raw[0].slice(1).every((x) => !String(x || "").trim())) {
-        hRow = normalizarFila(raw[1]).every((x, i) => x === (PADRON_UNICO_HEADERS[i] || "")) ? 1 : -1;
-      }
-      if (hRow < 0) return false;
-      const fila = normalizarFila(raw[hRow]);
-      if (PADRON_UNICO_HEADERS.some((h, i) => fila[i] !== h) || fila.slice(PADRON_UNICO_HEADERS.length).some(Boolean)) return false;
-      const huella = String(wb.Custprops?.[PADRON_UNICO_PROP] || "").trim().toUpperCase();
-      if (huella && huella !== PADRON_UNICO_TOKEN) return false;
-      if (huella && (hojas[0] !== "CARGA" || hRow !== 0 || carga["!ref"] !== "A1:G401" || (carga["!merges"] || []).length > 0)) return false;
-      if (!huella) {
-        const merges = carga["!merges"] || [];
-        const mergeNumbers = hRow === 1 && merges.length === 1 && merges[0].s.r === 0 && merges[0].s.c === 0 && merges[0].e.r === 0 && merges[0].e.c === 6;
-        if (merges.length && !mergeNumbers) return false;
-      }
-      for (let r = hRow + 1; r <= rango.e.r; r++) for (let c = 0; c < 7; c++) {
-        const celda = carga[XLSX2.utils.encode_cell({ r, c })];
-        if (celda && (celda.f || celda.l || celda.t === "e")) return false;
-      }
-      return true;
-    } catch {
-      return false;
-    }
-  }
   async function generarPlantillaXLSX() {
     const resp = await fetch("./public/PADRON_UNICO_CARGA_MASIVA_FORGE.xlsx", { cache: "no-store" });
     if (!resp.ok) throw new Error("No se pudo obtener el padr\xF3n oficial");
@@ -63068,14 +63029,9 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
     }
     async function parsearArchivo(file) {
       setEstado("leyendo");
-      if (!/\.xlsx$/i.test(file?.name || "")) {
-        setEstado("idle");
-        alert("Solo se acepta el archivo oficial PADRON_UNICO_CARGA_MASIVA_FORGE.xlsx.");
-        return;
-      }
       if (Number(file?.size || 0) > 5 * 1024 * 1024) {
         setEstado("idle");
-        alert("El archivo supera el tama\xF1o permitido. Usa el padr\xF3n oficial sin agregar im\xE1genes ni otras hojas.");
+        alert("El archivo supera el tama\xF1o permitido de 5 MB.");
         return;
       }
       try {
@@ -63099,14 +63055,15 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
         };
         const XLSX2 = await loadXLSX();
         const buf = await file.arrayBuffer();
-        const wb = XLSX2.read(buf, { type: "array", bookVBA: true, cellStyles: true });
-        if (!validarPadronUnico(XLSX2, wb)) {
-          setEstado("idle");
-          alert("Esta planilla no se puede cargar. Usa PADRON_UNICO_CARGA_MASIVA_FORGE.xlsx y copia tus datos dentro de la hoja CARGA sin modificar los t\xEDtulos.");
-          return;
-        }
+        const wb = XLSX2.read(buf, { type: "array" });
         if (onArchivoCapturado) onArchivoCapturado(file);
-        const raw = XLSX2.utils.sheet_to_json(wb.Sheets.CARGA, { header: 1, defval: "" });
+        const HOJAS_IGNORADAS = ["marcas", "instrucciones", "como usarlo", "ws_huella"];
+        let raw = [];
+        for (const shName of wb.SheetNames || []) {
+          if (HOJAS_IGNORADAS.includes(norm(shName).toLowerCase().trim())) continue;
+          const rows = XLSX2.utils.sheet_to_json(wb.Sheets[shName], { header: 1, defval: "" });
+          if (rows.length > 1) raw = raw.concat(rows);
+        }
         if (raw.length < 2) {
           setEstado("idle");
           alert("El archivo est\xE1 vac\xEDo o no tiene datos");
@@ -63150,19 +63107,19 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
           }
           return -1;
         };
-        const isPadronUnico = true;
+        const isPadronUnico = PADRON_UNICO_HEADERS.map((h) => n(h)).every((h) => headers.includes(h));
         const isTH = headers.some((h) => h.includes("\u2605") || h.includes("descripciondelproducto") || h.includes("descripcion del producto") || h.includes("descripcion") && headers.some((hh) => hh.includes("sku") || hh.includes("codigo")));
         const isNumerico = !isTH && headers.some((h) => /^\d+\.\s/.test(h) || h.includes("item/art") || h.includes("unidad de medida") || h.includes("cant. de ingreso"));
         const isIZi = !isNumerico && !isTH && headers.some((h) => h.includes("subgategoria"));
         let cSKU, cMarca, cDesc, cPrecio, cCat, cTalla, cColor, cStock, cMaterial = -1, cDetalles = -1;
         if (isPadronUnico) {
-          cMarca = 0;
-          cDesc = 1;
-          cDetalles = 2;
-          cColor = 3;
-          cStock = 4;
-          cTalla = 5;
-          cPrecio = 6;
+          cMarca = col("marca");
+          cDesc = col("producto");
+          cDetalles = col("descripcion");
+          cColor = col("color");
+          cStock = col("cantidad");
+          cTalla = col("talla");
+          cPrecio = col("precio venta", "precio");
           cCat = -1;
           cSKU = -1;
           cMaterial = -1;
@@ -63605,7 +63562,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       fontFamily: FONT,
       marginBottom: 3,
       letterSpacing: "0.01em"
-    } }, "Padr\xF3n \xFAnico oficial de carga"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT_UI, lineHeight: 1.45 } }, "Usa siempre este mismo archivo. Las marcas solo copian y pegan sus datos en CARGA; otros formatos ser\xE1n rechazados.")), /* @__PURE__ */ import_react.default.createElement(
+    } }, "Plantilla recomendada de carga"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT_UI, lineHeight: 1.45 } }, "Puedes usar la plantilla o un Excel anterior; el sistema detectar\xE1 las columnas disponibles.")), /* @__PURE__ */ import_react.default.createElement(
       "button",
       {
         onClick: generarPlantilla,
@@ -63652,8 +63609,8 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
         letterSpacing: "0.01em",
         marginBottom: 6
       } }, isDragging ? "Suelta el archivo aqu\xED" : "Importar inventario rellenado"),
-      /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.label3, fontFamily: FONT_UI, marginBottom: 16 } }, "Arrastra el padr\xF3n oficial completado o haz clic para seleccionar"),
-      /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap" } }, [".xlsx"].map((ext) => /* @__PURE__ */ import_react.default.createElement("span", { key: ext, style: {
+      /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.label3, fontFamily: FONT_UI, marginBottom: 16 } }, "Arrastra tu archivo o haz clic para seleccionar"),
+      /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap" } }, [".xlsx", ".xls", ".csv"].map((ext) => /* @__PURE__ */ import_react.default.createElement("span", { key: ext, style: {
         fontSize: 11,
         fontWeight: 700,
         color: C.gold,
@@ -63668,7 +63625,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       {
         ref: fileRef,
         type: "file",
-        accept: ".xlsx",
+        accept: ".xlsx,.xls,.csv",
         onChange: (e) => {
           const f = e.target.files?.[0];
           if (f) parsearArchivo(f);
@@ -63684,7 +63641,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       letterSpacing: 0.7,
       marginBottom: 12
     } }, "Qu\xE9 analiza el sistema al importar"), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 8 } }, [
-      ["\u{1F512} Valida el padr\xF3n", "Exige una sola hoja y las siete columnas oficiales; compatible con Excel y Numbers", C.label],
+      ["\u{1F4C4} Detecta columnas", "Reconoce la plantilla y formatos anteriores de Excel, Numbers y CSV", C.label],
       ["\u{1F3F7}\uFE0F Auto-c\xF3digo", "Genera un c\xF3digo \xFAnico con marca, talla y correlativo", C.gold],
       ["\u{1F455} Conserva el detalle", "Guarda Producto, Descripci\xF3n, Color y Talla para inventario y etiquetas", C.blue],
       ["\u2705 Verifica precio", "Detecta precio inv\xE1lido o 0 y lo marca como error antes de importar", C.green],
