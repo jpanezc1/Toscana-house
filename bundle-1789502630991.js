@@ -56015,21 +56015,16 @@
     } catch {
     }
   }
-  var HOJA_HUELLA_CARGA = "WS_HUELLA";
-  var PADRON_UNICO_TOKEN = "FORGE-PADRON-UNICO-2026-V2";
-  var PADRON_UNICO_AVISO = "No borres ni renombres esta hoja.";
+  var PADRON_UNICO_PROP = "FORGE_TEMPLATE_ID";
+  var PADRON_UNICO_TOKEN = "FORGE-PADRON-UNICO-2026-V3";
   var PADRON_UNICO_HEADERS = ["MARCA", "PRODUCTO", "DESCRIPCI\xD3N", "COLOR", "TALLA", "CANTIDAD", "PRECIO VENTA"];
   function validarPadronUnico(XLSX2, wb) {
     try {
       const hojas = wb.SheetNames || [];
-      if (hojas.length !== 3 || hojas[0] !== "CARGA" || hojas[1] !== "COMO USARLO" || hojas[2] !== HOJA_HUELLA_CARGA) return false;
+      if (hojas.length !== 1 || hojas[0] !== "CARGA") return false;
       const metas = wb.Workbook?.Sheets || [];
-      if (metas.length !== 3 || Number(metas[0]?.Hidden || 0) !== 0 || Number(metas[1]?.Hidden || 0) !== 0 || Number(metas[2]?.Hidden) !== 1) return false;
-      const huella = wb.Sheets[HOJA_HUELLA_CARGA];
-      if (!huella || huella["!ref"] !== "A1:A2") return false;
-      const firma = huella.A1?.v;
-      if (String(firma || "").trim().toUpperCase() !== PADRON_UNICO_TOKEN) return false;
-      if (String(huella.A2?.v || "").trim() !== PADRON_UNICO_AVISO) return false;
+      if (metas.length !== 1 || Number(metas[0]?.Hidden || 0) !== 0) return false;
+      if (String(wb.Custprops?.[PADRON_UNICO_PROP] || "").trim().toUpperCase() !== PADRON_UNICO_TOKEN) return false;
       if (wb.vbaraw) return false;
       const carga = wb.Sheets.CARGA;
       if (!carga || carga["!ref"] !== "A1:G401" || (carga["!merges"] || []).length > 0) return false;
@@ -56060,23 +56055,9 @@
     ws["!cols"] = [{ wch: 22 }, { wch: 28 }, { wch: 38 }, { wch: 18 }, { wch: 12 }, { wch: 12 }, { wch: 16 }];
     ws["!autofilter"] = { ref: "A1:G401" };
     ws["!protect"] = { password: "FORGE2026", formatCells: true, formatColumns: true, formatRows: true, insertColumns: true, deleteColumns: true, insertRows: true, deleteRows: true };
-    const guia = XLSX2.utils.aoa_to_sheet([
-      ["PADR\xD3N \xDANICO DE CARGA MASIVA"],
-      ["Copien y peguen debajo de los t\xEDtulos de CARGA. No agreguen, borren, muevan ni renombren columnas."],
-      ["Sirve para Toscana House y Monas, incluidas todas sus marcas."],
-      ["Completen MARCA, PRODUCTO, TALLA, CANTIDAD y PRECIO VENTA. DESCRIPCI\xD3N y COLOR pueden quedar vac\xEDos."],
-      ["La DESCRIPCI\xD3N debe ser breve: tambi\xE9n aparecer\xE1 en inventario y etiquetas junto con COLOR y TALLA."],
-      ["Guarden y env\xEDen este mismo archivo .xlsx; no copien la hoja a otro libro."]
-    ]);
-    guia["!cols"] = [{ wch: 110 }];
-    guia["!protect"] = { password: "FORGE2026" };
-    const firma = XLSX2.utils.aoa_to_sheet([[PADRON_UNICO_TOKEN], [PADRON_UNICO_AVISO]]);
-    firma["!protect"] = { password: "FORGE2026" };
     const wb = XLSX2.utils.book_new();
     XLSX2.utils.book_append_sheet(wb, ws, "CARGA");
-    XLSX2.utils.book_append_sheet(wb, guia, "COMO USARLO");
-    XLSX2.utils.book_append_sheet(wb, firma, HOJA_HUELLA_CARGA);
-    wb.Workbook = { Sheets: [{ Hidden: 0 }, { Hidden: 0 }, { Hidden: 1 }], WBProps: {}, Views: [] };
+    wb.Custprops = { ...wb.Custprops || {}, [PADRON_UNICO_PROP]: PADRON_UNICO_TOKEN };
     const buf = XLSX2.write(wb, { bookType: "xlsx", type: "array", cellStyles: true });
     descargarArchivo(new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), "PADRON_UNICO_CARGA_MASIVA_FORGE.xlsx");
   }
@@ -63355,7 +63336,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
           if (!fila.desc) fila._errs.push("Sin producto");
           if (fila.precio <= 0) fila._errs.push("Precio inv\xE1lido o cero");
           if (!marcaEnc) fila._errs.push(`Marca "${marcaRaw || "\u2014"}" no encontrada`);
-          if (!fila.talla) fila._errs.push("Sin talla; usa T/U si es talla \xFAnica");
+          if (!fila.talla) fila._errs.push("Sin talla; usa \xDANICA o T/U si corresponde");
           if (fila.stock <= 0) fila._errs.push("Cantidad inv\xE1lida o cero");
           const dk = descKey(fila.marcaNombre, fila.desc, fila.talla, fila.color);
           const dkSinColor = descKey(fila.marcaNombre, fila.desc, fila.talla, "");
@@ -63704,7 +63685,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       letterSpacing: 0.7,
       marginBottom: 12
     } }, "Qu\xE9 analiza el sistema al importar"), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 8 } }, [
-      ["\u{1F512} Valida el padr\xF3n", "Exige la huella y las siete columnas oficiales en el orden correcto", C.label],
+      ["\u{1F512} Valida el padr\xF3n", "Exige una sola hoja CARGA, la huella interna y las siete columnas oficiales", C.label],
       ["\u{1F3F7}\uFE0F Auto-c\xF3digo", "Genera un c\xF3digo \xFAnico con marca, talla y correlativo", C.gold],
       ["\u{1F455} Conserva el detalle", "Guarda Producto, Descripci\xF3n, Color y Talla para inventario y etiquetas", C.blue],
       ["\u2705 Verifica precio", "Detecta precio inv\xE1lido o 0 y lo marca como error antes de importar", C.green],

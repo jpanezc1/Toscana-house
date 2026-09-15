@@ -2501,21 +2501,17 @@ function playPagoSound(){
 // Usa xlsx-js-style: fork de SheetJS con soporte REAL de estilos
 // (colores de fondo, fuentes, bordes — sin licencia Pro)
 // ══════════════════════════════════════════════════════════════
-const HOJA_HUELLA_CARGA = "WS_HUELLA"; // nombre legado, oculto; compartido con Working Style
-const PADRON_UNICO_TOKEN = "FORGE-PADRON-UNICO-2026-V2";
-const PADRON_UNICO_AVISO = "No borres ni renombres esta hoja.";
+const PADRON_UNICO_PROP = "FORGE_TEMPLATE_ID";
+const PADRON_UNICO_TOKEN = "FORGE-PADRON-UNICO-2026-V3";
 const PADRON_UNICO_HEADERS = ["MARCA","PRODUCTO","DESCRIPCIÓN","COLOR","TALLA","CANTIDAD","PRECIO VENTA"];
 function validarPadronUnico(XLSX,wb){
   try{
     const hojas=wb.SheetNames||[];
-    if(hojas.length!==3 || hojas[0]!=="CARGA" || hojas[1]!=="COMO USARLO" || hojas[2]!==HOJA_HUELLA_CARGA) return false;
+    if(hojas.length!==1 || hojas[0]!=="CARGA") return false;
     const metas=wb.Workbook?.Sheets||[];
-    if(metas.length!==3 || Number(metas[0]?.Hidden||0)!==0 || Number(metas[1]?.Hidden||0)!==0 || Number(metas[2]?.Hidden)!==1) return false;
-    const huella=wb.Sheets[HOJA_HUELLA_CARGA];
-    if(!huella || huella["!ref"]!=="A1:A2") return false;
-    const firma=huella.A1?.v;
-    if(String(firma||"").trim().toUpperCase()!==PADRON_UNICO_TOKEN) return false;
-    if(String(huella.A2?.v||"").trim()!==PADRON_UNICO_AVISO) return false;
+    if(metas.length!==1 || Number(metas[0]?.Hidden||0)!==0) return false;
+    // La huella vive en una propiedad interna del libro: no agrega hojas visibles.
+    if(String(wb.Custprops?.[PADRON_UNICO_PROP]||"").trim().toUpperCase()!==PADRON_UNICO_TOKEN) return false;
     if(wb.vbaraw) return false;
     const carga=wb.Sheets.CARGA;
     if(!carga || carga["!ref"]!=="A1:G401" || (carga["!merges"]||[]).length>0) return false;
@@ -2547,20 +2543,9 @@ async function generarPlantillaXLSX(){
   ws["!cols"]=[{wch:22},{wch:28},{wch:38},{wch:18},{wch:12},{wch:12},{wch:16}];
   ws["!autofilter"]={ref:"A1:G401"};
   ws["!protect"]={password:"FORGE2026",formatCells:true,formatColumns:true,formatRows:true,insertColumns:true,deleteColumns:true,insertRows:true,deleteRows:true};
-  const guia=XLSX.utils.aoa_to_sheet([
-    ["PADRÓN ÚNICO DE CARGA MASIVA"],
-    ["Copien y peguen debajo de los títulos de CARGA. No agreguen, borren, muevan ni renombren columnas."],
-    ["Sirve para Toscana House y Monas, incluidas todas sus marcas."],
-    ["Completen MARCA, PRODUCTO, TALLA, CANTIDAD y PRECIO VENTA. DESCRIPCIÓN y COLOR pueden quedar vacíos."],
-    ["La DESCRIPCIÓN debe ser breve: también aparecerá en inventario y etiquetas junto con COLOR y TALLA."],
-    ["Guarden y envíen este mismo archivo .xlsx; no copien la hoja a otro libro."],
-  ]);
-  guia["!cols"]=[{wch:110}]; guia["!protect"]={password:"FORGE2026"};
-  const firma=XLSX.utils.aoa_to_sheet([[PADRON_UNICO_TOKEN],[PADRON_UNICO_AVISO]]);
-  firma["!protect"]={password:"FORGE2026"};
   const wb=XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb,ws,"CARGA"); XLSX.utils.book_append_sheet(wb,guia,"COMO USARLO"); XLSX.utils.book_append_sheet(wb,firma,HOJA_HUELLA_CARGA);
-  wb.Workbook={Sheets:[{Hidden:0},{Hidden:0},{Hidden:1}],WBProps:{},Views:[]};
+  XLSX.utils.book_append_sheet(wb,ws,"CARGA");
+  wb.Custprops={...(wb.Custprops||{}),[PADRON_UNICO_PROP]:PADRON_UNICO_TOKEN};
   const buf=XLSX.write(wb,{bookType:"xlsx",type:"array",cellStyles:true});
   descargarArchivo(new Blob([buf],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}),"PADRON_UNICO_CARGA_MASIVA_FORGE.xlsx");
 }
@@ -9600,7 +9585,7 @@ function ImportarExcelModal({inv, onImportar, onClose, onArchivoCapturado}){
         if(!fila.desc)    fila._errs.push("Sin producto");
         if(fila.precio<=0) fila._errs.push("Precio inválido o cero");
         if(!marcaEnc)      fila._errs.push(`Marca "${marcaRaw||"—"}" no encontrada`);
-        if(!fila.talla)    fila._errs.push("Sin talla; usa T/U si es talla única");
+        if(!fila.talla)    fila._errs.push("Sin talla; usa ÚNICA o T/U si corresponde");
         if(fila.stock<=0)  fila._errs.push("Cantidad inválida o cero");
 
         // ── Detectar duplicado por código exacto O misma descripción ────
@@ -9958,7 +9943,7 @@ function ImportarExcelModal({inv, onImportar, onClose, onArchivoCapturado}){
             </div>
             <div style={{display:"flex",flexDirection:"column",gap:8}}>
               {[
-                ["🔒 Valida el padrón","Exige la huella y las siete columnas oficiales en el orden correcto",C.label],
+                ["🔒 Valida el padrón","Exige una sola hoja CARGA, la huella interna y las siete columnas oficiales",C.label],
                 ["🏷️ Auto-código","Genera un código único con marca, talla y correlativo",C.gold],
                 ["👕 Conserva el detalle","Guarda Producto, Descripción, Color y Talla para inventario y etiquetas",C.blue],
                 ["✅ Verifica precio","Detecta precio inválido o 0 y lo marca como error antes de importar",C.green],
