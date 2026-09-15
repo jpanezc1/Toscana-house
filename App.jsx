@@ -9218,11 +9218,6 @@ function ImportarExcelModal({inv, onImportar, onClose, onArchivoCapturado}){
   // ── Parsear archivo ───────────────────────────────────────────────
   async function parsearArchivo(file){
     setEstado("leyendo");
-    if(Number(file?.size||0)>5*1024*1024){
-      setEstado("idle");
-      alert("El archivo supera el tamaño permitido de 5 MB.");
-      return;
-    }
     try{
       const XLSX = await loadXLSX();
       const buf  = await file.arrayBuffer();
@@ -9230,7 +9225,7 @@ function ImportarExcelModal({inv, onImportar, onClose, onArchivoCapturado}){
       if(onArchivoCapturado) onArchivoCapturado(file);
 
       // Lector flexible: detecta encabezados y procesa las hojas con datos.
-      const HOJAS_IGNORADAS=["marcas","instrucciones","como usarlo","ws_huella"];
+      const HOJAS_IGNORADAS=["marcas","instrucciones","como usarlo","ws_huella","export summary"];
       let raw=[];
       for(const shName of wb.SheetNames||[]){
         if(HOJAS_IGNORADAS.includes(norm(shName).toLowerCase().trim())) continue;
@@ -9324,10 +9319,11 @@ function ImportarExcelModal({inv, onImportar, onClose, onArchivoCapturado}){
         // Mapeamos por posición + keyword
         cSKU    = col("codigo","item","articulo","sku","ref");
         // "2. Nombre" = nombre de la MARCA
-        cMarca  = headers.findIndex(h=>h.match(/^2\.|h\.includes("nombre")/))||
-                  headers.findIndex(h=>h==="nombre"||h.includes("2. nombre")||h.includes("nombre de"));
+        cMarca  = headers.findIndex(h=>/^2\.\s*/.test(h)&&h.includes("nombre"));
+        if(cMarca<0) cMarca = headers.findIndex(h=>h==="nombre"||h.includes("2. nombre")||h.includes("nombre de"));
         if(cMarca<0) cMarca = col("nombre","marca","brand");
-        cCat    = headers.findIndex(h=>h.match(/^3\./)&&h.includes("categ"))||col("categoria","cat","tipo","rubro");
+        cCat    = headers.findIndex(h=>/^3\.\s*/.test(h)&&h.includes("categ"));
+        if(cCat<0) cCat = col("categoria","cat","tipo","rubro");
         cDesc   = col("descripcion del producto","descripcion","desc","producto");
         // "5. Unidad de medida" = talla en este formato
         cTalla  = col("unidad de medida","unidad","medida","talla","size");
@@ -9876,14 +9872,14 @@ function ImportarExcelModal({inv, onImportar, onClose, onArchivoCapturado}){
               Arrastra tu archivo o haz clic para seleccionar
             </div>
             <div style={{display:"flex",gap:8,justifyContent:"center",flexWrap:"wrap"}}>
-              {[".xlsx",".xls",".csv"].map(ext=>(
+              {[".xlsx",".xls",".xlsm",".csv",".ods"].map(ext=>(
                 <span key={ext} style={{fontSize:11,fontWeight:700,color:C.gold,
                   background:`${C.gold}15`,padding:"4px 10px",borderRadius:12,
                   border:`1px solid ${C.gold}30`,fontFamily:FONT_UI}}>{ext}</span>
               ))}
             </div>
           </div>
-          <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv"
+          <input ref={fileRef} type="file" accept=".xlsx,.xls,.xlsm,.csv,.ods"
             onChange={e=>{const f=e.target.files?.[0];if(f)parsearArchivo(f);}}
             style={{display:"none"}}/>
 

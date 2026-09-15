@@ -63029,11 +63029,6 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
     }
     async function parsearArchivo(file) {
       setEstado("leyendo");
-      if (Number(file?.size || 0) > 5 * 1024 * 1024) {
-        setEstado("idle");
-        alert("El archivo supera el tama\xF1o permitido de 5 MB.");
-        return;
-      }
       try {
         let matchMarca = function(nomRaw) {
           if (!nomRaw || !nomRaw.trim()) return null;
@@ -63057,7 +63052,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
         const buf = await file.arrayBuffer();
         const wb = XLSX2.read(buf, { type: "array" });
         if (onArchivoCapturado) onArchivoCapturado(file);
-        const HOJAS_IGNORADAS = ["marcas", "instrucciones", "como usarlo", "ws_huella"];
+        const HOJAS_IGNORADAS = ["marcas", "instrucciones", "como usarlo", "ws_huella", "export summary"];
         let raw = [];
         for (const shName of wb.SheetNames || []) {
           if (HOJAS_IGNORADAS.includes(norm(shName).toLowerCase().trim())) continue;
@@ -63142,9 +63137,11 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
           if (cSKU < 0) cSKU = 7;
         } else if (isNumerico) {
           cSKU = col("codigo", "item", "articulo", "sku", "ref");
-          cMarca = headers.findIndex((h) => h.match(/^2\.|h\.includes("nombre")/)) || headers.findIndex((h) => h === "nombre" || h.includes("2. nombre") || h.includes("nombre de"));
+          cMarca = headers.findIndex((h) => /^2\.\s*/.test(h) && h.includes("nombre"));
+          if (cMarca < 0) cMarca = headers.findIndex((h) => h === "nombre" || h.includes("2. nombre") || h.includes("nombre de"));
           if (cMarca < 0) cMarca = col("nombre", "marca", "brand");
-          cCat = headers.findIndex((h) => h.match(/^3\./) && h.includes("categ")) || col("categoria", "cat", "tipo", "rubro");
+          cCat = headers.findIndex((h) => /^3\.\s*/.test(h) && h.includes("categ"));
+          if (cCat < 0) cCat = col("categoria", "cat", "tipo", "rubro");
           cDesc = col("descripcion del producto", "descripcion", "desc", "producto");
           cTalla = col("unidad de medida", "unidad", "medida", "talla", "size");
           cStock = col("cant. de ingreso", "cant de ingreso", "cantidad de ingreso", "cant", "cantidad", "stock", "existencia", "ingreso");
@@ -63610,7 +63607,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
         marginBottom: 6
       } }, isDragging ? "Suelta el archivo aqu\xED" : "Importar inventario rellenado"),
       /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.label3, fontFamily: FONT_UI, marginBottom: 16 } }, "Arrastra tu archivo o haz clic para seleccionar"),
-      /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap" } }, [".xlsx", ".xls", ".csv"].map((ext) => /* @__PURE__ */ import_react.default.createElement("span", { key: ext, style: {
+      /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap" } }, [".xlsx", ".xls", ".xlsm", ".csv", ".ods"].map((ext) => /* @__PURE__ */ import_react.default.createElement("span", { key: ext, style: {
         fontSize: 11,
         fontWeight: 700,
         color: C.gold,
@@ -63625,7 +63622,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       {
         ref: fileRef,
         type: "file",
-        accept: ".xlsx,.xls,.csv",
+        accept: ".xlsx,.xls,.xlsm,.csv,.ods",
         onChange: (e) => {
           const f = e.target.files?.[0];
           if (f) parsearArchivo(f);
