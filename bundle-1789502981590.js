@@ -56016,8 +56016,8 @@
     }
   }
   var PADRON_UNICO_PROP = "FORGE_TEMPLATE_ID";
-  var PADRON_UNICO_TOKEN = "FORGE-PADRON-UNICO-2026-V3";
-  var PADRON_UNICO_HEADERS = ["MARCA", "PRODUCTO", "DESCRIPCI\xD3N", "COLOR", "TALLA", "CANTIDAD", "PRECIO VENTA"];
+  var PADRON_UNICO_TOKEN = "FORGE-PADRON-UNICO-2026-V4";
+  var PADRON_UNICO_HEADERS = ["MARCA", "PRODUCTO", "DESCRIPCI\xD3N", "COLOR", "CANTIDAD", "TALLA", "PRECIO VENTA"];
   function validarPadronUnico(XLSX2, wb) {
     try {
       const hojas = wb.SheetNames || [];
@@ -63144,8 +63144,8 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
           cDesc = 1;
           cDetalles = 2;
           cColor = 3;
-          cTalla = 4;
-          cStock = 5;
+          cStock = 4;
+          cTalla = 5;
           cPrecio = 6;
           cCat = -1;
           cSKU = -1;

@@ -2502,8 +2502,8 @@ function playPagoSound(){
 // (colores de fondo, fuentes, bordes — sin licencia Pro)
 // ══════════════════════════════════════════════════════════════
 const PADRON_UNICO_PROP = "FORGE_TEMPLATE_ID";
-const PADRON_UNICO_TOKEN = "FORGE-PADRON-UNICO-2026-V3";
-const PADRON_UNICO_HEADERS = ["MARCA","PRODUCTO","DESCRIPCIÓN","COLOR","TALLA","CANTIDAD","PRECIO VENTA"];
+const PADRON_UNICO_TOKEN = "FORGE-PADRON-UNICO-2026-V4";
+const PADRON_UNICO_HEADERS = ["MARCA","PRODUCTO","DESCRIPCIÓN","COLOR","CANTIDAD","TALLA","PRECIO VENTA"];
 function validarPadronUnico(XLSX,wb){
   try{
     const hojas=wb.SheetNames||[];
@@ -9335,7 +9335,7 @@ function ImportarExcelModal({inv, onImportar, onClose, onArchivoCapturado}){
 
       if(isPadronUnico){
         cMarca=0; cDesc=1; cDetalles=2; cColor=3;
-        cTalla=4; cStock=5; cPrecio=6; cCat=-1; cSKU=-1; cMaterial=-1;
+        cStock=4; cTalla=5; cPrecio=6; cCat=-1; cSKU=-1; cMaterial=-1;
       } else if(isTH){
         // ── Plantilla Oficial TH — mapeo por nombre + fallback posición ──
         // Nombre compuesto (col B) = CATEGORIA DESCRIPCION COLOR TALLA → va a `nombre`
