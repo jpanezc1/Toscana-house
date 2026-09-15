@@ -55122,6 +55122,13 @@
     const m = (desc || "").match(/TALLA:\s*([^·\n]+)/i);
     return m ? m[1].trim() : "";
   }
+  function componerDescripcionInventario(descripcion, color, talla) {
+    return [
+      descripcion && String(descripcion).trim().toUpperCase(),
+      color && `COLOR: ${String(color).trim().toUpperCase()}`,
+      talla && `TALLA: ${String(talla).trim().toUpperCase()}`
+    ].filter(Boolean).join(" \xB7 ");
+  }
   var TALLAS_CODIGO = /* @__PURE__ */ new Set(["XXL", "XL", "XS", "S", "M", "L", "SM", "S/M", "ML", "M/L", "LXL", "L/XL", "TU", "T/U", "U", "UNICA", "\xDANICA"]);
   function extraerTallaCodigo(codigo) {
     const partes = String(codigo || "").toUpperCase().split("-").slice(1);
@@ -55290,8 +55297,9 @@
       overflow:hidden; text-overflow:ellipsis; }
     .barcode-wrap { width:100%; display:flex; justify-content:center; }
     .barcode-wrap svg { width:45mm!important; height:8.5mm!important; }
-    .color-row { font-size:6.5px; color:#555; text-transform:uppercase; letter-spacing:0.5px;
-      text-align:center; width:100%; margin:0.1mm 0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .color-row { font-size:6.2px; color:#555; text-transform:uppercase; letter-spacing:0.35px;
+      text-align:center; width:100%; margin:0.1mm 0; line-height:1.1; overflow:hidden;
+      display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; }
     .bottom-row { display:flex; justify-content:space-between; align-items:center; width:100%;
       margin-top:0.1mm; }
     .codigo { font-size:8px; color:#333; font-family:monospace; }
@@ -56008,8 +56016,8 @@
     }
   }
   var HOJA_HUELLA_CARGA = "WS_HUELLA";
-  var PADRON_UNICO_TOKEN = "FORGE-PADRON-UNICO-2026-V1";
-  var PADRON_UNICO_HEADERS = ["PRODUCTO", "MATERIAL", "DETALLES", "COLOR", "MARCA", "TALLA", "CANTIDAD", "TOTAL MODELO", "COSTO", "PRECIO VENTA"];
+  var PADRON_UNICO_TOKEN = "FORGE-PADRON-UNICO-2026-V2";
+  var PADRON_UNICO_HEADERS = ["MARCA", "PRODUCTO", "DESCRIPCI\xD3N", "COLOR", "TALLA", "CANTIDAD", "PRECIO VENTA"];
   function validarPadronUnico(XLSX2, wb) {
     try {
       const hojas = wb.SheetNames || [];
@@ -56022,7 +56030,7 @@
       if (!carga) return false;
       const fila = (XLSX2.utils.sheet_to_json(carga, { header: 1, defval: "" })[0] || []).map((x) => String(x || "").trim().toUpperCase());
       if (PADRON_UNICO_HEADERS.some((h, i) => fila[i] !== h) || fila.slice(PADRON_UNICO_HEADERS.length).some(Boolean)) return false;
-      return carga["!ref"] === "A1:J401";
+      return carga["!ref"] === "A1:G401";
     } catch {
       return false;
     }
@@ -56030,25 +56038,25 @@
   async function generarPlantillaXLSX() {
     const XLSX2 = await loadXLSX();
     const headers = PADRON_UNICO_HEADERS;
-    const rows = [headers, ...Array.from({ length: 400 }, () => Array(10).fill(""))];
+    const rows = [headers, ...Array.from({ length: 400 }, () => Array(7).fill(""))];
     const ws = XLSX2.utils.aoa_to_sheet(rows);
     for (let r = 2; r <= 401; r++) {
-      ws[`H${r}`] = { t: "n", f: `IF($A${r}="","",SUMIFS($G$2:$G$401,$A$2:$A$401,$A${r},$B$2:$B$401,$B${r},$C$2:$C$401,$C${r},$D$2:$D$401,$D${r}))` };
-      [1, 2, 3, 4, 5, 6, 7, 9, 10].forEach((c) => {
+      [1, 2, 3, 4, 5, 6, 7].forEach((c) => {
         const a = XLSX2.utils.encode_cell({ r: r - 1, c: c - 1 });
         if (!ws[a]) ws[a] = { t: "s", v: "" };
         ws[a].s = { ...ws[a].s || {}, protection: { locked: false } };
       });
     }
-    ws["!ref"] = "A1:J401";
-    ws["!cols"] = [{ wch: 28 }, { wch: 20 }, { wch: 34 }, { wch: 18 }, { wch: 22 }, { wch: 12 }, { wch: 12 }, { wch: 15 }, { wch: 14 }, { wch: 16 }];
-    ws["!autofilter"] = { ref: "A1:J401" };
+    ws["!ref"] = "A1:G401";
+    ws["!cols"] = [{ wch: 22 }, { wch: 28 }, { wch: 38 }, { wch: 18 }, { wch: 12 }, { wch: 12 }, { wch: 16 }];
+    ws["!autofilter"] = { ref: "A1:G401" };
     ws["!protect"] = { password: "FORGE2026", formatCells: true, formatColumns: true, formatRows: true, insertColumns: true, deleteColumns: true, insertRows: true, deleteRows: true };
     const guia = XLSX2.utils.aoa_to_sheet([
       ["PADR\xD3N \xDANICO DE CARGA MASIVA"],
       ["Copien y peguen debajo de los t\xEDtulos de CARGA. No agreguen, borren, muevan ni renombren columnas."],
-      ["Sirve para Working Style, Toscana House y Monas, incluidas todas sus marcas."],
-      ["CANTIDAD es el stock. TOTAL MODELO se calcula solo y no se carga."],
+      ["Sirve para Toscana House y Monas, incluidas todas sus marcas."],
+      ["Completen MARCA, PRODUCTO, TALLA, CANTIDAD y PRECIO VENTA. DESCRIPCI\xD3N y COLOR pueden quedar vac\xEDos."],
+      ["La DESCRIPCI\xD3N debe ser breve: tambi\xE9n aparecer\xE1 en inventario y etiquetas junto con COLOR y TALLA."],
       ["Guarden y env\xEDen este mismo archivo .xlsx; no copien la hoja a otro libro."]
     ]);
     guia["!cols"] = [{ wch: 110 }];
@@ -63154,16 +63162,16 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
         const isIZi = !isNumerico && !isTH && headers.some((h) => h.includes("subgategoria"));
         let cSKU, cMarca, cDesc, cPrecio, cCat, cTalla, cColor, cStock, cMaterial = -1, cDetalles = -1;
         if (isPadronUnico) {
-          cDesc = 0;
-          cMaterial = 1;
+          cMarca = 0;
+          cDesc = 1;
           cDetalles = 2;
           cColor = 3;
-          cMarca = 4;
-          cTalla = 5;
-          cStock = 6;
+          cTalla = 4;
+          cStock = 5;
+          cPrecio = 6;
           cCat = -1;
           cSKU = -1;
-          cPrecio = 9;
+          cMaterial = -1;
         } else if (isTH) {
           cMarca = col("marca");
           if (cMarca < 0) cMarca = 0;
@@ -63296,7 +63304,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
           const precio = parsePrecio(precioRaw);
           const stockRaw = cStock >= 0 ? row[cStock] : "";
           const stock = parseStock(stockRaw);
-          let desc = isPadronUnico ? [descRaw, materialRaw, detallesRaw].filter(Boolean).join(" \xB7 ") : descRaw;
+          let desc = descRaw;
           if (!desc && skuRaw) {
             const partes = [catRaw, tallaRaw, colorRaw].filter(Boolean).join(" ").trim();
             desc = partes ? partes === catRaw && precio > 0 ? `${catRaw} BS. ${precio}` : partes : skuRaw;
@@ -63318,6 +63326,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
             marcaId: marcaEnc?.id || null,
             marcaNombre: marcaEnc?.nombre || marcaRaw || "",
             desc: desc || "",
+            descripcionExtra: detallesRaw,
             material: materialRaw,
             detalles: detallesRaw,
             precio,
@@ -63329,9 +63338,11 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
             _errs: [],
             _dup: false
           };
-          if (!fila.desc) fila._errs.push("Sin descripci\xF3n");
+          if (!fila.desc) fila._errs.push("Sin producto");
           if (fila.precio <= 0) fila._errs.push("Precio inv\xE1lido o cero");
           if (!marcaEnc) fila._errs.push(`Marca "${marcaRaw || "\u2014"}" no encontrada`);
+          if (!fila.talla) fila._errs.push("Sin talla; usa T/U si es talla \xFAnica");
+          if (fila.stock <= 0) fila._errs.push("Cantidad inv\xE1lida o cero");
           const dk = descKey(fila.marcaNombre, fila.desc, fila.talla, fila.color);
           const dkSinColor = descKey(fila.marcaNombre, fila.desc, fila.talla, "");
           const prodExistente = codigosExistentes.has(sku) ? inv.find((p) => p.codigo.toUpperCase() === sku) : autoSKU ? descExistente.get(dk) || descExistenteSinColor.get(dkSinColor) || null : null;
@@ -63406,19 +63417,17 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
     }
     async function importar() {
       setEstado("importando");
-      const importables = preview.filter((f) => f.desc && f.marcaId && f.precio > 0 && !f._bloqueado);
+      const importables = preview.filter((f) => f._errs.length === 0 && f.desc && f.marcaId && f.precio > 0 && !f._bloqueado);
       let ok = 0, upd = 0;
       for (const f of importables) {
         if (f._dup) {
           upd++;
-          const descNueva = [
-            f.talla && `TALLA: ${f.talla.toUpperCase()}`,
-            f.color && `COLOR: ${f.color.toUpperCase()}`
-          ].filter(Boolean).join(" \xB7 ") || "";
+          const descNueva = componerDescripcionInventario(f.descripcionExtra, f.color, f.talla);
           onImportar({
             tipo: "update",
             codigo: f.sku,
             stock: f.stock,
+            nombre: (f.desc || "").toUpperCase() || void 0,
             descripcion: descNueva || void 0,
             subcat: f.talla ? f.talla.toUpperCase() : void 0,
             talla: (f.talla || "").toUpperCase(),
@@ -63432,10 +63441,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
             marcaId: f.marcaId,
             marcaNombre: f.marcaNombre,
             categoria: (f.cat || "General").toUpperCase(),
-            descripcion: [
-              f.talla && `TALLA: ${f.talla.toUpperCase()}`,
-              f.color && `COLOR: ${f.color.toUpperCase()}`
-            ].filter(Boolean).join(" \xB7 ") || "",
+            descripcion: componerDescripcionInventario(f.descripcionExtra, f.color, f.talla),
             subcat: (f.subcat || f.talla || "").toUpperCase(),
             precio: f.precio,
             stock: f.stock,
@@ -63444,7 +63450,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
           } });
         }
       }
-      const omitidos = preview.filter((f) => !(f.desc && f.marcaId && f.precio > 0)).map((f) => ({ sku: f.sku, desc: f.desc, marca: f.marcaNombre, errs: f._errs }));
+      const omitidos = preview.filter((f) => !(f._errs.length === 0 && f.desc && f.marcaId && f.precio > 0 && !f._bloqueado)).map((f) => ({ sku: f.sku, desc: f.desc, marca: f.marcaNombre, errs: f._errs }));
       const codigosEsperados = importables.map((f) => f.sku.toUpperCase().trim());
       const totalUnidades = importables.reduce((s, f) => s + (Number(f.stock) || 0), 0);
       setStats({ ok, upd, skip: omitidos.length, total: preview.length, omitidos, codigosEsperados, totalUnidades });
@@ -63684,8 +63690,9 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       letterSpacing: 0.7,
       marginBottom: 12
     } }, "Qu\xE9 analiza el sistema al importar"), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 8 } }, [
-      ["\u{1F50D} Detecta columnas", "Auto-detecta Marca, Descripci\xF3n, Precio, Talla, Stock, SKU \u2014 en cualquier orden y con nombres similares", C.label],
-      ["\u{1F3F7}\uFE0F Auto-c\xF3digo", "Si no hay SKU, genera: MARCA-INICIALES-TALLA-001 garantizando que sea \xFAnico", C.gold],
+      ["\u{1F512} Valida el padr\xF3n", "Exige la huella y las siete columnas oficiales en el orden correcto", C.label],
+      ["\u{1F3F7}\uFE0F Auto-c\xF3digo", "Genera un c\xF3digo \xFAnico con marca, talla y correlativo", C.gold],
+      ["\u{1F455} Conserva el detalle", "Guarda Producto, Descripci\xF3n, Color y Talla para inventario y etiquetas", C.blue],
       ["\u2705 Verifica precio", "Detecta precio inv\xE1lido o 0 y lo marca como error antes de importar", C.green],
       ["\u{1F50E} Verifica marca", "Coteja el nombre con las marcas registradas (fuzzy matching)", C.blue],
       ["\u26A0\uFE0F Duplicados", "Si el c\xF3digo ya existe, propone actualizar el stock en lugar de duplicar", C.amber],
@@ -63703,7 +63710,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       background: `${C.gold}10`,
       borderRadius: 12,
       border: `1px solid ${C.gold}25`
-    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT_UI, lineHeight: 1.5 } }, "\u{1F4A1} Formato de c\xF3digo auto-generado:", " ", /* @__PURE__ */ import_react.default.createElement("span", { style: { fontFamily: "monospace", color: C.label, fontWeight: 700 } }, "RAM-VLB-S-001"), " ", /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.label3 } }, "= Marca \xB7 Iniciales prod. \xB7 Talla \xB7 N\xFAmero secuencial"))))), estado === "leyendo" && /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center", padding: "50px 20px" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 40, marginBottom: 16 } }, "\u23F3"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 16, fontWeight: 600, color: C.label, fontFamily: FONT_UI, marginBottom: 6 } }, "Analizando archivo\u2026"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.label3, fontFamily: FONT_UI } }, "Detectando columnas y generando c\xF3digos")), estado === "preview" && /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr", gap: 8, marginBottom: 16 } }, [
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT_UI, lineHeight: 1.5 } }, "\u{1F4A1} Formato de c\xF3digo auto-generado:", " ", /* @__PURE__ */ import_react.default.createElement("span", { style: { fontFamily: "monospace", color: C.label, fontWeight: 700 } }, "MON-S-001"), " ", /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.label3 } }, "= Marca \xB7 Talla \xB7 N\xFAmero secuencial"))))), estado === "leyendo" && /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "center", padding: "50px 20px" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 40, marginBottom: 16 } }, "\u23F3"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 16, fontWeight: 600, color: C.label, fontFamily: FONT_UI, marginBottom: 6 } }, "Analizando archivo\u2026"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: C.label3, fontFamily: FONT_UI } }, "Detectando columnas y generando c\xF3digos")), estado === "preview" && /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr", gap: 8, marginBottom: 16 } }, [
       { v: preview.length, l: "Total", c: C.label },
       { v: nValidas, l: "V\xE1lidas", c: C.green },
       { v: nErrores, l: "Errores", c: C.red },
@@ -63806,7 +63813,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       flexDirection: "column",
       justifyContent: "space-between",
       fontFamily: "'Courier New',monospace"
-    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", fontSize: 7, color: "#333", textTransform: "uppercase" } }, /* @__PURE__ */ import_react.default.createElement("span", null, (f.marcaNombre || "").toUpperCase().slice(0, 14)), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontWeight: 700 } }, "TOSCANA HOUSE")), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 8, fontWeight: 700, textAlign: "center", lineHeight: 1.2, color: "#000" } }, (f.desc || "").toUpperCase().slice(0, 28)), (f.talla || f.color) && /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 7, textAlign: "center", color: "#444" } }, [f.talla && `TALLA: ${f.talla.toUpperCase()}`, f.color && `COLOR: ${f.color.toUpperCase()}`].filter(Boolean).join(" \xB7 ")), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "flex-end" } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 6, color: "#666", fontFamily: "monospace" } }, (f.sku || "").toUpperCase()), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 6.5, color: C.gold, fontWeight: 700 } }, "\xD7", f.stock || 1, " uds")), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, fontWeight: 700, color: "#000" } }, "Bs ", f.precio)))))) : /* @__PURE__ */ import_react.default.createElement("div", { style: { maxHeight: 300, overflowY: "auto", borderRadius: 14, border: `1px solid ${C.sep}`, marginBottom: 16 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", fontSize: 7, color: "#333", textTransform: "uppercase" } }, /* @__PURE__ */ import_react.default.createElement("span", null, (f.marcaNombre || "").toUpperCase().slice(0, 14)), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontWeight: 700 } }, "TOSCANA HOUSE")), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 8, fontWeight: 700, textAlign: "center", lineHeight: 1.2, color: "#000" } }, (f.desc || "").toUpperCase().slice(0, 28)), (f.descripcionExtra || f.talla || f.color) && /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 7, textAlign: "center", color: "#444" } }, componerDescripcionInventario(f.descripcionExtra, f.color, f.talla).slice(0, 64)), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "flex-end" } }, /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 6, color: "#666", fontFamily: "monospace" } }, (f.sku || "").toUpperCase()), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 6.5, color: C.gold, fontWeight: 700 } }, "\xD7", f.stock || 1, " uds")), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, fontWeight: 700, color: "#000" } }, "Bs ", f.precio)))))) : /* @__PURE__ */ import_react.default.createElement("div", { style: { maxHeight: 300, overflowY: "auto", borderRadius: 14, border: `1px solid ${C.sep}`, marginBottom: 16 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
       display: "grid",
       gridTemplateColumns: "2fr 1fr 1.5fr 0.6fr 0.6fr 1fr",
       padding: "9px 12px",
@@ -63841,7 +63848,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
         letterSpacing: 0.4,
         opacity: 0.7,
         marginTop: 1
-      } }, "\u{1F916} auto")), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: f.marcaId ? C.label : C.red, fontFamily: FONT_UI, fontWeight: f.marcaId ? 400 : 600 } }, f.marcaNombre.slice(0, 12) || "\u2014"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label, fontFamily: FONT_UI } }, f.desc.slice(0, 22), f.desc.length > 22 ? "\u2026" : "", f.talla && /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 9, color: C.label3, marginLeft: 4 } }, f.talla)), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, fontWeight: 600, color: f.precio > 0 ? C.label : C.red, fontFamily: FONT_UI } }, f.precio > 0 ? `Bs ${f.precio}` : "\u2014"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: C.blue, fontFamily: FONT_UI, textAlign: "center" } }, "\xD7", f.stock || 1), f._bloqueado ? /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 3 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 9, fontWeight: 700, color: C.red, fontFamily: FONT_UI, lineHeight: 1.3 } }, f._conflictoColor || f._conflictoCat), /* @__PURE__ */ import_react.default.createElement(
+      } }, "\u{1F916} auto")), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: f.marcaId ? C.label : C.red, fontFamily: FONT_UI, fontWeight: f.marcaId ? 400 : 600 } }, f.marcaNombre.slice(0, 12) || "\u2014"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label, fontFamily: FONT_UI, lineHeight: 1.25 } }, /* @__PURE__ */ import_react.default.createElement("div", null, f.desc.slice(0, 22), f.desc.length > 22 ? "\u2026" : ""), (f.descripcionExtra || f.color || f.talla) && /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 9, color: C.label3, marginTop: 2 } }, [f.descripcionExtra, f.color && `COLOR ${f.color}`, f.talla && `TALLA ${f.talla}`].filter(Boolean).join(" \xB7 ").slice(0, 48))), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, fontWeight: 600, color: f.precio > 0 ? C.label : C.red, fontFamily: FONT_UI } }, f.precio > 0 ? `Bs ${f.precio}` : "\u2014"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: C.blue, fontFamily: FONT_UI, textAlign: "center" } }, "\xD7", f.stock || 1), f._bloqueado ? /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 3 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 9, fontWeight: 700, color: C.red, fontFamily: FONT_UI, lineHeight: 1.3 } }, f._conflictoColor || f._conflictoCat), /* @__PURE__ */ import_react.default.createElement(
         "button",
         {
           onClick: () => desbloquearFila(f.sku),
@@ -64056,10 +64063,10 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       const paraNuevas = preview.filter((f) => f.desc && f.marcaId && f.precio > 0 && f._errs.length === 0 && !f._dup);
       const paraActs = preview.filter((f) => f._dup && f.marcaId && f.precio > 0);
       const todosParaEtiquetas = [
-        ...paraNuevas.map((f) => ({ nombre: (f.desc || "").toUpperCase(), codigo: f.sku.toUpperCase(), precio: f.precio, marcaNombre: f.marcaNombre, descripcion: [f.talla && `TALLA: ${f.talla.toUpperCase()}`, f.color && `COLOR: ${f.color.toUpperCase()}`].filter(Boolean).join(" \xB7 ") || "", stock: f.stock })),
+        ...paraNuevas.map((f) => ({ nombre: (f.desc || "").toUpperCase(), codigo: f.sku.toUpperCase(), precio: f.precio, marcaNombre: f.marcaNombre, descripcion: componerDescripcionInventario(f.descripcionExtra, f.color, f.talla), stock: f.stock })),
         ...paraActs.map((f) => {
           const prod = inv.find((p) => p.codigo.toUpperCase() === f.sku.toUpperCase());
-          return { nombre: (prod?.nombre || f.desc || "").toUpperCase(), codigo: f.sku.toUpperCase(), precio: prod?.precio || f.precio, marcaNombre: prod?.marcaNombre || f.marcaNombre, descripcion: prod?.descripcion || f.desc || "", stock: f.stock };
+          return { nombre: (f.desc || prod?.nombre || "").toUpperCase(), codigo: f.sku.toUpperCase(), precio: prod?.precio || f.precio, marcaNombre: prod?.marcaNombre || f.marcaNombre, descripcion: componerDescripcionInventario(f.descripcionExtra, f.color, f.talla) || prod?.descripcion || "", stock: f.stock };
         })
       ];
       const totalEtiquetas = todosParaEtiquetas.reduce((acc, f) => acc + (Number(f.stock) || 0), 0);
@@ -77537,12 +77544,12 @@ ${c.resumen || c.id}`)) onEliminarCarga(c.id);
           opacity: 0.7
         }
       }
-    ))), /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT, marginBottom: 4, fontWeight: 600 } }, "Descripci\xF3n (talla / color)"), /* @__PURE__ */ import_react.default.createElement(
+    ))), /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT, marginBottom: 4, fontWeight: 600 } }, "Descripci\xF3n, color y talla"), /* @__PURE__ */ import_react.default.createElement(
       "input",
       {
         value: editDesc,
         onChange: (e) => setEditDesc(e.target.value),
-        placeholder: "Ej: TALLA: XS \xB7 COLOR: NEGRO",
+        placeholder: "Ej: LINO CON BOTONES \xB7 COLOR: NEGRO \xB7 TALLA: XS",
         style: {
           width: "100%",
           padding: "8px 10px",

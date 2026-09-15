@@ -1603,6 +1603,13 @@ function BarcodeDisplay({ codigo, small }) {
 // Extrae el color del campo descripcion ("TALLA: X · COLOR: Y")
 function extraerColor(desc){ const m=(desc||"").match(/COLOR:\s*([^·\n]+)/i); return m?m[1].trim():""; }
 function extraerTalla(desc){ const m=(desc||"").match(/TALLA:\s*([^·\n]+)/i); return m?m[1].trim():""; }
+function componerDescripcionInventario(descripcion, color, talla){
+  return [
+    descripcion && String(descripcion).trim().toUpperCase(),
+    color && `COLOR: ${String(color).trim().toUpperCase()}`,
+    talla && `TALLA: ${String(talla).trim().toUpperCase()}`,
+  ].filter(Boolean).join(" · ");
+}
 const TALLAS_CODIGO = new Set(["XXL","XL","XS","S","M","L","SM","S/M","ML","M/L","LXL","L/XL","TU","T/U","U","UNICA","ÚNICA"]);
 function extraerTallaCodigo(codigo){
   const partes=String(codigo||"").toUpperCase().split("-").slice(1);
@@ -1738,8 +1745,9 @@ async function imprimirTicket(producto, marcaNombre) {
       overflow:hidden; text-overflow:ellipsis; }
     .barcode-wrap { width:100%; display:flex; justify-content:center; }
     .barcode-wrap svg { width:45mm!important; height:8.5mm!important; }
-    .color-row { font-size:6.5px; color:#555; text-transform:uppercase; letter-spacing:0.5px;
-      text-align:center; width:100%; margin:0.1mm 0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .color-row { font-size:6.2px; color:#555; text-transform:uppercase; letter-spacing:0.35px;
+      text-align:center; width:100%; margin:0.1mm 0; line-height:1.1; overflow:hidden;
+      display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; }
     .bottom-row { display:flex; justify-content:space-between; align-items:center; width:100%;
       margin-top:0.1mm; }
     .codigo { font-size:8px; color:#333; font-family:monospace; }
@@ -1860,8 +1868,9 @@ function imprimirEtiquetasLote(items) {
       overflow:hidden; text-overflow:ellipsis; }
     .barcode-wrap { width:100%; display:flex; justify-content:center; }
     .barcode-wrap svg { width:45mm!important; height:8.5mm!important; }
-    .color-row { font-size:6.5px; color:#555; text-transform:uppercase; letter-spacing:0.5px;
-      text-align:center; width:100%; margin:0.1mm 0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .color-row { font-size:6.2px; color:#555; text-transform:uppercase; letter-spacing:0.35px;
+      text-align:center; width:100%; margin:0.1mm 0; line-height:1.1; overflow:hidden;
+      display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; }
     .bottom-row { display:flex; justify-content:space-between; align-items:center; width:100%;
       margin-top:0.1mm; }
     .codigo { font-size:8px; color:#333; font-family:monospace; }
@@ -2493,8 +2502,8 @@ function playPagoSound(){
 // (colores de fondo, fuentes, bordes — sin licencia Pro)
 // ══════════════════════════════════════════════════════════════
 const HOJA_HUELLA_CARGA = "WS_HUELLA"; // nombre legado, oculto; compartido con Working Style
-const PADRON_UNICO_TOKEN = "FORGE-PADRON-UNICO-2026-V1";
-const PADRON_UNICO_HEADERS = ["PRODUCTO","MATERIAL","DETALLES","COLOR","MARCA","TALLA","CANTIDAD","TOTAL MODELO","COSTO","PRECIO VENTA"];
+const PADRON_UNICO_TOKEN = "FORGE-PADRON-UNICO-2026-V2";
+const PADRON_UNICO_HEADERS = ["MARCA","PRODUCTO","DESCRIPCIÓN","COLOR","TALLA","CANTIDAD","PRECIO VENTA"];
 function validarPadronUnico(XLSX,wb){
   try{
     const hojas=wb.SheetNames||[];
@@ -2507,32 +2516,32 @@ function validarPadronUnico(XLSX,wb){
     if(!carga) return false;
     const fila=(XLSX.utils.sheet_to_json(carga,{header:1,defval:""})[0]||[]).map(x=>String(x||"").trim().toUpperCase());
     if(PADRON_UNICO_HEADERS.some((h,i)=>fila[i]!==h) || fila.slice(PADRON_UNICO_HEADERS.length).some(Boolean)) return false;
-    return carga["!ref"]==="A1:J401";
+    return carga["!ref"]==="A1:G401";
   }catch{return false;}
 }
 
 async function generarPlantillaXLSX(){
   const XLSX=await loadXLSX();
   const headers=PADRON_UNICO_HEADERS;
-  const rows=[headers,...Array.from({length:400},()=>Array(10).fill(""))];
+  const rows=[headers,...Array.from({length:400},()=>Array(7).fill(""))];
   const ws=XLSX.utils.aoa_to_sheet(rows);
   for(let r=2;r<=401;r++){
-    ws[`H${r}`]={t:"n",f:`IF($A${r}="","",SUMIFS($G$2:$G$401,$A$2:$A$401,$A${r},$B$2:$B$401,$B${r},$C$2:$C$401,$C${r},$D$2:$D$401,$D${r}))`};
-    [1,2,3,4,5,6,7,9,10].forEach(c=>{
+    [1,2,3,4,5,6,7].forEach(c=>{
       const a=XLSX.utils.encode_cell({r:r-1,c:c-1});
       if(!ws[a]) ws[a]={t:"s",v:""};
       ws[a].s={...(ws[a].s||{}),protection:{locked:false}};
     });
   }
-  ws["!ref"]="A1:J401";
-  ws["!cols"]=[{wch:28},{wch:20},{wch:34},{wch:18},{wch:22},{wch:12},{wch:12},{wch:15},{wch:14},{wch:16}];
-  ws["!autofilter"]={ref:"A1:J401"};
+  ws["!ref"]="A1:G401";
+  ws["!cols"]=[{wch:22},{wch:28},{wch:38},{wch:18},{wch:12},{wch:12},{wch:16}];
+  ws["!autofilter"]={ref:"A1:G401"};
   ws["!protect"]={password:"FORGE2026",formatCells:true,formatColumns:true,formatRows:true,insertColumns:true,deleteColumns:true,insertRows:true,deleteRows:true};
   const guia=XLSX.utils.aoa_to_sheet([
     ["PADRÓN ÚNICO DE CARGA MASIVA"],
     ["Copien y peguen debajo de los títulos de CARGA. No agreguen, borren, muevan ni renombren columnas."],
-    ["Sirve para Working Style, Toscana House y Monas, incluidas todas sus marcas."],
-    ["CANTIDAD es el stock. TOTAL MODELO se calcula solo y no se carga."],
+    ["Sirve para Toscana House y Monas, incluidas todas sus marcas."],
+    ["Completen MARCA, PRODUCTO, TALLA, CANTIDAD y PRECIO VENTA. DESCRIPCIÓN y COLOR pueden quedar vacíos."],
+    ["La DESCRIPCIÓN debe ser breve: también aparecerá en inventario y etiquetas junto con COLOR y TALLA."],
     ["Guarden y envíen este mismo archivo .xlsx; no copien la hoja a otro libro."],
   ]);
   guia["!cols"]=[{wch:110}]; guia["!protect"]={password:"FORGE2026"};
@@ -9341,8 +9350,8 @@ function ImportarExcelModal({inv, onImportar, onClose, onArchivoCapturado}){
       let cSKU, cMarca, cDesc, cPrecio, cCat, cTalla, cColor, cStock, cMaterial=-1, cDetalles=-1;
 
       if(isPadronUnico){
-        cDesc=0; cMaterial=1; cDetalles=2; cColor=3; cMarca=4;
-        cTalla=5; cStock=6; cCat=-1; cSKU=-1; cPrecio=9;
+        cMarca=0; cDesc=1; cDetalles=2; cColor=3;
+        cTalla=4; cStock=5; cPrecio=6; cCat=-1; cSKU=-1; cMaterial=-1;
       } else if(isTH){
         // ── Plantilla Oficial TH — mapeo por nombre + fallback posición ──
         // Nombre compuesto (col B) = CATEGORIA DESCRIPCION COLOR TALLA → va a `nombre`
@@ -9532,9 +9541,7 @@ function ImportarExcelModal({inv, onImportar, onClose, onArchivoCapturado}){
 
         // ── Descripción final ────────────────────────────────────────
         // Si la descripción está vacía, construirla desde otras columnas
-        let desc = isPadronUnico
-          ? [descRaw,materialRaw,detallesRaw].filter(Boolean).join(" · ")
-          : descRaw;
+        let desc = descRaw;
         if(!desc && skuRaw){
           // Reconstruir desde columnas disponibles
           const partes = [catRaw, tallaRaw, colorRaw].filter(Boolean).join(" ").trim();
@@ -9567,16 +9574,18 @@ function ImportarExcelModal({inv, onImportar, onClose, onArchivoCapturado}){
           marcaNom: marcaRaw||marcaEnc?.nombre||"",
           marcaId: marcaEnc?.id||null,
           marcaNombre: marcaEnc?.nombre||marcaRaw||"",
-          desc: desc||"", material:materialRaw, detalles:detallesRaw,
+          desc: desc||"", descripcionExtra:detallesRaw, material:materialRaw, detalles:detallesRaw,
           precio, cat: catRaw||"General",
           talla: tallaRaw, color: colorRaw,
           stock, subcat:"",
           _errs:[], _dup:false,
         };
 
-        if(!fila.desc)    fila._errs.push("Sin descripción");
+        if(!fila.desc)    fila._errs.push("Sin producto");
         if(fila.precio<=0) fila._errs.push("Precio inválido o cero");
         if(!marcaEnc)      fila._errs.push(`Marca "${marcaRaw||"—"}" no encontrada`);
+        if(!fila.talla)    fila._errs.push("Sin talla; usa T/U si es talla única");
+        if(fila.stock<=0)  fila._errs.push("Cantidad inválida o cero");
 
         // ── Detectar duplicado por código exacto O misma descripción ────
         // Si el Excel trae SKU explícito, el código ES la identidad del producto:
@@ -9687,18 +9696,16 @@ function ImportarExcelModal({inv, onImportar, onClose, onArchivoCapturado}){
   // ── Importar ───────────────────────────────────────────────────────
   async function importar(){
     setEstado("importando");
-    const importables = preview.filter(f=>f.desc&&f.marcaId&&f.precio>0&&!f._bloqueado);
+    const importables = preview.filter(f=>f._errs.length===0&&f.desc&&f.marcaId&&f.precio>0&&!f._bloqueado);
     let ok=0, upd=0;
 
     for(const f of importables){
       if(f._dup){
         upd++;
-        const descNueva = [
-          f.talla && `TALLA: ${f.talla.toUpperCase()}`,
-          f.color && `COLOR: ${f.color.toUpperCase()}`,
-        ].filter(Boolean).join(" · ") || "";
+        const descNueva = componerDescripcionInventario(f.descripcionExtra, f.color, f.talla);
         onImportar({
           tipo:"update", codigo:f.sku, stock:f.stock,
+          nombre: (f.desc||"").toUpperCase()||undefined,
           descripcion: descNueva||undefined,
           subcat: f.talla ? f.talla.toUpperCase() : undefined,
           talla: (f.talla||"").toUpperCase(),
@@ -9707,22 +9714,17 @@ function ImportarExcelModal({inv, onImportar, onClose, onArchivoCapturado}){
       } else {
         ok++;
         // ── Mapeo plantilla → sistema + etiqueta ─────────────────────
-        // nombre      (col B) : nombre visible en sistema y línea central de etiqueta
-        // categoria   (col F) : chip categoría en sistema
-        // descripcion (col E+G): "TALLA: X · COLOR: Y" — alimenta extraerColor() para
-        //                        la fila de color en la etiqueta impresa
-        // codigo      (col H) : código de barras en etiqueta + búsqueda por scanner
-        // precio      (col C) : precio visible en etiqueta (fila inferior derecha)
+        // nombre      (col B) : producto visible en sistema y línea central de etiqueta
+        // descripcion (col C+D+E): detalle, color y talla visibles en inventario y etiqueta
+        // codigo      : se genera automáticamente y queda disponible para scanner
+        // precio      (col G) : precio visible en etiqueta
         onImportar({tipo:"create", producto:{
           codigo:      f.sku.toUpperCase(),
           nombre:      (f.desc||"").toUpperCase(),
           marcaId:     f.marcaId,
           marcaNombre: f.marcaNombre,
           categoria:   (f.cat||"General").toUpperCase(),
-          descripcion: [
-            f.talla && `TALLA: ${f.talla.toUpperCase()}`,
-            f.color && `COLOR: ${f.color.toUpperCase()}`,
-          ].filter(Boolean).join(" · ") || "",
+          descripcion: componerDescripcionInventario(f.descripcionExtra, f.color, f.talla),
           subcat:      (f.subcat||f.talla||"").toUpperCase(),
           precio:      f.precio,
           stock:       f.stock,
@@ -9733,7 +9735,7 @@ function ImportarExcelModal({inv, onImportar, onClose, onArchivoCapturado}){
     }
     // ── Filas omitidas (con errores) — se listan con su motivo ────────
     const omitidos = preview
-      .filter(f=>!(f.desc&&f.marcaId&&f.precio>0))
+      .filter(f=>!(f._errs.length===0&&f.desc&&f.marcaId&&f.precio>0&&!f._bloqueado))
       .map(f=>({sku:f.sku, desc:f.desc, marca:f.marcaNombre, errs:f._errs}));
 
     // ── Códigos que SÍ deberían quedar en el inventario tras la carga ──
@@ -9940,8 +9942,9 @@ function ImportarExcelModal({inv, onImportar, onClose, onArchivoCapturado}){
             </div>
             <div style={{display:"flex",flexDirection:"column",gap:8}}>
               {[
-                ["🔍 Detecta columnas","Auto-detecta Marca, Descripción, Precio, Talla, Stock, SKU — en cualquier orden y con nombres similares",C.label],
-                ["🏷️ Auto-código","Si no hay SKU, genera: MARCA-INICIALES-TALLA-001 garantizando que sea único",C.gold],
+                ["🔒 Valida el padrón","Exige la huella y las siete columnas oficiales en el orden correcto",C.label],
+                ["🏷️ Auto-código","Genera un código único con marca, talla y correlativo",C.gold],
+                ["👕 Conserva el detalle","Guarda Producto, Descripción, Color y Talla para inventario y etiquetas",C.blue],
                 ["✅ Verifica precio","Detecta precio inválido o 0 y lo marca como error antes de importar",C.green],
                 ["🔎 Verifica marca","Coteja el nombre con las marcas registradas (fuzzy matching)",C.blue],
                 ["⚠️ Duplicados","Si el código ya existe, propone actualizar el stock en lugar de duplicar",C.amber],
@@ -9958,8 +9961,8 @@ function ImportarExcelModal({inv, onImportar, onClose, onArchivoCapturado}){
               border:`1px solid ${C.gold}25`}}>
               <div style={{fontSize:11,color:C.label3,fontFamily:FONT_UI,lineHeight:1.5}}>
                 💡 Formato de código auto-generado:{" "}
-                <span style={{fontFamily:"monospace",color:C.label,fontWeight:700}}>RAM-VLB-S-001</span>
-                {" "}<span style={{color:C.label3}}>= Marca · Iniciales prod. · Talla · Número secuencial</span>
+                <span style={{fontFamily:"monospace",color:C.label,fontWeight:700}}>MON-S-001</span>
+                {" "}<span style={{color:C.label3}}>= Marca · Talla · Número secuencial</span>
               </div>
             </div>
           </div>
@@ -10079,9 +10082,9 @@ function ImportarExcelModal({inv, onImportar, onClose, onArchivoCapturado}){
                         <div style={{fontSize:8,fontWeight:700,textAlign:"center",lineHeight:1.2,color:"#000"}}>
                           {(f.desc||"").toUpperCase().slice(0,28)}
                         </div>
-                        {(f.talla||f.color)&&(
+                        {(f.descripcionExtra||f.talla||f.color)&&(
                           <div style={{fontSize:7,textAlign:"center",color:"#444"}}>
-                            {[f.talla&&`TALLA: ${f.talla.toUpperCase()}`,f.color&&`COLOR: ${f.color.toUpperCase()}`].filter(Boolean).join(" · ")}
+                            {componerDescripcionInventario(f.descripcionExtra,f.color,f.talla).slice(0,64)}
                           </div>
                         )}
                         <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-end"}}>
@@ -10139,9 +10142,11 @@ function ImportarExcelModal({inv, onImportar, onClose, onArchivoCapturado}){
                   <div style={{fontSize:11,color:f.marcaId?C.label:C.red,fontFamily:FONT_UI,fontWeight:f.marcaId?400:600}}>
                     {f.marcaNombre.slice(0,12)||"—"}
                   </div>
-                  <div style={{fontSize:11,color:C.label,fontFamily:FONT_UI}}>
-                    {f.desc.slice(0,22)}{f.desc.length>22?"…":""}
-                    {f.talla&&<span style={{fontSize:9,color:C.label3,marginLeft:4}}>{f.talla}</span>}
+                  <div style={{fontSize:11,color:C.label,fontFamily:FONT_UI,lineHeight:1.25}}>
+                    <div>{f.desc.slice(0,22)}{f.desc.length>22?"…":""}</div>
+                    {(f.descripcionExtra||f.color||f.talla)&&<div style={{fontSize:9,color:C.label3,marginTop:2}}>
+                      {[f.descripcionExtra,f.color&&`COLOR ${f.color}`,f.talla&&`TALLA ${f.talla}`].filter(Boolean).join(" · ").slice(0,48)}
+                    </div>}
                   </div>
                   <div style={{fontSize:11,fontWeight:600,color:f.precio>0?C.label:C.red,fontFamily:FONT_UI}}>
                     {f.precio>0?`Bs ${f.precio}`:"—"}
@@ -10342,10 +10347,10 @@ function ImportarExcelModal({inv, onImportar, onClose, onArchivoCapturado}){
             const paraNuevas = preview.filter(f=>f.desc&&f.marcaId&&f.precio>0&&f._errs.length===0&&!f._dup);
             const paraActs   = preview.filter(f=>f._dup&&f.marcaId&&f.precio>0);
             const todosParaEtiquetas = [
-              ...paraNuevas.map(f=>({nombre:(f.desc||"").toUpperCase(), codigo:f.sku.toUpperCase(), precio:f.precio, marcaNombre:f.marcaNombre, descripcion:[f.talla&&`TALLA: ${f.talla.toUpperCase()}`,f.color&&`COLOR: ${f.color.toUpperCase()}`].filter(Boolean).join(" · ")||"", stock:f.stock})),
+              ...paraNuevas.map(f=>({nombre:(f.desc||"").toUpperCase(), codigo:f.sku.toUpperCase(), precio:f.precio, marcaNombre:f.marcaNombre, descripcion:componerDescripcionInventario(f.descripcionExtra,f.color,f.talla), stock:f.stock})),
               ...paraActs.map(f=>{
                 const prod = inv.find(p=>p.codigo.toUpperCase()===f.sku.toUpperCase());
-                return {nombre:(prod?.nombre||f.desc||"").toUpperCase(), codigo:f.sku.toUpperCase(), precio:prod?.precio||f.precio, marcaNombre:prod?.marcaNombre||f.marcaNombre, descripcion:prod?.descripcion||f.desc||"", stock:f.stock};
+                return {nombre:(f.desc||prod?.nombre||"").toUpperCase(), codigo:f.sku.toUpperCase(), precio:prod?.precio||f.precio, marcaNombre:prod?.marcaNombre||f.marcaNombre, descripcion:componerDescripcionInventario(f.descripcionExtra,f.color,f.talla)||prod?.descripcion||"", stock:f.stock};
               }),
             ];
             const totalEtiquetas = todosParaEtiquetas.reduce((acc,f)=>acc+(Number(f.stock)||0),0);
@@ -22047,9 +22052,9 @@ function InventarioPorMarca({inv, ventas, retiros=[], bajas=[], onRecibir, onBaj
                 </div>
               </div>
               <div>
-                <div style={{fontSize:11,color:C.label3,fontFamily:FONT,marginBottom:4,fontWeight:600}}>Descripción (talla / color)</div>
+                <div style={{fontSize:11,color:C.label3,fontFamily:FONT,marginBottom:4,fontWeight:600}}>Descripción, color y talla</div>
                 <input value={editDesc} onChange={e=>setEditDesc(e.target.value)}
-                  placeholder="Ej: TALLA: XS · COLOR: NEGRO"
+                  placeholder="Ej: LINO CON BOTONES · COLOR: NEGRO · TALLA: XS"
                   style={{width:"100%",padding:"8px 10px",borderRadius:10,border:`1px solid ${C.sep}`,
                     background:C.bg2,color:C.label,fontSize:13,fontFamily:FONT}}/>
               </div>
