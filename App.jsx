@@ -335,14 +335,54 @@ async function sbObtenerSesionVerif(id) {
   } catch(e) { console.warn("Supabase obtener sesión verif:", e.message); return null; }
 }
 
-async function sbCrearSesionVerif(id, mk, marcaId, baseTs) {
+async function sbBuscarSesionActiva(mk, marcaId) {
   try {
     const db = await getSupabase();
-    await db.from("th_verif_sesion").upsert(
-      { id, mk, marca_id: marcaId, base_ts: baseTs.toISOString(), conteo: {} },
-      { onConflict: "id", ignoreDuplicates: true }
-    );
-  } catch(e) { console.warn("Supabase crear sesión verif:", e.message); }
+    let q = db.from("th_verif_sesion").select("*").eq("mk",mk).order("updated_at",{ascending:false}).limit(20);
+    q = marcaId==null ? q.is("marca_id",null) : q.eq("marca_id",marcaId);
+    const {data,error}=await q;
+    if(error) throw error;
+    return (data||[]).find(s=>s.metadata?.status==="active")||null;
+  } catch(e) { console.warn("Supabase buscar sesión verif:", e.message); return null; }
+}
+
+async function sbIniciarSesionVerif(id, mk, marcaId, baseTs, baseInv, user) {
+  try {
+    const db = await getSupabase();
+    const anterior = await sbBuscarSesionActiva(mk,marcaId);
+    if(anterior) await sbCerrarSesionVerif(anterior.id,"superseded",user);
+    const sessionToken = `${Date.now()}-${Math.random().toString(36).slice(2,10)}`;
+    const sessionId = `${id}-${sessionToken}`;
+    const baseStock = {};
+    (baseInv||[]).forEach(p=>{ baseStock[String(p.id)] = Number(p.stock)||0; });
+    const { error } = await db.from("th_verif_sesion").upsert({
+      id:sessionId, mk, marca_id: marcaId, base_ts: baseTs.toISOString(), conteo: {},
+      updated_by:user?.nombre||"—",
+      metadata:{
+        status:"active", session_token:sessionToken,
+        started_at:baseTs.toISOString(), started_by:user?.nombre||"—",
+        base_stock:baseStock,
+      },
+    }, { onConflict:"id" });
+    if(error) throw error;
+    return {sessionId, sessionToken, startedAt:baseTs.getTime()};
+  } catch(e) { console.warn("Supabase iniciar sesión verif:", e.message); return null; }
+}
+
+async function sbCerrarSesionVerif(id, status, user) {
+  try {
+    const db = await getSupabase();
+    const actual = await sbObtenerSesionVerif(id);
+    const { error } = await db.from("th_verif_sesion").update({
+      conteo:{}, updated_by:user?.nombre||"—",
+      metadata:{
+        ...(actual?.metadata||{}), status,
+        closed_at:new Date().toISOString(), closed_by:user?.nombre||"—",
+      },
+    }).eq("id",id);
+    if(error) throw error;
+    return true;
+  } catch(e) { console.warn("Supabase cerrar sesión verif:", e.message); return false; }
 }
 
 async function sbIncrementarConteoVerif(id, codigo) {
@@ -19010,14 +19050,9 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
   // (Borrar) lo limpia.
   const[vista,setVista]=useState(()=>{ try{return localStorage.getItem(`th_verif_vista_${MK}`)||"conteo";}catch{return "conteo";} });
   const[marcaSelec,setMarcaSelec]=useState(()=>{ try{return JSON.parse(localStorage.getItem(`th_verif_marca_${MK}`)||"null");}catch{return null;} });
-  const[conteo,setConteo]=useState(()=>{
-    try{
-      const marca=JSON.parse(localStorage.getItem(`th_verif_marca_${MK}`)||"null");
-      return JSON.parse(localStorage.getItem(`th_verif_conteo_${MK}_${marca||"ALL"}`)||"{}");
-    }catch{return {};}
-  }); // {prodId: cantidad} — 1ra pasada
-  const[verifConteo,setVerifConteo]=useState(()=>{ try{return JSON.parse(localStorage.getItem(`th_verif_doble_${MK}`)||"{}");}catch{return {};} }); // {prodId: cantidad} — 2da pasada (verificación)
-  const[manualVerif,setManualVerif]=useState(()=>{ try{return JSON.parse(localStorage.getItem(`th_verif_manual_${MK}`)||"{}");}catch{return {};} }); // {prodId: true} — verificado manualmente por admin
+  const[conteo,setConteo]=useState({}); // {prodId: cantidad} — 1ra pasada
+  const[verifConteo,setVerifConteo]=useState({}); // {prodId: cantidad} — 2da pasada (verificación)
+  const[manualVerif,setManualVerif]=useState({}); // {prodId: true} — verificado manualmente por admin
   const[showScanner,setShowScanner]=useState(false);
   const[modoCierre,setModoCierre]=useState(false); // escaneo continuo de cierre rápido
   const[modoVerif,setModoVerif]=useState(false); // escaneo continuo de verificación (2da pasada)
@@ -19029,6 +19064,11 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
   const[codAgregar,setCodAgregar]=useState("");
   const[msgAgregar,setMsgAgregar]=useState(null);
   const[cruceVerTodo,setCruceVerTodo]=useState(false); // mostrar todo el inventario en Cruce (incluye no contados como faltante)
+  const[sesionActiva,setSesionActiva]=useState(null); // sesión iniciada expresamente en este conteo
+  const[sesionPendiente,setSesionPendiente]=useState(null); // sesión reciente disponible para reanudar
+  const[sesionNubeId,setSesionNubeId]=useState(null); // id único: una sesión nunca comparte conteo con otra
+  const sesionActivaRef=useRef(null);
+  useEffect(()=>{ sesionActivaRef.current=sesionActiva; },[sesionActiva]);
 
   // ── Inventario base congelado al abrir el cierre ────────────────────
   // Ventas no modifican "sistema" a mitad del conteo.
@@ -19075,40 +19115,54 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
   // ── Persistencia local del progreso (sobrevive a cambios de pestaña) ──
   useEffect(()=>{ try{localStorage.setItem(`th_verif_vista_${MK}`, vista);}catch{} },[vista,MK]);
   useEffect(()=>{ try{localStorage.setItem(`th_verif_marca_${MK}`, JSON.stringify(marcaSelec));}catch{} },[marcaSelec,MK]);
-  useEffect(()=>{ try{localStorage.setItem(`th_verif_conteo_${MK}_${marcaSelec||"ALL"}`, JSON.stringify(conteo));}catch{} },[conteo,MK,marcaSelec]);
-  useEffect(()=>{ try{localStorage.setItem(`th_verif_doble_${MK}`, JSON.stringify(verifConteo));}catch{} },[verifConteo,MK]);
-  useEffect(()=>{ try{localStorage.setItem(`th_verif_manual_${MK}`, JSON.stringify(manualVerif));}catch{} },[manualVerif,MK]);
+  useEffect(()=>{ if(!sesionActiva)return; try{localStorage.setItem(`th_verif_conteo_${MK}_${marcaSelec||"ALL"}`, JSON.stringify(conteo));}catch{} },[conteo,MK,marcaSelec,sesionActiva]);
+  useEffect(()=>{ if(!sesionActiva)return; try{localStorage.setItem(`th_verif_doble_${MK}`, JSON.stringify(verifConteo));}catch{} },[verifConteo,MK,sesionActiva]);
+  useEffect(()=>{ if(!sesionActiva)return; try{localStorage.setItem(`th_verif_manual_${MK}`, JSON.stringify(manualVerif));}catch{} },[manualVerif,MK,sesionActiva]);
 
-  const sesionId = `VERIF-${MK}-${marcaSelec||"ALL"}`;
+  const sesionScopeId = `VERIF-${MK}-${marcaSelec||"ALL"}`;
   const channelRef = useRef(null);
 
   useEffect(()=>{
+    let mounted=true;
+    setSesionActiva(null); setSesionPendiente(null);
+    setSesionNubeId(null);
+    setConteo({}); setVerifConteo({}); setManualVerif({});
+    setBaseNubeConfirmada(false);
+    sbBuscarSesionActiva(MK,marcaSelec).then(sesion=>{
+      if(!mounted||!sesion) return;
+      const meta=sesion.metadata||{};
+      const inicioMs=Date.parse(meta.started_at||sesion.base_ts||"");
+      const reciente=Number.isFinite(inicioMs) && Date.now()-inicioMs < 12*60*60*1000;
+      if(meta.status==="active" && reciente) setSesionPendiente(sesion);
+    });
+    return ()=>{ mounted=false; };
+  },[sesionScopeId]);
+
+  useEffect(()=>{
     let channel=null, mounted=true;
-    sbCrearSesionVerif(sesionId, MK, marcaSelec, baseTs)
-      .then(()=> sbObtenerSesionVerif(sesionId))
-      .then(sesion=>{ if(mounted && sesion) mergeRemoteConteo(sesion.conteo); });
+    if(!sesionNubeId) return ()=>{ mounted=false; };
     getSupabase().then(db=>{
       if(!mounted) return;
-      channel = db.channel(`verif-${sesionId}`, { config:{ broadcast:{ self:false } } })
+      channel = db.channel(`verif-${sesionNubeId}`, { config:{ broadcast:{ self:false } } })
         // Broadcast por WebSocket: aviso inmediato (<100ms) a otros dispositivos
         // sin esperar la replicación de la base de datos. Suena un beep para
         // avisar que llegó un escaneo desde otro dispositivo.
         .on("broadcast", { event:"conteo" }, payload=>{
-          if(!mounted) return;
+          if(!mounted || !sesionActivaRef.current) return;
           mergeRemoteConteo(payload.payload?.conteo);
           beep(true);
         })
         // postgres_changes: respaldo por si un dispositivo se reconecta o
         // se perdió un broadcast (la BD sigue siendo la fuente de verdad).
         .on("postgres_changes",
-          { event:"UPDATE", schema:"public", table:"th_verif_sesion", filter:`id=eq.${sesionId}` },
-          payload=>{ if(mounted) mergeRemoteConteo(payload.new.conteo); }
+          { event:"UPDATE", schema:"public", table:"th_verif_sesion", filter:`id=eq.${sesionNubeId}` },
+          payload=>{ if(mounted && sesionActivaRef.current) mergeRemoteConteo(payload.new.conteo); }
         )
         .subscribe();
       channelRef.current = channel;
     });
     return ()=>{ mounted=false; channelRef.current=null; if(channel) channel.unsubscribe(); };
-  },[sesionId]);
+  },[sesionNubeId]);
 
   function flash(ok,txt){ setScanMsg({ok,txt}); setTimeout(()=>setScanMsg(null),2500); }
 
@@ -19144,12 +19198,13 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
       // Aviso inmediato a otros dispositivos (no espera la base de datos)
       channelRef.current?.send({type:"broadcast", event:"conteo", payload:{conteo:{[p.codigo]:res.cantNueva}}});
       // Persiste en Supabase (fuente de verdad / resolución de carreras)
-      sbIncrementarConteoVerif(sesionId,p.codigo).then(mergeRemoteConteo);
+      if(sesionNubeId) sbIncrementarConteoVerif(sesionNubeId,p.codigo).then(mergeRemoteConteo);
     }
     return res;
   }
 
   function buscarYAgregar(codigo){
+    if(!sesionActiva){ beepError(); flash(false,"Primero inicia un conteo nuevo o reanuda la sesión activa"); return false; }
     const c=(codigo||"").trim().toUpperCase().replace(/'/g,"-");
     if(!c) return false;
     const p=buscarEnInv(c);
@@ -19202,6 +19257,10 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
 
   // ── Verificación rápida: escaneo continuo con lector USB ──
   function onDetectCierreRapido(codigo){
+    if(!sesionActiva){
+      setLiveFeedback({ts:Date.now(),ok:false,title:"No hay un conteo activo",sub:"Inicia un conteo nuevo antes de escanear"});
+      return false;
+    }
     const c=(codigo||"").trim().toUpperCase();
     const p=buscarEnInv(c);
     if(!p){
@@ -19246,7 +19305,7 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
         localStorage.removeItem(`th_verif_doble_${MK}`);
         localStorage.removeItem(`th_verif_manual_${MK}`);
       }catch{}
-      sbResetSesionVerif(sesionId);
+      if(sesionNubeId) sbResetSesionVerif(sesionNubeId);
     }
   }
 
@@ -19258,13 +19317,15 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
       "Se borrará el conteo actual (no quedará guardado en el historial)."
     )) return;
     setConteo({}); setVerifConteo({}); setManualVerif({});
+    setSesionActiva(null); setSesionPendiente(null);
     setBaseNubeConfirmada(false);
     try{
       localStorage.removeItem(`th_verif_conteo_${MK}_${marcaSelec||"ALL"}`);
       localStorage.removeItem(`th_verif_doble_${MK}`);
       localStorage.removeItem(`th_verif_manual_${MK}`);
     }catch{}
-    sbResetSesionVerif(sesionId);
+    if(sesionNubeId) sbCerrarSesionVerif(sesionNubeId,"cancelled",user);
+    setSesionNubeId(null);
     setModoCierre(false);
     setModoVerif(false);
     setMarcaSelec(null);
@@ -19336,8 +19397,11 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
   // Después de confirmarla, la base vuelve a quedar congelada para que no cambie
   // silenciosamente a mitad del conteo.
   async function iniciarVerificacionRapida(){
-    if(baseNubeConfirmada){ setModoCierre(true); return; }
     if(iniciandoVerif) return;
+    if((sesionPendiente||itemsContados>0) && !window.confirm(
+      `¿Iniciar un conteo NUEVO${marcaSelec?` de ${marcaSelNombre}`:""}?\n\n`+
+      "Se descartará cualquier conteo pendiente de esta selección y se descargará el stock actual de la nube."
+    )) return;
     setIniciandoVerif(true);
     try{
       await procesarOutbox();
@@ -19359,13 +19423,61 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
         if(!continuar) return;
       }
       const fuente=Array.isArray(nube) && nube.length>0 ? nube : inv;
+      const ahora=new Date();
+      const meta=await sbIniciarSesionVerif(sesionScopeId,MK,marcaSelec,ahora,fuente,user);
+      if(!meta){
+        alert("No se pudo crear la nueva sesión de verificación en la nube. El conteo no fue iniciado para evitar datos incompletos.");
+        return;
+      }
+      setConteo({}); setVerifConteo({}); setManualVerif({});
+      try{
+        localStorage.removeItem(`th_verif_conteo_${MK}_${marcaSelec||"ALL"}`);
+        localStorage.removeItem(`th_verif_doble_${MK}`);
+        localStorage.removeItem(`th_verif_manual_${MK}`);
+      }catch{}
       setBaseInv(fuente.map(p=>({...p})));
-      setBaseTs(new Date());
+      setBaseTs(ahora);
+      setSesionActiva(meta);
+      setSesionNubeId(meta.sessionId);
+      setSesionPendiente(null);
       setBaseNubeConfirmada(Array.isArray(nube));
       setModoCierre(true);
     }finally{
       setIniciandoVerif(false);
     }
+  }
+
+  async function reanudarSesionActiva(){
+    if(!sesionPendiente||iniciandoVerif) return;
+    setIniciandoVerif(true);
+    try{
+      await procesarOutbox();
+      if(getOutbox().length>0){
+        alert("Todavía hay cambios pendientes de subir a la nube. Espera a que se sincronicen antes de reanudar la verificación.");
+        return;
+      }
+      const nube=await sbCargarInventario();
+      if(!Array.isArray(nube)){
+        alert("No se pudo consultar el inventario actual de la nube. La sesión no se reanudó para evitar un cruce incorrecto.");
+        return;
+      }
+      const stockBase=sesionPendiente.metadata?.base_stock||{};
+      const idsBase=new Set(Object.keys(stockBase));
+      const base=nube.map(p=> idsBase.has(String(p.id)) ? {...p,stock:Number(stockBase[String(p.id)])||0} : {...p});
+      const porCodigo={};
+      nube.forEach(p=>{ porCodigo[(p.codigo||"").toUpperCase()]=p.id; });
+      const conteoRestaurado={};
+      Object.entries(sesionPendiente.conteo||{}).forEach(([codigo,cant])=>{
+        const id=porCodigo[(codigo||"").toUpperCase()];
+        if(id!=null) conteoRestaurado[id]=Number(cant)||0;
+      });
+      const inicio=Date.parse(sesionPendiente.metadata?.started_at||sesionPendiente.base_ts||"");
+      setBaseInv(base); setBaseTs(Number.isFinite(inicio)?new Date(inicio):new Date());
+      setConteo(conteoRestaurado); setVerifConteo({}); setManualVerif({});
+      setSesionActiva({sessionToken:sesionPendiente.metadata?.session_token||"remote",startedAt:inicio||Date.now()});
+      setSesionNubeId(sesionPendiente.id);
+      setSesionPendiente(null); setBaseNubeConfirmada(true);
+    }finally{ setIniciandoVerif(false); }
   }
 
   // ── Resultado FINAL del cierre: incluye TODO el inventario, tratando los
@@ -19457,13 +19569,15 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
     // sistema vs escaneado, con faltantes/sobrantes marcados)
     try{ exportAuditoriaExcel(aud); }catch(e){ console.error("Export cierre:",e); }
     setConteo({}); setVerifConteo({}); setManualVerif({});
+    setSesionActiva(null); setSesionPendiente(null);
     setBaseNubeConfirmada(false);
     try{
       localStorage.removeItem(`th_verif_conteo_${MK}_${marcaSelec||"ALL"}`);
       localStorage.removeItem(`th_verif_doble_${MK}`);
       localStorage.removeItem(`th_verif_manual_${MK}`);
     }catch{}
-    sbResetSesionVerif(sesionId);
+    if(sesionNubeId) sbCerrarSesionVerif(sesionNubeId,"completed",user);
+    setSesionNubeId(null);
     flash(true,"✓ Verificación guardada · Excel generado");
     setVista("historial");
   }
@@ -19534,9 +19648,13 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
           padding:"7px 10px",borderRadius:10,background:C.bg2,border:`1px solid ${C.sep}`}}>
           <span style={{fontSize:13}}>🔒</span>
           <span style={{fontSize:11,color:C.label3,fontFamily:FONT,lineHeight:1.4}}>
-            Inventario base congelado: <b style={{color:C.label2}}>{baseTs.toLocaleDateString("es-BO")} {baseTs.toLocaleTimeString("es-BO",{hour:"2-digit",minute:"2-digit"})}</b> ·
-            las ventas y cargas de stock registradas durante el conteo se ajustan automáticamente
-            en el "sistema" para que el cruce sea fiel a lo que queda físicamente en tienda
+            {sesionActiva ? <>
+              Inventario base congelado: <b style={{color:C.label2}}>{baseTs.toLocaleDateString("es-BO")} {baseTs.toLocaleTimeString("es-BO",{hour:"2-digit",minute:"2-digit"})}</b> ·
+              las ventas y cargas de stock registradas durante el conteo se ajustan automáticamente
+              en el "sistema" para que el cruce sea fiel a lo que queda físicamente en tienda
+            </> : <>
+              <b style={{color:C.label2}}>Sin conteo activo.</b> Al iniciar se descargará el inventario vigente de la nube y se creará una base nueva.
+            </>}
           </span>
         </div>
         {totalAjustePorVentas>0&&(
@@ -19609,6 +19727,23 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
         )}
       </div>
 
+      {sesionPendiente&&!sesionActiva&&(
+        <div style={{padding:"12px 14px",borderRadius:13,marginBottom:12,
+          background:"#EEF2FF",border:`1px solid ${C.blue}44`,display:"flex",
+          alignItems:"center",justifyContent:"space-between",gap:12}}>
+          <div style={{minWidth:0}}>
+            <div style={{fontSize:12.5,fontWeight:700,color:C.blue,fontFamily:FONT}}>Hay un conteo activo reciente</div>
+            <div style={{fontSize:11,color:C.label3,fontFamily:FONT,marginTop:2}}>
+              Iniciado {new Date(sesionPendiente.metadata?.started_at||sesionPendiente.base_ts).toLocaleString("es-BO")} ·
+              {" "+Object.keys(sesionPendiente.conteo||{}).length} código(s) contados. Reanudar es siempre una decisión explícita.
+            </div>
+          </div>
+          <button onClick={reanudarSesionActiva} disabled={iniciandoVerif} style={{flexShrink:0,padding:"8px 12px",
+            borderRadius:9,border:"none",background:C.blue,color:"#fff",fontSize:11,fontWeight:700,
+            fontFamily:FONT,cursor:iniciandoVerif?"wait":"pointer"}}>Reanudar</button>
+        </div>
+      )}
+
       {/* ── Cierre Rápido — escaneo continuo de pasada ── */}
       <button onClick={iniciarVerificacionRapida} disabled={iniciandoVerif} style={{
         width:"100%",border:"none",borderRadius:16,marginBottom:14,
@@ -19622,10 +19757,10 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
           display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>⚡</div>
         <div style={{flex:1,minWidth:0}}>
           <div style={{fontSize:14.5,fontWeight:800,color:"#fff",fontFamily:FONT,letterSpacing:".01em"}}>
-            {iniciandoVerif?"Sincronizando inventario…":"Iniciar Verificación Rápida"}
+            {iniciandoVerif?"Sincronizando inventario…":"Iniciar nuevo conteo"}
           </div>
           <div style={{fontSize:11.5,color:"rgba(255,255,255,0.65)",fontFamily:FONT,marginTop:2}}>
-            Con lector de código de barras USB — escanea cada prenda en continuo
+            Crea una base nueva desde la nube y descarta cualquier sesión anterior de esta selección
           </div>
         </div>
         <div style={{fontSize:13,color:"#C4A57B",fontWeight:700,fontFamily:FONT,flexShrink:0}}>→</div>
@@ -19679,9 +19814,9 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
             return buscarYAgregar(codigo);
           }} onClose={()=>setShowScanner(false)}/>}
 
-          <div onClick={()=>setShowScanner(true)} style={{background:C.bg2,borderRadius:13,
-            border:`1.5px dashed ${C.sep}`,padding:"16px",marginBottom:12,cursor:"pointer",
-            display:"flex",alignItems:"center",gap:12,WebkitTapHighlightColor:"transparent"}}>
+          <div onClick={()=>sesionActiva&&setShowScanner(true)} style={{background:C.bg2,borderRadius:13,
+            border:`1.5px dashed ${C.sep}`,padding:"16px",marginBottom:12,cursor:sesionActiva?"pointer":"not-allowed",
+            display:"flex",alignItems:"center",gap:12,WebkitTapHighlightColor:"transparent",opacity:sesionActiva?1:.55}}>
             <span style={{fontSize:24}}>📷</span>
             <div>
               <div style={{fontSize:13,fontWeight:700,color:C.label,fontFamily:FONT}}>Escanear producto</div>
@@ -19695,14 +19830,15 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
           <div style={{display:"flex",gap:8,marginBottom:8}}>
             <input
               value={codManual}
+              disabled={!sesionActiva}
               onChange={e=>setCodManual(e.target.value.toUpperCase())}
               onKeyDown={e=>{ if(e.key==="Enter") buscarYAgregar(codManual); }}
-              placeholder="Código manual…"
+              placeholder={sesionActiva?"Código manual…":"Inicia un conteo nuevo para escanear"}
               style={{flex:1,padding:"10px 12px",border:`1px solid ${C.sep}`,
                 borderRadius:9,background:C.bg1,fontSize:13,color:C.label,
                 fontFamily:FONT_MONO,outline:"none",boxSizing:"border-box"}}
             />
-            <IOSBtn onPress={()=>buscarYAgregar(codManual)} small icon="+">Agregar</IOSBtn>
+            <IOSBtn onPress={()=>buscarYAgregar(codManual)} disabled={!sesionActiva} small icon="+">Agregar</IOSBtn>
           </div>
 
           {scanMsg&&(

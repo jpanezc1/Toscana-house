@@ -53721,15 +53721,71 @@
       return null;
     }
   }
-  async function sbCrearSesionVerif(id, mk, marcaId, baseTs) {
+  async function sbBuscarSesionActiva(mk, marcaId) {
     try {
       const db = await getSupabase();
-      await db.from("th_verif_sesion").upsert(
-        { id, mk, marca_id: marcaId, base_ts: baseTs.toISOString(), conteo: {} },
-        { onConflict: "id", ignoreDuplicates: true }
-      );
+      let q = db.from("th_verif_sesion").select("*").eq("mk", mk).order("updated_at", { ascending: false }).limit(20);
+      q = marcaId == null ? q.is("marca_id", null) : q.eq("marca_id", marcaId);
+      const { data, error } = await q;
+      if (error) throw error;
+      return (data || []).find((s) => s.metadata?.status === "active") || null;
     } catch (e) {
-      console.warn("Supabase crear sesi\xF3n verif:", e.message);
+      console.warn("Supabase buscar sesi\xF3n verif:", e.message);
+      return null;
+    }
+  }
+  async function sbIniciarSesionVerif(id, mk, marcaId, baseTs, baseInv, user) {
+    try {
+      const db = await getSupabase();
+      const anterior = await sbBuscarSesionActiva(mk, marcaId);
+      if (anterior) await sbCerrarSesionVerif(anterior.id, "superseded", user);
+      const sessionToken = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+      const sessionId = `${id}-${sessionToken}`;
+      const baseStock = {};
+      (baseInv || []).forEach((p) => {
+        baseStock[String(p.id)] = Number(p.stock) || 0;
+      });
+      const { error } = await db.from("th_verif_sesion").upsert({
+        id: sessionId,
+        mk,
+        marca_id: marcaId,
+        base_ts: baseTs.toISOString(),
+        conteo: {},
+        updated_by: user?.nombre || "\u2014",
+        metadata: {
+          status: "active",
+          session_token: sessionToken,
+          started_at: baseTs.toISOString(),
+          started_by: user?.nombre || "\u2014",
+          base_stock: baseStock
+        }
+      }, { onConflict: "id" });
+      if (error) throw error;
+      return { sessionId, sessionToken, startedAt: baseTs.getTime() };
+    } catch (e) {
+      console.warn("Supabase iniciar sesi\xF3n verif:", e.message);
+      return null;
+    }
+  }
+  async function sbCerrarSesionVerif(id, status, user) {
+    try {
+      const db = await getSupabase();
+      const actual = await sbObtenerSesionVerif(id);
+      const { error } = await db.from("th_verif_sesion").update({
+        conteo: {},
+        updated_by: user?.nombre || "\u2014",
+        metadata: {
+          ...actual?.metadata || {},
+          status,
+          closed_at: (/* @__PURE__ */ new Date()).toISOString(),
+          closed_by: user?.nombre || "\u2014"
+        }
+      }).eq("id", id);
+      if (error) throw error;
+      return true;
+    } catch (e) {
+      console.warn("Supabase cerrar sesi\xF3n verif:", e.message);
+      return false;
     }
   }
   async function sbIncrementarConteoVerif(id, codigo) {
@@ -73922,28 +73978,9 @@ ${sinStock.map((it) => {
         return null;
       }
     });
-    const [conteo, setConteo] = (0, import_react.useState)(() => {
-      try {
-        const marca = JSON.parse(localStorage.getItem(`th_verif_marca_${MK}`) || "null");
-        return JSON.parse(localStorage.getItem(`th_verif_conteo_${MK}_${marca || "ALL"}`) || "{}");
-      } catch {
-        return {};
-      }
-    });
-    const [verifConteo, setVerifConteo] = (0, import_react.useState)(() => {
-      try {
-        return JSON.parse(localStorage.getItem(`th_verif_doble_${MK}`) || "{}");
-      } catch {
-        return {};
-      }
-    });
-    const [manualVerif, setManualVerif] = (0, import_react.useState)(() => {
-      try {
-        return JSON.parse(localStorage.getItem(`th_verif_manual_${MK}`) || "{}");
-      } catch {
-        return {};
-      }
-    });
+    const [conteo, setConteo] = (0, import_react.useState)({});
+    const [verifConteo, setVerifConteo] = (0, import_react.useState)({});
+    const [manualVerif, setManualVerif] = (0, import_react.useState)({});
     const [showScanner, setShowScanner] = (0, import_react.useState)(false);
     const [modoCierre, setModoCierre] = (0, import_react.useState)(false);
     const [modoVerif, setModoVerif] = (0, import_react.useState)(false);
@@ -73955,6 +73992,13 @@ ${sinStock.map((it) => {
     const [codAgregar, setCodAgregar] = (0, import_react.useState)("");
     const [msgAgregar, setMsgAgregar] = (0, import_react.useState)(null);
     const [cruceVerTodo, setCruceVerTodo] = (0, import_react.useState)(false);
+    const [sesionActiva, setSesionActiva] = (0, import_react.useState)(null);
+    const [sesionPendiente, setSesionPendiente] = (0, import_react.useState)(null);
+    const [sesionNubeId, setSesionNubeId] = (0, import_react.useState)(null);
+    const sesionActivaRef = (0, import_react.useRef)(null);
+    (0, import_react.useEffect)(() => {
+      sesionActivaRef.current = sesionActiva;
+    }, [sesionActiva]);
     const [baseInv, setBaseInv] = (0, import_react.useState)(() => inv.map((p) => ({ ...p })));
     const [baseTs, setBaseTs] = (0, import_react.useState)(() => /* @__PURE__ */ new Date());
     const [iniciandoVerif, setIniciandoVerif] = (0, import_react.useState)(false);
@@ -74000,41 +74044,64 @@ ${sinStock.map((it) => {
       }
     }, [marcaSelec, MK]);
     (0, import_react.useEffect)(() => {
+      if (!sesionActiva) return;
       try {
         localStorage.setItem(`th_verif_conteo_${MK}_${marcaSelec || "ALL"}`, JSON.stringify(conteo));
       } catch {
       }
-    }, [conteo, MK, marcaSelec]);
+    }, [conteo, MK, marcaSelec, sesionActiva]);
     (0, import_react.useEffect)(() => {
+      if (!sesionActiva) return;
       try {
         localStorage.setItem(`th_verif_doble_${MK}`, JSON.stringify(verifConteo));
       } catch {
       }
-    }, [verifConteo, MK]);
+    }, [verifConteo, MK, sesionActiva]);
     (0, import_react.useEffect)(() => {
+      if (!sesionActiva) return;
       try {
         localStorage.setItem(`th_verif_manual_${MK}`, JSON.stringify(manualVerif));
       } catch {
       }
-    }, [manualVerif, MK]);
-    const sesionId = `VERIF-${MK}-${marcaSelec || "ALL"}`;
+    }, [manualVerif, MK, sesionActiva]);
+    const sesionScopeId = `VERIF-${MK}-${marcaSelec || "ALL"}`;
     const channelRef = (0, import_react.useRef)(null);
     (0, import_react.useEffect)(() => {
-      let channel = null, mounted = true;
-      sbCrearSesionVerif(sesionId, MK, marcaSelec, baseTs).then(() => sbObtenerSesionVerif(sesionId)).then((sesion) => {
-        if (mounted && sesion) mergeRemoteConteo(sesion.conteo);
+      let mounted = true;
+      setSesionActiva(null);
+      setSesionPendiente(null);
+      setSesionNubeId(null);
+      setConteo({});
+      setVerifConteo({});
+      setManualVerif({});
+      setBaseNubeConfirmada(false);
+      sbBuscarSesionActiva(MK, marcaSelec).then((sesion) => {
+        if (!mounted || !sesion) return;
+        const meta = sesion.metadata || {};
+        const inicioMs = Date.parse(meta.started_at || sesion.base_ts || "");
+        const reciente = Number.isFinite(inicioMs) && Date.now() - inicioMs < 12 * 60 * 60 * 1e3;
+        if (meta.status === "active" && reciente) setSesionPendiente(sesion);
       });
+      return () => {
+        mounted = false;
+      };
+    }, [sesionScopeId]);
+    (0, import_react.useEffect)(() => {
+      let channel = null, mounted = true;
+      if (!sesionNubeId) return () => {
+        mounted = false;
+      };
       getSupabase().then((db) => {
         if (!mounted) return;
-        channel = db.channel(`verif-${sesionId}`, { config: { broadcast: { self: false } } }).on("broadcast", { event: "conteo" }, (payload) => {
-          if (!mounted) return;
+        channel = db.channel(`verif-${sesionNubeId}`, { config: { broadcast: { self: false } } }).on("broadcast", { event: "conteo" }, (payload) => {
+          if (!mounted || !sesionActivaRef.current) return;
           mergeRemoteConteo(payload.payload?.conteo);
           beep(true);
         }).on(
           "postgres_changes",
-          { event: "UPDATE", schema: "public", table: "th_verif_sesion", filter: `id=eq.${sesionId}` },
+          { event: "UPDATE", schema: "public", table: "th_verif_sesion", filter: `id=eq.${sesionNubeId}` },
           (payload) => {
-            if (mounted) mergeRemoteConteo(payload.new.conteo);
+            if (mounted && sesionActivaRef.current) mergeRemoteConteo(payload.new.conteo);
           }
         ).subscribe();
         channelRef.current = channel;
@@ -74044,7 +74111,7 @@ ${sinStock.map((it) => {
         channelRef.current = null;
         if (channel) channel.unsubscribe();
       };
-    }, [sesionId]);
+    }, [sesionNubeId]);
     function flash(ok, txt) {
       setScanMsg({ ok, txt });
       setTimeout(() => setScanMsg(null), 2500);
@@ -74077,11 +74144,16 @@ ${sinStock.map((it) => {
       });
       if (res.ok) {
         channelRef.current?.send({ type: "broadcast", event: "conteo", payload: { conteo: { [p.codigo]: res.cantNueva } } });
-        sbIncrementarConteoVerif(sesionId, p.codigo).then(mergeRemoteConteo);
+        if (sesionNubeId) sbIncrementarConteoVerif(sesionNubeId, p.codigo).then(mergeRemoteConteo);
       }
       return res;
     }
     function buscarYAgregar(codigo) {
+      if (!sesionActiva) {
+        beepError();
+        flash(false, "Primero inicia un conteo nuevo o reanuda la sesi\xF3n activa");
+        return false;
+      }
       const c = (codigo || "").trim().toUpperCase().replace(/'/g, "-");
       if (!c) return false;
       const p = buscarEnInv(c);
@@ -74124,6 +74196,10 @@ ${sinStock.map((it) => {
       return disponible || variantes[0];
     }
     function onDetectCierreRapido(codigo) {
+      if (!sesionActiva) {
+        setLiveFeedback({ ts: Date.now(), ok: false, title: "No hay un conteo activo", sub: "Inicia un conteo nuevo antes de escanear" });
+        return false;
+      }
       const c = (codigo || "").trim().toUpperCase();
       const p = buscarEnInv(c);
       if (!p) {
@@ -74174,7 +74250,7 @@ ${sinStock.map((it) => {
           localStorage.removeItem(`th_verif_manual_${MK}`);
         } catch {
         }
-        sbResetSesionVerif(sesionId);
+        if (sesionNubeId) sbResetSesionVerif(sesionNubeId);
       }
     }
     function finalizarYEmpezarDeNuevo() {
@@ -74184,6 +74260,8 @@ ${sinStock.map((it) => {
       setConteo({});
       setVerifConteo({});
       setManualVerif({});
+      setSesionActiva(null);
+      setSesionPendiente(null);
       setBaseNubeConfirmada(false);
       try {
         localStorage.removeItem(`th_verif_conteo_${MK}_${marcaSelec || "ALL"}`);
@@ -74191,7 +74269,8 @@ ${sinStock.map((it) => {
         localStorage.removeItem(`th_verif_manual_${MK}`);
       } catch {
       }
-      sbResetSesionVerif(sesionId);
+      if (sesionNubeId) sbCerrarSesionVerif(sesionNubeId, "cancelled", user);
+      setSesionNubeId(null);
       setModoCierre(false);
       setModoVerif(false);
       setMarcaSelec(null);
@@ -74252,11 +74331,12 @@ ${sinStock.map((it) => {
     const itemsContados = Object.keys(conteo).length;
     const unidadesContadas = Object.values(conteo).reduce((s, v) => s + v, 0);
     async function iniciarVerificacionRapida() {
-      if (baseNubeConfirmada) {
-        setModoCierre(true);
-        return;
-      }
       if (iniciandoVerif) return;
+      if ((sesionPendiente || itemsContados > 0) && !window.confirm(
+        `\xBFIniciar un conteo NUEVO${marcaSelec ? ` de ${marcaSelNombre}` : ""}?
+
+Se descartar\xE1 cualquier conteo pendiente de esta selecci\xF3n y se descargar\xE1 el stock actual de la nube.`
+      )) return;
       setIniciandoVerif(true);
       try {
         await procesarOutbox();
@@ -74277,10 +74357,68 @@ Para una comparaci\xF3n exacta conviene esperar a que se sincronicen. \xBFDeseas
           if (!continuar) return;
         }
         const fuente = Array.isArray(nube) && nube.length > 0 ? nube : inv;
+        const ahora = /* @__PURE__ */ new Date();
+        const meta = await sbIniciarSesionVerif(sesionScopeId, MK, marcaSelec, ahora, fuente, user);
+        if (!meta) {
+          alert("No se pudo crear la nueva sesi\xF3n de verificaci\xF3n en la nube. El conteo no fue iniciado para evitar datos incompletos.");
+          return;
+        }
+        setConteo({});
+        setVerifConteo({});
+        setManualVerif({});
+        try {
+          localStorage.removeItem(`th_verif_conteo_${MK}_${marcaSelec || "ALL"}`);
+          localStorage.removeItem(`th_verif_doble_${MK}`);
+          localStorage.removeItem(`th_verif_manual_${MK}`);
+        } catch {
+        }
         setBaseInv(fuente.map((p) => ({ ...p })));
-        setBaseTs(/* @__PURE__ */ new Date());
+        setBaseTs(ahora);
+        setSesionActiva(meta);
+        setSesionNubeId(meta.sessionId);
+        setSesionPendiente(null);
         setBaseNubeConfirmada(Array.isArray(nube));
         setModoCierre(true);
+      } finally {
+        setIniciandoVerif(false);
+      }
+    }
+    async function reanudarSesionActiva() {
+      if (!sesionPendiente || iniciandoVerif) return;
+      setIniciandoVerif(true);
+      try {
+        await procesarOutbox();
+        if (getOutbox().length > 0) {
+          alert("Todav\xEDa hay cambios pendientes de subir a la nube. Espera a que se sincronicen antes de reanudar la verificaci\xF3n.");
+          return;
+        }
+        const nube = await sbCargarInventario();
+        if (!Array.isArray(nube)) {
+          alert("No se pudo consultar el inventario actual de la nube. La sesi\xF3n no se reanud\xF3 para evitar un cruce incorrecto.");
+          return;
+        }
+        const stockBase = sesionPendiente.metadata?.base_stock || {};
+        const idsBase = new Set(Object.keys(stockBase));
+        const base = nube.map((p) => idsBase.has(String(p.id)) ? { ...p, stock: Number(stockBase[String(p.id)]) || 0 } : { ...p });
+        const porCodigo = {};
+        nube.forEach((p) => {
+          porCodigo[(p.codigo || "").toUpperCase()] = p.id;
+        });
+        const conteoRestaurado = {};
+        Object.entries(sesionPendiente.conteo || {}).forEach(([codigo, cant]) => {
+          const id = porCodigo[(codigo || "").toUpperCase()];
+          if (id != null) conteoRestaurado[id] = Number(cant) || 0;
+        });
+        const inicio = Date.parse(sesionPendiente.metadata?.started_at || sesionPendiente.base_ts || "");
+        setBaseInv(base);
+        setBaseTs(Number.isFinite(inicio) ? new Date(inicio) : /* @__PURE__ */ new Date());
+        setConteo(conteoRestaurado);
+        setVerifConteo({});
+        setManualVerif({});
+        setSesionActiva({ sessionToken: sesionPendiente.metadata?.session_token || "remote", startedAt: inicio || Date.now() });
+        setSesionNubeId(sesionPendiente.id);
+        setSesionPendiente(null);
+        setBaseNubeConfirmada(true);
       } finally {
         setIniciandoVerif(false);
       }
@@ -74407,6 +74545,8 @@ Base de inventario tomada: ${baseTs.toLocaleString("es-BO")}`)) return;
       setConteo({});
       setVerifConteo({});
       setManualVerif({});
+      setSesionActiva(null);
+      setSesionPendiente(null);
       setBaseNubeConfirmada(false);
       try {
         localStorage.removeItem(`th_verif_conteo_${MK}_${marcaSelec || "ALL"}`);
@@ -74414,7 +74554,8 @@ Base de inventario tomada: ${baseTs.toLocaleString("es-BO")}`)) return;
         localStorage.removeItem(`th_verif_manual_${MK}`);
       } catch {
       }
-      sbResetSesionVerif(sesionId);
+      if (sesionNubeId) sbCerrarSesionVerif(sesionNubeId, "completed", user);
+      setSesionNubeId(null);
       flash(true, "\u2713 Verificaci\xF3n guardada \xB7 Excel generado");
       setVista("historial");
     }
@@ -74491,7 +74632,7 @@ Base de inventario tomada: ${baseTs.toLocaleString("es-BO")}`)) return;
       borderRadius: 10,
       background: C.bg2,
       border: `1px solid ${C.sep}`
-    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13 } }, "\u{1F512}"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 11, color: C.label3, fontFamily: FONT, lineHeight: 1.4 } }, "Inventario base congelado: ", /* @__PURE__ */ import_react.default.createElement("b", { style: { color: C.label2 } }, baseTs.toLocaleDateString("es-BO"), " ", baseTs.toLocaleTimeString("es-BO", { hour: "2-digit", minute: "2-digit" })), ' \xB7 las ventas y cargas de stock registradas durante el conteo se ajustan autom\xE1ticamente en el "sistema" para que el cruce sea fiel a lo que queda f\xEDsicamente en tienda')), totalAjustePorVentas > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: {
+    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13 } }, "\u{1F512}"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 11, color: C.label3, fontFamily: FONT, lineHeight: 1.4 } }, sesionActiva ? /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, null, "Inventario base congelado: ", /* @__PURE__ */ import_react.default.createElement("b", { style: { color: C.label2 } }, baseTs.toLocaleDateString("es-BO"), " ", baseTs.toLocaleTimeString("es-BO", { hour: "2-digit", minute: "2-digit" })), ' \xB7 las ventas y cargas de stock registradas durante el conteo se ajustan autom\xE1ticamente en el "sistema" para que el cruce sea fiel a lo que queda f\xEDsicamente en tienda') : /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, null, /* @__PURE__ */ import_react.default.createElement("b", { style: { color: C.label2 } }, "Sin conteo activo."), " Al iniciar se descargar\xE1 el inventario vigente de la nube y se crear\xE1 una base nueva."))), totalAjustePorVentas > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: {
       marginTop: 8,
       display: "flex",
       alignItems: "center",
@@ -74570,7 +74711,28 @@ Base de inventario tomada: ${baseTs.toLocaleString("es-BO")}`)) return;
         color: activa ? m.color : C.label2,
         whiteSpace: "nowrap"
       } }, m.nombre));
-    })), marcaSelec && /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT, marginTop: 8, lineHeight: 1.4, paddingLeft: 2 } }, "Solo se contar\xE1n y cruzar\xE1n productos de ", /* @__PURE__ */ import_react.default.createElement("b", { style: { color: C.label2 } }, marcaSelNombre), ". Los c\xF3digos de otras marcas se rechazan durante el escaneo.")), /* @__PURE__ */ import_react.default.createElement("button", { onClick: iniciarVerificacionRapida, disabled: iniciandoVerif, style: {
+    })), marcaSelec && /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT, marginTop: 8, lineHeight: 1.4, paddingLeft: 2 } }, "Solo se contar\xE1n y cruzar\xE1n productos de ", /* @__PURE__ */ import_react.default.createElement("b", { style: { color: C.label2 } }, marcaSelNombre), ". Los c\xF3digos de otras marcas se rechazan durante el escaneo.")), sesionPendiente && !sesionActiva && /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      padding: "12px 14px",
+      borderRadius: 13,
+      marginBottom: 12,
+      background: "#EEF2FF",
+      border: `1px solid ${C.blue}44`,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 12
+    } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { minWidth: 0 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12.5, fontWeight: 700, color: C.blue, fontFamily: FONT } }, "Hay un conteo activo reciente"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT, marginTop: 2 } }, "Iniciado ", new Date(sesionPendiente.metadata?.started_at || sesionPendiente.base_ts).toLocaleString("es-BO"), " \xB7", " " + Object.keys(sesionPendiente.conteo || {}).length, " c\xF3digo(s) contados. Reanudar es siempre una decisi\xF3n expl\xEDcita.")), /* @__PURE__ */ import_react.default.createElement("button", { onClick: reanudarSesionActiva, disabled: iniciandoVerif, style: {
+      flexShrink: 0,
+      padding: "8px 12px",
+      borderRadius: 9,
+      border: "none",
+      background: C.blue,
+      color: "#fff",
+      fontSize: 11,
+      fontWeight: 700,
+      fontFamily: FONT,
+      cursor: iniciandoVerif ? "wait" : "pointer"
+    } }, "Reanudar")), /* @__PURE__ */ import_react.default.createElement("button", { onClick: iniciarVerificacionRapida, disabled: iniciandoVerif, style: {
       width: "100%",
       border: "none",
       borderRadius: 16,
@@ -74595,7 +74757,7 @@ Base de inventario tomada: ${baseTs.toLocaleString("es-BO")}`)) return;
       alignItems: "center",
       justifyContent: "center",
       fontSize: 22
-    } }, "\u26A1"), /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 14.5, fontWeight: 800, color: "#fff", fontFamily: FONT, letterSpacing: ".01em" } }, iniciandoVerif ? "Sincronizando inventario\u2026" : "Iniciar Verificaci\xF3n R\xE1pida"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11.5, color: "rgba(255,255,255,0.65)", fontFamily: FONT, marginTop: 2 } }, "Con lector de c\xF3digo de barras USB \u2014 escanea cada prenda en continuo")), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: "#C4A57B", fontWeight: 700, fontFamily: FONT, flexShrink: 0 } }, "\u2192")), modoCierre && /* @__PURE__ */ import_react.default.createElement(
+    } }, "\u26A1"), /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 14.5, fontWeight: 800, color: "#fff", fontFamily: FONT, letterSpacing: ".01em" } }, iniciandoVerif ? "Sincronizando inventario\u2026" : "Iniciar nuevo conteo"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11.5, color: "rgba(255,255,255,0.65)", fontFamily: FONT, marginTop: 2 } }, "Crea una base nueva desde la nube y descarta cualquier sesi\xF3n anterior de esta selecci\xF3n")), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, color: "#C4A57B", fontWeight: 700, fontFamily: FONT, flexShrink: 0 } }, "\u2192")), modoCierre && /* @__PURE__ */ import_react.default.createElement(
       LectorHID,
       {
         onDetect: onDetectCierreRapido,
@@ -74635,26 +74797,28 @@ Base de inventario tomada: ${baseTs.toLocaleString("es-BO")}`)) return;
     )), vista === "conteo" && /* @__PURE__ */ import_react.default.createElement("div", null, showScanner && /* @__PURE__ */ import_react.default.createElement(CameraScanner, { onDetect: (codigo) => {
       setShowScanner(false);
       return buscarYAgregar(codigo);
-    }, onClose: () => setShowScanner(false) }), /* @__PURE__ */ import_react.default.createElement("div", { onClick: () => setShowScanner(true), style: {
+    }, onClose: () => setShowScanner(false) }), /* @__PURE__ */ import_react.default.createElement("div", { onClick: () => sesionActiva && setShowScanner(true), style: {
       background: C.bg2,
       borderRadius: 13,
       border: `1.5px dashed ${C.sep}`,
       padding: "16px",
       marginBottom: 12,
-      cursor: "pointer",
+      cursor: sesionActiva ? "pointer" : "not-allowed",
       display: "flex",
       alignItems: "center",
       gap: 12,
-      WebkitTapHighlightColor: "transparent"
+      WebkitTapHighlightColor: "transparent",
+      opacity: sesionActiva ? 1 : 0.55
     } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 24 } }, "\u{1F4F7}"), /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, fontWeight: 700, color: C.label, fontFamily: FONT } }, "Escanear producto"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT, marginTop: 2 } }, "Toca para abrir la c\xE1mara \u2014 cada escaneo suma 1 unidad al conteo"))), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 8, marginBottom: 8 } }, /* @__PURE__ */ import_react.default.createElement(
       "input",
       {
         value: codManual,
+        disabled: !sesionActiva,
         onChange: (e) => setCodManual(e.target.value.toUpperCase()),
         onKeyDown: (e) => {
           if (e.key === "Enter") buscarYAgregar(codManual);
         },
-        placeholder: "C\xF3digo manual\u2026",
+        placeholder: sesionActiva ? "C\xF3digo manual\u2026" : "Inicia un conteo nuevo para escanear",
         style: {
           flex: 1,
           padding: "10px 12px",
@@ -74668,7 +74832,7 @@ Base de inventario tomada: ${baseTs.toLocaleString("es-BO")}`)) return;
           boxSizing: "border-box"
         }
       }
-    ), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => buscarYAgregar(codManual), small: true, icon: "+" }, "Agregar")), scanMsg && /* @__PURE__ */ import_react.default.createElement("div", { style: {
+    ), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => buscarYAgregar(codManual), disabled: !sesionActiva, small: true, icon: "+" }, "Agregar")), scanMsg && /* @__PURE__ */ import_react.default.createElement("div", { style: {
       padding: "9px 12px",
       borderRadius: 9,
       marginBottom: 12,
