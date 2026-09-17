@@ -21278,6 +21278,7 @@ function RegistroCargas({cargas, marcas, marcaId=null, onVerificar=null, user=nu
           <option value="">Todos los tipos</option>
           <option value="MANUAL">Carga manual</option>
           <option value="IMPORT">Importación Excel</option>
+          <option value="CORRECCION_IMPORT">Corrección de importación</option>
           <option value="HISTORICO">Carga histórica</option>
         </select>
         <select value={filUsuario} onChange={e=>setFilUsuario(e.target.value)} style={{
@@ -21310,6 +21311,8 @@ function RegistroCargas({cargas, marcas, marcaId=null, onVerificar=null, user=nu
               const items = itemsDe(c);
               const tipoInfo = c.tipo==="IMPORT"
                 ? {label:"Importación Excel", icon:"📥", color:C.blue}
+                : c.tipo==="CORRECCION_IMPORT"
+                ? {label:"Corrección de importación", icon:"🛠️", color:C.orange}
                 : c.tipo==="HISTORICO"
                 ? {label:"Carga histórica", icon:"🕓", color:C.label3}
                 : {label:"Carga manual", icon:"✍️", color:C.green};
@@ -21350,7 +21353,7 @@ function RegistroCargas({cargas, marcas, marcaId=null, onVerificar=null, user=nu
                                 color:it.tipo==="update"?C.blue:C.green,
                                 background:it.tipo==="update"?"#EEF2FF":C.greenBg,
                                 padding:"2px 6px",borderRadius:5,flexShrink:0}}>
-                                {it.tipo==="update"?"STOCK":"NUEVO"}
+                                {it.tipo==="update"?(c.tipo==="CORRECCION_IMPORT"?"CORREGIDO":"STOCK"):"NUEVO"}
                               </span>
                               <div style={{flex:1,minWidth:0}}>
                                 <div style={{fontSize:12,fontWeight:600,color:C.label,fontFamily:FONT,
@@ -21363,7 +21366,9 @@ function RegistroCargas({cargas, marcas, marcaId=null, onVerificar=null, user=nu
                               </div>
                               <div style={{fontSize:11,color:C.label2,fontFamily:FONT,textAlign:"right",flexShrink:0}}>
                                 {it.tipo==="update"
-                                  ? `${it.stockAntes} → ${it.stockNuevo} (+${it.stockSumado})`
+                                  ? (it.stockAntes!=null&&it.stockNuevo!=null&&it.stockSumado!=null
+                                    ? `${it.stockAntes} → ${it.stockNuevo} (+${it.stockSumado})`
+                                    : `Descripción corregida · Stock ${it.stock??it.stockNuevo??"—"}`)
                                   : `Stock ${it.stock}${it.precio?` · ${$(it.precio)}`:""}`}
                               </div>
                             </div>

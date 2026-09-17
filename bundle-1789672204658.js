@@ -76526,7 +76526,7 @@ ${c.diferencia > 0.01 ? `Cliente paga diferencia: Bs ${fmt2(c.diferencia)} (${c.
       color: C.label,
       fontFamily: FONT,
       outline: "none"
-    } }, /* @__PURE__ */ import_react.default.createElement("option", { value: "" }, "Todos los tipos"), /* @__PURE__ */ import_react.default.createElement("option", { value: "MANUAL" }, "Carga manual"), /* @__PURE__ */ import_react.default.createElement("option", { value: "IMPORT" }, "Importaci\xF3n Excel"), /* @__PURE__ */ import_react.default.createElement("option", { value: "HISTORICO" }, "Carga hist\xF3rica")), /* @__PURE__ */ import_react.default.createElement("select", { value: filUsuario, onChange: (e) => setFilUsuario(e.target.value), style: {
+    } }, /* @__PURE__ */ import_react.default.createElement("option", { value: "" }, "Todos los tipos"), /* @__PURE__ */ import_react.default.createElement("option", { value: "MANUAL" }, "Carga manual"), /* @__PURE__ */ import_react.default.createElement("option", { value: "IMPORT" }, "Importaci\xF3n Excel"), /* @__PURE__ */ import_react.default.createElement("option", { value: "CORRECCION_IMPORT" }, "Correcci\xF3n de importaci\xF3n"), /* @__PURE__ */ import_react.default.createElement("option", { value: "HISTORICO" }, "Carga hist\xF3rica")), /* @__PURE__ */ import_react.default.createElement("select", { value: filUsuario, onChange: (e) => setFilUsuario(e.target.value), style: {
       flex: isDesktop ? "0 0 auto" : "1 1 140px",
       padding: "9px 12px",
       border: `1px solid ${C.sep}`,
@@ -76566,7 +76566,7 @@ ${c.diferencia > 0.01 ? `Cliente paga diferencia: Bs ${fmt2(c.diferencia)} (${c.
     ) : /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 10 } }, filtradas.map((c) => {
       const abierto = abierta === c.id;
       const items = itemsDe(c);
-      const tipoInfo = c.tipo === "IMPORT" ? { label: "Importaci\xF3n Excel", icon: "\u{1F4E5}", color: C.blue } : c.tipo === "HISTORICO" ? { label: "Carga hist\xF3rica", icon: "\u{1F553}", color: C.label3 } : { label: "Carga manual", icon: "\u270D\uFE0F", color: C.green };
+      const tipoInfo = c.tipo === "IMPORT" ? { label: "Importaci\xF3n Excel", icon: "\u{1F4E5}", color: C.blue } : c.tipo === "CORRECCION_IMPORT" ? { label: "Correcci\xF3n de importaci\xF3n", icon: "\u{1F6E0}\uFE0F", color: C.orange } : c.tipo === "HISTORICO" ? { label: "Carga hist\xF3rica", icon: "\u{1F553}", color: C.label3 } : { label: "Carga manual", icon: "\u270D\uFE0F", color: C.green };
       return /* @__PURE__ */ import_react.default.createElement("div", { key: c.id, style: {
         background: "linear-gradient(180deg,#FFFFFF,#FCFBF9)",
         boxShadow: "0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1px 0 rgba(255,255,255,.45)",
@@ -76621,7 +76621,7 @@ ${c.diferencia > 0.01 ? `Cliente paga diferencia: Bs ${fmt2(c.diferencia)} (${c.
         padding: "2px 6px",
         borderRadius: 5,
         flexShrink: 0
-      } }, it.tipo === "update" ? "STOCK" : "NUEVO"), /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      } }, it.tipo === "update" ? c.tipo === "CORRECCION_IMPORT" ? "CORREGIDO" : "STOCK" : "NUEVO"), /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
         fontSize: 12,
         fontWeight: 600,
         color: C.label,
@@ -76629,7 +76629,7 @@ ${c.diferencia > 0.01 ? `Cliente paga diferencia: Bs ${fmt2(c.diferencia)} (${c.
         overflow: "hidden",
         textOverflow: "ellipsis",
         whiteSpace: "nowrap"
-      } }, (it.nombre || "").toUpperCase()), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: C.label3, fontFamily: FONT_MONO } }, it.codigo, " \xB7 ", it.marca || "\u2014")), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label2, fontFamily: FONT, textAlign: "right", flexShrink: 0 } }, it.tipo === "update" ? `${it.stockAntes} \u2192 ${it.stockNuevo} (+${it.stockSumado})` : `Stock ${it.stock}${it.precio ? ` \xB7 ${$2(it.precio)}` : ""}`)))), items.filter((it) => it.codigo && it.nombre && Number(it.stock || it.stockNuevo || 1) > 0).length > 0 && (() => {
+      } }, (it.nombre || "").toUpperCase()), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: C.label3, fontFamily: FONT_MONO } }, it.codigo, " \xB7 ", it.marca || "\u2014")), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label2, fontFamily: FONT, textAlign: "right", flexShrink: 0 } }, it.tipo === "update" ? it.stockAntes != null && it.stockNuevo != null && it.stockSumado != null ? `${it.stockAntes} \u2192 ${it.stockNuevo} (+${it.stockSumado})` : `Descripci\xF3n corregida \xB7 Stock ${it.stock ?? it.stockNuevo ?? "\u2014"}` : `Stock ${it.stock}${it.precio ? ` \xB7 ${$2(it.precio)}` : ""}`)))), items.filter((it) => it.codigo && it.nombre && Number(it.stock || it.stockNuevo || 1) > 0).length > 0 && (() => {
         const _COLORES = /* @__PURE__ */ new Set(["NEGRO", "NEGRA", "NEGROS", "NEGRAS", "BLANCO", "BLANCA", "BLANCOS", "BLANCAS", "BEIGE", "ROSA", "ROJO", "ROJA", "AZUL", "VERDE", "GRIS", "CAFE", "CAF\xC9", "MARRON", "MARR\xD3N", "MORADO", "MORADA", "LILA", "LILA", "AMARILLO", "AMARILLA", "NARANJA", "CELESTE", "TURQUESA", "CREMA", "NATURAL", "NUDE", "CORAL", "SALMON", "SALM\xD3N", "BORDO", "BORD\xD3", "VINO", "MARFIL", "IVORY", "KHAKI", "KAKI", "MOSTAZA", "TERRACOTA", "MAGENTA", "VIOLETA", "PLATEADO", "PLATEADA", "DORADO", "DORADA", "ARENA", "INDIGO", "\xCDNDIGO", "MARENGO", "AQUA", "MENTA", "LAVANDA", "DURAZNO", "NUDE", "CAMEL", "TOSTADO", "TOSTADA", "CHOCOLATE", "PERLA", "CIELO", "PIEDRA", "HUESO", "COBRE", "BRONCE", "GRAFITO", "ESMERALDA", "BURDEOS", "FRESA", "MELON", "MEL\xD3N", "LIMA", "CANELA", "GRANATE", "NAVY"]);
         const paraImprimir = items.filter((it) => it.codigo && it.nombre).map((it) => {
           const prodInv = inv.find((p) => (p.codigo || "").toLowerCase() === (it.codigo || "").toLowerCase());
