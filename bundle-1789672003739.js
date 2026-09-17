@@ -63109,11 +63109,11 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
         const isTH = headers.some((h) => h.includes("\u2605") || h.includes("descripciondelproducto") || h.includes("descripcion del producto") || h.includes("descripcion") && headers.some((hh) => hh.includes("sku") || hh.includes("codigo")));
         const isNumerico = !isTH && headers.some((h) => /^\d+\.\s/.test(h) || h.includes("item/art") || h.includes("unidad de medida") || h.includes("cant. de ingreso"));
         const isIZi = !isNumerico && !isTH && headers.some((h) => h.includes("subgategoria"));
-        let cSKU, cMarca, cDesc, cPrecio, cCat, cTalla, cColor, cStock, cMaterial = -1, cDetalles = -1;
+        let cSKU, cMarca, cDesc, cPrecio, cCat, cTalla, cColor, cStock, cMaterial = -1, cDetalles = -1, cProducto = -1;
         if (isPadronUnico) {
           cMarca = col("marca");
-          cDesc = col("producto");
-          cDetalles = col("descripcion");
+          cProducto = col("producto");
+          cDesc = col("descripcion");
           cColor = col("color");
           cStock = col("cantidad");
           cTalla = col("talla");
@@ -63212,6 +63212,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
           if (!row || row.every((c) => String(c).trim() === "")) continue;
           const marcaRaw = cMarca >= 0 ? String(row[cMarca] || "").trim() : "";
           const descRaw = cDesc >= 0 ? String(row[cDesc] || "").trim() : "";
+          const productoRaw = cProducto >= 0 ? String(row[cProducto] || "").trim() : "";
           const materialRaw = cMaterial >= 0 ? String(row[cMaterial] || "").trim() : "";
           const detallesRaw = cDetalles >= 0 ? String(row[cDetalles] || "").trim() : "";
           const skuRaw = cSKU >= 0 ? String(row[cSKU] || "").trim().toUpperCase() : "";
@@ -63229,7 +63230,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
             if (/CONJUNTO|SET/.test(t)) return "Conjuntos";
             if (/CAPA/.test(t)) return "Capas";
             return "General";
-          })(descRaw);
+          })(productoRaw || descRaw);
           const catRaw = cCat >= 0 ? String(row[cCat] || "").trim() : categoriaPorProducto;
           const tallaRaw = cTalla >= 0 ? String(row[cTalla] || "").trim() : "";
           const colorRaw = cColor >= 0 ? String(row[cColor] || "").trim() : "";
@@ -63255,7 +63256,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
           const precio = parsePrecio(precioRaw);
           const stockRaw = cStock >= 0 ? row[cStock] : "";
           const stock = parseStock(stockRaw);
-          let desc = descRaw;
+          let desc = isPadronUnico ? [productoRaw, descRaw].filter(Boolean).join(" \xB7 ") : descRaw;
           if (!desc && skuRaw) {
             const partes = [catRaw, tallaRaw, colorRaw].filter(Boolean).join(" ").trim();
             desc = partes ? partes === catRaw && precio > 0 ? `${catRaw} BS. ${precio}` : partes : skuRaw;

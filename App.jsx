@@ -9302,10 +9302,14 @@ function ImportarExcelModal({inv, onImportar, onClose, onArchivoCapturado}){
       // Formato D: Estándar genérico (cualquier otro Excel reconocible)
       // — se maneja con col() flexible abajo
 
-      let cSKU, cMarca, cDesc, cPrecio, cCat, cTalla, cColor, cStock, cMaterial=-1, cDetalles=-1;
+      let cSKU, cMarca, cDesc, cPrecio, cCat, cTalla, cColor, cStock, cMaterial=-1, cDetalles=-1, cProducto=-1;
 
       if(isPadronUnico){
-        cMarca=col("marca"); cDesc=col("producto"); cDetalles=col("descripcion"); cColor=col("color");
+        // PRODUCTO es el tipo general (VESTIDO, TOP, FALDA).
+        // DESCRIPCIÓN es la identidad real de la prenda (DIANA DRESS, etc.).
+        // Antes se usaba PRODUCTO como nombre/identidad y se fusionaban prendas
+        // distintas cuando coincidían color y talla.
+        cMarca=col("marca"); cProducto=col("producto"); cDesc=col("descripcion"); cColor=col("color");
         cStock=col("cantidad"); cTalla=col("talla"); cPrecio=col("precio venta","precio"); cCat=-1; cSKU=-1; cMaterial=-1;
       } else if(isTH){
         // ── Plantilla Oficial TH — mapeo por nombre + fallback posición ──
@@ -9452,6 +9456,7 @@ function ImportarExcelModal({inv, onImportar, onClose, onArchivoCapturado}){
         // ── Extraer valores crudos ──────────────────────────────────
         const marcaRaw = cMarca>=0 ? String(row[cMarca]||"").trim() : "";
         const descRaw  = cDesc>=0  ? String(row[cDesc]||"").trim()  : "";
+        const productoRaw = cProducto>=0 ? String(row[cProducto]||"").trim() : "";
         const materialRaw = cMaterial>=0 ? String(row[cMaterial]||"").trim() : "";
         const detallesRaw = cDetalles>=0 ? String(row[cDetalles]||"").trim() : "";
         const skuRaw   = cSKU>=0   ? String(row[cSKU]||"").trim().toUpperCase() : "";
@@ -9469,7 +9474,7 @@ function ImportarExcelModal({inv, onImportar, onClose, onArchivoCapturado}){
           if(/CONJUNTO|SET/.test(t)) return "Conjuntos";
           if(/CAPA/.test(t)) return "Capas";
           return "General";
-        })(descRaw);
+        })(productoRaw||descRaw);
         const catRaw   = cCat>=0 ? String(row[cCat]||"").trim() : categoriaPorProducto;
         const tallaRaw = cTalla>=0 ? String(row[cTalla]||"").trim() : "";
         const colorRaw = cColor>=0 ? String(row[cColor]||"").trim() : "";
@@ -9497,7 +9502,9 @@ function ImportarExcelModal({inv, onImportar, onClose, onArchivoCapturado}){
 
         // ── Descripción final ────────────────────────────────────────
         // Si la descripción está vacía, construirla desde otras columnas
-        let desc = descRaw;
+        let desc = isPadronUnico
+          ? [productoRaw, descRaw].filter(Boolean).join(" · ")
+          : descRaw;
         if(!desc && skuRaw){
           // Reconstruir desde columnas disponibles
           const partes = [catRaw, tallaRaw, colorRaw].filter(Boolean).join(" ").trim();
