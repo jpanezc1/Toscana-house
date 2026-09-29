@@ -54787,6 +54787,8 @@
             nombre: p.nombre,
             categoria: p.categoria,
             precio: p.precio,
+            descripcion: p.descripcion || "",
+            subcat: p.subcat || "",
             stock: p.stock,
             stockInicial: p.stock_inicial,
             fecha: p.fecha
@@ -54803,7 +54805,8 @@
             nombre: p.nombre,
             precio: p.precio,
             categoria: p.categoria,
-            descripcion: p.descripcion || i.descripcion
+            descripcion: p.descripcion || i.descripcion || "",
+            subcat: p.subcat || i.subcat || ""
           } : i));
         }).on("postgres_changes", { event: "DELETE", schema: "public", table: "inventario" }, (payload) => {
           const id = payload.old?.id;
@@ -55176,6 +55179,10 @@
       maxWidth: small ? 140 : 200,
       wordBreak: "break-all"
     } }, codigo));
+  }
+  function extraerColor(desc) {
+    const m = (desc || "").match(/COLOR:\s*([^·\n]+)/i);
+    return m ? m[1].trim() : "";
   }
   function extraerTalla(desc) {
     const m = (desc || "").match(/TALLA:\s*([^·\n]+)/i);
@@ -66278,6 +66285,31 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       return Object.values(map).sort((a, b) => b.uds - a.uds).slice(0, 5);
     }, [vMes, mid]);
     const invMarca = (0, import_react.useMemo)(() => inv.filter((i) => i.marcaId === mid), [inv, mid]);
+    const detalleHistoricoPorCodigo = (0, import_react.useMemo)(() => {
+      const map = {};
+      const codigosMarca = new Set(invMarca.map((p) => (p.codigo || "").toUpperCase().trim()));
+      [...cargas || []].sort((a, b) => (Number(a.ts) || 0) - (Number(b.ts) || 0)).forEach((c) => {
+        (c.items || []).forEach((it) => {
+          const codigo = (it.codigo || "").toUpperCase().trim();
+          if (!codigo) return;
+          const esDeMarca = Number(it.marcaId) === mid || codigosMarca.has(codigo);
+          if (!esDeMarca) return;
+          const texto = [it.descripcion, it.nombre].filter(Boolean).join(" \xB7 ");
+          const color = (it.color || extraerColor(texto) || "").trim();
+          const talla = (it.talla || it.subcat || extraerTalla(texto) || "").trim();
+          if (color || talla) map[codigo] = { color, talla };
+        });
+      });
+      return map;
+    }, [cargas, mid, invMarca]);
+    function datosVisiblesProducto(p) {
+      const hist = detalleHistoricoPorCodigo[(p.codigo || "").toUpperCase()] || {};
+      const descripcion = (p.descripcion || "").trim();
+      const color = extraerColor(descripcion) || hist.color || "";
+      const talla = extraerTalla(descripcion) || p.subcat || hist.talla || "";
+      const detalle = descripcion.split("\xB7").map((s) => s.trim()).filter((s) => s && !/^COLOR\s*:/i.test(s) && !/^TALLA\s*:/i.test(s)).join(" \xB7 ");
+      return { descripcion, detalle, color, talla };
+    }
     const ticketEstrella = (0, import_react.useMemo)(() => {
       let best = null;
       vMes.forEach((v) => {
@@ -66527,6 +66559,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
     const [busqV, setBusqV] = (0, import_react.useState)("");
     const [busqInvP, setBusqInvP] = (0, import_react.useState)("");
     const [catFilP, setCatFilP] = (0, import_react.useState)("");
+    const [colorFilP, setColorFilP] = (0, import_react.useState)("");
     const [fechaDesde, setFechaDesde] = (0, import_react.useState)("");
     const [fechaHasta, setFechaHasta] = (0, import_react.useState)("");
     const [xlsxCarg, setXlsxCarg] = (0, import_react.useState)(false);
@@ -66541,17 +66574,23 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       () => [...new Set(invMarca.map((i) => i.categoria || "General"))].sort(),
       [invMarca]
     );
+    const coloresMarca = (0, import_react.useMemo)(
+      () => [...new Set(invMarca.map((i) => datosVisiblesProducto(i).color || "Sin color registrado"))].sort(),
+      [invMarca, detalleHistoricoPorCodigo]
+    );
     const invFiltrado = (0, import_react.useMemo)(() => {
       const q = busqInvP.trim().toLowerCase();
       let r = invMarca;
-      if (q) r = r.filter(
-        (i) => i.nombre.toLowerCase().includes(q) || i.codigo.toLowerCase().includes(q) || (i.categoria || "").toLowerCase().includes(q)
-      );
+      if (q) r = r.filter((i) => {
+        const d = datosVisiblesProducto(i);
+        return [i.nombre, i.codigo, i.categoria, i.descripcion, i.subcat, d.color, d.talla, d.detalle].some((v) => String(v || "").toLowerCase().includes(q));
+      });
       if (catFilP) r = r.filter((i) => (i.categoria || "General") === catFilP);
+      if (colorFilP) r = r.filter((i) => (datosVisiblesProducto(i).color || "Sin color registrado") === colorFilP);
       if (fechaDesde) r = r.filter((i) => i.fecha >= fechaDesde);
       if (fechaHasta) r = r.filter((i) => i.fecha <= fechaHasta);
       return r;
-    }, [invMarca, busqInvP, catFilP, fechaDesde, fechaHasta]);
+    }, [invMarca, busqInvP, catFilP, colorFilP, fechaDesde, fechaHasta, detalleHistoricoPorCodigo]);
     async function descargarExcelInvMarca() {
       if (xlsxCarg) return;
       setXlsxCarg(true);
@@ -66559,34 +66598,43 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
         const XLSX2 = await loadXLSX();
         const ahora = /* @__PURE__ */ new Date();
         const fmtFecha = (d) => d ? d.split("/").reverse().join("-") : "-";
-        const dataRows = invFiltrado.map((p) => [
-          p.codigo || "",
-          p.nombre || "",
-          marca.nombre,
-          p.categoria || "General",
-          p.stock > 2 ? "En stock" : p.stock > 0 ? "Bajo stock" : "Agotado",
-          fmtFecha(p.fecha),
-          $2(p.precio),
-          p.stock,
-          p.stockInicial || p.stock,
-          $2(p.precio * p.stock)
-        ]);
+        const dataRows = invFiltrado.map((p) => {
+          const d = datosVisiblesProducto(p);
+          return [
+            p.codigo || "",
+            p.nombre || "",
+            d.detalle || "",
+            d.color || "Sin color registrado",
+            d.talla || "",
+            marca.nombre,
+            p.categoria || "General",
+            p.stock > 2 ? "En stock" : p.stock > 0 ? "Bajo stock" : "Agotado",
+            fmtFecha(p.fecha),
+            $2(p.precio),
+            p.stock,
+            p.stockInicial || p.stock,
+            $2(p.precio * p.stock)
+          ];
+        });
         const encabezados = [
-          ["TOSCANA HOUSE \u2014 Inventario", marca.nombre, "", "", "", "", "", "", "", ""],
-          [`Generado: ${ahora.toLocaleDateString("es-BO")} ${ahora.toLocaleTimeString("es-BO")}`, "", "", "", "", "", "", "", "", ""],
+          ["TOSCANA HOUSE \u2014 Inventario", marca.nombre, "", "", "", "", "", "", "", "", "", "", ""],
+          [`Generado: ${ahora.toLocaleDateString("es-BO")} ${ahora.toLocaleTimeString("es-BO")}`, "", "", "", "", "", "", "", "", "", "", "", ""],
           [],
-          ["SKU", "Producto", "Marca", "Categor\xEDa", "Estado", "Fecha ingreso", "Precio unit.", "Stock actual", "Stock inicial", "Valor en stock"],
+          ["SKU", "Producto", "Descripci\xF3n", "Color", "Talla", "Marca", "Categor\xEDa", "Estado", "Fecha ingreso", "Precio unit.", "Stock actual", "Stock inicial", "Valor en stock"],
           ...dataRows,
           [],
-          ["", "", "", "", "", "", "", "Total productos:", invFiltrado.length, ""],
-          ["", "", "", "", "", "", "", "Valor total stock:", "", $2(invFiltrado.reduce((s, p) => s + p.precio * p.stock, 0))]
+          ["", "", "", "", "", "", "", "", "", "", "Total productos:", invFiltrado.length, ""],
+          ["", "", "", "", "", "", "", "", "", "", "Valor total stock:", "", $2(invFiltrado.reduce((s, p) => s + p.precio * p.stock, 0))]
         ];
         const ws = XLSX2.utils.aoa_to_sheet(encabezados);
         ws["!cols"] = [
           { wch: 16 },
-          { wch: 36 },
+          { wch: 34 },
+          { wch: 34 },
+          { wch: 22 },
+          { wch: 12 },
           { wch: 14 },
-          { wch: 14 },
+          { wch: 16 },
           { wch: 12 },
           { wch: 14 },
           { wch: 13 },
@@ -67360,7 +67408,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       {
         value: busqInvP,
         onChange: (e) => setBusqInvP(e.target.value),
-        placeholder: "SKU, nombre o categor\xEDa\u2026",
+        placeholder: "SKU, nombre, descripci\xF3n, color o talla\u2026",
         style: {
           width: "100%",
           padding: "10px 14px",
@@ -67406,6 +67454,27 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       },
       /* @__PURE__ */ import_react.default.createElement("option", { value: "" }, "Todas las categor\xEDas"),
       categoriasMarca.map((c) => /* @__PURE__ */ import_react.default.createElement("option", { key: c, value: c }, c))
+    ), /* @__PURE__ */ import_react.default.createElement(
+      "select",
+      {
+        value: colorFilP,
+        onChange: (e) => setColorFilP(e.target.value),
+        style: {
+          flex: "1 1 140px",
+          padding: "8px 10px",
+          borderRadius: 10,
+          border: `1px solid ${C.sep}`,
+          background: C.bg1,
+          fontSize: 12,
+          color: colorFilP ? C.label : C.label3,
+          fontFamily: FONT,
+          outline: "none",
+          WebkitAppearance: "none",
+          cursor: "pointer"
+        }
+      },
+      /* @__PURE__ */ import_react.default.createElement("option", { value: "" }, "Todos los colores"),
+      coloresMarca.map((c) => /* @__PURE__ */ import_react.default.createElement("option", { key: c, value: c }, c))
     ), /* @__PURE__ */ import_react.default.createElement(
       "input",
       {
@@ -67471,12 +67540,13 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       alignItems: "center",
       marginBottom: 14,
       gap: 8
-    } }, (busqInvP || catFilP || fechaDesde || fechaHasta) && /* @__PURE__ */ import_react.default.createElement(
+    } }, (busqInvP || catFilP || colorFilP || fechaDesde || fechaHasta) && /* @__PURE__ */ import_react.default.createElement(
       "button",
       {
         onClick: () => {
           setBusqInvP("");
           setCatFilP("");
+          setColorFilP("");
           setFechaDesde("");
           setFechaHasta("");
         },
@@ -67554,6 +67624,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       const vendTot = vendidasPorCodigo[p.codigo] || 0;
       const vendMes = vendidasMesPorCodigo[p.codigo] || 0;
       const stockReal = p.stock;
+      const info = datosVisiblesProducto(p);
       const pct = (p.stockInicial || 0) > 0 ? Math.round(stockReal / p.stockInicial * 100) : stockReal > 0 ? 100 : 0;
       return /* @__PURE__ */ import_react.default.createElement("div", { key: p.id, style: { padding: "14px 0", borderBottom: `1px solid ${C.sep}` } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
         fontSize: 13,
@@ -67563,7 +67634,14 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
         lineHeight: "1.3",
         marginBottom: 3,
         wordBreak: "break-word"
-      } }, p.nombre), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6, marginTop: 3, flexWrap: "wrap" } }, /* @__PURE__ */ import_react.default.createElement("span", { style: {
+      } }, p.nombre), info.detalle && /* @__PURE__ */ import_react.default.createElement("div", { style: {
+        fontSize: 11,
+        color: C.label2,
+        fontFamily: FONT_UI,
+        lineHeight: 1.45,
+        marginBottom: 5,
+        wordBreak: "break-word"
+      } }, info.detalle), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6, marginTop: 3, flexWrap: "wrap" } }, /* @__PURE__ */ import_react.default.createElement("span", { style: {
         fontSize: 10,
         fontWeight: 600,
         color: C.label2,
@@ -67579,7 +67657,25 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
         fontFamily: FONT_UI,
         letterSpacing: 0.5,
         textTransform: "uppercase"
-      } }, p.categoria))), /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "right", flexShrink: 0, marginLeft: 16 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 14, fontWeight: 700, color: C.label, fontFamily: FONT, letterSpacing: "-0.01em" } }, $2(p.precio)), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      } }, p.categoria), /* @__PURE__ */ import_react.default.createElement("span", { style: {
+        fontSize: 10,
+        fontWeight: 700,
+        fontFamily: FONT_UI,
+        color: info.color ? C.label : C.amber,
+        background: info.color ? C.bg2 : `${C.amber}10`,
+        border: `1px solid ${info.color ? C.sep : C.amber + "35"}`,
+        borderRadius: 5,
+        padding: "2px 6px"
+      } }, "Color: ", info.color || "Sin color registrado"), info.talla && /* @__PURE__ */ import_react.default.createElement("span", { style: {
+        fontSize: 10,
+        fontWeight: 700,
+        color: C.label2,
+        fontFamily: FONT_UI,
+        background: C.bg2,
+        border: `1px solid ${C.sep}`,
+        borderRadius: 5,
+        padding: "2px 6px"
+      } }, "Talla: ", info.talla))), /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "right", flexShrink: 0, marginLeft: 16 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 14, fontWeight: 700, color: C.label, fontFamily: FONT, letterSpacing: "-0.01em" } }, $2(p.precio)), /* @__PURE__ */ import_react.default.createElement("div", { style: {
         fontSize: 11,
         fontWeight: 600,
         marginTop: 2,
