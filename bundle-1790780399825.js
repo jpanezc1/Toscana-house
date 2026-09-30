@@ -72939,7 +72939,28 @@ Esta acci\xF3n no se puede deshacer.` : "\xBFEliminar esta carga? Esta acci\xF3n
     const pagoInfo = PAGOS.find((p) => p.id === pago) || PAGOS[0];
     const subtotal = carrito.reduce((s, it) => s + it.precio * it.cantidad, 0);
     const descItemInfo = (it) => descEfectivoCodigo(descuentos, descCodigos, it.marcaId, it.codigo);
-    const descItemPct = (it) => Math.min(60, descItemInfo(it).pct + (Number(descMarcaManual[it.marcaId]) || 0) + Number(descExtra || 0));
+    const brutoPorMarca = carrito.reduce((m, it) => {
+      m[it.marcaId] = (m[it.marcaId] || 0) + (Number(it.precio) || 0) * (Number(it.cantidad) || 0);
+      return m;
+    }, {});
+    const margenPctPorMarca = carrito.reduce((m, it) => {
+      const disponible = Math.max(0, 60 - descItemInfo(it).pct - Number(descExtra || 0));
+      m[it.marcaId] = m[it.marcaId] === void 0 ? disponible : Math.min(m[it.marcaId], disponible);
+      return m;
+    }, {});
+    function manualMarca(id) {
+      const raw = descMarcaManual[id];
+      if (raw === void 0 || raw === null) return { tipo: "pct", valor: 0 };
+      if (typeof raw === "object") return { tipo: raw.tipo === "bs" ? "bs" : "pct", valor: Math.max(0, Number(raw.valor) || 0) };
+      return { tipo: "pct", valor: Math.max(0, Number(raw) || 0) };
+    }
+    function manualPctMarca(id) {
+      const manual = manualMarca(id);
+      const bruto = brutoPorMarca[id] || 0;
+      const solicitado = manual.tipo === "bs" ? bruto > 0 ? manual.valor / bruto * 100 : 0 : manual.valor;
+      return Math.min(margenPctPorMarca[id] ?? 60, solicitado);
+    }
+    const descItemPct = (it) => Math.min(60, descItemInfo(it).pct + manualPctMarca(it.marcaId) + Number(descExtra || 0));
     const total = carrito.reduce((s, it) => s + it.precio * it.cantidad * (1 - descItemPct(it) / 100), 0);
     const descTotalBs = subtotal - total;
     const descPct = subtotal > 0 ? +(descTotalBs / subtotal * 100).toFixed(2) : 0;
@@ -72948,7 +72969,7 @@ Esta acci\xF3n no se puede deshacer.` : "\xBFEliminar esta carga? Esta acci\xF3n
       const m = {};
       carrito.forEach((it) => {
         const dm = descItemInfo(it).pct;
-        if (!m[it.marcaId]) m[it.marcaId] = { id: it.marcaId, nombre: it.marcaNombre, color: it.marcaColor, emoji: it.marcaEmoji, total: 0, neto: 0, uds: 0, descConfig: dm, descManual: Number(descMarcaManual[it.marcaId]) || 0 };
+        if (!m[it.marcaId]) m[it.marcaId] = { id: it.marcaId, nombre: it.marcaNombre, color: it.marcaColor, emoji: it.marcaEmoji, total: 0, neto: 0, uds: 0, descConfig: dm, descManual: manualMarca(it.marcaId) };
         const bruto = it.precio * it.cantidad;
         m[it.marcaId].total += bruto;
         m[it.marcaId].neto += bruto * (1 - descItemPct(it) / 100);
@@ -73164,6 +73185,7 @@ ${sinStock.map((it) => {
       autoDescargarNota(vf);
       setCarrito([]);
       setDescExtra(0);
+      setDescMarcaManual({});
       setBusq("");
       setEtiqueta(null);
       setCliente("");
@@ -73193,7 +73215,7 @@ ${sinStock.map((it) => {
     const cubreTotalUI = extraMontoUI <= 0.01;
     const _gcBrands = {};
     carrito.forEach((it) => {
-      const s = it.precio * it.cantidad * (1 - descPct / 100);
+      const s = it.precio * it.cantidad * (1 - descItemPct(it) / 100);
       if (!_gcBrands[it.marcaId]) _gcBrands[it.marcaId] = { marcaNombre: it.marcaNombre, subtotal: 0 };
       _gcBrands[it.marcaId].subtotal += s;
     });
@@ -73505,7 +73527,12 @@ ${sinStock.map((it) => {
       marginBottom: 10
     } }, "Descuento adicional por marca"), /* @__PURE__ */ import_react.default.createElement("div", { style: { border: `1px solid ${C.sep}`, borderRadius: 14, overflow: "hidden" } }, porMarca.map(([id, d], i) => {
       const on = id in descMarcaManual;
-      const manual = Number(descMarcaManual[id]) || 0;
+      const manual = manualMarca(id);
+      const rawManual = descMarcaManual[id];
+      const valorCampo = typeof rawManual === "object" ? rawManual.valor : manual.valor;
+      const pctManualAplicado = manualPctMarca(id);
+      const bsManualAplicado = d.total * pctManualAplicado / 100;
+      const maxBsManual = d.total * (margenPctPorMarca[id] ?? 60) / 100;
       return /* @__PURE__ */ import_react.default.createElement("div", { key: id, style: {
         padding: "11px 14px",
         borderBottom: i < porMarca.length - 1 ? `1px solid ${C.sep}` : "none",
@@ -73516,10 +73543,11 @@ ${sinStock.map((it) => {
           onClick: () => setDescMarcaManual((prev) => {
             const n = { ...prev };
             if (id in n) delete n[id];
-            else n[id] = 10;
+            else n[id] = { tipo: "pct", valor: 10 };
             return n;
           }),
-          "aria-label": "Descuento adicional",
+          "aria-label": `${on ? "Quitar" : "Agregar"} descuento adicional para ${d.nombre}`,
+          "aria-pressed": on,
           style: {
             width: 46,
             height: 26,
@@ -73544,28 +73572,143 @@ ${sinStock.map((it) => {
           transition: "left .2s",
           boxShadow: "0 1px 3px rgba(0,0,0,0.3)"
         } })
-      )), on && /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 6, marginTop: 10 } }, [5, 10, 15, 20, 30, 40, 50, 60].map((v) => /* @__PURE__ */ import_react.default.createElement(
+      )), on && /* @__PURE__ */ import_react.default.createElement("div", { style: { marginTop: 12 } }, /* @__PURE__ */ import_react.default.createElement(
+        "div",
+        {
+          role: "group",
+          "aria-label": `Tipo de descuento para ${d.nombre}`,
+          style: {
+            display: "grid",
+            gridTemplateColumns: "1fr 1fr",
+            gap: 6,
+            padding: 4,
+            background: C.bg2,
+            borderRadius: 12,
+            border: `1px solid ${C.sep}`
+          }
+        },
+        [
+          { tipo: "pct", label: "% Porcentaje" },
+          { tipo: "bs", label: "Bs Monto fijo" }
+        ].map((op) => /* @__PURE__ */ import_react.default.createElement(
+          "button",
+          {
+            key: op.tipo,
+            onClick: () => setDescMarcaManual((prev) => ({
+              ...prev,
+              [id]: { tipo: op.tipo, valor: manual.valor || 10 }
+            })),
+            "aria-pressed": manual.tipo === op.tipo,
+            style: {
+              minHeight: 44,
+              borderRadius: 9,
+              cursor: "pointer",
+              fontFamily: FONT_UI,
+              fontSize: 12.5,
+              fontWeight: manual.tipo === op.tipo ? 700 : 500,
+              border: `1px solid ${manual.tipo === op.tipo ? C.green : "transparent"}`,
+              background: manual.tipo === op.tipo ? `${C.green}18` : "transparent",
+              color: manual.tipo === op.tipo ? C.green : C.label2,
+              WebkitTapHighlightColor: "transparent"
+            }
+          },
+          op.label
+        ))
+      ), manual.tipo === "pct" ? /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 6, marginTop: 8 } }, [5, 10, 15, 20, 30, 40, 50, 60].map((v) => /* @__PURE__ */ import_react.default.createElement(
         "button",
         {
           key: v,
-          onClick: () => setDescMarcaManual((prev) => ({ ...prev, [id]: v })),
+          onClick: () => setDescMarcaManual((prev) => ({ ...prev, [id]: { tipo: "pct", valor: v } })),
           style: {
+            minHeight: 44,
             padding: "8px 0",
             borderRadius: 999,
             cursor: "pointer",
             fontFamily: FONT_UI,
             fontSize: 12.5,
-            fontWeight: manual === v ? 700 : 500,
-            border: `${manual === v ? 2 : 1}px solid ${manual === v ? C.green : C.sep}`,
-            background: manual === v ? `${C.green}18` : C.bg2,
-            color: manual === v ? C.green : C.label2,
+            fontWeight: manual.valor === v ? 700 : 500,
+            border: `${manual.valor === v ? 2 : 1}px solid ${manual.valor === v ? C.green : C.sep}`,
+            background: manual.valor === v ? `${C.green}18` : C.bg2,
+            color: manual.valor === v ? C.green : C.label2,
             WebkitTapHighlightColor: "transparent"
           }
         },
         v,
         "%"
-      ))));
-    })), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT, marginTop: 8, lineHeight: 1.5 } }, "Se suma al descuento que ya tenga la marca. Cada marca absorbe el suyo y queda registrado en la venta.")), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+      ))) : /* @__PURE__ */ import_react.default.createElement("div", { style: { marginTop: 8 } }, /* @__PURE__ */ import_react.default.createElement("label", { htmlFor: `desc-bs-${id}`, style: {
+        display: "block",
+        fontSize: 11,
+        color: C.label3,
+        fontFamily: FONT_UI,
+        marginBottom: 5
+      } }, "Monto exacto a descontar"), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+        display: "flex",
+        alignItems: "center",
+        border: `2px solid ${C.green}`,
+        background: C.bg2,
+        borderRadius: 12,
+        minHeight: 48,
+        overflow: "hidden"
+      } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { padding: "0 0 0 14px", fontSize: 14, fontWeight: 700, color: C.green, fontFamily: FONT_UI } }, "Bs"), /* @__PURE__ */ import_react.default.createElement(
+        "input",
+        {
+          id: `desc-bs-${id}`,
+          type: "number",
+          inputMode: "decimal",
+          min: "0",
+          max: maxBsManual.toFixed(2),
+          step: "0.01",
+          value: valorCampo,
+          onChange: (e) => setDescMarcaManual((prev) => ({ ...prev, [id]: { tipo: "bs", valor: e.target.value } })),
+          onBlur: () => setDescMarcaManual((prev) => ({ ...prev, [id]: {
+            tipo: "bs",
+            valor: +Math.min(maxBsManual, Math.max(0, Number(manualMarca(id).valor) || 0)).toFixed(2)
+          } })),
+          placeholder: "10,00",
+          style: {
+            flex: 1,
+            minWidth: 0,
+            height: 46,
+            border: "none",
+            outline: "none",
+            background: "transparent",
+            padding: "0 14px 0 8px",
+            fontSize: 18,
+            fontWeight: 700,
+            color: C.label,
+            fontFamily: FONT_UI
+          }
+        }
+      )), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 6, marginTop: 7 } }, [5, 10, 20, 50].map((v) => /* @__PURE__ */ import_react.default.createElement(
+        "button",
+        {
+          key: v,
+          onClick: () => setDescMarcaManual((prev) => ({ ...prev, [id]: { tipo: "bs", valor: Math.min(v, maxBsManual) } })),
+          style: {
+            minHeight: 40,
+            borderRadius: 999,
+            cursor: "pointer",
+            fontFamily: FONT_UI,
+            fontSize: 12,
+            border: `1px solid ${C.sep}`,
+            background: C.bg2,
+            color: C.label2
+          }
+        },
+        "Bs ",
+        v
+      )))), /* @__PURE__ */ import_react.default.createElement("div", { "aria-live": "polite", style: {
+        display: "flex",
+        justifyContent: "space-between",
+        gap: 10,
+        marginTop: 9,
+        padding: "9px 10px",
+        borderRadius: 9,
+        background: `${C.green}0d`,
+        fontSize: 11.5,
+        fontFamily: FONT_UI
+      } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.label2 } }, "Descuento adicional: ", /* @__PURE__ */ import_react.default.createElement("b", { style: { color: C.green } }, "\u2212", $2(bsManualAplicado))), /* @__PURE__ */ import_react.default.createElement("span", { style: { color: C.label2 } }, "Queda: ", /* @__PURE__ */ import_react.default.createElement("b", null, $2(d.neto)))), manual.tipo === "bs" && manual.valor > maxBsManual + 5e-3 && /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.red, fontFamily: FONT_UI, marginTop: 6 } }, "El m\xE1ximo permitido para esta marca es ", $2(maxBsManual), ".")));
+    })), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT, marginTop: 8, lineHeight: 1.5 } }, "Eleg\xED porcentaje o un monto exacto en bolivianos. Se suma a la promoci\xF3n vigente; cada marca absorbe su descuento y queda registrado en la venta.")), /* @__PURE__ */ import_react.default.createElement("div", { style: {
       fontSize: 13,
       fontWeight: 600,
       color: C.label3,

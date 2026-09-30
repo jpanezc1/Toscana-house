@@ -18060,7 +18060,10 @@ function POS({inv,onVenta,onVerNota,user,descuentos={},descCodigos={}}){
   var _hNcl  = useState(""); var cliente  = _hNcl[0];  var setCliente  = _hNcl[1];;
   var _hNct  = useState(""); var clienteTel = _hNct[0]; var setClienteTel = _hNct[1];;
   var _hN139 = useState(0); var descExtra = _hN139[0]; var setDescExtra = _hN139[1];;
-  // Descuento adicional POR MARCA de esta venta (manual en caja): {marcaId: pct}
+  // Descuento adicional POR MARCA de esta venta (manual en caja):
+  // {marcaId: {tipo:"pct"|"bs", valor:number|string}}.
+  // Se conserva el descuento efectivo por item como porcentaje para no romper
+  // ventas históricas, liquidaciones ni facturación.
   const [descMarcaManual, setDescMarcaManual] = useState({});
   var _hN140 = useState(null); var etiqueta = _hN140[0]; var setEtiqueta = _hN140[1];;
   var _hN141 = useState(null); var ultima = _hN141[0]; var setUltima = _hN141[1];;
@@ -18110,10 +18113,31 @@ function POS({inv,onVenta,onVerNota,user,descuentos={},descCodigos={}}){
   const pagoInfo=PAGOS.find(p=>p.id===pago)||PAGOS[0];
   const subtotal=carrito.reduce((s,it)=>s+it.precio*it.cantidad,0); // precio lleno
   // Descuento del ítem = el del CÓDIGO (manda) o el general de la MARCA, más el
-  // manual global (admin), tope 50%. Cada marca absorbe SOLO el suyo.
+  // manual de su propia marca. Tope histórico del sistema: 60%.
   const descItemInfo = it => descEfectivoCodigo(descuentos, descCodigos, it.marcaId, it.codigo);
-  // Efectivo del ítem = config (código/marca) + adicional manual de SU marca + global admin, tope 50%
-  const descItemPct = it => Math.min(60, descItemInfo(it).pct + (Number(descMarcaManual[it.marcaId])||0) + Number(descExtra||0));
+  const brutoPorMarca=carrito.reduce((m,it)=>{
+    m[it.marcaId]=(m[it.marcaId]||0)+(Number(it.precio)||0)*(Number(it.cantidad)||0);
+    return m;
+  },{});
+  const margenPctPorMarca=carrito.reduce((m,it)=>{
+    const disponible=Math.max(0,60-descItemInfo(it).pct-Number(descExtra||0));
+    m[it.marcaId]=m[it.marcaId]===undefined?disponible:Math.min(m[it.marcaId],disponible);
+    return m;
+  },{});
+  function manualMarca(id){
+    const raw=descMarcaManual[id];
+    if(raw===undefined||raw===null) return {tipo:"pct",valor:0};
+    if(typeof raw==="object") return {tipo:raw.tipo==="bs"?"bs":"pct",valor:Math.max(0,Number(raw.valor)||0)};
+    // Compatibilidad con el estado porcentual anterior durante una actualización en vivo.
+    return {tipo:"pct",valor:Math.max(0,Number(raw)||0)};
+  }
+  function manualPctMarca(id){
+    const manual=manualMarca(id);
+    const bruto=brutoPorMarca[id]||0;
+    const solicitado=manual.tipo==="bs"?(bruto>0?manual.valor/bruto*100:0):manual.valor;
+    return Math.min(margenPctPorMarca[id]??60,solicitado);
+  }
+  const descItemPct = it => Math.min(60, descItemInfo(it).pct + manualPctMarca(it.marcaId) + Number(descExtra||0));
   const total = carrito.reduce((s,it)=>s + it.precio*it.cantidad*(1-descItemPct(it)/100), 0);
   const descTotalBs = subtotal - total;                       // Bs descontados en total
   const descPct = subtotal>0 ? +(descTotalBs/subtotal*100).toFixed(2) : 0; // % ponderado (display/compat)
@@ -18123,7 +18147,7 @@ function POS({inv,onVenta,onVerNota,user,descuentos={},descCodigos={}}){
     const m={};
     carrito.forEach(it=>{
       const dm=descItemInfo(it).pct; // descuento configurado (código o marca)
-      if(!m[it.marcaId])m[it.marcaId]={id:it.marcaId,nombre:it.marcaNombre,color:it.marcaColor,emoji:it.marcaEmoji,total:0,neto:0,uds:0,descConfig:dm,descManual:Number(descMarcaManual[it.marcaId])||0};
+      if(!m[it.marcaId])m[it.marcaId]={id:it.marcaId,nombre:it.marcaNombre,color:it.marcaColor,emoji:it.marcaEmoji,total:0,neto:0,uds:0,descConfig:dm,descManual:manualMarca(it.marcaId)};
       const bruto=it.precio*it.cantidad;
       m[it.marcaId].total+=bruto;                              // lleno
       m[it.marcaId].neto +=bruto*(1-descItemPct(it)/100);      // con descuento
@@ -18284,7 +18308,7 @@ function POS({inv,onVenta,onVerNota,user,descuentos={},descCodigos={}}){
     const vf=onVenta({items,total,subtotal,descPct,metodoPago:metodoPagoFinal,vendedor:vendedor||"Tienda",clienteNombre:cliente,clienteTelefono:clienteTel,etiquetaImg:etiqueta});
     setUltima(vf);setShowOk(true);setShowPago(false);
     autoDescargarNota(vf);
-    setCarrito([]);setDescExtra(0);setBusq("");setEtiqueta(null);setCliente("");setClienteTel("");
+    setCarrito([]);setDescExtra(0);setDescMarcaManual({});setBusq("");setEtiqueta(null);setCliente("");setClienteTel("");
     setPagoMixto(false);setMontosMixtos({efectivo:"",qr:"",tarjeta:""});
   }
 
@@ -18313,7 +18337,7 @@ function POS({inv,onVenta,onVerNota,user,descuentos={},descCodigos={}}){
   // Distribución por marca para display de GC
   const _gcBrands = {};
   carrito.forEach(it=>{
-    const s=it.precio*it.cantidad*(1-descPct/100);
+    const s=it.precio*it.cantidad*(1-descItemPct(it)/100);
     if(!_gcBrands[it.marcaId])_gcBrands[it.marcaId]={marcaNombre:it.marcaNombre,subtotal:0};
     _gcBrands[it.marcaId].subtotal+=s;
   });
@@ -18600,7 +18624,12 @@ function POS({inv,onVenta,onVerNota,user,descuentos={},descCodigos={}}){
             <div style={{border:`1px solid ${C.sep}`,borderRadius:14,overflow:"hidden"}}>
               {porMarca.map(([id,d],i)=>{
                 const on = id in descMarcaManual;
-                const manual = Number(descMarcaManual[id])||0;
+                const manual = manualMarca(id);
+                const rawManual = descMarcaManual[id];
+                const valorCampo = typeof rawManual==="object" ? rawManual.valor : manual.valor;
+                const pctManualAplicado = manualPctMarca(id);
+                const bsManualAplicado = d.total*pctManualAplicado/100;
+                const maxBsManual = d.total*(margenPctPorMarca[id]??60)/100;
                 return (
                   <div key={id} style={{padding:"11px 14px",
                     borderBottom:i<porMarca.length-1?`1px solid ${C.sep}`:"none",
@@ -18619,10 +18648,11 @@ function POS({inv,onVenta,onVerNota,user,descuentos={},descCodigos={}}){
                       {/* toggle */}
                       <button onClick={()=>setDescMarcaManual(prev=>{
                           const n={...prev};
-                          if(id in n) delete n[id]; else n[id]=10;
+                          if(id in n) delete n[id]; else n[id]={tipo:"pct",valor:10};
                           return n;
                         })}
-                        aria-label="Descuento adicional"
+                        aria-label={`${on?"Quitar":"Agregar"} descuento adicional para ${d.nombre}`}
+                        aria-pressed={on}
                         style={{width:46,height:26,borderRadius:999,border:"none",cursor:"pointer",flexShrink:0,
                           background:on?C.green:C.label3,position:"relative",transition:"background .2s",
                           WebkitTapHighlightColor:"transparent"}}>
@@ -18631,17 +18661,80 @@ function POS({inv,onVenta,onVerNota,user,descuentos={},descCodigos={}}){
                       </button>
                     </div>
                     {on&&(
-                      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:6,marginTop:10}}>
-                        {[5,10,15,20,30,40,50,60].map(v=>(
-                          <button key={v} onClick={()=>setDescMarcaManual(prev=>({...prev,[id]:v}))}
-                            style={{padding:"8px 0",borderRadius:999,cursor:"pointer",fontFamily:FONT_UI,
-                              fontSize:12.5,fontWeight:manual===v?700:500,
-                              border:`${manual===v?2:1}px solid ${manual===v?C.green:C.sep}`,
-                              background:manual===v?`${C.green}18`:C.bg2, color:manual===v?C.green:C.label2,
-                              WebkitTapHighlightColor:"transparent"}}>
-                            {v}%
-                          </button>
-                        ))}
+                      <div style={{marginTop:12}}>
+                        <div role="group" aria-label={`Tipo de descuento para ${d.nombre}`}
+                          style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,padding:4,
+                            background:C.bg2,borderRadius:12,border:`1px solid ${C.sep}`}}>
+                          {[
+                            {tipo:"pct",label:"% Porcentaje"},
+                            {tipo:"bs",label:"Bs Monto fijo"},
+                          ].map(op=>(
+                            <button key={op.tipo} onClick={()=>setDescMarcaManual(prev=>({
+                                ...prev,[id]:{tipo:op.tipo,valor:manual.valor||10}
+                              }))}
+                              aria-pressed={manual.tipo===op.tipo}
+                              style={{minHeight:44,borderRadius:9,cursor:"pointer",fontFamily:FONT_UI,
+                                fontSize:12.5,fontWeight:manual.tipo===op.tipo?700:500,
+                                border:`1px solid ${manual.tipo===op.tipo?C.green:"transparent"}`,
+                                background:manual.tipo===op.tipo?`${C.green}18`:"transparent",
+                                color:manual.tipo===op.tipo?C.green:C.label2,
+                                WebkitTapHighlightColor:"transparent"}}>
+                              {op.label}
+                            </button>
+                          ))}
+                        </div>
+
+                        {manual.tipo==="pct"?(
+                          <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:6,marginTop:8}}>
+                            {[5,10,15,20,30,40,50,60].map(v=>(
+                              <button key={v} onClick={()=>setDescMarcaManual(prev=>({...prev,[id]:{tipo:"pct",valor:v}}))}
+                                style={{minHeight:44,padding:"8px 0",borderRadius:999,cursor:"pointer",fontFamily:FONT_UI,
+                                  fontSize:12.5,fontWeight:manual.valor===v?700:500,
+                                  border:`${manual.valor===v?2:1}px solid ${manual.valor===v?C.green:C.sep}`,
+                                  background:manual.valor===v?`${C.green}18`:C.bg2, color:manual.valor===v?C.green:C.label2,
+                                  WebkitTapHighlightColor:"transparent"}}>
+                                {v}%
+                              </button>
+                            ))}
+                          </div>
+                        ):(
+                          <div style={{marginTop:8}}>
+                            <label htmlFor={`desc-bs-${id}`} style={{display:"block",fontSize:11,color:C.label3,
+                              fontFamily:FONT_UI,marginBottom:5}}>Monto exacto a descontar</label>
+                            <div style={{display:"flex",alignItems:"center",border:`2px solid ${C.green}`,
+                              background:C.bg2,borderRadius:12,minHeight:48,overflow:"hidden"}}>
+                              <span style={{padding:"0 0 0 14px",fontSize:14,fontWeight:700,color:C.green,fontFamily:FONT_UI}}>Bs</span>
+                              <input id={`desc-bs-${id}`} type="number" inputMode="decimal" min="0"
+                                max={maxBsManual.toFixed(2)} step="0.01" value={valorCampo}
+                                onChange={e=>setDescMarcaManual(prev=>({...prev,[id]:{tipo:"bs",valor:e.target.value}}))}
+                                onBlur={()=>setDescMarcaManual(prev=>({...prev,[id]:{
+                                  tipo:"bs",valor:+Math.min(maxBsManual,Math.max(0,Number(manualMarca(id).valor)||0)).toFixed(2)
+                                }}))}
+                                placeholder="10,00"
+                                style={{flex:1,minWidth:0,height:46,border:"none",outline:"none",background:"transparent",
+                                  padding:"0 14px 0 8px",fontSize:18,fontWeight:700,color:C.label,fontFamily:FONT_UI}}/>
+                            </div>
+                            <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:6,marginTop:7}}>
+                              {[5,10,20,50].map(v=>(
+                                <button key={v} onClick={()=>setDescMarcaManual(prev=>({...prev,[id]:{tipo:"bs",valor:Math.min(v,maxBsManual)}}))}
+                                  style={{minHeight:40,borderRadius:999,cursor:"pointer",fontFamily:FONT_UI,fontSize:12,
+                                    border:`1px solid ${C.sep}`,background:C.bg2,color:C.label2}}>Bs {v}</button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        <div aria-live="polite" style={{display:"flex",justifyContent:"space-between",gap:10,
+                          marginTop:9,padding:"9px 10px",borderRadius:9,background:`${C.green}0d`,
+                          fontSize:11.5,fontFamily:FONT_UI}}>
+                          <span style={{color:C.label2}}>Descuento adicional: <b style={{color:C.green}}>−{$(bsManualAplicado)}</b></span>
+                          <span style={{color:C.label2}}>Queda: <b>{$(d.neto)}</b></span>
+                        </div>
+                        {manual.tipo==="bs"&&manual.valor>maxBsManual+0.005&&(
+                          <div style={{fontSize:11,color:C.red,fontFamily:FONT_UI,marginTop:6}}>
+                            El máximo permitido para esta marca es {$(maxBsManual)}.
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -18649,7 +18742,7 @@ function POS({inv,onVenta,onVerNota,user,descuentos={},descCodigos={}}){
               })}
             </div>
             <div style={{fontSize:11,color:C.label3,fontFamily:FONT,marginTop:8,lineHeight:1.5}}>
-              Se suma al descuento que ya tenga la marca. Cada marca absorbe el suyo y queda registrado en la venta.
+              Elegí porcentaje o un monto exacto en bolivianos. Se suma a la promoción vigente; cada marca absorbe su descuento y queda registrado en la venta.
             </div>
           </div>
         )}
@@ -18887,9 +18980,8 @@ function POS({inv,onVenta,onVerNota,user,descuentos={},descCodigos={}}){
           </div>
         )}
 
-        {/* Campo de descuento manual global ELIMINADO — el único control de
-            descuento en el cobro es el toggle "Descuento adicional por marca"
-            (chips 5-60%). descExtra queda en 0 y no se suma. */}
+        {/* El único control manual de descuento está arriba y es por marca.
+            Puede expresarse en porcentaje o como monto fijo en bolivianos. */}
         {user?.rol==="caja"
           ? <div style={{padding:"10px 14px",borderRadius:12,background:C.bg2,
               border:`1px solid ${C.sep}`,marginBottom:10}}>
