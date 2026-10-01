@@ -75678,20 +75678,30 @@ Se registrar\xE1 que los faltantes/sobrantes fueron verificados f\xEDsicamente y
       if (!q || q.length < 2) return [];
       return inv.filter((i) => i.stock > 0 && (i.nombre.toLowerCase().includes(q) || i.codigo.toLowerCase().includes(q) || (i.categoria || "").toLowerCase().includes(q))).slice(0, 6);
     }, [inv, busqNuevo]);
-    const totalDev = devueltos.reduce((s, it) => s + it.precioUnit * (it.cantDev || 1), 0);
+    const itemsDevueltosSeleccionados = devueltos.filter((it) => it.selec && Number(it.cantDev) > 0);
+    const totalDev = itemsDevueltosSeleccionados.reduce((s, it) => s + it.precioUnit * it.cantDev, 0);
     const totalNuevo = nuevos.reduce((s, it) => s + it.precio * it.cantidad, 0);
     const diferencia = totalNuevo - totalDev;
     function seleccionarVenta(v) {
       setVentaOrigen(v);
-      setDevueltos(v.items.map((it) => ({ ...it, cantDev: it.cantidad, selec: true })));
+      setDevueltos(v.items.map((it) => ({ ...it, cantDev: 0, selec: false })));
       setBusqVenta("");
       setPaso(2);
     }
     function toggleDevuelto(prodId) {
-      setDevueltos((p) => p.map((it) => it.prodId === prodId ? { ...it, selec: !it.selec } : it));
+      setDevueltos((p) => p.map((it) => {
+        if (it.prodId !== prodId) return it;
+        const selec = !it.selec;
+        return { ...it, selec, cantDev: selec ? Math.max(1, Number(it.cantDev) || 0) : 0 };
+      }));
     }
     function setCantDev(prodId, n) {
-      setDevueltos((p) => p.map((it) => it.prodId === prodId ? { ...it, cantDev: Math.max(1, Math.min(it.cantidad, n)) } : it));
+      setDevueltos((p) => p.map((it) => {
+        if (it.prodId !== prodId) return it;
+        const maxCantidad = Math.max(1, Number(it.cantidad) || 1);
+        const cantDev = Math.max(0, Math.min(maxCantidad, Number(n) || 0));
+        return { ...it, cantDev, selec: cantDev > 0 };
+      }));
     }
     function agregarNuevo(prod) {
       setNuevos((p) => {
@@ -75709,7 +75719,7 @@ Se registrar\xE1 que los faltantes/sobrantes fueron verificados f\xEDsicamente y
     }
     function confirmar() {
       const id = `CAM${Date.now()}`;
-      const itemsDevueltos = devueltos.filter((it) => it.selec).map((it) => ({
+      const itemsDevueltos = itemsDevueltosSeleccionados.map((it) => ({
         prodId: it.prodId,
         codigo: it.codigo,
         nombre: it.nombre,
@@ -75835,18 +75845,20 @@ ${c.diferencia > 0.01 ? `Cliente paga diferencia: Bs ${fmt2(c.diferencia)} (${c.
         style: { background: "none", border: "none", fontSize: 20, cursor: "pointer", color: C.label2 }
       },
       "\u2039"
-    ), /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, fontWeight: 700, color: C.label, fontFamily: FONT } }, "Prendas a devolver"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT } }, "Venta ", ventaOrigen.id, " \xB7 ", ventaOrigen.fecha))), /* @__PURE__ */ import_react.default.createElement("div", { style: { background: C.bg2, borderRadius: 14, overflow: "hidden", border: `1px solid ${C.sep}`, marginBottom: 16 } }, devueltos.map((it, i) => /* @__PURE__ */ import_react.default.createElement("div", { key: it.prodId, style: {
+    ), /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 13, fontWeight: 700, color: C.label, fontFamily: FONT } }, "Prendas a devolver"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT } }, "Venta ", ventaOrigen.id, " \xB7 ", ventaOrigen.fecha))), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, fontFamily: FONT, marginBottom: 12, lineHeight: 1.45 } }, "Eleg\xED \xFAnicamente las prendas que el cliente devuelve. Us\xE1 ", /* @__PURE__ */ import_react.default.createElement("strong", null, "+"), " para seleccionarlas; ", /* @__PURE__ */ import_react.default.createElement("strong", null, "\u2212"), " hasta 0 las quita del cambio."), /* @__PURE__ */ import_react.default.createElement("div", { style: { background: C.bg2, borderRadius: 14, overflow: "hidden", border: `1px solid ${C.sep}`, marginBottom: 16 } }, devueltos.map((it, i) => /* @__PURE__ */ import_react.default.createElement("div", { key: it.prodId, style: {
       padding: "12px 16px",
       borderBottom: i < devueltos.length - 1 ? `1px solid ${C.sep}` : "",
-      opacity: it.selec ? 1 : 0.45,
-      transition: "opacity .15s"
+      background: it.selec ? `${C.gold}0D` : "transparent",
+      opacity: it.selec ? 1 : 0.72,
+      transition: "opacity .15s, background .15s"
     } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 12 } }, /* @__PURE__ */ import_react.default.createElement(
       "input",
       {
         type: "checkbox",
         checked: !!it.selec,
         onChange: () => toggleDevuelto(it.prodId),
-        style: { width: 18, height: 18, cursor: "pointer", accentColor: C.gold }
+        "aria-label": `Seleccionar ${it.nombre} para devolver`,
+        style: { width: 22, height: 22, cursor: "pointer", accentColor: C.gold, flexShrink: 0 }
       }
     ), /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
       fontSize: 13,
@@ -75856,35 +75868,41 @@ ${c.diferencia > 0.01 ? `Cliente paga diferencia: Bs ${fmt2(c.diferencia)} (${c.
       overflow: "hidden",
       textOverflow: "ellipsis",
       whiteSpace: "nowrap"
-    } }, it.nombre), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT } }, it.marcaNombre, " \xB7 Bs ", it.precioUnit)), it.selec && /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6 } }, /* @__PURE__ */ import_react.default.createElement(
+    } }, it.nombre), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT } }, it.marcaNombre, " \xB7 Bs ", it.precioUnit)), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6 } }, /* @__PURE__ */ import_react.default.createElement(
       "button",
       {
-        onClick: () => setCantDev(it.prodId, (it.cantDev || 1) - 1),
+        onClick: () => setCantDev(it.prodId, (it.cantDev || 0) - 1),
+        disabled: !it.cantDev,
+        "aria-label": `Quitar una unidad de ${it.nombre}`,
         style: {
-          width: 28,
-          height: 28,
-          borderRadius: 8,
+          width: 36,
+          height: 36,
+          borderRadius: 9,
           border: `1px solid ${C.sep}`,
           background: C.bg1,
-          fontSize: 16,
-          cursor: "pointer",
-          color: C.label
+          fontSize: 18,
+          cursor: it.cantDev ? "pointer" : "default",
+          color: C.label,
+          opacity: it.cantDev ? 1 : 0.35
         }
       },
       "\u2212"
-    ), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 14, fontWeight: 600, color: C.label, fontFamily: FONT, minWidth: 16, textAlign: "center" } }, it.cantDev || 1), /* @__PURE__ */ import_react.default.createElement(
+    ), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 14, fontWeight: 700, color: C.label, fontFamily: FONT, minWidth: 20, textAlign: "center" } }, it.cantDev || 0), /* @__PURE__ */ import_react.default.createElement(
       "button",
       {
-        onClick: () => setCantDev(it.prodId, (it.cantDev || 1) + 1),
+        onClick: () => setCantDev(it.prodId, (it.cantDev || 0) + 1),
+        disabled: (it.cantDev || 0) >= Math.max(1, Number(it.cantidad) || 1),
+        "aria-label": `Agregar una unidad de ${it.nombre} para devolver`,
         style: {
-          width: 28,
-          height: 28,
-          borderRadius: 8,
+          width: 36,
+          height: 36,
+          borderRadius: 9,
           border: `1px solid ${C.sep}`,
           background: C.bg1,
-          fontSize: 16,
-          cursor: "pointer",
-          color: C.label
+          fontSize: 18,
+          cursor: (it.cantDev || 0) < Math.max(1, Number(it.cantidad) || 1) ? "pointer" : "default",
+          color: C.label,
+          opacity: (it.cantDev || 0) < Math.max(1, Number(it.cantidad) || 1) ? 1 : 0.35
         }
       },
       "+"
@@ -75903,7 +75921,7 @@ ${c.diferencia > 0.01 ? `Cliente paga diferencia: Bs ${fmt2(c.diferencia)} (${c.
         onPress: () => setPaso(3),
         variant: "fill",
         full: true,
-        disabled: devueltos.filter((it) => it.selec).length === 0
+        disabled: itemsDevueltosSeleccionados.length === 0
       },
       "Continuar \u2192 Elegir prendas nuevas"
     ));

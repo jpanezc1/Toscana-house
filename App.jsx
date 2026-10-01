@@ -20520,22 +20520,35 @@ function CambiosTab({inv, ventas, onCambio}){
     )).slice(0,6);
   },[inv,busqNuevo]);
 
-  const totalDev=devueltos.reduce((s,it)=>s+it.precioUnit*(it.cantDev||1),0);
+  const itemsDevueltosSeleccionados=devueltos.filter(it=>it.selec&&Number(it.cantDev)>0);
+  const totalDev=itemsDevueltosSeleccionados.reduce((s,it)=>s+it.precioUnit*it.cantDev,0);
   const totalNuevo=nuevos.reduce((s,it)=>s+it.precio*it.cantidad,0);
   const diferencia=totalNuevo-totalDev; // >0 cliente paga, <0 tienda devuelve/crédito
 
   function seleccionarVenta(v){
     setVentaOrigen(v);
-    setDevueltos(v.items.map(it=>({...it,cantDev:it.cantidad,selec:true})));
+    // Un cambio parcial debe comenzar vacío: la operadora elige expresamente
+    // qué prendas vuelven. Antes todo arrancaba seleccionado y el mínimo era 1,
+    // por lo que el formulario forzaba la devolución de la venta completa.
+    setDevueltos(v.items.map(it=>({...it,cantDev:0,selec:false})));
     setBusqVenta("");
     setPaso(2);
   }
 
   function toggleDevuelto(prodId){
-    setDevueltos(p=>p.map(it=>it.prodId===prodId?{...it,selec:!it.selec}:it));
+    setDevueltos(p=>p.map(it=>{
+      if(it.prodId!==prodId) return it;
+      const selec=!it.selec;
+      return {...it,selec,cantDev:selec?Math.max(1,Number(it.cantDev)||0):0};
+    }));
   }
   function setCantDev(prodId,n){
-    setDevueltos(p=>p.map(it=>it.prodId===prodId?{...it,cantDev:Math.max(1,Math.min(it.cantidad,n))}:it));
+    setDevueltos(p=>p.map(it=>{
+      if(it.prodId!==prodId) return it;
+      const maxCantidad=Math.max(1,Number(it.cantidad)||1);
+      const cantDev=Math.max(0,Math.min(maxCantidad,Number(n)||0));
+      return {...it,cantDev,selec:cantDev>0};
+    }));
   }
 
   function agregarNuevo(prod){
@@ -20553,7 +20566,7 @@ function CambiosTab({inv, ventas, onCambio}){
 
   function confirmar(){
     const id=`CAM${Date.now()}`;
-    const itemsDevueltos=devueltos.filter(it=>it.selec).map(it=>({
+    const itemsDevueltos=itemsDevueltosSeleccionados.map(it=>({
       prodId:it.prodId,codigo:it.codigo,nombre:it.nombre,
       marcaId:it.marcaId,marcaNombre:it.marcaNombre,
       cantidad:it.cantDev,precioUnit:it.precioUnit,
@@ -20685,29 +20698,35 @@ ${c.diferencia>0.01?`Cliente paga diferencia: Bs ${fmt2(c.diferencia)} (${c.meto
           <div style={{fontSize:11,color:C.label3,fontFamily:FONT}}>Venta {ventaOrigen.id} · {ventaOrigen.fecha}</div>
         </div>
       </div>
+      <div style={{fontSize:12,color:C.label3,fontFamily:FONT,marginBottom:12,lineHeight:1.45}}>
+        Elegí únicamente las prendas que el cliente devuelve. Usá <strong>+</strong> para seleccionarlas; <strong>−</strong> hasta 0 las quita del cambio.
+      </div>
       <div style={{background:C.bg2,borderRadius:14,overflow:"hidden",border:`1px solid ${C.sep}`,marginBottom:16}}>
         {devueltos.map((it,i)=>(
           <div key={it.prodId} style={{padding:"12px 16px",borderBottom:i<devueltos.length-1?`1px solid ${C.sep}`:"",
-            opacity:it.selec?1:0.45,transition:"opacity .15s"}}>
+            background:it.selec?`${C.gold}0D`:"transparent",opacity:it.selec?1:0.72,transition:"opacity .15s, background .15s"}}>
             <div style={{display:"flex",alignItems:"center",gap:12}}>
               <input type="checkbox" checked={!!it.selec} onChange={()=>toggleDevuelto(it.prodId)}
-                style={{width:18,height:18,cursor:"pointer",accentColor:C.gold}}/>
+                aria-label={`Seleccionar ${it.nombre} para devolver`}
+                style={{width:22,height:22,cursor:"pointer",accentColor:C.gold,flexShrink:0}}/>
               <div style={{flex:1,minWidth:0}}>
                 <div style={{fontSize:13,fontWeight:500,color:C.label,fontFamily:FONT,
                   overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{it.nombre}</div>
                 <div style={{fontSize:11,color:C.label3,fontFamily:FONT}}>{it.marcaNombre} · Bs {it.precioUnit}</div>
               </div>
-              {it.selec&&(
-                <div style={{display:"flex",alignItems:"center",gap:6}}>
-                  <button onClick={()=>setCantDev(it.prodId,(it.cantDev||1)-1)}
-                    style={{width:28,height:28,borderRadius:8,border:`1px solid ${C.sep}`,
-                      background:C.bg1,fontSize:16,cursor:"pointer",color:C.label}}>−</button>
-                  <span style={{fontSize:14,fontWeight:600,color:C.label,fontFamily:FONT,minWidth:16,textAlign:"center"}}>{it.cantDev||1}</span>
-                  <button onClick={()=>setCantDev(it.prodId,(it.cantDev||1)+1)}
-                    style={{width:28,height:28,borderRadius:8,border:`1px solid ${C.sep}`,
-                      background:C.bg1,fontSize:16,cursor:"pointer",color:C.label}}>+</button>
-                </div>
-              )}
+              <div style={{display:"flex",alignItems:"center",gap:6}}>
+                <button onClick={()=>setCantDev(it.prodId,(it.cantDev||0)-1)} disabled={!it.cantDev}
+                  aria-label={`Quitar una unidad de ${it.nombre}`}
+                  style={{width:36,height:36,borderRadius:9,border:`1px solid ${C.sep}`,
+                    background:C.bg1,fontSize:18,cursor:it.cantDev?"pointer":"default",color:C.label,
+                    opacity:it.cantDev?1:0.35}}>−</button>
+                <span style={{fontSize:14,fontWeight:700,color:C.label,fontFamily:FONT,minWidth:20,textAlign:"center"}}>{it.cantDev||0}</span>
+                <button onClick={()=>setCantDev(it.prodId,(it.cantDev||0)+1)} disabled={(it.cantDev||0)>=Math.max(1,Number(it.cantidad)||1)}
+                  aria-label={`Agregar una unidad de ${it.nombre} para devolver`}
+                  style={{width:36,height:36,borderRadius:9,border:`1px solid ${C.sep}`,
+                    background:C.bg1,fontSize:18,cursor:(it.cantDev||0)<Math.max(1,Number(it.cantidad)||1)?"pointer":"default",color:C.label,
+                    opacity:(it.cantDev||0)<Math.max(1,Number(it.cantidad)||1)?1:0.35}}>+</button>
+              </div>
             </div>
           </div>
         ))}
@@ -20717,7 +20736,7 @@ ${c.diferencia>0.01?`Cliente paga diferencia: Bs ${fmt2(c.diferencia)} (${c.meto
         Total a devolver: <strong>Bs {totalDev.toFixed(2)}</strong>
       </div>
       <IOSBtn onPress={()=>setPaso(3)} variant="fill" full
-        disabled={devueltos.filter(it=>it.selec).length===0}>
+        disabled={itemsDevueltosSeleccionados.length===0}>
         Continuar → Elegir prendas nuevas
       </IOSBtn>
     </div>
