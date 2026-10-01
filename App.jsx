@@ -274,10 +274,18 @@ async function sbGuardarVenta(venta) {
   if (ventaBloqueada(venta?.id)) return true;
   if (!ESCRITURA_NUBE_OK) return true; // barrera: copia no productiva no sube ventas
   try {
+    // Un reintento de un equipo que quedó abierto puede traer un mk antiguo.
+    // La fecha de la venta manda también en la persistencia, incluso al
+    // reprocesar operaciones guardadas en el outbox.
+    const fechaPartes = String(venta.fecha||"").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    const mesFecha = fechaPartes ? Number(fechaPartes[2]) : 0;
+    const anioVenta = mesFecha>=1 && mesFecha<=12 ? Number(fechaPartes[1]) : venta.anio;
+    const mesVenta = mesFecha>=1 && mesFecha<=12 ? mesFecha-1 : venta.mes;
+    const mkVenta = mesFecha>=1 && mesFecha<=12 ? `${fechaPartes[1]}-${fechaPartes[2]}` : venta.mk;
     const db = await getSupabase();
     const { error: errVenta } = await db.from("ventas").upsert({
       id: venta.id, fecha: venta.fecha, hora: venta.hora,
-      mk: venta.mk, mes: venta.mes, anio: venta.anio,
+      mk: mkVenta, mes: mesVenta, anio: anioVenta,
       total: venta.total, subtotal: venta.subtotal,
       desc_pct: venta.descPct||0, metodo_pago: venta.metodoPago,
       vendedor: venta.vendedor, etiqueta_img: venta.etiquetaImg||null,
@@ -16642,7 +16650,15 @@ function App(){
 
   function handleVenta(v){
     const id=`V${Date.now()}`;
-    const vf={...v,id,fecha:hoy(),hora:hora(),mk:MK,mes,anio};
+    // El mes seleccionado en pantalla puede quedar atrasado si la app sigue
+    // abierta durante un cambio de mes. La fecha y el período de la venta
+    // deben salir del mismo instante de cobro.
+    const fechaVenta=hoy();
+    const [anioVenta,mesISO]=fechaVenta.split("-").map(Number);
+    const mesVenta=mesISO-1;
+    const vf={...v,id,fecha:fechaVenta,hora:hora(),mk:mkKey(mesVenta,anioVenta),mes:mesVenta,anio:anioVenta};
+    if(mes!==mesVenta) setMes(mesVenta);
+    if(anio!==anioVenta) setAnio(anioVenta);
     setVentas(p=>[...p,vf]);
     const stockCambios = [];
     v.items.forEach(it=>{
