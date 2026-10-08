@@ -1,6 +1,8 @@
 # Caja Toscana House — dos turnos, una caja física
 
-Estado: especificación verificada; **no activada en producción**.
+Estado: tablas de turnos y archivo privado de PDF creados en Supabase el 8/10/2026;
+interfaz y obligatoriedad de apertura aún **no publicadas**. No usar el registro
+antiguo `caja_turnos` como si fuera este libro nuevo (`th_caja_turnos`).
 
 ## Flujo operativo
 
@@ -11,6 +13,9 @@ Estado: especificación verificada; **no activada en producción**.
 5. Antes del cierre se muestran el resumen y el PDF preliminar. El cierre definitivo requiere contar el efectivo y confirmar que las ventas del turno llegaron a la nube.
 6. Tarde: abrir un turno nuevo con el fondo que efectivamente recibió. El cierre de mañana no se mezcla con el de tarde.
 7. Cada cierre se conserva para volver a abrir y descargar el mismo PDF; el envío por WhatsApp es descarga y adjunto manual, no una promesa de envío automático del archivo.
+8. El PDF del cierre se guarda en un bucket privado. El historial permite buscar
+   cierres anteriores por páginas y abrir el archivo guardado. Si la subida falla,
+   el resumen inmutable del cierre permite regenerar y reintentar el PDF.
 
 ## Arqueo
 
@@ -24,8 +29,14 @@ El PDF debe mostrar apertura, responsable, horario, cantidad y total de ventas v
 
 - La pantalla `CajasTab` actual de Toscana solo guarda dos indicadores de abierto/cerrado en `kv_sync`; no está en el menú principal ni vincula ventas al turno. No es un arqueo.
 - Las ventas de Toscana se guardan con reintento diferido. Un cierre hecho solo con datos de nube mientras haya ventas pendientes produciría un faltante aparente. Debe impedirse el cierre definitivo, no el cobro, hasta confirmar la sincronización.
-- Dos de las tres cuentas activas con rol de caja no tienen `auth_id` en `usuarios` al momento de la revisión. No se debe publicar una caja financiera con escrituras anónimas para evitar que esas cuentas queden fuera: primero hay que migrarlas a sesiones autenticadas.
+- Las tres cuentas activas de caja ya tienen `auth_id` en `usuarios`, pero el inicio
+  de sesión conserva rutas heredadas por contraseña local. La caja nueva exige
+  sesión Supabase Auth; se deben probar esas credenciales sin operar datos reales.
 - Re Kids calcula el cierre con registros de caja en base de datos y funciones transaccionales. Toscana necesita un registro equivalente, con una sola caja abierta a la vez y un turno por sesión, en lugar de copiar solo la pantalla.
+- El asesor de seguridad de Supabase todavía marca `ventas` y `usuarios` con RLS
+  desactivado. Por eso el arqueo nuevo no se presenta como libro financiero
+  inviolable, ni se habilita el bloqueo de ventas, hasta corregir el acceso y
+  validar el flujo de caja en un entorno aislado.
 
 ## Despliegue seguro
 

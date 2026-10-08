@@ -73,6 +73,9 @@ function puedeEscribirNube(){
   return _hostEsProduccion();
 }
 const ESCRITURA_NUBE_OK = puedeEscribirNube();
+// Activar únicamente tras prueba aislada de apertura, dos turnos, cierre y PDF.
+// Mientras tanto, el POS existente conserva continuidad operativa.
+const CAJA_APERTURA_OBLIGATORIA = false;
 if(!ESCRITURA_NUBE_OK && typeof console!=="undefined"){
   console.warn("[BARRERA] Copia NO productiva: las escrituras a la nube están DESACTIVADAS. Nada de lo que hagas acá toca la base real de Toscana.");
 }
@@ -283,11 +286,15 @@ async function sbGuardarVenta(venta) {
     const mesVenta = mesFecha>=1 && mesFecha<=12 ? mesFecha-1 : venta.mes;
     const mkVenta = mesFecha>=1 && mesFecha<=12 ? `${fechaPartes[1]}-${fechaPartes[2]}` : venta.mk;
     const db = await getSupabase();
+    const pagosVenta = parsePago(venta.metodoPago, Number(venta.total)||0);
     const { error: errVenta } = await db.from("ventas").upsert({
       id: venta.id, fecha: venta.fecha, hora: venta.hora,
       mk: mkVenta, mes: mesVenta, anio: anioVenta,
       total: venta.total, subtotal: venta.subtotal,
       desc_pct: venta.descPct||0, metodo_pago: venta.metodoPago,
+      efectivo: pagosVenta.efectivo, qr: pagosVenta.qr,
+      tarjeta: pagosVenta.tarjeta, gc_usado: pagosVenta.giftcard,
+      ...(venta.cajaTurnoId ? {caja_turno_id:venta.cajaTurnoId} : {}),
       vendedor: venta.vendedor, etiqueta_img: venta.etiquetaImg||null,
       cliente_nombre: venta.clienteNombre||null, cliente_telefono: venta.clienteTelefono||null
     });
@@ -1056,6 +1063,7 @@ async function sbCargarAuditLog() {
 // no esté disponible en el momento de guardar.
 // ════════════════════════════════════════════════════════════
 const TH_OUTBOX_KEY = "th_sync_outbox";
+let _ventasEnVuelo = 0; // evita cerrar mientras una venta aún no entró al outbox
 
 function getOutbox(){
   try{ return JSON.parse(localStorage.getItem(TH_OUTBOX_KEY)||"[]"); }catch{ return []; }
@@ -8409,6 +8417,172 @@ function CajasTab(){
   );
 }
 
+// Libro de caja real: un turno para la caja física. El PDF cerrado se guarda
+// en Storage privado; el resumen SQL queda como respaldo si falla la subida.
+function cajaPDF(turno, movimientos){
+  const jsPDF = window.jspdf?.jsPDF;
+  if(!jsPDF) throw new Error("No cargó el generador de PDF");
+  if(turno.estado!=="cerrado" || !turno.cierre_resumen) throw new Error("El turno todavía no está cerrado");
+  const doc = new jsPDF({unit:"mm",format:"a4"});
+  let y=18;
+  const line=(label,value,bold=false)=>{
+    if(y>275){doc.addPage();y=18;}
+    doc.setFont("helvetica",bold?"bold":"normal"); doc.setFontSize(bold?11:9);
+    doc.text(`${label}: ${value}`,15,y); y+=bold?8:6;
+  };
+  const n=x=>`Bs ${Number(x||0).toFixed(2)}`;
+  const r=turno.cierre_resumen, v=r.ventas||{}, m=r.movimientos||{};
+  doc.setFont("helvetica","bold"); doc.setFontSize(16);
+  doc.text("TOSCANA HOUSE - CIERRE DE CAJA",15,y); y+=10;
+  line("Turno",turno.id); line("Abrió",`${turno.abierto_usuario} - ${new Date(turno.abierto_at).toLocaleString("es-BO")}`);
+  line("Cerró",`${turno.cerrado_usuario} - ${new Date(turno.cerrado_at).toLocaleString("es-BO")}`);
+  y+=3; line("ARQUEO", "", true);
+  line("Efectivo inicial",n(r.apertura)); line("Ventas",`${v.cantidad||0} - ${n(v.total)}`);
+  line("Efectivo recibido",n(v.efectivo)); line("QR",n(v.qr));
+  line("Tarjeta",n(v.tarjeta)); line("Gift card utilizada",n(v.giftcard));
+  line("Aportes",n(m.aportes)); line("Retiros",n(m.retiros));
+  line("Efectivo esperado",n(r.esperado),true);
+  line("Efectivo contado",n(r.contado),true);
+  line("Diferencia",n(r.diferencia),true);
+  y+=4; line("MOVIMIENTOS DEL CAJÓN", "", true);
+  (movimientos||[]).forEach(x=>line(
+    `${new Date(x.creado_at).toLocaleString("es-BO")} ${x.tipo.toUpperCase()}`,
+    `${n(x.monto)} - ${x.destinatario} - ${x.motivo}`.slice(0,80)
+  ));
+  doc.setFontSize(8); doc.text("Registro histórico del turno. No sustituye la factura fiscal.",15,288);
+  return doc;
+}
+async function cajaGuardarPDF(turno,movimientos){
+  if(!ESCRITURA_NUBE_OK) throw new Error("Copia local: no se guarda en producción");
+  const db=await getSupabase();
+  const doc=cajaPDF(turno,movimientos);
+  const path=`${turno.id}.pdf`;
+  const {error}=await db.storage.from("caja-cierres").upload(path,doc.output("blob"),
+    {contentType:"application/pdf",upsert:false});
+  if(error && !/already exists|duplicate/i.test(error.message||"")) throw error;
+  return path;
+}
+async function cajaAbrirPDF(turno,movimientos){
+  const db=await getSupabase();
+  const {data,error}=await db.storage.from("caja-cierres").download(`${turno.id}.pdf`);
+  if(error || !data){
+    // El cierre permanece disponible aunque la subida inicial haya fallado.
+    const doc=cajaPDF(turno,movimientos);
+    if(ESCRITURA_NUBE_OK) await cajaGuardarPDF(turno,movimientos);
+    doc.save(`Cierre_Caja_${turno.id.slice(0,8)}.pdf`);
+    return;
+  }
+  const url=URL.createObjectURL(data);
+  const link=document.createElement("a");
+  link.href=url; link.target="_blank"; link.rel="noopener noreferrer";
+  document.body.appendChild(link); link.click(); link.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),60000);
+}
+function CajaTurnosPanel({user,turno,onTurnoChange,onGoPos}){
+  const [lista,setLista]=useState([]);
+  const [histLimite,setHistLimite]=useState(60);
+  const [movimientos,setMovimientos]=useState([]);
+  const [resumen,setResumen]=useState(null);
+  const [apertura,setApertura]=useState("");
+  const [contado,setContado]=useState("");
+  const [tipo,setTipo]=useState("retiro");
+  const [monto,setMonto]=useState("");
+  const [destinatario,setDestinatario]=useState("");
+  const [motivo,setMotivo]=useState("");
+  const [busy,setBusy]=useState(false);
+  const [error,setError]=useState("");
+  const money=x=>`Bs ${Number(x||0).toFixed(2)}`;
+  const validarMonto=(s,permiteCero=false)=>/^\d+(?:\.\d{1,2})?$/.test(String(s).trim()) && Number(s)>=(permiteCero?0:0.01);
+  async function refrescar(){
+    const db=await getSupabase();
+    const {data,error:e}=await db.from("th_caja_turnos").select("*").order("abierto_at",{ascending:false}).limit(histLimite);
+    if(e) throw e;
+    setLista(data||[]);
+    onTurnoChange((data||[]).find(x=>x.estado==="abierto")||null);
+    if(turno?.id){
+      const {data:mov,error:em}=await db.from("th_caja_movimientos").select("*").eq("turno_id",turno.id).order("creado_at");
+      if(em) throw em;
+      setMovimientos(mov||[]);
+      const {data:r,error:er}=await db.rpc("caja_resumen",{p_turno:turno.id});
+      if(er) throw er;
+      setResumen(r);
+    } else {setMovimientos([]);setResumen(null);}
+  }
+  useEffect(()=>{refrescar().catch(e=>setError(e.message||"No se pudo leer caja"));},[turno?.id,histLimite]);
+  async function ejecutar(fn){
+    setBusy(true); setError("");
+    try{await fn(); await refrescar();}catch(e){setError(e.message||"No se pudo completar la operación");}
+    finally{setBusy(false);}
+  }
+  const inp={padding:"10px 12px",borderRadius:9,border:`1px solid ${C.sep}`,fontSize:14,background:C.bg2,color:C.label};
+  const btn={padding:"11px 16px",border:0,borderRadius:10,background:C.gold,color:"#fff",fontWeight:700,cursor:"pointer"};
+  return <div style={{maxWidth:780,margin:"auto",fontFamily:FONT}}>
+    <h2 style={{color:C.label}}>Caja por turnos</h2>
+    <p style={{color:C.label3}}>Una caja física · turno mañana 10:00–14:30 · turno tarde desde 14:30. Cada cambio exige cierre y nueva apertura.</p>
+    {error&&<div role="alert" style={{padding:12,background:"#FDECEC",color:"#9C2525",borderRadius:10,marginBottom:12}}>{error}</div>}
+    {!turno ? <div style={{padding:20,background:C.bg2,borderRadius:14,border:`1px solid ${C.sep}`}}>
+      <h3>Iniciar nuevo turno</h3>
+      <p>Contá el efectivo que recibís, incluida la caja chica. Abrirá con tu usuario: {user.nombre}.</p>
+      <input aria-label="Efectivo recibido" type="number" min="0" step="0.01" value={apertura} onChange={e=>setApertura(e.target.value)} style={inp} placeholder="Efectivo recibido Bs"/>
+      <button disabled={busy||!validarMonto(apertura,true)} onClick={()=>ejecutar(async()=>{
+        const db=await getSupabase(); const {data,error:e}=await db.rpc("caja_abrir",{p_efectivo:Number(apertura)});
+        if(e) throw e; onTurnoChange(data); setApertura("");
+      })} style={{...btn,marginLeft:8,opacity:busy||!validarMonto(apertura,true)?.5:1}}>Abrir caja</button>
+    </div> : <div style={{padding:20,background:C.bg2,borderRadius:14,border:`1px solid ${C.sep}`}}>
+      <h3>Turno abierto · {turno.abierto_usuario}</h3>
+      <p>Desde {new Date(turno.abierto_at).toLocaleString("es-BO")} · Fondo inicial {money(turno.efectivo_apertura)}</p>
+      <button style={btn} onClick={onGoPos}>Ir a cobrar</button>
+      <button style={{...btn,marginLeft:8,background:C.label3}} onClick={()=>refrescar().catch(e=>setError(e.message))}>Actualizar arqueo</button>
+      {resumen&&<div style={{marginTop:18,lineHeight:1.8}}>
+        <b>Ventas:</b> {resumen.ventas?.cantidad||0} · {money(resumen.ventas?.total)}<br/>
+        <b>Efectivo:</b> {money(resumen.ventas?.efectivo)} · <b>QR:</b> {money(resumen.ventas?.qr)} · <b>Tarjeta:</b> {money(resumen.ventas?.tarjeta)} · <b>Gift card:</b> {money(resumen.ventas?.giftcard)}<br/>
+        <b>Aportes:</b> {money(resumen.movimientos?.aportes)} · <b>Retiros:</b> {money(resumen.movimientos?.retiros)}<br/>
+        <b>Efectivo esperado:</b> {money(resumen.esperado)}
+      </div>}
+      <h4>Movimiento de efectivo</h4>
+      <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
+        <select aria-label="Tipo de movimiento" value={tipo} onChange={e=>setTipo(e.target.value)} style={inp}><option value="retiro">Retiro</option><option value="aporte">Aporte</option></select>
+        <input aria-label="Monto" type="number" min="0.01" step="0.01" value={monto} onChange={e=>setMonto(e.target.value)} style={inp} placeholder="Monto Bs"/>
+        <input aria-label="Destinatario" value={destinatario} onChange={e=>setDestinatario(e.target.value)} style={inp} placeholder="Recibe / entrega"/>
+        <input aria-label="Motivo" value={motivo} onChange={e=>setMotivo(e.target.value)} style={inp} placeholder="Motivo"/>
+        <button disabled={busy||!validarMonto(monto)||!destinatario.trim()||!motivo.trim()} style={btn} onClick={()=>ejecutar(async()=>{
+          const db=await getSupabase();const {error:e}=await db.rpc("caja_movimiento",{
+            p_turno:turno.id,p_tipo:tipo,p_monto:Number(monto),p_destinatario:destinatario,p_motivo:motivo});
+          if(e) throw e; setMonto("");setDestinatario("");setMotivo("");
+        })}>Registrar</button>
+      </div>
+      {movimientos.map(x=><div key={x.id} style={{padding:"7px 0",borderBottom:`1px solid ${C.sep}`,fontSize:12}}>{new Date(x.creado_at).toLocaleString("es-BO")} · {x.tipo} {money(x.monto)} · {x.destinatario} · {x.motivo}</div>)}
+      <h4>Cierre y entrega del turno</h4>
+      <p>Contá el efectivo físico. Si hay diferencia, queda registrada; no cambies el valor para forzar el cuadre. Confirmá que los demás equipos hayan sincronizado sus ventas.</p>
+      <input aria-label="Efectivo contado" type="number" min="0" step="0.01" value={contado} onChange={e=>setContado(e.target.value)} style={inp} placeholder="Efectivo contado Bs"/>
+      <button disabled={busy||!validarMonto(contado,true)} style={{...btn,marginLeft:8,background:"#752424"}} onClick={()=>ejecutar(async()=>{
+        if(_ventasEnVuelo>0) throw new Error("Hay ventas todavía sincronizándose. Esperá unos segundos y reintentá el cierre.");
+        await procesarOutbox();
+        const pendientes=getOutbox().filter(o=>["venta","anularVenta"].includes(o.tipo));
+        if(pendientes.length) throw new Error(`${pendientes.length} ventas locales siguen sin sincronizar. No se puede cerrar todavía.`);
+        if(!window.confirm("¿Confirmás el efectivo contado y el cierre de este turno? Esta acción no se puede deshacer.")) return;
+        const db=await getSupabase();const {data,error:e}=await db.rpc("caja_cerrar",{p_turno:turno.id,p_contado:Number(contado)});
+        if(e) throw e;
+        onTurnoChange(null);setContado("");
+        try{await cajaGuardarPDF(data,movimientos);}catch(pdfError){
+          setError(`Turno cerrado. El PDF no se guardó aún: ${pdfError.message}. Usá el historial para reintentarlo.`);
+        }
+      })}>Cerrar turno y guardar PDF</button>
+    </div>}
+    <h3 style={{marginTop:25}}>Historial de cierres</h3>
+    {lista.filter(x=>x.estado==="cerrado").map(x=><div key={x.id} style={{padding:12,marginBottom:8,background:C.bg2,borderRadius:10,display:"flex",justifyContent:"space-between",gap:10}}>
+      <span>{new Date(x.abierto_at).toLocaleString("es-BO")} · {x.abierto_usuario} → {x.cerrado_usuario}<br/>
+        <small>Contado {money(x.efectivo_contado)} · Diferencia {money(x.cierre_resumen?.diferencia)}</small></span>
+      <button style={btn} onClick={()=>ejecutar(async()=>{
+        const db=await getSupabase();
+        const {data,error:e}=await db.from("th_caja_movimientos").select("*").eq("turno_id",x.id).order("creado_at");
+        if(e) throw e; await cajaAbrirPDF(x,data||[]);
+      })}>Ver PDF</button>
+    </div>)}
+    {lista.length>=histLimite&&<button style={btn} onClick={()=>setHistLimite(n=>n+60)}>Ver cierres anteriores</button>}
+  </div>;
+}
+
 // ══════════════════════════════════════════════════════════
 // APP PRINCIPAL
 // ══════════════════════════════════════════════════════════
@@ -15575,6 +15749,23 @@ function App(){
   const sync = useSyncStatus();
   const now=new Date();
   const[tab,setTab]         =useState("inicio");
+  const[cajaTurno,setCajaTurno]=useState(null);
+  const[cajaCargando,setCajaCargando]=useState(true);
+  const[cajaError,setCajaError]=useState("");
+  useEffect(()=>{
+    if(!user || !["caja","admin"].includes(user.rol)) return;
+    let activo=true;
+    setCajaCargando(true);
+    getSupabase().then(async db=>{
+      const {data,error}=await db.from("th_caja_turnos").select("*").eq("estado","abierto").maybeSingle();
+      if(!activo) return;
+      if(error){setCajaError(error.message);setCajaTurno(null);}
+      else {setCajaError("");setCajaTurno(data||null);}
+      setCajaCargando(false);
+    }).catch(e=>{if(activo){setCajaError(e.message);setCajaCargando(false);}});
+    if(user.rol==="caja" && CAJA_APERTURA_OBLIGATORIA) setTab("th_caja_turnos");
+    return ()=>{activo=false;};
+  },[user?.usuario]);
   // ── Persistencia local: ini desde localStorage, sync a nube con Supabase ──
   const[inv,setInv]     =useState(()=>{ try{return JSON.parse(localStorage.getItem("th_inv")||"[]");}catch{return[];} });
   const[ventas,setVentas]=useState(()=>{ try{return JSON.parse(localStorage.getItem("th_ventas")||"[]").filter(v=>!ventaBloqueada(v?.id));}catch{return[];} });
@@ -16697,6 +16888,10 @@ function App(){
   }
 
   function handleVenta(v){
+    if(CAJA_APERTURA_OBLIGATORIA && !cajaTurno?.id){
+      alert("Primero abrí un turno de caja para registrar la venta.");
+      return null;
+    }
     const id=`V${Date.now()}`;
     // El mes seleccionado en pantalla puede quedar atrasado si la app sigue
     // abierta durante un cambio de mes. La fecha y el período de la venta
@@ -16704,7 +16899,7 @@ function App(){
     const fechaVenta=hoy();
     const [anioVenta,mesISO]=fechaVenta.split("-").map(Number);
     const mesVenta=mesISO-1;
-    const vf={...v,id,fecha:fechaVenta,hora:hora(),mk:mkKey(mesVenta,anioVenta),mes:mesVenta,anio:anioVenta};
+    const vf={...v,id,fecha:fechaVenta,hora:hora(),mk:mkKey(mesVenta,anioVenta),mes:mesVenta,anio:anioVenta,cajaTurnoId:cajaTurno.id};
     if(mes!==mesVenta) setMes(mesVenta);
     if(anio!==anioVenta) setAnio(anioVenta);
     setVentas(p=>[...p,vf]);
@@ -16717,7 +16912,9 @@ function App(){
       stockCambios.push({prodId:it.prodId, codigo:it.codigo, nombre:it.nombre, stockAntes, stockDespues});
     });
     drive.syncVenta(vf);
-    syncConRespaldo("venta", vf, ()=>sbGuardarVenta(vf));
+    _ventasEnVuelo++;
+    syncConRespaldo("venta", vf, ()=>sbGuardarVenta(vf))
+      .finally(()=>{_ventasEnVuelo=Math.max(0,_ventasEnVuelo-1);});
     // ── Audit forense ─────────────────────────────────────────────
     const marcas = [...new Set(v.items.map(i=>i.marcaNombre))].join(", ");
     logAudit("VENTA", {
@@ -16914,6 +17111,7 @@ function App(){
 
   const TABS_ALL=[
     {id:"inicio",        icon:"⊞", label:"Inicio"},
+    {id:"th_caja_turnos",   icon:"▣", label:"Turnos"},
     {id:"pos",           icon:"⊕", label:"Caja"},
     {id:"ventas",        icon:"◈", label:"Ventas"},
     {id:"clientes",      icon:"◐", label:"Clientes"},
@@ -16931,9 +17129,9 @@ function App(){
   // + config (para cargar la llave de facturación de su equipo; adentro solo ve
   //   Perfil, Seguridad y Facturación — "Sistema" queda solo para admin).
   const TABS = user?.rol==="caja"
-    ? TABS_ALL.filter(t=>["inicio","pos","ventas","clientes","cambios","inventario","auditoria","config"].includes(t.id))
+    ? TABS_ALL.filter(t=>["inicio","th_caja_turnos","pos","ventas","clientes","cambios","inventario","auditoria","config"].includes(t.id))
     : user?.rol==="admin" ? TABS_ALL
-    : TABS_ALL.filter(t=>t.id!=="auditoria"&&t.id!=="cargas"&&t.id!=="ventas_ant");
+    : TABS_ALL.filter(t=>t.id!=="auditoria"&&t.id!=="cargas"&&t.id!=="ventas_ant"&&t.id!=="th_caja_turnos");
 
   // Pantallas con vista de detalle (back button)
   const showingDetail = tab==="marcas" && marcaDetalle;
@@ -17118,7 +17316,16 @@ function App(){
         )}
 
         {/* POS */}
-        {tab==="pos" && <POSContainer inv={inv} onVenta={handleVenta} retiros={retiros} onRetiro={registrarRetiro} onRetiroBatch={registrarRetiroBatch} onAnularRetiro={anularRetiro} onVerNota={v=>setVentaDetalle(v)} user={user} descuentos={descuentos} descCodigos={descCodigos} onCambioPrecio={handleEditarProducto} permPrecio={permPrecioStaff}/>}
+        {tab==="pos" && (!CAJA_APERTURA_OBLIGATORIA || cajaTurno
+          ? <POSContainer inv={inv} onVenta={handleVenta} retiros={retiros} onRetiro={registrarRetiro} onRetiroBatch={registrarRetiroBatch} onAnularRetiro={anularRetiro} onVerNota={v=>setVentaDetalle(v)} user={user} descuentos={descuentos} descCodigos={descCodigos} onCambioPrecio={handleEditarProducto} permPrecio={permPrecioStaff}/>
+          : <div style={{padding:24,background:C.bg2,borderRadius:14}}>
+              <h3>{cajaCargando?"Verificando el turno de caja…":"Primero abrí la caja"}</h3>
+              <p>{cajaError||"Para cobrar, registrá el efectivo recibido e iniciá el turno."}</p>
+              <IOSBtn onPress={()=>setTab("th_caja_turnos")} variant="fill">Ir a turnos</IOSBtn>
+            </div>)}
+
+        {tab==="th_caja_turnos" && <CajaTurnosPanel user={user} turno={cajaTurno}
+          onTurnoChange={setCajaTurno} onGoPos={()=>setTab("pos")}/>}
 
         {/* INVENTARIO — por marca */}
         {tab==="inventario" && (
@@ -18332,7 +18539,13 @@ function POS({inv,onVenta,onVerNota,user,descuentos={},descCodigos={}}){
         ? "giftcard"
         : `mixto|giftcard:${gcUsado}|${metodoCompl}:${extraMonto}`;
 
-      // Deducir saldo GC
+      const vf=onVenta({items,total,subtotal,descPct,
+        metodoPago:metodoPagoFinal,
+        vendedor:vendedor||"Tienda",clienteNombre:cliente,clienteTelefono:clienteTel,etiquetaImg:etiqueta,
+        gcId:gcEncontrado.codigo, gcUsado, gcAllocations,
+      });
+      if(!vf) return;
+      // Deducir saldo solo después de que la venta fue admitida por caja.
       const gcLista=cargarGC();
       guardarGC(gcLista.map(g=>g.codigo!==gcEncontrado.codigo?g:{
         ...g,
@@ -18343,12 +18556,6 @@ function POS({inv,onVenta,onVerNota,user,descuentos={},descCodigos={}}){
           nota:`Venta POS — ${items.length} prod.`
         }],
       }));
-
-      const vf=onVenta({items,total,subtotal,descPct,
-        metodoPago:metodoPagoFinal,
-        vendedor:vendedor||"Tienda",clienteNombre:cliente,clienteTelefono:clienteTel,etiquetaImg:etiqueta,
-        gcId:gcEncontrado.codigo, gcUsado, gcAllocations,
-      });
       setUltima(vf);setShowOk(true);setShowPago(false);
       autoDescargarNota(vf);
       setCarrito([]);setDescExtra(0);setDescMarcaManual({});setBusq("");setEtiqueta(null);setCliente("");setClienteTel("");
@@ -18370,6 +18577,7 @@ function POS({inv,onVenta,onVerNota,user,descuentos={},descCodigos={}}){
       metodoPagoFinal=partes.length>0?"mixto|"+partes.join("|"):pago;
     }
     const vf=onVenta({items,total,subtotal,descPct,metodoPago:metodoPagoFinal,vendedor:vendedor||"Tienda",clienteNombre:cliente,clienteTelefono:clienteTel,etiquetaImg:etiqueta});
+    if(!vf) return;
     setUltima(vf);setShowOk(true);setShowPago(false);
     autoDescargarNota(vf);
     setCarrito([]);setDescExtra(0);setDescMarcaManual({});setBusq("");setEtiqueta(null);setCliente("");setClienteTel("");

@@ -53451,6 +53451,7 @@
     return _hostEsProduccion();
   }
   var ESCRITURA_NUBE_OK = puedeEscribirNube();
+  var CAJA_APERTURA_OBLIGATORIA = false;
   if (!ESCRITURA_NUBE_OK && typeof console !== "undefined") {
     console.warn("[BARRERA] Copia NO productiva: las escrituras a la nube est\xE1n DESACTIVADAS. Nada de lo que hagas ac\xE1 toca la base real de Toscana.");
   }
@@ -53651,6 +53652,7 @@
       const mesVenta = mesFecha >= 1 && mesFecha <= 12 ? mesFecha - 1 : venta.mes;
       const mkVenta = mesFecha >= 1 && mesFecha <= 12 ? `${fechaPartes[1]}-${fechaPartes[2]}` : venta.mk;
       const db = await getSupabase();
+      const pagosVenta = parsePago(venta.metodoPago, Number(venta.total) || 0);
       const { error: errVenta } = await db.from("ventas").upsert({
         id: venta.id,
         fecha: venta.fecha,
@@ -53662,6 +53664,11 @@
         subtotal: venta.subtotal,
         desc_pct: venta.descPct || 0,
         metodo_pago: venta.metodoPago,
+        efectivo: pagosVenta.efectivo,
+        qr: pagosVenta.qr,
+        tarjeta: pagosVenta.tarjeta,
+        gc_usado: pagosVenta.giftcard,
+        ...venta.cajaTurnoId ? { caja_turno_id: venta.cajaTurnoId } : {},
         vendedor: venta.vendedor,
         etiqueta_img: venta.etiquetaImg || null,
         cliente_nombre: venta.clienteNombre || null,
@@ -54572,6 +54579,7 @@
     }
   }
   var TH_OUTBOX_KEY = "th_sync_outbox";
+  var _ventasEnVuelo = 0;
   function getOutbox() {
     try {
       return JSON.parse(localStorage.getItem(TH_OUTBOX_KEY) || "[]");
@@ -62335,6 +62343,178 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       WebkitTapHighlightColor: "transparent"
     } }, "Confirmar Cierre"))))));
   }
+  function cajaPDF(turno, movimientos) {
+    const jsPDF = window.jspdf?.jsPDF;
+    if (!jsPDF) throw new Error("No carg\xF3 el generador de PDF");
+    if (turno.estado !== "cerrado" || !turno.cierre_resumen) throw new Error("El turno todav\xEDa no est\xE1 cerrado");
+    const doc = new jsPDF({ unit: "mm", format: "a4" });
+    let y = 18;
+    const line = (label, value, bold = false) => {
+      if (y > 275) {
+        doc.addPage();
+        y = 18;
+      }
+      doc.setFont("helvetica", bold ? "bold" : "normal");
+      doc.setFontSize(bold ? 11 : 9);
+      doc.text(`${label}: ${value}`, 15, y);
+      y += bold ? 8 : 6;
+    };
+    const n = (x) => `Bs ${Number(x || 0).toFixed(2)}`;
+    const r = turno.cierre_resumen, v = r.ventas || {}, m = r.movimientos || {};
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(16);
+    doc.text("TOSCANA HOUSE - CIERRE DE CAJA", 15, y);
+    y += 10;
+    line("Turno", turno.id);
+    line("Abri\xF3", `${turno.abierto_usuario} - ${new Date(turno.abierto_at).toLocaleString("es-BO")}`);
+    line("Cerr\xF3", `${turno.cerrado_usuario} - ${new Date(turno.cerrado_at).toLocaleString("es-BO")}`);
+    y += 3;
+    line("ARQUEO", "", true);
+    line("Efectivo inicial", n(r.apertura));
+    line("Ventas", `${v.cantidad || 0} - ${n(v.total)}`);
+    line("Efectivo recibido", n(v.efectivo));
+    line("QR", n(v.qr));
+    line("Tarjeta", n(v.tarjeta));
+    line("Gift card utilizada", n(v.giftcard));
+    line("Aportes", n(m.aportes));
+    line("Retiros", n(m.retiros));
+    line("Efectivo esperado", n(r.esperado), true);
+    line("Efectivo contado", n(r.contado), true);
+    line("Diferencia", n(r.diferencia), true);
+    y += 4;
+    line("MOVIMIENTOS DEL CAJ\xD3N", "", true);
+    (movimientos || []).forEach((x) => line(
+      `${new Date(x.creado_at).toLocaleString("es-BO")} ${x.tipo.toUpperCase()}`,
+      `${n(x.monto)} - ${x.destinatario} - ${x.motivo}`.slice(0, 80)
+    ));
+    doc.setFontSize(8);
+    doc.text("Registro hist\xF3rico del turno. No sustituye la factura fiscal.", 15, 288);
+    return doc;
+  }
+  async function cajaGuardarPDF(turno, movimientos) {
+    if (!ESCRITURA_NUBE_OK) throw new Error("Copia local: no se guarda en producci\xF3n");
+    const db = await getSupabase();
+    const doc = cajaPDF(turno, movimientos);
+    const path = `${turno.id}.pdf`;
+    const { error } = await db.storage.from("caja-cierres").upload(
+      path,
+      doc.output("blob"),
+      { contentType: "application/pdf", upsert: false }
+    );
+    if (error && !/already exists|duplicate/i.test(error.message || "")) throw error;
+    return path;
+  }
+  async function cajaAbrirPDF(turno, movimientos) {
+    const db = await getSupabase();
+    const { data, error } = await db.storage.from("caja-cierres").download(`${turno.id}.pdf`);
+    if (error || !data) {
+      const doc = cajaPDF(turno, movimientos);
+      if (ESCRITURA_NUBE_OK) await cajaGuardarPDF(turno, movimientos);
+      doc.save(`Cierre_Caja_${turno.id.slice(0, 8)}.pdf`);
+      return;
+    }
+    const url = URL.createObjectURL(data);
+    const link = document.createElement("a");
+    link.href = url;
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 6e4);
+  }
+  function CajaTurnosPanel({ user, turno, onTurnoChange, onGoPos }) {
+    const [lista, setLista] = (0, import_react.useState)([]);
+    const [histLimite, setHistLimite] = (0, import_react.useState)(60);
+    const [movimientos, setMovimientos] = (0, import_react.useState)([]);
+    const [resumen, setResumen] = (0, import_react.useState)(null);
+    const [apertura, setApertura] = (0, import_react.useState)("");
+    const [contado, setContado] = (0, import_react.useState)("");
+    const [tipo, setTipo] = (0, import_react.useState)("retiro");
+    const [monto, setMonto] = (0, import_react.useState)("");
+    const [destinatario, setDestinatario] = (0, import_react.useState)("");
+    const [motivo, setMotivo] = (0, import_react.useState)("");
+    const [busy, setBusy] = (0, import_react.useState)(false);
+    const [error, setError] = (0, import_react.useState)("");
+    const money = (x) => `Bs ${Number(x || 0).toFixed(2)}`;
+    const validarMonto = (s, permiteCero = false) => /^\d+(?:\.\d{1,2})?$/.test(String(s).trim()) && Number(s) >= (permiteCero ? 0 : 0.01);
+    async function refrescar() {
+      const db = await getSupabase();
+      const { data, error: e } = await db.from("th_caja_turnos").select("*").order("abierto_at", { ascending: false }).limit(histLimite);
+      if (e) throw e;
+      setLista(data || []);
+      onTurnoChange((data || []).find((x) => x.estado === "abierto") || null);
+      if (turno?.id) {
+        const { data: mov, error: em } = await db.from("th_caja_movimientos").select("*").eq("turno_id", turno.id).order("creado_at");
+        if (em) throw em;
+        setMovimientos(mov || []);
+        const { data: r, error: er } = await db.rpc("caja_resumen", { p_turno: turno.id });
+        if (er) throw er;
+        setResumen(r);
+      } else {
+        setMovimientos([]);
+        setResumen(null);
+      }
+    }
+    (0, import_react.useEffect)(() => {
+      refrescar().catch((e) => setError(e.message || "No se pudo leer caja"));
+    }, [turno?.id, histLimite]);
+    async function ejecutar(fn) {
+      setBusy(true);
+      setError("");
+      try {
+        await fn();
+        await refrescar();
+      } catch (e) {
+        setError(e.message || "No se pudo completar la operaci\xF3n");
+      } finally {
+        setBusy(false);
+      }
+    }
+    const inp = { padding: "10px 12px", borderRadius: 9, border: `1px solid ${C.sep}`, fontSize: 14, background: C.bg2, color: C.label };
+    const btn = { padding: "11px 16px", border: 0, borderRadius: 10, background: C.gold, color: "#fff", fontWeight: 700, cursor: "pointer" };
+    return /* @__PURE__ */ import_react.default.createElement("div", { style: { maxWidth: 780, margin: "auto", fontFamily: FONT } }, /* @__PURE__ */ import_react.default.createElement("h2", { style: { color: C.label } }, "Caja por turnos"), /* @__PURE__ */ import_react.default.createElement("p", { style: { color: C.label3 } }, "Una caja f\xEDsica \xB7 turno ma\xF1ana 10:00\u201314:30 \xB7 turno tarde desde 14:30. Cada cambio exige cierre y nueva apertura."), error && /* @__PURE__ */ import_react.default.createElement("div", { role: "alert", style: { padding: 12, background: "#FDECEC", color: "#9C2525", borderRadius: 10, marginBottom: 12 } }, error), !turno ? /* @__PURE__ */ import_react.default.createElement("div", { style: { padding: 20, background: C.bg2, borderRadius: 14, border: `1px solid ${C.sep}` } }, /* @__PURE__ */ import_react.default.createElement("h3", null, "Iniciar nuevo turno"), /* @__PURE__ */ import_react.default.createElement("p", null, "Cont\xE1 el efectivo que recib\xEDs, incluida la caja chica. Abrir\xE1 con tu usuario: ", user.nombre, "."), /* @__PURE__ */ import_react.default.createElement("input", { "aria-label": "Efectivo recibido", type: "number", min: "0", step: "0.01", value: apertura, onChange: (e) => setApertura(e.target.value), style: inp, placeholder: "Efectivo recibido Bs" }), /* @__PURE__ */ import_react.default.createElement("button", { disabled: busy || !validarMonto(apertura, true), onClick: () => ejecutar(async () => {
+      const db = await getSupabase();
+      const { data, error: e } = await db.rpc("caja_abrir", { p_efectivo: Number(apertura) });
+      if (e) throw e;
+      onTurnoChange(data);
+      setApertura("");
+    }), style: { ...btn, marginLeft: 8, opacity: busy || !validarMonto(apertura, true) ? 0.5 : 1 } }, "Abrir caja")) : /* @__PURE__ */ import_react.default.createElement("div", { style: { padding: 20, background: C.bg2, borderRadius: 14, border: `1px solid ${C.sep}` } }, /* @__PURE__ */ import_react.default.createElement("h3", null, "Turno abierto \xB7 ", turno.abierto_usuario), /* @__PURE__ */ import_react.default.createElement("p", null, "Desde ", new Date(turno.abierto_at).toLocaleString("es-BO"), " \xB7 Fondo inicial ", money(turno.efectivo_apertura)), /* @__PURE__ */ import_react.default.createElement("button", { style: btn, onClick: onGoPos }, "Ir a cobrar"), /* @__PURE__ */ import_react.default.createElement("button", { style: { ...btn, marginLeft: 8, background: C.label3 }, onClick: () => refrescar().catch((e) => setError(e.message)) }, "Actualizar arqueo"), resumen && /* @__PURE__ */ import_react.default.createElement("div", { style: { marginTop: 18, lineHeight: 1.8 } }, /* @__PURE__ */ import_react.default.createElement("b", null, "Ventas:"), " ", resumen.ventas?.cantidad || 0, " \xB7 ", money(resumen.ventas?.total), /* @__PURE__ */ import_react.default.createElement("br", null), /* @__PURE__ */ import_react.default.createElement("b", null, "Efectivo:"), " ", money(resumen.ventas?.efectivo), " \xB7 ", /* @__PURE__ */ import_react.default.createElement("b", null, "QR:"), " ", money(resumen.ventas?.qr), " \xB7 ", /* @__PURE__ */ import_react.default.createElement("b", null, "Tarjeta:"), " ", money(resumen.ventas?.tarjeta), " \xB7 ", /* @__PURE__ */ import_react.default.createElement("b", null, "Gift card:"), " ", money(resumen.ventas?.giftcard), /* @__PURE__ */ import_react.default.createElement("br", null), /* @__PURE__ */ import_react.default.createElement("b", null, "Aportes:"), " ", money(resumen.movimientos?.aportes), " \xB7 ", /* @__PURE__ */ import_react.default.createElement("b", null, "Retiros:"), " ", money(resumen.movimientos?.retiros), /* @__PURE__ */ import_react.default.createElement("br", null), /* @__PURE__ */ import_react.default.createElement("b", null, "Efectivo esperado:"), " ", money(resumen.esperado)), /* @__PURE__ */ import_react.default.createElement("h4", null, "Movimiento de efectivo"), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 8 } }, /* @__PURE__ */ import_react.default.createElement("select", { "aria-label": "Tipo de movimiento", value: tipo, onChange: (e) => setTipo(e.target.value), style: inp }, /* @__PURE__ */ import_react.default.createElement("option", { value: "retiro" }, "Retiro"), /* @__PURE__ */ import_react.default.createElement("option", { value: "aporte" }, "Aporte")), /* @__PURE__ */ import_react.default.createElement("input", { "aria-label": "Monto", type: "number", min: "0.01", step: "0.01", value: monto, onChange: (e) => setMonto(e.target.value), style: inp, placeholder: "Monto Bs" }), /* @__PURE__ */ import_react.default.createElement("input", { "aria-label": "Destinatario", value: destinatario, onChange: (e) => setDestinatario(e.target.value), style: inp, placeholder: "Recibe / entrega" }), /* @__PURE__ */ import_react.default.createElement("input", { "aria-label": "Motivo", value: motivo, onChange: (e) => setMotivo(e.target.value), style: inp, placeholder: "Motivo" }), /* @__PURE__ */ import_react.default.createElement("button", { disabled: busy || !validarMonto(monto) || !destinatario.trim() || !motivo.trim(), style: btn, onClick: () => ejecutar(async () => {
+      const db = await getSupabase();
+      const { error: e } = await db.rpc("caja_movimiento", {
+        p_turno: turno.id,
+        p_tipo: tipo,
+        p_monto: Number(monto),
+        p_destinatario: destinatario,
+        p_motivo: motivo
+      });
+      if (e) throw e;
+      setMonto("");
+      setDestinatario("");
+      setMotivo("");
+    }) }, "Registrar")), movimientos.map((x) => /* @__PURE__ */ import_react.default.createElement("div", { key: x.id, style: { padding: "7px 0", borderBottom: `1px solid ${C.sep}`, fontSize: 12 } }, new Date(x.creado_at).toLocaleString("es-BO"), " \xB7 ", x.tipo, " ", money(x.monto), " \xB7 ", x.destinatario, " \xB7 ", x.motivo)), /* @__PURE__ */ import_react.default.createElement("h4", null, "Cierre y entrega del turno"), /* @__PURE__ */ import_react.default.createElement("p", null, "Cont\xE1 el efectivo f\xEDsico. Si hay diferencia, queda registrada; no cambies el valor para forzar el cuadre. Confirm\xE1 que los dem\xE1s equipos hayan sincronizado sus ventas."), /* @__PURE__ */ import_react.default.createElement("input", { "aria-label": "Efectivo contado", type: "number", min: "0", step: "0.01", value: contado, onChange: (e) => setContado(e.target.value), style: inp, placeholder: "Efectivo contado Bs" }), /* @__PURE__ */ import_react.default.createElement("button", { disabled: busy || !validarMonto(contado, true), style: { ...btn, marginLeft: 8, background: "#752424" }, onClick: () => ejecutar(async () => {
+      if (_ventasEnVuelo > 0) throw new Error("Hay ventas todav\xEDa sincroniz\xE1ndose. Esper\xE1 unos segundos y reintent\xE1 el cierre.");
+      await procesarOutbox();
+      const pendientes = getOutbox().filter((o) => ["venta", "anularVenta"].includes(o.tipo));
+      if (pendientes.length) throw new Error(`${pendientes.length} ventas locales siguen sin sincronizar. No se puede cerrar todav\xEDa.`);
+      if (!window.confirm("\xBFConfirm\xE1s el efectivo contado y el cierre de este turno? Esta acci\xF3n no se puede deshacer.")) return;
+      const db = await getSupabase();
+      const { data, error: e } = await db.rpc("caja_cerrar", { p_turno: turno.id, p_contado: Number(contado) });
+      if (e) throw e;
+      onTurnoChange(null);
+      setContado("");
+      try {
+        await cajaGuardarPDF(data, movimientos);
+      } catch (pdfError) {
+        setError(`Turno cerrado. El PDF no se guard\xF3 a\xFAn: ${pdfError.message}. Us\xE1 el historial para reintentarlo.`);
+      }
+    }) }, "Cerrar turno y guardar PDF")), /* @__PURE__ */ import_react.default.createElement("h3", { style: { marginTop: 25 } }, "Historial de cierres"), lista.filter((x) => x.estado === "cerrado").map((x) => /* @__PURE__ */ import_react.default.createElement("div", { key: x.id, style: { padding: 12, marginBottom: 8, background: C.bg2, borderRadius: 10, display: "flex", justifyContent: "space-between", gap: 10 } }, /* @__PURE__ */ import_react.default.createElement("span", null, new Date(x.abierto_at).toLocaleString("es-BO"), " \xB7 ", x.abierto_usuario, " \u2192 ", x.cerrado_usuario, /* @__PURE__ */ import_react.default.createElement("br", null), /* @__PURE__ */ import_react.default.createElement("small", null, "Contado ", money(x.efectivo_contado), " \xB7 Diferencia ", money(x.cierre_resumen?.diferencia))), /* @__PURE__ */ import_react.default.createElement("button", { style: btn, onClick: () => ejecutar(async () => {
+      const db = await getSupabase();
+      const { data, error: e } = await db.from("th_caja_movimientos").select("*").eq("turno_id", x.id).order("creado_at");
+      if (e) throw e;
+      await cajaAbrirPDF(x, data || []);
+    }) }, "Ver PDF"))), lista.length >= histLimite && /* @__PURE__ */ import_react.default.createElement("button", { style: btn, onClick: () => setHistLimite((n) => n + 60) }, "Ver cierres anteriores"));
+  }
   function generarPlanillaAlquileres(ventas, mes, anio) {
     const MK = `${mes}-${anio}`;
     const vMes = ventas.filter((v) => v.mes === mes && v.anio === anio && !v.anulada);
@@ -69984,6 +70164,35 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
     const sync = useSyncStatus();
     const now = /* @__PURE__ */ new Date();
     const [tab, setTab] = (0, import_react.useState)("inicio");
+    const [cajaTurno, setCajaTurno] = (0, import_react.useState)(null);
+    const [cajaCargando, setCajaCargando] = (0, import_react.useState)(true);
+    const [cajaError, setCajaError] = (0, import_react.useState)("");
+    (0, import_react.useEffect)(() => {
+      if (!user || !["caja", "admin"].includes(user.rol)) return;
+      let activo = true;
+      setCajaCargando(true);
+      getSupabase().then(async (db) => {
+        const { data, error } = await db.from("th_caja_turnos").select("*").eq("estado", "abierto").maybeSingle();
+        if (!activo) return;
+        if (error) {
+          setCajaError(error.message);
+          setCajaTurno(null);
+        } else {
+          setCajaError("");
+          setCajaTurno(data || null);
+        }
+        setCajaCargando(false);
+      }).catch((e) => {
+        if (activo) {
+          setCajaError(e.message);
+          setCajaCargando(false);
+        }
+      });
+      if (user.rol === "caja" && CAJA_APERTURA_OBLIGATORIA) setTab("th_caja_turnos");
+      return () => {
+        activo = false;
+      };
+    }, [user?.usuario]);
     const [inv, setInv] = (0, import_react.useState)(() => {
       try {
         return JSON.parse(localStorage.getItem("th_inv") || "[]");
@@ -71348,11 +71557,15 @@ Esta acci\xF3n no se puede deshacer.` : "\xBFEliminar esta carga? Esta acci\xF3n
       return { ok, fail, total: productos.length };
     }
     function handleVenta(v) {
+      if (CAJA_APERTURA_OBLIGATORIA && !cajaTurno?.id) {
+        alert("Primero abr\xED un turno de caja para registrar la venta.");
+        return null;
+      }
       const id = `V${Date.now()}`;
       const fechaVenta = hoy();
       const [anioVenta, mesISO] = fechaVenta.split("-").map(Number);
       const mesVenta = mesISO - 1;
-      const vf = { ...v, id, fecha: fechaVenta, hora: hora(), mk: mkKey(mesVenta, anioVenta), mes: mesVenta, anio: anioVenta };
+      const vf = { ...v, id, fecha: fechaVenta, hora: hora(), mk: mkKey(mesVenta, anioVenta), mes: mesVenta, anio: anioVenta, cajaTurnoId: cajaTurno.id };
       if (mes !== mesVenta) setMes(mesVenta);
       if (anio !== anioVenta) setAnio(anioVenta);
       setVentas((p) => [...p, vf]);
@@ -71365,7 +71578,10 @@ Esta acci\xF3n no se puede deshacer.` : "\xBFEliminar esta carga? Esta acci\xF3n
         stockCambios.push({ prodId: it.prodId, codigo: it.codigo, nombre: it.nombre, stockAntes, stockDespues });
       });
       drive.syncVenta(vf);
-      syncConRespaldo("venta", vf, () => sbGuardarVenta(vf));
+      _ventasEnVuelo++;
+      syncConRespaldo("venta", vf, () => sbGuardarVenta(vf)).finally(() => {
+        _ventasEnVuelo = Math.max(0, _ventasEnVuelo - 1);
+      });
       const marcas = [...new Set(v.items.map((i) => i.marcaNombre))].join(", ");
       logAudit("VENTA", {
         resumen: `Venta Bs ${v.total} \xB7 ${v.items.length} \xEDtem(s) \xB7 ${marcas}`,
@@ -71565,6 +71781,7 @@ Esta acci\xF3n no se puede deshacer.` : "\xBFEliminar esta carga? Esta acci\xF3n
     }, [ventas]);
     const TABS_ALL = [
       { id: "inicio", icon: "\u229E", label: "Inicio" },
+      { id: "th_caja_turnos", icon: "\u25A3", label: "Turnos" },
       { id: "pos", icon: "\u2295", label: "Caja" },
       { id: "ventas", icon: "\u25C8", label: "Ventas" },
       { id: "clientes", icon: "\u25D0", label: "Clientes" },
@@ -71578,7 +71795,7 @@ Esta acci\xF3n no se puede deshacer.` : "\xBFEliminar esta carga? Esta acci\xF3n
       { id: "ventas_ant", icon: "\u23F1", label: "V.Antiguas" },
       { id: "config", icon: "\u2699", label: "Config" }
     ];
-    const TABS = user?.rol === "caja" ? TABS_ALL.filter((t) => ["inicio", "pos", "ventas", "clientes", "cambios", "inventario", "auditoria", "config"].includes(t.id)) : user?.rol === "admin" ? TABS_ALL : TABS_ALL.filter((t) => t.id !== "auditoria" && t.id !== "cargas" && t.id !== "ventas_ant");
+    const TABS = user?.rol === "caja" ? TABS_ALL.filter((t) => ["inicio", "th_caja_turnos", "pos", "ventas", "clientes", "cambios", "inventario", "auditoria", "config"].includes(t.id)) : user?.rol === "admin" ? TABS_ALL : TABS_ALL.filter((t) => t.id !== "auditoria" && t.id !== "cargas" && t.id !== "ventas_ant" && t.id !== "th_caja_turnos");
     const showingDetail = tab === "marcas" && marcaDetalle;
     if (!authReady) return /* @__PURE__ */ import_react.default.createElement("div", { style: {
       minHeight: "100vh",
@@ -71772,7 +71989,15 @@ Esta acci\xF3n no se puede deshacer.` : "\xBFEliminar esta carga? Esta acci\xF3n
         descuentos,
         descCodigos
       }
-    ), tab === "pos" && /* @__PURE__ */ import_react.default.createElement(POSContainer, { inv, onVenta: handleVenta, retiros, onRetiro: registrarRetiro, onRetiroBatch: registrarRetiroBatch, onAnularRetiro: anularRetiro, onVerNota: (v) => setVentaDetalle(v), user, descuentos, descCodigos, onCambioPrecio: handleEditarProducto, permPrecio: permPrecioStaff }), tab === "inventario" && /* @__PURE__ */ import_react.default.createElement(InventarioPorMarca, { inv, ventas, retiros, bajas: bajasLog, onRecibir: () => setShInv(true), onBaja: () => {
+    ), tab === "pos" && (!CAJA_APERTURA_OBLIGATORIA || cajaTurno ? /* @__PURE__ */ import_react.default.createElement(POSContainer, { inv, onVenta: handleVenta, retiros, onRetiro: registrarRetiro, onRetiroBatch: registrarRetiroBatch, onAnularRetiro: anularRetiro, onVerNota: (v) => setVentaDetalle(v), user, descuentos, descCodigos, onCambioPrecio: handleEditarProducto, permPrecio: permPrecioStaff }) : /* @__PURE__ */ import_react.default.createElement("div", { style: { padding: 24, background: C.bg2, borderRadius: 14 } }, /* @__PURE__ */ import_react.default.createElement("h3", null, cajaCargando ? "Verificando el turno de caja\u2026" : "Primero abr\xED la caja"), /* @__PURE__ */ import_react.default.createElement("p", null, cajaError || "Para cobrar, registr\xE1 el efectivo recibido e inici\xE1 el turno."), /* @__PURE__ */ import_react.default.createElement(IOSBtn, { onPress: () => setTab("th_caja_turnos"), variant: "fill" }, "Ir a turnos"))), tab === "th_caja_turnos" && /* @__PURE__ */ import_react.default.createElement(
+      CajaTurnosPanel,
+      {
+        user,
+        turno: cajaTurno,
+        onTurnoChange: setCajaTurno,
+        onGoPos: () => setTab("pos")
+      }
+    ), tab === "inventario" && /* @__PURE__ */ import_react.default.createElement(InventarioPorMarca, { inv, ventas, retiros, bajas: bajasLog, onRecibir: () => setShInv(true), onBaja: () => {
       setShBaja(true);
       setBajaMsg(null);
       setBajaCod("");
@@ -73199,17 +73424,6 @@ ${sinStock.map((it) => {
         }
         const gcAllocations = calcGCAllocations(items, total, gcUsado);
         const metodoPagoFinal2 = extraMonto <= 0.01 ? "giftcard" : `mixto|giftcard:${gcUsado}|${metodoCompl}:${extraMonto}`;
-        const gcLista = cargarGC();
-        guardarGC(gcLista.map((g) => g.codigo !== gcEncontrado.codigo ? g : {
-          ...g,
-          saldo: +(g.saldo - gcUsado).toFixed(2),
-          ultimoUso: hoy(),
-          usos: [...g.usos || [], {
-            fecha: hoy(),
-            monto: gcUsado,
-            nota: `Venta POS \u2014 ${items.length} prod.`
-          }]
-        }));
         const vf2 = onVenta({
           items,
           total,
@@ -73224,6 +73438,18 @@ ${sinStock.map((it) => {
           gcUsado,
           gcAllocations
         });
+        if (!vf2) return;
+        const gcLista = cargarGC();
+        guardarGC(gcLista.map((g) => g.codigo !== gcEncontrado.codigo ? g : {
+          ...g,
+          saldo: +(g.saldo - gcUsado).toFixed(2),
+          ultimoUso: hoy(),
+          usos: [...g.usos || [], {
+            fecha: hoy(),
+            monto: gcUsado,
+            nota: `Venta POS \u2014 ${items.length} prod.`
+          }]
+        }));
         setUltima(vf2);
         setShowOk(true);
         setShowPago(false);
@@ -73258,6 +73484,7 @@ ${sinStock.map((it) => {
         metodoPagoFinal = partes.length > 0 ? "mixto|" + partes.join("|") : pago;
       }
       const vf = onVenta({ items, total, subtotal, descPct, metodoPago: metodoPagoFinal, vendedor: vendedor || "Tienda", clienteNombre: cliente, clienteTelefono: clienteTel, etiquetaImg: etiqueta });
+      if (!vf) return;
       setUltima(vf);
       setShowOk(true);
       setShowPago(false);
