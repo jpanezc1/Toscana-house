@@ -7,7 +7,9 @@ app = app.replace(/^import .+\n/gm, "");
 const main = `import React, { useState, useMemo, useRef, useCallback, useEffect } from "react";
 import { createRoot } from "react-dom/client";
 import * as __XLSXBundled from "xlsx";
+import { jsPDF as __jsPDFBundled } from "jspdf";
 if (typeof window !== "undefined") window.__XLSXBundled = __XLSXBundled;
+if (typeof window !== "undefined") window.jspdf = { jsPDF: __jsPDFBundled };
 ${app}
 const root = createRoot(document.getElementById("root"));
 root.render(React.createElement(App));
@@ -18,7 +20,7 @@ fs.writeFileSync("main.jsx", main);
 const v = Date.now();
 
 // Eliminar bundles anteriores
-fs.readdirSync(".").filter(f=>/^bundle-\d+\.js$/.test(f)).forEach(f=>fs.unlinkSync(f));
+fs.readdirSync(".").filter(f=>/^bundle-\d+\.js(?:\.LEGAL\.txt)?$/.test(f)).forEach(f=>fs.unlinkSync(f));
 
 // ── Compilar bundle con nombre versionado ─────────────────────────────────────
 esbuild.buildSync({
@@ -29,8 +31,17 @@ esbuild.buildSync({
   jsx: "transform",
   platform: "browser",
   target: "es2020",
-  minify: false,
+  minifyWhitespace: true,
+  minifyIdentifiers: false,
+  minifySyntax: false,
+  legalComments: "external",
 });
+// esbuild copia avisos legales de dependencias; normalizar espacios al final
+// evita diffs ruidosos sin alterar su contenido ni su atribución.
+const legalFile = `bundle-${v}.js.LEGAL.txt`;
+if (fs.existsSync(legalFile)) {
+  fs.writeFileSync(legalFile, fs.readFileSync(legalFile, "utf8").replace(/[ \t]+$/gm, ""));
+}
 
 // ── PWA Manifest ──────────────────────────────────────────────────────────────
 const manifest = {
@@ -330,7 +341,6 @@ const html = `<!DOCTYPE html>
     })();
   </script>
   <!-- jsPDF: generación de notas de venta en PDF nativo (ligero, nítido) -->
-  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
   <script src="bundle-${v}.js"></script>
   <!-- Service worker: permite instalar la app y seguir usándola sin internet -->
   <script>

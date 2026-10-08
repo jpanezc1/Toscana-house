@@ -73,9 +73,9 @@ function puedeEscribirNube(){
   return _hostEsProduccion();
 }
 const ESCRITURA_NUBE_OK = puedeEscribirNube();
-// Activar únicamente tras prueba aislada de apertura, dos turnos, cierre y PDF.
-// Mientras tanto, el POS existente conserva continuidad operativa.
-const CAJA_APERTURA_OBLIGATORIA = false;
+// Caja física por turnos: la primera venta exige un turno autenticado.
+// Las pruebas de este flujo usan datos sintéticos, nunca ventas reales.
+const CAJA_APERTURA_OBLIGATORIA = true;
 if(!ESCRITURA_NUBE_OK && typeof console!=="undefined"){
   console.warn("[BARRERA] Copia NO productiva: las escrituras a la nube están DESACTIVADAS. Nada de lo que hagas acá toca la base real de Toscana.");
 }
@@ -593,8 +593,29 @@ async function sbGuardarUsuarios(lista) {
 async function sbActualizarPassword(usuario, password) {
   try {
     const db = await getSupabase();
-    const { error } = await db.from("usuarios").update({ password }).eq("usuario", usuario);
-    if (error) throw error;
+    const {data:target,error:targetError}=await db.from("usuarios")
+      .select("auth_id,rol").eq("usuario",usuario).maybeSingle();
+    if(targetError||!target) throw targetError||new Error("Usuario inexistente");
+    if(target.auth_id && ["admin","caja"].includes(target.rol)){
+      const {data:{session}}=await db.auth.getSession();
+      if(!session) throw new Error("Se requiere sesión autenticada");
+      if(session.user.id===target.auth_id){
+        const {error}=await db.auth.updateUser({password});
+        if(error) throw error;
+      }else{
+        const {data,error}=await db.functions.invoke("admin-usuario",{body:{
+          action:"reset_password",usuario,password,operationId:crypto.randomUUID()
+        }});
+        if(error||!data?.ok) throw error||new Error(data?.error||"No se pudo actualizar la contraseña");
+      }
+      // El equipo de caja ya no utiliza contraseñas en texto plano.
+      const {error:cleanError}=await db.from("usuarios").update({password:null}).eq("usuario",usuario);
+      if(cleanError) console.warn("La credencial Auth cambió, pero no se limpió la columna heredada:",cleanError.message);
+    }else{
+      // Compatibilidad temporal del portal de marcas que aún no usa Auth.
+      const {error}=await db.from("usuarios").update({password}).eq("usuario",usuario);
+      if(error) throw error;
+    }
     return true;
   } catch(e) { console.warn("Supabase update password:", e.message); return false; }
 }
@@ -1064,6 +1085,7 @@ async function sbCargarAuditLog() {
 // ════════════════════════════════════════════════════════════
 const TH_OUTBOX_KEY = "th_sync_outbox";
 let _ventasEnVuelo = 0; // evita cerrar mientras una venta aún no entró al outbox
+let _ventaConfirmando = false; // evita doble click durante verificación del turno
 
 function getOutbox(){
   try{ return JSON.parse(localStorage.getItem(TH_OUTBOX_KEY)||"[]"); }catch{ return []; }
@@ -6613,9 +6635,7 @@ function LiqModal({marcaId,ventas,mes,anio,MK,cierres,setCierres,onClose,syncCie
 // Para agregar usuarios: {usuario, password, nombre, rol}
 // rol: "admin" (acceso total) | "caja" (solo POS y ventas)
 const USUARIOS = [
-  { usuario: "toscana",  password: "casa2024",    nombre: "Toscana House",  rol: "admin" },
-  { usuario: "caja",     password: "caja2024",    nombre: "Vendedor Caja",  rol: "caja"  },
-  { usuario: "tatiana",  password: "toscana2024", nombre: "Tatiana",        rol: "admin" },
+  { usuario: "toscana",  nombre: "Toscana House",  rol: "admin" },
 ];
 function useAuth() {
   var _hN108 = useState(null); var user = _hN108[0]; var setUser = _hN108[1];
@@ -6661,10 +6681,6 @@ function useAuth() {
 
     // Respaldo local mientras Supabase Auth se estabiliza
     const FALLBACK = [
-      { usuario:"toscana",  password:"casa2024",    nombre:"Carolina Granier", rol:"admin" },
-      { usuario:"caja",     password:"caja2024",    nombre:"Vendedor Caja",    rol:"caja"  },
-      { usuario:"tatiana",  password:"toscana2024", nombre:"Tatiana",          rol:"admin" },
-      { usuario:"jpanezc",  password:"123456",      nombre:"Juan Pablo Anez",  rol:"admin" },
       { usuario:"juanpa",   password:"123456",      nombre:"Jp",               rol:"marca" },
     ];
 
@@ -6686,7 +6702,9 @@ function useAuth() {
     } catch(e) {}
 
     // Si Supabase Auth falla, verificar contra lista local
-    const found = FALLBACK.find(u => u.usuario === uLow && u.password === pass);
+    // Los roles que operan caja requieren JWT real: una contraseña local no
+    // autoriza aperturas, retiros ni cierres en el libro protegido.
+    const found = FALLBACK.find(u => u.rol === "marca" && u.usuario === uLow && u.password === pass);
     if (found) {
       setUser({ ...found, loginAt: Date.now() });
       return { ok: true };
@@ -6700,7 +6718,7 @@ function useAuth() {
       const db = await getSupabase();
       const { data } = await db.from("usuarios").select("usuario,nombre,rol,estado,marca_id,password")
         .eq("usuario", uLow).single();
-      if (data && data.estado !== "inactivo" && data.password && data.password === pass) {
+      if (data && data.rol === "marca" && data.estado !== "inactivo" && data.password && data.password === pass) {
         setUser({ usuario:data.usuario, nombre:data.nombre, rol:data.rol,
           estado:data.estado, marcaId:data.marca_id, loginAt:Date.now() });
         return { ok: true };
@@ -8437,7 +8455,8 @@ function cajaPDF(turno, movimientos){
   line("Turno",turno.id); line("Abrió",`${turno.abierto_usuario} - ${new Date(turno.abierto_at).toLocaleString("es-BO")}`);
   line("Cerró",`${turno.cerrado_usuario} - ${new Date(turno.cerrado_at).toLocaleString("es-BO")}`);
   y+=3; line("ARQUEO", "", true);
-  line("Efectivo inicial",n(r.apertura)); line("Ventas",`${v.cantidad||0} - ${n(v.total)}`);
+  line("Efectivo inicial",n(r.apertura)); line("Ventas válidas",`${v.cantidad||0} - ${n(v.total)}`);
+  line("Ventas anuladas (no sumadas)",`${v.anuladas_cantidad||0} - ${n(v.anuladas_total)}`);
   line("Efectivo recibido",n(v.efectivo)); line("QR",n(v.qr));
   line("Tarjeta",n(v.tarjeta)); line("Gift card utilizada",n(v.giftcard));
   line("Aportes",n(m.aportes)); line("Retiros",n(m.retiros));
@@ -8478,7 +8497,25 @@ async function cajaAbrirPDF(turno,movimientos){
   document.body.appendChild(link); link.click(); link.remove();
   setTimeout(()=>URL.revokeObjectURL(url),60000);
 }
-function CajaTurnosPanel({user,turno,onTurnoChange,onGoPos}){
+async function cajaCompartirPDF(turno,movimientos){
+  const db=await getSupabase();
+  let {data,error}=await db.storage.from("caja-cierres").download(`${turno.id}.pdf`);
+  if(error||!data){
+    data=cajaPDF(turno,movimientos).output("blob");
+    if(ESCRITURA_NUBE_OK) await cajaGuardarPDF(turno,movimientos);
+  }
+  const file=new File([data],`Cierre_Caja_${turno.id.slice(0,8)}.pdf`,{type:"application/pdf"});
+  if(navigator.share && (!navigator.canShare||navigator.canShare({files:[file]}))){
+    try{await navigator.share({files:[file],title:"Cierre de caja Toscana House"});return;}
+    catch(e){if(e.name==="AbortError") return;}
+  }
+  const url=URL.createObjectURL(file);
+  const link=document.createElement("a");
+  link.href=url;link.download=file.name;
+  document.body.appendChild(link);link.click();link.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),60000);
+}
+function CajaTurnosPanel({user,turno,cargando,onTurnoChange,onGoPos}){
   const [lista,setLista]=useState([]);
   const [histLimite,setHistLimite]=useState(60);
   const [movimientos,setMovimientos]=useState([]);
@@ -8511,7 +8548,8 @@ function CajaTurnosPanel({user,turno,onTurnoChange,onGoPos}){
   useEffect(()=>{refrescar().catch(e=>setError(e.message||"No se pudo leer caja"));},[turno?.id,histLimite]);
   async function ejecutar(fn){
     setBusy(true); setError("");
-    try{await fn(); await refrescar();}catch(e){setError(e.message||"No se pudo completar la operación");}
+    try{await fn(); await refrescar();}
+    catch(e){setError(e.message||"No se pudo completar la operación");try{await refrescar();}catch{}}
     finally{setBusy(false);}
   }
   const inp={padding:"10px 12px",borderRadius:9,border:`1px solid ${C.sep}`,fontSize:14,background:C.bg2,color:C.label};
@@ -8520,9 +8558,14 @@ function CajaTurnosPanel({user,turno,onTurnoChange,onGoPos}){
     <h2 style={{color:C.label}}>Caja por turnos</h2>
     <p style={{color:C.label3}}>Una caja física · turno mañana 10:00–14:30 · turno tarde desde 14:30. Cada cambio exige cierre y nueva apertura.</p>
     {error&&<div role="alert" style={{padding:12,background:"#FDECEC",color:"#9C2525",borderRadius:10,marginBottom:12}}>{error}</div>}
-    {!turno ? <div style={{padding:20,background:C.bg2,borderRadius:14,border:`1px solid ${C.sep}`}}>
+    {cargando ? <div style={{padding:20,background:C.bg2,borderRadius:14}}>Verificando la caja abierta…</div>
+    : !turno ? <div style={{padding:20,background:C.bg2,borderRadius:14,border:`1px solid ${C.sep}`}}>
       <h3>Iniciar nuevo turno</h3>
       <p>Contá el efectivo que recibís, incluida la caja chica. Abrirá con tu usuario: {user.nombre}.</p>
+      {lista.find(x=>x.estado==="cerrado")&&<p style={{color:C.label3,fontSize:12}}>
+        Último cierre: {money(lista.find(x=>x.estado==="cerrado")?.efectivo_contado)} contados.
+        Ingresá lo que recibiste físicamente; si Carolina retiró dinero, puede ser menor.
+      </p>}
       <input aria-label="Efectivo recibido" type="number" min="0" step="0.01" value={apertura} onChange={e=>setApertura(e.target.value)} style={inp} placeholder="Efectivo recibido Bs"/>
       <button disabled={busy||!validarMonto(apertura,true)} onClick={()=>ejecutar(async()=>{
         const db=await getSupabase(); const {data,error:e}=await db.rpc("caja_abrir",{p_efectivo:Number(apertura)});
@@ -8534,7 +8577,8 @@ function CajaTurnosPanel({user,turno,onTurnoChange,onGoPos}){
       <button style={btn} onClick={onGoPos}>Ir a cobrar</button>
       <button style={{...btn,marginLeft:8,background:C.label3}} onClick={()=>refrescar().catch(e=>setError(e.message))}>Actualizar arqueo</button>
       {resumen&&<div style={{marginTop:18,lineHeight:1.8}}>
-        <b>Ventas:</b> {resumen.ventas?.cantidad||0} · {money(resumen.ventas?.total)}<br/>
+        <b>Ventas válidas:</b> {resumen.ventas?.cantidad||0} · {money(resumen.ventas?.total)}<br/>
+        <b>Anuladas (no sumadas):</b> {resumen.ventas?.anuladas_cantidad||0} · {money(resumen.ventas?.anuladas_total)}<br/>
         <b>Efectivo:</b> {money(resumen.ventas?.efectivo)} · <b>QR:</b> {money(resumen.ventas?.qr)} · <b>Tarjeta:</b> {money(resumen.ventas?.tarjeta)} · <b>Gift card:</b> {money(resumen.ventas?.giftcard)}<br/>
         <b>Aportes:</b> {money(resumen.movimientos?.aportes)} · <b>Retiros:</b> {money(resumen.movimientos?.retiros)}<br/>
         <b>Efectivo esperado:</b> {money(resumen.esperado)}
@@ -8551,10 +8595,23 @@ function CajaTurnosPanel({user,turno,onTurnoChange,onGoPos}){
           if(e) throw e; setMonto("");setDestinatario("");setMotivo("");
         })}>Registrar</button>
       </div>
-      {movimientos.map(x=><div key={x.id} style={{padding:"7px 0",borderBottom:`1px solid ${C.sep}`,fontSize:12}}>{new Date(x.creado_at).toLocaleString("es-BO")} · {x.tipo} {money(x.monto)} · {x.destinatario} · {x.motivo}</div>)}
+      {movimientos.map(x=><div key={x.id} style={{padding:"7px 0",borderBottom:`1px solid ${C.sep}`,fontSize:12,display:"flex",justifyContent:"space-between",gap:8}}>
+        <span>{new Date(x.creado_at).toLocaleString("es-BO")} · {x.tipo} {money(x.monto)} · {x.destinatario} · {x.motivo}{x.reversa_de?" · REVERSA AUDITADA":""}</span>
+        {!x.reversa_de&&!movimientos.some(y=>y.reversa_de===x.id)&&<button disabled={busy} style={{...btn,background:C.label3,padding:"4px 8px",fontSize:11}} onClick={()=>{
+          if(!window.confirm("¿Revertir este movimiento? Se guardará una contraoperación, sin borrar el original.")) return;
+          ejecutar(async()=>{const db=await getSupabase();const {error:e}=await db.rpc("caja_movimiento",{
+            p_turno:turno.id,p_tipo:x.tipo==="retiro"?"aporte":"retiro",p_monto:Number(x.monto),
+            p_destinatario:x.destinatario,p_motivo:`Reversa: ${x.motivo}`,p_reversa_de:x.id});
+            if(e) throw e;
+          });
+        }}>Revertir</button>}
+      </div>)}
       <h4>Cierre y entrega del turno</h4>
       <p>Contá el efectivo físico. Si hay diferencia, queda registrada; no cambies el valor para forzar el cuadre. Confirmá que los demás equipos hayan sincronizado sus ventas.</p>
       <input aria-label="Efectivo contado" type="number" min="0" step="0.01" value={contado} onChange={e=>setContado(e.target.value)} style={inp} placeholder="Efectivo contado Bs"/>
+      {validarMonto(contado,true)&&resumen&&<div style={{marginTop:8,color:Math.abs(Number(contado)-Number(resumen.esperado))<0.01?C.green:C.red,fontWeight:700}}>
+        Diferencia prevista: {money(Number(contado)-Number(resumen.esperado))}
+      </div>}
       <button disabled={busy||!validarMonto(contado,true)} style={{...btn,marginLeft:8,background:"#752424"}} onClick={()=>ejecutar(async()=>{
         if(_ventasEnVuelo>0) throw new Error("Hay ventas todavía sincronizándose. Esperá unos segundos y reintentá el cierre.");
         await procesarOutbox();
@@ -8573,11 +8630,13 @@ function CajaTurnosPanel({user,turno,onTurnoChange,onGoPos}){
     {lista.filter(x=>x.estado==="cerrado").map(x=><div key={x.id} style={{padding:12,marginBottom:8,background:C.bg2,borderRadius:10,display:"flex",justifyContent:"space-between",gap:10}}>
       <span>{new Date(x.abierto_at).toLocaleString("es-BO")} · {x.abierto_usuario} → {x.cerrado_usuario}<br/>
         <small>Contado {money(x.efectivo_contado)} · Diferencia {money(x.cierre_resumen?.diferencia)}</small></span>
-      <button style={btn} onClick={()=>ejecutar(async()=>{
-        const db=await getSupabase();
-        const {data,error:e}=await db.from("th_caja_movimientos").select("*").eq("turno_id",x.id).order("creado_at");
-        if(e) throw e; await cajaAbrirPDF(x,data||[]);
-      })}>Ver PDF</button>
+      <span style={{display:"flex",gap:6}}>
+        {[["Ver PDF",cajaAbrirPDF],["Compartir",cajaCompartirPDF]].map(([label,fn])=><button key={label} style={btn} onClick={()=>ejecutar(async()=>{
+          const db=await getSupabase();
+          const {data,error:e}=await db.from("th_caja_movimientos").select("*").eq("turno_id",x.id).order("creado_at");
+          if(e) throw e; await fn(x,data||[]);
+        })}>{label}</button>)}
+      </span>
     </div>)}
     {lista.length>=histLimite&&<button style={btn} onClick={()=>setHistLimite(n=>n+60)}>Ver cierres anteriores</button>}
   </div>;
@@ -15756,15 +15815,19 @@ function App(){
     if(!user || !["caja","admin"].includes(user.rol)) return;
     let activo=true;
     setCajaCargando(true);
-    getSupabase().then(async db=>{
+    const cargar=()=>getSupabase().then(async db=>{
       const {data,error}=await db.from("th_caja_turnos").select("*").eq("estado","abierto").maybeSingle();
       if(!activo) return;
       if(error){setCajaError(error.message);setCajaTurno(null);}
       else {setCajaError("");setCajaTurno(data||null);}
       setCajaCargando(false);
     }).catch(e=>{if(activo){setCajaError(e.message);setCajaCargando(false);}});
+    cargar();
+    const timer=setInterval(cargar,15000);
+    const visible=()=>{if(document.visibilityState==="visible") cargar();};
+    document.addEventListener("visibilitychange",visible);
     if(user.rol==="caja" && CAJA_APERTURA_OBLIGATORIA) setTab("th_caja_turnos");
-    return ()=>{activo=false;};
+    return ()=>{activo=false;clearInterval(timer);document.removeEventListener("visibilitychange",visible);};
   },[user?.usuario]);
   // ── Persistencia local: ini desde localStorage, sync a nube con Supabase ──
   const[inv,setInv]     =useState(()=>{ try{return JSON.parse(localStorage.getItem("th_inv")||"[]");}catch{return[];} });
@@ -16887,10 +16950,28 @@ function App(){
     return { ok, fail, total: productos.length };
   }
 
-  function handleVenta(v){
+  async function handleVenta(v){
+    if(_ventaConfirmando) return null;
+    _ventaConfirmando=true;
+    try{
     if(CAJA_APERTURA_OBLIGATORIA && !cajaTurno?.id){
       alert("Primero abrí un turno de caja para registrar la venta.");
       return null;
+    }
+    if(CAJA_APERTURA_OBLIGATORIA && ESCRITURA_NUBE_OK && navigator.onLine!==false){
+      try{
+        const db=await getSupabase();
+        const {data,error}=await db.from("th_caja_turnos").select("id,estado")
+          .eq("id",cajaTurno.id).maybeSingle();
+        if(error||data?.estado!=="abierto"){
+          setCajaTurno(null);
+          alert("El turno ya no está abierto o no se pudo verificar. Abrí Turnos y actualizá antes de cobrar.");
+          return null;
+        }
+      }catch{
+        alert("No se pudo verificar la caja. No se registró la venta; reintentá cuando vuelva la conexión.");
+        return null;
+      }
     }
     const id=`V${Date.now()}`;
     // El mes seleccionado en pantalla puede quedar atrasado si la app sigue
@@ -16899,7 +16980,7 @@ function App(){
     const fechaVenta=hoy();
     const [anioVenta,mesISO]=fechaVenta.split("-").map(Number);
     const mesVenta=mesISO-1;
-    const vf={...v,id,fecha:fechaVenta,hora:hora(),mk:mkKey(mesVenta,anioVenta),mes:mesVenta,anio:anioVenta,cajaTurnoId:cajaTurno.id};
+    const vf={...v,id,fecha:fechaVenta,hora:hora(),mk:mkKey(mesVenta,anioVenta),mes:mesVenta,anio:anioVenta,cajaTurnoId:cajaTurno?.id||null};
     if(mes!==mesVenta) setMes(mesVenta);
     if(anio!==anioVenta) setAnio(anioVenta);
     setVentas(p=>[...p,vf]);
@@ -16939,6 +17020,7 @@ function App(){
       stockCambios,
     }, user);
     return vf;
+    }finally{_ventaConfirmando=false;}
   }
 
   function handleVentaHistorica(v){
@@ -17059,6 +17141,10 @@ function App(){
   function handleAnularVenta(ventaId){
     const v = ventas.find(x=>x.id===ventaId);
     if(!v||v.anulada) return;
+    if(v.cajaTurnoId && v.cajaTurnoId!==cajaTurno?.id){
+      const ok=window.confirm("Esta venta pertenece a un turno de caja ya cerrado. El PDF histórico no cambiará. Si devolvés efectivo, registrá la salida en el turno actual. ¿Continuar con la anulación?");
+      if(!ok) return;
+    }
     const stockCambios = [];
     v.items.forEach(it=>{
       const actual = inv.find(i=>i.id===it.prodId)?.stock||0;
@@ -17148,6 +17234,11 @@ function App(){
     </div>
   );
   if (!user) return <LoginScreen onLogin={login}/>;
+  if(user.rol==="caja" && CAJA_APERTURA_OBLIGATORIA && cajaCargando) return (
+    <div style={{minHeight:"100vh",display:"grid",placeItems:"center",background:"#f5f5f7",fontFamily:FONT,color:C.label3}}>
+      Verificando el turno de caja…
+    </div>
+  );
 
   // Portal de marca (lectura)
   if (user.rol === "marca") return <BrandPortal user={user} ventas={ventas} inv={inv} cargas={cargasCompletas} retiros={retiros} logout={logout} descuentos={descuentos} onGuardarDescuento={guardarDescuentoMarca} descCodigos={descCodigos} onGuardarDescCodigo={guardarDescuentoCodigo} onQuitarDescCodigo={eliminarDescuentoCodigo} campanas={campanas} onGuardarCampana={guardarCampana} onEliminarCampana={eliminarCampana}/>;
@@ -17324,7 +17415,7 @@ function App(){
               <IOSBtn onPress={()=>setTab("th_caja_turnos")} variant="fill">Ir a turnos</IOSBtn>
             </div>)}
 
-        {tab==="th_caja_turnos" && <CajaTurnosPanel user={user} turno={cajaTurno}
+        {tab==="th_caja_turnos" && <CajaTurnosPanel user={user} turno={cajaTurno} cargando={cajaCargando}
           onTurnoChange={setCajaTurno} onGoPos={()=>setTab("pos")}/>}
 
         {/* INVENTARIO — por marca */}
@@ -18512,7 +18603,7 @@ function POS({inv,onVenta,onVerNota,user,descuentos={},descCodigos={}}){
     }));
   }
 
-  function cobrar(){
+  async function cobrar(){
     if(!carrito.length) return;
     const sinStock=carrito.filter(it=>{const s=inv.find(i=>i.id===it.prodId)?.stock||0;return it.cantidad>s;});
     if(sinStock.length){alert(`Stock insuficiente:\n${sinStock.map(it=>{const s=inv.find(i=>i.id===it.prodId)?.stock||0;return`• ${it.nombre}: pedís ${it.cantidad}, hay ${s}`;}).join("\n")}`);return;}
@@ -18539,7 +18630,7 @@ function POS({inv,onVenta,onVerNota,user,descuentos={},descCodigos={}}){
         ? "giftcard"
         : `mixto|giftcard:${gcUsado}|${metodoCompl}:${extraMonto}`;
 
-      const vf=onVenta({items,total,subtotal,descPct,
+      const vf=await onVenta({items,total,subtotal,descPct,
         metodoPago:metodoPagoFinal,
         vendedor:vendedor||"Tienda",clienteNombre:cliente,clienteTelefono:clienteTel,etiquetaImg:etiqueta,
         gcId:gcEncontrado.codigo, gcUsado, gcAllocations,
@@ -18576,7 +18667,7 @@ function POS({inv,onVenta,onVerNota,user,descuentos={},descCodigos={}}){
       if(parseFloat(montosMixtos.tarjeta)>0)  partes.push("tarjeta:"+montosMixtos.tarjeta);
       metodoPagoFinal=partes.length>0?"mixto|"+partes.join("|"):pago;
     }
-    const vf=onVenta({items,total,subtotal,descPct,metodoPago:metodoPagoFinal,vendedor:vendedor||"Tienda",clienteNombre:cliente,clienteTelefono:clienteTel,etiquetaImg:etiqueta});
+    const vf=await onVenta({items,total,subtotal,descPct,metodoPago:metodoPagoFinal,vendedor:vendedor||"Tienda",clienteNombre:cliente,clienteTelefono:clienteTel,etiquetaImg:etiqueta});
     if(!vf) return;
     setUltima(vf);setShowOk(true);setShowPago(false);
     autoDescargarNota(vf);
@@ -24431,21 +24522,31 @@ function PanelCambiarPass({user, usuarios, onGuardar}){
 
   async function cambiar(){
     setMsg(null);
-    if(passNueva.length<6){ setMsg({ok:false,txt:"Mínimo 6 caracteres"}); return; }
+    if(passNueva.length<8){ setMsg({ok:false,txt:"Mínimo 8 caracteres"}); return; }
     if(passNueva!==passConfirm){ setMsg({ok:false,txt:"Las contraseñas no coinciden"}); return; }
     setSaving(true);
-    // Verifica la contraseña actual contra Supabase (fuente de verdad del login).
-    // Si el usuario aún no tiene password seteada en la nube, se permite.
-    const actualNube = await sbLeerPassword(user.usuario);
-    const localU = usuarios.find(x=>x.usuario===user.usuario);
-    const actualReal = actualNube!=null ? actualNube : (localU?.password ?? "");
-    if(actualReal && actualReal !== passActual){
-      setSaving(false); setMsg({ok:false,txt:"Contraseña actual incorrecta"}); return;
-    }
-    onGuardar(usuarios.map(x=>x.usuario===user.usuario?{...x,password:passNueva}:x));
-    setSaving(false);
-    setMsg({ok:true,txt:"✓ Contraseña actualizada · ya funciona en todos los dispositivos"});
-    setPassActual(""); setPassNueva(""); setPassConfirm("");
+    try{
+      if(["admin","caja"].includes(user.rol)){
+        const db=await getSupabase();
+        const {error:verify}=await db.auth.signInWithPassword({
+          email:`${user.usuario}@th.internal`,password:passActual
+        });
+        if(verify) throw new Error("Contraseña actual incorrecta");
+        if(!(await sbActualizarPassword(user.usuario,passNueva)))
+          throw new Error("No se pudo actualizar la contraseña. Probá de nuevo.");
+      }else{
+        const actualNube=await sbLeerPassword(user.usuario);
+        const localU=usuarios.find(x=>x.usuario===user.usuario);
+        const actualReal=actualNube!=null?actualNube:(localU?.password??"");
+        if(actualReal&&actualReal!==passActual) throw new Error("Contraseña actual incorrecta");
+        if(!(await sbActualizarPassword(user.usuario,passNueva)))
+          throw new Error("No se pudo actualizar la contraseña. Probá de nuevo.");
+        onGuardar(usuarios.map(x=>x.usuario===user.usuario?{...x,password:undefined}:x));
+      }
+      setMsg({ok:true,txt:"✓ Contraseña actualizada · ya funciona en todos los dispositivos"});
+      setPassActual("");setPassNueva("");setPassConfirm("");
+    }catch(e){setMsg({ok:false,txt:e.message||"No se pudo cambiar la contraseña"});}
+    finally{setSaving(false);}
   }
 
   const ipt=(label,val,set,placeholder)=>(
@@ -25846,18 +25947,11 @@ function ConfigTab({user, logout, onRecargarDesdeSupabase, onSyncCompleto, permP
   const {toasts, addToast} = useToast();
 
   function guardarUsuarios(u, accion, afectado, toastMsg){
-    setUsuarios(u);
-    localStorage.setItem("th_usuarios", JSON.stringify(u));
+    const sinClaves=u.map(x=>["admin","caja"].includes(x.rol)?{...x,password:undefined}:x);
+    setUsuarios(sinClaves);
+    localStorage.setItem("th_usuarios", JSON.stringify(sinClaves));
     // Metadata (nombre/rol/estado/marca) con reintento automático si no hay red
-    syncConRespaldo("usuarios", u, ()=>sbGuardarUsuarios(u));
-    // Password: se escribe en su propia columna, con reintento, por cada usuario
-    // que traiga una contraseña. El login la lee de Supabase → efectiva al instante
-    // en todas las sesiones. sbGuardarUsuarios NO toca password (no la pisa).
-    u.forEach(x=>{
-      if(typeof x.password === "string" && x.password.length>0){
-        syncConRespaldo("password", {usuario:x.usuario, password:x.password}, ()=>sbActualizarPassword(x.usuario, x.password));
-      }
-    });
+    syncConRespaldo("usuarios", sinClaves, ()=>sbGuardarUsuarios(sinClaves));
     if(accion&&afectado){
       agregarAudit(accion, afectado, user.nombre);
       setAuditLog(JSON.parse(localStorage.getItem(AUDIT_KEY)||"[]"));
@@ -25938,14 +26032,13 @@ function ConfigTab({user, logout, onRecargarDesdeSupabase, onSyncCompleto, permP
   }
 
   // acciones
-  function handleResetPass(u){
+  async function handleResetPass(u){
     const temp=generarTempPassword();
-    // Guarda la contraseña temporal en la tabla usuarios (con reintento) → toma
-    // efecto de inmediato en todas las sesiones. Se muestra para entregársela.
-    guardarUsuarios(
-      usuarios.map(x=>x.usuario===u.usuario?{...x,password:temp}:x),
-      "Reseteó contraseña", u.usuario
-    );
+    if(!(await sbActualizarPassword(u.usuario,temp))){
+      addToast(`No se pudo resetear @${u.usuario}; la contraseña no cambió`,"error");
+      return;
+    }
+    agregarAudit("Reseteó contraseña",u.usuario,user.nombre);
     setTempPass({usuario:u.usuario,nombre:u.nombre,password:temp,soloManual:false});
     setConfirmAct(null); setMenuAbierto(null);
   }
@@ -25968,22 +26061,24 @@ function ConfigTab({user, logout, onRecargarDesdeSupabase, onSyncCompleto, permP
     );
     setConfirmAct(null); setMenuAbierto(null);
   }
-  function handleGuardarUsuario(data,isNew){
+  async function handleGuardarUsuario(data,isNew){
     if(isNew){
-      const nuevoUsuario = {...data,estado:"activo",marcaId:data.marcaId?Number(data.marcaId):undefined};
+      if(!data.password || !(await sbCrearAuthUsuario(data.usuario,data.password,data.nombre,data.rol,data.marcaId))){
+        addToast(`No se pudo crear la cuenta @${data.usuario}`,"error");return;
+      }
+      const nuevoUsuario = {...data,password:undefined,estado:"activo",marcaId:data.marcaId?Number(data.marcaId):undefined};
       guardarUsuarios(
         [...usuarios, nuevoUsuario],
         "Creó usuario", data.usuario,
         `Usuario @${data.usuario} creado correctamente`
       );
-      // Crear también en Supabase Auth
-      if(data.password) sbCrearAuthUsuario(data.usuario, data.password, data.nombre, data.rol, data.marcaId);
     } else {
       const update = {...data, marcaId:data.marcaId?Number(data.marcaId):undefined};
-      // Si el admin dejó el campo vacío, NO tocar la contraseña (no pisarla).
-      // Si escribió una nueva, se conserva y guardarUsuarios la persiste.
-      if(!update.password) delete update.password;
       const cambioPass = !!update.password;
+      if(cambioPass && !(await sbActualizarPassword(data.usuario,update.password))){
+        addToast(`No se pudo cambiar la contraseña de @${data.usuario}`,"error");return;
+      }
+      delete update.password;
       guardarUsuarios(
         usuarios.map(u=>u.usuario===data.usuario ? {...u,...update} : u),
         cambioPass ? "Cambió contraseña" : "Editó usuario", data.usuario,

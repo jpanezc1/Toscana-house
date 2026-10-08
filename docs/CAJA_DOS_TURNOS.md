@@ -1,8 +1,10 @@
 # Caja Toscana House — dos turnos, una caja física
 
 Estado: tablas de turnos y archivo privado de PDF creados en Supabase el 8/10/2026;
-interfaz y obligatoriedad de apertura aún **no publicadas**. No usar el registro
-antiguo `caja_turnos` como si fuera este libro nuevo (`th_caja_turnos`).
+interfaz y apertura obligatoria implementadas y probadas con datos sintéticos.
+La activación pública se confirma únicamente al verificar la versión de Vercel.
+No usar el registro antiguo `caja_turnos` como si fuera este libro nuevo
+(`th_caja_turnos`).
 
 ## Flujo operativo
 
@@ -34,9 +36,10 @@ El PDF debe mostrar apertura, responsable, horario, cantidad y total de ventas v
   sesión Supabase Auth; se deben probar esas credenciales sin operar datos reales.
 - Re Kids calcula el cierre con registros de caja en base de datos y funciones transaccionales. Toscana necesita un registro equivalente, con una sola caja abierta a la vez y un turno por sesión, en lugar de copiar solo la pantalla.
 - El asesor de seguridad de Supabase todavía marca `ventas` y `usuarios` con RLS
-  desactivado. Por eso el arqueo nuevo no se presenta como libro financiero
-  inviolable, ni se habilita el bloqueo de ventas, hasta corregir el acceso y
-  validar el flujo de caja en un entorno aislado.
+  desactivado. Las tablas y PDF nuevos sí exigen Auth/RLS, y un trigger protege
+  monto, método y turno de ventas ya vinculadas. Queda pendiente migrar la
+  seguridad de todas las ventas y cuentas de marca heredadas; no presentar el
+  sistema entero como inviolable hasta cerrar esa deuda.
 
 ## Despliegue seguro
 
