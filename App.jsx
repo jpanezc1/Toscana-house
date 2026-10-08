@@ -5835,6 +5835,7 @@ const FOS_NAV_PATHS = {
   inicio:    "M3 11l9-7 9 7v9a2 2 0 01-2 2h-4v-6h-6v6H5a2 2 0 01-2-2z",
   dashboard: "M3 11l9-7 9 7v9a2 2 0 01-2 2h-4v-6h-6v6H5a2 2 0 01-2-2z",
   pos:       "M2 3h3l2.6 12.4A2 2 0 009.6 17h8.9a2 2 0 002-1.6L22 7H6 M9 21h.01M19 21h.01",
+  th_caja_turnos:"M3 7h18v12H3z M3 11h18 M7 15h4 M17 15h.01",
   ventas:    "M3 17l6-6 4 4 8-8 M21 7v6h-6",
   cambios:   "M7 16V5 M7 5L3 9 M7 5l4 4 M17 8v11 M17 19l4-4 M17 19l-4-4",
   inventario:"M21 8l-9-5-9 5 9 5 9-5z M3 8v8l9 5 9-5V8 M12 13v8",
@@ -5862,7 +5863,7 @@ function FosNavIcon({id}){
 
 function DesktopSidebar({tabs, active, onChange, user, logout, groups: customGroups, dotColors: customDot}){
   const GROUPS = customGroups || [
-    {label:"Principal", ids:["inicio","pos","ventas","clientes","cambios"]},
+    {label:"Principal", ids:["inicio","th_caja_turnos","pos","ventas","clientes","cambios"]},
     {label:"Gestión",   ids:["inventario","marcas","liquidaciones","giftcards"]},
     {label:"Sistema",   ids:["auditoria","cargas","ventas_ant","config"]},
   ];
@@ -8438,38 +8439,177 @@ function CajasTab(){
 
 // Libro de caja real: un turno para la caja física. El PDF cerrado se guarda
 // en Storage privado; el resumen SQL queda como respaldo si falla la subida.
-function cajaPDF(turno, movimientos){
+function cajaPDF(turno, movimientos, resumenPreliminar=null){
   const jsPDF = window.jspdf?.jsPDF;
   if(!jsPDF) throw new Error("No cargó el generador de PDF");
-  if(turno.estado!=="cerrado" || !turno.cierre_resumen) throw new Error("El turno todavía no está cerrado");
-  const doc = new jsPDF({unit:"mm",format:"a4"});
-  let y=18;
-  const line=(label,value,bold=false)=>{
-    if(y>275){doc.addPage();y=18;}
-    doc.setFont("helvetica",bold?"bold":"normal"); doc.setFontSize(bold?11:9);
-    doc.text(`${label}: ${value}`,15,y); y+=bold?8:6;
+  const r=turno.cierre_resumen||resumenPreliminar;
+  if(!r) throw new Error("No hay arqueo para generar el PDF");
+  const preliminar=turno.estado!=="cerrado";
+  const doc=new jsPDF({unit:"pt",format:"a4"});
+  const W=doc.internal.pageSize.getWidth(), H=doc.internal.pageSize.getHeight();
+  const left=44, right=W-44, inner=W-88;
+  const gold=[153,112,62], ink=[40,35,31], muted=[112,105,97], rule=[226,218,207];
+  const v=r.ventas||{}, mov=r.movimientos||{};
+  const num=x=>Number(x)||0;
+  const bs=x=>`Bs ${num(x).toLocaleString("es-BO",{minimumFractionDigits:2,maximumFractionDigits:2})}`;
+  const date=x=>x?new Date(x).toLocaleString("es-BO",{dateStyle:"medium",timeStyle:"short"}):"—";
+  const full=(s,max=90)=>String(s||"—").slice(0,max);
+  let y=47;
+  const line=(yy,x1=left,x2=right)=>{doc.setDrawColor(...rule);doc.setLineWidth(.8);doc.line(x1,yy,x2,yy);};
+  const label=(txt,x,yy,size=8,color=muted)=>{
+    doc.setFont("helvetica","bold");doc.setFontSize(size);doc.setTextColor(...color);doc.text(String(txt).toUpperCase(),x,yy);
   };
-  const n=x=>`Bs ${Number(x||0).toFixed(2)}`;
-  const r=turno.cierre_resumen, v=r.ventas||{}, m=r.movimientos||{};
-  doc.setFont("helvetica","bold"); doc.setFontSize(16);
-  doc.text("TOSCANA HOUSE - CIERRE DE CAJA",15,y); y+=10;
-  line("Turno",turno.id); line("Abrió",`${turno.abierto_usuario} - ${new Date(turno.abierto_at).toLocaleString("es-BO")}`);
-  line("Cerró",`${turno.cerrado_usuario} - ${new Date(turno.cerrado_at).toLocaleString("es-BO")}`);
-  y+=3; line("ARQUEO", "", true);
-  line("Efectivo inicial",n(r.apertura)); line("Ventas válidas",`${v.cantidad||0} - ${n(v.total)}`);
-  line("Ventas anuladas (no sumadas)",`${v.anuladas_cantidad||0} - ${n(v.anuladas_total)}`);
-  line("Efectivo recibido",n(v.efectivo)); line("QR",n(v.qr));
-  line("Tarjeta",n(v.tarjeta)); line("Gift card utilizada",n(v.giftcard));
-  line("Aportes",n(m.aportes)); line("Retiros",n(m.retiros));
-  line("Efectivo esperado",n(r.esperado),true);
-  line("Efectivo contado",n(r.contado),true);
-  line("Diferencia",n(r.diferencia),true);
-  y+=4; line("MOVIMIENTOS DEL CAJÓN", "", true);
-  (movimientos||[]).forEach(x=>line(
-    `${new Date(x.creado_at).toLocaleString("es-BO")} ${x.tipo.toUpperCase()}`,
-    `${n(x.monto)} - ${x.destinatario} - ${x.motivo}`.slice(0,80)
-  ));
-  doc.setFontSize(8); doc.text("Registro histórico del turno. No sustituye la factura fiscal.",15,288);
+  const value=(txt,x,yy,size=11,color=ink,bold=false,opts={})=>{
+    doc.setFont("helvetica",bold?"bold":"normal");doc.setFontSize(size);doc.setTextColor(...color);doc.text(String(txt),x,yy,opts);
+  };
+  const nextPage=(need=24)=>{if(y+need>H-65){doc.addPage();y=48;label("Toscana House · cierre de caja (continuación)",left,y,9,gold);y+=20;line(y);y+=16;}};
+  const section=txt=>{nextPage(34);label(txt,left,y,9,gold);y+=12;line(y);y+=17;};
+  const row=(txt,amount,opts={})=>{
+    nextPage(21);
+    const x=opts.x??left, width=opts.width??inner;
+    doc.setFont("helvetica",opts.bold?"bold":"normal");doc.setFontSize(opts.size??9.5);
+    const maxWidth=width-doc.getTextWidth(String(amount))-13;
+    let text=String(txt);
+    while(text.length>2&&doc.getTextWidth(text)>maxWidth) text=text.slice(0,-2)+"…";
+    value(text,x,y,opts.size??9.5,opts.color??ink,opts.bold);
+    value(amount,x+width,y,opts.size??9.5,opts.color??ink,opts.bold,{align:"right"});
+    y+=22;line(y-7,x,x+width);
+  };
+  // Encabezado de Toscana, manteniendo la jerarquía del cierre de ReKids.
+  label("TOSCANA HOUSE",left,y,20,ink);
+  value("CASA DE MODA",left,y+17,8,muted);
+  value(preliminar?"RESUMEN PRELIMINAR":"CIERRE DE CAJA",right,y,11,gold,true,{align:"right"});
+  value(preliminar?"El turno sigue abierto":"Documento interno · turno cerrado",right,y+17,8,muted,false,{align:"right"});
+  y+=37;line(y);y+=20;
+  value(`Turno ${turno.id}`,left,y,8,muted);
+  y+=17;
+  value(`Abrió ${full(turno.abierto_usuario,35)} · ${date(turno.abierto_at)}`,left,y,9);
+  y+=15;
+  value(`${preliminar?"Preparado":"Cerró"} ${full(turno.cerrado_usuario||turno.abierto_usuario,35)} · ${date(turno.cerrado_at||new Date().toISOString())}`,left,y,9);
+  y+=25;
+
+  const cardGap=10, cardW=(inner-cardGap*2)/3;
+  const cards=[
+    ["VENTAS DEL TURNO",String(num(v.cantidad)),`${num(v.prendas)} prendas`],
+    ["TOTAL VENDIDO",bs(v.total),"sin anuladas"],
+    ["EFECTIVO ESPERADO",bs(r.esperado),"solo el cajón"],
+  ];
+  cards.forEach(([title,amount,sub],i)=>{
+    const x=left+i*(cardW+cardGap), highlighted=i===1;
+    if(highlighted){doc.setFillColor(...ink);doc.roundedRect(x,y,cardW,70,7,7,"F");}
+    else{doc.setDrawColor(...rule);doc.roundedRect(x,y,cardW,70,7,7,"S");}
+    label(title,x+11,y+19,7.4,highlighted?[216,198,171]:muted);
+    value(amount,x+11,y+43,highlighted?16:15,highlighted?[255,255,255]:gold,true);
+    value(sub,x+11,y+58,7.8,highlighted?[216,198,171]:muted);
+  });
+  y+=93;
+
+  const colGap=22,colW=(inner-colGap)/2, baseY=y;
+  const colRow=(x,yy,txt,amount,strong=false,color=ink)=>{
+    value(txt,x,yy,8.9,color,strong);
+    value(amount,x+colW,yy,8.9,color,strong,{align:"right"});
+    line(yy+7,x,x+colW);
+  };
+  label("VENTAS POR FORMA DE PAGO",left,baseY,8.6,gold);
+  let ly=baseY+22;
+  [["Efectivo",v.efectivo],["QR",v.qr],["Tarjeta",v.tarjeta]].forEach(([name,amount])=>{
+    colRow(left,ly,name,bs(amount));ly+=22;
+  });
+  if(num(v.giftcard)>0){colRow(left,ly,"Gift card utilizada",bs(v.giftcard));ly+=22;}
+  colRow(left,ly,"Vendido en tickets",bs(v.total),true,gold);ly+=22;
+  const cobrado=num(v.efectivo)+num(v.qr)+num(v.tarjeta);
+  colRow(left,ly,"Cobrado ahora",bs(cobrado),true,ink);ly+=22;
+  if(num(v.anuladas_cantidad)>0){
+    colRow(left,ly,`Anuladas (${num(v.anuladas_cantidad)})`,bs(v.anuladas_total),false,[155,48,44]);ly+=22;
+  }
+  label("ARQUEO DEL EFECTIVO",left+colW+colGap,baseY,8.6,gold);
+  const rx=left+colW+colGap;
+  let ry=baseY+22;
+  [["Fondo inicial",r.apertura],["Ventas en efectivo",v.efectivo],["Aportes al cajón",mov.aportes]].forEach(([name,amount])=>{
+    colRow(rx,ry,name,bs(amount));ry+=22;
+  });
+  colRow(rx,ry,"Salidas del cajón",`- ${bs(mov.retiros)}`,false,[155,48,44]);ry+=22;
+  colRow(rx,ry,"Efectivo esperado",bs(r.esperado),true,gold);ry+=22;
+  colRow(rx,ry,"Contado a mano",bs(r.contado),true,ink);ry+=22;
+  const diferencia=num(r.diferencia);
+  colRow(rx,ry,"Diferencia",diferencia===0?"Cuadra exacto":`${diferencia>0?"Sobra":"Falta"} ${bs(Math.abs(diferencia))}`,true,
+    diferencia<0?[155,48,44]:diferencia>0?[43,120,70]:ink);ry+=22;
+  y=Math.max(ly,ry)+22;
+
+  const qrExtra=num(mov.qr_ingresos)-num(mov.qr_egresos);
+  if(num(mov.qr_ingresos)||num(mov.qr_egresos)){
+    section("POR QR, FUERA DE VENTAS · NO TOCA EL CAJÓN");
+    row("Ingresos QR",bs(mov.qr_ingresos));
+    row("Egresos QR",`- ${bs(mov.qr_egresos)}`);
+    row("QR neto incluyendo ventas",bs(num(v.qr)+qrExtra),{bold:true,color:gold});
+    y+=14;
+  }
+  if((movimientos||[]).length){
+    section("EN QUÉ ENTRÓ Y SALIÓ EL DINERO");
+    (movimientos||[]).forEach(x=>{
+      const signo=x.tipo==="aporte"?"+":"-";
+      const cat=x.categoria||x.tipo;
+      const titulo=`${new Date(x.creado_at).toLocaleString("es-BO",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"})} · ${cat} / ${x.metodo||"efectivo"}`;
+      nextPage(44);
+      label(titulo,left,y,8,muted);y+=15;
+      row(full(`${x.motivo}${x.destinatario?` · ${x.destinatario}`:""}${x.reversa_de?" · reversa auditada":""}`,130),
+        `${signo} ${bs(x.monto)}`,{size:8.8});
+      y+=5;
+    });
+  }
+  nextPage(65);y+=8;
+  value("El QR y la tarjeta no entran al cajón. La diferencia compara solo el efectivo contado con el esperado.",left,y,8,muted,false,{maxWidth:inner});
+  y+=39;
+  nextPage(50);
+  line(y,left,left+210);line(y,left+inner-210,right);
+  value("Entrega · responsable de cierre",left,y+13,8,muted);
+  value("Recibe · siguiente turno / administración",right,y+13,8,muted,false,{align:"right"});
+  const pages=doc.internal.getNumberOfPages();
+  for(let i=1;i<=pages;i++){
+    doc.setPage(i);line(H-50);
+    value("Toscana House · documento interno, no sustituye la factura fiscal",left,H-34,7.7,muted);
+    value(`${i} / ${pages}`,right,H-34,7.7,muted,false,{align:"right"});
+  }
+  return doc;
+}
+function cajaNotaRetiroPDF(mov,turno){
+  const jsPDF=window.jspdf?.jsPDF;
+  if(!jsPDF) throw new Error("No cargó el generador de PDF");
+  const doc=new jsPDF({unit:"pt",format:"a4"}), W=doc.internal.pageSize.getWidth();
+  const bs=n=>`Bs ${Number(n||0).toLocaleString("es-BO",{minimumFractionDigits:2,maximumFractionDigits:2})}`;
+  for(let copia=0;copia<2;copia++){
+    const top=48+copia*360;
+    doc.setDrawColor(217,207,190);doc.setLineWidth(.8);
+    doc.roundedRect(42,top,W-84,315,8,8,"S");
+    doc.setFont("helvetica","bold");doc.setFontSize(16);doc.setTextColor(40,35,31);
+    doc.text("TOSCANA HOUSE",60,top+28);
+    doc.setFontSize(9);doc.setTextColor(153,112,62);
+    doc.text("NOTA DE RETIRO DE EFECTIVO",W-60,top+28,{align:"right"});
+    doc.setFont("helvetica","normal");doc.setFontSize(9);doc.setTextColor(112,105,97);
+    doc.text(copia===0?"Original · caja":"Copia · quien recibe",60,top+45);
+    doc.setDrawColor(217,207,190);doc.line(60,top+56,W-60,top+56);
+    const line=(nombre,valor,yy)=>{
+      doc.setFont("helvetica","normal");doc.setFontSize(10);doc.setTextColor(112,105,97);doc.text(nombre,60,yy);
+      doc.setFont("helvetica","bold");doc.setTextColor(40,35,31);
+      doc.text(String(valor),W-60,yy,{align:"right",maxWidth:300});
+    };
+    line("Fecha",new Date(mov.creado_at).toLocaleString("es-BO"),top+83);
+    line("Monto entregado",bs(mov.monto),top+108);
+    line("Registró",mov.creado_usuario,top+133);
+    line("Recibió",mov.destinatario,top+158);
+    line("Saldo esperado que queda",bs(mov.saldo_efectivo),top+183);
+    doc.setFont("helvetica","normal");doc.setFontSize(9);doc.setTextColor(112,105,97);
+    doc.text("Motivo",60,top+211);
+    doc.setTextColor(40,35,31);
+    doc.text(doc.splitTextToSize(mov.motivo||"—",W-130).slice(0,2),60,top+226);
+    doc.setDrawColor(217,207,190);
+    doc.line(60,top+280,255,top+280);doc.line(W-255,top+280,W-60,top+280);
+    doc.setTextColor(112,105,97);doc.setFontSize(8);
+    doc.text("Entrega · caja",60,top+294);
+    doc.text("Recibe el efectivo",W-60,top+294,{align:"right"});
+  }
+  doc.setFontSize(7.5);doc.setTextColor(112,105,97);
+  doc.text(`Turno ${turno.id} · documento interno`,42,doc.internal.pageSize.getHeight()-20);
   return doc;
 }
 async function cajaGuardarPDF(turno,movimientos){
@@ -8488,7 +8628,7 @@ async function cajaAbrirPDF(turno,movimientos){
   if(error || !data){
     // El cierre permanece disponible aunque la subida inicial haya fallado.
     const doc=cajaPDF(turno,movimientos);
-    if(ESCRITURA_NUBE_OK) await cajaGuardarPDF(turno,movimientos);
+    if(ESCRITURA_NUBE_OK) cajaGuardarPDF(turno,movimientos).catch(e=>console.warn("Archivo PDF pendiente:",e.message));
     doc.save(`Cierre_Caja_${turno.id.slice(0,8)}.pdf`);
     return;
   }
@@ -8503,143 +8643,399 @@ async function cajaCompartirPDF(turno,movimientos){
   let {data,error}=await db.storage.from("caja-cierres").download(`${turno.id}.pdf`);
   if(error||!data){
     data=cajaPDF(turno,movimientos).output("blob");
-    if(ESCRITURA_NUBE_OK) await cajaGuardarPDF(turno,movimientos);
+    if(ESCRITURA_NUBE_OK) cajaGuardarPDF(turno,movimientos).catch(e=>console.warn("Archivo PDF pendiente:",e.message));
   }
   const file=new File([data],`Cierre_Caja_${turno.id.slice(0,8)}.pdf`,{type:"application/pdf"});
   if(navigator.share && (!navigator.canShare||navigator.canShare({files:[file]}))){
-    try{await navigator.share({files:[file],title:"Cierre de caja Toscana House"});return;}
-    catch(e){if(e.name==="AbortError") return;}
+    try{await navigator.share({files:[file],title:"Cierre de caja Toscana House"});return true;}
+    catch(e){if(e.name==="AbortError") return true;}
   }
   const url=URL.createObjectURL(file);
   const link=document.createElement("a");
   link.href=url;link.download=file.name;
   document.body.appendChild(link);link.click();link.remove();
   setTimeout(()=>URL.revokeObjectURL(url),60000);
+  return false;
 }
+
+// Flujo visible de caja, adaptado de ReKids: abrir, ver actividad, anotar
+// movimientos, previsualizar el arqueo, cerrar y volver a ver el PDF histórico.
+const CAJA_CATEGORIAS=[
+  {id:"gasto",nombre:"Gasto",ayuda:"Plata gastada del cajón (agua, taxi, compra chica)."},
+  {id:"retiro",nombre:"Retiro",ayuda:"Efectivo que Carolina u otra persona se lleva; sigue siendo de la tienda."},
+  {id:"deposito",nombre:"Depósito",ayuda:"Dinero entregado al banco; podés adjuntar el comprobante."},
+  {id:"aporte",nombre:"Entró plata",ayuda:"Dinero que entra a la caja sin ser una venta (por ejemplo, sencillo)."},
+];
 function CajaTurnosPanel({user,turno,cargando,onTurnoChange,onGoPos}){
   const [lista,setLista]=useState([]);
-  const [histLimite,setHistLimite]=useState(60);
+  const [histLimite,setHistLimite]=useState(30);
   const [movimientos,setMovimientos]=useState([]);
+  const [ventasTurno,setVentasTurno]=useState([]);
   const [resumen,setResumen]=useState(null);
   const [apertura,setApertura]=useState("");
   const [contado,setContado]=useState("");
-  const [tipo,setTipo]=useState("retiro");
+  const [categoria,setCategoria]=useState("gasto");
+  const [metodo,setMetodo]=useState("efectivo");
   const [monto,setMonto]=useState("");
-  const [destinatario,setDestinatario]=useState("");
-  const [motivo,setMotivo]=useState("");
+  const [concepto,setConcepto]=useState("");
+  const [entregadoA,setEntregadoA]=useState("");
+  const [comprobante,setComprobante]=useState(null);
+  const [vista,setVista]=useState(null);
   const [busy,setBusy]=useState(false);
+  const accionEnVuelo=useRef(false);
   const [error,setError]=useState("");
-  const money=x=>`Bs ${Number(x||0).toFixed(2)}`;
-  const validarMonto=(s,permiteCero=false)=>/^\d+(?:\.\d{1,2})?$/.test(String(s).trim()) && Number(s)>=(permiteCero?0:0.01);
+  const bs=n=>`Bs ${Number(n||0).toLocaleString("es-BO",{minimumFractionDigits:2,maximumFractionDigits:2})}`;
+  const fecha=n=>n?new Date(n).toLocaleString("es-BO",{dateStyle:"medium",timeStyle:"short"}):"—";
+  const valido=(s,cero=false)=>/^\d+(?:\.\d{1,2})?$/.test(String(s).trim())&&Number(s)>=(cero?0:.01);
+  const btn={border:0,borderRadius:11,padding:"11px 16px",fontSize:13,fontWeight:700,
+    fontFamily:FONT,cursor:"pointer",background:C.label,color:"#fff"};
+  const inp={border:`1px solid ${C.sep}`,borderRadius:11,padding:"11px 13px",fontSize:14,
+    fontFamily:FONT,color:C.label,background:"#fff",minWidth:0};
+  const card={background:"#fff",border:`1px solid ${C.sep}`,borderRadius:17,padding:18,
+    boxShadow:"0 3px 14px rgba(0,0,0,.045)"};
   async function refrescar(){
     const db=await getSupabase();
-    const {data,error:e}=await db.from("th_caja_turnos").select("*").order("abierto_at",{ascending:false}).limit(histLimite);
+    const {data:filas,error:e}=await db.from("th_caja_turnos").select("*")
+      .order("abierto_at",{ascending:false}).limit(histLimite);
     if(e) throw e;
-    setLista(data||[]);
-    onTurnoChange((data||[]).find(x=>x.estado==="abierto")||null);
-    if(turno?.id){
-      const {data:mov,error:em}=await db.from("th_caja_movimientos").select("*").eq("turno_id",turno.id).order("creado_at");
-      if(em) throw em;
-      setMovimientos(mov||[]);
-      const {data:r,error:er}=await db.rpc("caja_resumen",{p_turno:turno.id});
-      if(er) throw er;
-      setResumen(r);
-    } else {setMovimientos([]);setResumen(null);}
+    const activos=filas||[];
+    setLista(activos);
+    const actual=activos.find(x=>x.estado==="abierto")||null;
+    onTurnoChange(actual);
+    if(!actual){setMovimientos([]);setVentasTurno([]);setResumen(null);return;}
+    const [rm,rv,rr]=await Promise.all([
+      db.from("th_caja_movimientos").select("*").eq("turno_id",actual.id).order("creado_at",{ascending:false}),
+      db.from("ventas").select("id,fecha,hora,total,anulada,efectivo,qr,tarjeta,gc_usado")
+        .eq("caja_turno_id",actual.id).order("id",{ascending:false}).limit(500),
+      db.rpc("caja_resumen",{p_turno:actual.id}),
+    ]);
+    if(rm.error||rv.error||rr.error) throw rm.error||rv.error||rr.error;
+    setMovimientos(rm.data||[]);setVentasTurno(rv.data||[]);setResumen(rr.data);
   }
-  useEffect(()=>{refrescar().catch(e=>setError(e.message||"No se pudo leer caja"));},[turno?.id,histLimite]);
+  useEffect(()=>{
+    const cargar=()=>refrescar().catch(e=>setError(e.message||"No se pudo leer la caja"));
+    cargar();
+    const timer=setInterval(cargar,20000);
+    const visible=()=>{if(document.visibilityState==="visible") cargar();};
+    document.addEventListener("visibilitychange",visible);
+    return ()=>{clearInterval(timer);document.removeEventListener("visibilitychange",visible);};
+  },[turno?.id,histLimite]);
   async function ejecutar(fn){
-    setBusy(true); setError("");
-    try{await fn(); await refrescar();}
+    if(accionEnVuelo.current)return;
+    accionEnVuelo.current=true;
+    setBusy(true);setError("");
+    try{await fn();await refrescar();}
     catch(e){setError(e.message||"No se pudo completar la operación");try{await refrescar();}catch{}}
-    finally{setBusy(false);}
+    finally{accionEnVuelo.current=false;setBusy(false);}
   }
-  const inp={padding:"10px 12px",borderRadius:9,border:`1px solid ${C.sep}`,fontSize:14,background:C.bg2,color:C.label};
-  const btn={padding:"11px 16px",border:0,borderRadius:10,background:C.gold,color:"#fff",fontWeight:700,cursor:"pointer"};
-  return <div style={{maxWidth:780,margin:"auto",fontFamily:FONT}}>
-    <h2 style={{color:C.label}}>Caja por turnos</h2>
-    <p style={{color:C.label3}}>Una caja física · turno mañana 10:00–14:30 · turno tarde desde 14:30. Cada cambio exige cierre y nueva apertura.</p>
-    {error&&<div role="alert" style={{padding:12,background:"#FDECEC",color:"#9C2525",borderRadius:10,marginBottom:12}}>{error}</div>}
-    {cargando ? <div style={{padding:20,background:C.bg2,borderRadius:14}}>Verificando la caja abierta…</div>
-    : !turno ? <div style={{padding:20,background:C.bg2,borderRadius:14,border:`1px solid ${C.sep}`}}>
-      <h3>Iniciar nuevo turno</h3>
-      <p>Contá el efectivo que recibís, incluida la caja chica. Abrirá con tu usuario: {user.nombre}.</p>
-      {lista.find(x=>x.estado==="cerrado")&&<p style={{color:C.label3,fontSize:12}}>
-        Último cierre: {money(lista.find(x=>x.estado==="cerrado")?.efectivo_contado)} contados.
-        Ingresá lo que recibiste físicamente; si Carolina retiró dinero, puede ser menor.
-      </p>}
-      <input aria-label="Efectivo recibido" type="number" min="0" step="0.01" value={apertura} onChange={e=>setApertura(e.target.value)} style={inp} placeholder="Efectivo recibido Bs"/>
-      <button disabled={busy||!validarMonto(apertura,true)} onClick={()=>ejecutar(async()=>{
-        const db=await getSupabase(); const {data,error:e}=await db.rpc("caja_abrir",{p_efectivo:Number(apertura)});
-        if(e) throw e; onTurnoChange(data); setApertura("");
-      })} style={{...btn,marginLeft:8,opacity:busy||!validarMonto(apertura,true)?.5:1}}>Abrir caja</button>
-    </div> : <div style={{padding:20,background:C.bg2,borderRadius:14,border:`1px solid ${C.sep}`}}>
-      <h3>Turno abierto · {turno.abierto_usuario}</h3>
-      <p>Desde {new Date(turno.abierto_at).toLocaleString("es-BO")} · Fondo inicial {money(turno.efectivo_apertura)}</p>
-      <button style={btn} onClick={onGoPos}>Ir a cobrar</button>
-      <button style={{...btn,marginLeft:8,background:C.label3}} onClick={()=>refrescar().catch(e=>setError(e.message))}>Actualizar arqueo</button>
-      {resumen&&<div style={{marginTop:18,lineHeight:1.8}}>
-        <b>Ventas válidas:</b> {resumen.ventas?.cantidad||0} · {money(resumen.ventas?.total)}<br/>
-        <b>Anuladas (no sumadas):</b> {resumen.ventas?.anuladas_cantidad||0} · {money(resumen.ventas?.anuladas_total)}<br/>
-        <b>Efectivo:</b> {money(resumen.ventas?.efectivo)} · <b>QR:</b> {money(resumen.ventas?.qr)} · <b>Tarjeta:</b> {money(resumen.ventas?.tarjeta)} · <b>Gift card:</b> {money(resumen.ventas?.giftcard)}<br/>
-        <b>Aportes:</b> {money(resumen.movimientos?.aportes)} · <b>Retiros:</b> {money(resumen.movimientos?.retiros)}<br/>
-        <b>Efectivo esperado:</b> {money(resumen.esperado)}
-      </div>}
-      <h4>Movimiento de efectivo</h4>
-      <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
-        <select aria-label="Tipo de movimiento" value={tipo} onChange={e=>setTipo(e.target.value)} style={inp}><option value="retiro">Retiro</option><option value="aporte">Aporte</option></select>
-        <input aria-label="Monto" type="number" min="0.01" step="0.01" value={monto} onChange={e=>setMonto(e.target.value)} style={inp} placeholder="Monto Bs"/>
-        <input aria-label="Destinatario" value={destinatario} onChange={e=>setDestinatario(e.target.value)} style={inp} placeholder="Recibe / entrega"/>
-        <input aria-label="Motivo" value={motivo} onChange={e=>setMotivo(e.target.value)} style={inp} placeholder="Motivo"/>
-        <button disabled={busy||!validarMonto(monto)||!destinatario.trim()||!motivo.trim()} style={btn} onClick={()=>ejecutar(async()=>{
-          const db=await getSupabase();const {error:e}=await db.rpc("caja_movimiento",{
-            p_turno:turno.id,p_tipo:tipo,p_monto:Number(monto),p_destinatario:destinatario,p_motivo:motivo});
-          if(e) throw e; setMonto("");setDestinatario("");setMotivo("");
-        })}>Registrar</button>
-      </div>
-      {movimientos.map(x=><div key={x.id} style={{padding:"7px 0",borderBottom:`1px solid ${C.sep}`,fontSize:12,display:"flex",justifyContent:"space-between",gap:8}}>
-        <span>{new Date(x.creado_at).toLocaleString("es-BO")} · {x.tipo} {money(x.monto)} · {x.destinatario} · {x.motivo}{x.reversa_de?" · REVERSA AUDITADA":""}</span>
-        {!x.reversa_de&&!movimientos.some(y=>y.reversa_de===x.id)&&<button disabled={busy} style={{...btn,background:C.label3,padding:"4px 8px",fontSize:11}} onClick={()=>{
-          if(!window.confirm("¿Revertir este movimiento? Se guardará una contraoperación, sin borrar el original.")) return;
-          ejecutar(async()=>{const db=await getSupabase();const {error:e}=await db.rpc("caja_movimiento",{
-            p_turno:turno.id,p_tipo:x.tipo==="retiro"?"aporte":"retiro",p_monto:Number(x.monto),
-            p_destinatario:x.destinatario,p_motivo:`Reversa: ${x.motivo}`,p_reversa_de:x.id});
-            if(e) throw e;
-          });
-        }}>Revertir</button>}
-      </div>)}
-      <h4>Cierre y entrega del turno</h4>
-      <p>Contá el efectivo físico. Si hay diferencia, queda registrada; no cambies el valor para forzar el cuadre. Confirmá que los demás equipos hayan sincronizado sus ventas.</p>
-      <input aria-label="Efectivo contado" type="number" min="0" step="0.01" value={contado} onChange={e=>setContado(e.target.value)} style={inp} placeholder="Efectivo contado Bs"/>
-      {validarMonto(contado,true)&&resumen&&<div style={{marginTop:8,color:Math.abs(Number(contado)-Number(resumen.esperado))<0.01?C.green:C.red,fontWeight:700}}>
-        Diferencia prevista: {money(Number(contado)-Number(resumen.esperado))}
-      </div>}
-      <button disabled={busy||!validarMonto(contado,true)} style={{...btn,marginLeft:8,background:"#752424"}} onClick={()=>ejecutar(async()=>{
-        if(_ventasEnVuelo>0) throw new Error("Hay ventas todavía sincronizándose. Esperá unos segundos y reintentá el cierre.");
-        await procesarOutbox();
-        const pendientes=getOutbox().filter(o=>["venta","anularVenta"].includes(o.tipo));
-        if(pendientes.length) throw new Error(`${pendientes.length} ventas locales siguen sin sincronizar. No se puede cerrar todavía.`);
-        if(!window.confirm("¿Confirmás el efectivo contado y el cierre de este turno? Esta acción no se puede deshacer.")) return;
-        const db=await getSupabase();const {data,error:e}=await db.rpc("caja_cerrar",{p_turno:turno.id,p_contado:Number(contado)});
+  async function abrir(){
+    if(!valido(apertura,true))return;
+    await ejecutar(async()=>{
+      const db=await getSupabase();
+      const {data,error:e}=await db.rpc("caja_abrir",{p_efectivo:Number(apertura)});
+      if(e) throw e;
+      onTurnoChange(data);setApertura("");
+    });
+  }
+  async function guardarMovimiento(){
+    if(!turno||!valido(monto)||concepto.trim().length<3||
+       (["retiro","deposito"].includes(categoria)&&entregadoA.trim().length<3))return;
+    await ejecutar(async()=>{
+      await pendientes();
+      const db=await getSupabase();
+      let ruta=null;
+      if(comprobante){
+        if(comprobante.size>5*1024*1024) throw new Error("El comprobante supera 5 MB.");
+        const ext={"image/jpeg":"jpg","image/png":"png","image/webp":"webp","application/pdf":"pdf"}[comprobante.type];
+        if(!ext) throw new Error("El comprobante debe ser imagen o PDF.");
+        ruta=`${turno.id}/${crypto.randomUUID()}.${ext}`;
+        const {error:e}=await db.storage.from("caja-comprobantes").upload(ruta,comprobante,
+          {contentType:comprobante.type,upsert:false});
         if(e) throw e;
-        onTurnoChange(null);setContado("");
-        try{await cajaGuardarPDF(data,movimientos);}catch(pdfError){
-          setError(`Turno cerrado. El PDF no se guardó aún: ${pdfError.message}. Usá el historial para reintentarlo.`);
-        }
-      })}>Cerrar turno y guardar PDF</button>
+      }
+      const {data:registrado,error:e}=await db.rpc("caja_movimiento_detallado",{
+        p_turno:turno.id,p_categoria:categoria,p_metodo:metodo,p_monto:Number(monto),
+        p_concepto:concepto.trim(),p_entregado_a:entregadoA.trim()||null,p_comprobante:ruta,
+      });
+      if(e) throw e;
+      if(categoria==="retiro"&&metodo==="efectivo"&&registrado){
+        try{cajaNotaRetiroPDF(registrado,turno).save(`Retiro_Caja_${registrado.id.slice(0,8)}.pdf`);}
+        catch(pdfError){setError(`Retiro guardado; la nota se puede bajar desde Movimientos: ${pdfError.message}`);}
+      }
+      setMonto("");setConcepto("");setEntregadoA("");setComprobante(null);setMetodo("efectivo");
+    });
+  }
+  async function revertir(x){
+    const motivo=window.prompt(`¿Por qué corregís este movimiento de ${bs(x.monto)}?`);
+    if(!motivo?.trim())return;
+    await ejecutar(async()=>{
+      const db=await getSupabase();
+      const {error:e}=await db.rpc("caja_movimiento_detallado",{
+        p_turno:turno.id,p_categoria:"reversa",p_metodo:x.metodo||"efectivo",p_monto:Number(x.monto),
+        p_concepto:`Reversa: ${motivo.trim()}`,p_reversa_de:x.id,
+      });
+      if(e) throw e;
+    });
+  }
+  async function verComprobante(x){
+    if(!x.comprobante)return;
+    try{
+      const db=await getSupabase();
+      const {data,error:e}=await db.storage.from("caja-comprobantes").createSignedUrl(x.comprobante,300);
+      if(e) throw e;
+      window.open(data.signedUrl,"_blank","noopener,noreferrer");
+    }catch(e){setError(`No se pudo abrir el comprobante: ${e.message}`);}
+  }
+  async function pendientes(){
+    if(_ventasEnVuelo>0) throw new Error("Hay una venta sincronizándose; esperá unos segundos.");
+    await procesarOutbox();
+    const cola=getOutbox().filter(o=>["venta","anularVenta"].includes(o.tipo));
+    if(cola.length) throw new Error(`${cola.length} venta(s) pendiente(s) de subir. El cierre espera para no crear un faltante falso.`);
+  }
+  async function verResumen(){
+    if(!turno||!valido(contado,true))return;
+    await ejecutar(async()=>{
+      await pendientes();
+      const db=await getSupabase();
+      const [rr,rm]=await Promise.all([
+        db.rpc("caja_resumen",{p_turno:turno.id}),
+        db.from("th_caja_movimientos").select("*").eq("turno_id",turno.id).order("creado_at"),
+      ]);
+      if(rr.error||rm.error) throw rr.error||rm.error;
+      const actualizado={...rr.data,contado:Number(contado),
+        diferencia:Math.round((Number(contado)-Number(rr.data.esperado))*100)/100};
+      setVista({turno,resumen:actualizado,movimientos:rm.data||[],historico:false});
+    });
+  }
+  async function cerrar(){
+    if(!vista||vista.historico||!turno||vista.turno.id!==turno.id)return;
+    if(!window.confirm("¿Confirmás el cierre de esta caja con el efectivo contado? Esta acción no se puede deshacer."))return;
+    await ejecutar(async()=>{
+      await pendientes();
+      const db=await getSupabase();
+      const {contado:contadoVista,diferencia:_,...revision}=vista.resumen;
+      const {data,error:e}=await db.rpc("caja_cerrar_verificado",{
+        p_turno:turno.id,p_contado:Number(contadoVista),p_revision:revision,
+      });
+      if(e) throw e;
+      onTurnoChange(null);setContado("");
+      const {data:finalMov,error:em}=await db.from("th_caja_movimientos").select("*")
+        .eq("turno_id",turno.id).order("creado_at");
+      if(em){setVista(null);setError("Caja cerrada. Abrí el historial para recuperar el PDF: "+em.message);return;}
+      setVista({turno:data,resumen:data.cierre_resumen,movimientos:finalMov||[],historico:true});
+      try{await cajaGuardarPDF(data,finalMov||[]);}
+      catch(pdfError){setError(`Caja cerrada, pero el PDF aún no subió: ${pdfError.message}. Podés abrirlo desde el historial y reintentará guardarlo.`);}
+    });
+  }
+  async function verHistorico(x){
+    await ejecutar(async()=>{
+      const db=await getSupabase();
+      const {data,error:e}=await db.from("th_caja_movimientos").select("*")
+        .eq("turno_id",x.id).order("creado_at");
+      if(e) throw e;
+      setVista({turno:x,resumen:x.cierre_resumen,movimientos:data||[],historico:true});
+    });
+  }
+  function abrirVistaPDF(){
+    if(!vista)return;
+    if(vista.historico) cajaAbrirPDF(vista.turno,vista.movimientos).catch(e=>setError(e.message));
+    else window.open(cajaPDF(vista.turno,vista.movimientos,vista.resumen).output("bloburl"),"_blank","noopener,noreferrer");
+  }
+  function compartirVista(){
+    if(!vista)return;
+    const r=vista.resumen,v=r.ventas||{};
+    const texto=`Toscana House · cierre de caja\n${fecha(vista.turno.cerrado_at)}\n`+
+      `${v.cantidad||0} ventas · ${bs(v.total)}\nEfectivo esperado ${bs(r.esperado)}\n`+
+      `Contado ${bs(r.contado)} · Diferencia ${bs(r.diferencia)}\nPDF: adjuntar el archivo descargado.`;
+    cajaCompartirPDF(vista.turno,vista.movimientos).then(compartido=>{
+      // En escritorio el archivo se descarga para adjuntarlo manualmente.
+      if(!compartido) window.open(`https://wa.me/?text=${encodeURIComponent(texto)}`,"_blank","noopener,noreferrer");
+    }).catch(e=>setError(e.message));
+  }
+  const ultimo=lista.find(x=>x.estado==="cerrado");
+  const v=resumen?.ventas||{},m=resumen?.movimientos||{};
+  const qrNeto=Number(v.qr||0)+Number(m.qr_ingresos||0)-Number(m.qr_egresos||0);
+  const salidas=Number(m.retiros||0);
+  const cajaKpi=[
+    ["Efectivo en cajón",resumen?.esperado,C.green,`Apertura ${bs(resumen?.apertura)} + ventas y aportes − salidas`],
+    ["Cobrado por QR",qrNeto,C.blue,"Incluye QR fuera de ventas; no entra al cajón"],
+    ["Cobrado por tarjeta",v.tarjeta,C.gold,"Tarjeta no entra al cajón"],
+    ["Salió del cajón",salidas,C.red,`Gastos ${bs(m.gastos)} · retiros ${bs(m.retiros_puros)} · depósitos ${bs(m.depositos)}`],
+  ];
+  return <div style={{maxWidth:900,margin:"auto",fontFamily:FONT,paddingBottom:28}}>
+    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,marginBottom:20}}>
+      <div><h2 style={{fontSize:25,color:C.label,margin:"0 0 5px"}}>Caja</h2>
+        <div style={{fontSize:13,color:C.label3}}>Una caja física · dos turnos · cambio a las 14:30</div></div>
+      <span style={{padding:"7px 11px",borderRadius:20,fontSize:12,fontWeight:700,
+        color:turno?C.green:C.label3,background:turno?"#EAF5EC":C.bg2}}>
+        {cargando?"Verificando…":turno?"● Turno abierto":"○ Sin caja abierta"}</span>
+    </div>
+    {error&&<div role="alert" style={{...card,borderColor:"#E6ADAD",background:"#FFF4F4",color:C.red,marginBottom:14}}>{error}</div>}
+    {cargando?<div style={card}>Verificando la caja abierta…</div>
+    :!turno?<div style={{...card,maxWidth:560,marginBottom:22}}>
+      <h3 style={{margin:"0 0 7px",fontSize:19}}>Abrir caja</h3>
+      <p style={{fontSize:13,color:C.label3,lineHeight:1.55}}>Contá el efectivo con el que arranca el turno, incluida la caja chica. Abrirá con tu usuario: <b>{user.nombre}</b>.</p>
+      {ultimo&&<p style={{fontSize:12,color:C.label3}}>Último cierre: {fecha(ultimo.cerrado_at)} · contado {bs(ultimo.efectivo_contado)}. Ingresá lo recibido físicamente después de cualquier retiro.</p>}
+      <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+        <input aria-label="Efectivo inicial" type="number" min="0" step="0.01" value={apertura}
+          onChange={e=>setApertura(e.target.value)} placeholder="Efectivo inicial Bs" style={{...inp,flex:"1 1 200px"}}/>
+        <button style={{...btn,background:C.green,opacity:busy||!valido(apertura,true)?.5:1}}
+          disabled={busy||!valido(apertura,true)} onClick={abrir}>Abrir caja</button>
+      </div>
+    </div>:<>
+      <div style={{fontSize:13,color:C.label3,marginBottom:15}}>Turno abierto por <b>{turno.abierto_usuario}</b> · {fecha(turno.abierto_at)} · fondo {bs(turno.efectivo_apertura)}</div>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(175px,1fr))",gap:10,marginBottom:18}}>
+        {cajaKpi.map(([title,amount,color,tip])=><div key={title} style={card} title={tip}>
+          <div style={{fontSize:11,color:C.label3,textTransform:"uppercase",letterSpacing:.5}}>{title}</div>
+          <div style={{fontSize:23,fontWeight:800,color,marginTop:10,fontVariantNumeric:"tabular-nums"}}>{bs(amount)}</div>
+          <div style={{fontSize:11,color:C.label3,marginTop:6,lineHeight:1.4}}>{tip}</div>
+        </div>)}
+      </div>
+      <div style={{display:"flex",gap:8,marginBottom:18}}>
+        <button style={btn} onClick={onGoPos}>Ir al punto de venta</button>
+        <button style={{...btn,background:C.bg2,color:C.label}} onClick={()=>refrescar().catch(e=>setError(e.message))}>Actualizar caja</button>
+      </div>
+      <div style={{...card,marginBottom:18}}>
+        <h3 style={{fontSize:18,margin:"0 0 7px"}}>Anotar un movimiento</h3>
+        <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:8}}>
+          {CAJA_CATEGORIAS.map(x=><button key={x.id} onClick={()=>setCategoria(x.id)}
+            style={{...btn,background:categoria===x.id?C.label:C.bg2,color:categoria===x.id?"#fff":C.label,padding:"8px 12px"}}>{x.nombre}</button>)}
+        </div>
+        <p style={{fontSize:12,color:C.label3,margin:"0 0 10px"}}>{CAJA_CATEGORIAS.find(x=>x.id===categoria)?.ayuda}</p>
+        <div style={{display:"flex",gap:6,alignItems:"center",marginBottom:12}}>
+          <b style={{fontSize:12,color:C.label3}}>¿Por dónde?</b>
+          {["efectivo","qr"].map(x=><button key={x} onClick={()=>setMetodo(x)} style={{...btn,padding:"7px 12px",
+            background:metodo===x?C.gold:C.bg2,color:metodo===x?"#fff":C.label}}>{x==="qr"?"QR":"Efectivo"}</button>)}
+          {metodo==="qr"&&<span style={{fontSize:11,color:C.label3}}>No toca el cajón: aparecerá aparte en el cierre.</span>}
+        </div>
+        <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+          <input aria-label="Monto del movimiento" type="number" min="0.01" step="0.01" value={monto}
+            onChange={e=>setMonto(e.target.value)} placeholder="Monto Bs" style={{...inp,flex:"1 1 115px"}}/>
+          <input aria-label="Concepto del movimiento" value={concepto} onChange={e=>setConcepto(e.target.value)}
+            placeholder="¿En qué o para qué?" style={{...inp,flex:"2 1 220px"}}/>
+          {categoria!=="gasto"&&<input aria-label="Persona que recibe o entrega" value={entregadoA}
+            onChange={e=>setEntregadoA(e.target.value)} placeholder={categoria==="aporte"?"¿Quién trajo el dinero? (opcional)":"¿Quién se lleva el dinero?"}
+            style={{...inp,flex:"2 1 200px"}}/>}
+          <button style={{...btn,background:C.gold}} disabled={busy||!valido(monto)||concepto.trim().length<3||
+            (["retiro","deposito"].includes(categoria)&&entregadoA.trim().length<3)} onClick={guardarMovimiento}>
+            {busy?"Guardando…":"Anotar"}</button>
+        </div>
+        <label style={{display:"block",fontSize:12,color:C.label3,marginTop:10,cursor:"pointer"}}>
+          📎 {comprobante?comprobante.name:"Adjuntar comprobante (imagen o PDF, opcional)"}
+          <input type="file" accept="image/jpeg,image/png,image/webp,application/pdf" style={{display:"none"}}
+            onChange={e=>setComprobante(e.target.files?.[0]||null)}/>
+        </label>
+        {movimientos.length>0&&<div style={{borderTop:`1px solid ${C.sep}`,marginTop:16,paddingTop:12}}>
+          <b style={{fontSize:13}}>Movimientos anotados</b>
+          {movimientos.map(x=><div key={x.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,
+            padding:"9px 0",borderBottom:`1px solid ${C.sep}`,fontSize:12}}>
+            <span><b style={{color:x.tipo==="aporte"?C.green:C.red}}>{x.tipo==="aporte"?"+":"−"}{bs(x.monto)}</b>
+              {` · ${x.categoria||x.tipo} / ${x.metodo||"efectivo"} · ${x.motivo}`}
+              {x.destinatario&&` · ${x.destinatario}`}
+              <small style={{display:"block",color:C.label3}}>{fecha(x.creado_at)} · {x.creado_usuario}{x.reversa_de?" · reversa auditada":""}</small>
+            </span>
+            <span style={{display:"flex",gap:7}}>
+              {x.categoria==="retiro"&&(x.metodo||"efectivo")==="efectivo"&&<button onClick={()=>{
+                try{cajaNotaRetiroPDF(x,turno).save(`Retiro_Caja_${x.id.slice(0,8)}.pdf`);}
+                catch(e){setError(e.message);}
+              }} style={{...btn,padding:"6px 8px",background:C.bg2,color:C.label}}>Nota</button>}
+              {x.comprobante&&<button onClick={()=>verComprobante(x)} style={{...btn,padding:"6px 8px",background:C.bg2,color:C.label}}>Comprobante</button>}
+              {!x.reversa_de&&!movimientos.some(z=>z.reversa_de===x.id)&&<button disabled={busy} onClick={()=>revertir(x)}
+                style={{...btn,padding:"6px 8px",background:C.bg2,color:C.label}}>Corregir</button>}
+            </span>
+          </div>)}
+        </div>}
+      </div>
+      <div style={{...card,marginBottom:18}}>
+        <h3 style={{fontSize:18,margin:"0 0 10px"}}>Movimientos del turno</h3>
+        <p style={{fontSize:12,color:C.label3}}>Abierta {fecha(turno.abierto_at)} · {v.cantidad||0} ventas válidas · {v.prendas||0} prendas</p>
+        {ventasTurno.length===0?<p style={{fontSize:13,color:C.label3}}>Todavía no hay ventas registradas en este turno.</p>
+          :<div style={{maxHeight:270,overflowY:"auto"}}>{ventasTurno.map(x=><div key={x.id}
+            style={{display:"flex",justifyContent:"space-between",gap:8,padding:"8px 0",borderBottom:`1px solid ${C.sep}`,fontSize:12}}>
+            <span>{x.fecha} · {x.hora} · {x.id}{x.anulada&&<b style={{color:C.red}}> · ANULADA</b>}</span>
+            <span style={{textAlign:"right"}}>{bs(x.total)}<small style={{display:"block",color:C.label3}}>
+              {[["Efectivo",x.efectivo],["QR",x.qr],["Tarjeta",x.tarjeta],["Gift card",x.gc_usado]]
+                .filter(([,n])=>Number(n)>0).map(([name,n])=>`${name} ${bs(n)}`).join(" · ")}</small></span>
+          </div>)}</div>}
+          {ventasTurno.length>=500&&<small style={{color:C.label3}}>Se muestran las 500 ventas más recientes; el arqueo incluye todas.</small>}
+      </div>
+      <div style={{...card,marginBottom:18}}>
+        <h3 style={{fontSize:18,margin:"0 0 6px"}}>Cerrar caja · entregar turno</h3>
+        <p style={{fontSize:13,color:C.label3,lineHeight:1.5}}>Contá el efectivo real del cajón. El sistema espera <b>{bs(resumen?.esperado)}</b>. Primero revisás el resumen y el PDF preliminar; la caja sigue abierta hasta que confirmes el cierre.</p>
+        <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+          <input aria-label="Efectivo contado" type="number" min="0" step="0.01" value={contado}
+            onChange={e=>setContado(e.target.value)} placeholder="Efectivo contado Bs" style={{...inp,flex:"1 1 210px"}}/>
+          <button disabled={busy||!valido(contado,true)} onClick={verResumen} style={{...btn,background:C.gold}}>Ver resumen</button>
+        </div>
+        {valido(contado,true)&&<p style={{fontSize:12,color:Number(contado)-Number(resumen?.esperado||0)<-.005?C.red:C.green}}>
+          Diferencia prevista: {bs(Number(contado)-Number(resumen?.esperado||0))}
+        </p>}
+      </div>
+    </>}
+    <div style={{...card,marginTop:20}}>
+      <h3 style={{fontSize:18,margin:"0 0 5px"}}>Cierres anteriores</h3>
+      <p style={{fontSize:12,color:C.label3,margin:"0 0 10px"}}>Tocá uno para revisar el cuadre y volver a abrir o compartir su PDF.</p>
+      {lista.filter(x=>x.estado==="cerrado").length===0?<p style={{fontSize:13,color:C.label3}}>Todavía no hay cierres registrados.</p>
+      :lista.filter(x=>x.estado==="cerrado").map(x=><button key={x.id} onClick={()=>verHistorico(x)}
+        style={{display:"flex",width:"100%",textAlign:"left",justifyContent:"space-between",gap:12,
+          border:0,borderTop:`1px solid ${C.sep}`,background:"transparent",padding:"12px 0",cursor:"pointer",fontFamily:FONT}}>
+        <span style={{fontSize:13,color:C.label}}><b>{fecha(x.cerrado_at)}</b>
+          <small style={{display:"block",color:C.label3}}>Abrió {x.abierto_usuario} · cerró {x.cerrado_usuario} · contado {bs(x.efectivo_contado)}</small></span>
+        <span style={{fontWeight:700,color:Number(x.cierre_resumen?.diferencia||0)===0?C.green:C.red,fontSize:13}}>
+          {Number(x.cierre_resumen?.diferencia||0)===0?"Cuadró":`Diferencia ${bs(x.cierre_resumen?.diferencia)}`} ›</span>
+      </button>)}
+      {lista.length>=histLimite&&<button style={{...btn,background:C.bg2,color:C.label,marginTop:8}}
+        onClick={()=>setHistLimite(n=>n+30)}>Ver cierres anteriores</button>}
+    </div>
+    {vista&&<div role="dialog" aria-modal="true" aria-label={vista.historico?"Cierre ya hecho":"Resumen antes de cerrar"}
+      style={{position:"fixed",inset:0,zIndex:1000,background:"rgba(24,20,18,.55)",display:"grid",placeItems:"center",padding:16}}>
+      <div style={{width:"min(650px,100%)",maxHeight:"90vh",overflowY:"auto",background:"#fff",borderRadius:20,padding:22,
+        boxShadow:"0 20px 70px rgba(0,0,0,.2)"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8}}>
+          <h3 style={{margin:0,fontSize:20,color:C.label}}>{vista.historico?"Cierre ya hecho":"Resumen del turno · sin cerrar"}</h3>
+          <button onClick={()=>setVista(null)} style={{...btn,background:C.bg2,color:C.label,padding:"7px 11px"}}>✕</button>
+        </div>
+        <p style={{fontSize:12,color:C.label3}}>{fecha(vista.turno.abierto_at)} → {vista.historico?fecha(vista.turno.cerrado_at):"turno abierto"}</p>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,margin:"15px 0"}}>
+          {[["VENTAS",String(vista.resumen.ventas?.cantidad||0),`${vista.resumen.ventas?.prendas||0} prendas`],
+            ["TOTAL VENDIDO",bs(vista.resumen.ventas?.total),"sin anuladas"],
+            ["EFECTIVO ESPERADO",bs(vista.resumen.esperado),"solo cajón"]].map(([title,value,sub])=><div key={title}
+            style={{background:C.bg2,borderRadius:12,padding:10,minWidth:0}}><small style={{fontSize:10,color:C.label3}}>{title}</small>
+              <b style={{display:"block",fontSize:17,color:C.label,overflowWrap:"anywhere"}}>{value}</b>
+              <small style={{fontSize:10,color:C.label3}}>{sub}</small></div>)}
+        </div>
+        <div style={{...card,marginBottom:10}}><b style={{fontSize:13}}>Ventas por forma de pago</b>
+          {[["Efectivo",vista.resumen.ventas?.efectivo],["QR",vista.resumen.ventas?.qr],["Tarjeta",vista.resumen.ventas?.tarjeta],
+            ["Gift card utilizada (no entra dinero)",vista.resumen.ventas?.giftcard]].map(([name,amount])=><div key={name}
+            style={{display:"flex",justifyContent:"space-between",fontSize:13,padding:"6px 0"}}><span>{name}</span><b>{bs(amount)}</b></div>)}
+          <div style={{borderTop:`1px solid ${C.sep}`,paddingTop:8,fontSize:12,color:C.label3}}>
+            Vendido en tickets {bs(vista.resumen.ventas?.total)} · cobrado ahora {bs(Number(vista.resumen.ventas?.efectivo||0)+Number(vista.resumen.ventas?.qr||0)+Number(vista.resumen.ventas?.tarjeta||0))}
+          </div>
+        </div>
+        {Number(vista.resumen.ventas?.anuladas_cantidad)>0&&<p style={{...card,color:C.red,fontSize:13}}>
+          Anuladas: {vista.resumen.ventas.anuladas_cantidad} por {bs(vista.resumen.ventas.anuladas_total)}. No están sumadas a las ventas válidas.
+        </p>}
+        <div style={{...card,marginBottom:10}}><b style={{fontSize:13}}>Arqueo del efectivo</b>
+          {[["Fondo inicial",vista.resumen.apertura],["Ventas en efectivo",vista.resumen.ventas?.efectivo],
+            ["Aportes",vista.resumen.movimientos?.aportes],["Salidas del cajón",-Number(vista.resumen.movimientos?.retiros||0)],
+            ["Esperado",vista.resumen.esperado],["Contado a mano",vista.resumen.contado]].map(([name,amount])=><div key={name}
+            style={{display:"flex",justifyContent:"space-between",fontSize:13,padding:"5px 0"}}><span>{name}</span><b>{bs(amount)}</b></div>)}
+          <div style={{borderTop:`1px solid ${C.sep}`,display:"flex",justifyContent:"space-between",fontWeight:800,
+            color:Number(vista.resumen.diferencia)<0?C.red:C.green,paddingTop:9}}>
+            <span>Diferencia</span><span>{Number(vista.resumen.diferencia)===0?"Cuadra exacto":`${Number(vista.resumen.diferencia)>0?"Sobra":"Falta"} ${bs(Math.abs(Number(vista.resumen.diferencia)))}`}</span>
+          </div>
+        </div>
+        {(Number(vista.resumen.movimientos?.qr_ingresos)>0||Number(vista.resumen.movimientos?.qr_egresos)>0)&&
+          <p style={{fontSize:12,color:C.label3}}>QR fuera de ventas: +{bs(vista.resumen.movimientos?.qr_ingresos)} / −{bs(vista.resumen.movimientos?.qr_egresos)}. No modifica el cajón.</p>}
+        <div style={{display:"flex",gap:7,flexWrap:"wrap",marginTop:16}}>
+          <button onClick={abrirVistaPDF} style={btn}>Ver PDF</button>
+          {vista.historico?<button onClick={compartirVista} style={{...btn,background:C.green}}>Compartir PDF</button>
+            :<><button disabled={busy} onClick={cerrar} style={{...btn,background:C.red}}>Cerrar caja</button>
+              <button onClick={()=>setVista(null)} style={{...btn,background:C.bg2,color:C.label}}>Volver a contar</button></>}
+        </div>
+        {!vista.historico&&<p style={{fontSize:11,color:C.label3,marginTop:10}}>La caja sigue abierta. Solo se cierra al pulsar “Cerrar caja”.</p>}
+      </div>
     </div>}
-    <h3 style={{marginTop:25}}>Historial de cierres</h3>
-    {lista.filter(x=>x.estado==="cerrado").map(x=><div key={x.id} style={{padding:12,marginBottom:8,background:C.bg2,borderRadius:10,display:"flex",justifyContent:"space-between",gap:10}}>
-      <span>{new Date(x.abierto_at).toLocaleString("es-BO")} · {x.abierto_usuario} → {x.cerrado_usuario}<br/>
-        <small>Contado {money(x.efectivo_contado)} · Diferencia {money(x.cierre_resumen?.diferencia)}</small></span>
-      <span style={{display:"flex",gap:6}}>
-        {[["Ver PDF",cajaAbrirPDF],["Compartir",cajaCompartirPDF]].map(([label,fn])=><button key={label} style={btn} onClick={()=>ejecutar(async()=>{
-          const db=await getSupabase();
-          const {data,error:e}=await db.from("th_caja_movimientos").select("*").eq("turno_id",x.id).order("creado_at");
-          if(e) throw e; await fn(x,data||[]);
-        })}>{label}</button>)}
-      </span>
-    </div>)}
-    {lista.length>=histLimite&&<button style={btn} onClick={()=>setHistLimite(n=>n+60)}>Ver cierres anteriores</button>}
   </div>;
 }
 
@@ -17269,7 +17665,7 @@ function App(){
 
   const TABS_ALL=[
     {id:"inicio",        icon:"⊞", label:"Inicio"},
-    {id:"th_caja_turnos",   icon:"▣", label:"Turnos"},
+    {id:"th_caja_turnos",   icon:"▣", label:"Apertura y cierre"},
     {id:"pos",           icon:"⊕", label:"Caja"},
     {id:"ventas",        icon:"◈", label:"Ventas"},
     {id:"clientes",      icon:"◐", label:"Clientes"},

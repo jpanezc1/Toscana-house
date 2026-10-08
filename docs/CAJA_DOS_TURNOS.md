@@ -1,8 +1,10 @@
 # Caja Toscana House — dos turnos, una caja física
 
-Estado: tablas de turnos y archivo privado de PDF creados en Supabase el 8/10/2026;
-interfaz y apertura obligatoria implementadas y probadas con datos sintéticos.
-La activación pública se confirma únicamente al verificar la versión de Vercel.
+Estado: el libro de turnos está en producción. La revisión visual/operativa al
+estilo ReKids y la migración `caja_flujo_rekids_toscana_20261008.sql` están
+preparadas y probadas solo con datos sintéticos; no deben activarse en medio
+de un turno abierto. La activación pública se confirma únicamente al verificar
+la versión de Vercel después del cierre de tienda.
 No usar el registro antiguo `caja_turnos` como si fuera este libro nuevo
 (`th_caja_turnos`).
 
@@ -11,10 +13,21 @@ No usar el registro antiguo `caja_turnos` como si fuera este libro nuevo
 1. Después de iniciar sesión, el personal de caja ve primero la pantalla de turno. Si no hay turno abierto, debe completar la apertura con fecha/hora, usuario y efectivo inicial contado antes de acceder al cobro. Cerrar y volver a abrir la app no crea un turno nuevo.
 2. Si ya existe un turno abierto, la pantalla muestra quién lo abrió, el horario y el efectivo inicial. La trabajadora puede continuar en ese mismo turno; no puede abrir una segunda caja física en paralelo. El cambio de turno exige cierre y arqueo del anterior antes de abrir el siguiente.
 3. Cada venta nueva se vincula al turno y registra el dinero realmente recibido por efectivo, QR y tarjeta. Un pago mixto se separa en sus componentes; la gift card se muestra aparte porque no vuelve a entrar dinero en ese momento.
-4. Si Carolina retira efectivo, registrar monto, destinataria, motivo, fecha/hora, usuario y saldo calculado que queda como caja chica. Se permite más de un retiro en el mismo turno. No se borra un retiro: una corrección queda como reversa auditada.
-5. Antes del cierre se muestran el resumen y el PDF preliminar. El cierre definitivo requiere contar el efectivo y confirmar que las ventas del turno llegaron a la nube.
+4. Anotar cada salida o entrada en el momento: gasto, retiro, depósito o aporte;
+   indicar si fue por efectivo o QR. Los movimientos QR quedan fuera del cajón.
+   En retiro y depósito se identifica quién recibió el dinero. Se puede adjuntar
+   comprobante privado; los retiros de efectivo generan nota por duplicado.
+   No se borra un movimiento: una corrección queda como reversa auditada.
+5. Antes del cierre se muestran tarjetas de ventas/métodos, arqueo y PDF
+   preliminar. La caja sigue abierta. El cierre definitivo requiere contar el
+   efectivo y confirmar que las ventas del turno llegaron completas a la nube.
+   Si el resumen cambia antes de confirmar, se exige revisarlo de nuevo.
 6. Tarde: abrir un turno nuevo con el fondo que efectivamente recibió. El cierre de mañana no se mezcla con el de tarde.
-7. Cada cierre se conserva para volver a abrir y descargar el mismo PDF; el envío por WhatsApp es descarga y adjunto manual, no una promesa de envío automático del archivo.
+7. Cada cierre se conserva para volver a abrir y descargar el mismo PDF.
+   En dispositivos que admiten compartir archivos se puede enviar el PDF con
+   la hoja de compartir; en escritorio se descarga y se adjunta manualmente
+   a WhatsApp. El enlace de WhatsApp lleva solo el resumen, no adjunta por sí
+   mismo el archivo.
 8. El PDF del cierre se guarda en un bucket privado. El historial permite buscar
    cierres anteriores por páginas y abrir el archivo guardado. Si la subida falla,
    el resumen inmutable del cierre permite regenerar y reintentar el PDF.
@@ -25,7 +38,11 @@ No usar el registro antiguo `caja_turnos` como si fuera este libro nuevo
 
 `diferencia = efectivo contado − efectivo esperado`
 
-El PDF debe mostrar apertura, responsable, horario, cantidad y total de ventas válidas, anuladas por separado, efectivo, QR, tarjeta, desglose de mixtos, gift card por separado, movimientos del cajón (incluidos retiros de Carolina y caja chica resultante), esperado, contado, diferencia y cierre.
+El PDF debe mostrar apertura, responsable, horario, cantidad y total de ventas
+válidas, prendas, anuladas por separado, efectivo, QR, tarjeta, gift card por
+separado, movimientos de efectivo y QR fuera de ventas, esperado, contado,
+diferencia y firmas de entrega/recepción. QR, tarjeta y gift card no se suman
+al efectivo esperado.
 
 ## Diferencias verificadas respecto a Re Kids
 
@@ -41,12 +58,17 @@ El PDF debe mostrar apertura, responsable, horario, cantidad y total de ventas v
   seguridad de todas las ventas y cuentas de marca heredadas; no presentar el
   sistema entero como inviolable hasta cerrar esa deuda.
 
-## Despliegue seguro
+## Despliegue seguro de la revisión ReKids
 
-1. Crear tablas y funciones de caja con permisos y auditoría, sin bloquear ventas existentes. Añadir asociación de venta a turno y desglose por método en la escritura nueva; los registros anteriores se mantienen intactos.
-2. Migrar y probar las cuentas de caja a Supabase Auth. No eliminar el acceso actual hasta confirmar que ambas usuarias pueden entrar.
-3. Activar modo observación: aperturas, movimientos, cierres y PDF sin obligatoriedad de apertura; conciliar al menos ambos turnos completos contra el libro de ventas y el efectivo.
-4. Solo después habilitar la obligación de caja abierta para cobrar. Si hay ventas pendientes de sincronización, permitir seguir cobrando y advertir que no se puede cerrar todavía.
+1. Confirmar por lectura que no hay turno abierto y que la cola de ventas está
+   sincronizada. No probar ventas, movimientos ni stock reales.
+2. Aplicar la migración versionada y verificar columnas, RPC y bucket privado.
+   La RPC anterior permanece para equipos que aún no se actualizaron.
+3. Publicar la interfaz desde `main`, verificar HTML/bundle/version públicos y
+   la pestaña visible en escritorio y móvil, sin confirmar un cierre real de prueba.
+4. La primera apertura/cierre real del nuevo flujo debe validarse con las
+   cajeras y su arqueo físico. Si hay ventas pendientes, pueden seguir
+   cobrando; el cierre espera a que se sincronicen.
 
 ## Pruebas obligatorias
 
