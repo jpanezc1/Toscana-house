@@ -928,6 +928,7 @@ const KV_LS_MAP = k =>
   k==="giftcards" ? "th_gc_v1" :
   k==="cajas"     ? "th_cajas_v1" :
   k==="meta_mensual" ? "th_meta_mensual_v1" :
+  k==="meta_diaria" ? "th_meta_diaria_v1" :
   k==="qr_banco"  ? "th_qr_banco" :
   k.startsWith("gastos_") ? "th_liq_gastos_"+k.slice(7) :
   k.startsWith("fac_")    ? "th_fac_"+k.slice(4) : null;
@@ -11345,6 +11346,76 @@ function BurbujaDescuentos({descuentos, descCodigos, isDesktop}){
   );
 }
 
+function MetaReloj({porcentaje,color}){
+  const radio=47, perimetro=2*Math.PI*radio;
+  const avance=Math.min(100,Math.max(0,porcentaje));
+  return <div role="progressbar" aria-label="Avance de la meta" aria-valuenow={avance} aria-valuemin={0} aria-valuemax={100}
+    style={{position:"relative",width:124,height:124,flexShrink:0}}>
+    <svg width="124" height="124" viewBox="0 0 124 124" aria-hidden="true">
+      <circle cx="62" cy="62" r={radio} fill="none" stroke="#EEE9E1" strokeWidth="11"/>
+      <circle cx="62" cy="62" r={radio} fill="none" stroke={color} strokeWidth="11" strokeLinecap="round"
+        strokeDasharray={perimetro} strokeDashoffset={perimetro*(1-avance/100)}
+        transform="rotate(-90 62 62)" style={{transition:"stroke-dashoffset .6s ease"}}/>
+    </svg>
+    <div style={{position:"absolute",inset:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center"}}>
+      <strong style={{fontSize:25,color,fontVariantNumeric:"tabular-nums"}}>{Math.round(porcentaje)}%</strong>
+      <small style={{fontSize:10,color:C.label3}}>de la meta</small>
+    </div>
+  </div>;
+}
+
+function MetasCajaInicio({ventas}){
+  const [fecha,setFecha]=useState(hoy());
+  const [metasMes,setMetasMes]=useState(()=>{try{return JSON.parse(localStorage.getItem("th_meta_mensual_v1")||"{}");}catch{return {};}});
+  const [metasDia,setMetasDia]=useState(()=>{try{return JSON.parse(localStorage.getItem("th_meta_diaria_v1")||"{}");}catch{return {};}});
+  useEffect(()=>{
+    const reloj=setInterval(()=>setFecha(hoy()),60000);
+    const onMeta=e=>{
+      if(e.detail?.key==="meta_mensual") setMetasMes(e.detail.data||{});
+      if(e.detail?.key==="meta_diaria") setMetasDia(e.detail.data||{});
+    };
+    window.addEventListener("th-kv",onMeta);
+    return ()=>{clearInterval(reloj);window.removeEventListener("th-kv",onMeta);};
+  },[]);
+  const periodo=fecha.slice(0,7);
+  const [ano,mesNum]=periodo.split("-").map(Number);
+  const diasMes=new Date(ano,mesNum,0).getDate();
+  const mesMeta=Number(metasMes[periodo])||0;
+  const diaConfigurado=Number(metasDia[periodo])||0;
+  const diaMeta=diaConfigurado>0?diaConfigurado:mesMeta>0?mesMeta/diasMes:0;
+  const validas=ventas.filter(v=>!v.anulada&&!ventaBloqueada(v.id));
+  const deHoy=validas.filter(v=>v.fecha===fecha);
+  const delMes=validas.filter(v=>typeof v.fecha==="string"&&v.fecha.slice(0,7)===periodo);
+  const sumar=lista=>lista.reduce((s,v)=>s+getDisplayTotal(v),0);
+  const bs=n=>`Bs ${Number(n||0).toLocaleString("es-BO",{minimumFractionDigits:2,maximumFractionDigits:2})}`;
+  const tarjeta=(titulo,lista,meta,color,detalle)=>{
+    const vendido=sumar(lista),porcentaje=meta>0?vendido/meta*100:0;
+    return <div key={titulo} style={{background:"#fff",border:`1px solid ${C.sep}`,borderRadius:18,padding:18,
+      display:"flex",alignItems:"center",gap:16,boxShadow:"0 3px 14px rgba(0,0,0,.05)"}}>
+      <MetaReloj porcentaje={porcentaje} color={color}/>
+      <div style={{minWidth:0}}>
+        <div style={{fontSize:12,color:C.label3,textTransform:"uppercase",letterSpacing:1,fontWeight:700}}>{titulo}</div>
+        <div style={{fontSize:25,fontWeight:800,color:C.label,fontVariantNumeric:"tabular-nums",marginTop:4}}>{bs(vendido)}</div>
+        <div style={{fontSize:13,color:C.label2,marginTop:5}}>Meta: {meta>0?bs(meta):"Sin configurar"}</div>
+        <div style={{fontSize:12,color:C.label3,marginTop:4}}>{lista.length} venta{lista.length===1?"":"s"} · {detalle}</div>
+        {meta>0&&<div style={{fontSize:12,color:porcentaje>=100?C.green:C.label2,marginTop:5}}>
+          {porcentaje>=100?`Meta alcanzada · excedente ${bs(vendido-meta)}`:`Faltan ${bs(meta-vendido)}`}
+        </div>}
+      </div>
+    </div>;
+  };
+  return <section aria-label="Metas de ventas de caja" style={{marginBottom:16}}>
+    <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",gap:8,marginBottom:9}}>
+      <h2 style={{fontSize:17,margin:0,color:C.label}}>Avance de ventas</h2>
+      <small style={{color:C.label3}}>Tienda completa · {fecha.split("-").reverse().join("/")}</small>
+    </div>
+    <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))",gap:10}}>
+      {tarjeta("Hoy",deHoy,diaMeta,C.green,diaConfigurado>0?"meta diaria configurada":mesMeta>0?"meta diaria calculada del mes":"configurar meta en Administración")}
+      {tarjeta("Este mes",delMes,mesMeta,C.gold,`${Math.max(0,diasMes-Number(fecha.slice(8))+1)} días del mes disponibles`)}
+    </div>
+  </section>;
+}
+
 function HomeDashboard({ventas, inv, vMes, mes, anio, onGoTab, descuentos, descCodigos}){
   const isDesktop = useIsDesktop();
   const [metasMensuales, setMetasMensuales] = useState(()=>{
@@ -16266,7 +16337,7 @@ function App(){
         }
       });
       // 2. sembrar claves locales que la nube no tiene todavía
-      const candidatas = ["th_alq","th_gc_v1","th_cajas_v1","th_qr_banco","th_meta_mensual_v1"];
+      const candidatas = ["th_alq","th_gc_v1","th_cajas_v1","th_qr_banco","th_meta_mensual_v1","th_meta_diaria_v1"];
       try{ Object.keys(localStorage).forEach(k=>{
         if(k.startsWith("th_liq_gastos_")||k.startsWith("th_fac_")) candidatas.push(k);
       }); }catch{}
@@ -16274,6 +16345,7 @@ function App(){
         const key = lsKey==="th_alq" ? "alq" : lsKey==="th_gc_v1" ? "giftcards"
           : lsKey==="th_cajas_v1" ? "cajas" : lsKey==="th_qr_banco" ? "qr_banco"
           : lsKey==="th_meta_mensual_v1" ? "meta_mensual"
+          : lsKey==="th_meta_diaria_v1" ? "meta_diaria"
           : lsKey.startsWith("th_liq_gastos_") ? "gastos_"+lsKey.slice(14)
           : "fac_"+lsKey.slice(7);
         if(nube.has(key)) return;
@@ -17398,12 +17470,15 @@ function App(){
 
         {/* INICIO — dashboard */}
         {tab==="inicio" && (
-          <HomeDashboard
-            ventas={ventas} inv={inv} vMes={vMes}
-            mes={mes} anio={anio}
-            onGoTab={setTab}
-            descuentos={descuentos} descCodigos={descCodigos}
-          />
+          <>
+            {user.rol==="caja"&&<MetasCajaInicio ventas={ventas}/>}
+            <HomeDashboard
+              ventas={ventas} inv={inv} vMes={vMes}
+              mes={mes} anio={anio}
+              onGoTab={setTab}
+              descuentos={descuentos} descCodigos={descCodigos}
+            />
+          </>
         )}
 
         {/* POS */}
@@ -25863,16 +25938,25 @@ function ConfigTab({user, logout, onRecargarDesdeSupabase, onSyncCompleto, permP
     try { return JSON.parse(localStorage.getItem("th_meta_mensual_v1")||"{}"); }
     catch { return {}; }
   });
+  const [metasDiarias,setMetasDiarias]=useState(()=>{
+    try{return JSON.parse(localStorage.getItem("th_meta_diaria_v1")||"{}");}
+    catch{return {};}
+  });
   const metaKey = `${anio}-${String(mes+1).padStart(2,"0")}`;
   const [metaDraft, setMetaDraft] = useState("");
+  const [metaDiariaDraft,setMetaDiariaDraft]=useState("");
   const [metaError, setMetaError] = useState("");
   const [guardandoMeta, setGuardandoMeta] = useState(false);
   useEffect(()=>{
     setMetaDraft(metasMensuales[metaKey] == null ? "" : String(metasMensuales[metaKey]));
   },[metaKey,metasMensuales]);
   useEffect(()=>{
+    setMetaDiariaDraft(metasDiarias[metaKey] == null ? "" : String(metasDiarias[metaKey]));
+  },[metaKey,metasDiarias]);
+  useEffect(()=>{
     const onMeta = e=>{
       if(e.detail?.key==="meta_mensual") setMetasMensuales(e.detail.data||{});
+      if(e.detail?.key==="meta_diaria") setMetasDiarias(e.detail.data||{});
     };
     window.addEventListener("th-kv", onMeta);
     return ()=>window.removeEventListener("th-kv", onMeta);
@@ -25896,6 +25980,25 @@ function ConfigTab({user, logout, onRecargarDesdeSupabase, onSyncCompleto, permP
         antes:Number(metasMensuales[metaKey])||0,despues:siguiente[metaKey]}, user);
     }catch(e){ setMetaError("No se pudo guardar la meta en la nube. Probá de nuevo."); }
     finally{ setGuardandoMeta(false); }
+  }
+  async function guardarMetaDiaria(){
+    const valor=Number(String(metaDiariaDraft).replace(",","."));
+    if(!Number.isFinite(valor)||valor<=0){setMetaError("Ingresá una meta diaria mayor a cero.");return;}
+    if(!ESCRITURA_NUBE_OK){setMetaError("La copia de demostración no puede cambiar metas reales.");return;}
+    const siguiente={...metasDiarias,[metaKey]:Math.round(valor*100)/100};
+    setGuardandoMeta(true);setMetaError("");
+    try{
+      const db=await getSupabase();
+      const {error}=await db.from("kv_sync").upsert({
+        key:"meta_diaria",data:siguiente,updated_at:new Date().toISOString()
+      },{onConflict:"key"});
+      if(error) throw error;
+      kvAplicarLocal("meta_diaria",siguiente);
+      setMetasDiarias(siguiente);
+      logAudit("META_DIARIA",{resumen:`Meta diaria de ${metaKey} actualizada`,periodo:metaKey,
+        antes:Number(metasDiarias[metaKey])||0,despues:siguiente[metaKey]},user);
+    }catch(e){setMetaError("No se pudo guardar la meta diaria en la nube. Probá de nuevo.");}
+    finally{setGuardandoMeta(false);}
   }
   const [usuarios, setUsuarios] = useState(()=>{
     try{return JSON.parse(localStorage.getItem("th_usuarios")||"null")||USUARIOS;}
@@ -26159,7 +26262,7 @@ create policy "allow all usuarios" on usuarios
         </div>
       </div>
 
-      {/* ════ META MENSUAL (solo administración) ════ */}
+      {/* ════ METAS DE VENTAS (solo administración) ════ */}
       {subTab==="metas"&&isAdmin&&(
         <div style={{background:C.bg2,border:`1px solid ${C.sep}`,borderRadius:18,padding:20,marginBottom:20}}>
           <div style={{fontSize:17,fontWeight:700,color:C.label,marginBottom:6}}>Meta de ventas · {MESES[mes]} {anio}</div>
@@ -26174,9 +26277,23 @@ create policy "allow all usuarios" on usuarios
             <button onClick={guardarMetaMensual} disabled={guardandoMeta} style={{background:C.label,color:"white",border:0,borderRadius:12,
               padding:"12px 18px",fontWeight:700,cursor:guardandoMeta?"wait":"pointer"}}>{guardandoMeta?"Guardando…":"Guardar meta"}</button>
           </div>
+          <div style={{display:"flex",gap:8,alignItems:"end",flexWrap:"wrap",marginTop:14}}>
+            <div style={{flex:"1 1 180px"}}>
+              <IOSInput label="Meta diaria (Bs)" type="number" min="0.01" step="0.01"
+                value={metaDiariaDraft} onChange={e=>setMetaDiariaDraft(e.target.value)} placeholder="Ej. 2500"/>
+            </div>
+            <button onClick={guardarMetaDiaria} disabled={guardandoMeta} style={{background:C.label,color:"white",border:0,borderRadius:12,
+              padding:"12px 18px",fontWeight:700,cursor:guardandoMeta?"wait":"pointer"}}>{guardandoMeta?"Guardando…":"Guardar meta diaria"}</button>
+          </div>
+          <div style={{fontSize:12,color:C.label3,marginTop:8}}>
+            La meta diaria se aplica a cada día del mes seleccionado. Si no la configurás, Inicio calcula una referencia con la meta mensual dividida entre los días del mes.
+          </div>
           {metaError&&<div role="alert" style={{color:C.red,fontSize:12,marginTop:8}}>{metaError}</div>}
           {Number(metasMensuales[metaKey])>0&&<div style={{fontSize:12,color:C.green,marginTop:8}}>
             Meta guardada: Bs {Number(metasMensuales[metaKey]).toLocaleString("es-BO",{minimumFractionDigits:2})}
+          </div>}
+          {Number(metasDiarias[metaKey])>0&&<div style={{fontSize:12,color:C.green,marginTop:5}}>
+            Meta diaria guardada: Bs {Number(metasDiarias[metaKey]).toLocaleString("es-BO",{minimumFractionDigits:2})}
           </div>}
         </div>
       )}
