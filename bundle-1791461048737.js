@@ -54381,7 +54381,7 @@
       return est ? { ...m, estado: est } : m;
     });
   }
-  var KV_LS_MAP = (k) => k === "alq" ? "th_alq" : k === "giftcards" ? "th_gc_v1" : k === "cajas" ? "th_cajas_v1" : k === "qr_banco" ? "th_qr_banco" : k.startsWith("gastos_") ? "th_liq_gastos_" + k.slice(7) : k.startsWith("fac_") ? "th_fac_" + k.slice(4) : null;
+  var KV_LS_MAP = (k) => k === "alq" ? "th_alq" : k === "giftcards" ? "th_gc_v1" : k === "cajas" ? "th_cajas_v1" : k === "meta_mensual" ? "th_meta_mensual_v1" : k === "qr_banco" ? "th_qr_banco" : k.startsWith("gastos_") ? "th_liq_gastos_" + k.slice(7) : k.startsWith("fac_") ? "th_fac_" + k.slice(4) : null;
   var KV_CACHE = {};
   var _kvTimers = {};
   async function sbKVCargarTodo() {
@@ -64856,6 +64856,20 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
   }
   function HomeDashboard({ ventas, inv, vMes, mes, anio, onGoTab, descuentos, descCodigos }) {
     const isDesktop = useIsDesktop();
+    const [metasMensuales, setMetasMensuales] = (0, import_react.useState)(() => {
+      try {
+        return JSON.parse(localStorage.getItem("th_meta_mensual_v1") || "{}");
+      } catch {
+        return {};
+      }
+    });
+    (0, import_react.useEffect)(() => {
+      const onMeta = (e) => {
+        if (e.detail?.key === "meta_mensual") setMetasMensuales(e.detail.data || {});
+      };
+      window.addEventListener("th-kv", onMeta);
+      return () => window.removeEventListener("th-kv", onMeta);
+    }, []);
     const hoyStr = hoy();
     const vHoy = ventas.filter((v) => v.fecha === hoyStr && !v.anulada);
     const totalHoy = vHoy.reduce((s, v) => s + getDisplayTotal(v), 0);
@@ -64895,12 +64909,27 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
     const today = /* @__PURE__ */ new Date();
     const dayNames = ["Dom", "Lun", "Mar", "Mi\xE9", "Jue", "Vie", "S\xE1b"];
     const dateStr = `${dayNames[today.getDay()]}, ${today.getDate()} de ${MESES[today.getMonth()]} ${today.getFullYear()}`;
-    const diaActual = today.getDate();
+    const periodoSeleccionado = anio * 12 + mes;
+    const periodoActual = today.getFullYear() * 12 + today.getMonth();
+    const mesCerrado = periodoSeleccionado < periodoActual;
+    const mesFuturo = periodoSeleccionado > periodoActual;
+    const diaActual = mesCerrado ? new Date(anio, mes + 1, 0).getDate() : mesFuturo ? 0 : today.getDate();
     const diasEnMes = new Date(anio, mes + 1, 0).getDate();
-    const proyeccionCierre = diaActual > 0 ? Math.round(totalMes / diaActual * diasEnMes) : 0;
+    const proyeccionCierre = mesCerrado ? totalMes : diaActual > 0 ? Math.round(totalMes / diaActual * diasEnMes) : 0;
     const progresoDias = Math.round(diaActual / diasEnMes * 100);
-    const diasRestantes = diasEnMes - diaActual;
+    const diasRestantes = mesCerrado ? 0 : diasEnMes - diaActual;
     const fmtBs = (n) => `Bs ${new Intl.NumberFormat("es-BO", { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(n)}`;
+    const fmtBsExact = (n) => `Bs ${new Intl.NumberFormat("es-BO", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n)}`;
+    const metaKey = `${anio}-${String(mes + 1).padStart(2, "0")}`;
+    const metaMes = Number(metasMensuales[metaKey]) || 0;
+    const promedioDiario = diaActual > 0 ? totalMes / diaActual : 0;
+    const ventasPorDia = vMes.reduce((map, v) => {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(v.fecha || "")) return map;
+      map[v.fecha] = (map[v.fecha] || 0) + getDisplayTotal(v);
+      return map;
+    }, {});
+    const [mejorFecha, mejorImporte] = Object.entries(ventasPorDia).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0] || ["", 0];
+    const avanceMeta = metaMes > 0 ? Math.round(totalMes / metaMes * 100) : 0;
     const cardStyle = {
       background: "linear-gradient(180deg,#FFFFFF,#FCFBF9)",
       borderRadius: 20,
@@ -65031,6 +65060,46 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
         sub: "a precio de venta",
         color: "#6D4C41"
       }
+    )), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "grid", gridTemplateColumns: isDesktop ? "repeat(4,1fr)" : "repeat(2,1fr)", gap: 8, marginBottom: isDesktop ? 10 : 14 } }, /* @__PURE__ */ import_react.default.createElement(
+      KPICard,
+      {
+        icon: "\u{1F4CA}",
+        label: "Promedio diario",
+        compact: isDesktop,
+        val: fmtBsExact(promedioDiario),
+        sub: mesFuturo ? "Mes no iniciado" : `En ${diaActual} d\xEDa${diaActual === 1 ? "" : "s"} del mes`,
+        color: C.blue
+      }
+    ), /* @__PURE__ */ import_react.default.createElement(
+      KPICard,
+      {
+        icon: "\u{1F3AF}",
+        label: "Meta del mes",
+        compact: isDesktop,
+        val: metaMes > 0 ? fmtBsExact(metaMes) : "Sin configurar",
+        sub: metaMes > 0 ? `${avanceMeta}% cumplido \xB7 faltan ${fmtBsExact(Math.max(0, metaMes - totalMes))}` : "Config \u2192 Metas",
+        color: C.gold
+      }
+    ), /* @__PURE__ */ import_react.default.createElement(
+      KPICard,
+      {
+        icon: "\u{1F3C6}",
+        label: "Mejor d\xEDa",
+        compact: isDesktop,
+        val: mejorFecha ? fmtBsExact(mejorImporte) : "\u2014",
+        sub: mejorFecha ? `${mejorFecha.slice(8, 10)}/${mejorFecha.slice(5, 7)}/${mejorFecha.slice(0, 4)}` : "Sin ventas",
+        color: C.amber
+      }
+    ), /* @__PURE__ */ import_react.default.createElement(
+      KPICard,
+      {
+        icon: "\u{1F9FE}",
+        label: "Ventas del mes",
+        compact: isDesktop,
+        val: vMes.length.toLocaleString("es-BO"),
+        sub: `${Object.keys(ventasPorDia).length} d\xEDa${Object.keys(ventasPorDia).length === 1 ? "" : "s"} con ventas`,
+        color: C.green
+      }
     )), /* @__PURE__ */ import_react.default.createElement("div", { className: "fos-bub", style: {
       padding: isDesktop ? "14px 18px" : "16px 18px",
       marginBottom: isDesktop ? 10 : 14
@@ -65042,14 +65111,14 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
       textTransform: "uppercase",
       letterSpacing: 1.2,
       marginBottom: 4
-    } }, "Proyecci\xF3n de cierre \u2014 ", MESES[mes], " ", anio), /* @__PURE__ */ import_react.default.createElement("div", { style: {
+    } }, mesCerrado ? "Cierre real" : mesFuturo ? "Mes por comenzar" : "Proyecci\xF3n de cierre", " \u2014 ", MESES[mes], " ", anio), /* @__PURE__ */ import_react.default.createElement("div", { style: {
       fontSize: isDesktop ? 26 : 30,
       fontWeight: 700,
       color: C.gold,
       fontFamily: FONT,
       letterSpacing: "-0.03em",
       lineHeight: 1
-    } }, fmtBs(proyeccionCierre)), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT_UI, marginTop: 4 } }, "Basado en ", fmtBs(totalMes), " en ", diaActual, " d\xEDa", diaActual !== 1 ? "s" : "", " \xB7 ", diasRestantes, " d\xEDa", diasRestantes !== 1 ? "s" : "", " restantes")), /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "right", flexShrink: 0 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 22, fontWeight: 700, color: C.label, fontFamily: FONT } }, progresoDias, "%"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: C.label3, fontFamily: FONT_UI } }, "del mes transcurrido"))), /* @__PURE__ */ import_react.default.createElement("div", { style: { background: C.sep, borderRadius: 99, height: 6, overflow: "hidden" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+    } }, mesCerrado ? fmtBsExact(proyeccionCierre) : fmtBs(proyeccionCierre)), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 11, color: C.label3, fontFamily: FONT_UI, marginTop: 4 } }, mesCerrado ? "Mes cerrado \xB7 total de ventas registradas" : mesFuturo ? "El per\xEDodo todav\xEDa no comenz\xF3" : `Basado en ${fmtBs(totalMes)} en ${diaActual} d\xEDa${diaActual !== 1 ? "s" : ""} \xB7 ${diasRestantes} d\xEDa${diasRestantes !== 1 ? "s" : ""} restantes`)), /* @__PURE__ */ import_react.default.createElement("div", { style: { textAlign: "right", flexShrink: 0 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 22, fontWeight: 700, color: C.label, fontFamily: FONT } }, progresoDias, "%"), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 10, color: C.label3, fontFamily: FONT_UI } }, "del mes transcurrido"))), /* @__PURE__ */ import_react.default.createElement("div", { style: { background: C.sep, borderRadius: 99, height: 6, overflow: "hidden" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: {
       width: `${progresoDias}%`,
       height: "100%",
       borderRadius: 99,
@@ -70523,7 +70592,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
             kvAplicarLocal(key, final);
           }
         });
-        const candidatas = ["th_alq", "th_gc_v1", "th_cajas_v1", "th_qr_banco"];
+        const candidatas = ["th_alq", "th_gc_v1", "th_cajas_v1", "th_qr_banco", "th_meta_mensual_v1"];
         try {
           Object.keys(localStorage).forEach((k) => {
             if (k.startsWith("th_liq_gastos_") || k.startsWith("th_fac_")) candidatas.push(k);
@@ -70531,7 +70600,7 @@ ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.pri
         } catch {
         }
         candidatas.forEach((lsKey) => {
-          const key = lsKey === "th_alq" ? "alq" : lsKey === "th_gc_v1" ? "giftcards" : lsKey === "th_cajas_v1" ? "cajas" : lsKey === "th_qr_banco" ? "qr_banco" : lsKey.startsWith("th_liq_gastos_") ? "gastos_" + lsKey.slice(14) : "fac_" + lsKey.slice(7);
+          const key = lsKey === "th_alq" ? "alq" : lsKey === "th_gc_v1" ? "giftcards" : lsKey === "th_cajas_v1" ? "cajas" : lsKey === "th_qr_banco" ? "qr_banco" : lsKey === "th_meta_mensual_v1" ? "meta_mensual" : lsKey.startsWith("th_liq_gastos_") ? "gastos_" + lsKey.slice(14) : "fac_" + lsKey.slice(7);
           if (nube.has(key)) return;
           const local = leerLS(lsKey);
           if (local != null && !(Array.isArray(local) && local.length === 0)) sbKVGuardar(key, local);
@@ -72208,7 +72277,7 @@ Esta acci\xF3n no se puede deshacer.` : "\xBFEliminar esta carga? Esta acci\xF3n
         cierres,
         onVentaClick: (v) => setVentaDetalle(v)
       }
-    ), tab === "config" && /* @__PURE__ */ import_react.default.createElement(ConfigTab, { user, logout, onRecargarDesdeSupabase: recargarDesdeSupabase, onSyncCompleto: forzarSyncInventario, permPrecioStaff, onTogglePermPrecio: togglePermPrecio }))), !isDesktop && /* @__PURE__ */ import_react.default.createElement(TabBar, { tabs: TABS, active: tab, onChange: (t) => {
+    ), tab === "config" && /* @__PURE__ */ import_react.default.createElement(ConfigTab, { user, logout, onRecargarDesdeSupabase: recargarDesdeSupabase, onSyncCompleto: forzarSyncInventario, permPrecioStaff, onTogglePermPrecio: togglePermPrecio, mes, anio }))), !isDesktop && /* @__PURE__ */ import_react.default.createElement(TabBar, { tabs: TABS, active: tab, onChange: (t) => {
       setTab(t);
       setMD(null);
     } }), /* @__PURE__ */ import_react.default.createElement(
@@ -81370,8 +81439,64 @@ ${c.resumen || c.id}`)) onEliminarCarga(c.id);
       WebkitTapHighlightColor: "transparent"
     } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 17 } }, "\u{1F4C4}"), /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 13.5, fontWeight: 700, color: "#fff", fontFamily: FONT_UI } }, "Descargar PDF"))))));
   }
-  function ConfigTab({ user, logout, onRecargarDesdeSupabase, onSyncCompleto, permPrecioStaff, onTogglePermPrecio }) {
+  function ConfigTab({ user, logout, onRecargarDesdeSupabase, onSyncCompleto, permPrecioStaff, onTogglePermPrecio, mes, anio }) {
     const [subTab, setSubTab] = (0, import_react.useState)("perfil");
+    const [metasMensuales, setMetasMensuales] = (0, import_react.useState)(() => {
+      try {
+        return JSON.parse(localStorage.getItem("th_meta_mensual_v1") || "{}");
+      } catch {
+        return {};
+      }
+    });
+    const metaKey = `${anio}-${String(mes + 1).padStart(2, "0")}`;
+    const [metaDraft, setMetaDraft] = (0, import_react.useState)("");
+    const [metaError, setMetaError] = (0, import_react.useState)("");
+    const [guardandoMeta, setGuardandoMeta] = (0, import_react.useState)(false);
+    (0, import_react.useEffect)(() => {
+      setMetaDraft(metasMensuales[metaKey] == null ? "" : String(metasMensuales[metaKey]));
+    }, [metaKey, metasMensuales]);
+    (0, import_react.useEffect)(() => {
+      const onMeta = (e) => {
+        if (e.detail?.key === "meta_mensual") setMetasMensuales(e.detail.data || {});
+      };
+      window.addEventListener("th-kv", onMeta);
+      return () => window.removeEventListener("th-kv", onMeta);
+    }, []);
+    async function guardarMetaMensual() {
+      const valor = Number(String(metaDraft).replace(",", "."));
+      if (!Number.isFinite(valor) || valor <= 0) {
+        setMetaError("Ingres\xE1 una meta mayor a cero.");
+        return;
+      }
+      if (!ESCRITURA_NUBE_OK) {
+        setMetaError("La copia de demostraci\xF3n no puede cambiar metas reales.");
+        return;
+      }
+      const siguiente = { ...metasMensuales, [metaKey]: Math.round(valor * 100) / 100 };
+      setGuardandoMeta(true);
+      setMetaError("");
+      try {
+        const db = await getSupabase();
+        const { error } = await db.from("kv_sync").upsert({
+          key: "meta_mensual",
+          data: siguiente,
+          updated_at: (/* @__PURE__ */ new Date()).toISOString()
+        }, { onConflict: "key" });
+        if (error) throw error;
+        kvAplicarLocal("meta_mensual", siguiente);
+        setMetasMensuales(siguiente);
+        logAudit("META_MENSUAL", {
+          resumen: `Meta de ${metaKey} actualizada`,
+          periodo: metaKey,
+          antes: Number(metasMensuales[metaKey]) || 0,
+          despues: siguiente[metaKey]
+        }, user);
+      } catch (e) {
+        setMetaError("No se pudo guardar la meta en la nube. Prob\xE1 de nuevo.");
+      } finally {
+        setGuardandoMeta(false);
+      }
+    }
     const [usuarios, setUsuarios] = (0, import_react.useState)(() => {
       try {
         return JSON.parse(localStorage.getItem("th_usuarios") || "null") || USUARIOS;
@@ -81495,6 +81620,7 @@ ${c.resumen || c.id}`)) onEliminarCarga(c.id);
       { id: "perfil", icon: "\u{1F464}", label: "Perfil" },
       ...isAdmin ? [
         { id: "equipo", icon: "\u{1F465}", label: "Equipo" },
+        { id: "metas", icon: "\u{1F3AF}", label: "Metas" },
         { id: "auditoria", icon: "\u{1F4CB}", label: "Auditor\xEDa" }
       ] : [],
       { id: "seguridad", icon: "\u{1F512}", label: "Seguridad" },
@@ -81700,7 +81826,26 @@ create policy "allow all usuarios" on usuarios
       boxShadow: subTab === t.id ? "0 2px 10px rgba(0,0,0,0.18)" : "none",
       transition: "background .15s",
       WebkitTapHighlightColor: "transparent"
-    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 14 } }, t.icon), t.label)))), subTab === "perfil" && /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: {
+    } }, /* @__PURE__ */ import_react.default.createElement("span", { style: { fontSize: 14 } }, t.icon), t.label)))), subTab === "metas" && isAdmin && /* @__PURE__ */ import_react.default.createElement("div", { style: { background: C.bg2, border: `1px solid ${C.sep}`, borderRadius: 18, padding: 20, marginBottom: 20 } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 17, fontWeight: 700, color: C.label, marginBottom: 6 } }, "Meta de ventas \xB7 ", MESES[mes], " ", anio), /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.label3, marginBottom: 14 } }, "Se guarda para este mes y se comparte entre los equipos. Cambi\xE1 el mes en el encabezado para programar otro per\xEDodo."), /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "flex", gap: 8, alignItems: "end", flexWrap: "wrap" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { flex: "1 1 180px" } }, /* @__PURE__ */ import_react.default.createElement(
+      IOSInput,
+      {
+        label: "Meta mensual (Bs)",
+        type: "number",
+        min: "0.01",
+        step: "0.01",
+        value: metaDraft,
+        onChange: (e) => setMetaDraft(e.target.value),
+        placeholder: "Ej. 75000"
+      }
+    )), /* @__PURE__ */ import_react.default.createElement("button", { onClick: guardarMetaMensual, disabled: guardandoMeta, style: {
+      background: C.label,
+      color: "white",
+      border: 0,
+      borderRadius: 12,
+      padding: "12px 18px",
+      fontWeight: 700,
+      cursor: guardandoMeta ? "wait" : "pointer"
+    } }, guardandoMeta ? "Guardando\u2026" : "Guardar meta")), metaError && /* @__PURE__ */ import_react.default.createElement("div", { role: "alert", style: { color: C.red, fontSize: 12, marginTop: 8 } }, metaError), Number(metasMensuales[metaKey]) > 0 && /* @__PURE__ */ import_react.default.createElement("div", { style: { fontSize: 12, color: C.green, marginTop: 8 } }, "Meta guardada: Bs ", Number(metasMensuales[metaKey]).toLocaleString("es-BO", { minimumFractionDigits: 2 }))), subTab === "perfil" && /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("div", { style: {
       background: "linear-gradient(180deg,#FFFFFF,#FCFBF9)",
       boxShadow: "0 1px 2px rgba(20,19,24,.04),0 10px 26px -12px rgba(20,19,24,.14),inset 0 1px 0 rgba(255,255,255,.45)",
       borderRadius: 20,
