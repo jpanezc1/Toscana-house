@@ -11855,6 +11855,184 @@ function MetasCajaInicio({ventas,user}){
   </section>;
 }
 
+// Tres lecturas del mismo libro de ventas: acumulado/meta, día equivalente
+// del mes anterior y evolución mensual de las marcas. Ninguna escribe datos.
+function datosGraficasMensuales(ventas,mes,anio,metaMes,fechaActual=hoy()){
+  const periodo=`${anio}-${String(mes+1).padStart(2,"0")}`;
+  const [hoyAnio,hoyMes,hoyDia]=fechaActual.split("-").map(Number);
+  const elegido=anio*12+mes,actual=hoyAnio*12+hoyMes-1;
+  const diasMes=new Date(anio,mes+1,0).getDate();
+  const diasVisibles=elegido<actual?diasMes:elegido===actual?Math.min(hoyDia,diasMes):0;
+  const mesPrev=mes===0?11:mes-1,anioPrev=mes===0?anio-1:anio;
+  const periodoPrev=`${anioPrev}-${String(mesPrev+1).padStart(2,"0")}`;
+  const diasPrev=new Date(anioPrev,mesPrev+1,0).getDate();
+  const porDia=Array(diasMes).fill(0),porDiaPrev=Array(diasPrev).fill(0);
+  const marcas=new Map();
+  const hastaMesMarca=elegido<=actual?mes:-1;
+  for(const v of ventas||[]){
+    if(v.anulada||ventaBloqueada(v.id)||!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(v.fecha||"")||v.fecha>fechaActual)continue;
+    const fechaMes=v.fecha.slice(0,7),dia=Number(v.fecha.slice(8,10));
+    const centavos=Math.round(Number(getDisplayTotal(v)||0)*100);
+    if(Number.isFinite(centavos)&&centavos>=0){
+      if(fechaMes===periodo&&dia>=1&&dia<=diasMes)porDia[dia-1]+=centavos;
+      if(fechaMes===periodoPrev&&dia>=1&&dia<=diasPrev)porDiaPrev[dia-1]+=centavos;
+    }
+    const mesVenta=Number(v.fecha.slice(5,7))-1;
+    if(Number(v.fecha.slice(0,4))!==anio||mesVenta<0||mesVenta>hastaMesMarca)continue;
+    for(const it of v.items||[]){
+      const nombre=String(it.marcaNombre||"").trim();
+      if(!nombre)continue;
+      const clave=it.marcaId!=null?`id:${it.marcaId}`:`nombre:${normalizarNombreVendedor(nombre)}`;
+      const neto=Math.round(Number(netItemSub(v,it)||0)*100);
+      if(!Number.isFinite(neto)||neto<0)continue;
+      if(!marcas.has(clave))marcas.set(clave,{nombre,centavos:Array(12).fill(0),total:0});
+      const marca=marcas.get(clave);
+      marca.centavos[mesVenta]+=neto;
+      marca.total+=neto;
+    }
+  }
+  let suma=0;
+  const acumulado=[0];
+  for(let d=0;d<diasVisibles;d++){
+    suma+=porDia[d];
+    acumulado.push(suma/100);
+  }
+  const comparables=Math.min(diasVisibles,diasPrev);
+  const actualComparable=porDia.slice(0,comparables).reduce((s,n)=>s+n,0)/100;
+  const previoComparable=porDiaPrev.slice(0,comparables).reduce((s,n)=>s+n,0)/100;
+  const topMarcas=[...marcas.values()].filter(m=>m.total>0)
+    .sort((a,b)=>b.total-a.total||a.nombre.localeCompare(b.nombre)).slice(0,3)
+    .map(m=>({nombre:m.nombre,valores:m.centavos.map(n=>n/100)}));
+  return {
+    periodo,diasMes,diasVisibles,meta:Math.max(0,Number(metaMes)||0),
+    acumulado,vendido:suma/100,
+    metaDiaria:metaMes>0?Array.from({length:diasMes+1},(_,d)=>Number(metaMes)*d/diasMes):[],
+    diarioActual:porDia.map((n,i)=>i<diasVisibles?n/100:null),
+    diarioPrevio:Array.from({length:diasMes},(_,i)=>i<comparables?porDiaPrev[i]/100:null),
+    comparables,actualComparable,previoComparable,
+    variacion:previoComparable>0?Math.round((actualComparable/previoComparable-1)*10000)/100:null,
+    marcas:topMarcas,hastaMesMarca,
+  };
+}
+
+function GraficaLineasSVG({series,etiquetas,descripcion}){
+  const ancho=620,alto=214,izq=48,der=16,arriba=12,abajo=31;
+  const w=ancho-izq-der,h=alto-arriba-abajo;
+  const valores=series.flatMap(s=>s.valores.filter(n=>n!=null&&Number.isFinite(n)));
+  const mayor=Math.max(0,...valores);
+  const paso=mayor<=1000?250:mayor<=5000?1000:mayor<=20000?5000:mayor<=100000?20000:50000;
+  const maxY=Math.max(paso,Math.ceil(mayor/paso)*paso);
+  const n=Math.max(2,etiquetas.length);
+  const x=i=>izq+(i/(n-1))*w;
+  const y=v=>arriba+h-(v/maxY)*h;
+  const fmtEje=v=>v>=1000000?`${(v/1000000).toFixed(1)}m`:v>=1000?`${Math.round(v/1000)}k`:String(Math.round(v));
+  const fmtBs=v=>`Bs ${Number(v||0).toLocaleString("es-BO",{minimumFractionDigits:2,maximumFractionDigits:2})}`;
+  const marcasX=[...new Set([0,Math.round((n-1)/4),Math.round((n-1)/2),Math.round(3*(n-1)/4),n-1])];
+  const trazo=valores=>{
+    let path="",activo=false;
+    valores.forEach((valor,i)=>{
+      if(valor==null||!Number.isFinite(valor)){activo=false;return;}
+      path+=`${activo?"L":"M"}${x(i).toFixed(1)},${y(valor).toFixed(1)} `;
+      activo=true;
+    });
+    return path.trim();
+  };
+  return <svg role="img" aria-label={descripcion} viewBox={`0 0 ${ancho} ${alto}`}
+    style={{width:"100%",height:"auto",display:"block",overflow:"visible"}}>
+    {[0,1,2,3,4].map(i=>{
+      const valor=maxY*i/4,yy=y(valor);
+      return <g key={i}><line x1={izq} y1={yy} x2={ancho-der} y2={yy} stroke="#E8E1D8" strokeWidth="1"/>
+        <text x={izq-9} y={yy+3} textAnchor="end" fill="#827B72" fontSize="10" fontFamily={FONT}>{fmtEje(valor)}</text></g>;
+    })}
+    {marcasX.map(i=><text key={i} x={x(i)} y={alto-7} textAnchor={i===0?"start":i===n-1?"end":"middle"}
+      fill="#827B72" fontSize="10" fontFamily={FONT}>{etiquetas[i]||""}</text>)}
+    {series.map((s,si)=>{
+      const puntos=s.valores.map((valor,i)=>({valor,i})).filter(p=>p.valor!=null&&Number.isFinite(p.valor));
+      const ultimo=puntos[puntos.length-1];
+      return <g key={`${s.nombre}-${si}`}>
+        <path d={trazo(s.valores)} fill="none" stroke={s.color} strokeWidth={s.punteada?2:3.2}
+          strokeLinecap="round" strokeLinejoin="round" strokeDasharray={s.punteada?"5 6":undefined}/>
+        {puntos.map(p=><circle key={p.i} cx={x(p.i)} cy={y(p.valor)} r="8" fill="transparent">
+          <title>{s.nombre} · {etiquetas[p.i]||p.i}: {fmtBs(p.valor)}</title>
+        </circle>)}
+        {ultimo&&!s.punteada&&<circle cx={x(ultimo.i)} cy={y(ultimo.valor)} r="5" fill="#fff"
+          stroke={s.color} strokeWidth="2.7"/>}
+      </g>;
+    })}
+  </svg>;
+}
+
+function GraficasMensuales({ventas,mes,anio,metaMes}){
+  const isDesktop=useIsDesktop();
+  const [fechaHoy,setFechaHoy]=useState(hoy());
+  useEffect(()=>{
+    const timer=setInterval(()=>setFechaHoy(hoy()),60000);
+    return ()=>clearInterval(timer);
+  },[]);
+  const d=useMemo(()=>datosGraficasMensuales(ventas,mes,anio,metaMes,fechaHoy),
+    [ventas,mes,anio,metaMes,fechaHoy]);
+  const bs=n=>`Bs ${Number(n||0).toLocaleString("es-BO",{minimumFractionDigits:2,maximumFractionDigits:2})}`;
+  const meses=["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
+  const dias=Array.from({length:d.diasMes},(_,i)=>String(i+1).padStart(2,"0"));
+  const base={background:"linear-gradient(180deg,#FFFFFF,#FCFBF9)",border:`1px solid ${C.sep}`,
+    borderRadius:18,padding:isDesktop?18:15,boxShadow:"0 3px 14px rgba(0,0,0,.045)",minWidth:0};
+  const tarjeta=(titulo,subtitulo,dato,detalle,series,etiquetas,descripcion,nota,principal=false)=><div
+    style={{...base,gridColumn:principal?"1 / -1":undefined}}>
+    <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:12,flexWrap:"wrap"}}>
+      <div><div style={{fontSize:17,fontWeight:750,color:C.label}}>{titulo}</div>
+        <div style={{fontSize:12,color:C.label3,marginTop:3}}>{subtitulo}</div></div>
+      <div style={{textAlign:"right"}}><div style={{fontSize:24,fontWeight:800,color:C.label,
+        fontVariantNumeric:"tabular-nums"}}>{dato}</div>
+        <div style={{fontSize:11,color:C.label3}}>{detalle}</div></div>
+    </div>
+    <div style={{display:"flex",gap:15,flexWrap:"wrap",margin:"12px 0 1px"}}>
+      {series.map(s=><span key={s.nombre} style={{display:"inline-flex",alignItems:"center",gap:6,
+        fontSize:11,color:C.label3}}><i style={{width:10,height:3,background:s.color,display:"inline-block",
+        borderRadius:2}}/>{s.nombre}</span>)}
+    </div>
+    <GraficaLineasSVG series={series} etiquetas={etiquetas} descripcion={descripcion}/>
+    <div style={{fontSize:11,color:C.label3,marginTop:2}}>{nota}</div>
+  </div>;
+  const metaSeries=[
+    ...(d.meta>0?[{nombre:"Meta esperada",color:"#D5C4B2",valores:d.metaDiaria,punteada:true}]:[]),
+    {nombre:"Venta acumulada",color:"#BA9160",valores:d.acumulado},
+  ];
+  const comparacionSeries=[
+    {nombre:"Mes anterior",color:"#D5C4B2",valores:d.diarioPrevio},
+    {nombre:"Mes seleccionado",color:"#4A2831",valores:d.diarioActual},
+  ];
+  const colores=["#4A2831","#BA9160","#778F7B"];
+  const marcasSeries=d.marcas.map((m,i)=>({nombre:m.nombre,color:colores[i],
+    valores:m.valores.map((v,idx)=>idx<=d.hastaMesMarca?v:null)}));
+  const comparacion=d.comparables>0&&d.variacion!=null
+    ?`${d.variacion>=0?"+":""}${Math.round(d.variacion)}%`:"—";
+  return <section aria-label="Gráficas mensuales de ventas" style={{marginBottom:isDesktop?12:14}}>
+    <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",gap:8,marginBottom:9}}>
+      <h2 style={{fontSize:17,margin:0,color:C.label}}>Tendencias de ventas</h2>
+      <small style={{color:C.label3}}>{MESES[mes]} {anio} · ventas válidas</small>
+    </div>
+    <div style={{display:"grid",gridTemplateColumns:isDesktop?"repeat(2,minmax(0,1fr))":"1fr",gap:10}}>
+      {tarjeta("Camino a la meta","Avance acumulado del mes",
+        d.meta>0?`${Math.round(d.vendido/d.meta*100)}%`:bs(d.vendido),
+        d.meta>0?`${bs(d.vendido)} de ${bs(d.meta)}`:"Meta mensual sin configurar",
+        metaSeries,["0",...dias],
+        `Ventas acumuladas de ${MESES[mes]} ${anio}: ${bs(d.vendido)}${d.meta>0?` de una meta de ${bs(d.meta)}`:""}`,
+        d.diasVisibles===0?"El período todavía no comenzó.":"La venta real se detiene en el último día transcurrido.",true)}
+      {tarjeta("Mes contra mes","Ventas de cada día equivalente",comparacion,
+        d.comparables?`Comparación hasta el día ${d.comparables}`:"Sin días comparables",
+        comparacionSeries,dias,
+        `Comparación diaria: ${MESES[mes]} ${anio} ${bs(d.actualComparable)} y mes anterior ${bs(d.previoComparable)} en ${d.comparables} días comparables`,
+        "Compara solo los días transcurridos en ambos meses.")}
+      {tarjeta("Pulso por marca","Top 3 por ventas del año seleccionado",
+        d.marcas.length?`${d.marcas.length} marca${d.marcas.length===1?"":"s"}`:"—",
+        d.hastaMesMarca>=0?`Ene–${meses[d.hastaMesMarca]} ${anio}`:`Año ${anio} aún no iniciado`,
+        marcasSeries,meses,
+        `Evolución mensual de ${d.marcas.map(m=>m.nombre).join(", ")||"ninguna marca con ventas"} en ${anio}`,
+        d.marcas.length?"Valores netos de prendas vendidas; no incluye ventas anuladas.":"Todavía no hay ventas por marca en este período.")}
+    </div>
+  </section>;
+}
+
 function HomeDashboard({ventas, inv, vMes, mes, anio, onGoTab, descuentos, descCodigos}){
   const isDesktop = useIsDesktop();
   const [metasMensuales, setMetasMensuales] = useState(()=>{
@@ -12046,6 +12224,8 @@ function HomeDashboard({ventas, inv, vMes, mes, anio, onGoTab, descuentos, descC
           val={vMes.length.toLocaleString("es-BO")}
           sub={`${Object.keys(ventasPorDia).length} día${Object.keys(ventasPorDia).length===1?"":"s"} con ventas`} color={C.green}/>
       </div>
+
+      <GraficasMensuales ventas={ventas} mes={mes} anio={anio} metaMes={metaMes}/>
 
       {/* ── Proyección de cierre mensual ── */}
       <div className="fos-bub" style={{
