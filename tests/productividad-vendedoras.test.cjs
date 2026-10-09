@@ -16,6 +16,7 @@ const sandbox = {
 vm.createContext(sandbox);
 vm.runInContext(src.slice(inicio, fin), sandbox);
 const resumen = sandbox.resumenVentasVendedoras;
+const historial = sandbox.historialProductividadVendedoras;
 
 const cajeras = [
   {usuario:'alejandrap',nombre:'Alejandra Pardo',rol:'caja',estado:'activo'},
@@ -53,4 +54,22 @@ assert.equal(septiembre.filas.find(f=>f.usuario==='nadia').mesCentavos,50000);
 assert.equal(septiembre.filas.find(f=>f.usuario==='nadia').diaCentavos,10000,
   'La tarjeta diaria no debe cambiar cuando se selecciona otro mes');
 
-console.log('OK: ventas por vendedora, alias, turnos compartidos, conciliación y exclusiones');
+const historia = historial(ventas,cajeras,'2026-10-09');
+assert.deepEqual(Array.from(historia,x=>x.periodo),['2026-10','2026-09']);
+assert.equal(historia[0].filas.find(f=>f.usuario==='alejandrap').puesto,1);
+assert.equal(historia[0].filas.find(f=>f.usuario==='nadia').puesto,2);
+assert.equal(historia[0].filas.find(f=>f.usuario==='daniah').puesto,3);
+assert.equal(historia[0].totalTienda,40075);
+assert.equal(historia[1].filas.find(f=>f.usuario==='nadia').puesto,1);
+assert.equal(historia[1].filas.find(f=>f.usuario==='alejandrap').puesto,null);
+assert.equal(historia[1].totalTienda,50000);
+
+const empate = historial([
+  {id:'T1',fecha:'2026-10-09',vendedor:'Nadia',total:100},
+  {id:'T2',fecha:'2026-10-09',vendedor:'Alejandra Pardo',total:100},
+],cajeras,'2026-10-09')[0];
+assert.equal(empate.filas.find(f=>f.usuario==='nadia').puesto,1);
+assert.equal(empate.filas.find(f=>f.usuario==='alejandrap').puesto,1);
+assert.equal(empate.filas.find(f=>f.usuario==='daniah').puesto,null);
+
+console.log('OK: ventas por vendedora, historial mensual, ranking, conciliación y exclusiones');

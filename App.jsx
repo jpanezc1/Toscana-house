@@ -12030,10 +12030,38 @@ function resumenVentasVendedoras(ventas,cajeras,fecha,mes,anio){
   return {filas,otras,fecha,periodo};
 }
 
+// Score = posición por importe vendido dentro de cada mes. Incluye meses y
+// cajeras sin ventas; no inventa puntos ni mezcla ventas de administración.
+function historialProductividadVendedoras(ventas,cajeras,fecha){
+  const periodos=new Set([fecha.slice(0,7)]);
+  for(const v of ventas||[]){
+    if(v.anulada||ventaBloqueada(v.id)||!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(v.fecha||"")||v.fecha>fecha)continue;
+    periodos.add(v.fecha.slice(0,7));
+  }
+  return [...periodos].sort((a,b)=>b.localeCompare(a)).map(periodo=>{
+    const [anio,mes]=periodo.split("-").map(Number);
+    const r=resumenVentasVendedoras(ventas,cajeras,fecha,mes-1,anio);
+    const filas=[...r.filas].sort((a,b)=>b.mesCentavos-a.mesCentavos||a.nombre.localeCompare(b.nombre));
+    let puesto=0,importeAnterior=null;
+    const ranking=filas.map((f,i)=>{
+      if(f.mesCentavos<=0)return {...f,puesto:null};
+      if(f.mesCentavos!==importeAnterior)puesto=i+1;
+      importeAnterior=f.mesCentavos;
+      return {...f,puesto};
+    });
+    const totalCajeras=filas.reduce((n,f)=>n+f.mesCentavos,0);
+    return {periodo,filas:ranking,otras:r.otras,totalCajeras,
+      totalTienda:totalCajeras+r.otras.mesCentavos};
+  });
+}
+
 function RendimientoVendedoras({ventas,mes,anio}){
   const isDesktop=useIsDesktop();
   const [fecha,setFecha]=useState(hoy());
   const [cajeras,setCajeras]=useState(null);
+  const [periodoEquipo,setPeriodoEquipo]=useState(`${anio}-${String(mes+1).padStart(2,"0")}`);
+  const [verTodo,setVerTodo]=useState(false);
+  useEffect(()=>setPeriodoEquipo(`${anio}-${String(mes+1).padStart(2,"0")}`),[mes,anio]);
   useEffect(()=>{
     let mounted=true;
     const cargar=()=>sbCargarUsuarios().then(lista=>{
@@ -12046,13 +12074,75 @@ function RendimientoVendedoras({ventas,mes,anio}){
     const timer=setInterval(()=>setFecha(hoy()),60000);
     return ()=>{mounted=false;clearInterval(timer);};
   },[]);
-  const resumen=useMemo(()=>resumenVentasVendedoras(ventas,cajeras||[],fecha,mes,anio),
-    [ventas,cajeras,fecha,mes,anio]);
+  const historial=useMemo(()=>historialProductividadVendedoras(ventas,cajeras||[],fecha),
+    [ventas,cajeras,fecha]);
+  const [anioEquipo,mesEquipo]=periodoEquipo.split("-").map(Number);
+  const resumen=useMemo(()=>resumenVentasVendedoras(ventas,cajeras||[],fecha,mesEquipo-1,anioEquipo),
+    [ventas,cajeras,fecha,mesEquipo,anioEquipo]);
   const bs=centavos=>`Bs ${(centavos/100).toLocaleString("es-BO",{minimumFractionDigits:2,maximumFractionDigits:2})}`;
+  const etiquetaPeriodo=p=>{const [a,m]=p.split("-").map(Number);return `${MESES[m-1]} ${a}`;};
+  const periodosDisponibles=[...new Set([periodoEquipo,...historial.map(h=>h.periodo)])]
+    .sort((a,b)=>b.localeCompare(a));
+  async function exportarScore(){
+    try{
+      const XLSX=await getXLSXRead();
+      const wb=XLSX.utils.book_new();
+      const score=[["MES","PUESTO","VENDEDORA","VENTAS","VENDIDO (BS)","% DE VENTAS DE CAJERAS"]];
+      for(const h of historial){
+        for(const f of h.filas)score.push([h.periodo,f.puesto||"",f.nombre,f.mesVentas,
+          f.mesCentavos/100,h.totalCajeras?+(f.mesCentavos/h.totalCajeras*100).toFixed(2):0]);
+        if(h.otras.mesVentas)score.push([h.periodo,"",h.otras.nombre,h.otras.mesVentas,h.otras.mesCentavos/100,""]);
+      }
+      const wsScore=XLSX.utils.aoa_to_sheet(score);
+      wsScore["!cols"]=[{wch:12},{wch:9},{wch:30},{wch:10},{wch:18},{wch:24}];
+      XLSX.utils.book_append_sheet(wb,wsScore,"Ranking mensual");
+      const resumenRows=[["VENDEDORA","VENTAS TOTALES","VENDIDO TOTAL (BS)","MESES CON VENTAS","MEJOR MES","MEJOR MES (BS)"]];
+      for(const u of (cajeras||[]).filter(u=>u.rol==="caja")){
+        const registros=historial.map(h=>({periodo:h.periodo,f:h.filas.find(f=>f.usuario===u.usuario)}));
+        const mejor=[...registros].sort((a,b)=>(b.f?.mesCentavos||0)-(a.f?.mesCentavos||0))[0];
+        resumenRows.push([u.nombre||u.usuario,registros.reduce((n,x)=>n+(x.f?.mesVentas||0),0),
+          registros.reduce((n,x)=>n+(x.f?.mesCentavos||0),0)/100,
+          registros.filter(x=>x.f?.mesVentas>0).length,
+          mejor?.f?.mesCentavos?mejor.periodo:"",(mejor?.f?.mesCentavos||0)/100]);
+      }
+      const wsResumen=XLSX.utils.aoa_to_sheet(resumenRows);
+      wsResumen["!cols"]=[{wch:30},{wch:17},{wch:22},{wch:20},{wch:14},{wch:20}];
+      XLSX.utils.book_append_sheet(wb,wsResumen,"Acumulado");
+      const nombres=new Map((cajeras||[]).filter(u=>u.rol==="caja")
+        .map(u=>[normalizarNombreVendedor(u.nombre||u.usuario),u.nombre||u.usuario]));
+      const dania=(cajeras||[]).find(u=>u.usuario==="daniah");
+      if(dania)nombres.set("dania",dania.nombre||dania.usuario);
+      const detalle=[["ID VENTA","FECHA","HORA","MES","VENDEDOR REGISTRADO","ASIGNACIÓN","IMPORTE NETO (BS)"]];
+      for(const v of ventas||[]){
+        if(v.anulada||ventaBloqueada(v.id)||!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(v.fecha||"")||v.fecha>fecha)continue;
+        const importe=Number(getDisplayTotal(v)||0);
+        if(!Number.isFinite(importe)||importe<0)continue;
+        detalle.push([v.id||"",v.fecha,v.hora||"",v.fecha.slice(0,7),v.vendedor||"",
+          nombres.get(normalizarNombreVendedor(v.vendedor))||"Administración / sin asignar",+importe.toFixed(2)]);
+      }
+      const wsDetalle=XLSX.utils.aoa_to_sheet(detalle);
+      wsDetalle["!cols"]=[{wch:23},{wch:13},{wch:13},{wch:12},{wch:28},{wch:30},{wch:22}];
+      XLSX.utils.book_append_sheet(wb,wsDetalle,"Ventas fuente");
+      const criterios=XLSX.utils.aoa_to_sheet([
+        ["REPORTE","SCORE DE VENDEDORAS · TOSCANA HOUSE"],
+        ["GENERADO",new Date().toLocaleString("es-BO",{timeZone:"America/La_Paz"})],
+        ["CORTE",fecha],
+        ["SCORE","Posición mensual según el importe neto vendido; empates comparten puesto."],
+        ["VENTAS INCLUIDAS","Ventas registradas hasta el corte; no incluye anuladas ni pruebas."],
+        ["ATRIBUCIÓN","Vendedor registrado en cada venta; no usuario que abrió el turno."],
+        ["SIN ASIGNAR","Ventas de administración o sin vendedora de caja, separadas para conciliar el total."],
+      ]);
+      criterios["!cols"]=[{wch:22},{wch:90}];
+      XLSX.utils.book_append_sheet(wb,criterios,"Criterios");
+      const buf=XLSX.write(wb,{bookType:"xlsx",type:"array"});
+      descargarArchivo(new Blob([buf],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}),
+        `Toscana_Score_Vendedoras_${fecha}.xlsx`);
+    }catch(e){alert(`No se pudo descargar el score: ${e.message}`);}
+  }
   if(cajeras===null)return <section aria-label="Productividad de vendedoras" style={{
     background:"#fff",border:`1px solid ${C.sep}`,borderRadius:18,padding:18,
     marginBottom:isDesktop?12:14,fontSize:13,color:C.label3}}>Cargando productividad del equipo…</section>;
-  const tarjeta=(titulo,subtitulo,campoMonto,campoVentas)=>{
+  const tarjeta=(titulo,subtitulo,campoMonto,campoVentas,selector=false)=>{
     const filas=[...resumen.filas].sort((a,b)=>b[campoMonto]-a[campoMonto]||a.nombre.localeCompare(b.nombre));
     const total=filas.reduce((s,f)=>s+f[campoMonto],resumen.otras[campoMonto]);
     const max=Math.max(1,...filas.map(f=>f[campoMonto]));
@@ -12060,7 +12150,12 @@ function RendimientoVendedoras({ventas,mes,anio}){
       borderRadius:18,padding:isDesktop?18:15,minWidth:0,boxShadow:"0 3px 14px rgba(0,0,0,.045)"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10,flexWrap:"wrap",marginBottom:14}}>
         <div><div style={{fontSize:17,fontWeight:750,color:C.label}}>{titulo}</div>
-          <div style={{fontSize:12,color:C.label3,marginTop:3}}>{subtitulo}</div></div>
+          {selector?<select aria-label="Mes de ventas por vendedora" value={periodoEquipo}
+            onChange={e=>setPeriodoEquipo(e.target.value)} style={{marginTop:4,padding:"5px 8px",
+              background:"#F7F4EF",border:`1px solid ${C.sep}`,borderRadius:8,color:C.label,
+              fontSize:12,fontFamily:FONT,cursor:"pointer"}}>
+            {periodosDisponibles.map(p=><option key={p} value={p}>{etiquetaPeriodo(p)}</option>)}
+          </select>:<div style={{fontSize:12,color:C.label3,marginTop:3}}>{subtitulo}</div>}</div>
         <div style={{textAlign:"right",fontVariantNumeric:"tabular-nums"}}>
           <strong style={{fontSize:20,color:C.label}}>{bs(total)}</strong>
           <div style={{fontSize:11,color:C.label3}}>total tienda</div>
@@ -12095,7 +12190,42 @@ function RendimientoVendedoras({ventas,mes,anio}){
     </div>
     <div style={{display:"grid",gridTemplateColumns:isDesktop?"repeat(2,minmax(0,1fr))":"1fr",gap:10}}>
       {tarjeta("Ventas de hoy",fecha.split("-").reverse().join("/"),"diaCentavos","diaVentas")}
-      {tarjeta("Ventas del mes",`${MESES[mes]} ${anio}`,"mesCentavos","mesVentas")}
+      {tarjeta("Ventas del mes",etiquetaPeriodo(periodoEquipo),"mesCentavos","mesVentas",true)}
+    </div>
+    <div style={{background:"linear-gradient(180deg,#FFFFFF,#FCFBF9)",border:`1px solid ${C.sep}`,
+      borderRadius:18,padding:isDesktop?18:15,marginTop:10,boxShadow:"0 3px 14px rgba(0,0,0,.045)"}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:12,flexWrap:"wrap",marginBottom:12}}>
+        <div><div style={{fontSize:17,fontWeight:750,color:C.label}}>Historial y score mensual</div>
+          <div style={{fontSize:11,color:C.label3,marginTop:3}}>Posición por importe vendido · sin ventas anuladas</div></div>
+        <button onClick={exportarScore} style={{border:`1px solid ${C.gold}`,background:"#F7F0E6",
+          color:C.label,borderRadius:10,padding:"9px 12px",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:FONT}}>
+          ↓ Descargar score Excel
+        </button>
+      </div>
+      {(verTodo?historial:historial.slice(0,4)).map(h=><div key={h.periodo} style={{
+        borderTop:`1px solid ${C.sep}`,padding:"11px 0"}}>
+        <button onClick={()=>setPeriodoEquipo(h.periodo)} style={{display:"flex",justifyContent:"space-between",
+          alignItems:"center",width:"100%",gap:10,border:0,background:"none",padding:0,cursor:"pointer",
+          color:C.label,fontFamily:FONT,textAlign:"left"}}>
+          <strong style={{fontSize:13}}>{etiquetaPeriodo(h.periodo)}{h.periodo===periodoEquipo?" · seleccionado":""}</strong>
+          <span style={{fontSize:12,fontVariantNumeric:"tabular-nums"}}>{bs(h.totalTienda)}</span>
+        </button>
+        {h.filas.map(f=><div key={f.usuario} style={{display:"grid",gridTemplateColumns:"28px 1fr auto",
+          gap:8,alignItems:"baseline",padding:"5px 0",fontSize:12,color:C.label2}}>
+          <span style={{fontWeight:700,color:f.puesto===1?C.gold:C.label3}}>{f.puesto?`${f.puesto}º`:"—"}</span>
+          <span>{f.nombre} <small style={{color:C.label3}}>· {f.mesVentas} venta{f.mesVentas===1?"":"s"}</small></span>
+          <strong style={{fontVariantNumeric:"tabular-nums",whiteSpace:"nowrap"}}>{bs(f.mesCentavos)}</strong>
+        </div>)}
+        {h.otras.mesVentas>0&&<div style={{display:"flex",justifyContent:"space-between",gap:8,
+          fontSize:11,color:C.label3,marginTop:4}}>
+          <span>Administración / sin asignar · {h.otras.mesVentas} ventas</span>
+          <span>{bs(h.otras.mesCentavos)}</span>
+        </div>}
+      </div>)}
+      {historial.length>4&&<button onClick={()=>setVerTodo(v=>!v)} style={{border:0,background:"none",
+        color:C.gold,fontSize:12,fontWeight:700,cursor:"pointer",padding:"7px 0",fontFamily:FONT}}>
+        {verTodo?"Ver menos":"Ver todo el historial"}
+      </button>}
     </div>
   </section>;
 }
