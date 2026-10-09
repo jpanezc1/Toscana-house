@@ -11,9 +11,7 @@ assert.ok(inicio >= 0 && fin > inicio, 'No se encontró el cálculo de las gráf
 const sandbox = {
   hoy: () => '2026-10-09',
   getDisplayTotal: v => v.total,
-  netItemSub: (_v, it) => it.neto,
   ventaBloqueada: id => String(id).startsWith('TEST'),
-  normalizarNombreVendedor: nombre => nombre.toLowerCase().trim(),
 };
 vm.createContext(sandbox);
 vm.runInContext(src.slice(inicio, fin), sandbox);
@@ -41,10 +39,6 @@ assert.equal(actual.comparables, 9);
 assert.equal(actual.previoComparable, 100);
 assert.equal(actual.actualComparable, 150.5);
 assert.equal(actual.variacion, 50.5);
-assert.deepEqual(JSON.parse(JSON.stringify(actual.marcas)), [
-  {nombre:'Ramona',valores:[0,0,0,0,0,0,0,10,80,100,0,0]},
-  {nombre:'Glowphoria',valores:[0,0,0,0,0,0,0,0,20,50.5,0,0]},
-]);
 
 const historico = calcular(ventas, 8, 2026, 0, '2026-10-09');
 assert.equal(historico.diasVisibles, 30);
@@ -55,7 +49,6 @@ assert.equal(historico.metaDiaria.length, 0);
 const futuro = calcular(ventas, 10, 2026, 0, '2026-10-09');
 assert.equal(futuro.diasVisibles, 0);
 assert.deepEqual(JSON.parse(JSON.stringify(futuro.acumulado)), [0]);
-assert.equal(futuro.marcas.length, 0);
 
 const enero = calcular([
   {id:'9',fecha:'2025-12-03',total:42},
@@ -65,4 +58,4 @@ assert.equal(enero.comparables, 4);
 assert.equal(enero.previoComparable, 42);
 assert.equal(enero.actualComparable, 50);
 
-console.log('OK: gráficas mensuales, meta, comparación justa, marcas y cambio de año');
+console.log('OK: gráficas mensuales, meta, comparación justa y cambio de año');

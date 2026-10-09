@@ -11855,8 +11855,8 @@ function MetasCajaInicio({ventas,user}){
   </section>;
 }
 
-// Tres lecturas del mismo libro de ventas: acumulado/meta, día equivalente
-// del mes anterior y evolución mensual de las marcas. Ninguna escribe datos.
+// Dos lecturas del mismo libro de ventas: acumulado/meta y día equivalente
+// del mes anterior. Ninguna escribe datos.
 function datosGraficasMensuales(ventas,mes,anio,metaMes,fechaActual=hoy()){
   const periodo=`${anio}-${String(mes+1).padStart(2,"0")}`;
   const [hoyAnio,hoyMes,hoyDia]=fechaActual.split("-").map(Number);
@@ -11867,8 +11867,6 @@ function datosGraficasMensuales(ventas,mes,anio,metaMes,fechaActual=hoy()){
   const periodoPrev=`${anioPrev}-${String(mesPrev+1).padStart(2,"0")}`;
   const diasPrev=new Date(anioPrev,mesPrev+1,0).getDate();
   const porDia=Array(diasMes).fill(0),porDiaPrev=Array(diasPrev).fill(0);
-  const marcas=new Map();
-  const hastaMesMarca=elegido<=actual?mes:-1;
   for(const v of ventas||[]){
     if(v.anulada||ventaBloqueada(v.id)||!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(v.fecha||"")||v.fecha>fechaActual)continue;
     const fechaMes=v.fecha.slice(0,7),dia=Number(v.fecha.slice(8,10));
@@ -11876,19 +11874,6 @@ function datosGraficasMensuales(ventas,mes,anio,metaMes,fechaActual=hoy()){
     if(Number.isFinite(centavos)&&centavos>=0){
       if(fechaMes===periodo&&dia>=1&&dia<=diasMes)porDia[dia-1]+=centavos;
       if(fechaMes===periodoPrev&&dia>=1&&dia<=diasPrev)porDiaPrev[dia-1]+=centavos;
-    }
-    const mesVenta=Number(v.fecha.slice(5,7))-1;
-    if(Number(v.fecha.slice(0,4))!==anio||mesVenta<0||mesVenta>hastaMesMarca)continue;
-    for(const it of v.items||[]){
-      const nombre=String(it.marcaNombre||"").trim();
-      if(!nombre)continue;
-      const clave=it.marcaId!=null?`id:${it.marcaId}`:`nombre:${normalizarNombreVendedor(nombre)}`;
-      const neto=Math.round(Number(netItemSub(v,it)||0)*100);
-      if(!Number.isFinite(neto)||neto<0)continue;
-      if(!marcas.has(clave))marcas.set(clave,{nombre,centavos:Array(12).fill(0),total:0});
-      const marca=marcas.get(clave);
-      marca.centavos[mesVenta]+=neto;
-      marca.total+=neto;
     }
   }
   let suma=0;
@@ -11900,9 +11885,6 @@ function datosGraficasMensuales(ventas,mes,anio,metaMes,fechaActual=hoy()){
   const comparables=Math.min(diasVisibles,diasPrev);
   const actualComparable=porDia.slice(0,comparables).reduce((s,n)=>s+n,0)/100;
   const previoComparable=porDiaPrev.slice(0,comparables).reduce((s,n)=>s+n,0)/100;
-  const topMarcas=[...marcas.values()].filter(m=>m.total>0)
-    .sort((a,b)=>b.total-a.total||a.nombre.localeCompare(b.nombre)).slice(0,3)
-    .map(m=>({nombre:m.nombre,valores:m.centavos.map(n=>n/100)}));
   return {
     periodo,diasMes,diasVisibles,meta:Math.max(0,Number(metaMes)||0),
     acumulado,vendido:suma/100,
@@ -11911,7 +11893,6 @@ function datosGraficasMensuales(ventas,mes,anio,metaMes,fechaActual=hoy()){
     diarioPrevio:Array.from({length:diasMes},(_,i)=>i<comparables?porDiaPrev[i]/100:null),
     comparables,actualComparable,previoComparable,
     variacion:previoComparable>0?Math.round((actualComparable/previoComparable-1)*10000)/100:null,
-    marcas:topMarcas,hastaMesMarca,
   };
 }
 
@@ -11972,12 +11953,10 @@ function GraficasMensuales({ventas,mes,anio,metaMes}){
   const d=useMemo(()=>datosGraficasMensuales(ventas,mes,anio,metaMes,fechaHoy),
     [ventas,mes,anio,metaMes,fechaHoy]);
   const bs=n=>`Bs ${Number(n||0).toLocaleString("es-BO",{minimumFractionDigits:2,maximumFractionDigits:2})}`;
-  const meses=["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
   const dias=Array.from({length:d.diasMes},(_,i)=>String(i+1).padStart(2,"0"));
   const base={background:"linear-gradient(180deg,#FFFFFF,#FCFBF9)",border:`1px solid ${C.sep}`,
     borderRadius:18,padding:isDesktop?18:15,boxShadow:"0 3px 14px rgba(0,0,0,.045)",minWidth:0};
-  const tarjeta=(titulo,subtitulo,dato,detalle,series,etiquetas,descripcion,nota,principal=false)=><div
-    style={{...base,gridColumn:principal?"1 / -1":undefined}}>
+  const tarjeta=(titulo,subtitulo,dato,detalle,series,etiquetas,descripcion,nota)=><div style={base}>
     <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:12,flexWrap:"wrap"}}>
       <div><div style={{fontSize:17,fontWeight:750,color:C.label}}>{titulo}</div>
         <div style={{fontSize:12,color:C.label3,marginTop:3}}>{subtitulo}</div></div>
@@ -12001,9 +11980,6 @@ function GraficasMensuales({ventas,mes,anio,metaMes}){
     {nombre:"Mes anterior",color:"#D5C4B2",valores:d.diarioPrevio},
     {nombre:"Mes seleccionado",color:"#4A2831",valores:d.diarioActual},
   ];
-  const colores=["#4A2831","#BA9160","#778F7B"];
-  const marcasSeries=d.marcas.map((m,i)=>({nombre:m.nombre,color:colores[i],
-    valores:m.valores.map((v,idx)=>idx<=d.hastaMesMarca?v:null)}));
   const comparacion=d.comparables>0&&d.variacion!=null
     ?`${d.variacion>=0?"+":""}${Math.round(d.variacion)}%`:"—";
   return <section aria-label="Gráficas mensuales de ventas" style={{marginBottom:isDesktop?12:14}}>
@@ -12011,24 +11987,18 @@ function GraficasMensuales({ventas,mes,anio,metaMes}){
       <h2 style={{fontSize:17,margin:0,color:C.label}}>Tendencias de ventas</h2>
       <small style={{color:C.label3}}>{MESES[mes]} {anio} · ventas válidas</small>
     </div>
-    <div style={{display:"grid",gridTemplateColumns:isDesktop?"repeat(2,minmax(0,1fr))":"1fr",gap:10}}>
+    <div style={{display:"grid",gridTemplateColumns:"1fr",gap:10}}>
       {tarjeta("Camino a la meta","Avance acumulado del mes",
         d.meta>0?`${Math.round(d.vendido/d.meta*100)}%`:bs(d.vendido),
         d.meta>0?`${bs(d.vendido)} de ${bs(d.meta)}`:"Meta mensual sin configurar",
         metaSeries,["0",...dias],
         `Ventas acumuladas de ${MESES[mes]} ${anio}: ${bs(d.vendido)}${d.meta>0?` de una meta de ${bs(d.meta)}`:""}`,
-        d.diasVisibles===0?"El período todavía no comenzó.":"La venta real se detiene en el último día transcurrido.",true)}
+        d.diasVisibles===0?"El período todavía no comenzó.":"La venta real se detiene en el último día transcurrido.")}
       {tarjeta("Mes contra mes","Ventas de cada día equivalente",comparacion,
         d.comparables?`Comparación hasta el día ${d.comparables}`:"Sin días comparables",
         comparacionSeries,dias,
         `Comparación diaria: ${MESES[mes]} ${anio} ${bs(d.actualComparable)} y mes anterior ${bs(d.previoComparable)} en ${d.comparables} días comparables`,
         "Compara solo los días transcurridos en ambos meses.")}
-      {tarjeta("Pulso por marca","Top 3 por ventas del año seleccionado",
-        d.marcas.length?`${d.marcas.length} marca${d.marcas.length===1?"":"s"}`:"—",
-        d.hastaMesMarca>=0?`Ene–${meses[d.hastaMesMarca]} ${anio}`:`Año ${anio} aún no iniciado`,
-        marcasSeries,meses,
-        `Evolución mensual de ${d.marcas.map(m=>m.nombre).join(", ")||"ninguna marca con ventas"} en ${anio}`,
-        d.marcas.length?"Valores netos de prendas vendidas; no incluye ventas anuladas.":"Todavía no hay ventas por marca en este período.")}
     </div>
   </section>;
 }
