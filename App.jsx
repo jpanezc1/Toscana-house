@@ -12003,7 +12003,104 @@ function GraficasMensuales({ventas,mes,anio,metaMes}){
   </section>;
 }
 
-function HomeDashboard({ventas, inv, vMes, mes, anio, onGoTab, descuentos, descCodigos}){
+// Productividad atribuida al vendedor guardado en cada venta. El turno de caja
+// no identifica al vendedor: varias cajeras pueden cobrar dentro del mismo turno.
+function resumenVentasVendedoras(ventas,cajeras,fecha,mes,anio){
+  const periodo=`${anio}-${String(mes+1).padStart(2,"0")}`;
+  const filas=(cajeras||[]).filter(u=>u.rol==="caja").map(u=>({
+    usuario:u.usuario,nombre:u.nombre||u.usuario,estado:u.estado||"activo",
+    diaCentavos:0,diaVentas:0,mesCentavos:0,mesVentas:0,
+  }));
+  const porNombre=new Map();
+  filas.forEach(f=>porNombre.set(normalizarNombreVendedor(f.nombre),f));
+  // Ventas anteriores al alta de Dania tenían únicamente su primer nombre.
+  const dania=filas.find(f=>f.usuario==="daniah");
+  if(dania)porNombre.set("dania",dania);
+  const otras={nombre:"Administración / sin asignar",diaCentavos:0,diaVentas:0,mesCentavos:0,mesVentas:0};
+  for(const v of ventas||[]){
+    if(v.anulada||ventaBloqueada(v.id)||!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(v.fecha||"")||v.fecha>fecha)continue;
+    const esDia=v.fecha===fecha,esMes=v.fecha.slice(0,7)===periodo;
+    if(!esDia&&!esMes)continue;
+    const centavos=Math.round(Number(getDisplayTotal(v)||0)*100);
+    if(!Number.isFinite(centavos)||centavos<0)continue;
+    const fila=porNombre.get(normalizarNombreVendedor(v.vendedor))||otras;
+    if(esDia){fila.diaCentavos+=centavos;fila.diaVentas++;}
+    if(esMes){fila.mesCentavos+=centavos;fila.mesVentas++;}
+  }
+  return {filas,otras,fecha,periodo};
+}
+
+function RendimientoVendedoras({ventas,mes,anio}){
+  const isDesktop=useIsDesktop();
+  const [fecha,setFecha]=useState(hoy());
+  const [cajeras,setCajeras]=useState(null);
+  useEffect(()=>{
+    let mounted=true;
+    const cargar=()=>sbCargarUsuarios().then(lista=>{
+      if(!mounted)return;
+      if(lista){setCajeras(lista);return;}
+      try{setCajeras(JSON.parse(localStorage.getItem("th_usuarios")||"[]"));}
+      catch{setCajeras([]);}
+    });
+    cargar();
+    const timer=setInterval(()=>setFecha(hoy()),60000);
+    return ()=>{mounted=false;clearInterval(timer);};
+  },[]);
+  const resumen=useMemo(()=>resumenVentasVendedoras(ventas,cajeras||[],fecha,mes,anio),
+    [ventas,cajeras,fecha,mes,anio]);
+  const bs=centavos=>`Bs ${(centavos/100).toLocaleString("es-BO",{minimumFractionDigits:2,maximumFractionDigits:2})}`;
+  if(cajeras===null)return <section aria-label="Productividad de vendedoras" style={{
+    background:"#fff",border:`1px solid ${C.sep}`,borderRadius:18,padding:18,
+    marginBottom:isDesktop?12:14,fontSize:13,color:C.label3}}>Cargando productividad del equipo…</section>;
+  const tarjeta=(titulo,subtitulo,campoMonto,campoVentas)=>{
+    const filas=[...resumen.filas].sort((a,b)=>b[campoMonto]-a[campoMonto]||a.nombre.localeCompare(b.nombre));
+    const total=filas.reduce((s,f)=>s+f[campoMonto],resumen.otras[campoMonto]);
+    const max=Math.max(1,...filas.map(f=>f[campoMonto]));
+    return <div style={{background:"linear-gradient(180deg,#FFFFFF,#FCFBF9)",border:`1px solid ${C.sep}`,
+      borderRadius:18,padding:isDesktop?18:15,minWidth:0,boxShadow:"0 3px 14px rgba(0,0,0,.045)"}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10,flexWrap:"wrap",marginBottom:14}}>
+        <div><div style={{fontSize:17,fontWeight:750,color:C.label}}>{titulo}</div>
+          <div style={{fontSize:12,color:C.label3,marginTop:3}}>{subtitulo}</div></div>
+        <div style={{textAlign:"right",fontVariantNumeric:"tabular-nums"}}>
+          <strong style={{fontSize:20,color:C.label}}>{bs(total)}</strong>
+          <div style={{fontSize:11,color:C.label3}}>total tienda</div>
+        </div>
+      </div>
+      {filas.map(f=><div key={f.usuario} style={{padding:"10px 0",borderTop:`1px solid ${C.sep}`}}>
+        <div style={{display:"flex",justifyContent:"space-between",gap:10,alignItems:"baseline"}}>
+          <div style={{fontSize:13,fontWeight:650,color:C.label}}>{f.nombre}{f.estado==="inactivo"?" · inactiva":""}</div>
+          <strong style={{fontSize:15,color:C.label,fontVariantNumeric:"tabular-nums",whiteSpace:"nowrap"}}>{bs(f[campoMonto])}</strong>
+        </div>
+        <div style={{display:"flex",justifyContent:"space-between",gap:8,fontSize:11,color:C.label3,marginTop:3}}>
+          <span>{f[campoVentas]} venta{f[campoVentas]===1?"":"s"}</span>
+          <span>{total>0?Math.round(f[campoMonto]/total*100):0}% del total</span>
+        </div>
+        <div style={{height:4,background:"#EDE8E1",borderRadius:99,marginTop:7,overflow:"hidden"}}>
+          <div style={{width:`${f[campoMonto]/max*100}%`,height:"100%",background:C.gold,borderRadius:99}}/>
+        </div>
+      </div>)}
+      {filas.length===0&&<div style={{fontSize:12,color:C.label3,padding:"12px 0"}}>
+        No hay cuentas de caja disponibles.</div>}
+      {resumen.otras[campoVentas]>0&&<div style={{display:"flex",justifyContent:"space-between",gap:10,
+        borderTop:`1px solid ${C.sep}`,paddingTop:10,fontSize:12,color:C.label2}}>
+        <span>{resumen.otras.nombre} · {resumen.otras[campoVentas]} venta{resumen.otras[campoVentas]===1?"":"s"}</span>
+        <strong style={{fontVariantNumeric:"tabular-nums",whiteSpace:"nowrap"}}>{bs(resumen.otras[campoMonto])}</strong>
+      </div>}
+    </div>;
+  };
+  return <section aria-label="Productividad de vendedoras" style={{marginBottom:isDesktop?12:14}}>
+    <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",gap:8,marginBottom:9}}>
+      <h2 style={{fontSize:17,margin:0,color:C.label}}>Productividad del equipo</h2>
+      <small style={{fontSize:11,color:C.label3}}>Según vendedor registrado en cada venta</small>
+    </div>
+    <div style={{display:"grid",gridTemplateColumns:isDesktop?"repeat(2,minmax(0,1fr))":"1fr",gap:10}}>
+      {tarjeta("Ventas de hoy",fecha.split("-").reverse().join("/"),"diaCentavos","diaVentas")}
+      {tarjeta("Ventas del mes",`${MESES[mes]} ${anio}`,"mesCentavos","mesVentas")}
+    </div>
+  </section>;
+}
+
+function HomeDashboard({ventas, inv, vMes, mes, anio, onGoTab, descuentos, descCodigos, mostrarRendimiento}){
   const isDesktop = useIsDesktop();
   const [metasMensuales, setMetasMensuales] = useState(()=>{
     try { return JSON.parse(localStorage.getItem("th_meta_mensual_v1")||"{}"); }
@@ -12194,6 +12291,8 @@ function HomeDashboard({ventas, inv, vMes, mes, anio, onGoTab, descuentos, descC
           val={vMes.length.toLocaleString("es-BO")}
           sub={`${Object.keys(ventasPorDia).length} día${Object.keys(ventasPorDia).length===1?"":"s"} con ventas`} color={C.green}/>
       </div>
+
+      {mostrarRendimiento&&<RendimientoVendedoras ventas={ventas} mes={mes} anio={anio}/>}
 
       <GraficasMensuales ventas={ventas} mes={mes} anio={anio} metaMes={metaMes}/>
 
@@ -18066,6 +18165,7 @@ function App(){
               mes={mes} anio={anio}
               onGoTab={setTab}
               descuentos={descuentos} descCodigos={descCodigos}
+              mostrarRendimiento={user.rol==="admin"}
             />
           </>
         )}
