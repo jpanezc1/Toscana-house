@@ -11760,7 +11760,34 @@ function MetaReloj({porcentaje,color}){
   </div>;
 }
 
-function MetasCajaInicio({ventas}){
+function normalizarNombreVendedor(nombre){
+  return String(nombre||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"")
+    .toLowerCase().replace(/\s+/g," ").trim();
+}
+
+// Récord personal histórico. Las ventas de caja usan el nombre de la cuenta;
+// los registros anteriores al alta de Dania también dicen solo "Dania".
+function mejorDiaVendedora(ventas,user){
+  const nombre=normalizarNombreVendedor(user?.nombre);
+  if(!nombre)return null;
+  const nombres=new Set([nombre]);
+  if(user?.usuario==="daniah") nombres.add("dania");
+  const porFecha=new Map();
+  for(const v of ventas||[]){
+    if(v.anulada||ventaBloqueada(v.id)||!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(v.fecha||"")
+      ||!nombres.has(normalizarNombreVendedor(v.vendedor)))continue;
+    const cents=Math.round(Number(getDisplayTotal(v)||0)*100);
+    if(!Number.isFinite(cents)||cents<0)continue;
+    const actual=porFecha.get(v.fecha)||{fecha:v.fecha,centavos:0,ventas:0};
+    actual.centavos+=cents;
+    actual.ventas++;
+    porFecha.set(v.fecha,actual);
+  }
+  const mejor=[...porFecha.values()].sort((a,b)=>b.centavos-a.centavos||a.fecha.localeCompare(b.fecha))[0];
+  return mejor?{fecha:mejor.fecha,total:mejor.centavos/100,ventas:mejor.ventas}:null;
+}
+
+function MetasCajaInicio({ventas,user}){
   const [fecha,setFecha]=useState(hoy());
   const [metasMes,setMetasMes]=useState(()=>{try{return JSON.parse(localStorage.getItem("th_meta_mensual_v1")||"{}");}catch{return {};}});
   const [metasDia,setMetasDia]=useState(()=>{try{return JSON.parse(localStorage.getItem("th_meta_diaria_v1")||"{}");}catch{return {};}});
@@ -11780,6 +11807,7 @@ function MetasCajaInicio({ventas}){
   const diaConfigurado=Number(metasDia[periodo])||0;
   const diaMeta=diaConfigurado>0?diaConfigurado:mesMeta>0?mesMeta/diasMes:0;
   const validas=ventas.filter(v=>!v.anulada&&!ventaBloqueada(v.id));
+  const mejorPersonal=useMemo(()=>mejorDiaVendedora(ventas,user),[ventas,user?.nombre,user?.usuario]);
   const deHoy=validas.filter(v=>v.fecha===fecha);
   const delMes=validas.filter(v=>typeof v.fecha==="string"&&v.fecha.slice(0,7)===periodo);
   const sumar=lista=>lista.reduce((s,v)=>s+getDisplayTotal(v),0);
@@ -11808,6 +11836,21 @@ function MetasCajaInicio({ventas}){
     <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))",gap:10}}>
       {tarjeta("Hoy",deHoy,diaMeta,C.green,diaConfigurado>0?"meta diaria configurada":mesMeta>0?"meta diaria calculada del mes":"configurar meta en Administración")}
       {tarjeta("Este mes",delMes,mesMeta,C.gold,`${Math.max(0,diasMes-Number(fecha.slice(8))+1)} días del mes disponibles`)}
+      <div aria-label="Tu mejor día de ventas en Toscana" style={{gridColumn:"1 / -1",background:"linear-gradient(135deg,#fff,#F8F4EE)",
+        border:`1px solid ${C.sep}`,borderRadius:18,padding:"18px 20px",display:"flex",alignItems:"center",gap:16,
+        boxShadow:"0 3px 14px rgba(0,0,0,.05)"}}>
+        <div aria-hidden="true" style={{width:58,height:58,borderRadius:17,background:"#F5EBDD",display:"grid",
+          placeItems:"center",fontSize:28,flexShrink:0}}>🏆</div>
+        <div style={{minWidth:0}}>
+          <div style={{fontSize:12,color:C.label3,textTransform:"uppercase",letterSpacing:1,fontWeight:700}}>Tu mejor día en Toscana</div>
+          <div style={{fontSize:27,fontWeight:800,color:C.label,fontVariantNumeric:"tabular-nums",marginTop:3}}>
+            {mejorPersonal?bs(mejorPersonal.total):"Todavía sin ventas"}</div>
+          <div style={{fontSize:13,color:C.label2,marginTop:3}}>{mejorPersonal
+            ?`${mejorPersonal.fecha.slice(8,10)}/${mejorPersonal.fecha.slice(5,7)}/${mejorPersonal.fecha.slice(0,4)} · ${mejorPersonal.ventas} venta${mejorPersonal.ventas===1?"":"s"}`
+            :"Aparecerá cuando registres tu primera venta"}</div>
+          <div style={{fontSize:11,color:C.label3,marginTop:4}}>Récord personal histórico · sin ventas anuladas</div>
+        </div>
+      </div>
     </div>
   </section>;
 }
@@ -11996,7 +12039,7 @@ function HomeDashboard({ventas, inv, vMes, mes, anio, onGoTab, descuentos, descC
         <KPICard icon="🎯" label="Meta del mes" compact={isDesktop}
           val={metaMes>0?fmtBsExact(metaMes):"Sin configurar"}
           sub={metaMes>0?`${avanceMeta}% cumplido · faltan ${fmtBsExact(Math.max(0,metaMes-totalMes))}`:"Config → Metas"} color={C.gold}/>
-        <KPICard icon="🏆" label="Mejor día" compact={isDesktop}
+        <KPICard icon="🏆" label="Mejor día tienda" compact={isDesktop}
           val={mejorFecha?fmtBsExact(mejorImporte):"—"}
           sub={mejorFecha?`${mejorFecha.slice(8,10)}/${mejorFecha.slice(5,7)}/${mejorFecha.slice(0,4)}`:"Sin ventas"} color={C.amber}/>
         <KPICard icon="🧾" label="Ventas del mes" compact={isDesktop}
@@ -17867,7 +17910,7 @@ function App(){
         {/* INICIO — dashboard */}
         {tab==="inicio" && (
           <>
-            {user.rol==="caja"&&<MetasCajaInicio ventas={ventas}/>}
+            {user.rol==="caja"&&<MetasCajaInicio ventas={ventas} user={user}/>}
             <HomeDashboard
               ventas={ventas} inv={inv} vMes={vMes}
               mes={mes} anio={anio}
