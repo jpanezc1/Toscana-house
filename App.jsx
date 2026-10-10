@@ -9909,6 +9909,14 @@ function LectorHID({onDetect, onClose, onReiniciar, feedback, stats, rows, marca
 // ══════════════════════════════════════════════════════════
 // ImportarExcelModal — Importación masiva con auto-generación de códigos
 // ══════════════════════════════════════════════════════════════════════
+function esFilaGuiaImportacion(row, marcaReconocida=false){
+  if(marcaReconocida) return false;
+  const primera=String((row||[]).find(c=>String(c).trim()!=="")||"")
+    .trim().normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase();
+  const guias=["nombre de tu marca","★","no ingresar","atencion","ejemplo",
+    "example","#ref","##","instrucciones","plantilla"];
+  return guias.some(g=>primera===g||primera.startsWith(g+" ")||primera.startsWith(g+":"));
+}
 function codigoExistenteEnDescripcion(desc, marcaId, precio, talla, color, inventario){
   const texto=String(desc||"").trim().toUpperCase();
   const normal=s=>String(s||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"")
@@ -10213,10 +10221,11 @@ function ImportarExcelModal({inv, onImportar, onClose, onArchivoCapturado}){
         const colorRaw = cColor>=0 ? String(row[cColor]||"").trim() : "";
 
         // ── Saltar filas de cabecera repetidas o ejemplos ───────────
-        const skips = ["nombre de tu marca","★","no ingresar","atencion","atención",
-                       "ejemplo","example","#ref","##","instrucciones","plantilla"];
         const rowText = row.map(c=>n(String(c))).join(" ");
-        if(skips.some(s=>rowText.includes(s))) continue;
+        // Solo una fila que EMPIEZA con texto de ayuda es una instrucción.
+        // Antes se buscaba "plantilla" en toda la fila: "plantilla de corcho"
+        // hizo desaparecer tres zapatos de Ramona sin avisar.
+        if(esFilaGuiaImportacion(row,!!matchMarca(marcaRaw))) continue;
         // Saltar si la fila parece ser otra fila de encabezado
         // Requiere al menos 2 coincidencias de header para evitar falsos positivos
         // (ej: "BICOLOR" contiene "color" que es un header pero NO es encabezado)
@@ -10354,6 +10363,22 @@ function ImportarExcelModal({inv, onImportar, onClose, onArchivoCapturado}){
         filas.push(fila);
       }
 
+      if(isPadronUnico){
+        const leidas=new Set(filas.map(f=>f._row));
+        const omitidas=raw.slice(hRow+1).flatMap((row,idx)=>{
+          const numero=hRow+idx+2;
+          if(!row||row.every(c=>String(c).trim()==="")||esFilaGuiaImportacion(row)) return [];
+          const marca=String(row[cMarca]||"").trim();
+          const producto=String(row[cProducto]||"").trim();
+          const descripcion=String(row[cDesc]||"").trim();
+          return marca&&(producto||descripcion)&&!leidas.has(numero)?[numero]:[];
+        });
+        if(omitidas.length){
+          setEstado("idle");
+          alert(`Carga detenida: ${omitidas.length} fila(s) con productos no se leyeron (${omitidas.join(", ")}). No se importó nada. Revisá esas filas o pedí ayuda antes de continuar.`);
+          return;
+        }
+      }
       if(filas.length===0){ setEstado("idle"); alert("No se encontraron productos válidos en el archivo."); return; }
 
       // ── Consolidar duplicados dentro del mismo Excel ─────────────────
