@@ -12179,13 +12179,15 @@ function RendimientoVendedoras({ventas,mes,anio}){
     const filas=[...resumen.filas].sort((a,b)=>b[campoMonto]-a[campoMonto]||a.nombre.localeCompare(b.nombre));
     const total=filas.reduce((s,f)=>s+f[campoMonto],resumen.otras[campoMonto]);
     const max=Math.max(1,...filas.map(f=>f[campoMonto]));
-    return <div style={{background:"linear-gradient(180deg,#FFFFFF,#FCFBF9)",border:`1px solid ${C.sep}`,
-      borderRadius:18,padding:isDesktop?18:15,minWidth:0,boxShadow:"0 3px 14px rgba(0,0,0,.045)"}}>
+    return <div style={{background:selector?"linear-gradient(145deg,#FFF8ED 0%,#F5E8D2 100%)":"linear-gradient(180deg,#FFFFFF,#FCFBF9)",
+      border:`1px solid ${selector?"#D6B884":C.sep}`,
+      borderRadius:18,padding:isDesktop?18:15,minWidth:0,
+      boxShadow:selector?"0 4px 16px rgba(119,80,31,.10)":"0 3px 14px rgba(0,0,0,.045)"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10,flexWrap:"wrap",marginBottom:14}}>
         <div><div style={{fontSize:17,fontWeight:750,color:C.label}}>{titulo}</div>
           {selector?<select aria-label="Mes de ventas por vendedora" value={periodoEquipo}
             onChange={e=>setPeriodoEquipo(e.target.value)} style={{marginTop:4,padding:"5px 8px",
-              background:"#F7F4EF",border:`1px solid ${C.sep}`,borderRadius:8,color:C.label,
+              background:"#FFFCF6",border:"1px solid #D6B884",borderRadius:8,color:C.label,
               fontSize:12,fontFamily:FONT,cursor:"pointer"}}>
             {periodosDisponibles.map(p=><option key={p} value={p}>{etiquetaPeriodo(p)}</option>)}
           </select>:<div style={{fontSize:12,color:C.label3,marginTop:3}}>{subtitulo}</div>}</div>
