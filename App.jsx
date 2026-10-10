@@ -9285,11 +9285,16 @@ function generarPlanillaAlquileres(ventas, mes, anio) {
 // ══════════════════════════════════════════════════════════
 // KPI CARD — small metric tile
 // ══════════════════════════════════════════════════════════
-function KPICard({icon, label, val, sub, color, compact}){
+function KPICard({icon, label, val, sub, color, compact, highlightMonth=false}){
   return (
     <div className="fos-bub" style={{
       padding: compact ? "15px 16px" : "18px 20px",
       textAlign:"left",display:"flex",flexDirection:"column",justifyContent:"center",
+      ...(highlightMonth?{
+        background:"linear-gradient(145deg,#FFF8ED 0%,#F5E8D2 100%)",
+        border:"1px solid #D6B884",
+        boxShadow:"0 4px 16px rgba(119,80,31,.10)",
+      }:{}),
     }}>
       <div style={{display:"flex",alignItems:"center",gap:6,marginBottom: compact ? 7 : 9}}>
         <span style={{width:7,height:7,borderRadius:3,background:color||FOS.lav,flexShrink:0,
@@ -12420,7 +12425,7 @@ function HomeDashboard({ventas, inv, vMes, mes, anio, onGoTab, descuentos, descC
           val={`Bs ${new Intl.NumberFormat("es-BO",{minimumFractionDigits:0,maximumFractionDigits:0}).format(totalHoy)}`}
           sub={`${vHoy.length} transacción${vHoy.length!==1?"es":""}`}
           color="#2E7D32"/>
-        <KPICard icon="📅" label={`Ventas ${MESES[mes].slice(0,3)}`} compact={isDesktop}
+        <KPICard icon="📅" label={`Ventas ${MESES[mes].slice(0,3)}`} compact={isDesktop} highlightMonth
           val={`Bs ${new Intl.NumberFormat("es-BO",{minimumFractionDigits:0,maximumFractionDigits:0}).format(totalMes)}`}
           sub={`${vMes.length} transacciones`}
           color={C.gold}/>
