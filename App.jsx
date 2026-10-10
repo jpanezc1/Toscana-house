@@ -2396,6 +2396,35 @@ const $    = n => "Bs " + new Intl.NumberFormat("es-BO",{minimumFractionDigits:0
 const $1   = n => "Bs " + new Intl.NumberFormat("es-BO",{minimumFractionDigits:1,maximumFractionDigits:1}).format(n||0);
 const hoy  = () => { const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
 const hora = () => new Date().toLocaleTimeString("es-BO",{hour:"2-digit",minute:"2-digit"});
+// Toscana no abre domingos: proyecciones y metas avanzan solo en días de venta.
+// Las ventas reales no se alteran, aun si existe una venta excepcional en domingo.
+function calendarioMesSinDomingos(anio,mes,fechaActual=hoy()){
+  const [anioHoy,mesHoy,diaHoy]=fechaActual.split("-").map(Number);
+  const seleccionado=anio*12+mes,actual=anioHoy*12+mesHoy-1;
+  const estado=seleccionado<actual?"cerrado":seleccionado>actual?"futuro":"actual";
+  const diasCalendario=new Date(anio,mes+1,0).getDate();
+  const corte=estado==="cerrado"?diasCalendario:estado==="futuro"?0:Math.min(diasCalendario,Math.max(0,diaHoy));
+  const acumulados=[0];
+  for(let dia=1;dia<=diasCalendario;dia++){
+    acumulados.push(acumulados[dia-1]+(new Date(anio,mes,dia).getDay()===0?0:1));
+  }
+  const diasVentaTotal=acumulados[diasCalendario];
+  return {estado,diasCalendario,corte,acumulados,diasVentaTotal,
+    diasVentaTranscurridos:acumulados[corte],
+    diasVentaRestantes:diasVentaTotal-acumulados[corte],
+    diasVentaDisponibles:estado==="actual"?diasVentaTotal-acumulados[Math.max(0,corte-1)]:0,
+    hoyEsDiaVenta:estado==="actual"&&corte>0&&acumulados[corte]>acumulados[corte-1]};
+}
+function proyeccionVentasSinDomingos(total,anio,mes,fechaActual=hoy()){
+  const calendario=calendarioMesSinDomingos(anio,mes,fechaActual);
+  const vendido=Number(total)||0;
+  const promedio=calendario.diasVentaTranscurridos>0?vendido/calendario.diasVentaTranscurridos:0;
+  const proyeccion=calendario.estado==="cerrado"?vendido:
+    calendario.estado==="futuro"?0:promedio*calendario.diasVentaTotal;
+  const progreso=calendario.diasVentaTotal>0?
+    Math.round(calendario.diasVentaTranscurridos/calendario.diasVentaTotal*100):0;
+  return {...calendario,promedio,proyeccion,progreso};
+}
 // Convierte fecha ("2026-07-02") + hora ("06:18 p. m." / "18:18" / "—") a un
 // número ordenable. La hora se guarda en formato 12h con a.m./p.m., por lo que
 // compararla como texto ordena mal ("12:26 p.m." > "06:18 p.m.").
@@ -11802,10 +11831,12 @@ function MetasCajaInicio({ventas,user}){
   },[]);
   const periodo=fecha.slice(0,7);
   const [ano,mesNum]=periodo.split("-").map(Number);
-  const diasMes=new Date(ano,mesNum,0).getDate();
+  const calendario=calendarioMesSinDomingos(ano,mesNum-1,fecha);
   const mesMeta=Number(metasMes[periodo])||0;
   const diaConfigurado=Number(metasDia[periodo])||0;
-  const diaMeta=diaConfigurado>0?diaConfigurado:mesMeta>0?mesMeta/diasMes:0;
+  const diaMeta=calendario.hoyEsDiaVenta
+    ?diaConfigurado>0?diaConfigurado:mesMeta>0?mesMeta/calendario.diasVentaTotal:0
+    :0;
   const validas=ventas.filter(v=>!v.anulada&&!ventaBloqueada(v.id));
   const mejorPersonal=useMemo(()=>mejorDiaVendedora(ventas,user),[ventas,user?.nombre,user?.usuario]);
   const deHoy=validas.filter(v=>v.fecha===fecha);
@@ -11820,7 +11851,8 @@ function MetasCajaInicio({ventas,user}){
       <div style={{minWidth:0}}>
         <div style={{fontSize:12,color:C.label3,textTransform:"uppercase",letterSpacing:1,fontWeight:700}}>{titulo}</div>
         <div style={{fontSize:25,fontWeight:800,color:C.label,fontVariantNumeric:"tabular-nums",marginTop:4}}>{bs(vendido)}</div>
-        <div style={{fontSize:13,color:C.label2,marginTop:5}}>Meta: {meta>0?bs(meta):"Sin configurar"}</div>
+        <div style={{fontSize:13,color:C.label2,marginTop:5}}>Meta: {titulo==="Hoy"&&!calendario.hoyEsDiaVenta
+          ?"No aplica (domingo)":meta>0?bs(meta):"Sin configurar"}</div>
         <div style={{fontSize:12,color:C.label3,marginTop:4}}>{lista.length} venta{lista.length===1?"":"s"} · {detalle}</div>
         {meta>0&&<div style={{fontSize:12,color:porcentaje>=100?C.green:C.label2,marginTop:5}}>
           {porcentaje>=100?`Meta alcanzada · excedente ${bs(vendido-meta)}`:`Faltan ${bs(meta-vendido)}`}
@@ -11834,8 +11866,8 @@ function MetasCajaInicio({ventas,user}){
       <small style={{color:C.label3}}>Tienda completa · {fecha.split("-").reverse().join("/")}</small>
     </div>
     <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))",gap:10}}>
-      {tarjeta("Hoy",deHoy,diaMeta,C.green,diaConfigurado>0?"meta diaria configurada":mesMeta>0?"meta diaria calculada del mes":"configurar meta en Administración")}
-      {tarjeta("Este mes",delMes,mesMeta,C.gold,`${Math.max(0,diasMes-Number(fecha.slice(8))+1)} días del mes disponibles`)}
+      {tarjeta("Hoy",deHoy,diaMeta,C.green,!calendario.hoyEsDiaVenta?"domingo sin ventas previstas":diaConfigurado>0?"meta diaria configurada":mesMeta>0?"meta diaria calculada sin domingos":"configurar meta en Administración")}
+      {tarjeta("Este mes",delMes,mesMeta,C.gold,`${calendario.diasVentaDisponibles} días de venta disponibles, sin domingos`)}
       <div aria-label="Tu mejor día de ventas en Toscana" style={{gridColumn:"1 / -1",background:"linear-gradient(135deg,#fff,#F8F4EE)",
         border:`1px solid ${C.sep}`,borderRadius:18,padding:"18px 20px",display:"flex",alignItems:"center",gap:16,
         boxShadow:"0 3px 14px rgba(0,0,0,.05)"}}>
@@ -11866,6 +11898,7 @@ function datosGraficasMensuales(ventas,mes,anio,metaMes,fechaActual=hoy()){
   const mesPrev=mes===0?11:mes-1,anioPrev=mes===0?anio-1:anio;
   const periodoPrev=`${anioPrev}-${String(mesPrev+1).padStart(2,"0")}`;
   const diasPrev=new Date(anioPrev,mesPrev+1,0).getDate();
+  const calendarioMeta=calendarioMesSinDomingos(anio,mes,fechaActual);
   const porDia=Array(diasMes).fill(0),porDiaPrev=Array(diasPrev).fill(0);
   for(const v of ventas||[]){
     if(v.anulada||ventaBloqueada(v.id)||!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(v.fecha||"")||v.fecha>fechaActual)continue;
@@ -11888,7 +11921,7 @@ function datosGraficasMensuales(ventas,mes,anio,metaMes,fechaActual=hoy()){
   return {
     periodo,diasMes,diasVisibles,meta:Math.max(0,Number(metaMes)||0),
     acumulado,vendido:suma/100,
-    metaDiaria:metaMes>0?Array.from({length:diasMes+1},(_,d)=>Number(metaMes)*d/diasMes):[],
+    metaDiaria:metaMes>0?calendarioMeta.acumulados.map(d=>Number(metaMes)*d/calendarioMeta.diasVentaTotal):[],
     diarioActual:porDia.map((n,i)=>i<diasVisibles?n/100:null),
     diarioPrevio:Array.from({length:diasMes},(_,i)=>i<comparables?porDiaPrev[i]/100:null),
     comparables,actualComparable,previoComparable,
@@ -11988,12 +12021,12 @@ function GraficasMensuales({ventas,mes,anio,metaMes}){
       <small style={{color:C.label3}}>{MESES[mes]} {anio} · ventas válidas</small>
     </div>
     <div style={{display:"grid",gridTemplateColumns:"1fr",gap:10}}>
-      {tarjeta("Camino a la meta","Avance acumulado del mes",
+      {tarjeta("Camino a la meta","Avance acumulado · meta distribuida sin domingos",
         d.meta>0?`${Math.round(d.vendido/d.meta*100)}%`:bs(d.vendido),
         d.meta>0?`${bs(d.vendido)} de ${bs(d.meta)}`:"Meta mensual sin configurar",
         metaSeries,["0",...dias],
         `Ventas acumuladas de ${MESES[mes]} ${anio}: ${bs(d.vendido)}${d.meta>0?` de una meta de ${bs(d.meta)}`:""}`,
-        d.diasVisibles===0?"El período todavía no comenzó.":"La venta real se detiene en el último día transcurrido.")}
+        d.diasVisibles===0?"El período todavía no comenzó.":"La línea de meta no avanza los domingos; las ventas reales llegan hasta hoy.")}
       {tarjeta("Mes contra mes","Ventas de cada día equivalente",comparacion,
         d.comparables?`Comparación hasta el día ${d.comparables}`:"Sin días comparables",
         comparacionSeries,dias,
@@ -12305,22 +12338,18 @@ function HomeDashboard({ventas, inv, vMes, mes, anio, onGoTab, descuentos, descC
   const dateStr  = `${dayNames[today.getDay()]}, ${today.getDate()} de ${MESES[today.getMonth()]} ${today.getFullYear()}`;
 
   // ── Proyección de cierre mensual ────────────────────────
-  const periodoSeleccionado = anio * 12 + mes;
-  const periodoActual = today.getFullYear() * 12 + today.getMonth();
-  const mesCerrado = periodoSeleccionado < periodoActual;
-  const mesFuturo = periodoSeleccionado > periodoActual;
-  const diaActual = mesCerrado ? new Date(anio, mes + 1, 0).getDate()
-    : mesFuturo ? 0 : today.getDate();
-  const diasEnMes   = new Date(anio, mes + 1, 0).getDate();
-  const proyeccionCierre = mesCerrado ? totalMes
-    : diaActual > 0 ? Math.round((totalMes / diaActual) * diasEnMes) : 0;
-  const progresoDias = Math.round((diaActual / diasEnMes) * 100);
-  const diasRestantes = mesCerrado ? 0 : diasEnMes - diaActual;
+  const calendarioProyeccion=proyeccionVentasSinDomingos(totalMes,anio,mes,hoyStr);
+  const mesCerrado=calendarioProyeccion.estado==="cerrado";
+  const mesFuturo=calendarioProyeccion.estado==="futuro";
+  const diaActual=calendarioProyeccion.diasVentaTranscurridos;
+  const proyeccionCierre=mesCerrado?totalMes:Math.round(calendarioProyeccion.proyeccion);
+  const progresoDias=calendarioProyeccion.progreso;
+  const diasRestantes=calendarioProyeccion.diasVentaRestantes;
   const fmtBs = n => `Bs ${new Intl.NumberFormat("es-BO",{minimumFractionDigits:0,maximumFractionDigits:0}).format(n)}`;
   const fmtBsExact = n => `Bs ${new Intl.NumberFormat("es-BO",{minimumFractionDigits:2,maximumFractionDigits:2}).format(n)}`;
   const metaKey = `${anio}-${String(mes+1).padStart(2,"0")}`;
   const metaMes = Number(metasMensuales[metaKey])||0;
-  const promedioDiario = diaActual > 0 ? totalMes/diaActual : 0;
+  const promedioDiario=calendarioProyeccion.promedio;
   const ventasPorDia = vMes.reduce((map,v)=>{
     if(!/^\d{4}-\d{2}-\d{2}$/.test(v.fecha||"")) return map;
     map[v.fecha] = (map[v.fecha]||0) + getDisplayTotal(v);
@@ -12378,7 +12407,7 @@ function HomeDashboard({ventas, inv, vMes, mes, anio, onGoTab, descuentos, descC
                 {vHoy.length} transacci{vHoy.length===1?"ón":"ones"}
               </div>
             </div>
-            <FosRing pct={progresoDias} size={84} label="DEL MES"/>
+            <FosRing pct={progresoDias} size={84} label="DÍAS VENTA"/>
           </div>
         </div>
       </div>
@@ -12409,8 +12438,8 @@ function HomeDashboard({ventas, inv, vMes, mes, anio, onGoTab, descuentos, descC
 
       {/* ── Indicadores del mes seleccionado ── */}
       <div style={{display:"grid",gridTemplateColumns:isDesktop?"repeat(4,1fr)":"repeat(2,1fr)",gap:8,marginBottom:isDesktop?10:14}}>
-        <KPICard icon="📊" label="Promedio diario" compact={isDesktop}
-          val={fmtBsExact(promedioDiario)} sub={mesFuturo?"Mes no iniciado":`En ${diaActual} día${diaActual===1?"":"s"} del mes`} color={C.blue}/>
+        <KPICard icon="📊" label="Promedio por día de venta" compact={isDesktop}
+          val={fmtBsExact(promedioDiario)} sub={mesFuturo?"Mes no iniciado":`En ${diaActual} día${diaActual===1?"":"s"} de venta`} color={C.blue}/>
         <KPICard icon="🎯" label="Meta del mes" compact={isDesktop}
           val={metaMes>0?fmtBsExact(metaMes):"Sin configurar"}
           sub={metaMes>0?`${avanceMeta}% cumplido · faltan ${fmtBsExact(Math.max(0,metaMes-totalMes))}`:"Config → Metas"} color={C.gold}/>
@@ -12444,12 +12473,12 @@ function HomeDashboard({ventas, inv, vMes, mes, anio, onGoTab, descuentos, descC
             <div style={{fontSize:11, color:C.label3, fontFamily:FONT_UI, marginTop:4}}>
               {mesCerrado ? "Mes cerrado · total de ventas registradas"
                 : mesFuturo ? "El período todavía no comenzó"
-                : `Basado en ${fmtBs(totalMes)} en ${diaActual} día${diaActual!==1?"s":""} · ${diasRestantes} día${diasRestantes!==1?"s":""} restantes`}
+                : `Basado en ${fmtBs(totalMes)} en ${diaActual} día${diaActual!==1?"s":""} de venta · ${diasRestantes} día${diasRestantes!==1?"s":""} de venta restantes, sin domingos`}
             </div>
           </div>
           <div style={{textAlign:"right", flexShrink:0}}>
             <div style={{fontSize:22, fontWeight:700, color:C.label, fontFamily:FONT}}>{progresoDias}%</div>
-            <div style={{fontSize:10, color:C.label3, fontFamily:FONT_UI}}>del mes transcurrido</div>
+            <div style={{fontSize:10, color:C.label3, fontFamily:FONT_UI}}>de días de venta transcurridos</div>
           </div>
         </div>
         {/* Barra de progreso */}
@@ -12462,7 +12491,7 @@ function HomeDashboard({ventas, inv, vMes, mes, anio, onGoTab, descuentos, descC
         </div>
         <div style={{display:"flex", justifyContent:"space-between", marginTop:5}}>
           <div style={{fontSize:10, color:C.label3, fontFamily:FONT_UI}}>1 {MESES[mes].slice(0,3)}</div>
-          <div style={{fontSize:10, color:C.label3, fontFamily:FONT_UI}}>{diasEnMes} {MESES[mes].slice(0,3)}</div>
+          <div style={{fontSize:10, color:C.label3, fontFamily:FONT_UI}}>{calendarioProyeccion.diasCalendario} {MESES[mes].slice(0,3)}</div>
         </div>
       </div>
 
@@ -13537,9 +13566,10 @@ function BrandPortal({user, ventas, inv, cargas, retiros=[], logout, descuentos=
   },0),[vMes,mid]);
 
   // Proyección fin de mes
-  const diaActual = (mes===now.getMonth()&&anio===now.getFullYear())?now.getDate():new Date(anio,mes+1,0).getDate();
-  const diasTotal = new Date(anio,mes+1,0).getDate();
-  const proyeccion = diaActual>0?(brutoMes/diaActual)*diasTotal:0;
+  const calendarioProyeccion=proyeccionVentasSinDomingos(brutoMes,anio,mes,hoy());
+  const proyeccion=calendarioProyeccion.proyeccion;
+  const proyeccionLabel=calendarioProyeccion.estado==="cerrado"?"Cierre real":
+    calendarioProyeccion.estado==="futuro"?"Mes por comenzar":"Proyección sin domingos";
 
   // Mes anterior
   const mPrev = mes===0?11:mes-1, aPrev = mes===0?anio-1:anio;
@@ -14095,7 +14125,7 @@ function BrandPortal({user, ventas, inv, cargas, retiros=[], logout, descuentos=
                       <FosCount value={brutoMes} prefix="Bs "/>
                     </div>
                     <div style={fosMono({color:"#E7E1D5",marginTop:8})}>
-                      Proyección <span style={{color:FOS.lavL}}>{$(proyeccion)}</span>
+                      {proyeccionLabel} <span style={{color:FOS.lavL}}>{$(proyeccion)}</span>
                     </div>
                   </div>
                   {mejorMes&&<FosRing pct={metaPct} label="TU RÉCORD"/>}
@@ -14485,7 +14515,7 @@ function BrandPortal({user, ventas, inv, cargas, retiros=[], logout, descuentos=
                 </div>
                 <div style={{textAlign:"right"}}>
                   <div style={{fontSize:10,color:C.label3,fontFamily:FONT_UI,letterSpacing:.5,opacity:.6,marginBottom:3}}>
-                    PROYECCIÓN
+                    {proyeccionLabel.toUpperCase()}
                   </div>
                   <div style={{fontSize:15,fontWeight:700,color:C.label,fontFamily:FONT,letterSpacing:"-0.02em"}}>{$(proyeccion)}</div>
                 </div>
@@ -27105,7 +27135,7 @@ create policy "allow all usuarios" on usuarios
               padding:"12px 18px",fontWeight:700,cursor:guardandoMeta?"wait":"pointer"}}>{guardandoMeta?"Guardando…":"Guardar meta diaria"}</button>
           </div>
           <div style={{fontSize:12,color:C.label3,marginTop:8}}>
-            La meta diaria se aplica a cada día del mes seleccionado. Si no la configurás, Inicio calcula una referencia con la meta mensual dividida entre los días del mes.
+            La meta diaria se aplica de lunes a sábado; el domingo no tiene meta. Si no la configurás, Inicio divide la meta mensual entre los días de venta del mes, excluyendo domingos.
           </div>
           {metaError&&<div role="alert" style={{color:C.red,fontSize:12,marginTop:8}}>{metaError}</div>}
           {Number(metasMensuales[metaKey])>0&&<div style={{fontSize:12,color:C.green,marginTop:8}}>

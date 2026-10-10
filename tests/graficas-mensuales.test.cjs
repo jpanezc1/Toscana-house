@@ -14,6 +14,9 @@ const sandbox = {
   ventaBloqueada: id => String(id).startsWith('TEST'),
 };
 vm.createContext(sandbox);
+const inicioCalendario = src.indexOf('function calendarioMesSinDomingos(');
+const finCalendario = src.indexOf('// Convierte fecha (', inicioCalendario);
+vm.runInContext(src.slice(inicioCalendario, finCalendario), sandbox);
 vm.runInContext(src.slice(inicio, fin), sandbox);
 const calcular = sandbox.datosGraficasMensuales;
 
@@ -33,7 +36,8 @@ assert.equal(actual.diasVisibles, 9);
 assert.equal(actual.vendido, 150.5);
 assert.equal(actual.acumulado.length, 10);
 assert.equal(actual.metaDiaria.length, 32);
-assert.equal(actual.metaDiaria[9], 900);
+assert.ok(Math.abs(actual.metaDiaria[9] - 3100*8/27) < 1e-9);
+assert.equal(actual.metaDiaria[4],actual.metaDiaria[3], 'La meta no sube en domingo');
 assert.equal(actual.diarioActual[9], null, 'Los días futuros no deben dibujarse como ventas reales');
 assert.equal(actual.comparables, 9);
 assert.equal(actual.previoComparable, 100);
