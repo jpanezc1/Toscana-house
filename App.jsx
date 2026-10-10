@@ -9909,6 +9909,23 @@ function LectorHID({onDetect, onClose, onReiniciar, feedback, stats, rows, marca
 // ══════════════════════════════════════════════════════════
 // ImportarExcelModal — Importación masiva con auto-generación de códigos
 // ══════════════════════════════════════════════════════════════════════
+function codigoExistenteEnDescripcion(desc, marcaId, precio, talla, color, inventario){
+  const texto=String(desc||"").trim().toUpperCase();
+  const normal=s=>String(s||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"")
+    .toUpperCase().replace(/[^A-Z0-9]+/g," ").trim();
+  return (inventario||[]).find(p=>{
+    if(String(p.marcaId)!==String(marcaId)||Number(p.precio)!==Number(precio)) return false;
+    const codigo=String(p.codigo||"").toUpperCase();
+    if(codigo.length<5||!/^[A-Z0-9]+(?:-[A-Z0-9]+)+$/.test(codigo)) return false;
+    const escaped=codigo.replace(/[.*+?^${}()|[\]\\]/g,"\\$&");
+    const rx=new RegExp(`(^|[^A-Z0-9])${escaped}(?=$|[^A-Z0-9])`);
+    if(!rx.test(texto)||normal(texto.replace(rx,"$1"))!==normal(p.nombre)) return false;
+    const tallaAnterior=extraerTalla(p.descripcion)||p.subcat||extraerTallaCodigo(codigo);
+    if(tallaAnterior&&talla&&tallaComparable(tallaAnterior)!==tallaComparable(talla)) return false;
+    const colorAnterior=extraerColor(p.descripcion);
+    return !colorAnterior||!color||normal(colorAnterior)===normal(color);
+  })||null;
+}
 function ImportarExcelModal({inv, onImportar, onClose, onArchivoCapturado}){
   const isDesktop = useIsDesktop();
   const [preview,    setPreview]    = useState([]);
@@ -10241,10 +10258,17 @@ function ImportarExcelModal({inv, onImportar, onClose, onArchivoCapturado}){
         }
 
         // ── SKU / Código ─────────────────────────────────────────────
-        const autoSKU = !skuRaw;
+        // Un padrón de siete columnas no trae SKU. Si la descripción termina
+        // con un código histórico de la misma marca, nombre y precio, respetar
+        // ese código en vez de crear otro MARCA-TALLA-NNN.
+        const existentePorCodigo= !skuRaw&&marcaEnc
+          ? codigoExistenteEnDescripcion(desc,marcaEnc.id,precio,tallaRaw,colorRaw,inv)
+          : null;
+        const autoSKU = !skuRaw&&!existentePorCodigo;
         const tallaParaCod = tallaRaw || (isIZi ? (catRaw||"").replace(/[^A-Za-z]/g,"").slice(0,3).toUpperCase() : "TU");
-        const sku = skuRaw || genCodImport(marcaEnc?.nombre||marcaRaw, desc, tallaParaCod, usadosSet);
-        if(skuRaw) usadosSet.add(sku);
+        const sku = skuRaw || existentePorCodigo?.codigo || genCodImport(marcaEnc?.nombre||marcaRaw, desc, tallaParaCod, usadosSet);
+        if(skuRaw||existentePorCodigo) usadosSet.add(sku);
+        if(existentePorCodigo) desc=existentePorCodigo.nombre;
 
         // ── Construir fila ────────────────────────────────────────────
         const fila = {
@@ -10286,7 +10310,7 @@ function ImportarExcelModal({inv, onImportar, onClose, onArchivoCapturado}){
           // Crear variante si hay color nuevo y es distinto al existente (o no se conoce el color del producto base)
           const esColorDistinto = colorNuevo && (!colorExistente || colorExistente !== colorNuevo);
 
-          if(esColorDistinto){
+          if(esColorDistinto&&!existentePorCodigo){
             // Color distinto → nuevo código variante usando el código REAL del producto base
             const baseCodigo = prodExistente.codigo.toUpperCase();
             if(!variantesUsadas.has(baseCodigo)) variantesUsadas.set(baseCodigo, new Set());

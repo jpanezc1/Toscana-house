@@ -1,10 +1,10 @@
 // Generado automáticamente por build.js — no editar a mano
-const CACHE_NAME = "th-cache-1791591332266";
+const CACHE_NAME = "th-cache-1791672095917";
 const CORE_ASSETS = [
   "./",
   "./index.html",
   "./manifest.json",
-  "./bundle-1791591332266.js",
+  "./bundle-1791672095917.js",
   "./public/favicon.ico",
   "./public/logo192.png",
   "./public/logo512.png",
