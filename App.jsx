@@ -1114,7 +1114,10 @@ async function ejecutarOpOutbox(op){
     case "stock":         return op.payload.stock_inicial!=null
                             ? await sbActualizarProductoPatch(op.payload.prodId, {stock:Math.max(0,op.payload.stock), stock_inicial:op.payload.stock_inicial})
                             : await sbActualizarStock(op.payload.prodId, op.payload.stock);
-    case "producto_patch":return await sbActualizarProductoPatch(op.payload.prodId, op.payload);
+    case "producto_patch":{
+      const {prodId, ...campos} = op.payload;
+      return await sbActualizarProductoPatch(prodId, campos);
+    }
     case "venta":       return await sbGuardarVenta(op.payload);
     case "anularVenta": return await sbAnularVenta(op.payload.id);
     case "cierre":      return await sbGuardarCierre(op.payload.key, op.payload.data);
@@ -17678,23 +17681,13 @@ function App(){
     setRepCod(""); setRepCant("");
   }
 
-  function modificarPrecio(){
+  async function modificarPrecio(){
     const cod=repCod.trim().toUpperCase();
     const prod=inv.find(i=>i.codigo.toUpperCase()===cod)||inv.find(i=>limpiarCod(i.codigo)===limpiarCod(cod));
     if(!prod){setRepMsg({ok:false,msg:`"${cod}" no encontrado`});return;}
-    const nuevoPrecio=Number(repPrecio);
-    if(!nuevoPrecio||nuevoPrecio<=0){setRepMsg({ok:false,msg:"Ingresa un precio válido"});return;}
-    const precioAntes=prod.precio||0;
-    const prodActualizado={...prod,precio:nuevoPrecio};
-    setInv(p=>p.map(i=>i.id===prod.id?prodActualizado:i));
-    syncConRespaldo("producto", prodActualizado, ()=>sbGuardarProducto(prodActualizado));
-    logAudit("PRECIO_EDIT", {
-      resumen: `Modificación de precio: ${prod.nombre} (${prod.codigo}) Bs ${precioAntes} → Bs ${nuevoPrecio}`,
-      codigo: prod.codigo, nombre: prod.nombre,
-      marca: prod.marcaNombre||"—",
-      precioAntes, precioNuevo: nuevoPrecio,
-    }, user);
-    setRepMsg({ok:true,msg:`✓ "${prod.nombre}": precio Bs ${precioAntes} → Bs ${nuevoPrecio}`});
+    const result=await handleEditarProducto(prod.id,{precio:Number(repPrecio),_motivo:"Cambio de precio del stock disponible"});
+    if(!result?.ok){setRepMsg({ok:false,msg:result?.error||"No se pudo cambiar el precio"});return;}
+    setRepMsg({ok:true,msg:`✓ "${prod.nombre}": Bs ${prod.precio} → Bs ${Number(repPrecio).toFixed(2)}. Ventas anteriores sin cambios.${result.synced?"":" Pendiente de sincronización."}`});
     setRepCod(""); setRepPrecio("");
   }
 
@@ -17704,11 +17697,21 @@ function App(){
   async function handleEditarProducto(prodId, campos){
     const prev = inv.find(p=>p.id===prodId);
     const { _motivo, ...rest } = campos; // _motivo es solo para auditoría, no es columna
+    if(!prev) return {ok:false,error:"El producto ya no está disponible. Actualizá el inventario."};
+    if(Object.prototype.hasOwnProperty.call(rest,"precio")){
+      const error=validarPrecioDisponible(prev,rest.precio);
+      if(error) return {ok:false,error};
+      rest.precio=Math.round(Number(rest.precio)*100)/100;
+      // Un formulario abierto no debe reenviar el precio si no se modificó.
+      if(rest.precio===Number(prev.precio)) delete rest.precio;
+    }
     setInv(p=>p.map(x=>x.id===prodId?{...x,...rest}:x));
     // Traducir a columnas de Supabase (estado local usa stockInicial; la tabla, stock_inicial)
     const cloud = {...rest};
     if("stockInicial" in cloud){ cloud.stock_inicial = cloud.stockInicial; delete cloud.stockInicial; }
-    await sbActualizarProductoPatch(prodId, cloud);
+    // Nunca guardar el producto completo al cambiar precio: podría pisar stock
+    // vendido desde otra caja. Las ventas mantienen su precioUnit original.
+    const synced=await syncConRespaldo("producto_patch", {prodId,...cloud}, ()=>sbActualizarProductoPatch(prodId, cloud));
     const inv2 = JSON.parse(localStorage.getItem("th_inv")||"[]");
     localStorage.setItem("th_inv", JSON.stringify(inv2.map(p=>p.id===prodId?{...p,...rest}:p)));
     // Auditoría forense si fue una corrección de stock a la baja (admin)
@@ -17730,9 +17733,11 @@ function App(){
         resumen:`Cambio de precio: ${prev.nombre} (${prev.codigo}) Bs ${antes} → Bs ${desp} (${dir}${pct?` ${pct>0?"+":""}${pct}%`:""})${_motivo?` · ${_motivo}`:""}`,
         codigo:prev.codigo, nombre:prev.nombre, marca:prev.marcaNombre||"—",
         precioAntes:antes, precioDespues:desp, delta:+(desp-antes).toFixed(2), pct,
-        motivo:_motivo||"",
+        motivo:_motivo||"", alcance:"stock_disponible", stockDisponible:Number(prev.stock)||0,
+        ventasHistoricasModificadas:false,
       }, user);
     }
+    return {ok:true,synced};
   }
 
   async function handleEliminarProducto(prodId){
@@ -18974,7 +18979,7 @@ function App(){
 
         {repTab==="precio"&&(<>
           <p style={{color:C.label2,fontFamily:FONT,fontSize:14,margin:"0 0 16px"}}>
-            Actualiza el precio de venta de un producto existente. El cambio queda registrado en auditoría.
+            Cambia el precio del stock disponible para las próximas ventas. Las ventas anteriores conservan su precio original. El cambio queda registrado en auditoría.
           </p>
           <IOSInput label="Código del producto" value={repCod}
             onChange={e=>{setRepCod(e.target.value.toUpperCase());setRepMsg(null);}}
@@ -18988,7 +18993,7 @@ function App(){
               border:`1px solid ${(repMsg.ok?C.green:C.red)}40`,
               color:repMsg.ok?C.green:C.red,fontSize:14,fontFamily:FONT}}>{repMsg.msg}</div>
           )}
-          <IOSBtn onPress={modificarPrecio} variant="primary" full disabled={!repCod.trim()||!repPrecio}>Actualizar Precio</IOSBtn>
+          <IOSBtn onPress={modificarPrecio} variant="primary" full disabled={!repCod.trim()||!repPrecio}>Cambiar precio del stock disponible</IOSBtn>
         </>)}
       </Sheet>
 
@@ -19132,6 +19137,14 @@ function App(){
 // POSContainer — Caja con sub-tabs Venta | Retiros
 // ══════════════════════════════════════════════════════════
 // ── Cambio de precio (staff y admin) — sube o baja, con motivo y auditoría ──
+function validarPrecioDisponible(prod,precio){
+  const n=Number(precio);
+  if(!Number.isFinite(n)||Math.round(n*100)/100<=0) return "Ingresá un precio válido mayor que cero.";
+  if(Math.round(n*100)/100!==Number(prod.precio) && !(Number(prod.stock)>0))
+    return "Esta prenda no tiene stock disponible. Las ventas anteriores conservan su precio original.";
+  return null;
+}
+
 function CambioPrecioTab({inv, onGuardar, user}){
   const [cod, setCod]           = useState("");
   const [prod, setProd]         = useState(null);
@@ -19152,22 +19165,27 @@ function CambioPrecioTab({inv, onGuardar, user}){
     else { setBusq([{_no:true, codigo:s}]); setProd(null); }
   }
 
-  const precioActual = Number(prod?.precio)||0;
+  const prodVigente=inv.find(p=>p.id===prod?.id);
+  const stockDisponible=Number(prodVigente?.stock)||0;
+  const precioActual = Number(prodVigente?.precio)||0;
   const nuevoNum = parseFloat(nuevo)||0;
   const delta = +(nuevoNum-precioActual).toFixed(2);
   const pct   = precioActual>0 ? Math.round(delta/precioActual*1000)/10 : 0;
   const sube  = delta>0;
   const grande= Math.abs(pct)>=30;
-  const valido= prod && nuevoNum>0 && nuevoNum!==precioActual && motivo.trim().length>=3;
+  const valido= prodVigente && stockDisponible>0 && Number.isFinite(nuevoNum) && nuevoNum>0 && nuevoNum!==precioActual && motivo.trim().length>=3;
   const col   = sube ? C.green : C.gold;
 
   async function guardar(){
     if(!valido || guardando) return;
     if(grande && !confirmGrande){ setCG(true); return; }
     setGuard(true);
-    await onGuardar(prod.id, {precio:+nuevoNum.toFixed(2), _motivo:motivo.trim()});
-    setGuard(false);
-    setOkMsg(`${prod.codigo}: Bs ${precioActual} → Bs ${nuevoNum} · guardado y registrado`);
+    let result;
+    try { result=await onGuardar(prod.id, {precio:+nuevoNum.toFixed(2), _motivo:motivo.trim()}); }
+    catch { alert("No se pudo guardar el cambio. Intentá nuevamente."); return; }
+    finally { setGuard(false); }
+    if(!result?.ok){ alert(result?.error||"No se pudo guardar el cambio."); return; }
+    setOkMsg(`${prod.codigo}: Bs ${precioActual} → Bs ${nuevoNum} · ventas anteriores sin cambios${result.synced?" · guardado":" · pendiente de sincronización"}`);
     setProd(null); setCod(""); setNuevo(""); setMotivo(""); setCG(false);
     setTimeout(()=>inputRef.current?.focus(),60);
   }
@@ -19241,7 +19259,11 @@ function CambioPrecioTab({inv, onGuardar, user}){
               </div>
             </div>
 
-            <div style={lbl}>Precio nuevo</div>
+            <div style={{fontSize:13,color:stockDisponible>0?C.label2:C.red,fontFamily:FONT,lineHeight:1.5,marginBottom:14}}>
+              {stockDisponible>0?`${stockDisponible} unidad(es) disponibles. El nuevo precio se aplicará a las próximas ventas.`:"Sin stock disponible para cambiar el precio."}
+              <br/>Las ventas anteriores y las compras ya iniciadas mantienen su precio original.
+            </div>
+            <div style={lbl}>Nuevo precio del stock disponible</div>
             <input type="number" min="0" step="1" inputMode="decimal" value={nuevo} placeholder="0"
               onChange={e=>{ setNuevo(e.target.value); setCG(false); }}
               style={{...field,fontSize:20,fontWeight:800,borderColor:nuevoNum>0?col:C.sep,
@@ -19277,7 +19299,7 @@ function CambioPrecioTab({inv, onGuardar, user}){
                 background: valido&&!guardando ? C.label : C.sep,
                 color:"#fff",fontSize:14,fontWeight:600,fontFamily:FONT,
                 cursor: valido&&!guardando?"pointer":"not-allowed",opacity:valido&&!guardando?1:.6}}>
-              {guardando ? "Guardando…" : grande&&confirmGrande ? "Confirmar cambio grande" : "Guardar cambio de precio"}
+              {guardando ? "Guardando…" : grande&&confirmGrande ? "Confirmar cambio grande" : "Cambiar precio del stock disponible"}
             </button>
             <div style={{fontSize:11,color:C.label3,fontFamily:FONT,marginTop:10,textAlign:"center"}}>
               Se guarda con tu nombre en el reporte y no se puede borrar.
@@ -23158,9 +23180,9 @@ function InventarioPorMarca({inv, ventas, retiros=[], bajas=[], onRecibir, onBaj
     if(!editProd||!onEditarProducto) return;
     const campos = {
       nombre: editNombre.toUpperCase().trim(),
-      precio: Number(editPrecio)||editProd.precio,
       descripcion: editDesc.trim(),
     };
+    if(Number(editPrecio)!==Number(editProd.precio)) campos.precio=Number(editPrecio);
     // ── Corrección de stock a la baja — SOLO admin ─────────────────────
     if(user?.rol==="admin" && editStock.trim()!==""){
       const actual = Number(editProd.stock)||0;
@@ -23181,8 +23203,12 @@ function InventarioPorMarca({inv, ventas, retiros=[], bajas=[], onRecibir, onBaj
       }
     }
     setEditGuardando(true);
-    await onEditarProducto(editProd.id, campos);
-    setEditGuardando(false);
+    let result;
+    try { result=await onEditarProducto(editProd.id, campos); }
+    catch { alert("No se pudo guardar. Intentá nuevamente."); return; }
+    finally { setEditGuardando(false); }
+    if(!result?.ok){ alert(result?.error||"No se pudo guardar."); return; }
+    if(!result.synced) alert("Cambio guardado en este dispositivo, pendiente de sincronización con la nube.");
     setEditProd(null);
   }
 
@@ -23662,7 +23688,8 @@ function InventarioPorMarca({inv, ventas, retiros=[], bajas=[], onRecibir, onBaj
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
                 <div>
                   <div style={{fontSize:11,color:C.label3,fontFamily:FONT,marginBottom:4,fontWeight:600}}>Precio (Bs)</div>
-                  <input value={editPrecio} onChange={e=>setEditPrecio(e.target.value)} type="number"
+                  <input value={editPrecio} onChange={e=>setEditPrecio(e.target.value)} type="number" min="0.01" step="0.01"
+                    disabled={!(Number(inv.find(p=>p.id===editProd.id)?.stock)>0)}
                     style={{width:"100%",padding:"8px 10px",borderRadius:10,border:`1px solid ${C.sep}`,
                       background:C.bg2,color:C.label,fontSize:13,fontFamily:FONT}}/>
                 </div>
@@ -23673,6 +23700,9 @@ function InventarioPorMarca({inv, ventas, retiros=[], bajas=[], onRecibir, onBaj
                       background:C.bg1,color:C.label3,fontSize:12,fontFamily:FONT_MONO,opacity:.7}}/>
                 </div>
               </div>
+              <p style={{fontSize:13,color:C.label2,fontFamily:FONT,lineHeight:1.5,margin:0}}>
+                El precio se cambia solo para el stock disponible y las próximas ventas. Las prendas ya vendidas conservan el precio cobrado.
+              </p>
               <div>
                 <div style={{fontSize:11,color:C.label3,fontFamily:FONT,marginBottom:4,fontWeight:600}}>Descripción, color y talla</div>
                 <input value={editDesc} onChange={e=>setEditDesc(e.target.value)}
