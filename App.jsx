@@ -772,7 +772,9 @@ async function sbCargarTodo() {
       vendedor: v.vendedor, etiquetaImg: v.etiqueta_img,
       clienteNombre: v.cliente_nombre||"", clienteTelefono: v.cliente_telefono||"",
       anulada: v.anulada || false,
+      canal: v.canal || "local", pedidoLoop: v.pedido_loop || null, totalLoop: Number(v.total_loop)||0,
       items: (items||[]).filter(i=>i.venta_id===v.id).map(i=>({
+        precioLoop: i.precio_loop != null ? Number(i.precio_loop) : undefined,
         prodId: i.prod_id, codigo: i.codigo, nombre: i.nombre,
         marcaId: i.marca_id, marcaNombre: i.marca_nombre,
         cantidad: i.cantidad, precioUnit: i.precio_unit, subtotal: i.subtotal,
@@ -1269,6 +1271,28 @@ async function syncConRespaldo(tipo, payload, fnDirecto){
 // ── Realtime sync — escucha cambios en Supabase y actualiza estado local ────
 // Activa canales en: ventas (INSERT/UPDATE) + inventario (INSERT/UPDATE)
 // Deduplicación: si la fila ya existe (optimistic update local), no se agrega.
+// ── Reservas de Loop: prendas que un cliente de Loop está pagando (15 min) ───
+// La caja las muestra y avisa antes de venderlas. Solo lectura (código y
+// cantidad). Si la base todavía no tiene la función, no muestra nada.
+function useReservasLoop(activo){
+  const [mapa,setMapa]=useState({});
+  useEffect(()=>{
+    if(!activo) return;
+    let vivo=true, t=null;
+    async function leer(){
+      try{
+        const db=await getSupabase();
+        const {data,error}=await db.rpc("th_reservas_loop");
+        if(!error && vivo){ const m={}; (data||[]).forEach(r=>{ m[String(r.codigo||"").toUpperCase()]={reservado:Number(r.reservado)||0, venceEn:r.vence_en}; }); setMapa(m); }
+      }catch{}
+      if(vivo) t=setTimeout(leer, 20000);
+    }
+    leer();
+    return ()=>{ vivo=false; clearTimeout(t); };
+  },[activo]);
+  return mapa;
+}
+
 function useRealtimeSync(setVentas, setInv, setRetiros, setFactoryResetRecibido, onResync, onDescuentoMarca, onDescuentoCodigo) {
   useEffect(() => {
     let channel = null;
@@ -1289,8 +1313,11 @@ function useRealtimeSync(setVentas, setInv, setRetiros, setFactoryResetRecibido,
               mes: v.mes, anio: v.anio, total: v.total, subtotal: v.subtotal,
               descPct: v.desc_pct, metodoPago: v.metodo_pago,
               vendedor: v.vendedor, etiquetaImg: v.etiqueta_img,
+              clienteNombre: v.cliente_nombre||"", clienteTelefono: v.cliente_telefono||"",
               anulada: v.anulada || false,
+              canal: v.canal || "local", pedidoLoop: v.pedido_loop || null, totalLoop: Number(v.total_loop)||0,
               items: (rawItems || []).map(i => ({
+                precioLoop: i.precio_loop != null ? Number(i.precio_loop) : undefined,
                 prodId: i.prod_id, codigo: i.codigo, nombre: i.nombre,
                 marcaId: i.marca_id, marcaNombre: i.marca_nombre,
                 cantidad: i.cantidad, precioUnit: i.precio_unit, subtotal: i.subtotal,
@@ -2322,8 +2349,26 @@ const PAGOS = [
 ];
 
 // ── Helpers pago ──────────────────────────────────────────
+// ── Canal Loop: ventas que entran desde la tienda online Loop (Toscana es su
+// inventario). Su plata NO pasa por la caja del local: van en su propio canal.
+const LOOP_COLOR = "#FF5804";
+function esVentaLoop(v){ return !!v && (v.canal==="loop" || /^Loop\b/.test(String(v.metodoPago||""))); }
+// Prendas que salieron del depósito vendidas por Loop (solo de referencia: la plata es de Loop).
+function resumenLoop(ventas){
+  const vs=(ventas||[]).filter(v=>!v.anulada&&esVentaLoop(v));
+  return { ventas:vs.length, prendas:vs.reduce((s,v)=>s+v.items.reduce((a,i)=>a+(Number(i.cantidad)||0),0),0), monto:vs.reduce((s,v)=>s+(Number(v.totalLoop)||0),0) };
+}
+function AvisoVendidoLoop({ventas, titulo}){
+  const r=resumenLoop(ventas);
+  if(!r.ventas) return null;
+  return <div style={{background:`${LOOP_COLOR}0F`,border:`1px solid ${LOOP_COLOR}33`,borderRadius:12,padding:"10px 14px",margin:"0 0 12px",fontFamily:FONT_UI}}>
+    <div style={{fontSize:13,fontWeight:700,color:LOOP_COLOR}}>🛍️ {titulo||"Vendido por Loop"}: {r.prendas} prenda{r.prendas===1?"":"s"} · {r.ventas} pedido{r.ventas===1?"":"s"}</div>
+    <div style={{fontSize:12,color:C.label2,marginTop:2}}>Salieron del depósito de Toscana. Las cobró Loop ({$(r.monto)}) y Loop las liquida con cada marca: no suman a la caja ni a la liquidación de Toscana.</div>
+  </div>;
+}
 function labelPago(mp){
   if(!mp) return "—";
+  if(/^Loop\b/.test(mp)) return "Vendida por Loop";
   if(mp==="giftcard") return "Gift Card";
   if(mp.startsWith("mixto|")){
     if(mp.includes("giftcard")) return "Gift Card + Otro";
@@ -2333,6 +2378,7 @@ function labelPago(mp){
 }
 function colorPago(mp){
   if(!mp) return "#4A9B6F";
+  if(/^Loop\b/.test(mp)) return LOOP_COLOR;
   if(mp==="giftcard") return "#7C3AED";
   if(mp.startsWith("mixto|")){
     if(mp.includes("giftcard")) return "#7C3AED";
@@ -2342,6 +2388,7 @@ function colorPago(mp){
 }
 function iconPago(mp){
   if(!mp) return "";
+  if(/^Loop\b/.test(mp)) return "🛍️";
   if(mp==="giftcard") return "🎁";
   if(mp.startsWith("mixto|")){
     if(mp.includes("giftcard")) return "🎁";
@@ -2357,6 +2404,9 @@ function iconPago(mp){
 function parsePago(metodoPago, total){
   const res={efectivo:0,qr:0,tarjeta:0,giftcard:0};
   if(!metodoPago) return res;
+  // Venta de Loop: la cobró Loop, no Toscana. No suma a la caja, a los métodos ni al efectivo
+  // (su total en Toscana es 0; el precio de Loop queda aparte en totalLoop, solo de referencia).
+  if(/^Loop\b/.test(metodoPago)) return res;
   if(metodoPago.startsWith("mixto|")){
     metodoPago.split("|").slice(1).forEach(p=>{
       const [k,v]=p.split(":");
@@ -6536,6 +6586,8 @@ function LiqModal({marcaId,ventas,mes,anio,MK,cierres,setCierres,onClose,syncCie
   });
 
   const bruto = brutoEfect + brutoQR + brutoTarjeta;
+  // Prendas de esta marca que vendió Loop: salen del depósito pero Toscana no las cobra ni las liquida.
+  const prendasLoop = vMarca.filter(v=>!v.anulada&&esVentaLoop(v)).reduce((s,v)=>s+v.items.filter(i=>i.marcaId===marcaId).reduce((a,i)=>a+(Number(i.cantidad)||0),0),0);
   const descTarjeta = brutoTarjeta * pctTarjeta/100;
   const subtotalBanco = bruto - descTarjeta;
   const comision = subtotalBanco * pctComision/100;
@@ -6620,6 +6672,7 @@ function LiqModal({marcaId,ventas,mes,anio,MK,cierres,setCierres,onClose,syncCie
         <div style={{padding:"12px 16px",borderBottom:`1px solid ${C.sep}`}}>
           <div style={{fontSize:11,fontWeight:700,color:C.label3,textTransform:"uppercase",
             letterSpacing:.6,marginBottom:8,fontFamily:FONT}}>Desglose por método de pago</div>
+          {prendasLoop>0&&<div style={{fontSize:12,color:LOOP_COLOR,fontFamily:FONT_UI,marginBottom:8}}>🛍️ {prendasLoop} prenda{prendasLoop===1?"":"s"} de esta marca se vendieron por Loop: las cobra y las liquida Loop, no entran acá.</div>}
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
             {[
               {label:"Efectivo",val:brutoEfect,color:C.green},
@@ -11509,7 +11562,8 @@ function ImportarVentasLibresModal({open, onImportar, onClose}){
 // ── CLIENTES — directorio de clientas (admin y staff) ─────────────────
 // Deriva las clientas de las ventas (nombre + teléfono), con compras, total
 // gastado y última visita. Exporta la lista por WhatsApp y a Excel.
-function ClientesTab({ventas, user}){
+function ClientesTab({ventas:ventasTodas, user}){
+  const ventas=(ventasTodas||[]).filter(v=>!esVentaLoop(v)); // los clientes de Loop son de Loop
   const [busq, setBusq] = useState("");
   const [soloTel, setSoloTel] = useState(false);
   const [sel, setSel] = useState(null); // clienta seleccionada → ficha + compras
@@ -11911,7 +11965,8 @@ function mejorDiaVendedora(ventas,user){
   return mejor?{fecha:mejor.fecha,total:mejor.centavos/100,ventas:mejor.ventas}:null;
 }
 
-function MetasCajaInicio({ventas,user}){
+function MetasCajaInicio({ventas:ventasTodas,user}){
+  const ventas=(ventasTodas||[]).filter(v=>!esVentaLoop(v));
   const [fecha,setFecha]=useState(hoy());
   const [metasMes,setMetasMes]=useState(()=>{try{return JSON.parse(localStorage.getItem("th_meta_mensual_v1")||"{}");}catch{return {};}});
   const [metasDia,setMetasDia]=useState(()=>{try{return JSON.parse(localStorage.getItem("th_meta_diaria_v1")||"{}");}catch{return {};}});
@@ -12183,7 +12238,8 @@ function historialProductividadVendedoras(ventas,cajeras,fecha){
   });
 }
 
-function RendimientoVendedoras({ventas,mes,anio}){
+function RendimientoVendedoras({ventas:ventasTodas,mes,anio}){
+  const ventas=(ventasTodas||[]).filter(v=>!esVentaLoop(v));
   const isDesktop=useIsDesktop();
   const [fecha,setFecha]=useState(hoy());
   const [cajeras,setCajeras]=useState(null);
@@ -12375,7 +12431,8 @@ function HomeDashboard({ventas, inv, vMes, mes, anio, onGoTab, descuentos, descC
   },[]);
 
   const hoyStr = hoy();
-  const vHoy   = ventas.filter(v => v.fecha === hoyStr && !v.anulada);
+  const vHoy   = ventas.filter(v => v.fecha === hoyStr && !v.anulada && !esVentaLoop(v));
+  const vLoopHoy = ventas.filter(v => v.fecha === hoyStr && esVentaLoop(v));
   const totalHoy = vHoy.reduce((s, v) => s + getDisplayTotal(v), 0);
   const totalMes  = vMes.reduce((s, v) => s + getDisplayTotal(v), 0);
   const stockTotal = inv.reduce((s, i) => s + (i.stock || 0), 0);
@@ -12709,6 +12766,7 @@ function HomeDashboard({ventas, inv, vMes, mes, anio, onGoTab, descuentos, descC
       </div>
 
       {/* ── Métodos de pago hoy ── */}
+      <AvisoVendidoLoop ventas={vLoopHoy} titulo="Vendido por Loop hoy"/>
       {totalHoy > 0 && (
         <div style={cardStyle}>
           <div style={{fontSize:13, fontWeight:700, color:C.label2, fontFamily:FONT_UI, marginBottom:10}}>
@@ -19458,6 +19516,7 @@ function QRPagoPanel({total, refVenta}){
 // ══════════════════════════════════════════════════════════
 function POS({inv,onVenta,onVerNota,user,descuentos={},descCodigos={}}){
   var _hN135 = useState([]); var carrito = _hN135[0]; var setCarrito = _hN135[1];;
+  const reservasLoop = useReservasLoop(true);
   var _hN136 = useState(""); var busq = _hN136[0]; var setBusq = _hN136[1];;
   var _hN137 = useState("efectivo"); var pago = _hN137[0]; var setPago = _hN137[1];;
   var _hN138 = useState(user?.nombre||""); var vendedor = _hN138[0]; var setVendedor = _hN138[1];;
@@ -19563,6 +19622,15 @@ function POS({inv,onVenta,onVerNota,user,descuentos={},descCodigos={}}){
 
   function add(prod){
     const m=MARCAS.find(x=>x.id===prod.marcaId);
+    // Si un cliente de Loop la está pagando, avisar antes de venderla acá.
+    const rl=reservasLoop[String(prod.codigo||"").toUpperCase()];
+    if(rl && rl.reservado>0){
+      const enCarrito=carrito.find(x=>x.prodId===prod.id)?.cantidad||0;
+      if(enCarrito+1>(prod.stock||0)-rl.reservado){
+        const hasta=rl.venceEn?new Date(rl.venceEn).toLocaleTimeString("es-BO",{hour:"2-digit",minute:"2-digit"}):"";
+        if(!window.confirm(`«${prod.nombre}»: ${rl.reservado} unidad${rl.reservado===1?"":"es"} está${rl.reservado===1?"":"n"} apartada${rl.reservado===1?"":"s"} por un cliente de Loop que está pagando${hasta?` (hasta las ${hasta})`:""}.\n\nSi la vendés acá, a ese cliente no se le va a poder confirmar la compra.\n\n¿Vender igual?`)) return;
+      }
+    }
     setCarrito(p=>{
       const ex=p.find(x=>x.prodId===prod.id);
       if(ex){if(ex.cantidad>=prod.stock)return p;return p.map(x=>x.prodId===prod.id?{...x,cantidad:x.cantidad+1}:x);}
@@ -19796,6 +19864,11 @@ function POS({inv,onVenta,onVerNota,user,descuentos={},descCodigos={}}){
                       <span style={{fontFamily:"monospace",fontSize:11,color:C.gold,
                         background:`${C.gold}18`,padding:"1px 6px",borderRadius:4}}>{p.codigo}</span>
                       <span style={{fontSize:12,color:C.label3,fontFamily:FONT}}>stock: {p.stock}</span>
+                      {reservasLoop[String(p.codigo||"").toUpperCase()]?.reservado>0&&(
+                        <span title="Un cliente de Loop la está pagando" style={{fontSize:11,fontWeight:600,color:LOOP_COLOR,
+                          background:`${LOOP_COLOR}14`,padding:"1px 6px",borderRadius:4,fontFamily:FONT_UI}}>
+                          🛍️ {reservasLoop[String(p.codigo||"").toUpperCase()].reservado} apartada en Loop
+                        </span>)}
                     </div>
                   </div>
                 </div>
@@ -28056,7 +28129,7 @@ function VentasTab({vMes, totalVtas, mes, anio, onVentaClick, retiros=[], bajas=
   const [retiroSelec, setRetiroSelec] = useState(null);
 
   // Ventas activas (excluye anuladas) — para totales, montos y desglose por marca
-  const vMesActivas = useMemo(()=>vMes.filter(v=>!v.anulada),[vMes]);
+  const vMesActivas = useMemo(()=>vMes.filter(v=>!v.anulada&&!esVentaLoop(v)),[vMes]);
 
   // Calcular ventas por marca con desglose de método de pago — mixto distribuido
   const porMarca = useMemo(()=>{
@@ -28123,6 +28196,7 @@ function VentasTab({vMes, totalVtas, mes, anio, onVentaClick, retiros=[], bajas=
           {vMesActivas.length} transacciones<br/>{porMarca.length} marcas activas
         </div>
       </div>
+      <AvisoVendidoLoop ventas={vMes} titulo="Vendido por Loop este mes"/>
       <div style={{display:"grid",gridTemplateColumns: isDesktop ? "1fr 1fr 1fr" : "1fr 1fr",gap: isDesktop ? 10 : 10,marginBottom: isDesktop ? 12 : 16}}>
         {[
           {label:"Efectivo",value:totalEfectivo,color:"#4A9B6F"},

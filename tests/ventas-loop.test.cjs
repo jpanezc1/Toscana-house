@@ -1,0 +1,21 @@
+// Las ventas de Loop salen del depósito pero NO son plata de Toscana.
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const vm=require('node:vm');
+const src=fs.readFileSync(require('node:path').join(__dirname,'..','App.jsx'),'utf8');
+const section=(start,end)=>src.slice(src.indexOf(start),src.indexOf(end,src.indexOf(start)));
+const ctx={Number,String,Math,PAGOS:[{id:'efectivo',label:'Efectivo'},{id:'qr',label:'QR'}],C:{},FONT_UI:'',$:x=>'Bs '+x};
+vm.createContext(ctx);
+vm.runInContext(section('const LOOP_COLOR','function AvisoVendidoLoop('),ctx);
+vm.runInContext(section('function parsePago(','// ── PagoDisplay'),ctx);
+vm.runInContext(section('function labelPago(','function colorPago('),ctx);
+const loop={canal:'loop',metodoPago:'Loop',total:0,totalLoop:600,anulada:false,items:[{marcaId:1,cantidad:1,subtotal:0,precioLoop:600}]};
+const local={metodoPago:'efectivo',total:300,items:[{marcaId:1,cantidad:1,subtotal:300}]};
+assert.deepEqual(JSON.parse(JSON.stringify(ctx.parsePago('Loop',600))),{efectivo:0,qr:0,tarjeta:0,giftcard:0},'Loop nunca cae como efectivo');
+assert.equal(ctx.sumPagos([loop,local]).efectivo,300,'la caja solo cuenta la venta del local');
+assert.equal(ctx.esVentaLoop(loop),true);
+assert.equal(ctx.esVentaLoop(local),false);
+assert.equal(ctx.labelPago('Loop'),'Vendida por Loop');
+const r=ctx.resumenLoop([loop,local,{...loop,anulada:true}]);
+assert.equal(r.ventas,1);assert.equal(r.prendas,1);assert.equal(r.monto,600);
+console.log('ventas Loop: OK');

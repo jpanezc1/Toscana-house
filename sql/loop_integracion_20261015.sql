@@ -7,8 +7,11 @@
 --      que un reintento del outbox no descuente dos veces.
 --   2. reservas_canal: Loop aparta prendas 15 min mientras el cliente paga.
 --      "Disponible" = stock − reservas activas.
---   3. Ventas del canal Loop dentro de ventas/venta_items (canal = 'loop'), así
---      entran al historial, a los reportes y a la liquidación de cada marca.
+--   3. Ventas del canal Loop dentro de ventas/venta_items (canal = 'loop'). La plata
+--      la cobra Loop, NO Toscana: la venta queda en Bs 0 para Toscana (no suma a la
+--      caja, a los métodos ni a la liquidación que paga Toscana) y la prenda figura
+--      como "Vendida por Loop". El precio de Loop queda en total_loop / precio_loop,
+--      solo de referencia. Toscana es el depósito, el custodio y la base de datos.
 --   4. Funciones canal_* para el servidor de Loop (solo service_role).
 --
 -- Se puede correr más de una vez. No borra ni cambia datos existentes.
@@ -18,6 +21,8 @@
 -- ── 1. Columnas de canal en ventas ─────────────────────────────────────────
 alter table public.ventas add column if not exists canal text not null default 'local';
 alter table public.ventas add column if not exists pedido_loop text;
+alter table public.ventas add column if not exists total_loop numeric;
+alter table public.venta_items add column if not exists precio_loop numeric;
 create unique index if not exists ventas_pedido_loop_unico on public.ventas (pedido_loop) where pedido_loop is not null;
 
 -- ── 2. Tablas de apoyo ─────────────────────────────────────────────────────
@@ -74,6 +79,19 @@ create or replace view public.inventario_canal as
                 where estado = 'activa' and vence_en > now() group by codigo) r on r.codigo = i.codigo;
 revoke all on public.inventario_canal from public, anon, authenticated;
 grant select on public.inventario_canal to service_role;
+
+-- Lo que Loop tiene apartado ahora (para que la caja lo muestre). Solo códigos y
+-- cantidades: ningún dato del cliente de Loop.
+create or replace function public.th_reservas_loop()
+returns table (codigo text, reservado integer, vence_en timestamptz)
+language sql stable security definer set search_path = '' as $$
+  select r.codigo, sum(r.cantidad)::integer, min(r.vence_en)
+    from public.reservas_canal r
+   where r.estado = 'activa' and r.vence_en > now()
+   group by r.codigo;
+$$;
+revoke all on function public.th_reservas_loop() from public;
+grant execute on function public.th_reservas_loop() to anon, authenticated, service_role;
 
 -- ── 4. Caja: mover stock de forma relativa ─────────────────────────────────
 -- Devuelve el stock resultante. Si el producto no existe devuelve nada (la cola
@@ -202,17 +220,17 @@ begin
 
   insert into public.ventas (id, fecha, hora, mk, mes, anio, total, subtotal, desc_pct, metodo_pago,
                              efectivo, qr, tarjeta, gc_usado, vendedor, cliente_nombre, cliente_telefono,
-                             canal, pedido_loop)
+                             canal, pedido_loop, total_loop)
   values (v_id, to_char(v_fecha, 'YYYY-MM-DD'), coalesce(p_venta->>'hora', to_char(now() at time zone 'America/La_Paz', 'HH24:MI')),
           to_char(v_fecha, 'YYYY-MM'), extract(month from v_fecha)::integer - 1, extract(year from v_fecha)::integer,
-          coalesce((p_venta->>'total')::numeric, 0), coalesce((p_venta->>'subtotal')::numeric, 0), 0,
-          'Loop · ' || coalesce(p_venta->>'metodo_pago', 'QR'),
+          0, 0, 0,                                   -- para Toscana la venta es Bs 0: la cobró Loop
+          'Loop',
           0, 0, 0, 0, 'Loop', p_venta->>'cliente_nombre', p_venta->>'cliente_telefono',
-          'loop', p_pedido);
+          'loop', p_pedido, coalesce((p_venta->>'total')::numeric, 0));
 
-  insert into public.venta_items (venta_id, prod_id, codigo, nombre, marca_id, marca_nombre, cantidad, precio_unit, subtotal)
+  insert into public.venta_items (venta_id, prod_id, codigo, nombre, marca_id, marca_nombre, cantidad, precio_unit, subtotal, precio_loop)
   select v_id, i.id, i.codigo, coalesce(x->>'nombre', i.nombre), i.marca_id, i.marca_nombre,
-         (x->>'cantidad')::integer, (x->>'precio_unit')::numeric, (x->>'subtotal')::numeric
+         (x->>'cantidad')::integer, 0, 0, (x->>'precio_unit')::numeric
     from jsonb_array_elements(p_venta->'items') x
     join public.inventario i on upper(i.codigo) = upper(trim(x->>'codigo'));
 
