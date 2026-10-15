@@ -196,6 +196,32 @@ async function sbActualizarStock(prodId, nuevoStock) {
   } catch(e) { console.warn("Supabase update stock:", e.message); return false; }
 }
 
+// Mueve stock de forma RELATIVA en la base (suma o resta), en lugar de escribir el
+// número final calculado en este navegador. Así la caja no pisa lo que vendió otro
+// equipo u otro canal (Loop) mientras estaba sin internet. `ref` evita que un
+// reintento del outbox mueva dos veces. Si la base todavía no tiene la función
+// (sql/loop_integracion_20261015.sql sin correr), hace el mismo cálculo sobre el
+// valor actual de la nube.
+async function sbMoverStock(prodId, delta, deltaInicial = 0, ref = null) {
+  if (!ESCRITURA_NUBE_OK) return true;
+  try {
+    const db = await getSupabase();
+    const { error } = await db.rpc("th_mover_stock", { p_id: prodId, p_delta: delta, p_delta_inicial: deltaInicial || 0, p_ref: ref });
+    if (!error) return true;
+    if (/PGRST202|42883|th_mover_stock|Could not find the function/i.test(`${error.code||""} ${error.message||""}`)) {
+      const { data, error: eLeer } = await db.from("inventario").select("stock,stock_inicial").eq("id", prodId).maybeSingle();
+      if (eLeer) throw eLeer;
+      if (!data) return true;
+      const patch = { stock: Math.max(0, (data.stock || 0) + delta) };
+      if (deltaInicial) patch.stock_inicial = Math.max(0, (data.stock_inicial || 0) + deltaInicial);
+      const { error: eGuardar } = await db.from("inventario").update(patch).eq("id", prodId);
+      if (eGuardar) throw eGuardar;
+      return true;
+    }
+    throw error;
+  } catch (e) { console.warn("Supabase mover stock:", e.message); return false; }
+}
+
 async function sbActualizarProductoPatch(prodId, campos) {
   if (!ESCRITURA_NUBE_OK) return true;
   try {
@@ -1114,6 +1140,7 @@ async function ejecutarOpOutbox(op){
     case "stock":         return op.payload.stock_inicial!=null
                             ? await sbActualizarProductoPatch(op.payload.prodId, {stock:Math.max(0,op.payload.stock), stock_inicial:op.payload.stock_inicial})
                             : await sbActualizarStock(op.payload.prodId, op.payload.stock);
+    case "stock_delta":   return await sbMoverStock(op.payload.prodId, op.payload.delta, op.payload.deltaInicial||0, op.payload.ref||null);
     case "producto_patch":{
       const {prodId, ...campos} = op.payload;
       return await sbActualizarProductoPatch(prodId, campos);
@@ -1174,7 +1201,8 @@ async function procesarOutbox(){
 function rtBroadcastForOp(tipo, payload){
   try{
     switch(tipo){
-      case "stock": {
+      case "stock":
+      case "stock_delta": {
         const p = {id: payload.prodId, stock: payload.stock};
         if(payload.stock_inicial!=null) p.stockInicial = payload.stock_inicial;
         rtBroadcast("inv_update", {p});
@@ -1208,6 +1236,16 @@ function rtBroadcastForOp(tipo, payload){
 // Intenta guardar en Supabase de inmediato; si no hay red o falla,
 // encola la operación para reintento automático. Los datos ya están
 // seguros en localStorage (estado React) independientemente del resultado.
+// Movimiento de stock de la caja (venta, retiro, baja, reposición, cambio,
+// anulación): viaja como diferencia, no como número final. `stockLocal` solo se
+// usa para refrescar las otras pantallas abiertas al instante.
+function moverStockNube(prodId, delta, stockLocal, deltaInicial = 0, iniLocal = null){
+  const ref = `mv-${Date.now()}-${Math.random().toString(36).slice(2,10)}`;
+  const payload = { prodId, delta, deltaInicial, stock: stockLocal, ref };
+  if(iniLocal != null) payload.stock_inicial = iniLocal;
+  return syncConRespaldo("stock_delta", payload, ()=>sbMoverStock(prodId, delta, deltaInicial, ref));
+}
+
 async function syncConRespaldo(tipo, payload, fnDirecto){
   // Barrera: en una copia no productiva NO se escribe a la nube ni se encola
   // (encolar sería peligroso: el outbox podría drenar a producción después).
@@ -17371,7 +17409,7 @@ function App(){
     const stockAntes = prod?.stock||0;
     const stockDespues = Math.max(0, stockAntes - r.cantidad);
     setInv(p=>p.map(i=>i.id===r.prodId?{...i,stock:stockDespues}:i));
-    syncConRespaldo("stock", {prodId:r.prodId, stock:stockDespues}, ()=>sbActualizarStock(r.prodId, stockDespues));
+    moverStockNube(r.prodId, -(Number(r.cantidad)||0), stockDespues);
     syncConRespaldo("retiro", r, ()=>sbGuardarRetiro(r));
     // ── Audit forense ─────────────────────────────────────────────
     logAudit("RETIRO", {
@@ -17407,7 +17445,7 @@ function App(){
       const pid = prod?.id ?? r.prodId;
       if(pid!=null){
         setInv(p=>p.map(i=>i.id===pid?{...i,stock:stockDespues}:i));
-        syncConRespaldo("stock", {prodId:pid, stock:stockDespues}, ()=>sbActualizarStock(pid, stockDespues));
+        moverStockNube(pid, -(Number(r.cantidad)||0), stockDespues);
       }
       syncConRespaldo("retiro", r, ()=>sbGuardarRetiro(r));
       logAudit("RETIRO", {
@@ -17430,7 +17468,7 @@ function App(){
     const stockDespues = stockAntes + (Number(r.cantidad)||0);
     if(pid!=null){
       setInv(p=>p.map(i=>i.id===pid?{...i,stock:stockDespues}:i));
-      syncConRespaldo("stock", {prodId:pid, stock:stockDespues}, ()=>sbActualizarStock(pid, stockDespues));
+      moverStockNube(pid, (Number(r.cantidad)||0), stockDespues);
     }
     const updated = retiros.map(x=>x.id===r.id?{...x,anulada:true}:x);
     setRetiros(updated);
@@ -17629,7 +17667,7 @@ function App(){
   function registrarBaja(prod, stockAntes, cant, motivo){
     const stockDespues = Math.max(0, stockAntes - cant);
     setInv(p=>p.map(i=>i.id===prod.id?{...i,stock:stockDespues}:i));
-    syncConRespaldo("stock", {prodId:prod.id, stock:stockDespues}, ()=>sbActualizarStock(prod.id, stockDespues));
+    moverStockNube(prod.id, -(Number(cant)||0), stockDespues);
     const now = new Date();
     const bajaEvt = {
       id: "EVT_"+Date.now()+"_"+Math.random().toString(36).slice(2,6),
@@ -17670,7 +17708,7 @@ function App(){
     const iniAntes=Number(prod.stockInicial)||stockAntes;
     const iniDespues=iniAntes+cant;
     setInv(p=>p.map(i=>i.id===prod.id?{...i,stock:stockDespues,stockInicial:iniDespues}:i));
-    syncConRespaldo("stock", {prodId:prod.id, stock:stockDespues, stock_inicial:iniDespues}, ()=>sbActualizarProductoPatch(prod.id, {stock:stockDespues, stock_inicial:iniDespues}));
+    moverStockNube(prod.id, cant, stockDespues, cant, iniDespues);
     logAudit("STOCK_ADD", {
       resumen: `Entrada de stock: ${prod.nombre} (${prod.codigo}) +${cant} · stock ${stockAntes}→${stockDespues}`,
       codigo: prod.codigo, nombre: prod.nombre,
@@ -17970,7 +18008,7 @@ function App(){
       const stockAntes = inv.find(i=>i.id===it.prodId)?.stock||0;
       const stockDespues = Math.max(0, stockAntes - it.cantidad);
       setInv(p=>p.map(i=>i.id===it.prodId?{...i,stock:stockDespues}:i));
-      syncConRespaldo("stock", {prodId:it.prodId, stock:stockDespues}, ()=>sbActualizarStock(it.prodId, stockDespues));
+      moverStockNube(it.prodId, -(Number(it.cantidad)||0), stockDespues);
       stockCambios.push({prodId:it.prodId, codigo:it.codigo, nombre:it.nombre, stockAntes, stockDespues});
     });
     drive.syncVenta(vf);
@@ -18027,7 +18065,7 @@ function App(){
       const stockAntes = inv.find(i => i.id === it.prodId)?.stock || 0;
       const stockDespues = Math.max(0, stockAntes - it.cantidad);
       setInv(p => p.map(i => i.id === it.prodId ? {...i, stock: stockDespues} : i));
-      syncConRespaldo("stock", {prodId: it.prodId, stock: stockDespues}, () => sbActualizarStock(it.prodId, stockDespues));
+      moverStockNube(it.prodId, -(Number(it.cantidad)||0), stockDespues);
       stockCambios.push({prodId: it.prodId, codigo: it.codigo, nombre: it.nombre, stockAntes, stockDespues});
     });
     syncConRespaldo("venta", vf, () => sbGuardarVenta(vf));
@@ -18105,7 +18143,7 @@ function App(){
       if(!prod) return;
       const nuevoStock=prod.stock+it.cantidad;
       setInv(p=>p.map(i=>i.id===it.prodId?{...i,stock:nuevoStock}:i));
-      syncConRespaldo("stock",{prodId:it.prodId,stock:nuevoStock},()=>sbActualizarStock(it.prodId,nuevoStock));
+      moverStockNube(it.prodId, (Number(it.cantidad)||0), nuevoStock);
     });
     // Descontar stock de items nuevos
     cambio.itemsNuevos.forEach(it=>{
@@ -18113,7 +18151,7 @@ function App(){
       if(!prod) return;
       const nuevoStock=Math.max(0,prod.stock-it.cantidad);
       setInv(p=>p.map(i=>i.id===it.prodId?{...i,stock:nuevoStock}:i));
-      syncConRespaldo("stock",{prodId:it.prodId,stock:nuevoStock},()=>sbActualizarStock(it.prodId,nuevoStock));
+      moverStockNube(it.prodId, -(Number(it.cantidad)||0), nuevoStock);
     });
     logAudit("CAMBIO",{
       resumen:`Cambio ${cambio.id} · Venta origen ${cambio.ventaOriginalId} · Dif Bs ${cambio.diferencia.toFixed(2)}`,
@@ -18132,7 +18170,7 @@ function App(){
     v.items.forEach(it=>{
       const actual = inv.find(i=>i.id===it.prodId)?.stock||0;
       setInv(p=>p.map(i=>i.id===it.prodId?{...i,stock:actual+it.cantidad}:i));
-      syncConRespaldo("stock", {prodId:it.prodId, stock:actual+it.cantidad}, ()=>sbActualizarStock(it.prodId, actual+it.cantidad));
+      moverStockNube(it.prodId, (Number(it.cantidad)||0), actual+it.cantidad);
       stockCambios.push({codigo:it.codigo, nombre:it.nombre, stockAntes:actual, stockDespues:actual+it.cantidad});
     });
     const vAnulada = {...v, anulada:true, fechaAnulacion:hoy()};
