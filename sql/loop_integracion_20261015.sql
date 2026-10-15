@@ -1,31 +1,31 @@
--- ═══════════════════════════════════════════════════════════════════════════
--- Toscana House × Loop · núcleo seguro de stock (15/10/2026)
+-- ===========================================================================
+-- Toscana House x Loop - nucleo seguro de stock (15/10/2026)
 --
--- Toscana es la ÚNICA fuente de stock. Este archivo agrega:
+-- Toscana es la UNICA fuente de stock. Este archivo agrega:
 --   1. th_mover_stock: la caja suma o resta unidades en la base (en lugar de
---      escribir el número final calculado en el navegador). Con referencia para
+--      escribir el numero final calculado en el navegador). Con referencia para
 --      que un reintento del outbox no descuente dos veces.
 --   2. reservas_canal: Loop aparta prendas 15 min mientras el cliente paga.
---      "Disponible" = stock − reservas activas.
+--      "Disponible" = stock - reservas activas.
 --   3. Ventas del canal Loop dentro de ventas/venta_items (canal = 'loop'). La plata
 --      la cobra Loop, NO Toscana: la venta queda en Bs 0 para Toscana (no suma a la
---      caja, a los métodos ni a la liquidación que paga Toscana) y la prenda figura
+--      caja, a los metodos ni a la liquidacion que paga Toscana) y la prenda figura
 --      como "Vendida por Loop". El precio de Loop queda en total_loop / precio_loop,
---      solo de referencia. Toscana es el depósito, el custodio y la base de datos.
+--      solo de referencia. Toscana es el deposito, el custodio y la base de datos.
 --   4. Funciones canal_* para el servidor de Loop (solo service_role).
 --
--- Se puede correr más de una vez. No borra ni cambia datos existentes.
--- Correr en Supabase → SQL Editor del proyecto uqphxiixdulqscbfyxhz.
--- ═══════════════════════════════════════════════════════════════════════════
+-- Se puede correr mas de una vez. No borra ni cambia datos existentes.
+-- Correr en Supabase -> SQL Editor del proyecto uqphxiixdulqscbfyxhz.
+-- ===========================================================================
 
--- ── 1. Columnas de canal en ventas ─────────────────────────────────────────
+-- -- 1. Columnas de canal en ventas -----------------------------------------
 alter table public.ventas add column if not exists canal text not null default 'local';
 alter table public.ventas add column if not exists pedido_loop text;
 alter table public.ventas add column if not exists total_loop numeric;
 alter table public.venta_items add column if not exists precio_loop numeric;
 create unique index if not exists ventas_pedido_loop_unico on public.ventas (pedido_loop) where pedido_loop is not null;
 
--- ── 2. Tablas de apoyo ─────────────────────────────────────────────────────
+-- -- 2. Tablas de apoyo -----------------------------------------------------
 -- Referencias de movimientos ya aplicados (idempotencia del outbox de la caja).
 create table if not exists public.th_stock_refs (
   ref text primary key,
@@ -48,7 +48,7 @@ create table if not exists public.reservas_canal (
 create index if not exists reservas_canal_activas on public.reservas_canal (codigo) where estado = 'activa';
 
 -- Cuando una venta del local deja el stock por debajo de lo reservado por Loop.
--- La venta física siempre gana; esto avisa para que Loop resuelva el pedido.
+-- La venta fisica siempre gana; esto avisa para que Loop resuelva el pedido.
 create table if not exists public.th_canal_conflictos (
   id bigserial primary key,
   codigo text not null,
@@ -60,9 +60,9 @@ create table if not exists public.th_canal_conflictos (
 alter table public.th_stock_refs enable row level security;
 alter table public.reservas_canal enable row level security;
 alter table public.th_canal_conflictos enable row level security;
--- Sin políticas: anon no lee ni escribe estas tablas directamente; solo las funciones.
+-- Sin politicas: anon no lee ni escribe estas tablas directamente; solo las funciones.
 
--- ── 3. Reservado y disponible ──────────────────────────────────────────────
+-- -- 3. Reservado y disponible ----------------------------------------------
 create or replace function public.th_reservado(p_codigo text)
 returns integer language sql stable security definer set search_path = '' as $$
   select coalesce(sum(cantidad), 0)::integer from public.reservas_canal
@@ -80,8 +80,8 @@ create or replace view public.inventario_canal as
 revoke all on public.inventario_canal from public, anon, authenticated;
 grant select on public.inventario_canal to service_role;
 
--- Lo que Loop tiene apartado ahora (para que la caja lo muestre). Solo códigos y
--- cantidades: ningún dato del cliente de Loop.
+-- Lo que Loop tiene apartado ahora (para que la caja lo muestre). Solo codigos y
+-- cantidades: ningun dato del cliente de Loop.
 create or replace function public.th_reservas_loop()
 returns table (codigo text, reservado integer, vence_en timestamptz)
 language sql stable security definer set search_path = '' as $$
@@ -93,7 +93,7 @@ $$;
 revoke all on function public.th_reservas_loop() from public;
 grant execute on function public.th_reservas_loop() to anon, authenticated, service_role;
 
--- ── 4. Caja: mover stock de forma relativa ─────────────────────────────────
+-- -- 4. Caja: mover stock de forma relativa ---------------------------------
 -- Devuelve el stock resultante. Si el producto no existe devuelve nada (la cola
 -- de la caja lo da por hecho, igual que hoy). Nunca deja stock negativo.
 create or replace function public.th_mover_stock(p_id bigint, p_delta integer,
@@ -123,7 +123,7 @@ begin
     v_reservado := public.th_reservado(v_codigo);
     if v_stock < v_reservado then
       insert into public.th_canal_conflictos(codigo, detalle)
-      values (v_codigo, 'La caja dejó ' || v_stock || ' unidad(es) y Loop tenía ' || v_reservado || ' reservada(s).');
+      values (v_codigo, 'La caja dejo ' || v_stock || ' unidad(es) y Loop tenia ' || v_reservado || ' reservada(s).');
     end if;
   end if;
 
@@ -132,7 +132,7 @@ end $$;
 revoke all on function public.th_mover_stock(bigint, integer, integer, text) from public;
 grant execute on function public.th_mover_stock(bigint, integer, integer, text) to anon, authenticated, service_role;
 
--- ── 5. Funciones del canal Loop (solo el servidor de Loop) ──────────────────
+-- -- 5. Funciones del canal Loop (solo el servidor de Loop) ------------------
 
 -- Vence reservas pasadas de hora.
 create or replace function public.canal_vencer()
@@ -164,7 +164,7 @@ begin
       from jsonb_array_elements(p_items) x
      group by 1 order by 1          -- orden fijo: evita bloqueos cruzados entre dos pedidos
   loop
-    if r.cantidad is null or r.cantidad <= 0 then raise exception 'cantidad inválida para %', r.codigo; end if;
+    if r.cantidad is null or r.cantidad <= 0 then raise exception 'cantidad invalida para %', r.codigo; end if;
     select i.stock into v_stock from public.inventario i where upper(i.codigo) = r.codigo for update;
     if v_stock is null then raise exception 'sin_producto:%', r.codigo; end if;
     v_reservado := public.th_reservado(r.codigo);
@@ -209,7 +209,7 @@ begin
   loop
     select i.id, i.stock into p from public.inventario i where upper(i.codigo) = it.codigo for update;
     if p.id is null then raise exception 'sin_producto:%', it.codigo; end if;
-    -- Lo reservado por ESTE pedido ya está apartado para él; lo de otros no.
+    -- Lo reservado por ESTE pedido ya esta apartado para el; lo de otros no.
     select coalesce(sum(cantidad), 0) into v_res from public.reservas_canal
      where codigo = it.codigo and estado = 'activa' and vence_en > now() and pedido <> p_pedido;
     if p.stock - v_res < it.cantidad then raise exception 'sin_stock:%', it.codigo; end if;
@@ -223,7 +223,7 @@ begin
                              canal, pedido_loop, total_loop)
   values (v_id, to_char(v_fecha, 'YYYY-MM-DD'), coalesce(p_venta->>'hora', to_char(now() at time zone 'America/La_Paz', 'HH24:MI')),
           to_char(v_fecha, 'YYYY-MM'), extract(month from v_fecha)::integer - 1, extract(year from v_fecha)::integer,
-          0, 0, 0,                                   -- para Toscana la venta es Bs 0: la cobró Loop
+          0, 0, 0,                                   -- para Toscana la venta es Bs 0: la cobro Loop
           'Loop',
           0, 0, 0, 0, 'Loop', p_venta->>'cliente_nombre', p_venta->>'cliente_telefono',
           'loop', p_pedido, coalesce((p_venta->>'total')::numeric, 0));
@@ -237,7 +237,7 @@ begin
   return jsonb_build_object('ok', true, 'venta_id', v_id);
 end $$;
 
--- Devolución aprobada en Loop: el stock vuelve y la venta queda anulada.
+-- Devolucion aprobada en Loop: el stock vuelve y la venta queda anulada.
 create or replace function public.canal_devolver_venta(p_pedido text)
 returns jsonb language plpgsql security definer set search_path = '' as $$
 declare v_id text; v_anulada boolean; it record;
