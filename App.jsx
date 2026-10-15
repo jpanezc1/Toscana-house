@@ -18040,6 +18040,8 @@ function App(){
       descuento: v.descPct || 0,
       metodoPago: v.metodoPago,
       vendedor: user?.nombre || "Admin",
+      cliente: v.clienteNombre || "—",
+      clienteTelefono: v.clienteTelefono || "",
       marcas: marcasNombres,
       items: v.items.map(it => ({
         codigo: it.codigo, nombre: it.nombre,
@@ -22284,7 +22286,30 @@ function VentasAntiguas({inv, ventas, cargas, onVentaHistorica, onImportarVentas
   const [shImportLibre, setShImportLibre] = React.useState(false);
   const [descPct,       setDescPct]       = React.useState("");
   const [montosMixtos,  setMontosMixtos]  = React.useState({efectivo:"", qr:"", tarjeta:""});
+  const [cliente,       setCliente]       = React.useState("");
+  const [clienteTel,    setClienteTel]    = React.useState("");
   const inputRef = React.useRef(null);
+
+  // Clientas ya registradas en ventas anteriores. Al elegir una sugerencia se
+  // completa también el teléfono, pero ambos campos siguen siendo editables.
+  const clientasConocidas = React.useMemo(()=>{
+    const porNombre = new Map();
+    (ventas||[]).forEach(v=>{
+      const nombre = String(v.clienteNombre||"").trim();
+      if(!nombre) return;
+      const key = nombre.toLocaleLowerCase("es");
+      const telefono = String(v.clienteTelefono||"").trim();
+      const actual = porNombre.get(key);
+      if(!actual || (!actual.telefono && telefono)) porNombre.set(key,{nombre,telefono});
+    });
+    return [...porNombre.values()].sort((a,b)=>a.nombre.localeCompare(b.nombre,"es"));
+  },[ventas]);
+
+  function elegirClienta(nombre){
+    setCliente(nombre);
+    const conocida = clientasConocidas.find(c=>c.nombre===nombre);
+    if(conocida?.telefono) setClienteTel(conocida.telefono);
+  }
 
   // Descuento POR ÍTEM (cada código puede tener el suyo). El campo global de
   // arriba es solo un atajo para aplicar el mismo % a todos de una.
@@ -22406,12 +22431,14 @@ function VentasAntiguas({inv, ventas, cargas, onVentaHistorica, onImportarVentas
     }
     const venta = {
       fecha, turno, metodoPago:metodoPagoFinal, total:totalFinal, subtotal:totalLleno, descPct:descEfectivo, items:itemsFinal,
+      clienteNombre: cliente.trim(), clienteTelefono: clienteTel.trim(),
       ...(verificados.size>0 ? {advertencia:"ITEMS_VERIFICADOS_MANUALMENTE", itemsVerificados:itemsVerif, verificadoPor:user?.nombre||"Admin"} : {}),
     };
     const vf = onVentaHistorica(venta);
     setConfirmado({...vf, cantItems:carrito.length, conVerif:verificados.size>0});
     setCarrito([]); setCodInput(""); setBusqueda([]); setVerificados(new Set()); setDescPct("");
     setMontosMixtos({efectivo:"", qr:"", tarjeta:""});
+    setCliente(""); setClienteTel("");
     setGuardando(false);
   }
 
@@ -22540,6 +22567,40 @@ function VentasAntiguas({inv, ventas, cargas, onVentaHistorica, onImportarVentas
               {TURNOS.map(t=><option key={t}>{t}</option>)}
             </select>
           </div>
+        </div>
+
+        {/* Clienta de la venta histórica */}
+        <div style={{background:C.bg0,border:`1px solid ${C.sep}`,borderRadius:10,padding:12}}>
+          <div style={{fontSize:11,fontWeight:600,color:C.label2,marginBottom:8,
+            display:"flex",alignItems:"center",gap:5}}>
+            <i className="ti ti-user" style={{fontSize:13}} aria-hidden="true"/> Clienta
+            <span style={{fontWeight:400,color:C.label3}}>(opcional)</span>
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"minmax(0,1.4fr) minmax(0,1fr)",gap:8}}>
+            <div>
+              <input list="ventas-antiguas-clientas" value={cliente}
+                onChange={e=>elegirClienta(e.target.value)}
+                placeholder="Nombre de la clienta"
+                autoComplete="off"
+                style={{width:"100%",padding:"8px 10px",borderRadius:8,boxSizing:"border-box",
+                  border:`1px solid ${C.sep}`,background:C.bg1,color:C.label,
+                  fontSize:13,fontFamily:FONT_UI}}/>
+              <datalist id="ventas-antiguas-clientas">
+                {clientasConocidas.map(c=><option key={c.nombre} value={c.nombre}>{c.telefono||"Clienta registrada"}</option>)}
+              </datalist>
+            </div>
+            <input value={clienteTel} onChange={e=>setClienteTel(e.target.value)}
+              placeholder="Teléfono / WhatsApp" type="tel" inputMode="tel"
+              style={{width:"100%",padding:"8px 10px",borderRadius:8,boxSizing:"border-box",
+                border:`1px solid ${C.sep}`,background:C.bg1,color:C.label,
+                fontSize:13,fontFamily:FONT_UI}}/>
+          </div>
+          {cliente.trim()&&(
+            <div style={{fontSize:10.5,color:C.green,marginTop:7,display:"flex",alignItems:"center",gap:4}}>
+              <i className="ti ti-circle-check" aria-hidden="true"/>
+              La venta quedará vinculada a {cliente.trim()} en Clientes.
+            </div>
+          )}
         </div>
 
         {/* Método de pago + Descuento */}
