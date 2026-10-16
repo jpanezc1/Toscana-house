@@ -19512,6 +19512,140 @@ function QRPagoPanel({total, refVenta}){
   );
 }
 
+// ── Pedidos de Loop en la caja ──────────────────────────────────────────────
+// Cuando un cliente compra en Loop una prenda de Toscana, aparece acá con sonido.
+// La caja confirma que la tiene, la embolsa y avisa que está lista: sale la
+// moto de Loop a retirarla. Habla con la API de Loop con la cuenta "comercio"
+// que Loop le crea a Toscana (nombre + clave, sesión de 14 h en este equipo).
+const LOOP_API = /^(localhost|127\.0\.0\.1)$/.test(location.hostname) ? "http://127.0.0.1:4820/api/catalogo" : "https://loopbo.com/gestor/api/catalogo";   // en la Mac, el Loop de prueba
+const LOOP_SES = "th_loop_comercio";
+function PedidosLoopCaja(){
+  const leerSes=()=>{ try{ return JSON.parse(localStorage.getItem(LOOP_SES)); }catch{ return null; } };
+  const [ses,setSes]=useState(leerSes);
+  const [abierto,setAbierto]=useState(false);
+  const [datos,setDatos]=useState(null);
+  const [err,setErr]=useState("");
+  const [ocupado,setOcupado]=useState(null);
+  const [form,setForm]=useState({n:"",c:""});
+  const vistos=useRef(null);
+  async function api(accion,extra){
+    const r=await fetch(LOOP_API,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({accion,...(extra||{}),...(accion==="entrar"?{}:{clave:(leerSes()||{}).token||""})})});
+    const d=await r.json().catch(()=>({ok:false,error:"Sin conexión con Loop."}));
+    if(r.status===401&&accion!=="entrar"){ localStorage.removeItem(LOOP_SES); setSes(null); }
+    if(!d.ok) throw new Error(d.error||"No se pudo.");
+    return d;
+  }
+  function sonar(){
+    try{ const ac=new(window.AudioContext||window.webkitAudioContext)(); [880,1175,1568].forEach((f,i)=>{ const o=ac.createOscillator(),g=ac.createGain(); o.frequency.value=f; o.connect(g); g.connect(ac.destination); const t=ac.currentTime+i*0.18; g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(0.35,t+0.02); g.gain.exponentialRampToValueAtTime(0.0001,t+0.3); o.start(t); o.stop(t+0.32); }); }catch{}
+    try{ if("Notification" in window && Notification.permission==="granted" && document.visibilityState!=="visible") new Notification("Pedido nuevo de Loop",{body:"Confirmá que tenés la prenda.",tag:"loop-caja"}); }catch{}
+  }
+  useEffect(()=>{
+    if(!ses) return;
+    let vivo=true,t=null;
+    async function leer(){
+      try{
+        const d=await api("comercio-pedidos");
+        if(!vivo) return;
+        const pend=(d.pedidos||[]).filter(p=>p.mi_estado==="pendiente"&&!["despacho","entregado"].includes(p.estado));
+        if(vistos.current&&pend.some(p=>!vistos.current.has(p.id))){ sonar(); setAbierto(true); }
+        vistos.current=new Set(pend.map(p=>p.id));
+        setDatos(d); setErr("");
+      }catch(e){ if(vivo) setErr(e.message); }
+      if(vivo) t=setTimeout(leer,15000);
+    }
+    leer();
+    return ()=>{ vivo=false; clearTimeout(t); };
+  },[ses&&ses.token]);
+  async function entrar(e){
+    e.preventDefault(); setErr("");
+    if(!form.n.trim()||!form.c){ setErr("Escribí el nombre y la clave de la cuenta de Loop."); return; }
+    setOcupado("entrar");
+    try{
+      const r=await api("entrar",{nombre:form.n.trim(),clave:form.c});
+      if(r.rol!=="comercio") throw new Error("Esa cuenta no es la de la caja. Pedile a Loop la cuenta de comercio.");
+      const s={token:r.token,nombre:r.nombre}; localStorage.setItem(LOOP_SES,JSON.stringify(s)); setSes(s); setForm({n:"",c:""});
+      try{ if("Notification" in window && Notification.permission==="default") Notification.requestPermission(); }catch{}
+    }catch(x){ setErr(x.message); }
+    setOcupado(null);
+  }
+  async function marcar(p,estado){
+    if(estado==="no_esta"&&!window.confirm("¿Seguro que no tenés la prenda del pedido "+p.numero+"? Loop le avisa al cliente.")) return;
+    setOcupado(p.id+estado);
+    try{ await api("comercio-confirmar",{id:p.id,estado}); const d=await api("comercio-pedidos"); setDatos(d); }catch(x){ setErr(x.message); }
+    setOcupado(null);
+  }
+  const lista=((datos&&datos.pedidos)||[]).filter(p=>!["despacho","entregado"].includes(p.estado)&&p.mi_estado!=="no_esta");
+  const porConfirmar=lista.filter(p=>p.mi_estado==="pendiente").length;
+  const btn=(bg,fg,brd)=>({minHeight:44,padding:"0 16px",borderRadius:999,border:"1px solid "+(brd||bg),background:bg,color:fg,fontWeight:600,fontSize:14,cursor:"pointer",WebkitTapHighlightColor:"transparent"});
+  const estadoTxt={pendiente:["Confirmá que la tenés",C.amber],disponible:["Embolsala con el número del pedido",C.blue],listo:["Lista: la moto de Loop viene a retirarla",C.green]};
+  return (
+    <>
+      <button onClick={()=>setAbierto(true)} aria-label={ses?"Pedidos de Loop: "+porConfirmar+" por confirmar":"Conectar la caja con Loop"}
+        style={{display:"flex",alignItems:"center",gap:10,width:"100%",minHeight:48,marginBottom:12,padding:"0 16px",borderRadius:14,cursor:"pointer",textAlign:"left",
+          border:"1px solid "+(porConfirmar?"#FF5804":C.sep),background:porConfirmar?"#FFEADF":C.bg1,color:C.label,WebkitTapHighlightColor:"transparent"}}>
+        <span style={{width:10,height:10,borderRadius:"50%",background:!ses?C.label3:porConfirmar?"#FF5804":C.green,flex:"none"}}/>
+        <b style={{fontSize:14}}>Pedidos de Loop</b>
+        <span style={{fontSize:13,color:C.label2,flex:1}}>{!ses?"Conectar esta caja con Loop":porConfirmar?porConfirmar+" por confirmar":lista.length?lista.length+" en curso":"Sin pedidos pendientes"}</span>
+        {porConfirmar>0&&<span style={{minWidth:24,height:24,borderRadius:12,background:"#FF5804",color:"#fff",fontSize:12,fontWeight:700,display:"grid",placeItems:"center",padding:"0 7px"}}>{porConfirmar}</span>}
+      </button>
+      {abierto&&(
+        <div role="dialog" aria-modal="true" aria-label="Pedidos de Loop" style={{position:"fixed",inset:0,zIndex:400,display:"flex",justifyContent:"flex-end"}}>
+          <div onClick={()=>setAbierto(false)} style={{position:"absolute",inset:0,background:"rgba(26,23,20,.45)"}}/>
+          <div style={{position:"relative",width:"min(520px,100%)",height:"100%",background:C.bg0,display:"flex",flexDirection:"column",boxShadow:"0 24px 60px rgba(0,0,0,.2)"}}>
+            <div style={{display:"flex",alignItems:"center",gap:12,padding:"16px 20px",background:C.bg1,borderBottom:"1px solid "+C.sep}}>
+              <div style={{flex:1}}><div style={{fontSize:18,fontWeight:700,color:C.label}}>Pedidos de Loop</div>
+                <div style={{fontSize:13,color:C.label2}}>{ses?"Caja conectada como "+ses.nombre:"Entrá con la cuenta de comercio que te dio Loop"}</div></div>
+              <button onClick={()=>setAbierto(false)} aria-label="Cerrar" style={{width:44,height:44,borderRadius:22,border:"1px solid "+C.sep,background:C.bg1,fontSize:18,cursor:"pointer"}}>×</button>
+            </div>
+            <div style={{flex:1,overflow:"auto",padding:20}}>
+              {err&&<div role="alert" style={{padding:"10px 14px",borderRadius:12,background:"#F9E1DE",color:C.red,fontSize:14,marginBottom:12}}>{err}</div>}
+              {!ses?(
+                <form onSubmit={entrar} noValidate>
+                  <label style={{display:"grid",gap:6,marginBottom:14,fontSize:14,fontWeight:600,color:C.label}}>Nombre de la cuenta
+                    <input value={form.n} onChange={e=>setForm({...form,n:e.target.value})} autoComplete="username" style={{minHeight:48,padding:"10px 14px",borderRadius:12,border:"1px solid "+C.sepH,fontSize:16}}/></label>
+                  <label style={{display:"grid",gap:6,marginBottom:16,fontSize:14,fontWeight:600,color:C.label}}>Clave
+                    <input type="password" value={form.c} onChange={e=>setForm({...form,c:e.target.value})} autoComplete="current-password" style={{minHeight:48,padding:"10px 14px",borderRadius:12,border:"1px solid "+C.sepH,fontSize:16}}/></label>
+                  <button type="submit" disabled={ocupado==="entrar"} style={{...btn(C.label,"#fff"),width:"100%",minHeight:52}}>{ocupado==="entrar"?"Conectando…":"Conectar con Loop"}</button>
+                </form>
+              ):!lista.length?(
+                <div style={{textAlign:"center",padding:"48px 16px",color:C.label2,fontSize:15,lineHeight:1.6}}>No hay pedidos de Loop para preparar.<br/>Cuando un cliente compre una prenda de Toscana, aparece acá con sonido.</div>
+              ):lista.map(p=>{
+                const [txt,col]=estadoTxt[p.mi_estado]||["",C.label2];
+                return (
+                  <div key={p.id} style={{background:C.bg1,border:"1px solid "+(p.mi_estado==="pendiente"?"#FF5804":C.sep),borderRadius:16,padding:16,marginBottom:12}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",gap:8}}>
+                      <b style={{fontSize:16,color:C.label}}>Pedido {p.numero}</b>
+                      <span style={{fontSize:12,fontWeight:600,color:col}}>{txt}</span>
+                    </div>
+                    {(p.prendas||[]).map((it,i)=>(
+                      <div key={i} style={{display:"grid",gridTemplateColumns:"56px 1fr",gap:12,alignItems:"center",padding:"10px 0",borderTop:i?"1px solid "+C.sep:"none",marginTop:i?0:8}}>
+                        {it.foto?<img src={it.foto} alt="" style={{width:56,height:70,borderRadius:8,objectFit:"cover",background:C.bg2}}/>:<span style={{width:56,height:70,borderRadius:8,background:C.bg2,display:"block"}}/>}
+                        <div><div style={{fontSize:14,fontWeight:600,color:C.label}}>{it.nombre}</div>
+                          <div style={{fontSize:13,color:C.label2}}>{[it.talla&&("Talla "+it.talla),it.color].filter(Boolean).join(" · ")}{it.cantidad>1?" · "+it.cantidad+" u.":""}</div>
+                          <div style={{fontSize:13,fontFamily:"ui-monospace,Menlo,monospace",color:C.label}}>{it.codigo}</div></div>
+                      </div>
+                    ))}
+                    <div style={{display:"flex",gap:10,marginTop:10,flexWrap:"wrap"}}>
+                      {p.mi_estado==="pendiente"&&<>
+                        <button disabled={!!ocupado} onClick={()=>marcar(p,"no_esta")} style={{...btn(C.bg1,C.red,"#F0C4BE"),flex:1}}>No está</button>
+                        <button disabled={!!ocupado} onClick={()=>marcar(p,"disponible")} style={{...btn(C.label,"#fff"),flex:1}}>{ocupado===p.id+"disponible"?"…":"La tengo"}</button></>}
+                      {p.mi_estado==="disponible"&&<button disabled={!!ocupado} onClick={()=>marcar(p,"listo")} style={{...btn("#FF5804","#1A1714"),flex:1,minHeight:52}}>{ocupado===p.id+"listo"?"…":"Listo para retirar"}</button>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            {ses&&<div style={{padding:"12px 20px",borderTop:"1px solid "+C.sep,background:C.bg1,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <span style={{fontSize:12,color:C.label3}}>Se actualiza cada 15 segundos.</span>
+              <button onClick={()=>{ if(window.confirm("¿Desconectar esta caja de Loop?")){ localStorage.removeItem(LOOP_SES); setSes(null); setDatos(null); } }} style={{border:0,background:"none",color:C.label2,fontSize:13,minHeight:44,cursor:"pointer"}}>Desconectar</button>
+            </div>}
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
 // POS — Caja de ventas
 // ══════════════════════════════════════════════════════════
 function POS({inv,onVenta,onVerNota,user,descuentos={},descCodigos={}}){
@@ -19822,6 +19956,7 @@ function POS({inv,onVenta,onVerNota,user,descuentos={},descCodigos={}}){
 
   return (
     <div>
+      <PedidosLoopCaja/>
       {/* Search bar */}
       <div style={{position:"relative",marginBottom:14}}>
         <span style={{position:"absolute",left:12,top:"50%",transform:"translateY(-50%)",fontSize:16,color:C.label3}}>🔍</span>
