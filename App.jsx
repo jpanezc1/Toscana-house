@@ -6686,23 +6686,24 @@ function LiqModal({marcaId,ventas,mes,anio,MK,cierres,setCierres,onClose,syncCie
       </div>
 
       {/* Desglose financiero */}
-      <div style={{background:C.bg2,borderRadius:14,padding:14,marginBottom:16}}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-          <strong style={{fontFamily:FONT,color:C.label}}>Reintegros a favor de la marca</strong>
-          {!cerrado&&<button onClick={()=>{setNuevoReintegro({desc:"",monto:""});setErrorReintegro("");}} style={{padding:10,borderRadius:8,border:`1px solid ${C.sep}`,color:C.green,background:C.bg1,cursor:"pointer"}}>+ Agregar reintegro</button>}
+      <div style={{marginBottom:16,fontFamily:FONT}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8,paddingLeft:4}}>
+          <span style={{fontSize:13,fontWeight:600,color:C.label3,fontFamily:FONT,textTransform:"uppercase",letterSpacing:.8}}>Reintegros</span>
+          {!cerrado&&<button aria-label="Agregar reintegro" title="Agregar reintegro" onClick={()=>{setNuevoReintegro({desc:"",monto:""});setErrorReintegro("");}} style={{width:28,height:28,borderRadius:8,border:`1px solid ${C.sep}`,background:C.bg2,cursor:"pointer",fontSize:16,fontWeight:700,color:C.label2,lineHeight:1,display:"flex",alignItems:"center",justifyContent:"center",WebkitTapHighlightColor:"transparent"}}>+</button>}
         </div>
-        <p style={{fontSize:12,color:C.label2}}>Se suman al neto a pagar. No modifican ventas ni inventario.</p>
-        {gastos.filter(esReintegroLiq).map(g=><div key={g.id} style={{padding:"10px 0",borderTop:`1px solid ${C.sep}`,fontFamily:FONT}}>
-          <div style={{display:"flex",justifyContent:"space-between",gap:10}}><span>{g.desc}</span><strong style={{color:C.green}}>{importeAjusteLiq(g)}</strong></div>
-          <small style={{color:C.label3}}>{g.creadoPorNombre||"Registro anterior"}{g.creadoEn?` · ${new Date(g.creadoEn).toLocaleString("es-BO")}`:""}</small>
-          {!cerrado&&<button onClick={()=>{if(!confirm("¿Quitar este reintegro de la liquidación?"))return;removeGasto(g.id);logAudit("REINTEGRO_LIQUIDACION",{marcaId,mk:MK,accion:"quitar",ajuste:g},user);if(typeof onCfgChange==="function")onCfgChange();}} style={{marginLeft:12,color:C.red,border:0,background:"transparent",cursor:"pointer"}}>Quitar</button>}
+        {gastos.filter(esReintegroLiq).map(g=><div key={g.id} style={{display:"flex",gap:8,marginBottom:8,alignItems:"center"}} title={`${g.creadoPorNombre||"Registro anterior"}${g.creadoEn?` · ${new Date(g.creadoEn).toLocaleString("es-BO")}`:""}`}>
+          <input readOnly aria-label="Descripción del reintegro guardado" value={g.desc} style={{flex:1,minWidth:0,padding:"9px 10px",borderRadius:8,border:`1px solid ${C.sep}`,background:C.bg1,fontSize:13,color:C.label,fontFamily:FONT,outline:"none",boxSizing:"border-box"}}/>
+          <input readOnly aria-label="Monto del reintegro guardado" value={Math.abs(Number(g.monto)||0)} style={{width:90,padding:"9px 10px",borderRadius:8,border:`1px solid ${C.sep}`,background:C.bg1,fontSize:13,color:C.label,fontFamily:FONT,outline:"none",boxSizing:"border-box",textAlign:"right"}}/>
+          {!cerrado&&<button aria-label="Quitar reintegro" onClick={()=>{if(!confirm("¿Quitar este reintegro de la liquidación?"))return;removeGasto(g.id);logAudit("REINTEGRO_LIQUIDACION",{marcaId,mk:MK,accion:"quitar",ajuste:g},user);if(typeof onCfgChange==="function")onCfgChange();}} style={{width:28,height:28,borderRadius:8,border:"none",background:"transparent",cursor:"pointer",fontSize:18,color:C.red,flexShrink:0,lineHeight:1,display:"flex",alignItems:"center",justifyContent:"center",WebkitTapHighlightColor:"transparent"}}>×</button>}
         </div>)}
-        {nuevoReintegro&&<div style={{display:"grid",gap:8,marginTop:12}}>
-          <label>Descripción del reintegro<input aria-label="Descripción del reintegro" value={nuevoReintegro.desc} onChange={e=>setNuevoReintegro({...nuevoReintegro,desc:e.target.value})} style={{width:"100%",padding:10,boxSizing:"border-box"}}/></label>
-          <label>Monto en Bs<input aria-label="Monto del reintegro" type="number" min="0.01" step="0.01" value={nuevoReintegro.monto} onChange={e=>setNuevoReintegro({...nuevoReintegro,monto:e.target.value})} style={{width:"100%",padding:10,boxSizing:"border-box"}}/></label>
-          {errorReintegro&&<div role="alert" style={{color:C.red}}>{errorReintegro}</div>}
-          <IOSBtn onPress={guardarReintegro} variant="success">Guardar reintegro</IOSBtn>
-          <IOSBtn onPress={()=>setNuevoReintegro(null)}>Cancelar</IOSBtn>
+        {nuevoReintegro&&<div>
+          <div style={{display:"flex",gap:8,marginBottom:8,alignItems:"center"}}>
+            <input autoFocus aria-label="Descripción del reintegro" placeholder="Descripción del reintegro" value={nuevoReintegro.desc} onChange={e=>setNuevoReintegro({...nuevoReintegro,desc:e.target.value})} style={{flex:1,minWidth:0,padding:"9px 10px",borderRadius:8,border:`1px solid ${C.sep}`,background:C.bg1,fontSize:13,color:C.label,fontFamily:FONT,outline:"none",boxSizing:"border-box"}}/>
+            <input aria-label="Monto del reintegro" placeholder="Bs" type="number" min="0.01" step="0.01" value={nuevoReintegro.monto} onChange={e=>setNuevoReintegro({...nuevoReintegro,monto:e.target.value})} style={{width:90,padding:"9px 10px",borderRadius:8,border:`1px solid ${C.sep}`,background:C.bg1,fontSize:13,color:C.label,fontFamily:FONT,outline:"none",boxSizing:"border-box",textAlign:"right"}}/>
+            <button aria-label="Cancelar reintegro" onClick={()=>setNuevoReintegro(null)} style={{width:28,height:28,borderRadius:8,border:"none",background:"transparent",cursor:"pointer",fontSize:18,color:C.red,flexShrink:0,lineHeight:1}}>×</button>
+          </div>
+          {errorReintegro&&<div role="alert" style={{color:C.red,fontSize:12,marginBottom:8}}>{errorReintegro}</div>}
+          <button onClick={guardarReintegro} style={{padding:"7px 12px",borderRadius:8,border:`1px solid ${C.sep}`,background:C.bg2,fontSize:12,fontWeight:600,color:C.label2,fontFamily:FONT,cursor:"pointer"}}>Guardar reintegro</button>
         </div>}
       </div>
       <div style={{background:C.bg2,borderRadius:16,overflow:"hidden",marginBottom:16}}>
@@ -12619,7 +12620,7 @@ function HomeDashboard({ventas, inv, vMes, mes, anio, onGoTab, descuentos, descC
           sub="unidades en tienda"
           color={C.indigo}/>
         <KPICard icon="🏷️" label="Marcas activas" compact={isDesktop}
-          val={MARCAS.length}
+          val={MARCAS.filter(m=>m.estado!=="inactiva").length}
           sub="marcas en tienda"
           color={C.amber}/>
         <KPICard icon="💎" label="Valor inventario" compact={isDesktop}
@@ -17090,6 +17091,22 @@ function App(){
   // marcasState es la fuente de verdad React para la lista de marcas.
   // MARCAS (global mutable) se mantiene en sync para el resto del código.
   const[marcasState,setMarcasState]       =useState(()=>cargarMarcas());
+  const[mostrarMarcasRetiradas,setMostrarMarcasRetiradas]=useState(false);
+  const[guardandoBajaMarca,setGuardandoBajaMarca]=useState(null);
+  async function cambiarBajaMarca(marca){
+    if(user?.rol!=="admin"||guardandoBajaMarca!==null)return;
+    const estado=marca.estado==="inactiva"?"activa":"inactiva";
+    const unidades=inv.filter(p=>p.marcaId===marca.id).reduce((s,p)=>s+Math.max(0,Number(p.stock)||0),0);
+    if(!confirm(`${estado==="inactiva"?"Dar de baja":"Reactivar"} ${marca.nombre}?\nSe conservarán ventas, liquidaciones e inventario.${estado==="inactiva"&&unidades>0?`\nTiene ${unidades} unidades registradas; esta acción NO registra su retiro físico.`:""}`))return;
+    setGuardandoBajaMarca(marca.id);
+    try{
+      const ok=await sbGuardarConfigMarca(marca.id,{estado});
+      if(!ok){alert("No se pudo guardar la baja. No se cambió el estado; intentá nuevamente.");return;}
+      const lista=marcasState.map(m=>m.id===marca.id?{...m,estado}:m);
+      MARCAS=lista;setMarcasState(lista);localStorage.setItem("th_marcas",JSON.stringify(lista));
+      logAudit("ESTADO_MARCA",{marcaId:marca.id,marcaNombre:marca.nombre,estadoAnterior:marca.estado||"activa",estado},user);
+    }finally{setGuardandoBajaMarca(null);}
+  }
   const drive = useDriveSync();
 
   // ── Permiso: staff puede cambiar precios (lo prende/apaga el admin) ──
@@ -18585,6 +18602,7 @@ function App(){
                 onGuardar={guardarDescuentoMarca}/>
             )}
 
+            <button onClick={()=>setMostrarMarcasRetiradas(v=>!v)} style={{fontFamily:FONT,fontSize:12,color:C.label2,background:C.bg2,border:`1px solid ${C.sep}`,borderRadius:8,padding:"8px 12px",marginBottom:12,cursor:"pointer"}}>{mostrarMarcasRetiradas?"Ocultar marcas dadas de baja":"Ver marcas dadas de baja"}</button>
             {/* Contador de estados */}
             {marcasState.filter(m=>m.estado==="inactiva").length>0&&(
               <div style={{fontSize:13,fontWeight:600,color:C.label3,textTransform:"uppercase",
@@ -18602,7 +18620,7 @@ function App(){
               flexDirection: isDesktop ? undefined : "column",
               gap: isDesktop ? 6 : 2,
             }}>
-              {marcasState.map((m,i)=>{
+              {marcasState.filter(m=>mostrarMarcasRetiradas||m.estado!=="inactiva").map((m,i)=>{
                 const total=vMes.reduce((s,v)=>s+v.items.filter(it=>it.marcaId===m.id).reduce((ss,it)=>ss+it.subtotal,0),0);
                 const prods=inv.filter(it=>it.marcaId===m.id).filter(p=>p.stock>0).length;
                 const cerrado=cierres[`${MK}-${m.id}`]?.cerrado;
@@ -18679,6 +18697,7 @@ function App(){
 
                     {/* Acciones */}
                     <div style={{display:"flex",alignItems:"center",gap:6,flexShrink:0}}>
+                      {user.rol==="admin"&&<button disabled={guardandoBajaMarca!==null} onClick={e=>{e.stopPropagation();cambiarBajaMarca(m);}} style={{fontFamily:FONT,fontSize:11,color:inactiva?C.label2:C.red,background:C.bg2,border:`1px solid ${C.sep}`,borderRadius:8,padding:"7px 9px",cursor:"pointer"}}>{guardandoBajaMarca===m.id?"Guardando…":inactiva?"Reactivar":"Dar de baja"}</button>}
                       {cerrado&&<Chip color={C.green} small>✓</Chip>}
                       {user.rol==="admin"&&(
                         <MarcaEditBtn
@@ -18914,6 +18933,7 @@ function App(){
                   justifyContent:"center",gap:6,marginBottom:16}}>
                 PDF de todas las marcas
               </button>
+              <button onClick={()=>setMostrarMarcasRetiradas(v=>!v)} style={{fontFamily:FONT,fontSize:12,color:C.label2,background:C.bg2,border:`1px solid ${C.sep}`,borderRadius:8,padding:"8px 12px",marginBottom:12,cursor:"pointer"}}>{mostrarMarcasRetiradas?"Ocultar marcas dadas de baja":"Ver liquidaciones de marcas dadas de baja"}</button>
             </div>
 
             <div style={{
@@ -18922,7 +18942,7 @@ function App(){
               flexDirection: isDesktop ? undefined : "column",
               gap: isDesktop ? 6 : 2,
             }}>
-              {MARCAS.map((m,i)=>{
+              {MARCAS.filter(m=>mostrarMarcasRetiradas||m.estado!=="inactiva").map((m,i)=>{
                 const liq=getLiq(m.id);
                 const cerrado=cierres[`${MK}-${m.id}`]?.cerrado;
                 return (

@@ -1,0 +1,15 @@
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const src=fs.readFileSync('App.jsx','utf8');
+assert(src.includes('marcasState.filter(m=>mostrarMarcasRetiradas||m.estado!=="inactiva").map'));
+assert(src.includes('MARCAS.filter(m=>mostrarMarcasRetiradas||m.estado!=="inactiva").map'));
+const action=src.slice(src.indexOf('async function cambiarBajaMarca('),src.indexOf('const drive = useDriveSync()',src.indexOf('async function cambiarBajaMarca(')));
+assert(action.includes('await sbGuardarConfigMarca(marca.id,{estado})'));
+assert(action.includes('if(!ok)'));
+assert(action.includes('user?.rol!=="admin"'));
+assert(action.includes('ESTADO_MARCA'));
+assert(!/setInv|setVentas|\.delete\(/.test(action));
+assert(src.includes('aria-label="Agregar reintegro"'));
+assert(src.includes('placeholder="Descripción del reintegro"'));
+assert(!src.includes('<strong style={{fontFamily:FONT,color:C.label}}>Reintegros a favor'));
+console.log('OK bajas reversibles, filtros y diseño compacto de reintegros');
