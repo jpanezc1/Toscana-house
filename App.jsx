@@ -1,4 +1,5 @@
 import { useState, useMemo, useRef, useCallback, useEffect } from "react";
+import { fechaRetiroMs, resumirVerificacion, conciliarRetirosVerificacion } from "./verificacion-retiros.mjs";
 
 // ════════════════════════════════════════════════════════════
 // SUPABASE — Base de datos en la nube
@@ -17416,11 +17417,13 @@ function App(){
   },[inv, cargas]);
 
   function registrarAuditoria(aud){
+    aud = resumirVerificacion(aud);
     setAuditorias(prev=>[aud, ...prev]);
     syncConRespaldo("auditoria", aud, ()=>sbGuardarAuditoria(aud));
   }
 
   function actualizarAuditoria(aud){
+    aud = resumirVerificacion(aud);
     setAuditorias(prev=>prev.map(a=>a.id===aud.id?aud:a));
     syncConRespaldo("auditoria", aud, ()=>sbGuardarAuditoria(aud));
   }
@@ -18509,7 +18512,7 @@ function App(){
         {/* AUDITORÍA — cierre de inventario mensual (conteo físico vs sistema) */}
         {/* VERIFICACIÓN — siempre montada para no perder el conteo ni el scanner */}
         <div style={{display: tab==="auditoria" ? "block" : "none"}}>
-          <AuditoriaInventario inv={inv} ventas={ventas} cargas={cargasCompletas} mes={mes} anio={anio} MK={MK}
+          <AuditoriaInventario inv={inv} ventas={ventas} retiros={retiros} cargas={cargasCompletas} mes={mes} anio={anio} MK={MK}
             auditorias={auditorias} onGuardarAuditoria={registrarAuditoria} onActualizarAuditoria={actualizarAuditoria}
             onCuadrarConAuditoria={cuadrarConAuditoria} user={user}
             onGoVerif={()=>setTab("auditoria")}
@@ -20811,7 +20814,8 @@ function SheetRecibir({open, onClose, inv, onAdd, fInv, setFInv}){
 // ══════════════════════════════════════════════════════════
 // AUDITORÍA — Cierre de inventario mensual (conteo físico vs sistema)
 // ══════════════════════════════════════════════════════════
-function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, onGuardarAuditoria, onActualizarAuditoria, onCuadrarConAuditoria, user, onGoVerif, tabActual}){
+function AuditoriaInventario({inv, ventas, retiros=[], cargas, mes, anio, MK, auditorias:auditoriasOriginales, onGuardarAuditoria, onActualizarAuditoria, onCuadrarConAuditoria, user, onGoVerif, tabActual}){
+  const auditorias = useMemo(()=>auditoriasOriginales.map(a=>conciliarRetirosVerificacion(a,retiros)),[auditoriasOriginales,retiros]);
   const isDesktop = useIsDesktop();
   // El trabajo en curso (vista, marca seleccionada, doble conteo) se guarda
   // en localStorage para que NO se pierda si el usuario cambia de pestaña
@@ -21135,10 +21139,20 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
     return map;
   },[cargas,baseTs,baseInv]);
 
+  const retirosAjuste = useMemo(()=>{
+    const map={}, vistos=new Set();
+    retiros.forEach(r=>{
+      if(r.anulada || vistos.has(r.id) || fechaRetiroMs(r)<=baseTs.getTime()) return;
+      vistos.add(r.id);
+      const p=baseInv.find(p=>String(p.codigo||'').toUpperCase()===String(r.codigo||'').toUpperCase());
+      if(p) map[p.id]=(map[p.id]||0)-Math.max(0,Number(r.cantidad)||0);
+    });
+    return map;
+  },[retiros,baseTs,baseInv]);
   // ── Cruce: sistema (base congelada, ajustado por movimientos en curso) vs conteo físico ─
   const cruce = useMemo(()=>{
     return productos.map(p=>{
-      const ajuste = (ventasAjuste[p.id]||0) + (cargasAjuste[p.id]||0);
+      const ajuste = (ventasAjuste[p.id]||0) + (cargasAjuste[p.id]||0) + (retirosAjuste[p.id]||0);
       const sistema = Math.max(0, p.stock + ajuste);
       const contado = conteo[p.id]||0;
       const diferencia = contado - sistema;
@@ -21147,7 +21161,7 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
     })
     .filter(r=>r.sistema>0 || r.contado>0)
     .sort((a,b)=> Math.abs(b.diferencia)-Math.abs(a.diferencia) || (a.nombre||"").localeCompare(b.nombre||""));
-  },[productos,conteo,ventasAjuste,cargasAjuste]);
+  },[productos,conteo,ventasAjuste,cargasAjuste,retirosAjuste]);
 
   const totalAjustePorVentas = useMemo(()=>
     Object.values(ventasAjuste).reduce((s,v)=>s+Math.abs(v),0)
@@ -22012,6 +22026,7 @@ function AuditoriaInventario({inv, ventas, cargas, mes, anio, MK, auditorias, on
                                           </div>
                                           <div style={{fontSize:10,color:C.label3,fontFamily:"monospace",marginTop:2}}>
                                             {d.codigo} · contado {d.contado} / sistema {d.sistema}
+                                            {d.retirosAplicados>0&&<span style={{color:C.green}}> · {d.retirosAplicados} retiro(s) descontado(s)</span>}
                                             {d.diferencia!==0&&<span style={{color:estadoColor,fontWeight:700}}>
                                               {" "}({d.diferencia>0?"+":""}{d.diferencia})
                                             </span>}
@@ -24482,7 +24497,8 @@ function InventarioPorMarca({inv, ventas, retiros=[], bajas=[], onRecibir, onBaj
 // ══════════════════════════════════════════════════════════
 // MARCA DETALLE — iOS navigation push style
 // ══════════════════════════════════════════════════════════
-function MarcaDetalle({marcaId,inv,ventas,vMes,mes,anio,MK,cierres,setCierres,getHist,getLiq,auditorias=[],onActualizarAuditoria,user,retiros=[],onVentaClick}){
+function MarcaDetalle({marcaId,inv,ventas,vMes,mes,anio,MK,cierres,setCierres,getHist,getLiq,auditorias:auditoriasOriginales=[],onActualizarAuditoria,user,retiros=[],onVentaClick}){
+  const auditorias=useMemo(()=>auditoriasOriginales.map(a=>conciliarRetirosVerificacion(a,retiros)),[auditoriasOriginales,retiros]);
   const isDesktop = useIsDesktop();
   var _hN150 = useState("historial"); var sub = _hN150[0]; var setSub = _hN150[1];;
   const [agregandoA, setAgregandoA] = useState(null);
