@@ -6,6 +6,7 @@ let app = fs.readFileSync("App.jsx", "utf8");
 app = app.replace(/^import .+\n/gm, "");
 const main = `import React, { useState, useMemo, useRef, useCallback, useEffect } from "react";
 import { createRoot } from "react-dom/client";
+import { fechaRetiroMs, resumirVerificacion, conciliarRetirosVerificacion } from "./verificacion-retiros.mjs";
 import * as __XLSXBundled from "xlsx";
 import { jsPDF as __jsPDFBundled } from "jspdf";
 if (typeof window !== "undefined") window.__XLSXBundled = __XLSXBundled;
