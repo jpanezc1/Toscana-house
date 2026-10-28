@@ -3017,6 +3017,11 @@ function leerGastosLiq(marcaId, MK) {
 function guardarGastosLiq(marcaId, MK, gastos) {
   sbKVGuardar(`gastos_${marcaId}_${MK}`, gastos); // nube + espejo local
 }
+// Ajustes firmados: gastos positivos descuentan; reintegros negativos suman.
+// Se conserva el almacenamiento existente para sincronización y cierres históricos.
+function esReintegroLiq(g){ return Number(g.monto)<0 || g.tipo==="reintegro"; }
+function etiquetaAjusteLiq(g){ return `${esReintegroLiq(g)?"+ Reintegro: ":"− "}${g.desc||"Gasto extra"}`; }
+function importeAjusteLiq(g){ return `${esReintegroLiq(g)?"+":"-"}${$1(Math.abs(Number(g.monto)||0))}`; }
 function parseMixtoXls(metodoPago, total) {
   if (metodoPago?.startsWith("mixto|")) {
     const obj = { efectivo: 0, qr: 0, tarjeta: 0, giftcard: 0 };
@@ -3411,8 +3416,8 @@ async function generarExcelMensual(ventas, inventario, mes, anio, setGenerando, 
         ["","","","","","","","SUBTOTAL BANCO",       +liqM.subBanco.toFixed(2),"","",""],
         ["","","","","","","",`− Comisión (${liqM.cfg.pctComision}%)`, -liqM.comision.toFixed(2),"","",""],
         ["","","","","","","","− Alquiler",           -liqM.alquiler.toFixed(2),"","",""],
-        ...liqM.gastos.filter(g=>g.desc||Number(g.monto)>0).map(g=>
-          ["","","","","","","",`− ${g.desc||"Gasto extra"}`, -(Number(g.monto)||0),"","",""]
+        ...liqM.gastos.filter(g=>g.desc||Math.abs(Number(g.monto))>0).map(g=>
+          ["","","","","","","",etiquetaAjusteLiq(g), -(Number(g.monto)||0),"","",""]
         ),
         ["","","","","","","","NETO A PAGAR",          +liqM.neto.toFixed(2),"","",""],
       );
@@ -3575,8 +3580,8 @@ async function generarExcelMarca(marca, ventas, inventario, setGenerando) {
           ["","","","","","","",`Subtotal -${liqP.cfg.pctTarjeta}%`,+liqP.subBanco.toFixed(2),"","",""],
           ["","","","","","","",`− Comisión (${liqP.cfg.pctComision}%)`,  -liqP.comision.toFixed(2),"","",""],
           ["","","","","","","","− Alquiler",            -liqP.alquiler.toFixed(2),"","",""],
-          ...liqP.gastos.filter(g=>g.desc||Number(g.monto)>0).map(g=>
-            ["","","","","","","",`− ${g.desc||"Gasto extra"}`, -(Number(g.monto)||0),"","",""]
+          ...liqP.gastos.filter(g=>g.desc||Math.abs(Number(g.monto))>0).map(g=>
+            ["","","","","","","",etiquetaAjusteLiq(g), -(Number(g.monto)||0),"","",""]
           ),
           ["","","","","","","","Neto",                  +liqP.neto.toFixed(2),"","",""],
         );
@@ -3907,8 +3912,8 @@ async function exportExcelLiquidacion(marca,ventas,mes,anio){
     [`Subtotal -${liq.cfg.pctTarjeta}%`,          liq.subBanco],
     [`Comisión ventas (${liq.cfg.pctComision}%)`, -liq.comision],
     ["Alquiler",                                  -liq.alquiler],
-    ...liq.gastos.filter(g=>g.desc||Number(g.monto)>0).map(g=>
-      [g.desc||"Gasto extra", -(Number(g.monto)||0)]
+    ...liq.gastos.filter(g=>g.desc||Math.abs(Number(g.monto))>0).map(g=>
+      [etiquetaAjusteLiq(g), -(Number(g.monto)||0)]
     ),
   ];
   const rDesgloseStart = rows.length;
@@ -4288,10 +4293,10 @@ function construirMensajeLiquidacion(marca, mes, anio, datos){
     `− Comisión ventas (${pctComision}%): -${$1(comision)}`,
   ];
   lines.push(`− Alquiler: -${$1(alquiler)}`);
-  if(totalGastos>0){
-    lines.push(`− Gastos extra: -${$1(totalGastos)}`);
-    gastos.filter(g=>g.desc||Number(g.monto)>0).forEach(g=>{
-      lines.push(`   · ${g.desc||"Gasto extra"}: -${$1(Number(g.monto)||0)}`);
+  if(gastos.length>0){
+    lines.push(`Ajustes de liquidación:`);
+    gastos.filter(g=>g.desc||Math.abs(Number(g.monto))>0).forEach(g=>{
+      lines.push(`   · ${etiquetaAjusteLiq(g)}: ${importeAjusteLiq(g)}`);
     });
   }
   lines.push(``, `💰 *TOTAL NETO: ${$1(neto)}*`,
@@ -4310,8 +4315,8 @@ function imprimirLiquidacion(marca, mes, anio, liq){
     liq.descTJ>0 ? [`= Subtotal -${liq.cfg?.pctTarjeta ?? 0}%`, $1(liq.subBanco), false] : null,
     (liq.cfg?.pctComision>0) ? [`− Comisión ventas (${liq.cfg?.pctComision ?? 0}%)`, `-${$1(liq.comision)}`, false] : null,
     (liq.alquiler>0) ? ["− Alquiler", `-${$1(liq.alquiler)}`, false] : null,
-    ...liq.gastos.filter(g=>g.desc||Number(g.monto)>0).map(g=>
-      [`− ${g.desc||"Gasto extra"}`, `-${$1(Number(g.monto)||0)}`, false]
+    ...liq.gastos.filter(g=>g.desc||Math.abs(Number(g.monto))>0).map(g=>
+      [etiquetaAjusteLiq(g), importeAjusteLiq(g), false]
     ),
     ["Neto a liquidar", $1(liq.neto), true],
   ].filter(Boolean);
@@ -4379,8 +4384,8 @@ function construirImagenLiquidacion(marca, mes, anio, d){
     [`= Subtotal -${d.pctTarjeta ?? 0}%`, $1(d.subtotalBanco), false],
     [`− Comisión ventas (${d.pctComision ?? 0}%)`, `-${$1(d.comision)}`, false],
     ["− Alquiler", `-${$1(d.alquiler)}`, false],
-    ...d.gastos.filter(g=>g.desc||Number(g.monto)>0).map(g=>
-      [`− ${g.desc||"Gasto extra"}`, `-${$1(Number(g.monto)||0)}`, false]
+    ...d.gastos.filter(g=>g.desc||Math.abs(Number(g.monto))>0).map(g=>
+      [etiquetaAjusteLiq(g), importeAjusteLiq(g), false]
     ),
     ["Neto a liquidar", $1(d.neto), true],
   ].filter(Boolean);
@@ -5023,8 +5028,8 @@ async function liquidacionPDF(marca, mes, anio, liq, opts={}){
   ];
   if((liq.cfg?.pctComision??0)>0) cuenta.push([`Comisión Toscana ${liq.cfg?.pctComision}%`, "- "+f2(liq.comision), false, [230,150,150]]);
   if(liq.alquiler>0) cuenta.push(["Alquiler del espacio", "- "+f2(liq.alquiler), false, [230,150,150]]);
-  (liq.gastos||[]).filter(g=>g.desc||Number(g.monto)>0).forEach(g=>
-    cuenta.push([g.desc||"Gasto", "- "+f2(Number(g.monto)||0), false, [230,150,150]]));
+  (liq.gastos||[]).filter(g=>g.desc||Math.abs(Number(g.monto))>0).forEach(g=>
+    cuenta.push([etiquetaAjusteLiq(g), (esReintegroLiq(g)?"+ ":"- ")+f2(Math.abs(Number(g.monto)||0)), false, esReintegroLiq(g)?[150,210,170]:[230,150,150]]));
   const nLin=cuenta.length + 1;
   const cardH = 16 + nLin*6.6 + 12;
   doc.setFillColor(38,37,31); doc.roundedRect(cx,cy,cw,cardH,4,4,"F");
@@ -6525,7 +6530,7 @@ function PctMarcasPanel({ onCfgChange }) {
 // ══════════════════════════════════════════════════════════
 // LiqModal — liquidación como componente iOS sheet
 // ══════════════════════════════════════════════════════════
-function LiqModal({marcaId,ventas,mes,anio,MK,cierres,setCierres,onClose,syncCierre,onCfgChange}){
+function LiqModal({marcaId,ventas,mes,anio,MK,cierres,setCierres,onClose,syncCierre,onCfgChange,user}){
   if(!marcaId) return null;
   const marca=MARCAS.find(x=>x.id===marcaId);
   const [cfg, setCfg] = useState(()=>leerCfgLiq(marcaId));
@@ -6543,6 +6548,19 @@ function LiqModal({marcaId,ventas,mes,anio,MK,cierres,setCierres,onClose,syncCie
 
   // ── Gastos extra del período ──────────────────────────────
   const [gastos, setGastos] = useState(()=>leerGastosLiq(marcaId, MK));
+  const [nuevoReintegro,setNuevoReintegro]=useState(null);
+  const [errorReintegro,setErrorReintegro]=useState("");
+  function guardarReintegro(){
+    const desc=(nuevoReintegro?.desc||"").trim();
+    const monto=Math.round(Number(nuevoReintegro?.monto)*100)/100;
+    if(!desc||!Number.isFinite(monto)||monto<=0){setErrorReintegro("Ingresá el motivo y un monto mayor a cero.");return;}
+    if(cierres[`${MK}-${marcaId}`]?.cerrado){setErrorReintegro("Reabrí la liquidación antes de agregar un reintegro.");return;}
+    const registro={id:crypto.randomUUID(),tipo:"reintegro",desc,monto:-Math.round(monto*100)/100,creadoEn:new Date().toISOString(),creadoPor:user?.usuario||user?.user,creadoPorNombre:user?.nombre};
+    updateGastos([...gastos,registro]);
+    logAudit("REINTEGRO_LIQUIDACION",{marcaId,marcaNombre:marca?.nombre,mk:MK,accion:"agregar",ajuste:registro},user);
+    setNuevoReintegro(null);setErrorReintegro("");
+    if(typeof onCfgChange==="function")onCfgChange();
+  }
   function updateGastos(next){
     setGastos(next);
     guardarGastosLiq(marcaId, MK, next);
@@ -6646,7 +6664,7 @@ function LiqModal({marcaId,ventas,mes,anio,MK,cierres,setCierres,onClose,syncCie
             display:"flex",alignItems:"center",justifyContent:"center",
             WebkitTapHighlightColor:"transparent"}}>+</button>
         </div>
-        {gastos.map(g=>(
+        {gastos.filter(g=>!esReintegroLiq(g)).map(g=>(
           <div key={g.id} style={{display:"flex",gap:8,marginBottom:8,alignItems:"center"}}>
             <input type="text" placeholder="Descripción del gasto" value={g.desc}
               onChange={e=>changeGasto(g.id,"desc",e.target.value)}
@@ -6668,6 +6686,25 @@ function LiqModal({marcaId,ventas,mes,anio,MK,cierres,setCierres,onClose,syncCie
       </div>
 
       {/* Desglose financiero */}
+      <div style={{background:C.bg2,borderRadius:14,padding:14,marginBottom:16}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <strong style={{fontFamily:FONT,color:C.label}}>Reintegros a favor de la marca</strong>
+          {!cerrado&&<button onClick={()=>{setNuevoReintegro({desc:"",monto:""});setErrorReintegro("");}} style={{padding:10,borderRadius:8,border:`1px solid ${C.sep}`,color:C.green,background:C.bg1,cursor:"pointer"}}>+ Agregar reintegro</button>}
+        </div>
+        <p style={{fontSize:12,color:C.label2}}>Se suman al neto a pagar. No modifican ventas ni inventario.</p>
+        {gastos.filter(esReintegroLiq).map(g=><div key={g.id} style={{padding:"10px 0",borderTop:`1px solid ${C.sep}`,fontFamily:FONT}}>
+          <div style={{display:"flex",justifyContent:"space-between",gap:10}}><span>{g.desc}</span><strong style={{color:C.green}}>{importeAjusteLiq(g)}</strong></div>
+          <small style={{color:C.label3}}>{g.creadoPorNombre||"Registro anterior"}{g.creadoEn?` · ${new Date(g.creadoEn).toLocaleString("es-BO")}`:""}</small>
+          {!cerrado&&<button onClick={()=>{if(!confirm("¿Quitar este reintegro de la liquidación?"))return;removeGasto(g.id);logAudit("REINTEGRO_LIQUIDACION",{marcaId,mk:MK,accion:"quitar",ajuste:g},user);if(typeof onCfgChange==="function")onCfgChange();}} style={{marginLeft:12,color:C.red,border:0,background:"transparent",cursor:"pointer"}}>Quitar</button>}
+        </div>)}
+        {nuevoReintegro&&<div style={{display:"grid",gap:8,marginTop:12}}>
+          <label>Descripción del reintegro<input aria-label="Descripción del reintegro" value={nuevoReintegro.desc} onChange={e=>setNuevoReintegro({...nuevoReintegro,desc:e.target.value})} style={{width:"100%",padding:10,boxSizing:"border-box"}}/></label>
+          <label>Monto en Bs<input aria-label="Monto del reintegro" type="number" min="0.01" step="0.01" value={nuevoReintegro.monto} onChange={e=>setNuevoReintegro({...nuevoReintegro,monto:e.target.value})} style={{width:"100%",padding:10,boxSizing:"border-box"}}/></label>
+          {errorReintegro&&<div role="alert" style={{color:C.red}}>{errorReintegro}</div>}
+          <IOSBtn onPress={guardarReintegro} variant="success">Guardar reintegro</IOSBtn>
+          <IOSBtn onPress={()=>setNuevoReintegro(null)}>Cancelar</IOSBtn>
+        </div>}
+      </div>
       <div style={{background:C.bg2,borderRadius:16,overflow:"hidden",marginBottom:16}}>
         {/* Ventas por método */}
         <div style={{padding:"12px 16px",borderBottom:`1px solid ${C.sep}`}}>
@@ -6697,8 +6734,8 @@ function LiqModal({marcaId,ventas,mes,anio,MK,cierres,setCierres,onClose,syncCie
           [`− Comisión ventas (${pctComision}%)`,`-${$1(comision)}`,C.red],
           [`= Subtotal -${pctComision}%`,$1(subtotalBanco-comision),C.label2],
           alquiler>0?[`− Alquiler`,`-${$1(alquiler)}`,C.amber]:null,
-          ...gastos.filter(g=>g.desc||Number(g.monto)>0).map(g=>
-            [`− ${g.desc||"Gasto extra"}`,`-${$1(Number(g.monto)||0)}`,C.red]
+          ...gastos.filter(g=>g.desc||Math.abs(Number(g.monto))>0).map(g=>
+            [etiquetaAjusteLiq(g),importeAjusteLiq(g),esReintegroLiq(g)?C.green:C.red]
           ),
         ].filter(Boolean).map(([k,v,c],i,arr)=>(
           <div key={`${k}-${i}`} style={{display:"flex",justifyContent:"space-between",alignItems:"center",
@@ -15151,8 +15188,8 @@ function BrandPortal({user, ventas, inv, cargas, retiros=[], logout, descuentos=
                 {label:`= Subtotal`,                                     value:liq.subBanco,  sign:"",  muted:false, bold:false},
                 {label:`− Comisión Toscana (${liq.cfg.pctComision}%)`,   value:liq.comision,  sign:"−", muted:false, bold:false,red:true},
                 ...(liq.alquiler>0?[{label:"− Alquiler",value:liq.alquiler,sign:"−",muted:false,bold:false,red:true}]:[]),
-                ...gastos.filter(g=>g.desc||Number(g.monto)>0).map(g=>(
-                  {label:`− ${g.desc||"Gasto extra"}`,value:Number(g.monto)||0,sign:"−",muted:false,bold:false,red:true,sub:true}
+                ...gastos.filter(g=>g.desc||Math.abs(Number(g.monto))>0).map(g=>(
+                  {label:etiquetaAjusteLiq(g),value:Math.abs(Number(g.monto)||0),sign:esReintegroLiq(g)?"+":"−",muted:false,bold:false,red:!esReintegroLiq(g),sub:true}
                 )),
                 {label:"Neto a liquidar",                               value:liq.neto,      sign:"",  muted:false, bold:true},
               ].map((row,i,arr)=>(
@@ -19211,6 +19248,7 @@ function App(){
 
       {/* Sheet: Liquidación */}
       <LiqModal
+        user={user}
         marcaId={mLiq} ventas={ventas} mes={mes} anio={anio}
         MK={MK} cierres={cierres} setCierres={setCierres}
         onClose={()=>setMLiq(null)}
@@ -24853,8 +24891,8 @@ function MarcaDetalle({marcaId,inv,ventas,vMes,mes,anio,MK,cierres,setCierres,ge
               [`= Subtotal`, $1(liq.subBanco), false, false],
               [`− Comisión (${liq.cfg?.pctComision ?? 0}%)`, `-${$1(liq.comision)}`, true, false],
               (liq.alquiler > 0) ? [`− Alquiler`, `-${$1(liq.alquiler)}`, true, false] : null,
-              ...liq.gastos.filter(g=>g.desc||Number(g.monto)>0).map(g=>
-                [`− ${g.desc||"Gasto extra"}`, `-${$1(Number(g.monto)||0)}`, true, false]
+              ...liq.gastos.filter(g=>g.desc||Math.abs(Number(g.monto))>0).map(g=>
+                [etiquetaAjusteLiq(g), importeAjusteLiq(g), true, false]
               ),
               ["Neto a liquidar", $1(liq.neto), false, true],
             ].filter(Boolean).map(([k,v,muted,bold],i,arr)=>(
